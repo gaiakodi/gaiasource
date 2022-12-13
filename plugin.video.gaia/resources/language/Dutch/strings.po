@@ -339,7 +339,7 @@ msgstr "Limiet"
 
 msgctxt "#32312"
 msgid "Time Limit"
-msgstr "Tijdslimiet"
+msgstr ""
 
 msgctxt "#32313"
 msgid "Image Limit"
@@ -383,11 +383,11 @@ msgstr "Geef de voorkeur aan %s afbeelding indien beschikbaar"
 
 msgctxt "#32323"
 msgid "Most Popular"
-msgstr ""
+msgstr "Meest populair"
 
 msgctxt "#32324"
 msgid "Reuse Connections"
-msgstr ""
+msgstr "Hergebruik verbindingen"
 
 msgctxt "#32325"
 msgid "Show Arrivals"
@@ -395,27 +395,27 @@ msgstr ""
 
 msgctxt "#32326"
 msgid "Episodes"
-msgstr ""
+msgstr "Afleveringen"
 
 msgctxt "#32327"
 msgid "Trakt Progress"
-msgstr ""
+msgstr "Trakt vooruitgang"
 
 msgctxt "#32328"
 msgid "Trakt Calendar"
-msgstr ""
+msgstr "Trakt kalender"
 
 msgctxt "#32329"
 msgid "Unselected"
-msgstr ""
+msgstr "Niet geselecteerd"
 
 msgctxt "#32330"
 msgid "Playback"
-msgstr ""
+msgstr "Afspelen"
 
 msgctxt "#32331"
 msgid "Autoselect First"
-msgstr ""
+msgstr "Eerst automatisch selecteren"
 
 msgctxt "#32332"
 msgid "Dialog"
@@ -427,7 +427,7 @@ msgstr ""
 
 msgctxt "#32334"
 msgid "Channel"
-msgstr ""
+msgstr "Kanaal"
 
 msgctxt "#32335"
 msgid "Scrape Interface"
@@ -439,19 +439,19 @@ msgstr ""
 
 msgctxt "#32337"
 msgid "Background"
-msgstr ""
+msgstr "Achtergrond"
 
 msgctxt "#32338"
 msgid "Use any image irrespective of decorations"
-msgstr ""
+msgstr "Gebruik elke afbeelding, ongeacht decoraties"
 
 msgctxt "#32339"
 msgid "Use plain image without text or decoration"
-msgstr ""
+msgstr "Gebruik een gewone afbeelding zonder tekst of decoratie"
 
 msgctxt "#32340"
 msgid "Use embell image with text or decoration"
-msgstr ""
+msgstr "Gebruik embell afbeelding met tekst of decoratie"
 
 msgctxt "#32341"
 msgid "[GAIA-NO-LABEL]"
@@ -467,11 +467,11 @@ msgstr ""
 
 msgctxt "#32344"
 msgid "Resume Playback"
-msgstr ""
+msgstr "Hervat afspelen"
 
 msgctxt "#32345"
 msgid "Providers"
-msgstr ""
+msgstr "Aanbieders"
 
 msgctxt "#32346"
 msgid "Accounts"
@@ -491,39 +491,39 @@ msgstr ""
 
 msgctxt "#32350"
 msgid "1st"
-msgstr ""
+msgstr "1e"
 
 msgctxt "#32351"
 msgid "2nd"
-msgstr ""
+msgstr "2e"
 
 msgctxt "#32352"
 msgid "3rd"
-msgstr ""
+msgstr "3e"
 
 msgctxt "#32353"
 msgid "Subtitles"
-msgstr ""
+msgstr "Ondertitels"
 
 msgctxt "#32354"
 msgid "4th"
-msgstr ""
+msgstr "4e"
 
 msgctxt "#32355"
 msgid "5th"
-msgstr ""
+msgstr "5e"
 
 msgctxt "#32356"
 msgid "Primary Language"
-msgstr ""
+msgstr Primair taal"
 
 msgctxt "#32357"
 msgid "Secondary Language"
-msgstr ""
+msgstr "Secundaire taal"
 
 msgctxt "#32358"
 msgid "Details Placement"
-msgstr ""
+msgstr "Details Plaatsing"
 
 msgctxt "#32359"
 msgid "Detailed Labels"
@@ -531,11 +531,11 @@ msgstr ""
 
 msgctxt "#32401"
 msgid "The Stream Is Unavailable"
-msgstr ""
+msgstr "De stream is niet beschikbaar"
 
 msgctxt "#32402"
 msgid "No Available Streams"
-msgstr ""
+msgstr "Geen beschikbare streams"
 
 msgctxt "#32403"
 msgid "Download"
@@ -543,11 +543,11 @@ msgstr ""
 
 msgctxt "#32404"
 msgid "Elapsed Time"
-msgstr ""
+msgstr "Verstreken tijd"
 
 msgctxt "#32405"
 msgid "Seconds"
-msgstr ""
+msgstr "seconden"
 
 msgctxt "#32406"
 msgid "Details Style"
@@ -563,11 +563,11 @@ msgstr ""
 
 msgctxt "#32501"
 msgid "Restart"
-msgstr ""
+msgstr "Herstarten"
 
 msgctxt "#32502"
 msgid "Do you want to resume the playback from %s?"
-msgstr ""
+msgstr "Wilt u het afspelen hervatten vanaf %s?"
 
 msgctxt "#32503"
 msgid "Resume"
@@ -575,19 +575,19 @@ msgstr ""
 
 msgctxt "#32511"
 msgid "An existing account was already activated. Do you want to authenticate a new account or revoke the current authentication?"
-msgstr ""
+msgstr "Er was al een bestaand account geactiveerd.  Wilt u een nieuw account authenticeren of de huidige authenticatie intrekken?"
 
 msgctxt "#32512"
 msgid "Authenticate"
-msgstr ""
+msgstr "Authenticeren"
 
 msgctxt "#32513"
 msgid "Revoke"
-msgstr ""
+msgstr "Herroepen"
 
 msgctxt "#32514"
 msgid "Authentication Revoked"
-msgstr ""
+msgstr "Authenticatie ingetrokken"
 
 msgctxt "#32515"
 msgid "Items"
@@ -595,31 +595,31 @@ msgstr ""
 
 msgctxt "#32516"
 msgid "Add Collection"
-msgstr ""
+msgstr "Collectie toevoegen"
 
 msgctxt "#32517"
 msgid "Remove Collection"
-msgstr ""
+msgstr "Collectie verwijderen"
 
 msgctxt "#32518"
 msgid "Add Watchlist"
-msgstr ""
+msgstr "Kijklijsttoevoegen"
 
 msgctxt "#32519"
 msgid "Remove Watchlist"
-msgstr ""
+msgstr "Kijklijst verwijderen"
 
 msgctxt "#32520"
 msgid "Add New List"
-msgstr ""
+msgstr "Nieuwe lijst toevoegen"
 
 msgctxt "#32521"
 msgid "Add %s"
-msgstr ""
+msgstr "Toevoegen %s"
 
 msgctxt "#32522"
 msgid "Remove %s"
-msgstr ""
+msgstr "Verwijder %s"
 
 msgctxt "#32531"
 msgid "Details Level"
@@ -641,43 +641,43 @@ msgstr ""
 
 msgctxt "#33000"
 msgid "Favourites"
-msgstr ""
+msgstr "Favorieten"
 
 msgctxt "#33001"
 msgid "Categories"
-msgstr ""
+msgstr "Categorieën"
 
 msgctxt "#33002"
 msgid "Lists"
-msgstr ""
+msgstr "Lijsten"
 
 msgctxt "#33003"
 msgid "Browse"
-msgstr ""
+msgstr "Bladeren"
 
 msgctxt "#33004"
 msgid "New Releases"
-msgstr ""
+msgstr "Nieuwe uitgaven"
 
 msgctxt "#33005"
 msgid "Highest Rated"
-msgstr ""
+msgstr "Hoogst gewaardeerd"
 
 msgctxt "#33006"
 msgid "Recently Premiered"
-msgstr ""
+msgstr "Onlangs in première gegaan"
 
 msgctxt "#33007"
 msgid "Currently Trending"
-msgstr ""
+msgstr "Momenteel trending"
 
 msgctxt "#33008"
 msgid "Award Winners"
-msgstr ""
+msgstr "Prijswinnaars"
 
 msgctxt "#33009"
 msgid "Airing Today"
-msgstr ""
+msgstr "Vandaag uitgezonden"
 
 msgctxt "#33010"
 msgid "Box Office Hits"
@@ -685,7 +685,7 @@ msgstr ""
 
 msgctxt "#33011"
 msgid "Settings"
-msgstr ""
+msgstr "Instellingen"
 
 msgctxt "#33012"
 msgid "Views"
@@ -709,23 +709,23 @@ msgstr ""
 
 msgctxt "#33017"
 msgid "Verification"
-msgstr ""
+msgstr "Verificatie"
 
 msgctxt "#33018"
 msgid "Verifying Accounts"
-msgstr ""
+msgstr "Accounts verifiëren"
 
 msgctxt "#33019"
 msgid "Verifying Providers"
-msgstr ""
+msgstr "Providers verifiëren"
 
 msgctxt "#33020"
 msgid "Notification Delay"
-msgstr ""
+msgstr "Meldingsvertraging"
 
 msgctxt "#33021"
 msgid "Current"
-msgstr ""
+msgstr "Huidig"
 
 msgctxt "#33022"
 msgid "Disabled"
@@ -741,7 +741,7 @@ msgstr ""
 
 msgctxt "#33025"
 msgid "Success"
-msgstr ""
+msgstr "Succes"
 
 msgctxt "#33026"
 msgid "Database"
@@ -749,11 +749,11 @@ msgstr ""
 
 msgctxt "#33027"
 msgid "Reset Addon"
-msgstr ""
+msgstr "Addon resetten"
 
 msgctxt "#33028"
 msgid "Episode"
-msgstr ""
+msgstr "Aflevering"
 
 msgctxt "#33029"
 msgid "All"
@@ -765,19 +765,19 @@ msgstr ""
 
 msgctxt "#33031"
 msgid "Copy Link"
-msgstr ""
+msgstr "Kopieer link"
 
 msgctxt "#33032"
 msgid "Clipboard"
-msgstr ""
+msgstr "Klembord"
 
 msgctxt "#33033"
 msgid "The %s was copied to your clipboard"
-msgstr ""
+msgstr "De %s is gekopieerd naar uw klembord"
 
 msgctxt "#33034"
 msgid "The %s was pasted from your clipboard"
-msgstr ""
+msgstr "De %s is vanaf uw klembord geplakt"
 
 msgctxt "#33035"
 msgid "item"
@@ -785,7 +785,7 @@ msgstr ""
 
 msgctxt "#33036"
 msgid "Copy Name"
-msgstr ""
+msgstr "Naam kopiëren"
 
 msgctxt "#33037"
 msgid "[GAIA-NO-LABEL]"
@@ -797,23 +797,23 @@ msgstr ""
 
 msgctxt "#33039"
 msgid "Title"
-msgstr ""
+msgstr "Titel"
 
 msgctxt "#33040"
 msgid "Description"
-msgstr ""
+msgstr "Beschrijving"
 
 msgctxt "#33041"
 msgid "Searches"
-msgstr ""
+msgstr "Zoekopdrachten"
 
 msgctxt "#33042"
 msgid "Are you sure you want to clear the data?"
-msgstr ""
+msgstr "Weet u zeker dat u de gegevens wilt wissen?"
 
 msgctxt "#33043"
 msgid "Data Successfully Cleared"
-msgstr ""
+msgstr "Gegevens succesvol gewist"
 
 msgctxt "#33044"
 msgid "Usenet Providers"
@@ -833,15 +833,15 @@ msgstr ""
 
 msgctxt "#33048"
 msgid "Revert"
-msgstr ""
+msgstr "Terugdraaien"
 
 msgctxt "#33049"
 msgid "Nothing Was Found"
-msgstr ""
+msgstr "Er is niets gevonden"
 
 msgctxt "#33050"
 msgid "Broadcasters"
-msgstr ""
+msgstr "Omroepen"
 
 msgctxt "#33051"
 msgid "Download"
@@ -853,23 +853,23 @@ msgstr ""
 
 msgctxt "#33053"
 msgid "%s Completed"
-msgstr ""
+msgstr "%s voltooid"
 
 msgctxt "#33054"
 msgid "%s Failed"
-msgstr ""
+msgstr "%s Mislukt"
 
 msgctxt "#33055"
 msgid "%s Started"
-msgstr ""
+msgstr "%s Gestart"
 
 msgctxt "#33056"
 msgid "%s Removed"
-msgstr ""
+msgstr "%s Verwijderd"
 
 msgctxt "#33057"
 msgid "%s Paused"
-msgstr ""
+msgstr "%s Gepauzeerd"
 
 msgctxt "#33058"
 msgid "%s Link"
@@ -877,51 +877,51 @@ msgstr ""
 
 msgctxt "#33059"
 msgid "%s Progress"
-msgstr ""
+msgstr "%s Vooruitgang"
 
 msgctxt "#33060"
 msgid "Refresh Kodi Menu"
-msgstr ""
+msgstr "Vernieuw het Kodi menu"
 
 msgctxt "#33061"
 msgid "Disabled %s Settings"
-msgstr ""
+msgstr "%s instellingen uitgeschakeld"
 
 msgctxt "#33062"
 msgid "Invalid %s Link"
-msgstr ""
+msgstr "Ongeldige %s link"
 
 msgctxt "#33063"
 msgid "Invalid %s Location"
-msgstr ""
+msgstr "Ongeldige %s locatie"
 
 msgctxt "#33064"
 msgid "Server Unreachable"
-msgstr ""
+msgstr "Server onbereikbaar"
 
 msgctxt "#33065"
 msgid "Ignore"
-msgstr ""
+msgstr "Negeren"
 
 msgctxt "#33066"
 msgid "The %s download feature is disabled. Enable the feature in the settings."
-msgstr ""
+msgstr "De %s downloadfunctie is uitgeschakeld.  Schakel de functie in de instellingen in."
 
 msgctxt "#33067"
 msgid "The provided %s link is invalid."
-msgstr ""
+msgstr "De gegeven %s link is ongeldig."
 
 msgctxt "#33068"
 msgid "The %s download location is invalid. Ensure the location provided in the settings is accessible and writable."
-msgstr ""
+msgstr "De %s downloadlocatie is ongeldig.  Zorg ervoor dat de locatie in de instellingen toegankelijk en beschrijfbaar is."
 
 msgctxt "#33069"
 msgid "The server is unreachable or the stream is inaccessible."
-msgstr ""
+msgstr "De server is onbereikbaar of de stream is ontoegankelijk."
 
 msgctxt "#33070"
 msgid "The %s completed successfully."
-msgstr ""
+msgstr "De %s is succesvol afgerond."
 
 msgctxt "#33071"
 msgid "Stream"
@@ -929,7 +929,7 @@ msgstr ""
 
 msgctxt "#33072"
 msgid "Initializing Download"
-msgstr ""
+msgstr "Downloaden initialiseren"
 
 msgctxt "#33073"
 msgid "of"
@@ -937,79 +937,79 @@ msgstr ""
 
 msgctxt "#33074"
 msgid "Download Speed"
-msgstr ""
+msgstr "Download snelheid"
 
 msgctxt "#33075"
 msgid "Completed Size"
-msgstr ""
+msgstr "Voltooide grootte"
 
 msgctxt "#33076"
 msgid "Download Options"
-msgstr ""
+msgstr "Download opties"
 
 msgctxt "#33077"
 msgid "Continue Download"
-msgstr ""
+msgstr "Doorgaan met downloaden""
 
 msgctxt "#33078"
 msgid "Continue download in the foreground"
-msgstr ""
+msgstr "Ga door met downloaden op de voorgrond"
 
 msgctxt "#33079"
 msgid "Hide Download"
-msgstr ""
+msgstr "Downloaden verbergen"
 
 msgctxt "#33080"
 msgid "Continue download in the background"
-msgstr ""
+msgstr "Ga door met downloaden op de achtergrond"
 
 msgctxt "#33081"
 msgid "Pause Download"
-msgstr ""
+msgstr "Pauzeer het downloaden"
 
 msgctxt "#33082"
 msgid "Pause download and keep the file"
-msgstr ""
+msgstr "Pauzeer het downloaden en bewaar het bestand"
 
 msgctxt "#33083"
 msgid "Delete Download"
-msgstr ""
+msgstr "Download verwijderen"
 
 msgctxt "#33084"
 msgid "Remove download and delete the file"
-msgstr ""
+msgstr "Verwijder de download en verwijder het bestand"
 
 msgctxt "#33085"
 msgid "Resume Download"
-msgstr ""
+msgstr "Download hervatten"
 
 msgctxt "#33086"
 msgid "Resume download from previous position"
-msgstr ""
+msgstr "Hervat het downloaden vanaf de vorige positie"
 
 msgctxt "#33087"
 msgid "Restart Download"
-msgstr ""
+msgstr "Start het downloaden opnieuw"
 
 msgctxt "#33088"
 msgid "Overwrite file and restart download"
-msgstr ""
+msgstr "Bestand overschrijven en opnieuw downloaden"
 
 msgctxt "#33089"
 msgid "Duplicate Download"
-msgstr ""
+msgstr "Dubbele download"
 
 msgctxt "#33090"
 msgid "Start a separate download"
-msgstr ""
+msgstr "Start een aparte download"
 
 msgctxt "#33091"
 msgid "Play Download"
-msgstr ""
+msgstr "Download afspelen"
 
 msgctxt "#33092"
 msgid "Pause download and play the file"
-msgstr ""
+msgstr "Pauzeer het downloaden en speel het bestand af"
 
 msgctxt "#33093"
 msgid "Stream Download"
@@ -1017,27 +1017,27 @@ msgstr ""
 
 msgctxt "#33094"
 msgid "Play the file"
-msgstr ""
+msgstr "Speel het bestand af"
 
 msgctxt "#33095"
 msgid "Continue download and play the file"
-msgstr ""
+msgstr "Ga door met downloaden en speel het bestand af"
 
 msgctxt "#33096"
 msgid "%s Options"
-msgstr ""
+msgstr "%s Opties"
 
 msgctxt "#33097"
 msgid "%s Completed Successfully"
-msgstr ""
+msgstr "%s Succesvol voltooid"
 
 msgctxt "#33098"
 msgid "Too Many %s Errors"
-msgstr ""
+msgstr "Te veel %s fouten"
 
 msgctxt "#33099"
 msgid "Too many %s errors detected during the transferal."
-msgstr ""
+msgstr "Te veel %s fouten gedetecteerd tijdens de overdracht."
 
 msgctxt "#33100"
 msgid "API Key"
@@ -1045,7 +1045,7 @@ msgstr ""
 
 msgctxt "#33101"
 msgid "Authentication"
-msgstr ""
+msgstr "Authenticatie"
 
 msgctxt "#33102"
 msgid "Menu"
@@ -1057,7 +1057,7 @@ msgstr ""
 
 msgctxt "#33104"
 msgid "Random Picks"
-msgstr ""
+msgstr "Willekeurige keuzes"
 
 msgctxt "#33105"
 msgid "Special"
@@ -1073,27 +1073,27 @@ msgstr ""
 
 msgctxt "#33108"
 msgid "Default Streaming"
-msgstr ""
+msgstr "Standaard streaming"
 
 msgctxt "#33109"
 msgid "Error Notifications"
-msgstr ""
+msgstr "Foutmeldingen"
 
 msgctxt "#33110"
 msgid "Manual"
-msgstr ""
+msgstr "Handleiding"
 
 msgctxt "#33111"
 msgid "Story"
-msgstr ""
+msgstr "Verhaal"
 
 msgctxt "#33112"
 msgid "None"
-msgstr ""
+msgstr "Geen"
 
 msgctxt "#33113"
 msgid "Any"
-msgstr ""
+msgstr "Elk"
 
 msgctxt "#33114"
 msgid "Include"
@@ -1105,19 +1105,19 @@ msgstr ""
 
 msgctxt "#33116"
 msgid "Performance"
-msgstr ""
+msgstr "Prestatie"
 
 msgctxt "#33117"
 msgid "Library Acceleration"
-msgstr ""
+msgstr "Bibliotheek versnelling"
 
 msgctxt "#33118"
 msgid "or"
-msgstr ""
+msgstr "of"
 
 msgctxt "#33119"
 msgid "Filter Configuration"
-msgstr ""
+msgstr "Filter configuratie"
 
 msgctxt "#33120"
 msgid "Video Filters"
@@ -1129,15 +1129,15 @@ msgstr ""
 
 msgctxt "#33122"
 msgid "Subtitle Filters"
-msgstr ""
+msgstr "Ondertitel filters"
 
 msgctxt "#33123"
 msgid "Blocked Hosters"
-msgstr ""
+msgstr "Geblokkeerde hosters"
 
 msgctxt "#33124"
 msgid "Both"
-msgstr ""
+msgstr "Beide"
 
 msgctxt "#33125"
 msgid "Leech"
@@ -1153,7 +1153,7 @@ msgstr ""
 
 msgctxt "#33128"
 msgid "Termination Conditions"
-msgstr ""
+msgstr "Beëindigingsvoorwaarden"
 
 msgctxt "#33129"
 msgid "Audio Channels"
@@ -1165,31 +1165,31 @@ msgstr ""
 
 msgctxt "#33131"
 msgid "Reloading Kodi"
-msgstr ""
+msgstr "Kodi opnieuw laden"
 
 msgctxt "#33132"
 msgid "The Kodi profile has to be reloaded for the changes to take effect and Kodi might become unresponsive for a few moments. Do you want to reload now or wait for the changes to take effect once Kodi is restarted?"
-msgstr ""
+msgstr "Het Kodi-profiel moet opnieuw worden geladen om de wijzigingen door te voeren en het kan zijn dat Kodi even niet meer reageert.  Wil je nu opnieuw laden of wachten tot de wijzigingen van kracht worden zodra Kodi opnieuw is opgestart?"
 
 msgctxt "#33133"
 msgid "File Bandwidth"
-msgstr ""
+msgstr "Bestand bandbreedte"
 
 msgctxt "#33134"
 msgid "Alphabetically A To Z"
-msgstr ""
+msgstr "Alfabetisch van A tot Z"
 
 msgctxt "#33135"
 msgid "Alphabetically Z To A"
-msgstr ""
+msgstr "Alfabetisch Z tot A"
 
 msgctxt "#33136"
 msgid "Best To Worst"
-msgstr ""
+msgstr "Beste naar slechtste"
 
 msgctxt "#33137"
 msgid "Worst To Best"
-msgstr ""
+msgstr "Slechtste naar beste"
 
 msgctxt "#33138"
 msgid "Common To Uncommon"
@@ -1201,43 +1201,43 @@ msgstr ""
 
 msgctxt "#33140"
 msgid "Highest To Lowest"
-msgstr ""
+msgstr "Hoogste naar laagste"
 
 msgctxt "#33141"
 msgid "Lowest To Highest"
-msgstr ""
+msgstr "Laagste naar hoogste"
 
 msgctxt "#33142"
 msgid "Largest To Smallest"
-msgstr ""
+msgstr "Groot naar klein"
 
 msgctxt "#33143"
 msgid "Smallest To Largest"
-msgstr ""
+msgstr "Klein naar groot"
 
 msgctxt "#33144"
 msgid "Newest To Oldest"
-msgstr ""
+msgstr "Nieuwste naar oudste"
 
 msgctxt "#33145"
 msgid "Oldest To Newest"
-msgstr ""
+msgstr "Oudste naar nieuwste"
 
 msgctxt "#33146"
 msgid "Alphabet Start"
-msgstr ""
+msgstr "Alfabet begin"
 
 msgctxt "#33147"
 msgid "Alphabet End"
-msgstr ""
+msgstr "Alfabet einde"
 
 msgctxt "#33148"
 msgid "The Python Interpreter has changed."
-msgstr ""
+msgstr "De Python interpreter is gewijzigd."
 
 msgctxt "#33149"
 msgid "Reload"
-msgstr ""
+msgstr "Herladen"
 
 msgctxt "#33150"
 msgid "[GAIA-NO-LABEL]"
@@ -1249,27 +1249,27 @@ msgstr ""
 
 msgctxt "#33152"
 msgid "Highest"
-msgstr ""
+msgstr "Hoogste"
 
 msgctxt "#33153"
 msgid "Lowest"
-msgstr ""
+msgstr "Laagste"
 
 msgctxt "#33154"
 msgid "Largest"
-msgstr ""
+msgstr "Grootste"
 
 msgctxt "#33155"
 msgid "Smallest"
-msgstr ""
+msgstr "Kleinste"
 
 msgctxt "#33156"
 msgid "Newest"
-msgstr ""
+msgstr "Nieuwste"
 
 msgctxt "#33157"
 msgid "Oldest"
-msgstr ""
+msgstr "Oudste"
 
 msgctxt "#33158"
 msgid "Media Type"
@@ -1277,35 +1277,35 @@ msgstr ""
 
 msgctxt "#33159"
 msgid "Domains"
-msgstr ""
+msgstr "Domeinen"
 
 msgctxt "#33160"
 msgid "Domain"
-msgstr ""
+msgstr "Domein"
 
 msgctxt "#33161"
 msgid "Metadata Detail"
-msgstr ""
+msgstr "Metagegevens detail"
 
 msgctxt "#33162"
 msgid "Essential Metadata"
-msgstr ""
+msgstr "Essentiële metagegevens"
 
 msgctxt "#33163"
 msgid "Standard Metadata"
-msgstr ""
+msgstr "Standaard metagegevens"
 
 msgctxt "#33164"
 msgid "Extended Metadata"
-msgstr ""
+msgstr "Uitgebreide metagegevens"
 
 msgctxt "#33165"
 msgid "Partial"
-msgstr ""
+msgstr "Gedeeltelijk"
 
 msgctxt "#33166"
 msgid "Complete"
-msgstr ""
+msgstr "Compleet"
 
 msgctxt "#33167"
 msgid "Packs"
@@ -1313,11 +1313,11 @@ msgstr ""
 
 msgctxt "#33168"
 msgid "Already Rated"
-msgstr ""
+msgstr "Reeds beoordeeld"
 
 msgctxt "#33169"
 msgid "Priority Rank"
-msgstr ""
+msgstr "Prioriteitsrang"
 
 msgctxt "#33170"
 msgid "Kodi"
@@ -1325,47 +1325,47 @@ msgstr ""
 
 msgctxt "#33171"
 msgid "Rename"
-msgstr ""
+msgstr "Hernoemen"
 
 msgctxt "#33172"
 msgid "1 - Title"
-msgstr ""
+msgstr "1 - Titel"
 
 msgctxt "#33173"
 msgid "01 - Title"
-msgstr ""
+msgstr "01 - Titel"
 
 msgctxt "#33174"
 msgid "1x1 - Title"
-msgstr ""
+msgstr "1x1 - Titel"
 
 msgctxt "#33175"
 msgid "1x01 - Title"
-msgstr ""
+msgstr "1x01 - Titel"
 
 msgctxt "#33176"
 msgid "01x01 - Title"
-msgstr ""
+msgstr "01x01 - Titel"
 
 msgctxt "#33177"
 msgid "E1 - Title"
-msgstr ""
+msgstr "E1 - Titel"
 
 msgctxt "#33178"
 msgid "E01 - Title"
-msgstr ""
+msgstr "E01 - Titel"
 
 msgctxt "#33179"
 msgid "S1E1 - Title"
-msgstr ""
+msgstr "S1E1 - Titel"
 
 msgctxt "#33180"
 msgid "S1E01 - Title"
-msgstr ""
+msgstr "S1E01 - Titel"
 
 msgctxt "#33181"
 msgid "S01E01 - Title"
-msgstr ""
+msgstr "S01E01 - Titel"
 
 msgctxt "#33182"
 msgid "Mirror Limit"
@@ -1373,31 +1373,31 @@ msgstr ""
 
 msgctxt "#33183"
 msgid "Toggle"
-msgstr ""
+msgstr "Schakel"
 
 msgctxt "#33184"
 msgid "Toggle All"
-msgstr ""
+msgstr "Schakel alles in"
 
 msgctxt "#33185"
 msgid "Source Seeds"
-msgstr ""
+msgstr "Bron Seeds"
 
 msgctxt "#33186"
 msgid "Source Leeches"
-msgstr ""
+msgstr "Bron Leeches"
 
 msgctxt "#33187"
 msgid "Access Filters"
-msgstr ""
+msgstr "Toegangsfilters"
 
 msgctxt "#33188"
 msgid "Source Filters"
-msgstr ""
+msgstr "Bron Filters"
 
 msgctxt "#33189"
 msgid "Source Peers"
-msgstr ""
+msgstr "Bron Peers"
 
 msgctxt "#33190"
 msgid "Peer"
@@ -1409,27 +1409,27 @@ msgstr ""
 
 msgctxt "#33192"
 msgid "Enable"
-msgstr ""
+msgstr "Inschakelen"
 
 msgctxt "#33193"
 msgid "Toggle Best"
-msgstr ""
+msgstr "Schakel beste in"
 
 msgctxt "#33194"
 msgid "Number"
-msgstr ""
+msgstr "Nummer"
 
 msgctxt "#33195"
 msgid "Captcha Protected"
-msgstr ""
+msgstr "Captcha beveiligd"
 
 msgctxt "#33196"
 msgid "Toggle Status"
-msgstr ""
+msgstr "Schakel status in"
 
 msgctxt "#33197"
 msgid "Condition"
-msgstr ""
+msgstr "Voorwaarde"
 
 msgctxt "#33198"
 msgid "Hosters"
@@ -1445,15 +1445,15 @@ msgstr ""
 
 msgctxt "#33201"
 msgid "Termination Mode"
-msgstr ""
+msgstr "Beëindigings modus"
 
 msgctxt "#33202"
 msgid "Termination Expression"
-msgstr ""
+msgstr "Beëindiging Uitdrukking"
 
 msgctxt "#33203"
 msgid "Stream Link Unsupported"
-msgstr ""
+msgstr "Streamlink niet ondersteund"
 
 msgctxt "#33204"
 msgid "Seeds"
@@ -1461,7 +1461,7 @@ msgstr ""
 
 msgctxt "#33205"
 msgid "Cost Indicators"
-msgstr ""
+msgstr "Kostenindicator"
 
 msgctxt "#33206"
 msgid "Code"
@@ -1469,11 +1469,11 @@ msgstr ""
 
 msgctxt "#33207"
 msgid "Remaining Points"
-msgstr ""
+msgstr "Resterende punten"
 
 msgctxt "#33208"
 msgid "Consumed Points"
-msgstr ""
+msgstr "Verbruikte punten"
 
 msgctxt "#33209"
 msgid "Debrid"
@@ -1489,11 +1489,11 @@ msgstr ""
 
 msgctxt "#33212"
 msgid "Access Cost"
-msgstr ""
+msgstr "Toegangskosten"
 
 msgctxt "#33213"
 msgid "Access Usage"
-msgstr ""
+msgstr "Toegang tot gebruik"
 
 msgctxt "#33214"
 msgid "Key"
@@ -1501,35 +1501,35 @@ msgstr ""
 
 msgctxt "#33215"
 msgid "No Account"
-msgstr ""
+msgstr "Geen account"
 
 msgctxt "#33216"
 msgid "Authenticated"
-msgstr ""
+msgstr "Geauthenticeerd"
 
 msgctxt "#33217"
 msgid "Termination"
-msgstr ""
+msgstr "Beëindiging"
 
 msgctxt "#33218"
 msgid "Account Authentication Failure"
-msgstr ""
+msgstr "Accountverificatie mislukt"
 
 msgctxt "#33219"
 msgid "Verify"
-msgstr ""
+msgstr "Verifiëren"
 
 msgctxt "#33220"
 msgid "Do you want to reset the specified settings of the provider to their default values?"
-msgstr ""
+msgstr "Wilt u de opgegeven instellingen van de provider terugzetten naar hun standaardwaarden?"
 
 msgctxt "#33221"
 msgid "Do you want to reset all the settings of the selected provider to their default values, including toggle statuses, account credentials, and custom settings?"
-msgstr ""
+msgstr "Wilt u alle instellingen van de geselecteerde provider terugzetten naar hun standaardwaarden, inclusief schakel statussen, accountreferenties en aangepaste instellingen?"
 
 msgctxt "#33222"
 msgid "Do you want to reset all the settings of the listed providers to their default values, including toggle statuses, account credentials, and custom settings?"
-msgstr ""
+msgstr "Wilt u alle instellingen van de vermelde providers terugzetten naar hun standaardwaarden, inclusief schakel statussen, accountreferenties en aangepaste instellingen?"
 
 msgctxt "#33223"
 msgid "Interface"
@@ -1541,7 +1541,7 @@ msgstr ""
 
 msgctxt "#33225"
 msgid "Premiumize Statistics"
-msgstr ""
+msgstr "Statistieken Premiumize"
 
 msgctxt "#33226"
 msgid "Factor"
@@ -1549,11 +1549,11 @@ msgstr ""
 
 msgctxt "#33227"
 msgid "Binge Rating"
-msgstr ""
+msgstr "Binge beoordeling"
 
 msgctxt "#33228"
 msgid "Usage"
-msgstr ""
+msgstr "Gebruik"
 
 msgctxt "#33229"
 msgid "Download Cloud"
@@ -1561,7 +1561,7 @@ msgstr ""
 
 msgctxt "#33230"
 msgid "Download Added To Remote Cloud"
-msgstr ""
+msgstr "Download toegevoegd aan externe cloud"
 
 msgctxt "#33231"
 msgid "Series Menu"
@@ -1569,7 +1569,7 @@ msgstr ""
 
 msgctxt "#33232"
 msgid "Navigation"
-msgstr ""
+msgstr "Navigatie"
 
 msgctxt "#33233"
 msgid "Theme"
@@ -1577,23 +1577,23 @@ msgstr ""
 
 msgctxt "#33234"
 msgid "Flatten Menus"
-msgstr ""
+msgstr "Maak menu's plat"
 
 msgctxt "#33235"
 msgid "Special Seasons"
-msgstr ""
+msgstr "Speciaal seizoen"
 
 msgctxt "#33236"
 msgid "Special Episodes"
-msgstr ""
+msgstr "Speciale afleveringen"
 
 msgctxt "#33237"
 msgid "Unknown Duration"
-msgstr ""
+msgstr "Onbekende duur"
 
 msgctxt "#33238"
 msgid "Metadata Language"
-msgstr ""
+msgstr "Metagegevens taal"
 
 msgctxt "#33239"
 msgid "Help"
@@ -1601,11 +1601,11 @@ msgstr ""
 
 msgctxt "#33240"
 msgid "Start Date"
-msgstr ""
+msgstr "Startdatum"
 
 msgctxt "#33241"
 msgid "End Date"
-msgstr ""
+msgstr "Einddatum"
 
 msgctxt "#33242"
 msgid "Artwork"
@@ -1617,35 +1617,35 @@ msgstr ""
 
 msgctxt "#33244"
 msgid "Local Library"
-msgstr ""
+msgstr "Lokale bibliotheek"
 
 msgctxt "#33245"
 msgid "Thread limit reached. Restart Kodi."
-msgstr ""
+msgstr "Thread limiet bereikt.  Herstart Kodi."
 
 msgctxt "#33246"
 msgid "The thread limit has been reached. No new threads can be created due to hardware limitations and the addon might stop functioning correctly. Please restart Kodi. Try to experiment with the [I]Concurrency Limit[/I]  under the [I]General[/I]  setting if this problem persists."
-msgstr ""
+msgstr "De thread limiet is bereikt.  Er kunnen geen nieuwe threads worden gemaakt vanwege hardwarebeperkingen en de addon werkt mogelijk niet meer correct.  Start Kodi opnieuw op.  Probeer te experimenteren met de [I]Gelijktijdigheidslimiet[/I] onder de instelling [I]Algemeen[/I] als dit probleem aanhoudt."
 
 msgctxt "#33247"
 msgid "Manual Downloads"
-msgstr ""
+msgstr "Handmatige downloads"
 
 msgctxt "#33248"
 msgid "Combined"
-msgstr ""
+msgstr "Gecombineerd"
 
 msgctxt "#33249"
 msgid "Separate"
-msgstr ""
+msgstr "Verschillend"
 
 msgctxt "#33250"
 msgid "Locations"
-msgstr ""
+msgstr "Locaties"
 
 msgctxt "#33251"
 msgid "Interleave Specials"
-msgstr ""
+msgstr "Interleave specials"
 
 msgctxt "#33252"
 msgid "Interval"
@@ -1653,15 +1653,15 @@ msgstr ""
 
 msgctxt "#33253"
 msgid "Automatic Update"
-msgstr ""
+msgstr "Automatische update"
 
 msgctxt "#33254"
 msgid "Exclude Unofficial"
-msgstr ""
+msgstr "Sluit Onofficia uit"
 
 msgctxt "#33255"
 msgid "Exclude Short"
-msgstr ""
+msgstr "Sluit Kort uit"
 
 msgctxt "#33256"
 msgid "Launch"
@@ -1677,15 +1677,15 @@ msgstr ""
 
 msgctxt "#33259"
 msgid "Link Prechecks"
-msgstr ""
+msgstr "voorcontroles link"
 
 msgctxt "#33260"
 msgid "Metadata Prechecks"
-msgstr ""
+msgstr "Voorcontroles van metagegevens"
 
 msgctxt "#33261"
 msgid "Exclude Supplementary"
-msgstr ""
+msgstr "Sluit aanvullend uit"
 
 msgctxt "#33262"
 msgid "Video Buffer"
@@ -1697,7 +1697,7 @@ msgstr ""
 
 msgctxt "#33264"
 msgid "Buffer Size"
-msgstr ""
+msgstr "Buffer grootte"
 
 msgctxt "#33265"
 msgid "Star"
@@ -1705,11 +1705,11 @@ msgstr ""
 
 msgctxt "#33266"
 msgid "Heart"
-msgstr ""
+msgstr "Hart"
 
 msgctxt "#33267"
 msgid "Username"
-msgstr ""
+msgstr "Gebruikersnaam"
 
 msgctxt "#33268"
 msgid "Rating Icon"
@@ -1717,19 +1717,19 @@ msgstr ""
 
 msgctxt "#33269"
 msgid "Precheck Failures"
-msgstr ""
+msgstr "Fouten vooraf controleren"
 
 msgctxt "#33270"
 msgid "Cache Inspection"
-msgstr ""
+msgstr "Cache inspectie"
 
 msgctxt "#33271"
 msgid "Keyword"
-msgstr ""
+msgstr "Trefwoord"
 
 msgctxt "#33272"
 msgid "Installation can fail if an addon cannot be found in any of the repositories. You only have the [B]core[/B] Gaia repository installed. Install the [B]full[/B] Gaia repository to get access to other third-party addons. Do you want to install the [B]full[/B] Gaia repository now?"
-msgstr ""
+msgstr "De installatie kan mislukken als een addon in geen van de repositories kan worden gevonden.  Je hebt alleen de [B]core[/B] Gaia repository geïnstalleerd.  Installeer de [B]volledige[/B] Gaia repository om toegang te krijgen tot andere addons van derden.  Wil je de [B]volledige[/B] Gaia repository nu installeren?"
 
 msgctxt "#33273"
 msgid "Timeout"
@@ -1737,111 +1737,111 @@ msgstr ""
 
 msgctxt "#33274"
 msgid "%s Confirmation"
-msgstr ""
+msgstr "%s bevestiging"
 
 msgctxt "#33275"
 msgid "Do you want continue the %s of %s with a size of %s."
-msgstr ""
+msgstr "Wil je de %s van %s voortzetten met een grootte van %s."
 
 msgctxt "#33276"
 msgid "Do you want continue the %s of %s with an unknown size."
-msgstr ""
+msgstr "Wil je doorgaan met de %s van %s met een onbekende grootte."
 
 msgctxt "#33277"
 msgid "The %s was stalled and the file transfer is incomplete."
-msgstr ""
+msgstr "De %s is vastgelopen en de bestandsoverdracht is niet voltooid."
 
 msgctxt "#33278"
 msgid "The %s was paused and the file transfer is incomplete."
-msgstr ""
+msgstr "De %s is gepauzeerd en de bestandsoverdracht is niet voltooid."
 
 msgctxt "#33279"
 msgid "The %s was already completed."
-msgstr ""
+msgstr "De %s was al voltooid."
 
 msgctxt "#33280"
 msgid "The %s is already running."
-msgstr ""
+msgstr "De %s is al actief."
 
 msgctxt "#33281"
 msgid "Another version of the %s already exists."
-msgstr ""
+msgstr "Er bestaat al een andere versie van de %s."
 
 msgctxt "#33282"
 msgid "%s Stalled"
-msgstr ""
+msgstr "%s vastgelopen"
 
 msgctxt "#33283"
 msgid "%s Busy"
-msgstr ""
+msgstr "%s bezet"
 
 msgctxt "#33284"
 msgid "%s Exists"
-msgstr ""
+msgstr "%s bestaat"
 
 msgctxt "#33285"
 msgid "Continue existing download"
-msgstr ""
+msgstr "Doorgaan met bestaande download"
 
 msgctxt "#33286"
 msgid "Remove Download"
-msgstr ""
+msgstr "Download verwijderen"
 
 msgctxt "#33287"
 msgid "Remove download and keep the file"
-msgstr ""
+msgstr "Verwijder de download en bewaar het bestand"
 
 msgctxt "#33288"
 msgid "Cancel Download"
-msgstr ""
+msgstr "Download annuleren"
 
 msgctxt "#33289"
 msgid "Close download action menu"
-msgstr ""
+msgstr "Sluit het download actie menu"
 
 msgctxt "#33290"
 msgid "Manual"
-msgstr ""
+msgstr "Handleiding"
 
 msgctxt "#33291"
 msgid "Busy"
-msgstr ""
+msgstr "Bezet"
 
 msgctxt "#33292"
 msgid "Paused"
-msgstr ""
+msgstr "Gepauzeerd"
 
 msgctxt "#33293"
 msgid "Stopped"
-msgstr ""
+msgstr "Gestopt"
 
 msgctxt "#33294"
 msgid "Completed"
-msgstr ""
+msgstr "Voltooid"
 
 msgctxt "#33295"
 msgid "Failed"
-msgstr ""
+msgstr "Mislukt"
 
 msgctxt "#33296"
 msgid "Language Limit"
-msgstr ""
+msgstr "Taal limiet"
 
 msgctxt "#33297"
 msgid "List"
-msgstr ""
+msgstr "Lijst"
 
 msgctxt "#33298"
 msgid "Clear %s"
-msgstr ""
+msgstr "Wis %s"
 
 msgctxt "#33299"
 msgid "Are you sure you want to clear these downloads?"
-msgstr ""
+msgstr "Weet u zeker dat u deze downloads wilt wissen?"
 
 msgctxt "#33300"
 msgid "Disabled Settings"
-msgstr ""
+msgstr "Uitgeschakelde instellingen"
 
 msgctxt "#33301"
 msgid "[GAIA-NO-LABEL]"
@@ -1853,35 +1853,35 @@ msgstr ""
 
 msgctxt "#33303"
 msgid "Started"
-msgstr ""
+msgstr "Begonnen"
 
 msgctxt "#33304"
 msgid "Completed"
-msgstr ""
+msgstr "Voltooid"
 
 msgctxt "#33305"
 msgid "Removed"
-msgstr ""
+msgstr "Verwijderd"
 
 msgctxt "#33306"
 msgid "Started and Removed"
-msgstr ""
+msgstr "Gestart en verwijderd"
 
 msgctxt "#33307"
 msgid "Completed and Removed"
-msgstr ""
+msgstr "Voltooid en verwijderd"
 
 msgctxt "#33308"
 msgid "Cache Downloads"
-msgstr ""
+msgstr "Cache downloaden"
 
 msgctxt "#33309"
 msgid "Cache Size"
-msgstr ""
+msgstr "Cache grootte"
 
 msgctxt "#33310"
 msgid "Experimental Feature"
-msgstr ""
+msgstr "Experimentele functie"
 
 msgctxt "#33311"
 msgid "Ambilight"
@@ -1889,27 +1889,27 @@ msgstr ""
 
 msgctxt "#33312"
 msgid "Lightpack Control"
-msgstr ""
+msgstr "Lightpack besturing"
 
 msgctxt "#33313"
 msgid "First Season"
-msgstr ""
+msgstr "Eerste seizoen"
 
 msgctxt "#33314"
 msgid "Last Season"
-msgstr ""
+msgstr "Laatste seizoen"
 
 msgctxt "#33315"
 msgid "First Episode"
-msgstr ""
+msgstr "Eerste aflevering"
 
 msgctxt "#33316"
 msgid "Last Episode"
-msgstr ""
+msgstr "Laatste aflevering"
 
 msgctxt "#33317"
 msgid "Invalid Episode Range"
-msgstr ""
+msgstr "Ongeldig afleveringsbereik"
 
 msgctxt "#33318"
 msgid "FenomScrapers"
@@ -1917,7 +1917,7 @@ msgstr ""
 
 msgctxt "#33319"
 msgid "Files"
-msgstr ""
+msgstr "Bestanden"
 
 msgctxt "#33320"
 msgid "Games"
@@ -1957,19 +1957,19 @@ msgstr ""
 
 msgctxt "#33329"
 msgid "Query Limit"
-msgstr ""
+msgstr "Query limiet"
 
 msgctxt "#33330"
 msgid "Provider Limit"
-msgstr ""
+msgstr "Provider Limiet"
 
 msgctxt "#33331"
 msgid "Finishes At"
-msgstr ""
+msgstr "Eindigt om"
 
 msgctxt "#33332"
 msgid "Generic"
-msgstr ""
+msgstr "Algemeen"
 
 msgctxt "#33333"
 msgid "VpnManager"
@@ -1977,15 +1977,15 @@ msgstr ""
 
 msgctxt "#33334"
 msgid "Free"
-msgstr ""
+msgstr "Gratis"
 
 msgctxt "#33335"
 msgid "Sort"
-msgstr ""
+msgstr "Soort"
 
 msgctxt "#33336"
 msgid "Internal"
-msgstr ""
+msgstr "Intern"
 
 msgctxt "#33337"
 msgid "Skin Theme"
@@ -2001,15 +2001,15 @@ msgstr ""
 
 msgctxt "#33340"
 msgid "Valid"
-msgstr ""
+msgstr "Geldig"
 
 msgctxt "#33341"
 msgid "Yes"
-msgstr ""
+msgstr "Ja"
 
 msgctxt "#33342"
 msgid "No"
-msgstr ""
+msgstr "Nee"
 
 msgctxt "#33343"
 msgid "Type"
@@ -2017,39 +2017,39 @@ msgstr ""
 
 msgctxt "#33344"
 msgid "Information"
-msgstr ""
+msgstr "Informatie"
 
 msgctxt "#33345"
 msgid "Expiration"
-msgstr ""
+msgstr "Vervaldatum"
 
 msgctxt "#33346"
 msgid "Date"
-msgstr ""
+msgstr "Datum"
 
 msgctxt "#33347"
 msgid "Days"
-msgstr ""
+msgstr "Dagen"
 
 msgctxt "#33348"
 msgid "Percentage"
-msgstr ""
+msgstr "Percentage"
 
 msgctxt "#33349"
 msgid "Points"
-msgstr ""
+msgstr "Punten"
 
 msgctxt "#33350"
 msgid "Storage"
-msgstr ""
+msgstr "Opslag"
 
 msgctxt "#33351"
 msgid "The %s account is not enabled. Enable the account in the settings."
-msgstr ""
+msgstr "Het %s account is niet ingeschakeld.  Schakel het account in de instellingen in."
 
 msgctxt "#33352"
 msgid "The %s account is invalid. Ensure the account details were correctly entered in the settings."
-msgstr ""
+msgstr "Het %s account is ongeldig.  Zorg ervoor dat de accountgegevens correct zijn ingevoerd in de instellingen."
 
 msgctxt "#33353"
 msgid "Rescrape"
@@ -2061,99 +2061,99 @@ msgstr ""
 
 msgctxt "#33355"
 msgid "Torrent streaming is not supported with your current setup. In order to stream from torrents you have to authenticated a supported debrid service in [B]Gaia[/B], [B]Orion[/B], [B]ResolveUrl[/B], or [B]UrlResolver[/B]. Alternatively, you can install [B]Elementum[/B] or [B]Quasar[/B] to stream torrents locally for free."
-msgstr ""
+msgstr "Torrent streaming wordt niet ondersteund met je huidige configuratie.  Om vanaf torrents te streamen, moet je een ondersteunde debrid service verifiëren in [B]Gaia[/B], [B]Orion[/B], [B]ResolveUrl[/B] of [B]UrlResolver[/B  ].  Je kunt ook [B]Elementum[/B] of [B]Quasar[/B] installeren om torrents gratis lokaal te streamen."
 
 msgctxt "#33356"
 msgid "Usenet streaming is not supported with your current setup. In order to stream from the usenet you have to authenticated a supported debrid service in [B]Gaia[/B] or [B]Orion."
-msgstr ""
+msgstr "Usenet streaming wordt niet ondersteund met uw huidige configuratie.  Om vanaf het usenet te streamen, moet je een ondersteunde debrid service authenticeren in [B]Gaia[/B] of [B]Orion."
 
 msgctxt "#33357"
 msgid "Hoster streaming is not supported with your current setup. In order to stream from hosters you have to authenticated a supported debrid service in [B]Gaia[/B], [B]Orion, [B]ResolveUrl[/B], or [B]UrlResolver[/B]."
-msgstr ""
+msgstr "Hoster streaming wordt niet ondersteund met uw huidige configuratie.  Om vanaf hosters te streamen, moet u een ondersteunde debrid service verifiëren in [B]Gaia[/B], [B]Orion, [B]ResolveUrl[/B] of [B]UrlResolver[/B]."
 
 msgctxt "#33358"
 msgid "About"
-msgstr ""
+msgstr "Over"
 
 msgctxt "#33359"
 msgid "Version"
-msgstr ""
+msgstr "Versie"
 
 msgctxt "#33360"
 msgid "Host Connection"
-msgstr ""
+msgstr "Host verbinding"
 
 msgctxt "#33361"
 msgid "Oldest Age"
-msgstr ""
+msgstr "Oudste leeftijd"
 
 msgctxt "#33362"
 msgid "Longest Unwatched"
-msgstr ""
+msgstr "Langst niet bekeken"
 
 msgctxt "#33363"
 msgid "Smallest Size"
-msgstr ""
+msgstr "Kleinste maat"
 
 msgctxt "#33364"
 msgid "Largest Size"
-msgstr ""
+msgstr "Grootste maat"
 
 msgctxt "#33365"
 msgid "%s Location Unwritable"
-msgstr ""
+msgstr "%s Locatie Onbeschrijfbaar"
 
 msgctxt "#33366"
 msgid "The %s could not be completed. Ensure that the download location is writable and has enough free space."
-msgstr ""
+msgstr "De %s kon niet worden voltooid.  Zorg ervoor dat de downloadlocatie beschrijfbaar is en voldoende vrije ruimte heeft."
 
 msgctxt "#33367"
 msgid "Remaining"
-msgstr ""
+msgstr "Verder"
 
 msgctxt "#33368"
 msgid "Buffering"
-msgstr ""
+msgstr "Bufferen"
 
 msgctxt "#33369"
 msgid "Buffering is caused by slow download speeds. Wait for the buffering to complete or press cancel to stop playback and continue downloading in the background."
-msgstr ""
+msgstr "Buffering wordt veroorzaakt door lage downloadsnelheden.  Wacht tot het bufferen is voltooid of druk op Annuleren om het afspelen te stoppen en door te gaan met downloaden op de achtergrond."
 
 msgctxt "#33370"
 msgid "Stalled"
-msgstr ""
+msgstr "Gestopt"
 
 msgctxt "#33371"
 msgid "Actions"
-msgstr ""
+msgstr "Acties"
 
 msgctxt "#33372"
 msgid "Refresh Download"
-msgstr ""
+msgstr "Ververs het downloaden"
 
 msgctxt "#33373"
 msgid "Refresh download progress"
-msgstr ""
+msgstr "Downloadvoortgang vernieuwen"
 
 msgctxt "#33374"
 msgid "The %s failed and the file transfer is incomplete."
-msgstr ""
+msgstr "De %s is mislukt en de bestandsoverdracht is onvolledig."
 
 msgctxt "#33375"
 msgid "Streaming is not supported with your current setup. In order to stream from torrents, usenet, or hosters you have to authenticated a supported debrid service in [B]Gaia[/B], [B]Orion[/B], [B]ResolveUrl[/B], or [B]UrlResolver[/B]. Alternatively, you can install [B]Elementum[/B] or [B]Quasar[/B] for free local torrent streaming."
-msgstr ""
+msgstr "Streaming wordt niet ondersteund met je huidige configuratie.  Om te streamen vanaf torrents, usenet of hosters moet je een ondersteunde debrid service authenticeren in [B]Gaia[/B], [B]Orion[/B], [B]ResolveUrl[/B] of [B  ]UrlResolver[/B].  Je kunt ook [B]Elementum[/B] of [B]Quasar[/B] installeren voor gratis lokale torrent streaming."
 
 msgctxt "#33376"
 msgid "Caching is an experimental feature. Local caching is supported on all systems, whereas network caching over Samba only works on Windows and Unix systems which have [I]smbclient[/I]  installed. Certain features also depend on the server functionality the file is downloaded from."
-msgstr ""
+msgstr "Caching is een experimentele functie.  Lokale caching wordt op alle systemen ondersteund, terwijl netwerkcaching via Samba alleen werkt op Windows- en Unix-systemen waarop [I]smbclient[/I] is geïnstalleerd.  Bepaalde functies zijn ook afhankelijk van de serverfunctionaliteit waarvan het bestand wordt gedownload."
 
 msgctxt "#33377"
 msgid "Do you want to toggle [B]Operational[/B] providers known to work, [B]Impaired[/B] providers that might have problems, or [B]Both[/B] operational and impaired providers?"
-msgstr ""
+msgstr "Wilt u schakelen tussen [B]Operationele[/B] providers waarvan bekend is dat ze werken, [B]Beperkte[/B] providers die mogelijk problemen hebben, of [B]Beide[/B] operationele en verzwakt providers?"
 
 msgctxt "#33378"
 msgid "Download Caching Still Running In The Background"
-msgstr ""
+msgstr "Downloadcaching draait nog steeds op de achtergrond"
 
 msgctxt "#33379"
 msgid "Details"
@@ -2161,7 +2161,7 @@ msgstr ""
 
 msgctxt "#33380"
 msgid "File"
-msgstr ""
+msgstr "Bestand"
 
 msgctxt "#33381"
 msgid "Link"
@@ -2169,31 +2169,31 @@ msgstr ""
 
 msgctxt "#33382"
 msgid "Path"
-msgstr ""
+msgstr "Pad"
 
 msgctxt "#33383"
 msgid "Size"
-msgstr ""
+msgstr "grootte"
 
 msgctxt "#33384"
 msgid "Accessible"
-msgstr ""
+msgstr "Beschikbaar"
 
 msgctxt "#33385"
 msgid "Created"
-msgstr ""
+msgstr "Gemaakt"
 
 msgctxt "#33386"
 msgid "Modified"
-msgstr ""
+msgstr "Gewijzigd"
 
 msgctxt "#33387"
 msgid "Unknown"
-msgstr ""
+msgstr "Onbekend"
 
 msgctxt "#33388"
 msgid "Remaining Time"
-msgstr ""
+msgstr "Overgebleven tijd"
 
 msgctxt "#33389"
 msgid "Status"
@@ -2201,15 +2201,15 @@ msgstr ""
 
 msgctxt "#33390"
 msgid "Name"
-msgstr ""
+msgstr "Naam"
 
 msgctxt "#33391"
 msgid "Extension"
-msgstr ""
+msgstr "Verlenging"
 
 msgctxt "#33392"
 msgid "Resumable"
-msgstr ""
+msgstr "Hervatbaar"
 
 msgctxt "#33393"
 msgid "Copy Path"
@@ -2225,11 +2225,11 @@ msgstr ""
 
 msgctxt "#33396"
 msgid "Update Notifications"
-msgstr ""
+msgstr "Melding bijwerken"
 
 msgctxt "#33397"
 msgid "Launch Animation"
-msgstr ""
+msgstr "Start Animatie"
 
 msgctxt "#33398"
 msgid "Fixed Profile"
@@ -2237,7 +2237,7 @@ msgstr ""
 
 msgctxt "#33399"
 msgid "Profile Name"
-msgstr ""
+msgstr "Profielnaam"
 
 msgctxt "#33400"
 msgid "Prismatik Program"
@@ -2245,11 +2245,11 @@ msgstr ""
 
 msgctxt "#33401"
 msgid "Automatic Detection"
-msgstr ""
+msgstr "Automatische detectie"
 
 msgctxt "#33402"
 msgid "Custom Location"
-msgstr ""
+msgstr "Aangepaste locatie"
 
 msgctxt "#33403"
 msgid "Prismatik Location"
@@ -2257,11 +2257,11 @@ msgstr ""
 
 msgctxt "#33404"
 msgid "Connection"
-msgstr ""
+msgstr "Verbinding"
 
 msgctxt "#33405"
 msgid "Pack Count"
-msgstr ""
+msgstr "Aantal pakketten"
 
 msgctxt "#33406"
 msgid "Lightpack"
@@ -2269,23 +2269,23 @@ msgstr ""
 
 msgctxt "#33407"
 msgid "Switch On"
-msgstr ""
+msgstr "Schakel in"
 
 msgctxt "#33408"
 msgid "Switch Off"
-msgstr ""
+msgstr "Uitzetten"
 
 msgctxt "#33409"
 msgid "Animate"
-msgstr ""
+msgstr "Animeren"
 
 msgctxt "#33410"
 msgid "The communication with the Lightpack failed. Make sure that your settings are correct, that the Lightpack is connected, and that Prismatik is running."
-msgstr ""
+msgstr "De communicatie met de Lightpack is mislukt.  Zorg ervoor dat uw instellingen correct zijn, dat de Lightpack is aangesloten en dat Prismatik actief is."
 
 msgctxt "#33411"
 msgid "Debrid Cache Access Failed"
-msgstr ""
+msgstr "Debrid Cache toegang mislukt"
 
 msgctxt "#33412"
 msgid "Repository"
@@ -2293,7 +2293,7 @@ msgstr ""
 
 msgctxt "#33413"
 msgid "Connections"
-msgstr ""
+msgstr "Verbindingen"
 
 msgctxt "#33414"
 msgid "Access Code"
@@ -2305,15 +2305,15 @@ msgstr ""
 
 msgctxt "#33416"
 msgid "Details Description"
-msgstr ""
+msgstr "Details Beschrijving"
 
 msgctxt "#33417"
 msgid "Single Line"
-msgstr ""
+msgstr "Enkele lijn"
 
 msgctxt "#33418"
 msgid "Multiple Lines"
-msgstr ""
+msgstr "Meerdere lijnen"
 
 msgctxt "#33419"
 msgid "Info"
@@ -2321,11 +2321,11 @@ msgstr ""
 
 msgctxt "#33420"
 msgid "Toggle the [B]N[/B] best providers according to their performance, rank, and status."
-msgstr ""
+msgstr "Schakel tussen de [B]N[/B] beste providers op basis van hun prestaties, rang en status."
 
 msgctxt "#33421"
 msgid "Preloading menu metadata for faster navigation"
-msgstr ""
+msgstr "Menu metagegevens vooraf laden voor snellere navigatie"
 
 msgctxt "#33422"
 msgid "Mirror Domains"
@@ -2333,95 +2333,95 @@ msgstr ""
 
 msgctxt "#33423"
 msgid "Startup Sound"
-msgstr ""
+msgstr "Opstartgeluid"
 
 msgctxt "#33424"
 msgid "Sound 1"
-msgstr ""
+msgstr "Geluid 1"
 
 msgctxt "#33425"
 msgid "Sound 2"
-msgstr ""
+msgstr "Geluid 2"
 
 msgctxt "#33426"
 msgid "Sound 3"
-msgstr ""
+msgstr "Geluid 3"
 
 msgctxt "#33427"
 msgid "Sound 4"
-msgstr ""
+msgstr "Geluid 4"
 
 msgctxt "#33428"
 msgid "Sound 5"
-msgstr ""
+msgstr "Geluid 5"
 
 msgctxt "#33429"
 msgid "Kids"
-msgstr ""
+msgstr "Kinderen"
 
 msgctxt "#33430"
 msgid "Operational"
-msgstr ""
+msgstr "operationeel"
 
 msgctxt "#33431"
 msgid "Impaired"
-msgstr ""
+msgstr "Verzwakt"
 
 msgctxt "#33432"
 msgid "Age Restriction"
-msgstr ""
+msgstr "Leeftijdsbeperking"
 
 msgctxt "#33433"
 msgid "Minor (< 7)"
-msgstr ""
+msgstr "Minderjarig (< 7)"
 
 msgctxt "#33434"
 msgid "Young (< 13)"
-msgstr ""
+msgstr "Jong (< 13)"
 
 msgctxt "#33435"
 msgid "Teens (< 16)"
-msgstr ""
+msgstr "Tieners (< 16)"
 
 msgctxt "#33436"
 msgid "Youth (< 18)"
-msgstr ""
+msgstr "Jeugd (< 18)"
 
 msgctxt "#33437"
 msgid "Age"
-msgstr ""
+msgstr "Leeftijd"
 
 msgctxt "#33438"
 msgid "Parental Control"
-msgstr ""
+msgstr "Ouderlijk toezicht"
 
 msgctxt "#33439"
 msgid "Access Password"
-msgstr ""
+msgstr "Toegangs wachtwoord"
 
 msgctxt "#33440"
 msgid "Incorrect Password"
-msgstr ""
+msgstr "Incorrect wachtwoord"
 
 msgctxt "#33441"
 msgid "The provided parental password is incorrect. The parental control will stay in place."
-msgstr ""
+msgstr "Het opgegeven ouderlijk wachtwoord is onjuist.  Het ouderlijk toezicht blijft van kracht."
 
 msgctxt "#33442"
 msgid "Parental Lock"
-msgstr ""
+msgstr "Kinderslot"
 
 msgctxt "#33443"
 msgid "Parental Unlock"
-msgstr ""
+msgstr "Kinderslot ontgrendelen"
 
 msgctxt "#33444"
 msgid "The parental control is now unlocked. All menus are accessible."
-msgstr ""
+msgstr "Het kinderslot toezicht is nu ontgrendeld.  Alle menu's zijn toegankelijk."
 
 msgctxt "#33445"
 msgid "The parental control is now locked. Only the kids menu is accessible."
-msgstr ""
+msgstr "Het kinderslot toezicht is nu vergrendeld.  Alleen het kindermenu is toegankelijk."
 
 msgctxt "#33446"
 msgid "[GAIA-NO-LABEL]"
@@ -2461,11 +2461,11 @@ msgstr ""
 
 msgctxt "#33455"
 msgid "Plain"
-msgstr ""
+msgstr "Vlak"
 
 msgctxt "#33456"
 msgid "Both"
-msgstr ""
+msgstr "Beide"
 
 msgctxt "#33457"
 msgid "Disc Box"
@@ -2485,7 +2485,7 @@ msgstr ""
 
 msgctxt "#33461"
 msgid "Automatic Playback"
-msgstr ""
+msgstr "Automatisch afspelen"
 
 msgctxt "#33462"
 msgid "[GAIA-NO-LABEL]"
@@ -2497,15 +2497,15 @@ msgstr ""
 
 msgctxt "#33464"
 msgid "Plain Dialog"
-msgstr ""
+msgstr "Gewoon dialoogvenster"
 
 msgctxt "#33465"
 msgid "Detailed Dialog"
-msgstr ""
+msgstr "Gedetailleerd dialoogvenster"
 
 msgctxt "#33466"
 msgid "Temporary"
-msgstr ""
+msgstr "Tijdelijk"
 
 msgctxt "#33467"
 msgid "System"
@@ -2517,7 +2517,7 @@ msgstr ""
 
 msgctxt "#33469"
 msgid "Do you want to automatically clean the Kodi library and remove titles that are no longer accessible?"
-msgstr ""
+msgstr "Wilt u de Kodi bibliotheek automatisch opschonen en titels verwijderen die niet langer toegankelijk zijn?"
 
 msgctxt "#33470"
 msgid "Docus"
@@ -2537,7 +2537,7 @@ msgstr ""
 
 msgctxt "#33474"
 msgid "Installation"
-msgstr ""
+msgstr "Installatie"
 
 msgctxt "#33475"
 msgid "Embell"
@@ -2561,7 +2561,7 @@ msgstr ""
 
 msgctxt "#33480"
 msgid "List Limit"
-msgstr ""
+msgstr "Lijst Limiet"
 
 msgctxt "#33481"
 msgid "Streams"
@@ -2573,15 +2573,15 @@ msgstr ""
 
 msgctxt "#33483"
 msgid "The stream cannot be started, because none of the torrent streaming options are enabled or supported."
-msgstr ""
+msgstr "De stream kan niet worden gestart, omdat geen van de torrent streamingopties is ingeschakeld of ondersteund."
 
 msgctxt "#33484"
 msgid "The stream cannot be started, because none of the usenet streaming options are enabled or supported."
-msgstr ""
+msgstr "De stream kan niet worden gestart, omdat geen van de usenet streamingopties is ingeschakeld of ondersteund."
 
 msgctxt "#33485"
 msgid "The stream cannot be started, because none of the hoster streaming options are enabled or supported."
-msgstr ""
+msgstr "De stream kan niet worden gestart, omdat geen van de streamingopties van de hoster is ingeschakeld of ondersteund."
 
 msgctxt "#33486"
 msgid "Close"
@@ -2601,11 +2601,11 @@ msgstr ""
 
 msgctxt "#33490"
 msgid "Arrivals"
-msgstr ""
+msgstr "Aankomsten"
 
 msgctxt "#33491"
 msgid "Documentaries"
-msgstr ""
+msgstr "Documentaires"
 
 msgctxt "#33492"
 msgid "Stream Type"
@@ -2613,7 +2613,7 @@ msgstr ""
 
 msgctxt "#33493"
 msgid "Authentication"
-msgstr ""
+msgstr "Authenticatie"
 
 msgctxt "#33494"
 msgid "Copy Hash"
@@ -2625,15 +2625,15 @@ msgstr ""
 
 msgctxt "#33496"
 msgid "Download Count"
-msgstr ""
+msgstr "Aantal downloads"
 
 msgctxt "#33497"
 msgid "Total"
-msgstr ""
+msgstr "Totaal"
 
 msgctxt "#33498"
 msgid "Download Size"
-msgstr ""
+msgstr "Download grootte "
 
 msgctxt "#33499"
 msgid "Download Host"
@@ -2645,31 +2645,31 @@ msgstr ""
 
 msgctxt "#33501"
 msgid "Size Limit"
-msgstr ""
+msgstr "Grootte limiet"
 
 msgctxt "#33502"
 msgid "Services"
-msgstr ""
+msgstr "Diensten"
 
 msgctxt "#33503"
 msgid "Changelog"
-msgstr ""
+msgstr "Wijzigingenlijst"
 
 msgctxt "#33504"
 msgid "Collections"
-msgstr ""
+msgstr "Collecties"
 
 msgctxt "#33505"
 msgid "Donate"
-msgstr ""
+msgstr "Doneer"
 
 msgctxt "#33506"
 msgid "Gaia Is Ready"
-msgstr ""
+msgstr "Gaia is er klaar voor"
 
 msgctxt "#33507"
 msgid "Wallet"
-msgstr ""
+msgstr "Portemonnee"
 
 msgctxt "#33508"
 msgid "TMDb"
@@ -2712,7 +2712,7 @@ msgid "Origin Index"
 msgstr ""
 
 msgctxt "#33518"
-msgid "Origin ID"
+msgid "ID"
 msgstr ""
 
 msgctxt "#33519"
@@ -2729,23 +2729,23 @@ msgstr ""
 
 msgctxt "#33522"
 msgid "Refresh Movie Metadata"
-msgstr ""
+msgstr "Film metagegevens vernieuwen"
 
 msgctxt "#33523"
 msgid "Refresh Show Metadata"
-msgstr ""
+msgstr "Serie metagegevens vernieuwen"
 
 msgctxt "#33524"
 msgid "Refresh Season Metadata"
-msgstr ""
+msgstr "Seizoen metagegevens vernieuwen"
 
 msgctxt "#33525"
 msgid "Refresh Episode Metadata"
-msgstr ""
+msgstr "Aflevering metagegevens vernieuwen"
 
 msgctxt "#33526"
 msgid "Refresh List Metadata"
-msgstr ""
+msgstr "Lijst metagegevens vernieuwen"
 
 msgctxt "#33527"
 msgid "[GAIA-NO-LABEL]"
@@ -2885,19 +2885,19 @@ msgstr ""
 
 msgctxt "#33561"
 msgid "Play With"
-msgstr ""
+msgstr "Spelen met"
 
 msgctxt "#33562"
 msgid "Download With"
-msgstr ""
+msgstr "Downloaden met"
 
 msgctxt "#33563"
 msgid "Cache With"
-msgstr ""
+msgstr "Cache met"
 
 msgctxt "#33564"
 msgid "Default"
-msgstr ""
+msgstr "Standaard"
 
 msgctxt "#33565"
 msgid "[GAIA-NO-LABEL]"
@@ -2925,7 +2925,7 @@ msgstr ""
 
 msgctxt "#33571"
 msgid "Home Releases"
-msgstr ""
+msgstr "Thuis releases"
 
 msgctxt "#33572"
 msgid "Documentary Arrivals"
@@ -2937,47 +2937,47 @@ msgstr ""
 
 msgctxt "#33574"
 msgid "No Stream Could Be Auto Played"
-msgstr ""
+msgstr "Er kan geen stream automatisch worden afgespeeld"
 
 msgctxt "#33575"
 msgid "Add item to your collection"
-msgstr ""
+msgstr "Item toevoegen aan je collectie"
 
 msgctxt "#33576"
 msgid "Remove item from your collection"
-msgstr ""
+msgstr "Item verwijderen uit je collectie"
 
 msgctxt "#33577"
 msgid "Add item to your watchlist"
-msgstr ""
+msgstr "Item toevoegen aan uw kijklijst"
 
 msgctxt "#33578"
 msgid "Remove item from your watchlist"
-msgstr ""
+msgstr "Item verwijderen van je kijklijst"
 
 msgctxt "#33579"
 msgid "Add item to a new list"
-msgstr ""
+msgstr "Item toevoegen aan een nieuwe lijst"
 
 msgctxt "#33580"
 msgid "Add item to your %s list"
-msgstr ""
+msgstr "Item toevoegen aan uw %s lijst"
 
 msgctxt "#33581"
 msgid "Remove item from your %s list"
-msgstr ""
+msgstr "Item verwijderen uit uw %s lijst"
 
 msgctxt "#33582"
 msgid "Item Added To Trakt"
-msgstr ""
+msgstr "Item toegevoegd aan Trakt"
 
 msgctxt "#33583"
 msgid "Item Removed From Trakt"
-msgstr ""
+msgstr "Item verwijderd uit Trakt"
 
 msgctxt "#33584"
 msgid "Trakt List Addition Failed"
-msgstr ""
+msgstr "Traktlijst toevoegen mislukt"
 
 msgctxt "#33585"
 msgid "Download Manager"
@@ -2993,55 +2993,55 @@ msgstr ""
 
 msgctxt "#33588"
 msgid "Title"
-msgstr ""
+msgstr "Titel"
 
 msgctxt "#33589"
 msgid "Title Year"
-msgstr ""
+msgstr "Titel Jaar"
 
 msgctxt "#33590"
 msgid "Title. Year"
-msgstr ""
+msgstr "Titel.  Jaar"
 
 msgctxt "#33591"
 msgid "Title - Year"
-msgstr ""
+msgstr "Titel - Jaar"
 
 msgctxt "#33592"
 msgid "Title (Year)"
-msgstr ""
+msgstr "Titel (jaar)"
 
 msgctxt "#33593"
 msgid "Title [Year]"
-msgstr ""
+msgstr "Titel [Jaar]"
 
 msgctxt "#33594"
 msgid "Year Title"
-msgstr ""
+msgstr "Jaar Titel"
 
 msgctxt "#33595"
 msgid "Year. Title"
-msgstr ""
+msgstr "Jaar.  Titel"
 
 msgctxt "#33596"
 msgid "Year - Title"
-msgstr ""
+msgstr "Jaar - Titel"
 
 msgctxt "#33597"
 msgid "(Year) Title"
-msgstr ""
+msgstr "(Jaar) Titl"
 
 msgctxt "#33598"
 msgid "[Year] Title"
-msgstr ""
+msgstr "[Jaar] Titel"
 
 msgctxt "#33599"
 msgid "Season 1"
-msgstr ""
+msgstr "Seizoen 1"
 
 msgctxt "#33600"
 msgid "Season 01"
-msgstr ""
+msgstr "Seizoen 01"
 
 msgctxt "#33601"
 msgid "S1"
@@ -3053,19 +3053,19 @@ msgstr ""
 
 msgctxt "#33603"
 msgid "1 Season"
-msgstr ""
+msgstr "1 seizoen"
 
 msgctxt "#33604"
 msgid "01 Season"
-msgstr ""
+msgstr "01 seizoen"
 
 msgctxt "#33605"
 msgid "1. Season"
-msgstr ""
+msgstr "1. Seizoen"
 
 msgctxt "#33606"
 msgid "01. Season"
-msgstr ""
+msgstr "01. Seizoen"
 
 msgctxt "#33607"
 msgid "1"
@@ -3077,59 +3077,59 @@ msgstr ""
 
 msgctxt "#33609"
 msgid "1 Title"
-msgstr ""
+msgstr "1 Titel"
 
 msgctxt "#33610"
 msgid "01 Title"
-msgstr ""
+msgstr "01 Titel"
 
 msgctxt "#33611"
 msgid "1. Title"
-msgstr ""
+msgstr "1. Titel"
 
 msgctxt "#33612"
 msgid "01. Title"
-msgstr ""
+msgstr "01. Titel"
 
 msgctxt "#33613"
 msgid "1x1 Title"
-msgstr ""
+msgstr "1x1 titel"
 
 msgctxt "#33614"
 msgid "1x01 Title"
-msgstr ""
+msgstr "1x01 Titel"
 
 msgctxt "#33615"
 msgid "01x01 Title"
-msgstr ""
+msgstr "01x01 Titel"
 
 msgctxt "#33616"
 msgid "E1 Title"
-msgstr ""
+msgstr "E1 Titel"
 
 msgctxt "#33617"
 msgid "E01 Title"
-msgstr ""
+msgstr "E01 Titel"
 
 msgctxt "#33618"
 msgid "E1. Title"
-msgstr ""
+msgstr "E1.  Titel"
 
 msgctxt "#33619"
 msgid "E01. Title"
-msgstr ""
+msgstr "E01.  Titel"
 
 msgctxt "#33620"
 msgid "S1E1 Title"
-msgstr ""
+msgstr "S1E1 titel"
 
 msgctxt "#33621"
 msgid "S1E01 Title"
-msgstr ""
+msgstr "S1E01 Titel"
 
 msgctxt "#33622"
 msgid "S01E01 Title"
-msgstr ""
+msgstr "S01E01 Titel"
 
 msgctxt "#33623"
 msgid "1"
@@ -3173,23 +3173,23 @@ msgstr ""
 
 msgctxt "#33633"
 msgid "Keep"
-msgstr ""
+msgstr "Houden"
 
 msgctxt "#33634"
 msgid "Movie Titles"
-msgstr ""
+msgstr "Titels van film"
 
 msgctxt "#33635"
 msgid "Show Titles"
-msgstr ""
+msgstr "Titels van Serie"
 
 msgctxt "#33636"
 msgid "Season Titles"
-msgstr ""
+msgstr "Titels van seizoen"
 
 msgctxt "#33637"
 msgid "Episode Titles"
-msgstr ""
+msgstr "Titels van aflevering"
 
 msgctxt "#33638"
 msgid "Docu Titles"
@@ -3201,7 +3201,7 @@ msgstr ""
 
 msgctxt "#33640"
 msgid "A %s account is required in order to conduct this speed test."
-msgstr ""
+msgstr "Er is een %s-account vereist om deze snelheidstest uit te voeren."
 
 msgctxt "#33641"
 msgid "Icon Quality"
@@ -3209,27 +3209,27 @@ msgstr ""
 
 msgctxt "#33642"
 msgid "Unauthenticated"
-msgstr ""
+msgstr "Niet geauthenticeerd"
 
 msgctxt "#33643"
 msgid "Low"
-msgstr ""
+msgstr "Laag"
 
 msgctxt "#33644"
 msgid "High"
-msgstr ""
+msgstr "Hoog"
 
 msgctxt "#33645"
 msgid "Automatic Removal"
-msgstr ""
+msgstr "Automatische verwijdering"
 
 msgctxt "#33646"
 msgid "A Trakt account is required for this feature. Do you want to authenticate a Trakt account now?"
-msgstr ""
+msgstr "Voor deze functie is een Trakt-account vereist.  Wilt u nu een Trakt account verifiëren?"
 
 msgctxt "#33647"
 msgid "An IMDb account is required for this feature. Do you want to authenticate an IMDb account now?"
-msgstr ""
+msgstr "Voor deze functie is een IMDb-account vereist.  Wilt u nu een IMDb account verifiëren?"
 
 msgctxt "#33648"
 msgid "[GAIA-NO-LABEL]"
@@ -3237,19 +3237,19 @@ msgstr ""
 
 msgctxt "#33649"
 msgid "Ascending"
-msgstr ""
+msgstr "Oplopend"
 
 msgctxt "#33650"
 msgid "Descending"
-msgstr ""
+msgstr "Aflopend"
 
 msgctxt "#33651"
 msgid "Watch Item"
-msgstr ""
+msgstr "Bekeken Item"
 
 msgctxt "#33652"
 msgid "Unwatch Item"
-msgstr ""
+msgstr "Onbekeken Item"
 
 msgctxt "#33653"
 msgid "Rate Item"
@@ -3261,23 +3261,23 @@ msgstr ""
 
 msgctxt "#33655"
 msgid "Mark the item as watched"
-msgstr ""
+msgstr "Markeer het item als bekeken"
 
 msgctxt "#33656"
 msgid "Mark the item as unwatched"
-msgstr ""
+msgstr "Markeer het item als onbewaakt"
 
 msgctxt "#33657"
 msgid "Provide a rating for the item"
-msgstr ""
+msgstr "Geef een beoordeling voor het item"
 
 msgctxt "#33658"
 msgid "Remove the rating from the item"
-msgstr ""
+msgstr "Verwijder de beoordeling van het item"
 
 msgctxt "#33659"
 msgid "This action requires the Trakt addon to be installed."
-msgstr ""
+msgstr "Deze actie vereist dat de Trakt addon is geïnstalleerd."
 
 msgctxt "#33660"
 msgid "[GAIA-NO-LABEL]"
@@ -3285,23 +3285,23 @@ msgstr ""
 
 msgctxt "#33661"
 msgid "Trakt List Addition Succeeded"
-msgstr ""
+msgstr "Trakt Lijst Toevoeging Geslaagd"
 
 msgctxt "#33662"
 msgid "Recommended"
-msgstr ""
+msgstr "Aanbevolen"
 
 msgctxt "#33663"
 msgid "Docu Lists"
-msgstr ""
+msgstr "Docu lijsten"
 
 msgctxt "#33664"
 msgid "Short Lists"
-msgstr ""
+msgstr "Short lijsten"
 
 msgctxt "#33665"
 msgid "Season Lists"
-msgstr ""
+msgstr "Seizoen Lijsten"
 
 msgctxt "#33666"
 msgid "Paging"
@@ -3317,23 +3317,23 @@ msgstr ""
 
 msgctxt "#33669"
 msgid "Failure Detection"
-msgstr ""
+msgstr "Foutdetectie"
 
 msgctxt "#33670"
 msgid "Failure Limit"
-msgstr ""
+msgstr "Falen Limiet"
 
 msgctxt "#33671"
 msgid "Retry Delay"
-msgstr ""
+msgstr "Wachttijd nieuwe poging"
 
 msgctxt "#33672"
 msgid "Preload Torrents"
-msgstr ""
+msgstr "Torrents vooraf laden"
 
 msgctxt "#33673"
 msgid "Preload Usenet"
-msgstr ""
+msgstr "Usenet vooraf laden"
 
 msgctxt "#33674"
 msgid "Initiating Stream Connection"
@@ -3345,19 +3345,19 @@ msgstr ""
 
 msgctxt "#33676"
 msgid "Temporary Trakt Server Problems"
-msgstr ""
+msgstr "Tijdelijke problemen met de Trakt server"
 
 msgctxt "#33677"
 msgid "Reauthenticate Trakt Access"
-msgstr ""
+msgstr "Verifieer Trakt toegang opnieuw"
 
 msgctxt "#33678"
 msgid "Refresh History"
-msgstr ""
+msgstr "Geschiedenis vernieuwen"
 
 msgctxt "#33679"
 msgid "Sorting Order"
-msgstr ""
+msgstr "Sorteervolgorde"
 
 msgctxt "#33680"
 msgid "[GAIA-NO-LABEL]"
@@ -3369,51 +3369,51 @@ msgstr ""
 
 msgctxt "#33682"
 msgid "Presets"
-msgstr ""
+msgstr "Voorinstellingen"
 
 msgctxt "#33683"
 msgid "Preset"
-msgstr ""
+msgstr "Vooraf ingesteld"
 
 msgctxt "#33684"
 msgid "Do you want to load the preset and replace your current provider configuration with the preset?"
-msgstr ""
+msgstr "Wil je de preset laden en je huidige providerconfiguratie vervangen door de preset?"
 
 msgctxt "#33685"
 msgid "Load"
-msgstr ""
+msgstr "Laden"
 
 msgctxt "#33686"
 msgid "Save"
-msgstr ""
+msgstr "Opslaan"
 
 msgctxt "#33687"
 msgid "Preset Name"
-msgstr ""
+msgstr "Vooraf ingestelde naam"
 
 msgctxt "#33688"
 msgid "Preset Successfully Saved"
-msgstr ""
+msgstr "Voorinstelling succesvol opgeslagen"
 
 msgctxt "#33689"
 msgid "Preset Successfully Loaded"
-msgstr ""
+msgstr "Voorinstelling succesvol geladen"
 
 msgctxt "#33690"
 msgid "Summary"
-msgstr ""
+msgstr "Overzicht"
 
 msgctxt "#33691"
 msgid "Provider Link Resolving Failure"
-msgstr ""
+msgstr "Provider Link lost storing op"
 
 msgctxt "#33692"
 msgid "Preset Configuration"
-msgstr ""
+msgstr "Vooraf ingestelde configuratie"
 
 msgctxt "#33693"
 msgid "Original"
-msgstr ""
+msgstr "Origineel"
 
 msgctxt "#33694"
 msgid "Transcoded"
@@ -3421,15 +3421,15 @@ msgstr ""
 
 msgctxt "#33695"
 msgid "Include the unaltered original file"
-msgstr ""
+msgstr "Voeg het ongewijzigde originele bestand toe"
 
 msgctxt "#33696"
 msgid "Include the transcoded streaming file"
-msgstr ""
+msgstr "Voeg het getranscodeerde streamingbestand toe"
 
 msgctxt "#33697"
 msgid "Include the original and transcoded files"
-msgstr ""
+msgstr "Voeg de originele en getranscodeerde bestanden toe"
 
 msgctxt "#33698"
 msgid "[GAIA-NO-LABEL]"
@@ -3453,15 +3453,15 @@ msgstr ""
 
 msgctxt "#33703"
 msgid "Network Information"
-msgstr ""
+msgstr "Netwerk informatie"
 
 msgctxt "#33704"
 msgid "Local Network"
-msgstr ""
+msgstr "Lokaal netwerk"
 
 msgctxt "#33705"
 msgid "Global Network"
-msgstr ""
+msgstr "Globaal netwerk"
 
 msgctxt "#33706"
 msgid "IP Address"
@@ -3485,7 +3485,7 @@ msgstr ""
 
 msgctxt "#33711"
 msgid "Organization"
-msgstr ""
+msgstr "Organisatie"
 
 msgctxt "#33712"
 msgid "System"
@@ -3497,47 +3497,47 @@ msgstr ""
 
 msgctxt "#33714"
 msgid "Country"
-msgstr ""
+msgstr "Land"
 
 msgctxt "#33715"
 msgid "Region"
-msgstr ""
+msgstr "Regio"
 
 msgctxt "#33716"
 msgid "City"
-msgstr ""
+msgstr "Stad"
 
 msgctxt "#33717"
 msgid "Latitude"
-msgstr ""
+msgstr "Breedtegraad"
 
 msgctxt "#33718"
 msgid "Longitude"
-msgstr ""
+msgstr "Lengtegraad"
 
 msgctxt "#33719"
 msgid "Network"
-msgstr ""
+msgstr "Netwerk"
 
 msgctxt "#33720"
 msgid "Extensions"
-msgstr ""
+msgstr "Extensies"
 
 msgctxt "#33721"
 msgid "Available"
-msgstr ""
+msgstr "Verkrijgbaar"
 
 msgctxt "#33722"
 msgid "Installed"
-msgstr ""
+msgstr "Geïnstalleerd"
 
 msgctxt "#33723"
 msgid "Required Addon"
-msgstr ""
+msgstr "Vereiste addon"
 
 msgctxt "#33724"
 msgid "Recommended Addon"
-msgstr ""
+msgstr "Aanbevolen addon"
 
 msgctxt "#33725"
 msgid "Optional Addon"
@@ -3545,7 +3545,7 @@ msgstr ""
 
 msgctxt "#33726"
 msgid "The addon provides the essential resources and icons for Gaia. The addon is required for Gaia to function properly."
-msgstr ""
+msgstr "
 
 msgctxt "#33727"
 msgid "The addon provides third-party Python modules for Gaia. The addon is required for Gaia to function properly."

@@ -2054,9 +2054,21 @@ class Manager(object):
 						connectionSpeed = data['connection']['value']['speed']
 						connectionLatency = data['connection']['value']['latency']
 
+				#gaiaremove
+				data0 = Tools.copy(data)
+
 				data = Hardware.performance(processorTotal = processorTotal, processorSingle = processorSingle, memory = memory, storageRead = storageRead, storageWrite = storageWrite, connectionSpeed = connectionSpeed, connectionLatency = connectionLatency)
 				performance = data['performance']
 				base = data['rating']
+
+				#gaiaremove
+				try:
+					if not data['processor']['label']['rating'] or data['processor']['label']['rating'] == '0%':
+						Logger.log('Hardware Data 0: ' + str(processor) + ' * ' + str(processorTotal) + ' * ' + str(processorSingle))
+						Logger.log('Hardware Data 1: ' + Converter.jsonTo(data0))
+						Logger.log('Hardware Data 2: ' + Converter.jsonTo(data))
+						Logger.log('Hardware Data 3: ' + Converter.jsonTo(Hardware.data()))
+				except: Logger.error()
 
 				label = [[36049, data['label']['description']]]
 				if processor: label.append([36046, data['processor']['label']['description']])

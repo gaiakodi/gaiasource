@@ -1,4 +1,8 @@
 
+[B]6.0.5 (2022.12.13)[/B]
+- Updated Dutch strings file.
+- Added debug info for Nvidia Shield.
+
 [B]6.0.4 (2022.12.13)[/B]
 - Fixed Android processor detection.
 
