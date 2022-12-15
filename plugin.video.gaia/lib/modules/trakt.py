@@ -160,7 +160,10 @@ def _error(url, post, timestamp, message):
 	_cache(url = url, post = post, timestamp = timestamp)
 	if tools.Settings.getBoolean('account.trakt.notifications'):
 		interface.Dialog.notification(title = 32315, message = message, icon = interface.Dialog.IconError)
-	interface.Loader.hide()
+
+	# Might want to keep the Loader shown when Trakt fails.
+	# Eg: Search Trakt, and if it fails, fall back to TMDb search, but keep the Loader visible.
+	#interface.Loader.hide()
 
 def _cache(url, post = None, timestamp = None):
 	return Cache.instance().traktCache(link = url, data = post, timestamp = timestamp)

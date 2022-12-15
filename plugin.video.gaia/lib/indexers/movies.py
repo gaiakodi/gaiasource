@@ -34,6 +34,7 @@ from lib.meta.cache import MetaCache
 from lib.meta.image import MetaImage
 from lib.meta.tools import MetaTools
 from lib.meta.processors.imdb import MetaImdb
+from lib.meta.processors.tmdb import MetaTmdb
 from lib.meta.processors.fanart import MetaFanart
 
 class Movies(object):
@@ -188,13 +189,23 @@ class Movies(object):
 					self.mModeSearch = True
 					items = self.cache('cacheMedium', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 
-					# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
-					# Only do this if the user did not specifically search for edition-related keywords.
-					# Eg: Search "lord rings":
-					#	{"imdb": "tt0120737", "tmdb": "120", "trakt": "88", "title": "The Lord of the Rings: The Fellowship of the Ring", "year": 2001}
-					#	{"imdb": "tt21811588", "tmdb": "1032873", "trakt": "830703", "title": "The Lord of the Rings - The Fellowship of the Ring (Extended Edition)", "year": null}
-					if not Regex.match(data = link, expression = '(extend|special|edition|version)'):
-						items = [i for i in items if not(Regex.match(data = i['title'], expression = '[\(\[].*?edition.*[\)\]]$') and (not 'year' in i or not i['year'] or not 'premiered' in i or not i['premiered'] or not 'duration' in i or not i['duration']))]
+					# In case Trakt is down.
+					if items:
+						# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
+						# Only do this if the user did not specifically search for edition-related keywords.
+						# Eg: Search "lord rings":
+						#	{"imdb": "tt0120737", "tmdb": "120", "trakt": "88", "title": "The Lord of the Rings: The Fellowship of the Ring", "year": 2001}
+						#	{"imdb": "tt21811588", "tmdb": "1032873", "trakt": "830703", "title": "The Lord of the Rings - The Fellowship of the Ring (Extended Edition)", "year": null}
+						if not Regex.match(data = link, expression = '(extend|special|edition|version)'):
+							items = [i for i in items if not(Regex.match(data = i['title'], expression = '[\(\[].*?edition.*[\)\]]$') and (not 'year' in i or not i['year'] or not 'premiered' in i or not i['premiered'] or not 'duration' in i or not i['duration']))]
+					else:
+						query = Regex.extract(data = link, expression = 'query=(.*?)(?:$|&)')
+						if query:
+							query = Networker.linkUnquote(query)
+							items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, query = query)
+							# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
+							if not Regex.match(data = link, expression = '(extend|special|edition|version)'):
+								items = [i for i in items if not(Regex.match(data = i['title'], expression = '[\(\[].*?edition.*[\)\]]$') and (not 'year' in i or not i['year'] or not 'premiered' in i or not i['premiered']))]
 
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -251,6 +262,19 @@ class Movies(object):
 				else:
 					items = self.cache('cacheMedium', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
+			elif domain == 'themoviedb':
+
+				if MetaTmdb.LinkSearchMovie in link:
+					self.mModeSearch = True
+					items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, link = link)
+
+					# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
+					if not Regex.match(data = link, expression = '(extend|special|edition|version)'):
+						items = [i for i in items if not(Regex.match(data = i['title'], expression = '[\(\[].*?edition.*[\)\]]$') and (not 'year' in i or not i['year'] or not 'premiered' in i or not i['premiered']))]
+
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
 		except: Logger.error()
 
 		genre = self.search_link in link and not self.persons_link in link and not self.personlist_link in link

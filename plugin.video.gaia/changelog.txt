@@ -1,4 +1,8 @@
 
+[B]6.0.6 (2022.12.15)[/B]
+- Added TMDb as fallback if Trakt search fails.
+- Fixed encoding detection.
+
 [B]6.0.5 (2022.12.13)[/B]
 - Updated Dutch strings file.
 - Added debug info for Nvidia Shield.

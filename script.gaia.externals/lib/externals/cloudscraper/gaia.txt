@@ -34,6 +34,8 @@ On Android (Nvidia Shield), the following error is thrown:
 
 It seems that "os.path.dirname(__file__)" is not possible on these devices.
 
+UPDATE: _bootlocale remain after this change. maybe it is the open() function that causes this. Just add fallback for hard-coded user agents if reading the file fails.
+
 #########################################################################################################################
 
 It seems there are issues with the SSLContext in some Python versions.

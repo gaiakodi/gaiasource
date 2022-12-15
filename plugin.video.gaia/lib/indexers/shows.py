@@ -36,6 +36,7 @@ from lib.meta.image import MetaImage
 from lib.meta.tools import MetaTools
 from lib.meta.manager import MetaManager
 from lib.meta.processors.imdb import MetaImdb
+from lib.meta.processors.tmdb import MetaTmdb
 from lib.meta.processors.fanart import MetaFanart
 
 class Shows(object):
@@ -168,6 +169,14 @@ class Shows(object):
 				elif self.search_link in link:
 					self.mModeSearch = True
 					items = self.cache('cacheShort', refresh, self.traktList,  link = link, user = self.mAccountTrakt)
+
+					# In case Trakt is down.
+					if not items:
+						query = Regex.extract(data = link, expression = 'query=(.*?)(?:$|&)')
+						if query:
+							query = Networker.linkUnquote(query)
+							items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, query = query)
+
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif self.traktrecommendations_link in link:
@@ -188,6 +197,13 @@ class Shows(object):
 
 				else:
 					items = self.cache('cacheMedium', refresh, self.imdbList, link = link, full = full)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
+			elif domain == 'themoviedb':
+
+				if MetaTmdb.LinkSearchShow in link:
+					self.mModeSearch = True
+					items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, link = link)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 			elif domain == 'tvmaze':

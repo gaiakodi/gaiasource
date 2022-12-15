@@ -452,6 +452,13 @@ class Networker(object):
 		if strip: path = path.lstrip('/')
 		return path
 
+	# Extracts the path from the link (excluding the protocol, domain, and parameters), split by / into a list.
+	@classmethod
+	def linkParts(self, link, parameters = False, strip = True):
+		path = self.linkPath(link = link, parameters = parameters, strip = strip)
+		if path: return path.split('/')
+		else: return None
+
 	# Extracts the file name.
 	@classmethod
 	def linkName(self, link, extension = True, decode = True):

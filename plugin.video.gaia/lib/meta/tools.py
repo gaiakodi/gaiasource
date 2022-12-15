@@ -2296,8 +2296,10 @@ class MetaTools(object):
 						data = data['results']
 						for i in data:
 							if (query == Title.clean(i['title']) or query == Title.clean(i['original_title'])):
-								release = Regex.extract(data = i['release_date'], expression = '(\d{4})-', group = 1)
-								if release: release = int(release)
+								release = None
+								if 'release_date' in i:
+									release = Regex.extract(data = i['release_date'], expression = '(\d{4})-', group = 1)
+									if release: release = int(release)
 								if not year or year == release:
 									link = 'https://api.themoviedb.org/3/movie/%s/external_ids' % str(i['id'])
 									data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
@@ -2330,12 +2332,12 @@ class MetaTools(object):
 		# Search TVDb before Trakt, since Trakt sometimes returns multiple shows.
 		try:
 			if not result or not 'tvdb' in result or not result['tvdb']:
-				if idImdb or idTvdb: # TVDb does not have the Trakt ID.
+				if idImdb or idTvdb or idTmdb: # TVDb does not have the Trakt ID.
 					if manager is None:
 						from lib.meta.manager import MetaManager
 						manager = MetaManager(provider = MetaManager.ProviderTvdb)
 					lookup = True
-					data = manager.search(idImdb = idImdb, idTvdb = idTvdb, idTrakt = idTrakt, media = MetaData.MediaShow, limit = 1, cache = False)
+					data = manager.search(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, media = MetaData.MediaShow, limit = 1, cache = False)
 					if data:
 						result = {}
 						ids = data.id()

@@ -2515,7 +2515,7 @@ class Converter(object):
 	@classmethod
 	def encodingDetect(self, value, best = True):
 		try:
-			c
+			from lib.modules.external import Importer
 			return Importer.moduleChardet().detect(value)['encoding']
 		except:
 			Logger.error()

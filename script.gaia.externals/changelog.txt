@@ -1,4 +1,7 @@
 
+[B]6.0.6 (2022.12.15)[/B]
+- Improved CloudScraper user-agent loading.
+
 [B]6.0.4 (2022.12.13)[/B]
 - Fixed CloudScraper for Nvidia Shield.
 - Fixed Js2Py for Nvidia Shield.
