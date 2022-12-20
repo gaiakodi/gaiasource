@@ -2068,6 +2068,12 @@ class Manager(object):
 						Logger.log('Hardware Data 1: ' + Converter.jsonTo(data0))
 						Logger.log('Hardware Data 2: ' + Converter.jsonTo(data))
 						Logger.log('Hardware Data 3: ' + Converter.jsonTo(Hardware.data()))
+
+						from lib.modules.tools import Platform
+						p1 = Platform.data(refresh = True)
+						p2 = Hardware.data(full = True, refresh = True)
+						Logger.log('Hardware Data 4: ' + Converter.jsonTo(p1))
+						Logger.log('Hardware Data 5: ' + Converter.jsonTo(p2))
 				except: Logger.error()
 
 				label = [[36049, data['label']['description']]]

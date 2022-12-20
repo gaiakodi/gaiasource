@@ -75,7 +75,7 @@ TimeoutExpired = None
 # --- utils
 
 def get_procfs_path():
-    return sys.modules['externals.psutil.35.arm64'].PROCFS_PATH
+    return sys.modules['externals.psutil.3_5.arm64'].PROCFS_PATH
 
 
 # --- functions

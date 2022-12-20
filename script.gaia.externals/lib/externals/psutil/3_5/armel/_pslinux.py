@@ -204,7 +204,7 @@ else:
 
 
 def get_procfs_path():
-    return sys.modules['externals.psutil.35.armel'].PROCFS_PATH
+    return sys.modules['externals.psutil.3_5.armel'].PROCFS_PATH
 
 
 def readlink(path):

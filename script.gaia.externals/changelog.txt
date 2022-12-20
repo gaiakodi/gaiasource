@@ -1,4 +1,7 @@
 
+[B]6.0.7 (2022.12.20)[/B]
+- Fixed Psutil version numbering.
+
 [B]6.0.6 (2022.12.15)[/B]
 - Improved CloudScraper user-agent loading.
 

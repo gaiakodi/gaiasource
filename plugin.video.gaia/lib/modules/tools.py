@@ -7262,264 +7262,279 @@ class Platform(object):
 		KodiAlienware		: {'name' : 'Alienware Alpha',	'expression' : 'alienware'},
 	}
 
-	PropertyPlatform	= 'GaiaPlatform'
-
 	SettingIdentifier	= 'internal.identifier'
 
-	Data				= None
+	PropertyFull		= 'GaiaPlatformFull'
+	PropertyBasic		= 'GaiaPlatformBasic'
+
+	DataFull			= None
+	DataBasic			= None
 
 	########################################
 	# DATA
 	########################################
 
 	@classmethod
-	def data(self, refresh = False):
-		if Platform.Data is None:
+	def data(self, refresh = False, full = True):
+		if full:
+			data = Platform.DataFull
+			property = Platform.PropertyFull
+		else:
+			data = Platform.DataBasic
+			property = Platform.PropertyBasic
+
+		if data is None:
 			# Some parameters can take a while to detect. Rather try to load/save to global vars.
 			if not refresh:
-				data = System.windowPropertyGet(Platform.PropertyPlatform)
-				if data:
-					data = Converter.jsonFrom(data)
-					if data:
-						try: version = data['addon']['version']
+				platform = System.windowPropertyGet(property)
+				if platform:
+					platform = Converter.jsonFrom(platform)
+					if platform:
+						try: version = platform['addon']['version']
 						except: version = None
-						if version and version == System.version(): Platform.Data = data
-			if Platform.Data is None:
-				Platform.Data = self.detect()
-				System.windowPropertySet(Platform.PropertyPlatform, Converter.jsonTo(Platform.Data))
-		return Platform.Data
+						if version and version == System.version(): data = platform
+
+			if data is None:
+				data = self.detect(full = full)
+				System.windowPropertySet(property, Converter.jsonTo(data))
+
+			if data:
+				if full: Platform.DataFull = data
+				else: Platform.DataBasic = data
+
+		return data
 
 	@classmethod
-	def identifier(self, refresh = False):
-		return self.data(refresh = refresh)['identifier']
+	def identifier(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['identifier']
 
 	@classmethod
 	def identifierReset(self):
 		Settings.set(Platform.SettingIdentifier, '')
 
 	@classmethod
-	def family(self, refresh = False):
-		return self.data(refresh = refresh)['family']
+	def family(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['family']
 
 	@classmethod
-	def familyType(self, refresh = False):
-		return self.family(refresh = refresh)['type']
+	def familyType(self, refresh = False, full = True):
+		return self.family(refresh = refresh, full = full)['type']
 
 	@classmethod
-	def familyTypeWindows(self, refresh = False):
-		return self.familyType(refresh = refresh) == Platform.FamilyWindows
+	def familyTypeWindows(self, refresh = False, full = True):
+		return self.familyType(refresh = refresh, full = full) == Platform.FamilyWindows
 
 	@classmethod
-	def familyTypeUnix(self, refresh = False):
-		return self.familyType(refresh = refresh) == Platform.FamilyUnix
+	def familyTypeUnix(self, refresh = False, full = True):
+		return self.familyType(refresh = refresh, full = full) == Platform.FamilyUnix
 
 	@classmethod
-	def familyName(self, refresh = False):
-		return self.family(refresh = refresh)['name']
+	def familyName(self, refresh = False, full = True):
+		return self.family(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def system(self, refresh = False):
-		return self.data(refresh = refresh)['system']
+	def system(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['system']
 
 	@classmethod
-	def systemType(self, refresh = False):
-		return self.system(refresh = refresh)['type']
+	def systemType(self, refresh = False, full = True):
+		return self.system(refresh = refresh, full = full)['type']
 
 	@classmethod
-	def systemTypeWindows(self, refresh = False):
-		return self.systemType(refresh = refresh) == Platform.SystemWindows
+	def systemTypeWindows(self, refresh = False, full = True):
+		return self.systemType(refresh = refresh, full = full) == Platform.SystemWindows
 
 	@classmethod
-	def systemTypeMacintosh(self, refresh = False):
-		return self.systemType(refresh = refresh) == Platform.SystemMacintosh
+	def systemTypeMacintosh(self, refresh = False, full = True):
+		return self.systemType(refresh = refresh, full = full) == Platform.SystemMacintosh
 
 	@classmethod
-	def systemTypeLinux(self, refresh = False):
-		return self.systemType(refresh = refresh) == Platform.SystemLinux
+	def systemTypeLinux(self, refresh = False, full = True):
+		return self.systemType(refresh = refresh, full = full) == Platform.SystemLinux
 
 	@classmethod
-	def systemTypeAndroid(self, refresh = False):
-		return self.systemType(refresh = refresh) == Platform.SystemAndroid
+	def systemTypeAndroid(self, refresh = False, full = True):
+		return self.systemType(refresh = refresh, full = full) == Platform.SystemAndroid
 
 	@classmethod
-	def systemName(self, refresh = False):
-		return self.system(refresh = refresh)['name']
+	def systemName(self, refresh = False, full = True):
+		return self.system(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def distribution(self, refresh = False):
-		return self.data(refresh = refresh)['distribution']
+	def distribution(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['distribution']
 
 	@classmethod
-	def distributionType(self, refresh = False):
-		return self.distribution(refresh = refresh)['type']
+	def distributionType(self, refresh = False, full = True):
+		return self.distribution(refresh = refresh, full = full)['type']
 
 	@classmethod
-	def distributionName(self, refresh = False):
-		return self.distribution(refresh = refresh)['name']
+	def distributionName(self, refresh = False, full = True):
+		return self.distribution(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def architecture(self, refresh = False):
-		return self.data(refresh = refresh)['architecture']
+	def architecture(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['architecture']
 
 	@classmethod
-	def architectureType(self, refresh = False):
-		return self.architecture(refresh = refresh)['type']
+	def architectureType(self, refresh = False, full = True):
+		return self.architecture(refresh = refresh, full = full)['type']
 
 	@classmethod
-	def architectureTypeX86(self, refresh = False):
-		return self.architectureType(refresh = refresh) == Platform.ArchitectureX86
+	def architectureTypeX86(self, refresh = False, full = True):
+		return self.architectureType(refresh = refresh, full = full) == Platform.ArchitectureX86
 
 	@classmethod
-	def architectureTypeArm(self, refresh = False):
-		return self.architectureType(refresh = refresh) == Platform.ArchitectureArm
+	def architectureTypeArm(self, refresh = False, full = True):
+		return self.architectureType(refresh = refresh, full = full) == Platform.ArchitectureArm
 
 	@classmethod
-	def architectureTypeArc(self, refresh = False):
-		return self.architectureType(refresh = refresh) == Platform.ArchitectureArc
+	def architectureTypeArc(self, refresh = False, full = True):
+		return self.architectureType(refresh = refresh, full = full) == Platform.ArchitectureArc
 
 	@classmethod
-	def architectureBits(self, refresh = False):
-		return self.architecture(refresh = refresh)['bits']
+	def architectureBits(self, refresh = False, full = True):
+		return self.architecture(refresh = refresh, full = full)['bits']
 
 	@classmethod
-	def architectureBits64(self, refresh = False):
-		return self.architectureBits(refresh = refresh) == Platform.Bits64
+	def architectureBits64(self, refresh = False, full = True):
+		return self.architectureBits(refresh = refresh, full = full) == Platform.Bits64
 
 	@classmethod
-	def architectureBits32(self, refresh = False):
-		return self.architectureBits(refresh = refresh) == Platform.Bits32
+	def architectureBits32(self, refresh = False, full = True):
+		return self.architectureBits(refresh = refresh, full = full) == Platform.Bits32
 
 	@classmethod
-	def architectureName(self, refresh = False):
-		return self.architecture(refresh = refresh)['name']
+	def architectureName(self, refresh = False, full = True):
+		return self.architecture(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def architectureLabel(self, refresh = False):
-		return self.architecture(refresh = refresh)['label']
+	def architectureLabel(self, refresh = False, full = True):
+		return self.architecture(refresh = refresh, full = full)['label']
 
 	@classmethod
-	def version(self, refresh = False):
-		return self.data(refresh = refresh)['version']
+	def version(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['version']
 
 	@classmethod
-	def versionNumber(self, refresh = False):
-		return self.version(refresh = refresh)['number']
+	def versionNumber(self, refresh = False, full = True):
+		return self.version(refresh = refresh, full = full)['number']
 
 	@classmethod
-	def versionName(self, refresh = False):
-		return self.version(refresh = refresh)['name']
+	def versionName(self, refresh = False, full = True):
+		return self.version(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def versionLabel(self, refresh = False):
-		return self.version(refresh = refresh)['label']
+	def versionLabel(self, refresh = False, full = True):
+		return self.version(refresh = refresh, full = full)['label']
 
 	@classmethod
-	def python(self, refresh = False):
-		return self.data(refresh = refresh)['python']
+	def python(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['python']
 
 	@classmethod
-	def pythonBuild(self, refresh = False):
-		return self.python(refresh = refresh)['build']
+	def pythonBuild(self, refresh = False, full = True):
+		return self.python(refresh = refresh, full = full)['build']
 
 	@classmethod
-	def pythonVersion(self, refresh = False):
-		return self.python(refresh = refresh)['version']
+	def pythonVersion(self, refresh = False, full = True):
+		return self.python(refresh = refresh, full = full)['version']
 
 	@classmethod
-	def pythonImplementation(self, refresh = False):
-		return self.python(refresh = refresh)['implementation']
+	def pythonImplementation(self, refresh = False, full = True):
+		return self.python(refresh = refresh, full = full)['implementation']
 
 	@classmethod
-	def pythonRelease(self, refresh = False):
-		return self.python(refresh = refresh)['release']
+	def pythonRelease(self, refresh = False, full = True):
+		return self.python(refresh = refresh, full = full)['release']
 
 	@classmethod
-	def pythonConcurrency(self, refresh = False):
-		return self.python(refresh = refresh)['concurrency']
+	def pythonConcurrency(self, refresh = False, full = True):
+		return self.python(refresh = refresh, full = full)['concurrency']
 
 	@classmethod
-	def pythonConcurrencyThread(self, refresh = False):
-		return self.pythonConcurrency(refresh = refresh)['thread']
+	def pythonConcurrencyThread(self, refresh = False, full = True):
+		return self.pythonConcurrency(refresh = refresh, full = full)['thread']
 
 	@classmethod
-	def pythonConcurrencyProcess(self, refresh = False):
-		return self.pythonConcurrency(refresh = refresh)['process']
+	def pythonConcurrencyProcess(self, refresh = False, full = True):
+		return self.pythonConcurrency(refresh = refresh, full = full)['process']
 
 	@classmethod
-	def pythonConcurrencyLabel(self, refresh = False):
-		return self.pythonConcurrency(refresh = refresh)['label']
+	def pythonConcurrencyLabel(self, refresh = False, full = True):
+		return self.pythonConcurrency(refresh = refresh, full = full)['label']
 
 	@classmethod
-	def kodi(self, refresh = False):
-		return self.data(refresh = refresh)['kodi']
+	def kodi(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['kodi']
 
 	@classmethod
-	def kodiBuild(self, refresh = False):
-		return self.kodi(refresh = refresh)['build']
+	def kodiBuild(self, refresh = False, full = True):
+		return self.kodi(refresh = refresh, full = full)['build']
 
 	@classmethod
-	def kodiName(self, refresh = False):
-		return self.kodi(refresh = refresh)['name']
+	def kodiName(self, refresh = False, full = True):
+		return self.kodi(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def kodiUptime(self, refresh = False):
-		return self.kodi(refresh = refresh)['uptime']
+	def kodiUptime(self, refresh = False, full = True):
+		return self.kodi(refresh = refresh, full = full)['uptime']
 
 	@classmethod
-	def kodiVersion(self, refresh = False):
-		return self.kodi(refresh = refresh)['version']
+	def kodiVersion(self, refresh = False, full = True):
+		return self.kodi(refresh = refresh, full = full)['version']
 
 	@classmethod
-	def kodiVersionNumber(self, refresh = False):
-		return self.kodiVersion(refresh = refresh)['number']
+	def kodiVersionNumber(self, refresh = False, full = True):
+		return self.kodiVersion(refresh = refresh, full = full)['number']
 
 	@classmethod
-	def kodiVersionCode(self, refresh = False):
-		return self.kodiVersion(refresh = refresh)['code']
+	def kodiVersionCode(self, refresh = False, full = True):
+		return self.kodiVersion(refresh = refresh, full = full)['code']
 
 	@classmethod
-	def kodiVersionLabel(self, refresh = False):
-		return self.kodiVersion(refresh = refresh)['label']
+	def kodiVersionLabel(self, refresh = False, full = True):
+		return self.kodiVersion(refresh = refresh, full = full)['label']
 
 	@classmethod
-	def kodiRelease(self, refresh = False):
-		return self.kodi(refresh = refresh)['kodi']['release']
+	def kodiRelease(self, refresh = False, full = True):
+		return self.kodi(refresh = refresh, full = full)['kodi']['release']
 
 	@classmethod
-	def kodiReleaseNumber(self, refresh = False):
-		return self.kodiRelease(refresh = refresh)['number']
+	def kodiReleaseNumber(self, refresh = False, full = True):
+		return self.kodiRelease(refresh = refresh, full = full)['number']
 
 	@classmethod
-	def kodiReleaseDate(self, refresh = False):
-		return self.kodiRelease(refresh = refresh)['date']
+	def kodiReleaseDate(self, refresh = False, full = True):
+		return self.kodiRelease(refresh = refresh, full = full)['date']
 
 	@classmethod
-	def kodiReleaseLabel(self, refresh = False):
-		return self.kodiRelease(refresh = refresh)['label']
+	def kodiReleaseLabel(self, refresh = False, full = True):
+		return self.kodiRelease(refresh = refresh, full = full)['label']
 
 	@classmethod
-	def addon(self, refresh = False):
-		return self.data(refresh = refresh)['addon']
+	def addon(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['addon']
 
 	@classmethod
-	def addonId(self, refresh = False):
-		return self.addon(refresh = refresh)['id']
+	def addonId(self, refresh = False, full = True):
+		return self.addon(refresh = refresh, full = full)['id']
 
 	@classmethod
-	def addonName(self, refresh = False):
-		return self.addon(refresh = refresh)['name']
+	def addonName(self, refresh = False, full = True):
+		return self.addon(refresh = refresh, full = full)['name']
 
 	@classmethod
-	def addonAuthor(self, refresh = False):
-		return self.addon(refresh = refresh)['author']
+	def addonAuthor(self, refresh = False, full = True):
+		return self.addon(refresh = refresh, full = full)['author']
 
 	@classmethod
-	def addonVersion(self, refresh = False):
-		return self.addon(refresh = refresh)['version']
+	def addonVersion(self, refresh = False, full = True):
+		return self.addon(refresh = refresh, full = full)['version']
 
 	@classmethod
-	def agent(self, refresh = False):
-		return self.data(refresh = refresh)['agent']
+	def agent(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['agent']
 
 	########################################
 	# INTERNAL
@@ -7538,7 +7553,8 @@ class Platform(object):
 	def detectWindows(self):
 		try:
 			import platform
-			return 'windows' in platform.system().lower()
+			system = platform.system().lower()
+			return 'windows' in system or 'win32' in system or 'win64' in system
 		except: return False
 
 	@classmethod
@@ -7572,21 +7588,32 @@ class Platform(object):
 			if Platform.SystemAndroid in system or Platform.SystemAndroid in system or (distribution and len(distribution) > 0 and Tools.isString(distribution[0]) and Platform.SystemAndroid in distribution[0].lower()):
 				return True
 
+			# Python 3.7+
+			try:
+				if hasattr(sys, 'getandroidapilevel'): return True
+			except: pass
+
+			# Environment variables.
+			try:
+				if 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_BOOTLOGO' in os.environ or 'ANDROID_STORAGE' in os.environ: return True
+			except: pass
+
 			if system == Platform.SystemLinux:
 				id = ''
-				if 'ANDROID_ARGUMENT' in os.environ:
-					id = True
 				if not id:
-					try: id = Subprocess.open('getprop ril.serialnumber').trim()
+					try: id = Subprocess.open('getprop ril.serialnumber').strip()
 					except: pass
 				if not id:
-					try: id = Subprocess.open('getprop ro.serialno').trim()
+					try: id = Subprocess.open('getprop ro.serialno').strip()
 					except: pass
 				if not id:
-					try: id = Subprocess.open('getprop sys.serialnumber').trim()
+					try: id = Subprocess.open('getprop sys.serialnumber').strip()
 					except: pass
 				if not id:
-					try: id = Subprocess.open('getprop gsm.sn1').trim()
+					try: id = Subprocess.open('getprop gsm.sn1').strip()
+					except: pass
+				if not id:
+					try: id = Subprocess.open('getprop init.svc.adbd').strip()
 					except: pass
 				if id:
 					try: return not 'not found' in id
@@ -8943,37 +8970,50 @@ class Hardware(object):
 
 	@classmethod
 	def detectProcessorModel(self):
+		# Manual
+		windows = False
+		mac = False
+		linux = False
+		android = Platform.detectAndroid()
 		try:
 			import platform
 			system = platform.system()
 			if system:
 				system = system.lower()
+				if 'windows' in system: windows = True
+				elif 'darwin' in system or 'mac' in system: mac = True
+				elif 'linux' in system or 'unix' in system: linux = True
+		except: pass
 
-				# Windows
-				if 'windows' in system:
-					result = Subprocess.output(['wmic', 'cpu', 'get', 'name']).strip().split('\r\n')[1]
-					if result:
-						processor = platform.processor()
-						if processor in result: return result
-						else: return ' '.join([result, processor])
+		# Windows
+		try:
+			if windows:
+				result = Subprocess.output(['wmic', 'cpu', 'get', 'name']).strip().split('\r\n')[1]
+				if result:
+					processor = platform.processor()
+					if processor in result: return result
+					else: return ' '.join([result, processor])
+		except: pass
 
-				# Mac
-				elif 'darwin' in system or 'mac' in system:
-					import os
-					os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
-					result = Subprocess.output('sysctl -n machdep.cpu.brand_string').strip()
-					if result: return result
+		# Mac
+		try:
+			if mac:
+				import os
+				os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
+				result = Subprocess.output('sysctl -n machdep.cpu.brand_string').strip()
+				if result: return result
+		except: pass
 
-				# Linux
-				elif 'linux' in system or 'unix' in system or Platform.detectAndroid():
-					data = Subprocess.output('cat /proc/cpuinfo').strip()
-					if data:
-						result = Regex.extract(data = data, expression = 'model\s*name\s*:\s*(.*?)[\n\r]')
-						if result: return result.strip()
-						result = Regex.extract(data = data, expression = 'processor\s*:\s*(.*?(?:intel|amd|arm|aarch|risc|acorn|a32|a64|arc).*?)(?:$|\n)') # Android devices.
-						if result: return result.strip()
-
-		except: Logger.error()
+		# Linux
+		try:
+			if linux or android:
+				data = Subprocess.output('cat /proc/cpuinfo').strip()
+				if data:
+					result = Regex.extract(data = data, expression = 'model\s*name\s*:\s*(.*?)[\n\r]')
+					if result: return result.strip()
+					result = Regex.extract(data = data, expression = 'processor\s*:\s*(.*?(?:intel|amd|arm|aarch|risc|acorn|a32|a64|arc).*?)(?:$|\n)') # Android devices.
+					if result: return result.strip()
+		except: pass
 
 		# CpuInfo
 		try:
@@ -8994,7 +9034,8 @@ class Hardware(object):
 
 		# At least ARM devices can be detected from the architecture.
 		try:
-			result = Platform.architectureLabel()
+			# NB: Not full, otherwise there is infinite recuysrions between Platform and Hardware.
+			result = Platform.architectureLabel(full = False)
 			if result: return result
 		except: pass
 
@@ -9232,43 +9273,60 @@ class Hardware(object):
 				if result and result['total']: return result
 		except: pass
 
+		# Manual
+		windows = False
+		mac = False
+		linux = False
+		android = Platform.detectAndroid()
 		try:
 			import platform
 			system = platform.system()
 			if system:
 				system = system.lower()
+				if 'windows' in system: windows = True
+				elif 'darwin' in system or 'mac' in system: mac = True
+				elif 'linux' in system or 'unix' in system: linux = True
+		except: pass
 
-				# Windows
-				if 'windows' in system:
-					for clock in ['MaxClockSpeed', 'CurrentClockSpeed']:
-						try:
-							result = Subprocess.output(['wmic', 'cpu', 'get', clock]).strip().split('\r\n')[1]
-							result = _result(result, unit = 'mhz', count = count)
-							if result and result['total']: return result
-						except: pass
-
-				# Mac
-				elif 'darwin' in system or 'mac' in system:
-					for clock in ['hw.cpufrequency_max', 'hw.cpufrequency']:
-						try:
-							import os
-							os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
-							result = Subprocess.output('sysctl ' + clock).strip()
-							result = _result(result, unit = 'hz', count = count)
-							if result and result['total']: return result
-						except: pass
-
-				# Linux
-				elif 'linux' in system or 'unix' in system or Platform.detectAndroid():
-					result = Subprocess.output('lscpu').strip()
-					if result:
-						result = Regex.extract(data = result, expression = 'cpu\s*mhz.*?([\d\.]+)')
+		# Windows
+		try:
+			if windows:
+				for clock in ['MaxClockSpeed', 'CurrentClockSpeed']:
+					try:
+						result = Subprocess.output(['wmic', 'cpu', 'get', clock]).strip().split('\r\n')[1]
 						result = _result(result, unit = 'mhz', count = count)
 						if result and result['total']: return result
+					except: pass
+		except: pass
 
-						result = Regex.extract(data = result, expression = 'cpu\s*ghz.*?([\d\.]+)')
-						result = _result(result, unit = 'ghz', count = count)
+		# Mac
+		try:
+			if mac:
+				for clock in ['hw.cpufrequency_max', 'hw.cpufrequency']:
+					try:
+						import os
+						os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
+						result = Subprocess.output('sysctl ' + clock).strip()
+						result = _result(result, unit = 'hz', count = count)
 						if result and result['total']: return result
+					except: pass
+		except: pass
+
+		# Linux
+		try:
+			if linux or android:
+				for info in ['lscpu', 'cat /proc/cpuinfo']:
+					try:
+						data = Subprocess.output(info).strip()
+						if data:
+							result = Regex.extract(data = data, expression = 'cpu\s*mhz.*?([\d\.]+)')
+							result = _result(result, unit = 'mhz', count = count)
+							if result and result['total']: return result
+
+							result = Regex.extract(data = data, expression = 'cpu\s*ghz.*?([\d\.]+)')
+							result = _result(result, unit = 'ghz', count = count)
+							if result and result['total']: return result
+					except: pass
 		except: pass
 
 		# CPU Model
@@ -9286,13 +9344,13 @@ class Hardware(object):
 
 		# Only use Kodi's InfoLabel last, since it takes long and sometimes returns -1MHz.
 		try:
-			result = System.infoLabel('System.CpuFrequency', wait = True)
+			data = System.infoLabel('System.CpuFrequency', wait = True)
 			if result:
-				result = Regex.extract(data = result, expression = '([\d\.\-]+)\s*mhz')
+				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*mhz')
 				result = _result(result, unit = 'mhz', count = count)
 				if result and result['total']: return result
 
-				result = Regex.extract(data = result, expression = '([\d\.\-]+)\s*ghz')
+				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*ghz')
 				result = _result(result, unit = 'ghz', count = count)
 				if result and result['total']: return result
 		except: pass

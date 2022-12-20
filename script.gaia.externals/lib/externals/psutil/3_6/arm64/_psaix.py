@@ -107,7 +107,7 @@ pmmap_ext = namedtuple(
 
 def get_procfs_path():
     """Return updated psutil.PROCFS_PATH constant."""
-    return sys.modules['externals.psutil.36.arm64'].PROCFS_PATH
+    return sys.modules['externals.psutil.3_6.arm64'].PROCFS_PATH
 
 
 # =====================================================================

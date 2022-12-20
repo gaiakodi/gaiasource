@@ -749,7 +749,7 @@ def bytes2human(n, format="%(value).1f%(symbol)s"):
 
 def get_procfs_path():
     """Return updated psutil.PROCFS_PATH constant."""
-    return sys.modules['externals.psutil.37.armel'].PROCFS_PATH
+    return sys.modules['externals.psutil.3_7.armel'].PROCFS_PATH
 
 
 if PY3:

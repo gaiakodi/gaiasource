@@ -148,7 +148,7 @@ def open_text(fname, **kwargs):
 
 
 def get_procfs_path():
-    return sys.modules['externals.psutil.35.armhf'].PROCFS_PATH
+    return sys.modules['externals.psutil.3_5.armhf'].PROCFS_PATH
 
 
 def readlink(path):
