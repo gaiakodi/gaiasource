@@ -2927,8 +2927,20 @@ class Core(object):
 		addonFanart = Theme.fanart()
 
 		total = len(items)
-		try: multi = 'meta' in items[0]
-		except: multi = False
+
+		multi = False
+		try:
+			if 'metadata' in items[0]:
+				different = False
+				previous = None
+				for item in items:
+					current = item['metadata']
+					if previous and current and not previous == current:
+						different = True
+						break
+					previous = current
+				multi = different
+		except: pass
 
 		try: title = metadata['tvshowtitle']
 		except:

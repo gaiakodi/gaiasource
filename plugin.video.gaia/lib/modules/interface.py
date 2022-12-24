@@ -61,6 +61,9 @@ class Skin(object):
 	TypeAeon = 'skin.aeon'
 	TypeAeonNox = 'skin.aeon.nox'
 	TypeAeonNoxSilvo = 'skin.aeon.nox.silvo'
+	TypeAeonViper = 'skin.aeon.viper'
+	TypeAeonViperK19 = 'skin.aeon.viper.k19'
+	TypeAeonViperK20 = 'skin.aeon.viper.k20'
 
 	TypeEminence = 'skin.eminence.2'
 	TypeEminenceGaia = 'skin.eminence.gaia'
@@ -73,6 +76,9 @@ class Skin(object):
 		TypeArcticHorizon : True,
 		TypeAeonNox : False, # Not sure, but at least the Silvo skin does not support it.
 		TypeAeonNoxSilvo : False, # Shows a normal list dialog, just with the icon on the side. But does not show label2 on the 2nd line.
+		TypeAeonViper : False,
+		TypeAeonViperK19 : False,
+		TypeAeonViperK20 : False,
 		TypeEminence : True,
 		TypeEminenceGaia : True,
 	}
@@ -85,6 +91,9 @@ class Skin(object):
 		TypeArcticHorizon : True,
 		TypeAeonNox : True,
 		TypeAeonNoxSilvo : True,
+		TypeAeonViper : True,
+		TypeAeonViperK19 : True,
+		TypeAeonViperK20 : True,
 		TypeEminence : True,
 		TypeEminenceGaia : True,
 	}
@@ -97,6 +106,9 @@ class Skin(object):
 		TypeArcticHorizon : True,
 		TypeAeonNox : True,
 		TypeAeonNoxSilvo : True,
+		TypeAeonViper : True,
+		TypeAeonViperK19 : True,
+		TypeAeonViperK20 : True,
 		TypeEminence : True,
 		TypeEminenceGaia : True,
 	}
@@ -109,6 +121,9 @@ class Skin(object):
 		TypeArcticHorizon : False,
 		TypeAeonNox : False,
 		TypeAeonNoxSilvo : False,
+		TypeAeonViper : False,
+		TypeAeonViperK19 : False,
+		TypeAeonViperK20 : False,
 		TypeEminence : False,
 		TypeEminenceGaia : True,
 	}
@@ -158,6 +173,10 @@ class Skin(object):
 	@classmethod
 	def isAeonNoxSilvo(self):
 		return self.isSkin(Skin.TypeAeonNoxSilvo)
+
+	@classmethod
+	def isAeonViper(self):
+		return self.isSkin(Skin.TypeAeonViper)
 
 	@classmethod
 	def isEminence(self):
@@ -2904,7 +2923,8 @@ class Loader(object):
 		if Loader.Enabled: tools.System.execute('ActivateWindow(%s)' % Loader.Id)
 
 	@classmethod
-	def hide(self, wait = False):
+	def hide(self, wait = False, delay = None):
+		if delay: tools.Time.sleep(delay)
 		tools.System.execute('Dialog.Close(%s)' % Loader.Id)
 		tools.System.execute('Dialog.Close(%s)' % Loader.IdCancel)
 		if wait:
@@ -2941,6 +2961,7 @@ class Directory(object):
 	ContentShows = 'tvshows'
 	ContentSeasons = 'seasons'
 	ContentEpisodes = 'episodes'
+	ContentSets = 'sets'
 	ContentAlbums = 'albums'
 	ContentSongs = 'songs'
 	ContentMusicVideos = 'musicvideos'
@@ -3483,6 +3504,8 @@ class Context(object):
 	EnabledDownloadCache = None
 	EnabledManagerManual = None
 	EnabledManagerCache = None
+	EnabledVpnManager = None
+	EnabledBluetooth = None
 
 	SettingsInformer = False
 	SettingsEnabled = False
@@ -3677,6 +3700,9 @@ class Context(object):
 			Context.EnabledManagerManual = data['enabled']['download']['manager']['manual']
 			Context.EnabledManagerCache = data['enabled']['download']['manager']['cache']
 
+			Context.EnabledVpnManager = data['enabled']['vpn']['manager']
+			Context.EnabledBluetooth = data['enabled']['bluetooth']
+
 			Context.SettingsInformer = data['settings']['informer']
 			Context.SettingsEnabled = data['settings']['enabled']['global']
 			Context.SettingsEnabledGaia = data['settings']['enabled']['gaia']
@@ -3696,6 +3722,7 @@ class Context(object):
 		from lib.modules.window import Window
 		from lib.informers import Informer
 		from lib.modules.library import Library
+		from lib.modules.bluetooth import Bluetooth
 		from lib.modules import trakt as Trakt
 		from lib.modules import video
 
@@ -3749,6 +3776,12 @@ class Context(object):
 						'cache' : enabledDownloadCache,
 					},
 				},
+
+				'vpn' : {
+					'manager' : tools.VpnManager.installed(),
+				},
+
+				'bluetooth' : Bluetooth.supported(),
 			},
 
 			'label' : {
@@ -3843,10 +3876,10 @@ class Context(object):
 		if not self.mKids is None and not 'kids' in parameters: parameters['kids'] = self.mKids
 		return dict((key, value) for key, value in parameters.items() if not value is None)
 
-	def _commandPlugin(self, action, parameters = {}):
+	def _commandPlugin(self, action, parameters = {}, id = None):
 		return tools.System.commandPlugin(action = action, parameters = self._command(parameters))
 
-	def _commandContainer(self, action, parameters = {}, replace = False):
+	def _commandContainer(self, action, parameters = {}, id = None, replace = False):
 		return tools.System.commandContainer(action = action, parameters = self._command(parameters), replace = replace)
 
 	def dataTo(self, force = False):
@@ -3952,9 +3985,6 @@ class Context(object):
 		result = (Context.LabelMenu, self._commandPlugin(action = 'contextShow', parameters = {'context' : self.dataTo()}))
 		if full: result = [result]
 		return result
-
-	def commandSettings(self):
-		return self._commandPlugin(action = 'settingsAdvanced')
 
 	def commandInformation(self):
 		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : self.mMedia, 'metadata' : self.mMetadata})
@@ -4237,6 +4267,63 @@ class Context(object):
 	def commandLibraryClean(self):
 		return self._commandPlugin(action = 'libraryClean')
 
+	def commandSettingsGaia(self):
+		return self._commandPlugin(action = 'settingsAdvanced')
+
+	def commandSettingsSkin(self):
+		return 'ActivateWindow(skinsettings)'
+
+	def commandSettingsKodi(self):
+		return 'ActivateWindow(settings)'
+
+	def commandNetworkInfo(self):
+		return self._commandPlugin(action = 'networkInformation')
+
+	def commandNetworkTest(self):
+		return self._commandPlugin(action = 'speedtestGlobal')
+
+	def commandVpnChange(self):
+		return self._commandPlugin(action = 'vpnChange', parameters = {'dialog' : True})
+
+	def commandVpnDisconnect(self):
+		return self._commandPlugin(action = 'vpnDisconnect')
+
+	def commandVpnStatus(self):
+		return self._commandPlugin(action = 'vpnStatus')
+
+	def commandVpnSettings(self):
+		return self._commandPlugin(action = 'vpnSettings', parameters = {'external' : True})
+
+	def commandBluetoothConnect(self):
+		return self._commandPlugin(action = 'bluetoothConnect')
+
+	def commandBluetoothDisconnect(self):
+		return self._commandPlugin(action = 'bluetoothDisconnect')
+
+	def commandBluetoothDevices(self):
+		return self._commandPlugin(action = 'bluetoothDialog')
+
+	def commandSystemInformation(self):
+		return self._commandPlugin(action = 'systemInformation')
+
+	def commandSystemManager(self):
+		return self._commandPlugin(action = 'systemManager')
+
+	def commandSystemTools(self):
+		return self._commandPlugin(action = 'systemTools')
+
+	def commandSystemCleanup(self):
+		return self._commandPlugin(action = 'clean')
+
+	def commandLogScrape(self):
+		return self._commandPlugin(action = 'logScrape')
+
+	def commandLogKodi(self):
+		return self._commandPlugin(action = 'logKodi')
+
+	def commandLogExport(self):
+		return self._commandPlugin(action = 'supportReport')
+
 	def add(self, label, icon = None, action = None, command = None, parameters = None, condition = None, dynamic = None, close = None, loader = None, items = None):
 		try:
 			item = {'label' : self._translate(label)}
@@ -4262,7 +4349,7 @@ class Context(object):
 			self.addLibrary()
 			self.addPlaylist()
 			self.addShortcut()
-			self.addSettings()
+			self.addTools()
 		except:
 			tools.Logger.error()
 
@@ -4281,7 +4368,7 @@ class Context(object):
 			self.addShortcut()
 			self.addDownloads()
 			self.addRefresh()
-			self.addSettings()
+			self.addTools()
 		except:
 			tools.Logger.error()
 
@@ -4299,17 +4386,14 @@ class Context(object):
 			self.addPlaylist()
 			self.addShortcut()
 			self.addManual()
-			self.addSettings()
+			self.addTools()
 		except: tools.Logger.error()
 
 	def addVideo(self):
 		try:
 			self.addVideoMenu()
-			self.addSettings()
+			self.addTools()
 		except: tools.Logger.error()
-
-	def addSettings(self):
-		self.add(label = 33011, icon = Font.IconSettings, command = 'commandSettings')
 
 	def addInformation(self):
 		items = []
@@ -4508,21 +4592,56 @@ class Context(object):
 
 	def addLibrary(self):
 		items = []
-		if not self.mLibrary == None:
+		if not self.mLibrary is None:
 			items.append({'label' : self._translate(35495, 32515), 'command' : 'commandLibraryAddDirect', 'condition' : 'Context.EnabledLibrary'})
-		elif self.mMode == Context.ModeStream and not self.mLink == None:
+		elif self.mMode == Context.ModeStream and not self.mLink is None:
 			items.append({'label' : self._translate(35495, 33071), 'command' : 'commandLibraryAddStream', 'condition' : 'Context.EnabledLibrary'})
-		if tools.Media.typeMovie(self.mMedia) and (not self.mImdb == None or not self.mTmdb == None):
+		if tools.Media.typeMovie(self.mMedia) and (not self.mImdb == None or not self.mTmdb is None):
 			items.append({'label' : self._translate(35495, 35497 if self.mMedia == tools.Media.TypeDocumentary else 35110  if self.mMedia == tools.Media.TypeShort else 35496), 'command' : 'commandLibraryAddMovie', 'condition' : 'Context.EnabledLibrary'})
-		if tools.Media.typeTelevision(self.mMedia) and (not self.mImdb == None or not self.mTvdb == None):
-			if not self.mSeason == None and not self.mEpisode == None:
+		if tools.Media.typeTelevision(self.mMedia) and (not self.mImdb is None or not self.mTvdb is None):
+			if not self.mSeason is None and not self.mEpisode is None:
 				items.append({'label' : self._translate(35495, 33028), 'command' : 'commandLibraryAddEpisode', 'condition' : 'Context.EnabledLibrary'})
-			if not self.mSeason == None:
+			if not self.mSeason is None:
 				items.append({'label' : self._translate(35495, 32055), 'command' : 'commandLibraryAddSeason', 'condition' : 'Context.EnabledLibrary'})
 			items.append({'label' : self._translate(35495, 35498), 'command' : 'commandLibraryAddShow', 'condition' : 'Context.EnabledLibrary'})
 		items.append({'label' : self._translate(35493), 'command' : 'commandLibraryUpdate', 'condition' : 'Context.EnabledLibrary'})
 		items.append({'label' : self._translate(35674), 'command' : 'commandLibraryClean', 'condition' : 'Context.EnabledLibrary'})
 		self.add(label = 35170, icon = Font.IconLibrary, items = items)
+
+	def addTools(self):
+		self.add(label = 32008, icon = Font.IconSettings, items = [
+			{'label' : 33011, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 32341, 'icon' : Font.IconSettings, 'command' : 'commandSettingsGaia'},
+				{'label' : 32342, 'icon' : Font.IconSettings, 'command' : 'commandSettingsSkin'},
+				{'label' : 32343, 'icon' : Font.IconSettings, 'command' : 'commandSettingsKodi'},
+			]},
+			{'label' : 33719, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 33037, 'icon' : Font.IconSettings, 'command' : 'commandNetworkInfo'},
+				{'label' : 33030, 'icon' : Font.IconSettings, 'command' : 'commandNetworkTest'},
+			]},
+			{'label' : 33801, 'icon' : Font.IconSettings, 'condition' : 'Context.EnabledVpnManager', 'items' : [
+				{'label' : 33150, 'icon' : Font.IconSettings, 'command' : 'commandVpnChange'},
+				{'label' : 33811, 'icon' : Font.IconSettings, 'command' : 'commandVpnDisconnect'},
+				{'label' : 33812, 'icon' : Font.IconSettings, 'command' : 'commandVpnStatus'},
+				{'label' : 33813, 'icon' : Font.IconSettings, 'command' : 'commandVpnSettings'},
+			]} if Context.EnabledVpnManager else None,
+			{'label' : 33529, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 33530, 'icon' : Font.IconSettings, 'command' : 'commandBluetoothConnect'},
+				{'label' : 33531, 'icon' : Font.IconSettings, 'command' : 'commandBluetoothDisconnect'},
+				{'label' : 33532, 'icon' : Font.IconSettings, 'command' : 'commandBluetoothDevices'},
+			]} if Context.EnabledBluetooth else None,
+			{'label' : 33467, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 33478, 'icon' : Font.IconSettings, 'command' : 'commandSystemInformation'},
+				{'label' : 33479, 'icon' : Font.IconSettings, 'command' : 'commandSystemManager'},
+				{'label' : 33476, 'icon' : Font.IconSettings, 'command' : 'commandSystemTools'},
+				{'label' : 33495, 'icon' : Font.IconSettings, 'command' : 'commandSystemCleanup'},
+			]},
+			{'label' : 32062, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 32063, 'icon' : Font.IconSettings, 'command' : 'commandLogScrape'},
+				{'label' : 32064, 'icon' : Font.IconSettings, 'command' : 'commandLogKodi'},
+				{'label' : 33151, 'icon' : Font.IconSettings, 'command' : 'commandLogExport'},
+			]},
+		])
 
 	def show(self, wait = False):
 		# Sometimes a sporadic issue occurs where it seems that the Gaia context menu is populated twice (or more) with the same context menu items.

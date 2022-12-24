@@ -175,7 +175,7 @@ class Shows(object):
 						query = Regex.extract(data = link, expression = 'query=(.*?)(?:$|&)')
 						if query:
 							query = Networker.linkUnquote(query)
-							items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, query = query)
+							items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, query = query, language = self.mLanguage)
 
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -203,7 +203,7 @@ class Shows(object):
 
 				if MetaTmdb.LinkSearchShow in link:
 					self.mModeSearch = True
-					items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, link = link)
+					items = self.cache('cacheMedium', refresh, MetaTmdb.searchShow, link = link, language = self.mLanguage)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 			elif domain == 'tvmaze':

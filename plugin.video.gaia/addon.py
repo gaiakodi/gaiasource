@@ -174,6 +174,16 @@ elif action.startswith('movies'):
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids, menu = menu).moviesLists()
 
+	elif action == 'moviesSets':
+		#gaiaremove
+		#from lib.indexers.navigator import Navigator
+		#Navigator(media = media, kids = kids, menu = menu).moviesSets()
+		#from lib.meta.processors.tmdb import MetaTmdb
+		from lib.meta.tools import MetaTools
+		#x =MetaTmdb.set(id = 10)
+		x=MetaTools.idSet(title = 'Star Wars', cache = False)
+		tools.Logger.log("UUUUUUUUUUUUUUU: "+tools.Converter.jsonTo(x))
+
 	elif action == 'moviesPeople':
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids, menu = menu).moviesPeople()
@@ -1588,6 +1598,25 @@ elif action.startswith('vpnmanager'): # Make sure this is placed BEFORE the 'vpn
 		tools.VpnManager.enable(refresh = True, confirm = True, settings = settings)
 
 ####################################################
+# BLUETOOTH
+####################################################
+
+elif action.startswith('bluetooth'):
+
+	if action == 'bluetoothConnect':
+		from lib.modules.bluetooth import Bluetooth
+		Bluetooth.connect()
+
+	elif action == 'bluetoothDisconnect':
+		from lib.modules.bluetooth import Bluetooth
+		Bluetooth.disconnect()
+
+	elif action == 'bluetoothDialog':
+		from lib.modules.bluetooth import Bluetooth
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Bluetooth.dialog(settings = settings)
+
+####################################################
 # SPEEDTEST
 ####################################################
 
@@ -1851,8 +1880,23 @@ elif action.startswith('vpn'):
 		Vpn.configuration(settings = settings)
 
 	elif action == 'vpnSettings':
-		from lib.modules.vpn import Vpn
-		Vpn.settingsLaunch()
+		external = tools.Converter.boolean(parameters.get('external'))
+		if external:
+			tools.VpnManager.settings()
+		else:
+			from lib.modules.vpn import Vpn
+			Vpn.settingsLaunch()
+
+	elif action == 'vpnChange':
+		profile = parameters.get('profile')
+		dialog = tools.Converter.boolean(parameters.get('dialog'))
+		tools.VpnManager.change(profile = profile, dialog = dialog)
+
+	elif action == 'vpnDisconnect':
+		tools.VpnManager.disconnect()
+
+	elif action == 'vpnStatus':
+		tools.VpnManager.status()
 
 ####################################################
 # EXTENSIONS

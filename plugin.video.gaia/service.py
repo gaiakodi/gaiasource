@@ -28,6 +28,7 @@ if not Settings.interpreterSelect(notification = True, silent = True):
 	from lib.modules.interface import Context
 	from lib.modules.library import Library
 	from lib.modules.vpn import Vpn
+	from lib.modules.bluetooth import Bluetooth
 
 	# Remove Old Settings
 	# Do here instead of during the addon launch, since this function can fail and also takes very long.
@@ -45,6 +46,9 @@ if not Settings.interpreterSelect(notification = True, silent = True):
 
 	# Context Menu
 	Context.initialize()
+
+	# Bluetooth Monitor
+	Bluetooth.service()
 
 	# Launch Lightpack
 	Lightpack().launchAutomatic()

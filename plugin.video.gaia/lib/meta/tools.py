@@ -2312,6 +2312,41 @@ class MetaTools(object):
 		return result if result else None
 
 	@classmethod
+	def idSet(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
+		if cache:
+			result = None
+			if not result and title: result = self._idCache(function = self.idSet, title = title, year = year, cache = False)
+			return result
+
+		result = {}
+		lookup = False
+		keyword = ' collection'
+
+		if not lookup and title:
+
+			# Search TMDb by title.
+			try:
+				if not result or not 'tmdb' in result or not result['tmdb']:
+					from lib.modules.account import Tmdb
+					from lib.modules.network import Networker
+					from lib.modules.clean import Title
+					key = Tmdb().key()
+					query = Title.clean(title)
+					link = 'https://api.themoviedb.org/3/search/collection'
+					data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query})
+					if data and 'results' in data:
+						data = data['results']
+						query = query.rstrip(keyword)
+						for i in data:
+							if query == Title.clean(i['name']).rstrip(keyword):
+								id = i.get('id')
+								if id: Tools.update(result, {'tmdb' : str(id)}, none = False)
+								break
+			except: Logger.error()
+
+		return result if result else None
+
+	@classmethod
 	def idShow(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
 		if cache:
 			# Do these separately, otherwise if this function is called with different ID-combination, it will not use the cached result.

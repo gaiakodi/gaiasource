@@ -138,6 +138,12 @@ class Core(base.Core):
 	def accountLabel(self):
 		return self.mAccount.dataLabel()
 
+	def accountUsername(self):
+		return self.mAccount.dataUsername()
+
+	def accountPassword(self):
+		return self.mAccount.dataPassword()
+
 	def accountSettings(self, enable = True):
 		tools.Settings.launch('premium.easynews.enabled')
 

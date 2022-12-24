@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Media, Logger, Regex
+from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter
 from lib.modules.account import Tmdb
 from lib.modules.network import Networker
 
@@ -31,6 +31,9 @@ class MetaTmdb(object):
 
 	LinkSearchMovie	= 'https://api.themoviedb.org/3/search/movie'
 	LinkSearchShow	= 'https://api.themoviedb.org/3/search/tv'
+
+	LinkSetIds		= 'https://files.tmdb.org/p/exports/collection_ids_%s.json.gz'
+	LinkSetDetails	= 'https://api.themoviedb.org/3/collection/%s'
 
 	##############################################################################
 	# GENERAL
@@ -72,7 +75,7 @@ class MetaTmdb(object):
 	##############################################################################
 
 	@classmethod
-	def searchMovie(self, query = None, page = 1, link = None):
+	def searchMovie(self, query = None, page = 1, link = None, language = None):
 		results = None
 		try:
 			if link:
@@ -84,7 +87,10 @@ class MetaTmdb(object):
 					Logger.error()
 					return results
 
-			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchMovie, data = {'query' : query, 'page' : page})
+			data = {'query' : query, 'page' : page}
+			if language: data['language'] = language
+
+			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchMovie, data = data)
 			if data:
 				page +=1
 				next = None
@@ -127,7 +133,7 @@ class MetaTmdb(object):
 		return results
 
 	@classmethod
-	def searchShow(self, query = None, page = 1, link = None):
+	def searchShow(self, query = None, page = 1, link = None, language = None):
 		results = None
 		try:
 			if link:
@@ -139,7 +145,10 @@ class MetaTmdb(object):
 					Logger.error()
 					return results
 
-			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchShow, data = {'query' : query, 'page' : page})
+			data = {'query' : query, 'page' : page}
+			if language: data['language'] = language
+
+			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchShow, data = data)
 			if data:
 				page +=1
 				next = None
@@ -180,3 +189,32 @@ class MetaTmdb(object):
 		except: Logger.error()
 
 		return results
+
+	##############################################################################
+	# SET
+	##############################################################################
+
+	@classmethod
+	def sets(self):
+		result = None
+		try:
+			link = MetaTmdb.LinkSetIds % Time.past(days = 1, format = '%m_%d_%Y')
+			data = Networker().requestData(link = link)
+			if data:
+				data = Tools.gzUncompress(data = data)
+				if data:
+					data = Converter.unicode(data)
+					if data:
+						data = data.strip()
+						data = data.replace('\n', ',\n')
+						data = data.strip('\n').strip(',').strip('\n')
+						data = Converter.jsonFrom('[' + data + ']')
+						if data: result = [{'tmdb' : i['id'], 'title' : i['name']} for i in data]
+		except: Logger.error()
+		return result
+
+	@classmethod
+	def set(self, id, language = None):
+		data = {'language' : language} if language else None
+		data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSetDetails % id, data = data)
+		return data

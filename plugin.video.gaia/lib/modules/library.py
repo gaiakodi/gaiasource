@@ -693,12 +693,12 @@ class Library(object):
 			try:
 				if it is None:
 					it = Episodes(kids = self.mKids).retrieve(idImdb = item['imdb'], idTvdb = item['tvdb'], title = item['tvshowtitle'], year = item['year'], menu = False)
-
-					status = it[0]['status'].lower()
-					it = [{'title': i['title'], 'year': item['year'] if item['year'] else i['year'], 'imdb': i['imdb'], 'tvdb': i['tvdb'], 'season': i['season'], 'episode': i['episode'], 'tvshowtitle': i['tvshowtitle'], 'premiered': i['premiered'], 'count': i['count'] if 'count' in i else None} for i in it]
-					if not status == 'continuing' and not status == 'continue':
-						json = Converter.jsonTo(it)
-						base._insert('INSERT INTO shows VALUES (?, ?);', parameters = (item['tvdb'], json))
+					if it:
+						status = it[0]['status'].lower()
+						it = [{'title': i['title'], 'year': item['year'] if item['year'] else i['year'], 'imdb': i['imdb'], 'tvdb': i['tvdb'], 'season': i['season'], 'episode': i['episode'], 'tvshowtitle': i['tvshowtitle'], 'premiered': i['premiered'], 'count': i['count'] if 'count' in i else None} for i in it]
+						if not status == 'continuing' and not status == 'continue':
+							json = Converter.jsonTo(it)
+							base._insert('INSERT INTO shows VALUES (?, ?);', parameters = (item['tvdb'], json))
 			except: Logger.error()
 
 			try:

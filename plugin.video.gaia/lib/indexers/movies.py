@@ -202,7 +202,7 @@ class Movies(object):
 						query = Regex.extract(data = link, expression = 'query=(.*?)(?:$|&)')
 						if query:
 							query = Networker.linkUnquote(query)
-							items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, query = query)
+							items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, query = query, language = self.mLanguage)
 							# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
 							if not Regex.match(data = link, expression = '(extend|special|edition|version)'):
 								items = [i for i in items if not(Regex.match(data = i['title'], expression = '[\(\[].*?edition.*[\)\]]$') and (not 'year' in i or not i['year'] or not 'premiered' in i or not i['premiered']))]
@@ -267,7 +267,7 @@ class Movies(object):
 
 				if MetaTmdb.LinkSearchMovie in link:
 					self.mModeSearch = True
-					items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, link = link)
+					items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, link = link, language = self.mLanguage)
 
 					# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
 					if not Regex.match(data = link, expression = '(extend|special|edition|version)'):

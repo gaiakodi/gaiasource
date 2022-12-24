@@ -1659,7 +1659,7 @@ class Episodes(object):
 				pack = Seasons().metadata(idImdb = idImdb, idTvdb = idTvdb, season = season, cache = cache)['pack']['seasons']
 				if not pack: raise Exception()
 			except:
-				Logger.log('CANNOT DETERMINE NEXT EPISODE: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
+				if developer: Logger.log('CANNOT DETERMINE NEXT EPISODE: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
 				return False
 
 			# Retrieve the next available episode after the last watched episode.

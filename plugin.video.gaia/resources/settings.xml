@@ -7926,6 +7926,74 @@ The label is then added to the action element:
 		</category>
 
 
+		<!---------- BLUETOOTH ---------->
+		<category id="bluetooth" label="33529" help="34554">
+
+			<!---------- BLUETOOTH - GENERAL ---------->
+			<group id="bluetooth.general" label="32310">
+				<setting id="bluetooth.general.enabled" type="boolean" label="33539" help="34555">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+			</group>
+
+			<!---------- BLUETOOTH - DEVICE ---------->
+			<group id="bluetooth.device" label="33536">
+				<setting id="bluetooth.device.list" type="string" label="33532" help="34556">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=bluetoothDialog&settings=true)</data>
+						<close>true</close>
+					</control>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<default>0 $ADDON[plugin.video.gaia 33536]</default>
+					<level>2</level>
+					<dependencies>
+						<dependency type="visible" setting="bluetooth.general.enabled">true</dependency>
+						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!---------- BLUETOOTH - MONITOR ---------->
+			<group id="bluetooth.monitor" label="33540">
+				<setting id="bluetooth.monitor.enabled" type="boolean" label="33537" help="34557">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="bluetooth.general.enabled">true</dependency>
+						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
+					</dependencies>
+				</setting>
+				<setting id="bluetooth.monitor.interval" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="bluetooth.monitor.interval.label" type="string" label="33538" help="34558" parent="bluetooth.monitor.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=bluetooth.monitor.interval&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="bluetooth.general.enabled">true</condition>
+								<condition setting="bluetooth.monitor.enabled">true</condition>
+							</and>
+						</dependency>
+						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+		</category>
+
+
 		<!---------- AMBILIGHT ---------->
 		<category id="ambilight" label="33311" help="34239">
 

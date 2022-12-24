@@ -35,6 +35,7 @@ class MetaCache(Database):
 	AttributeComplete	= 'complete'
 
 	TypeMovie			= Media.TypeMovie
+	TypeSet				= Media.TypeSet
 	TypeShow			= Media.TypeShow
 	TypeSeason			= Media.TypeSeason
 	TypeEpisode			= Media.TypeEpisode
@@ -53,6 +54,7 @@ class MetaCache(Database):
 	# When the data outdated and should be refreshed in the background while the old cached data is still returned and displayed.
 	TimeOutdated		= 2678400		# 1 Month.
 	TimeOutdatedMovie	= TimeOutdated
+	TimeOutdatedSet		= TimeOutdated
 	TimeOutdatedShow	= TimeOutdated
 	TimeOutdatedSeason	= TimeOutdated
 	TimeOutdatedEpisode	= TimeOutdated
@@ -61,6 +63,7 @@ class MetaCache(Database):
 	# Keep this at a very long time, since one can always show the new data by reloading the menu after it wass refreshed in the background.
 	TimeObsolete		= 31556952		# 1 Year.
 	TimeObsoleteMovie	= TimeObsolete
+	TimeObsoleteSet	= TimeObsolete
 	TimeObsoleteShow	= TimeObsolete
 	TimeObsoleteSeason	= TimeObsolete
 	TimeObsoleteEpisode	= TimeObsolete
@@ -104,6 +107,26 @@ class MetaCache(Database):
 				UNIQUE(settings, idImdb, idTmdb)
 			);
 			''' % MetaCache.TypeMovie,
+		)
+		self._create('''
+			CREATE TABLE IF NOT EXISTS `%s`
+			(
+				time INTEGER,
+				complete BOOLEAN,
+				settings TEXT,
+
+				idImdb TEXT,
+				idTmdb TEXT,
+				idTvdb TEXT,
+				idTrakt TEXT,
+				idTvmaze TEXT,
+				idSlug TEXT,
+
+				data TEXT,
+
+				UNIQUE(settings, idTmdb)
+			);
+			''' % MetaCache.TypeSet,
 		)
 		self._create('''
 			CREATE TABLE IF NOT EXISTS %s
@@ -222,18 +245,21 @@ class MetaCache(Database):
 	@classmethod
 	def _type(self, type):
 		typeMovie = False
+		typeSet = False
 		typeShow = False
 		typeSeason = False
 		typeEpisode = False
 		if type == MetaCache.TypeMovie: typeMovie = True
+		elif type == MetaCache.TypeSet: typeSet = True
 		elif type == MetaCache.TypeShow: typeShow = True
 		elif type == MetaCache.TypeSeason: typeSeason = True
 		elif type == MetaCache.TypeEpisode: typeEpisode = True
-		return typeMovie, typeShow, typeSeason, typeEpisode
+		return typeMovie, typeSet, typeShow, typeSeason, typeEpisode
 
 	@classmethod
 	def _timeOutdated(self, type):
 		if type == MetaCache.TypeMovie: return MetaCache.TimeOutdatedMovie
+		elif type == MetaCache.TypeSet: return MetaCache.TimeOutdatedSet
 		elif type == MetaCache.TypeShow: return MetaCache.TimeOutdatedShow
 		elif type == MetaCache.TypeSeason: return MetaCache.TimeOutdatedSeason
 		elif type == MetaCache.TypeEpisode: return MetaCache.TimeOutdatedEpisode
@@ -241,6 +267,7 @@ class MetaCache(Database):
 	@classmethod
 	def _timeObsolete(self, type):
 		if type == MetaCache.TypeMovie: return MetaCache.TimeObsoleteMovie
+		elif type == MetaCache.TypeSet: return MetaCache.TimeObsoleteSet
 		elif type == MetaCache.TypeShow: return MetaCache.TimeObsoleteShow
 		elif type == MetaCache.TypeSeason: return MetaCache.TimeObsoleteSeason
 		elif type == MetaCache.TypeEpisode: return MetaCache.TimeObsoleteEpisode
@@ -296,7 +323,7 @@ class MetaCache(Database):
 			result = True
 			time = Time.timestamp()
 			settings = self.settingsId()
-			typeMovie, typeShow, typeSeason, typeEpisode = self._type(type)
+			typeMovie, typeSet, typeShow, typeSeason, typeEpisode = self._type(type)
 
 			# Sometimes the IDs are incorrect.
 			# Especially Trakt sometimes returns the incorrect IMDb/TMDb/TVDb ID, specfically for less-known titles or newley/not-yet released titles.
@@ -307,6 +334,9 @@ class MetaCache(Database):
 				queryDelete2 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTmdb IS NULL;' % type
 				queryDelete3 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTmdb = ?;' % type
 				queryDelete4 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTmdb IS NULL AND idTvmaze = ?;' % type
+			elif typeSet:
+				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idTmdb = ?;' % type
 			elif typeShow:
 				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
 				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb = ?;' % type
@@ -358,6 +388,12 @@ class MetaCache(Database):
 								elif idTvmaze:
 									queryDelete = queryDelete4
 									parametersDelete = [idTvmaze]
+						elif typeSet:
+							if idTmdb:
+								parametersInsert = []
+								if idTmdb:
+									queryDelete = queryDelete1
+									parametersDelete = [idTmdb]
 						else:
 							if idImdb or idTvdb or idTvmaze:
 								parametersInsert = []
@@ -397,7 +433,7 @@ class MetaCache(Database):
 	def select(self, type, items):
 		try:
 			settings = self.settingsId()
-			typeMovie, typeShow, typeSeason, typeEpisode = self._type(type)
+			typeMovie, typeSet, typeShow, typeSeason, typeEpisode = self._type(type)
 
 			timeCurrent = Time.timestamp()
 			timeOutdated = self._timeOutdated(type)
@@ -415,6 +451,8 @@ class MetaCache(Database):
 				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? ORDER BY time DESC;' % type
 				querySelect3 = 'SELECT time, complete, settings, data FROM %s WHERE idTmdb = ? ORDER BY time DESC;' % type
 				querySelect4 = 'SELECT time, complete, settings, data FROM %s WHERE idTvmaze = ? ORDER BY time DESC;' % type
+			elif typeSet:
+				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idTmdb = ? ORDER BY time DESC;' % type
 			elif typeShow:
 				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
 				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? ORDER BY time DESC;' % type
@@ -454,6 +492,12 @@ class MetaCache(Database):
 							elif idTvmaze:
 								query = querySelect4
 								parameters = [idTvmaze]
+					elif typeSet:
+						if idTmdb:
+							parameters = []
+							if idTmdb:
+								query = querySelect1
+								parameters = [idTmdb]
 					else:
 						if idImdb or idTvdb or idTvmaze:
 							parameters = []

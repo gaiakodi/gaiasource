@@ -1,4 +1,16 @@
 
+[B]6.0.8 (2022.12.24)[/B]
+- Added additional tools to context menu.
+- Added Bluetooth support and reconnection.
+- Updated TMDb search language.
+- Fixed episode metadata retrieval.
+- Changed lowest processor rating.
+- Added support for Aeon Viper skin.
+- Fixed EasyNews provider.
+- Fixed local library provider.
+- Fixed multi stream list.
+- Fixed history menus.
+
 [B]6.0.7 (2022.12.20)[/B]
 - Updated processor detection for Android.
 

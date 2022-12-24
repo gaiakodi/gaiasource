@@ -1181,7 +1181,6 @@ class Networker(object):
 					else: errorMessage = errorDescription
 				except: errorMessage = errorDescription
 
-				#gaiaremove
 				# Add full description for Android "_bootlocale" errors.
 				try:
 					if 'bootlocale' in errorDescription:

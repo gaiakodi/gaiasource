@@ -626,6 +626,20 @@ class Tools(object):
 	def isStructure(self, value):
 		return isinstance(value, (dict, list, tuple))
 
+	@classmethod
+	def gzUncompress(self, data):
+		try:
+			from io import BytesIO
+			from gzip import GzipFile
+			data = BytesIO(data)
+			file = GzipFile(fileobj = data)
+			result = file.read()
+			file.close()
+			return result
+		except:
+			Logger.error()
+			return None
+
 class Regex(object):
 
 	FlagNone			= 0
@@ -830,6 +844,7 @@ class Math(object):
 	# https://stackoverflow.com/questions/4083401/negative-zero-in-python
 	@classmethod
 	def negative(self, value):
+		if value is None: return False
 		import math
 		return math.copysign(1, value) < 0
 
@@ -3749,12 +3764,14 @@ class System(object):
 
 	@classmethod
 	def commandPlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, call = True):
+		if id is None: id = System.GaiaAddon
 		if command is None: command = self.command(action = action, parameters = parameters, id = id)
 		if call: command = 'RunPlugin(%s)' % command
 		return command
 
 	@classmethod
 	def commandContainer(self, action = None, parameters = None, command = None, id = GaiaAddon, call = True, replace = False):
+		if id is None: id = System.GaiaAddon
 		if command is None: command = self.command(action = action, parameters = parameters, id = id)
 		if call: command = 'Container.Update(%s%s)' % (command, ',replace' if replace else '')
 		return command
@@ -4399,7 +4416,7 @@ class System(object):
 			from lib.providers.core.manager import Manager
 			Manager.check(progress = False, wait = True)
 			if self.tInitial: Manager.optimizeInternal()
-		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 42%
+		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 41%
 
 		# General Settings
 		def _launchSettings():
@@ -5161,6 +5178,20 @@ class Settings(object):
 				'default' : 120,
 				'minimum' : 30,
 				'maximum' : 600,
+			},
+			'special' : {
+				'zero' : SpecialDefault,
+				'none' : SpecialDefault,
+			},
+		},
+		'bluetooth.monitor.interval' : {
+			'type' : CustomDuration,
+			'title' : 33538,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 15,
+				'minimum' : 10,
+				'maximum' : 180,
 			},
 			'special' : {
 				'zero' : SpecialDefault,
@@ -6511,6 +6542,7 @@ class Media(object):
 
 	TypeNone = None
 	TypeMovie = 'movie'
+	TypeSet = 'set'
 	TypeDocumentary = 'documentary'
 	TypeShort = 'short'
 	TypeShow = 'show'
@@ -7152,15 +7184,16 @@ class Subprocess(object):
 			return None
 
 	@classmethod
-	def open(self, command, communicate = True):
+	def open(self, command, communicate = True, timeout = None):
 		try:
 			# Use "shell", otherwise Windows will show a CMD window popup.
 			from subprocess import Popen, PIPE
 			process = Popen(self.command(command), stdout = PIPE, stderr = PIPE, stdin = PIPE, shell = True)
-			if communicate: return Converter.unicode(process.communicate()[0])
+			if communicate is True: return Converter.unicode(process.communicate(timeout = timeout)[0])
+			elif communicate: return Converter.unicode(process.communicate(input = Converter.bytes(communicate), timeout = timeout)[0])
 			else: return None
 		except:
-			Logger.error()
+			if not timeout: Logger.error()
 			return None
 
 ###################################################################
@@ -8112,7 +8145,7 @@ class Hardware(object):
 		'processor' : {
 			'total' : {
 				'weight' : 0.25,
-				'minimum' : 6000000000, # 6.0GHz
+				'minimum' : 5000000000, # 5.0 GHz. Raspberry Pi 4 has 6.0GHz (4 cores @ 1.5GHz). Use a lower value than 6.0GHz.
 				'maximum' : 20000000000, # 20.0GHz
 			},
 			'single' : {
@@ -11488,6 +11521,62 @@ class VpnManager(object):
 	@classmethod
 	def disable(self, refresh = False):
 		return Extension.disable(id = VpnManager.Id, refresh = refresh)
+
+	@classmethod
+	def execute(self, action, parameters = None, loader = False):
+		if parameters:
+			if Tools.isArray(parameters): parameters = '?'.join(parameters)
+			parameters = '?%s' % parameters
+		else:
+			parameters = ''
+
+		result = System.executePlugin(command = '%s%s/?%s%s' % (System.PluginPrefix, VpnManager.Id, action, parameters))
+
+		if loader:
+			# Loader is still showing after VpnManager finished, even if it shows dialogs. Manually hide the loader.
+			from lib.modules.interface import Loader
+			Loader.show()
+			Pool.thread(target = Loader.hide, kwargs = {'delay' : 5}, start = True)
+
+		return result
+
+	@classmethod
+	def change(self, profile = None, dialog = False, loader = True):
+		if not profile: profile = 'Czech Republic'
+
+		profiles = []
+		addon = System.addon(id = VpnManager.Id)
+		for i in range(1, 11):
+			value = addon.getSetting('%d_vpn_validated_friendly' % i)
+			if value: profiles.append(value)
+		if len(profiles) <= 0: return False
+
+		current = System.windowPropertyGet('VPN_Manager_Connected_Profile_Friendly_Name')
+
+		if dialog:
+			from lib.modules.interface import Dialog
+			choice = Dialog.select(title = 33801, items = profiles, selection = current if current else None)
+			if choice < 0: return False
+			profile = profiles[choice]
+		else:
+			if len(profiles) == 1:
+				profile = profiles[0]
+			else:
+				if current: profiles.remove(current)
+				profile = Tools.listPick(profiles)
+
+		self.execute(action = 'change', parameters = profile, loader = loader)
+		return True
+
+	@classmethod
+	def disconnect(self, loader = True):
+		self.execute(action = 'disconnect', loader = loader)
+		return True
+
+	@classmethod
+	def status(self, loader = True):
+		self.execute(action = 'display', loader = loader)
+		return True
 
 ###################################################################
 # BACKUP

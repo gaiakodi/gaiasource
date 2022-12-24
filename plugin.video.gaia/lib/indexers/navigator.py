@@ -102,6 +102,7 @@ class Navigator(object):
 		self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('moviesArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
 		self.addDirectoryItem(name = 33001, description = 36011, query = self.parameterize('moviesCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
 		self.addDirectoryItem(name = 33002, description = 36012, query = self.parameterize('moviesLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
+		#self.addDirectoryItem(name = 33527, description = 33528, query = self.parameterize('moviesSets'), icon = 'collections.png', iconDefault = 'DefaultVideoPlaylists.png')#gaiaremove
 		self.addDirectoryItem(name = 32013, description = 36013, query = self.parameterize('moviesPeople'), icon = 'people.png', iconDefault = 'DefaultActor.png')
 		if lite == False: self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('moviesSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
@@ -144,9 +145,20 @@ class Navigator(object):
 
 			for history in histories:
 				metadata = Converter.dictionary(history[4])
-				id = str(metadata['imdb'])
+
+				try: id = metadata['tvshowtitle']
+				except:
+					try: id = metadata['title']
+					except: id = '-'
+				for i in ['imdb', 'tmdb', 'tvdb', 'trakt']:
+					try:
+						id = str(metadata[i])
+						if id: break
+					except: pass
+
 				if season and 'season' in metadata and not metadata['season'] is None: id += '_' + str(metadata['season'])
 				if episode and 'episode' in metadata and not metadata['episode'] is None: id += '_' + str(metadata['episode'])
+
 				if not id in ids:
 					item = {}
 					for value in values:
@@ -457,6 +469,10 @@ class Navigator(object):
 		self.addDirectoryItem(33006, self.parameterize('moviesRetrieve&link=theaters'), 'premiered.png', 'DefaultVideoPlaylists.png', library = 'theaters')
 		self.addDirectoryItem(33007, self.parameterize('moviesRetrieve&link=trending'), 'trending.png', 'DefaultVideoPlaylists.png', library = 'trending')
 		self.addDirectoryItem(32321, self.parameterize('moviesRetrieve&link=featured'), 'featured.png', 'DefaultVideoPlaylists.png', library = 'featured')
+		self.endDirectory()
+
+	def moviesSets(self):
+		self.addDirectoryItem(33003, self.parameterize('moviesRetrieve&link=sets'), 'browse.png', 'DefaultAddonContextItem.png')
 		self.endDirectory()
 
 	def moviesDrugs(self):

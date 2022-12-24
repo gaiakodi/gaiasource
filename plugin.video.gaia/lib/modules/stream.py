@@ -32371,7 +32371,7 @@ class Extractor(object):
 		result = self.__execute('mediainfo').lower()
 		if 'mediainfo' in result and '--help' in result: # Nativley installed
 			return 'mediainfo'
-		else:
+		elif tools.Extension.installed(id = tools.Extension.IdGaiaBinaries, enabled = True):
 			import sys
 
 			prefix = None

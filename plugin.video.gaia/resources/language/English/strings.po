@@ -453,15 +453,15 @@ msgid "Use embell image with text or decoration"
 msgstr ""
 
 msgctxt "#32341"
-msgid "[GAIA-NO-LABEL]"
+msgid "Gaia Settings"
 msgstr ""
 
 msgctxt "#32342"
-msgid "[GAIA-NO-LABEL]"
+msgid "Skin Settings"
 msgstr ""
 
 msgctxt "#32343"
-msgid "[GAIA-NO-LABEL]"
+msgid "Kodi Settings"
 msgstr ""
 
 msgctxt "#32344"
@@ -787,7 +787,7 @@ msgid "Copy Name"
 msgstr ""
 
 msgctxt "#33037"
-msgid "[GAIA-NO-LABEL]"
+msgid "Network Info"
 msgstr ""
 
 msgctxt "#33038"
@@ -1239,11 +1239,11 @@ msgid "Reload"
 msgstr ""
 
 msgctxt "#33150"
-msgid "[GAIA-NO-LABEL]"
+msgid "Change VPN"
 msgstr ""
 
 msgctxt "#33151"
-msgid "[GAIA-NO-LABEL]"
+msgid "Export Log"
 msgstr ""
 
 msgctxt "#33152"
@@ -2543,7 +2543,7 @@ msgid "Embell"
 msgstr ""
 
 msgctxt "#33476"
-msgid "[GAIA-NO-LABEL]"
+msgid "System Tools"
 msgstr ""
 
 msgctxt "#33477"
@@ -2551,11 +2551,11 @@ msgid "Webinterface"
 msgstr ""
 
 msgctxt "#33478"
-msgid "[GAIA-NO-LABEL]"
+msgid "System Info"
 msgstr ""
 
 msgctxt "#33479"
-msgid "[GAIA-NO-LABEL]"
+msgid "System Manager"
 msgstr ""
 
 msgctxt "#33480"
@@ -2619,7 +2619,7 @@ msgid "Copy Hash"
 msgstr ""
 
 msgctxt "#33495"
-msgid "[GAIA-NO-LABEL]"
+msgid "System Cleanup"
 msgstr ""
 
 msgctxt "#33496"
@@ -2747,59 +2747,59 @@ msgid "Refresh List Metadata"
 msgstr ""
 
 msgctxt "#33527"
-msgid "[GAIA-NO-LABEL]"
+msgid "Sets"
 msgstr ""
 
 msgctxt "#33528"
-msgid "[GAIA-NO-LABEL]"
+msgid "Sets that contain multiple related movies."
 msgstr ""
 
 msgctxt "#33529"
-msgid "[GAIA-NO-LABEL]"
+msgid "Bluetooth"
 msgstr ""
 
 msgctxt "#33530"
-msgid "[GAIA-NO-LABEL]"
+msgid "Connect All"
 msgstr ""
 
 msgctxt "#33531"
-msgid "[GAIA-NO-LABEL]"
+msgid "Disconnect All"
 msgstr ""
 
 msgctxt "#33532"
-msgid "[GAIA-NO-LABEL]"
+msgid "Device List"
 msgstr ""
 
 msgctxt "#33533"
-msgid "[GAIA-NO-LABEL]"
+msgid "Paired"
 msgstr ""
 
 msgctxt "#33534"
-msgid "[GAIA-NO-LABEL]"
+msgid "Blocked"
 msgstr ""
 
 msgctxt "#33535"
-msgid "[GAIA-NO-LABEL]"
+msgid "Unpaired"
 msgstr ""
 
 msgctxt "#33536"
-msgid "[GAIA-NO-LABEL]"
+msgid "Devices"
 msgstr ""
 
 msgctxt "#33537"
-msgid "[GAIA-NO-LABEL]"
+msgid "Automatic Reconnect"
 msgstr ""
 
 msgctxt "#33538"
-msgid "[GAIA-NO-LABEL]"
+msgid "Reconnect Interval"
 msgstr ""
 
 msgctxt "#33539"
-msgid "[GAIA-NO-LABEL]"
+msgid "Bluetooth Control"
 msgstr ""
 
 msgctxt "#33540"
-msgid "[GAIA-NO-LABEL]"
+msgid "Monitor"
 msgstr ""
 
 msgctxt "#33541"
@@ -3883,15 +3883,15 @@ msgid "Stream [B]Directly[/B] through [B]%s[/B]"
 msgstr ""
 
 msgctxt "#33811"
-msgid "[GAIA-NO-LABEL]"
+msgid "Disconnect VPN"
 msgstr ""
 
 msgctxt "#33812"
-msgid "[GAIA-NO-LABEL]"
+msgid "VPN Status"
 msgstr ""
 
 msgctxt "#33813"
-msgid "[GAIA-NO-LABEL]"
+msgid "VPN Settings"
 msgstr ""
 
 msgctxt "#33814"
@@ -6814,6 +6814,25 @@ msgctxt "#34553"
 msgid "Reuse the Python interpreter instead of initializing a new one for every action executed in the addon. Reusing the interpreter will increase the performance of the adddon. However, there are still some issues in Kodi with reusing interpreters. If Kodi crashes, menus hang, or unexpected errors occur in Gaia, [B]disable[/B] this option. If disabling this option solves the problem, please report this on Gaia's ticket system, since it might be something that can be fixed."
 msgstr ""
 
+msgctxt "#34554"
+msgid "Settings related to Bluetooth devices and monitoring."
+msgstr ""
+
+msgctxt "#34555"
+msgid "Enable Bluetooth control from the addon. Many Kodi builds already have native Bluetooth support, but sometimes there are issues with automatically reconnecting paired devices, such as when a Bluetooth device is switched on only after Kodi has already booted. Enabling this option will allow manually connecting a Bluetooth device from the context menu, or automatically reconnecting in the background. Bluetooth is only supported on Linux and other systems that can access the [I]bluetoothctl[/I]  program from the terminal."
+msgstr ""
+
+msgctxt "#34556"
+msgid "Show a list of available Bluetooth devices and manually connect or disconnect them."
+msgstr ""
+
+msgctxt "#34557"
+msgid "Enable a monitor that will continuously scan for Bluetooth devices and automatically connect to already paired devices once they are switched on. This option will execute the [I]bluetoothctl[/I]  program in the background every few seconds as long as Kodi is running. The performance implication of this continuous checking is unknown, but is most likely insignificant. Disable this option if you experience any performance issues or notice weird Bluetooth behavior, such as devices automatically reconnecting right after you manually disconnected the device. Please restart Kodi for the settings to take effect."
+msgstr ""
+
+msgctxt "#34558"
+msgid "Change how often the [I]bluetoothctl[/I]  program is executed in order to detect new devices that have come online. A lower interval will execute the [I]bluetoothctl[/I]  program more often, but will connect Bluetooth devices more quickly. A higher interval will execute the [I]bluetoothctl[/I]  program less often, but might take longer to connect Bluetooth devices."
+msgstr ""
 
 # [/GAIACODE]
 
