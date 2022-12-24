@@ -8586,7 +8586,7 @@ class Hardware(object):
 	########################################
 
 	@classmethod
-	def performance(self, processor = True, processorTotal = True, processorSingle = True, memory = True, storage = False, storageRead = True, storageWrite = True, connection = False, connectionLatency = True, connectionSpeed = True, connectionIterations = 3, callback = None):
+	def performance(self, processor = True, processorTotal = True, processorSingle = True, memory = True, storage = False, storageRead = True, storageWrite = True, connection = False, connectionLatency = True, connectionSpeed = True, connectionIterations = 2, callback = None):
 		from lib.modules.interface import Translation, Format
 		from lib.modules.speedtest import SpeedTesterGlobal
 

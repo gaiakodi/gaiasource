@@ -13,3 +13,10 @@ Add GAIACODE to not split/convert ignoreids if the string is empty.
 In build_user_agent() change the user-agent, since platform.platform() fails on some Android systems.
 
 #########################################################################################################################
+
+Change the minimum download sizes. The current ones are too small, and do not measure the full speed properly.
+
+The "2000" size is about 8MB.
+http://ookla-cr.salt.ch:8080/speedtest/random2000x2000.jpg
+
+#########################################################################################################################

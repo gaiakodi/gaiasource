@@ -1200,8 +1200,8 @@ class Speedtest(object):
         up_sizes = [32768, 65536, 131072, 262144, 524288, 1048576, 7340032]
         sizes = {
             'upload': up_sizes[ratio - 1:],
-            'download': [350, 500, 750, 1000, 1500, 2000, 2500,
-                         3000, 3500, 4000]
+            #'download': [350, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000]
+			'download': [2000, 2500, 3000, 3500, 4000] # GAIACODE
         }
 
         size_count = len(sizes['upload'])

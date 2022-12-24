@@ -397,10 +397,12 @@ class MetaTools(object):
 	@classmethod
 	def media(self, metadata):
 		if Tools.isArray(metadata): metadata = metadata[0]
-		if 'episode' in metadata: return Media.TypeEpisode
-		elif 'season' in metadata: return Media.TypeSeason
-		elif 'tvshowtitle' in metadata: return Media.TypeShow
-		else: return Media.TypeMovie
+		if metadata:
+			if 'episode' in metadata: return Media.TypeEpisode
+			elif 'season' in metadata: return Media.TypeSeason
+			elif 'tvshowtitle' in metadata: return Media.TypeShow
+			else: return Media.TypeMovie
+		return None
 
 	###################################################################
 	# COMMAND
