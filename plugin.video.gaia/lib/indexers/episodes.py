@@ -58,6 +58,7 @@ class Episodes(object):
 		self.mModeRelease = False
 		self.mModeSearch = False
 		self.mModeWatched = False
+		self.mModeHierarchical = False
 
 		self.mAccountTrakt = Trakt().dataUsername()
 		self.mAccountTmdb = Tmdb().key()
@@ -97,40 +98,47 @@ class Episodes(object):
 				if domain == 'trakt':
 
 					if self.progress_link in link:
+						self.mModeHierarchical = True
 						mixed = True
 						items = self.cache('cacheRefreshShort', refresh, self.traktListProgress, link = self.progress_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items, sort = 'progress')
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh, next = False) # 'next' was already done in self.page(). Do  not do it again, otherwise the 2nd-next episode is listed.
 
 					elif self.mycalendar_link in link:
+						self.mModeHierarchical = True
 						mixed = True
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.mycalendar_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items, sort = 'calendar')
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					elif link and '/users/' in link:
+						self.mModeHierarchical = True
 						mixed = True # The history page can have all episodes from the same show, and then it is not automatically detected as mixed.
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					elif self.traktunfinished_link in link:
+						self.mModeHierarchical = True
 						#self.mModeWatched = True # Do not hide watched items, in case of a rewatch.
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktunfinished_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					else:
+						self.mModeHierarchical = True
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif domain == 'tvmaze':
 
 					if link == self.added_link:
+						self.mModeHierarchical = True
 						items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items, type = 'release')
 
 					else:
+						self.mModeHierarchical = True
 						items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule, link = link)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -315,6 +323,7 @@ class Episodes(object):
 
 	def home(self, menu = True, clean = True, limit = None, detailed = True, quick = None, refresh = False):
 		self.mModeRelease = True
+		self.mModeHierarchical = True
 
 		items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule, offset = 1)
 		if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
@@ -1145,7 +1154,7 @@ class Episodes(object):
 
 				lock = Lock()
 				locks = {}
-				semaphore = Semaphore(50)
+				semaphore = Semaphore(self.mMetatools.concurrencyTasks(media = self.mMedia, hierarchical = self.mModeHierarchical))
 				metacache = MetaCache.instance()
 
 				if next and pickNext:

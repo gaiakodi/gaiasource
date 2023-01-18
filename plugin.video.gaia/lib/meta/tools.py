@@ -21,7 +21,7 @@
 from lib.meta.data import MetaData
 from lib.meta.image import MetaImage
 
-from lib.modules.tools import Media, Language, Country, Tools, Converter, Regex, Logger, System, Settings, Selection, Kids, Time
+from lib.modules.tools import Media, Language, Country, Tools, Converter, Regex, Logger, System, Settings, Selection, Kids, Time, Hardware
 from lib.modules.interface import Context, Directory, Icon, Format, Translation, Skin, Font
 from lib.modules.convert import ConverterTime
 from lib.modules.theme import Theme
@@ -82,6 +82,9 @@ class MetaTools(object):
 	###################################################################
 
 	def __init__(self):
+		self.mPerformance = Hardware.performanceType()
+		self.mConcurrencyTasks = {}
+
 		self.mSettingsDetail = Settings.getString('metadata.general.detail').lower()
 		self.mSettingsExternal = not Settings.getString('metadata.general.external') == Translation.string(32302) # Enable by default if user has a different language set.
 		self.mSettingsLanguage = Language.settingsCustom('metadata.location.language')
@@ -399,6 +402,78 @@ class MetaTools(object):
 		from lib.modules.window import WindowMetaExternal
 		WindowMetaExternal.show(wait = True)
 		if settings: Settings.launch(id = 'metadata.general.external')
+
+	###################################################################
+	# CONCURRENCY
+	##################################################################
+
+	# Kodi can run out of threads if we load the Trakt show arrivals list the first time.
+	# Too many sub-threads are created to retrieve shows, seasons, and episodes, all within the same execution.
+	# hierarchical: retrieve a list of episodes from different shows, each of them retrieving their own season and show metadata.
+	def concurrencyTasks(self, media = None, hierarchical = False):
+		id = str(media) + '_' + str(hierarchical)
+		if not id in self.mConcurrencyTasks:
+			tasks = 50
+			change = None
+			if media == Media.TypeEpisode:
+				change = {
+					Hardware.PerformanceBad : -30,
+					Hardware.PerformancePoor : -25,
+					Hardware.PerformanceMedium : -20,
+					Hardware.PerformanceGood : -10,
+					Hardware.PerformanceExcellent : 0,
+				}
+			elif media == Media.TypeSeason:
+				change = {
+					Hardware.PerformanceBad : -20,
+					Hardware.PerformancePoor : -15,
+					Hardware.PerformanceMedium : -10,
+					Hardware.PerformanceGood : -5,
+					Hardware.PerformanceExcellent : 0,
+				}
+			elif media == Media.TypeShow:
+				change = {
+					Hardware.PerformanceBad : -20,
+					Hardware.PerformancePoor : -15,
+					Hardware.PerformanceMedium : -10,
+					Hardware.PerformanceGood : -5,
+					Hardware.PerformanceExcellent : 0,
+				}
+			else:
+				change = {
+					Hardware.PerformanceBad : -10,
+					Hardware.PerformancePoor : -7,
+					Hardware.PerformanceMedium : -5,
+					Hardware.PerformanceGood : 0,
+					Hardware.PerformanceExcellent : 0,
+				}
+
+			try:
+				change = change[self.mPerformance]
+			except:
+				Logger.error()
+				change = 0
+
+			tasks += change
+
+			if hierarchical:
+				change = {
+					Hardware.PerformanceBad : 3.0,
+					Hardware.PerformancePoor : 2.5,
+					Hardware.PerformanceMedium : 2.0,
+					Hardware.PerformanceGood : 1.5,
+					Hardware.PerformanceExcellent : 1.0,
+				}
+				try:
+					change = change[self.mPerformance]
+				except:
+					Logger.error()
+					change = 1.0
+				tasks = max(10, int(tasks / change))
+
+			self.mConcurrencyTasks[id] = tasks
+
+		return self.mConcurrencyTasks[id]
 
 	###################################################################
 	# NETWORK

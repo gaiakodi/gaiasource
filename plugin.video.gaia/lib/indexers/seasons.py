@@ -188,7 +188,7 @@ class Seasons(object):
 
 				lock = Lock()
 				locks = {}
-				semaphore = Semaphore(50)
+				semaphore = Semaphore(self.mMetatools.concurrencyTasks(media = self.mMedia))
 				metacache = MetaCache.instance()
 				items = metacache.select(type = MetaCache.TypeSeason, items = items)
 

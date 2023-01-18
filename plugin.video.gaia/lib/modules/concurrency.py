@@ -168,7 +168,7 @@ class Concurrency(object):
 			if error == Concurrency.ErrorStart:
 				if not retry is None and retry > 0:
 					self._statusSet(Concurrency.StatusQueued)
-					Pool._log(message = '%s [%s]: Concurrency limit reached. Waiting for restart.' % (self.id(), self.label()), developer = True)
+					Pool._log(message = '%s [%s]: Concurrency limit reached (%d threads). Waiting for restart.' % (self.id(), self.label(), Pool.threadCount()), developer = True)
 					event = Pool.finishEvent(rank = self.rank())
 					event.wait(timeout = Concurrency.RetryTimeout)
 					Pool._log(message = '%s [%s]: Restarting instance.' % (self.id(), self.label()), developer = True)

@@ -193,7 +193,7 @@ class MetaProvider(object):
 			# Starting new threads can be slow, especially on low-end devices.
 			# Start threads here, since multiple resources can be requested at the same time, and sequentially requesting them is slower.
 			# Eg: When opening a show, all the shows seasons/episodes might be requested with a single call to this function.
-			# Pass "thread" in in order not to create another sub-thread within _cache().
+			# Pass "thread" in, in order not to create another sub-thread within _cache().
 			results = []
 			threads = []
 			for i in self._cacheParameters(parameter, **arguments):

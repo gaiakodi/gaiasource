@@ -123,7 +123,7 @@ class Provider(ProviderPremium, ProviderJson):
 		version = self.customVersion(default = ProviderJson.VersionAutomatic)
 		if version == ProviderJson.VersionAutomatic:
 			version = core.accountVersion(detect = True) # Always redetect, since the user might have changed the version preferences.
-			if version is None: version = ProviderJson.Version3
+			if version is None: version = ProviderJson.Version2
 			version = str(int(version))
 
 		self.mVersion = version

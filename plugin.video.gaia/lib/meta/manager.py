@@ -107,6 +107,7 @@ class MetaManager(object):
 		else: provider = self.provider(provider = provider, internal = True)
 		if not provider: return None
 
+		single = len(provider) == 1
 		results = {}
 		threads = []
 		for i in provider:
@@ -117,9 +118,14 @@ class MetaManager(object):
 			kwargs['provider'] = i
 			kwargs['function'] = function
 
-			thread = Pool.thread(target = self._providerExecute, args = args, kwargs = kwargs)
-			thread.start()
-			threads.append(thread)
+			# Reduce the number of threads created if only a single provider is used.
+			# The thread is joined below, so using threads with a single provider does not add any benefits.
+			if single:
+				self._providerExecute(*args, **kwargs)
+			else:
+				thread = Pool.thread(target = self._providerExecute, args = args, kwargs = kwargs)
+				thread.start()
+				threads.append(thread)
 		[i.join() for i in threads]
 
 		mode = None

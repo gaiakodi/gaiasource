@@ -185,8 +185,11 @@ class Core(base.Core):
 		return not self.account(cached = False, minimal = True) is None
 
 	def accountVersion(self, detect = False, cached = True):
-		try: return float(self.accountVersionDetect(cached = cached) if detect else self.mAccount.dataVersion())
-		except: return None
+		try:
+			if self.accountValid():
+				return float(self.accountVersionDetect(cached = cached) if detect else self.mAccount.dataVersion())
+		except: pass
+		return None
 
 	def accountVersionOld(self, detect = False, cached = True):
 		version = self.accountVersion(detect = detect, cached = cached)

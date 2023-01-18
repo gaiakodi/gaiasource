@@ -4484,6 +4484,11 @@ class System(object):
 			from lib.modules.window import WindowMetaExternal
 			WindowMetaExternal.show()
 
+		#gaiaremove
+		if version['old']['number'] == 610 and version['new']['number'] > 610:
+			from lib.modules.window import WindowMetaExternal
+			WindowMetaExternal.show()
+
 		_launchProgress(4) # 25%
 
 		self.tStatus = []

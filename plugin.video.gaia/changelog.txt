@@ -1,4 +1,9 @@
 
+[B]6.1.1 (2023.01.18)[/B]
+- Fixed preprocessed metadata setting.
+- Fixed EasyNews version detection.
+- Added concurrency task limits.
+
 [B]6.1.0 (2023.01.18)[/B]
 - Fixed Trakt show lists.
 - Removed specials form Trakt progress list.

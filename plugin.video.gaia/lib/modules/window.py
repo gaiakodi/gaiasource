@@ -4704,6 +4704,7 @@ class WindowMetaExternal(WindowStep):
 		if apply:
 			if tools.Extension.installed(id = tools.Extension.IdGaiaMetadata, enabled = True): _apply()
 			else: tools.Extension.enable(id = tools.Extension.IdGaiaMetadata, confirm = tools.Extension.ConfirmDisabled, notification = True, action = _apply, wait = True)
+			instance._selectMetadata(change = False)
 		else:
 			instance._selectMetadata()
 
@@ -4788,11 +4789,11 @@ class WindowMetaExternal(WindowStep):
 				item.setProperty('GaiaLabel%d' % counter, interface.Format.iconJoin(i))
 		for i in range(counter + 1, 5): item.setProperty('GaiaLabel%d' % i, '')
 
-	def _selectMetadata(self):
+	def _selectMetadata(self, change = True):
 		from lib.meta.tools import MetaTools
-		self.mEnabled = not self.mEnabled
+		if change: self.mEnabled = not self.mEnabled
 		MetaTools.settingsExternalSet(self.mEnabled)
-		self._setMetadata()
+		if change: self._setMetadata()
 
 
 class WindowWizardIntro(WindowStep):
