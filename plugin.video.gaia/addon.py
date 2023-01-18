@@ -348,8 +348,9 @@ elif action.startswith('episodes'):
 		if not episode is None: episode = float(episode) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
 		limit = parameters.get('limit')
 		if not limit is None: limit = int(limit)
+		reduce = tools.Converter.boolean(parameters.get('reduce'))
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, refresh = refresh)
+		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh)
 
 	elif action == 'episodesUserlists':
 		from lib.indexers.episodes import Episodes
@@ -2053,10 +2054,15 @@ elif action.startswith('settings'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		View.settings(media = media, content = content, previous = previous, settings = settings)
 
-	elif action == 'settingsMetadata':
+	elif action == 'settingsMetaDetail':
 		from lib.meta.tools import MetaTools
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		MetaTools.settingsDetailShow(settings = settings)
+
+	elif action == 'settingsMetaExternal':
+		from lib.meta.tools import MetaTools
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		MetaTools.settingsExternalShow(settings = settings)
 
 	elif action == 'settingsImage':
 		from lib.meta.image import MetaImage
@@ -2617,9 +2623,19 @@ elif action.startswith('navigator'):
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids, menu = menu).arrivals()
 
-	elif action == 'navigatorPreload':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).preload()
+####################################################
+# METADATA
+####################################################
+
+elif action.startswith('metadata'):
+
+	if action == 'metadataPreload':
+		from lib.meta.tools import MetaTools
+		MetaTools.batchPreload()
+
+	elif action == 'metadataGenerate':
+		from lib.meta.tools import MetaTools
+		MetaTools.batchGenerate()
 
 ####################################################
 # DUMMY

@@ -1,4 +1,9 @@
 
+[B]6.1.0 (2023.01.18)[/B]
+- Updated addon icon.
+- Updated wizard XML.
+- Removed module library.
+
 [B]6.0.0 (2022.12.12)[/B]
 - Major version upgrade.
 - Removed Python dependency.

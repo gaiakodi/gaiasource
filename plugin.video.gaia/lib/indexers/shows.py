@@ -539,7 +539,7 @@ class Shows(object):
 				('Action', 'action'),
 				('Crime', 'crime'),
 				('News', 'news'),
-				('Reality Shows', 'reality_tv'),
+				('Reality Show', 'reality_tv'),
 				('Talk Show', 'talk_show'),
 				('Thriller', 'thriller'),
 				('Western', 'western'),
@@ -1370,11 +1370,12 @@ class Shows(object):
 						try: refreshing = item[MetaCache.Attribute][MetaCache.AttributeRefresh]
 						except: refreshing = MetaCache.RefreshForeground
 						if refreshing == MetaCache.RefreshForeground or refresh:
+							self.mMetatools.busyStart(media = self.mMedia, item = item)
 							semaphore.acquire()
 							threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground:
-							semaphore.acquire()
-							threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 				else:
 					items = Tools.listShuffle(items)
 					lookup = []
@@ -1388,13 +1389,13 @@ class Shows(object):
 							lookup.append(item)
 						elif refreshing == MetaCache.RefreshForeground and (counter is None or len(lookup) < counter):
 							if foreground:
+								self.mMetatools.busyStart(media = self.mMedia, item = item)
 								lookup.append(item)
 								semaphore.acquire()
 								threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
-							if background:
-								semaphore.acquire()
-								threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 					items = lookup
 
 				# Wait for metadata that does not exist in the metacache.
@@ -1402,10 +1403,17 @@ class Shows(object):
 				if metadataForeground: metacache.insert(type = MetaCache.TypeShow, items = metadataForeground)
 
 				# Let the refresh of old metadata run in the background for the next menu load.
+				# Only start the threads here, so that background threads do not interfere or slow down the foreground threads.
 				if threadsBackground:
 					def _metadataBackground():
+						for i in range(len(threadsBackground)):
+							semaphore.acquire()
+							threadsBackground[i] = Pool.thread(target = self.metadataUpdate, kwargs = threadsBackground[i], start = True)
 						[thread.join() for thread in threadsBackground]
 						if metadataBackground: metacache.insert(type = MetaCache.TypeShow, items = metadataBackground)
+
+					# Make a deep copy of the items, since the items can be edited below while these threads are still busy, and we do not want to store the extra details in the database.
+					for i in threadsBackground: i['item'] = Tools.copy(i['item'])
 					Pool.thread(target = _metadataBackground, start = True)
 
 				if filter: items = [i for i in items if 'tvdb' in i and i['tvdb']]
@@ -1496,7 +1504,7 @@ class Shows(object):
 					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
 					{'id' : 'trakt', 'function' : self.metadataTrakt, 'parameters' : {'idImdb' : idImdb, 'idTrakt' : idTrakt, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
 					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'full' : True, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'tmdb', 'function' : self.metadataTmdb, 'parameters' : {'idTmdb' : idTmdb, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
+					{'id' : 'tmdb', 'function' : self.metadataTmdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'idTmdb' : idTmdb, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
 					{'id' : 'fanart', 'function' : self.metadataFanart, 'parameters' : {'idTvdb' : idTvdb, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
 					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
 				]
@@ -1574,6 +1582,7 @@ class Shows(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
+			self.mMetatools.busyFinish(media = self.mMedia, item = item)
 
 	def metadataDeveloper(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, item = None):
 		if self.mDeveloper:
@@ -1623,17 +1632,22 @@ class Shows(object):
 		return result
 
 	def metadataRequest(self, link, data = None, headers = None, method = None, cache = True):
+		# HTTP error 429 can be thrown if too many requests were made in a short time.
+		# This should only happen with Trakt (which does not call this function), since TMDb/TVDb/Fanart should not have any API limits at the moment.
+		# Still check for it, since in special cases 429 might still happen (eg: the TMDb CDN/Cloudflare might block more than 50 concurrent connections).
+		# This should not be an issue with normal use, only with batch-generating the preprocessed database that makes 1000s of request every few minutes.
+
 		networker = Networker()
 		if cache:
 			if cache is True: cache = Cache.TimeoutLong
 			result = self.mCache.cache(mode = None, timeout = cache, refresh = None, function = networker.request, link = link, data = data, headers = headers, method = method)
-			if not result or result['error']['type'] in Networker.ErrorNetwork:
+			if not result or result['error']['type'] in Networker.ErrorNetwork or result['error']['code'] == 429:
 				# Delete the cache, otherwise the next call will return the previously failed request.
 				self.mCache.cacheDelete(networker.request, link = link, data = data, headers = headers, method = method)
 				return False
 		else:
 			result = networker.request(link = link, data = data, headers = headers, method = method)
-			if not result or result['error']['type'] in Networker.ErrorNetwork: return False
+			if not result or result['error']['type'] in Networker.ErrorNetwork or result['error']['code'] == 429: return False
 		return Networker.dataJson(result['data'])
 
 	def metadataId(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None):
@@ -1883,7 +1897,7 @@ class Shows(object):
 
 					# This is used by flattened and indirect show menus in episodes.py to determine which seasons to retrieve and if a 'Next Page' should be added.
 					# Add here already and not only in seasons, since we need the episode counters for the ListItems (TotalSeasons, TotalEpisodes, WatchedEpisodes).
-					pack = self.mMetatools.pack(show = data, extended = True, idImdb = result['id'].get('imdb'), idTmdb = result['id'].get('tmdb'), idTvdb = result['id'].get('tvdb'))
+					pack = self.mMetatools.pack(show = data, extended = self.mDetail == MetaTools.DetailExtended, idImdb = result['id'].get('imdb'), idTmdb = result['id'].get('tmdb'), idTvdb = result['id'].get('tvdb'))
 					if pack: result['pack'] = pack
 
 					image = {
@@ -1903,7 +1917,7 @@ class Shows(object):
 		except: Logger.error()
 		return {'provider' : 'tvdb', 'complete' : complete, 'data' : result}
 
-	def metadataTmdb(self, idTmdb = None, language = None, item = None, cache = False):
+	def metadataTmdb(self, idImdb = None, idTvdb = None, idTmdb = None, language = None, item = None, cache = False):
 		complete = True
 		result = None
 		try:

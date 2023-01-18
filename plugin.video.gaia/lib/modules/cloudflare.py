@@ -35,6 +35,27 @@ class CloudflareException(Exception):
 
 class Cloudflare(object):
 
+	# SSL/TLS certificates can make use of RSA or Elliptic Curve Cryptography (ECC).
+	# ECC is genrally faster and more secure than RSA (or at least similar security).
+	# Most certificates use RSA, but newer ones might employ ECC.
+	#	https://www.cryptosys.net/pki/eccrypto.html
+	#	https://github.com/tlsfuzzer/python-ecdsa/blob/master/README.md
+	# To check the requirements of a SSL certificate:
+	#	openssl s_client -connect example.com:443
+	# To list all ECC supported on a system:
+	#	openssl ecparam -list_curves
+	# CloudScraper by default uses "prime256v1" if no ECC was specified. This is the most common ECC.
+	# This seems to work with almost all website, except EasyNews. Only members.easynews.com, the new members-beta.easynews.com does not have this problem.
+	# The following error is returned with members.easynews.com:
+	#	Network Error [Error Type: Certificate | Debug: Easynews | Link: https://members.easynews.com/...] (Caused by SSLError(SSLError(1, '[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:852)')
+	# This is caused by CloudScraper:
+	#	self.ssl_context.set_ecdh_curve(self.ecdhCurve)
+	# When using some other ECC (eg: secp521r1), or removing the statement altogether, EasyNews works fine.
+	CurvePrime256v1 = 'prime256v1'
+	CurveSecp384r1 = 'secp384r1'
+	CurveSecp512r1 = 'secp521r1'
+	CurveDefault = None
+
 	EngineNative = 'native' # Pure Python - no additional modules required.
 	EngineV8 = 'v8' # Not supported. Requires C++ code to be compiled to usue the Python module "v8eval".
 	EngineJs2py = 'js2py' # Pure Python - requires "js2py", "pyjsparser", and optionally "tzlocal" and "pytz"
@@ -174,7 +195,7 @@ class Cloudflare(object):
 		else:
 			return result
 
-	def _scraper(self, engine = None, certificate = None, link = None, domain = None):
+	def _scraper(self, engine = None, certificate = None, link = None, domain = None, curve = None):
 		if certificate is None: certificate = self.mValidate
 		if certificate <= Cloudflare.ValidateModerate:
 			urllib3 = Importer.moduleUrllib3()
@@ -187,16 +208,19 @@ class Cloudflare(object):
 			domain = self._scraperDomain(link = link, domain = domain)
 			Cloudflare.ReuseLock.acquire()
 			if not engine in Cloudflare.ReuseScrapers: Cloudflare.ReuseScrapers[engine] = {}
-			if not domain in Cloudflare.ReuseScrapers[engine]: Cloudflare.ReuseScrapers[engine][domain] = []
-			if Cloudflare.ReuseScrapers[engine][domain]: scraper = Cloudflare.ReuseScrapers[engine][domain].pop()
+			if not domain in Cloudflare.ReuseScrapers[engine]: Cloudflare.ReuseScrapers[engine][domain] = {}
+			if not curve in Cloudflare.ReuseScrapers[engine][domain]: Cloudflare.ReuseScrapers[engine][domain][curve] = []
+			if Cloudflare.ReuseScrapers[engine][domain][curve]: scraper = Cloudflare.ReuseScrapers[engine][domain][curve].pop()
 			Cloudflare.ReuseLock.release()
 
-		if not scraper: scraper = cloudscraper.create_scraper(interpreter = interpreter, ssl_verify = certificate)
+		if not scraper:
+			if curve: scraper = cloudscraper.create_scraper(interpreter = interpreter, ssl_verify = certificate, ecdhCurve = curve)
+			else: scraper = cloudscraper.create_scraper(interpreter = interpreter, ssl_verify = certificate)
 
 		return scraper, domain
 
-	def _scraperReuse(self, scraper, engine = None, link = None, domain = None):
-		if self.mReuse: Cloudflare.ReuseScrapers[engine][self._scraperDomain(link = link, domain = domain)].append(scraper)
+	def _scraperReuse(self, scraper, engine = None, link = None, domain = None, curve = None):
+		if self.mReuse: Cloudflare.ReuseScrapers[engine][self._scraperDomain(link = link, domain = domain)][curve].append(scraper)
 
 	def _scraperDomain(self, link = None, domain = None):
 		if domain:
@@ -284,7 +308,7 @@ class Cloudflare(object):
 		return False
 
 	# Verify a single link, or calculate the percentage of bypasses with predefined links.
-	def verify(self, link = None, engine = None, retry = None, timeout = None, certificate = None, notification = False, settings = False):
+	def verify(self, link = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, notification = False, settings = False):
 		from lib.modules.interface import Loader, Format, Translation, Dialog
 
 		if link:
@@ -300,7 +324,7 @@ class Cloudflare(object):
 			for link in Cloudflare.Links:
 				if System.aborted(): break
 
-				scraper, domain = self._scraper(engine = engine, certificate = certificate)
+				scraper, domain = self._scraper(engine = engine, certificate = certificate, curve = curve)
 				if retry is None: retry = self._settingsRetry()
 				if timeout is None: timeout = self._timeout()
 				delay = self._delay(retry = retry)
@@ -355,7 +379,7 @@ class Cloudflare(object):
 
 	# Sometimes the bypass fails, but when retyring again it works.
 	# This is due to new Cloudflare V2 challenges, which are currently returned +-80% of the time, whereas the other 20% returns old/solvable challenges.
-	def request(self, link, method = None, headers = None, data = None, engine = None, retry = None, timeout = None, certificate = None, redirect = True, log = True):
+	def request(self, link, method = None, headers = None, data = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, redirect = True, log = True):
 		# Old bypasser.
 		#cfscrape = Importer.moduleCfScrape()
 		#scraper = cfscrape.CloudflareScraper()
@@ -366,8 +390,9 @@ class Cloudflare(object):
 
 		if certificate is None: certificate = self.mValidate
 
-		scraper, domain = self._scraper(engine = engine, certificate = certificate, link = link)
+		scraper, domain = self._scraper(engine = engine, certificate = certificate, curve = curve, link = link)
 
+		duration = None
 		if retry is None: retry = self._settingsRetry()
 		if timeout is None: timeout = self._timeout()
 
@@ -375,7 +400,9 @@ class Cloudflare(object):
 
 		for i in range(retry):
 			try:
+				timer = Time(start = True)
 				scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect)
+				duration = timer.elapsed(milliseconds = True)
 				break
 			except cloudscraper.exceptions.CloudflareException as error:
 				if log: self._error('Cloudflare Error - Retry ' + str(i + 1), link)
@@ -393,6 +420,6 @@ class Cloudflare(object):
 		try: cookies = scraper.cookies.get_dict()
 		except: cookies = None
 
-		self._scraperReuse(scraper = scraper, engine = engine, domain = domain)
+		self._scraperReuse(scraper = scraper, engine = engine, domain = domain, curve = curve)
 
-		return {'response' : response, 'cookies' : cookies}
+		return {'response' : response, 'cookies' : cookies, 'duration' : duration}

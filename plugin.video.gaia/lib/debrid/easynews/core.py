@@ -38,7 +38,12 @@ class Core(base.Core):
 	LinkLogin = 'https://account.easynews.com/index.php'
 	LinkAccount = 'https://account.easynews.com/editinfo.php'
 	LinkUsage = 'https://account.easynews.com/usageview.php'
+	LinkPreferences = 'https://members.easynews.com/2.0/user/prefs?c=general'
 	LinkMembers = 'https://members.easynews.com'
+
+	AuthenticateHeader = 'header'
+	AuthenticateCookie = 'cookie'
+	AuthenticateDefault = AuthenticateHeader
 
 	##############################################################################
 	# CONSTRUCTOR
@@ -52,10 +57,27 @@ class Core(base.Core):
 	# INTERNAL
 	##############################################################################
 
-	def _request(self, link, parameters = None, headers = None, timeout = None, username = None, password = None):
-		if not headers: headers = {}
-		headers.update(self.accountHeader(username = username, password = password))
-		return network.Networker().requestText(link = link, data = parameters, headers = headers, timeout = timeout)
+	def _request(self, link, parameters = None, headers = None, cookies = None, timeout = None, username = None, password = None, authenticate = AuthenticateDefault):
+		if authenticate == Core.AuthenticateHeader:
+			if not headers: headers = {}
+			headers.update(self.accountHeader(username = username, password = password))
+		elif authenticate == Core.AuthenticateCookie:
+			if not cookies: cookies = {}
+			cookies.update(self.accountCookie(username = username, password = password))
+
+		# CloudScraper by default uses "prime256v1" if no ECC was specified. This is the most common ECC.
+		# This seems to work with almost all website, except EasyNews. Only members.easynews.com, the new members-beta.easynews.com does not have this problem.
+		# The following error is returned with members.easynews.com:
+		#	Network Error [Error Type: Certificate | Debug: Easynews | Link: https://members.easynews.com/...] (Caused by SSLError(SSLError(1, '[SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:852)')
+		# This is caused by CloudScraper:
+		#	self.ssl_context.set_ecdh_curve(self.ecdhCurve)
+		# When using some other ECC (eg: secp521r1), or removing the statement altogether, EasyNews works fine.
+		# NB: This curve is also used in the EasyNews provider code.
+		# More info in cloudflare.py.
+		curve = None
+		if Core.LinkMembers in link: curve = network.Networker.CurveSecp512r1
+
+		return network.Networker().requestText(link = link, data = parameters, headers = headers, cookies = cookies, curve = curve, timeout = timeout)
 
 	# Old request that uses cookies. Leave here in case EasyNews forces cookies in the future.
 	'''def _request(self, link, parameters = None, httpTimeout = None, httpData = None, httpHeaders = None):
@@ -162,33 +184,48 @@ class Core(base.Core):
 	def accountVerify(self):
 		return not self.account(cached = False, minimal = True) is None
 
-	def accountVersion(self):
-		try: return float(self.mAccount.dataVersion())
+	def accountVersion(self, detect = False, cached = True):
+		try: return float(self.accountVersionDetect(cached = cached) if detect else self.mAccount.dataVersion())
 		except: return None
 
-	def accountVersionOld(self):
-		version = self.accountVersion()
+	def accountVersionOld(self, detect = False, cached = True):
+		version = self.accountVersion(detect = detect, cached = cached)
 		return version and version < 3
 
-	def accountVersionNew(self):
-		version = self.accountVersion()
+	def accountVersionNew(self, detect = False, cached = True):
+		version = self.accountVersion(detect = detect, cached = cached)
 		return not version or version >= 3
 
 	def accountVersionDetect(self, cached = True):
 		version = 2.0
 		try:
-			if cached: html = cache.Cache.instance().cacheShort(self._request, Core.LinkMembers)
+			# Either has changed, or some accounts do not have this anymore.
+			'''if cached: html = cache.Cache.instance().cacheRefreshLong(self._request, Core.LinkMembers)
 			else: html = cache.Cache.instance().cacheClear(self._request, Core.LinkMembers)
 
 			version = tools.Regex.extract(data = html, expression = 'x-easynews-version.*?content\s*=\s*[\'"](.*?)[\'"]')
 			if version: version = float(version)
-			else: version = 2.0
+			else: version = 2.0'''
+
+			if cached: html = cache.Cache.instance().cacheMedium(self._request, link = Core.LinkPreferences)
+			else: html = cache.Cache.instance().cacheClear(self._request, link = Core.LinkPreferences)
+
+			version = tools.Regex.extract(data = html, expression = '<select.*?name="members2".*?>(.*?)<\/select>')
+			version = tools.Regex.extract(data = version, expression = '<option.*?selected="selected".*?>(.*?)<\/option>')
+			version = version.lower()
+
+			if '2.0' in version: version = 2.0
+			elif '3.0' in version: version = 3.0
+			elif version == 'easynews': version = 3.0
 		except: pass
 		return version
 
 	# Requests can be made either with cookies, or with Authorization headers.
-	def accountCookie(self):
-		return {Core.Cookie[0] : Core.Cookie[1] % (self.mAccount.dataUsername(), self.mAccount.dataPassword())}
+	def accountCookie(self, username = None, password = None):
+		if not username:
+			username = self.mAccount.dataUsername()
+			password = self.mAccount.dataPassword()
+		return {Core.Cookie[0] : Core.Cookie[1] % (username, password)}
 
 	# Requests can be made either with cookies, or with Authorization headers.
 	def accountHeader(self, username = None, password = None):
@@ -234,7 +271,7 @@ class Core(base.Core):
 					'email' : accountEmail,
 					'type' : accountType,
 					'status' : accountStatus,
-					'version' : self.accountVersion(),
+					'version' : self.accountVersion(detect = True), # Always redetect, since the user might have changed the version preferences.,
 			 		'expiration' : {
 						'timestamp' : accountTimestamp,
 						'date' : accountExpiration.strftime('%Y-%m-%d'),

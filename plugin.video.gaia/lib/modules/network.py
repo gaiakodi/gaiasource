@@ -62,6 +62,7 @@ class Networker(object):
 	HeaderAuthorization			= 'Authorization'
 	HeaderUserAgent				= 'User-Agent'
 	HeaderContentType			= 'Content-Type'
+	HeaderContentLength			= 'Content-Length'
 	HeaderContentDisposition	= 'Content-Disposition'
 	HeaderReferer				= 'Referer'
 	HeaderCookie				= 'Cookie'
@@ -72,6 +73,12 @@ class Networker(object):
 	HeaderAcceptEncoding		= 'Accept-Encoding'
 
 	CookiePhp					= 'PHPSESSID'
+
+	# More info in cloudflare.py.
+	CurvePrime256v1				= 'prime256v1'
+	CurveSecp384r1				= 'secp384r1'
+	CurveSecp512r1				= 'secp521r1'
+	CurveDefault				= None
 
 	StatusNone					= None
 	StatusUnknown				= 'unknown'
@@ -144,13 +151,16 @@ class Networker(object):
 			'status' : {
 				'code' : None, # The HTTP status code.
 				'message' : None, # The HTTP status description.
-				'duration' : None, # How long in milliseconds the request took to complete. This only measures the time it takes to receive a reply and not the time it takes to download the data.
 			},
 			'error' : {
 				'type' : None, # The type of the error occured.
 				'code' : None, # The code of the error occured. Is the HTTP status code if it is a request error, otherwise it is another error code string.
 				'message' : None, # The short message of the error occured. Is the HTTP status message if it is a request error, otherwise it is an exception message.
 				'description' : None, # The description of the error occured.
+			},
+			'duration' : {
+				'connection' : None, # How long in milliseconds the request took to complete. This only measures the time it takes to receive a reply and not the time it takes to download the data.
+				'request' : None, # How long in milliseconds the request took to complete. This includes the entire request, including downloading the data.
 			},
 			'meta' : {
 				'type' : None, # The MIME type extracted from the headers.
@@ -198,6 +208,10 @@ class Networker(object):
 		return Importer.moduleOrderedDict()
 
 	@classmethod
+	def moduleRequests(self):
+		return Importer.moduleRequests()
+
+	@classmethod
 	def moduleSession(self):
 		return Importer.moduleSession()
 
@@ -231,8 +245,8 @@ class Networker(object):
 
 	# Encodes a dictionary into a GET parameter string.
 	@classmethod
-	def linkEncode(self, data, duplicates = True):
-		return urlencode(data, doseq = duplicates)
+	def linkEncode(self, data, plus = True, duplicates = True):
+		return urlencode(data, doseq = duplicates, quote_via = quote_plus if plus else quote)
 
 	# Decodes a GET parameter string into a dictionary.
 	# If case parameter is True, a case-insenstive request dictionary is returned instead of a native dictionary.
@@ -817,7 +831,7 @@ class Networker(object):
 	###################################################################
 
 	@classmethod
-	def _session(self, reuse = None, validate = ValidateNone, link = None, domain = None):
+	def _session(self, reuse = None, validate = ValidateNone, curve = None, link = None, domain = None):
 		if reuse is None: reuse = self._settingsReuse()
 		session = None
 
@@ -838,6 +852,7 @@ class Networker(object):
 				class Certificate(self.moduleHttpAdapter()):
 					def __init__(self, *args, **kwargs):
 						self.context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+						if curve: self.context.set_ecdh_curve(curve)
 						self.context.check_hostname = False # Must be set BEFORE verify_mode, otherwise this statement is ignored and an error is thrown: " Cannot set verify_mode to CERT_NONE when check_hostname is enabled."
 						self.context.verify_mode = ssl.CERT_NONE
 						if validate <= Networker.ValidateLenient:
@@ -896,10 +911,12 @@ class Networker(object):
 			timeout (optional): The request timeout. If not set, the default timeout is used.
 			concurrency (optional): The maximum number of concurrent connections/requests. If not set, an unlimited number of connections can be established.
 			certificate (optional): Whether or not to validate SSL certificates. If not set, the user specified setting is used.
+			curve (optional): The Elliptic Curve Cryptography (ECC) to use for the SSL/TLS certificates. More info in cloudflare.py.
 			redirect (optional): Allow HTTP redirects.
 			encode (optional): Whether or not to URL encode the GET parameters.
 			charset (optional): Which character set to use for encoding.
 			vpn (optional): Whether or not to check if the VPN is connected (and possibly wait for reconnection) before makiong the request.
+			process (optional): Wether or not to process the data and save it to the response. If the output data/JSON/HTML is very large, saving it to the response can take long, and is unnecessary if the data is not used in the end (eg: speedtest).
 			debug (optional): An additional debug string to print if something goes wrong with the request.
 		RETURNS
 			Response dictionary.
@@ -910,13 +927,16 @@ class Networker(object):
 				'status' : {
 					'code' : <None/Integer - The HTTP status code.>,
 					'message' : <None/String - The HTTP status description.>,
-					'duration' : <None/Integer - How long in milliseconds the request took to complete. This only measures the time it takes to receive a reply and not the time it takes to download the data.>,
 				},
 				'error' : {
 					'type' : <None/String - The type of the error occured.>,
 					'code' : <None/Integer/String - The code of the error occured. Is the HTTP status code if it is a request error, otherwise it is another error code string.>,
 					'message' : <None/String - The message of the error occured. Is the HTTP status message if it is a request error, otherwise it is an exception message.>,
 					'description' : <None/String - The description of the error occured.>,
+				},
+				'duration' : {
+					'connection' : <None/Integer - How long in milliseconds the request took to complete. This only measures the time it takes to receive a reply and not the time it takes to download the data.>,
+					'request' : <None/Integer - How long in milliseconds the request took to complete. This includes the entire request, including downloading the data.>,
 				},
 				'meta' : {
 					'type' : <None/String - The MIME type extracted from the headers.>,
@@ -928,19 +948,19 @@ class Networker(object):
 				'cookies' : <None/Dictionary - The response cookies (case sensitive keys - can be accessed with any case, since it uses CaseInsensitiveDict).>,
 			}
 	'''
-	def request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, encode = True, charset = None, vpn = True, debug = None, cache = False):
+	def request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None, cache = False):
 		if cache is False:
-			return self._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, encode = encode, charset = charset, vpn = vpn, debug = debug)
+			return self._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
 		else:
 			from lib.modules.cache import Cache
 			if tools.Tools.isFunction(cache):
-				return cache(function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, encode = encode, charset = charset, vpn = vpn, debug = debug)
+				return cache(function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
 			else:
 				if tools.Tools.isNumber(cache): time = cache
 				else: time = Cache.TimeoutMedium
-				return Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, encode = encode, charset = charset, vpn = vpn, debug = debug)
+				return Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
 
-	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, redirect = True, encode = True, charset = None, vpn = True, debug = None):
+	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None):
 		try:
 			if link is None: return self.mRequest
 
@@ -1013,6 +1033,7 @@ class Networker(object):
 			validate = self._settingsCertificates()
 			reuse = self._settingsReuse()
 			released = False
+			duration = None
 
 			try:
 				headers = dict(self._headersClean(headers = headers)) # Headers are case insensitive. But just make them titlecase in case the Cloudflare scraper does something weird.
@@ -1026,15 +1047,18 @@ class Networker(object):
 						Networker.ConcurrencySemaphore[concurrency].acquire()
 
 					if Cloudflare.enabled():
-						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, headers = headers, data = data, timeout = timeout_, certificate = certificate, redirect = redirect, log = False)
+						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, log = False)
 						response = result['response']
 						responseCookies = result['cookies']
+						duration = result['duration']
 					else:
 						if certificate is None: certificate = validate
 						verify = certificate >= Cloudflare.ValidateStrict
 
-						session, domain = self._session(reuse = reuse, validate = certificate, link = link)
+						session, domain = self._session(reuse = reuse, validate = certificate, curve = curve, link = link)
+						timer = tools.Time(start = True)
 						response = session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect)
+						duration = timer.elapsed(milliseconds = True)
 
 						# NB: session.response.cookies does not return all of the cookies.
 						# Not entirley sure why, but maybe only the cookies of the last request are returned, and not all the cookies in the chain or redirection.
@@ -1058,8 +1082,6 @@ class Networker(object):
 				except: pass
 				try: self.mResponse['status']['message'] = response.reason
 				except: pass
-				try: self.mResponse['status']['duration'] = int(response.elapsed.total_seconds() * 1000)
-				except: pass
 
 				if not success:
 					if vpnError:
@@ -1070,24 +1092,33 @@ class Networker(object):
 						self.mResponse['error']['code'] = response.status_code
 						self.mResponse['error']['message'] = response.reason
 
+				try: self.mResponse['duration']['connection'] = int(response.elapsed.total_seconds() * 1000)
+				except: pass
+				try: self.mResponse['duration']['request'] = duration
+				except: pass
+
 				try: self.mResponse['link'] = response.url
 				except: pass
 
-				# Do not add different formats to the response.
-				# Firstly, this is wastes time if some format is not used.
-				# Secondly, large data will be stored as duplicate in cache.py, wasting disk space.
-				'''try: self.mResponse['data']['bytes'] = response.content
-				except: pass
-				try: self.mResponse['data']['unicode'] = tools.Converter.unicode(response.content)
-				except: pass
-				try: self.mResponse['data']['text'] = response.text
-				except: pass
-				try: self.mResponse['data']['json'] = response.json()
-				except: pass'''
-				try: self.mResponse['data'] = response.content
-				except: pass
-				try: responseText = response.text
-				except: responseText = ''
+				if process:
+					# Do not add different formats to the response.
+					# Firstly, this is wastes time if some format is not used.
+					# Secondly, large data will be stored as duplicate in cache.py, wasting disk space.
+					'''try: self.mResponse['data']['bytes'] = response.content
+					except: pass
+					try: self.mResponse['data']['unicode'] = tools.Converter.unicode(response.content)
+					except: pass
+					try: self.mResponse['data']['text'] = response.text
+					except: pass
+					try: self.mResponse['data']['json'] = response.json()
+					except: pass'''
+					try: self.mResponse['data'] = response.content
+					except: pass
+					try: responseText = response.text
+					except: responseText = None
+				else:
+					self.mResponse['data'] = None
+					responseText = None
 
 				try: self.mResponse['headers'] = CaseInsensitiveDict(response.headers)
 				except: pass
@@ -1133,8 +1164,12 @@ class Networker(object):
 				except: pass
 				try: self.mResponse['status']['message'] = error.response.reason
 				except: pass
-				try: self.mResponse['status']['duration'] = int(error.response.elapsed.total_seconds() * 1000)
+
+				try: self.mResponse['duration']['connection'] = int(error.response.elapsed.total_seconds() * 1000)
 				except: pass
+				try: self.mResponse['duration']['request'] = duration
+				except: pass
+
 				try:
 					self.mResponse['headers'] = CaseInsensitiveDict(error.response.headers)
 					self.mResponse['headers']['Status'] = error.response.status_code
@@ -1204,6 +1239,7 @@ class Networker(object):
 
 			if reuse and session: self._sessionReuse(session = session, domain = domain)
 
+
 			return self.mResponse
 		except:
 			tools.Logger.error()
@@ -1216,9 +1252,9 @@ class Networker(object):
 		RETURNS
 			The response data object on request success, otherwise None.
 	'''
-	def requestData(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestData(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mRequest['data']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return self.responseDataBytes()
 
 	'''
@@ -1228,9 +1264,9 @@ class Networker(object):
 		RETURNS
 			The response binary data on request success, otherwise None.
 	'''
-	def requestBytes(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestBytes(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mRequest['data']
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return self.responseDataBytes()
 
 	'''
@@ -1240,9 +1276,9 @@ class Networker(object):
 		RETURNS
 			The response unicode text data on request success, otherwise None.
 	'''
-	def requestText(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestText(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.dataText(self.mRequest['data'])
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return self.responseDataText()
 
 	'''
@@ -1252,9 +1288,9 @@ class Networker(object):
 		RETURNS
 			The response JSON dictionary on request success and if the returned data is JSON, otherwise None.
 	'''
-	def requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.dataJson(self.mRequest['data'])
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return self.responseDataJson()
 
 	'''
@@ -1264,9 +1300,9 @@ class Networker(object):
 		RETURNS
 			The response headers as a dictionary (lower case keys) on request success, otherwise None.
 	'''
-	def requestHeaders(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestHeaders(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mRequest['headers']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return response['headers']
 
 	'''
@@ -1276,9 +1312,9 @@ class Networker(object):
 		RETURNS
 			The response cookies as a dictionary (case sensitive keys) on request success, otherwise None.
 	'''
-	def requestCookies(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestCookies(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mRequest['cookies']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return response['cookies']
 
 	'''
@@ -1288,9 +1324,9 @@ class Networker(object):
 		RETURNS
 			The response final redirected URL on request success, otherwise None.
 	'''
-	def requestLink(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestLink(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mRequest['link']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		result = response['link']
 		if result == link:
 			try:
@@ -1307,9 +1343,9 @@ class Networker(object):
 		RETURNS
 			The response success status.
 	'''
-	def requestSuccess(self, link = None, method = MethodHead, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
+	def requestSuccess(self, link = None, method = MethodHead, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
 		if link is None: return self.mResponse['success']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 		return response['success']
 
 	'''
@@ -1319,8 +1355,8 @@ class Networker(object):
 		RETURNS
 			The response status.
 	'''
-	def requestStatus(self, link, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, redirect = True, vpn = True, cache = False):
-		response = self.request(link = link, method = Networker.MethodHead, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, vpn = vpn, cache = cache)
+	def requestStatus(self, link, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+		response = self.request(link = link, method = Networker.MethodHead, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
 
 		if not response['success']:
 			if response['error']['type'] == Networker.ErrorCloudflare:
@@ -1330,7 +1366,7 @@ class Networker(object):
 
 		if response['meta']['type']:
 			if any(i in response['meta']['type'] for i in ['text', 'json']):
-				response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, redirect = redirect, cache = cache)
+				response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, cache = cache)
 				text = self.responseDataText()
 				if text:
 					text = text.lower()
@@ -1385,9 +1421,6 @@ class Networker(object):
 	def responseStatusMessage(self):
 		return self.mResponse['status']['message']
 
-	def responseStatusDuration(self):
-		return self.mResponse['status']['duration']
-
 	def responseError(self):
 		return self.mResponse['error']
 
@@ -1441,6 +1474,15 @@ class Networker(object):
 
 	def responseError5xx(self):
 		return self.responseErrorXxx(rangeFrom = 500, rangeTo = 599)
+
+	def responseDuration(self):
+		return self.mResponse['duration']
+
+	def responseDurationConnection(self):
+		return self.mResponse['duration']['connection']
+
+	def responseDurationRequest(self):
+		return self.mResponse['duration']['request']
 
 	###################################################################
 	# DOWNLOAD

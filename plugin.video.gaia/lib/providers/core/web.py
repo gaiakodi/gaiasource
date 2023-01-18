@@ -441,6 +441,8 @@ class ProviderWeb(ProviderBase):
 		requestCount				= None,						# Some servers have a maximum number of concurrent connections allowed per client. If too many connections come in at the same time, such as when the subpages have to be requested, they are aborted by the server.If None, thene an infinite number of parallel connections can be made.
 		requestDelay				= None,						# Some APIs have limits on how many requests can be made within a time period. Set this value to the number of seconds between requests. Assumes that the maximum number of concurrent connections is 1. If None, then there is no delay.
 
+		certificateCurve			= None,						# The Elliptic Curve Cryptography (ECC to use for SSL/TLS certificates. More info in cloudflare.py.
+
 		# All the retry attributes can be a single value or a list of values.
 		# A single value only deals with a single retry error.
 		# A list of values can handle multiple/different errors, each with their own count and delay.
@@ -553,6 +555,10 @@ class ProviderWeb(ProviderBase):
 					'delay' : requestDelay,
 				},
 
+				'certificate' : {
+					'curve' : certificateCurve,
+				},
+
 				'retry' : {
 					'count' : retryCount,
 					'delay' : retryDelay,
@@ -650,7 +656,7 @@ class ProviderWeb(ProviderBase):
 	# REQUEST
 	##############################################################################
 
-	def request(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, retries = None, scrape = False):
+	def request(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, retries = None, scrape = False):
 		try:
 			if not self.timerCheck(): return None
 
@@ -678,6 +684,10 @@ class ProviderWeb(ProviderBase):
 			if cookies is None: cookies = {}
 			auth = self.accountAuthenticationCookies()
 			if auth: cookies.update(auth)
+
+			curve = None
+			if certificate is None: certificate = self.certificate()
+			if certificate and ProviderBase.RequestCurve in certificate: curve = certificate[ProviderBase.RequestCurve]
 
 			retryCount = self.retryCount()
 			if retryCount:
@@ -768,7 +778,7 @@ class ProviderWeb(ProviderBase):
 
 				#self.log('PROVIDER REQUEST: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew)), developer = True)
 				self.statisticsUpdateSearch(request = True)
-				networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
+				networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
 				# If there are Cloudflare errors, prevent all future requests to the domain, since they will most likley also fail with a Cloudflare error.
 				# Rather do this on a per-provider basis, instead of a per-domain basis, since mirror domains typically point to the same server.
@@ -859,7 +869,7 @@ class ProviderWeb(ProviderBase):
 						elif delay: Time.sleep(delay)
 
 						#self.log('PROVIDER RETRY: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew)), developer = True)
-						networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
+						networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
 						if networker.responseErrorCloudflare():
 							ProviderWeb.RequestError[id] = True
@@ -902,18 +912,18 @@ class ProviderWeb(ProviderBase):
 			self.logError()
 			return None
 
-	def requestText(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, scrape = False):
+	def requestText(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
 		# Use bytes and not text, since there are special characters (like the yellow star) in file names. Returning responseDataText() converts these characters to some other weird characters.
 		# Do not work with bytes, because providers do string processing on the var (eg: TorrentProject -> processRequest()).
 		# Instead, get the bytes and manual convert to unicode. The special icon characters are in any case removed in streams.py.
 		#try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape).responseDataBytes()
 		#except: return None
 
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape).responseDataText()
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataText()
 		except: return None
 
-	def requestJson(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, scrape = False):
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape).responseDataJson()
+	def requestJson(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataJson()
 		except: return None
 
 	def requestExtract(self, data = None, request = None, extract = None, fixed = None):
@@ -1045,6 +1055,16 @@ class ProviderWeb(ProviderBase):
 		if self.requestDelay():
 			ProviderWeb.RequestDelayCurrent[id] = 0
 			if not id in ProviderWeb.RequestDelayLock: ProviderWeb.RequestDelayLock[id] = Lock()
+
+	##############################################################################
+	# CERTIFICATE
+	##############################################################################
+
+	def certificate(self):
+		return self.mData['certificate']
+
+	def certificateCurve(self):
+		return self.mData['certificate']['curve']
 
 	##############################################################################
 	# REPLACEMENTS

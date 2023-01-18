@@ -2,7 +2,7 @@
 <addon id="script.gaia.icons" version="9.9.9" name="Gaia Icons" provider-name="Gaia">
 	<requires>
 	</requires>
-	<extension point="xbmc.python.module" library="lib" />
+	<extension point="xbmc.python.module" />
 	<extension point="xbmc.addon.metadata">
 		<summary lang="en">Gaia Icons</summary>
 		<description lang="en">Additional icons in various colors for Gaia.</description>

@@ -1,4 +1,26 @@
 
+[B]6.1.0 (2023.01.18)[/B]
+- Fixed Trakt show lists.
+- Removed specials form Trakt progress list.
+- Fixed IMDb episode filtering.
+- Fixed TVDb season posters.
+- Changed TVDb year season number.
+- Improved menu loading performance.
+- Added database indexes.
+- Improved additional scraping titles.
+- Changed specials in interleaved show menus.
+- Improved performance of metadata retrieval.
+- Added support for preprocessed metadata addon.
+- Fixed default artwork.
+- Fixed some labels.
+- Fixed EasyNews provider.
+- Added alternative elliptic curve cryptography.
+- Fixed command encoding errors.
+- Improved speed tests.
+- Added time and year ranges for show packs.
+- Added show year range stream validation.
+- Improved stream metadata detection.
+
 [B]6.0.9 (2022.12.24)[/B]
 - Fixed history stream list.
 - Improved download speed test.

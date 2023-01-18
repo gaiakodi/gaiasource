@@ -25,6 +25,7 @@ from lib.modules.tools import Media, Language, Country, Tools, Converter, Regex,
 from lib.modules.interface import Context, Directory, Icon, Format, Translation, Skin, Font
 from lib.modules.convert import ConverterTime
 from lib.modules.theme import Theme
+from lib.modules.cache import Cache, Memory
 from lib.modules.concurrency import Lock
 from lib.modules.video import Recap, Review, Extra, Deleted, Making, Director, Interview, Explanation
 
@@ -42,8 +43,10 @@ class MetaTools(object):
 	ProviderTmdb			= 'tmdb'
 	ProviderTvdb			= 'tvdb'
 	ProviderTvmaze			= 'tvmaze'
+	ProviderTvrage			= 'tvrage'
 	ProviderTrakt			= 'trakt'
 	ProviderFanart			= 'fanart'
+	Providers				= [ProviderImdb, ProviderTmdb, ProviderTvdb, ProviderTvmaze, ProviderTvrage, ProviderTrakt, ProviderFanart]
 
 	StreamVideo				= 'video'
 	StreamAudio				= 'audio'
@@ -72,12 +75,15 @@ class MetaTools(object):
 	TimeUnreleased			= 10800 # 3 hours.
 	TimeFuture				= 86400 # 1 day.
 
+	PropertyBusy			= 'GaiaMetadataBusy'
+
 	###################################################################
 	# CONSTRUCTOR
 	###################################################################
 
 	def __init__(self):
 		self.mSettingsDetail = Settings.getString('metadata.general.detail').lower()
+		self.mSettingsExternal = not Settings.getString('metadata.general.external') == Translation.string(32302) # Enable by default if user has a different language set.
 		self.mSettingsLanguage = Language.settingsCustom('metadata.location.language')
 		self.mSettingsCountry = Country.settings('metadata.location.country')
 
@@ -206,8 +212,9 @@ class MetaTools(object):
 		self.mShowInterleaveSupplementary = Settings.getBoolean('navigation.show.interleave.supplementary')
 		self.mShowInterleaveUnofficial = Settings.getBoolean('navigation.show.interleave.unofficial')
 		self.mShowInterleaveDuration = Settings.getInteger('navigation.show.interleave.duration')
-		if self.mShowInterleaveDuration == 1: self.mShowInterleaveDuration = 0.25
-		elif self.mShowInterleaveDuration == 2: self.mShowInterleaveDuration = 0.5
+		if self.mShowInterleaveDuration == 1: self.mShowInterleaveDuration = [0.0, 0.5] # 0.0 for series menus, 0.5 for other interleaved submenus (eg Trakt progress list).
+		elif self.mShowInterleaveDuration == 2: self.mShowInterleaveDuration = 0.25
+		elif self.mShowInterleaveDuration == 3: self.mShowInterleaveDuration = 0.5
 
 		self.mShowSpecial = Settings.getBoolean('navigation.show.special')
 		self.mShowSpecialSeason = Settings.getBoolean('navigation.show.special.season') if self.mShowSpecial else False
@@ -290,6 +297,8 @@ class MetaTools(object):
 
 	@classmethod
 	def reset(self, settings = True, full = True):
+		self.busyClear()
+
 		if settings:
 			MetaTools.Instance = None
 
@@ -370,9 +379,26 @@ class MetaTools(object):
 
 	@classmethod
 	def settingsDetailShow(self, settings = False):
-		from lib.modules.window import WindowMetadata
-		WindowMetadata.show(wait = True)
+		from lib.modules.window import WindowMetaDetail
+		WindowMetaDetail.show(wait = True)
 		if settings: Settings.launch(id = 'metadata.general.detail')
+
+	def settingsExternal(self):
+		return self.mSettingsExternal
+
+	@classmethod
+	def settingsExternalSet(self, enabled = True):
+		Settings.set('metadata.general.external', Translation.string(32301 if enabled else 32302))
+
+	@classmethod
+	def settingsExternalHas(self):
+		return Settings.defaultIs('metadata.general.external')
+
+	@classmethod
+	def settingsExternalShow(self, settings = False):
+		from lib.modules.window import WindowMetaExternal
+		WindowMetaExternal.show(wait = True)
+		if settings: Settings.launch(id = 'metadata.general.external')
 
 	###################################################################
 	# NETWORK
@@ -408,7 +434,7 @@ class MetaTools(object):
 	# COMMAND
 	###################################################################
 
-	def command(self, metadata, media = None, action = None, video = None, mixed = None, submenu = None, increment = False):
+	def command(self, metadata, media = None, action = None, video = None, mixed = None, submenu = None, reduce = None, increment = False):
 		force = False
 		if media == Media.TypeSeason and not 'season' in metadata: # Series menu.
 			media = Media.TypeShow
@@ -426,7 +452,11 @@ class MetaTools(object):
 			if not action: action = 'scrape'
 
 		parameters = {}
-		if action == 'scrape' or action == 'seasonsExtras': parameters['metadata'] = metadata
+
+		# Removes the current/next/previous season data to reduce time to encode/decode the metadata.
+		# Almost halfs the time to load menus.
+		if action == 'scrape' or action == 'seasonsExtras': parameters['metadata'] = self.reduce(metadata)
+
 		if mixed and submenu: parameters['limit'] = self.mPageMixed
 
 		for attribute in ['imdb', 'tmdb', 'tvdb', 'title', 'tvshowtitle', 'year', 'premiered', 'season', 'episode']:
@@ -449,6 +479,8 @@ class MetaTools(object):
 		if 'query' in metadata: parameters['title'] = parameters['tvshowtitle'] = metadata['query']
 		if not video is None: parameters['video'] = video
 		parameters['media'] = Media.TypeEpisode if media == Media.TypeSpecialRecap or media == Media.TypeSpecialExtra else media
+
+		parameters['reduce'] = reduce
 
 		return System.command(action = action, parameters = parameters)
 
@@ -661,7 +693,7 @@ class MetaTools(object):
 					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
 					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
 					if recap or extra:
-						cleaned = Tools.update(Tools.copy(metadata), item['metadata'])
+						cleaned = Tools.update(self.copy(metadata), item['metadata'])
 						if recap:
 							item = self.itemRecap(metadata = cleaned, media = media, kids = kids, mixed = mixed)
 							if item: itemRecap = (len(items) - 1, item)
@@ -823,8 +855,6 @@ class MetaTools(object):
 				if (media == Media.TypeSeason and not self.mShowFutureSeason) or (media == Media.TypeEpisode and not self.mShowFutureEpisode):
 					if future is None: return None # No release date.
 					if future > -MetaTools.TimeUnreleased: return None # Released in the past 3 hours or sometime in the future.
-
-			self.cleanEmpty(metadata = metadata) # This is also done later in clean(), but remove here already before calling itemPlayback().
 
 		if not item: item = self.itemCreate()
 
@@ -1251,7 +1281,7 @@ class MetaTools(object):
 				elif episode is None:
 					seasonsTotal = 1
 					for i in pack['seasons']:
-						if i['number'] == season:
+						if i['number'][MetaData.NumberOfficial] == season:
 							episodesTotal = i['count']
 							break
 				else:
@@ -1387,7 +1417,7 @@ class MetaTools(object):
 						metadataCurrent = metadata['seasonCurrent'] if 'seasonCurrent' in metadata else None
 						metadataPrevious = metadata['seasonPrevious'] if 'seasonPrevious' in metadata else None
 						metadataNext = metadata['seasonNext'] if 'seasonNext' in metadata else None
-						metadata = Tools.copy(metadataPrevious if metadataPrevious else metadataCurrent)
+						metadata = self.copy(metadataPrevious if metadataPrevious else metadataCurrent)
 						if not metadata: return None
 
 						if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(metadataCurrent[MetaImage.Attribute]), data = metadata)
@@ -1448,14 +1478,14 @@ class MetaTools(object):
 						if ended and 'pack' in metadata and metadata['pack']:
 							found = False
 							for i in metadata['pack']['seasons']:
-								if i['number'] == metadata['season']:
+								if i['number'][MetaData.NumberOfficial] == metadata['season']:
 									found = True
-									last = max([j['number'] for j in i['episodes']])
+									last = max([j['number'][MetaData.NumberOfficial] for j in i['episodes']])
 									if metadata['episode'] < last: ended = False
 									break
 
 							# Sometimes the new unaired season does not form part of the pack data.
-							if not found and season > max([i['number'] for i in metadata['pack']['seasons']]): ended = False
+							if not found and season > max([i['number'][MetaData.NumberOfficial] for i in metadata['pack']['seasons']]): ended = False
 
 						if ended:
 							# Ensures that the Extras are automatically marked as watched if the last episode in the season was watched.
@@ -1465,7 +1495,7 @@ class MetaTools(object):
 							metadataCurrent = metadata['seasonCurrent'] if 'seasonCurrent' in metadata else None
 							metadataPrevious = metadata['seasonPrevious'] if 'seasonPrevious' in metadata else None
 							metadataNext = metadata['seasonNext'] if 'seasonNext' in metadata else None
-							metadata = Tools.copy(metadataCurrent if metadataCurrent else metadataNext)
+							metadata = self.copy(metadataCurrent if metadataCurrent else metadataNext)
 							if not metadata: return None
 
 							if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(metadataCurrent[MetaImage.Attribute]), data = metadata)
@@ -1605,6 +1635,42 @@ class MetaTools(object):
 		return None
 
 	###################################################################
+	# COPY
+	###################################################################
+
+	@classmethod
+	def copy(self, metadata):
+		# Do not copy the pack and season data.
+		# For shows with a lot of seasons/episodes, the pack dictionary can be very large.
+		# Just copying the pack already takes a long time.
+		# And there should not be a reason to copy the pack, because it is static and not edited/cleaned like the rest of the metadata.
+		# Eg: Coronation Street - S01 has only 7 episodes, but loads 4-5 secs without the code below, or 2.5 secs with the code.
+
+		if metadata and 'pack' in metadata:
+			temp = {}
+			attributes = ['pack', 'seasonPrevious', 'seasonCurrent', 'seasonNext']
+
+			for i in attributes:
+				try:
+					temp[i] = metadata[i]
+					del metadata[i]
+				except: pass
+
+			result = Tools.copy(metadata)
+
+			for key, value in temp.items():
+				metadata[key] = value
+				result[key] = value
+
+			return result
+		else:
+			return Tools.copy(metadata)
+
+	@classmethod
+	def reduce(self, metadata):
+		return self.cleanSeason(Tools.copy(metadata, deep = False))
+
+	###################################################################
 	# CLEAN
 	###################################################################
 
@@ -1619,8 +1685,7 @@ class MetaTools(object):
 	def clean(self, metadata, media = None, exclude = None, studio = True):
 		if not metadata: return None
 		if Tools.isString(metadata): metadata = Converter.jsonFrom(metadata)
-		else: metadata = Tools.copy(metadata) # Create a copy, since we do not want to edit the outside dictionary passed to this function.
-		self.cleanEmpty(metadata = metadata)
+		else: metadata = self.copy(metadata) # Create a copy, since we do not want to edit the outside dictionary passed to this function.
 
 		if media is None: media = self.media(metadata = metadata)
 
@@ -1663,19 +1728,12 @@ class MetaTools(object):
 
 		return metadata
 
-	def cleanEmpty(self, metadata):
-		# Remove values with '0', otherwise they will show up as '0' in the Kodi info dialog.
-		# This is legacy code. Once all values were updated to properly use None instead, this function can be removed.
-		for key in self.mMetaNonzero:
-			try:
-				if metadata[key] == '0': del metadata[key]
-			except: pass
-
 	@classmethod
 	def cleanSeason(self, metadata):
 		for i in ['seasonCurrent', 'seasonPrevious', 'seasonNext']:
 			try: del metadata[i]
 			except: pass
+		return metadata
 
 	def cleanPlot(self, metadata):
 		try:
@@ -1990,9 +2048,13 @@ class MetaTools(object):
 	# PACK
 	###################################################################
 
+	# By default set cache = True, since this function is called from shows/seasons/episodes.py, and without caching this can take long when eg trakt progress list is loaded from scratch.
 	@classmethod
-	def pack(self, show = None, season = None, episode = None, extended = True, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None):
+	def pack(self, show = None, season = None, episode = None, extended = True, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, cache = True):
 		try:
+			def _packNumber(season, episode):
+				return int(('%06d' % season) + ('%06d' % episode))
+
 			# Trakt sometimes has more specials than TVDb.
 			# Eg: Game of Thrones: TVDb has 53 specials, Trakt has 236 specials.
 			if extended:
@@ -2016,11 +2078,12 @@ class MetaTools(object):
 					if 'trakt' in ids: idTrakt = ids['trakt']
 					if 'imdb' in ids: idImdb = ids['imdb']
 
-				if idTrakt or idImdb: extended = Trakt.getTVSeasonSummary(id = idTrakt or idImdb, season = 0, full = True, cache = False)
+				if idTrakt or idImdb: extended = Trakt.getTVSeasonSummary(id = idTrakt or idImdb, season = 0, full = True, cache = cache)
 
 			# Determine the number of episodes per season to estimate season pack episode sizes.
 			counts = {} # Do not use a list, since not all seasons are labeled by number. Eg: MythBusters
 			episodes = []
+			seasons = {}
 
 			if show:
 				season = show.season(sort = True)
@@ -2029,6 +2092,7 @@ class MetaTools(object):
 			if season:
 				if not Tools.isArray(season): season = [season]
 				for i in season:
+					seasons[i.numberSeason()] = i
 					i = i.episode(sort = True)
 					if i: episodes.extend(i)
 
@@ -2043,38 +2107,60 @@ class MetaTools(object):
 				if not number in seen:
 					seen.add(number)
 					temp.append(i)
-			seasons = {}
 			episodes = temp
+
+			episodesNumber = {}
+			episodesOrder = []
 			for i in episodes:
 				number = i.numberSeason()
 				if not number in counts: counts[number] = 0
 				counts[number] += 1
-				if not number in seasons: seasons[number] = []
-				seasons[number].append(i)
+				if not number in episodesNumber: episodesNumber[number] = []
+				episodesNumber[number].append(i)
+				if number > 0: episodesOrder.append(_packNumber(season = number, episode = i.numberEpisode()))
 
-			if not seasons and show:
+			episodesOrder = Tools.listSort(episodesOrder)
+			temp = {}
+			for i in range(len(episodesOrder)):
+				temp[episodesOrder[i]] = i + 1
+			episodesOrder = temp
+
+			if not episodesNumber and show:
 				i = show.season()
 				if i:
 					for j in i:
 						number = j.numberSeason()
 						counts[number] = 0
-						seasons[number] = []
+						episodesNumber[number] = []
 
 			time = Time.timestamp()
 			seasonItems = []
-			for number, item in seasons.items():
+			for number, item in episodesNumber.items():
 				if item:
+					try: numbersSeason = item[0].numbersSeason()
+					except: numbersSeason = None
+					if not numbersSeason: numbersSeason = {MetaData.NumberOfficial : number}
+					if not MetaData.NumberAbsolute in numbersSeason: numbersSeason[MetaData.NumberAbsolute] = 1 if number > 0 else 0
+
 					releases = []
 					episodeItems = {}
 					for i in item:
 						release = i.releaseDateFirst(format = MetaData.FormatTimestamp)
 						releases.append(release if release else 0)
 						episodeNumber = i.numberEpisode()
+
+						try: numbers = i.numbersEpisode()
+						except: numbers = None
+						if not numbers: numbers = {MetaData.NumberOfficial : episodeNumber}
+						try: numbers[MetaData.NumberAbsolute] = episodesOrder[_packNumber(season = number, episode = episodeNumber)]
+						except: pass
+
 						episodeItems[episodeNumber] = {
 							'title' : i.title(),
-							'number' : episodeNumber,
+							'number' : numbers,
 							'duration' : i.duration(),
-							'released' : release,
+							'time' : release,
+							'year' : None,
 						}
 					if number == 0 and Tools.isArray(extended):
 						for i in extended:
@@ -2094,7 +2180,7 @@ class MetaTools(object):
 									for key, value in episodeItems.items():
 										if value['title'] and Matcher.levenshtein(episodeTitle, value['title'][0], ignoreCase = True, ignoreSpace = True, ignoreNumeric = False, ignoreSymbol = True) > 0.99:
 											if not value['duration']: value['duration'] = episodeDuration
-											if not value['released']: value['released'] = episodePremiered
+											if not value['time']: value['time'] = episodePremiered
 											found = True
 											break
 
@@ -2103,24 +2189,25 @@ class MetaTools(object):
 									episodeItem = episodeItems[episodeNumber]
 									if not episodeItem['title']:
 										if not episodeItem['duration']: episodeItem['duration'] = episodeDuration
-										if not episodeItem['released']: episodeItem['released'] = episodePremiered
+										if not episodeItem['time']: episodeItem['time'] = episodePremiered
 
 							else:
 								episodeItems[episodeNumber] = {
 									'title' : [episodeTitle],
-									'number' : episodeNumber,
+									'number' : {MetaData.NumberOfficial : episodeNumber},
 									'duration' : episodeDuration,
-									'released' : episodePremiered,
+									'time' : episodePremiered,
+									'year' : None,
 								}
 
 					episodeItems = list(episodeItems.values())
-					episodeItems = Tools.listSort(episodeItems, key = lambda x : x['number'])
+					episodeItems = Tools.listSort(episodeItems, key = lambda x : x['number'][MetaData.NumberOfficial])
 
 					counts[number] = 0
-					seasons[number] = []
+					episodesNumber[number] = []
 					for i in episodeItems:
 						counts[number] += 1
-						seasons[number].append(i['number'])
+						episodesNumber[number].append(i['number'][MetaData.NumberOfficial])
 
 					# In case an episode does not have a duration, use the mean duration of other episodes as replacement.
 					duration = []
@@ -2135,25 +2222,25 @@ class MetaTools(object):
 					if not duration: duration = None
 
 					seasonItems.append({
-						'number' : number,
+						'number' : numbersSeason,
+						'status' : MetaData.StatusEnded if len(releases) > 1 and releases[-1] > 0 and max(releases) < time else MetaData.StatusContinuing, # TVDb only has a status for shows, but not for seasons. Calculate the status based on the episode release dates.
 						'count' : len(episodeItems),
 						'duration' : {'total' : duration, 'mean' : duration if duration is None else int(duration / float(len(episodeItems)))},
-						'status' : MetaData.StatusEnded if len(releases) > 1 and releases[-1] > 0 and max(releases) < time else MetaData.StatusContinuing, # TVDb only has a status for shows, but not for seasons. Calculate the status based on the episode release dates.
-						'released' : episodeItems[0]['released'] if episodeItems else None,
-						'ended' : episodeItems[-1]['released'] if episodeItems else None,
-						'episodes' : sorted(episodeItems, key = lambda i : i['number']),
+						'time' : {'start' : episodeItems[0]['time'] if episodeItems else None, 'end' : episodeItems[-1]['time'] if episodeItems else None},
+						'year' : {'start' : None, 'end' : None, 'years' : None},
+						'episodes' : sorted(episodeItems, key = lambda i : i['number'][MetaData.NumberOfficial]),
 					})
 				else:
 					seasonItems.append({
-						'number' : number,
+						'number' : {MetaData.NumberOfficial : number, MetaData.NumberAbsolute : 1 if number > 0 else 0},
+						'status' : None,
 						'count' : 0,
 						'duration' : {'total' : None, 'mean' : None},
-						'status' : None,
-						'released' : None,
-						'ended' : None,
+						'time' : {'start' : None, 'end' : None},
+						'year' : {'start' : None, 'end' : None, 'years' : None},
 						'episodes' : [],
 					})
-			seasonItems.sort(key = lambda i : i['number'])
+			seasonItems.sort(key = lambda i : i['number'][MetaData.NumberOfficial])
 
 			countEpisodeTotal = sum(list(counts.values()))
 			countSeasonTotal = len(counts.keys())
@@ -2170,12 +2257,49 @@ class MetaTools(object):
 			try: countMeanMain = int(round(float(countEpisodeMain) / len(counts.keys())))
 			except: countMeanMain = 0 # If counts is empty
 
+			timeStart = None
+			timeEnd = None
+			yearsShow = []
+			for itemSeason in seasonItems:
+				yearsSeason = []
+
+				# Calculate episode year.
+				for itemEpisode in itemSeason['episodes']:
+					if 'time' in itemEpisode and itemEpisode['time']:
+						itemEpisode['year'] = Time.year(timestamp = itemEpisode['time'])
+						yearsSeason.append(itemEpisode['year'])
+
+				# Do not include the end time if the season is still running.
+				if 'status' in itemSeason and itemSeason['status'] and not itemSeason['status'] in [MetaData.StatusEnded, MetaData.StatusCanceled]:
+					try: itemSeason['time']['end'] = None
+					except: pass
+
+				# Calculate season year.
+				if 'time' in itemSeason:
+					if 'start' in itemSeason['time'] and itemSeason['time']['start']: itemSeason['year']['start'] = Time.year(timestamp = itemSeason['time']['start'])
+					if 'end' in itemSeason['time'] and itemSeason['time']['end']: itemSeason['year']['end'] = Time.year(timestamp = itemSeason['time']['end'])
+				itemSeason['year']['years'] = Tools.listSort(Tools.listUnique(yearsSeason))
+				yearsShow.extend(itemSeason['year']['years'])
+
+				# Calculate show time period.
+				if itemSeason['number'][MetaData.NumberOfficial] > 0:
+					if 'start' in itemSeason['time'] and itemSeason['time']['start']:
+						timeStart = itemSeason['time']['start'] if timeStart is None else min(timeStart, itemSeason['time']['start'])
+					if 'end' in itemSeason['time'] and itemSeason['time']['end']:
+						timeEnd = itemSeason['time']['end'] if timeEnd is None else max(timeEnd, itemSeason['time']['end'])
+
+			yearStart = Time.year(timestamp = timeStart) if timeStart else None
+			yearEnd = Time.year(timestamp = timeEnd) if timeEnd else None
+			yearsShow = Tools.listSort(Tools.listUnique(yearsShow))
+
 			if show and season is None and episode is None:
 				return {
+					'status' : show.status(),
 					'count' : {
 						'season' : {'total' : countSeasonTotal, 'main' : countSeasonMain},
 					},
-					'status' : show.status(),
+					'time' : {'start' : timeStart, 'end' : timeEnd},
+					'year' : {'start' : yearStart, 'end' : yearEnd, 'years' : yearsShow},
 					'seasons' : seasonItems,
 				}
 			else:
@@ -2184,12 +2308,13 @@ class MetaTools(object):
 				durationShowTotal = sum(temp)
 				if not durationShowTotal: durationShowTotal = None
 				durationMeanTotal = durationShowTotal if durationShowTotal is None else int(durationShowTotal / float(count))
-				temp = [i['duration']['total'] for i in seasonItems if i['duration']['total'] and not i['number'] == 0]
-				count = sum([i['count'] for i in seasonItems if i['count'] and not i['number'] == 0])
+				temp = [i['duration']['total'] for i in seasonItems if i['duration']['total'] and not i['number'][MetaData.NumberOfficial] == 0]
+				count = sum([i['count'] for i in seasonItems if i['count'] and not i['number'][MetaData.NumberOfficial] == 0])
 				durationShowMain = sum(temp)
 				if not durationShowMain: durationShowMain = None
 				durationMeanMain = durationShowMain if durationShowMain is None else int(durationShowMain / float(count))
 				return {
+					'status' : show.status() if show else None,
 					'count' : {
 						'season' : {'total' : countSeasonTotal, 'main' : countSeasonMain},
 						'episode' : {'total' : countEpisodeTotal, 'main' : countEpisodeMain},
@@ -2200,7 +2325,8 @@ class MetaTools(object):
 						'show' : {'total' : durationShowTotal, 'main' : durationShowMain},
 						'mean' : {'total' : durationMeanTotal, 'main' : durationMeanMain},
 					},
-					'status' : show.status() if show else None,
+					'time' : {'start' : timeStart, 'end' : timeEnd},
+					'year' : {'start' : yearStart, 'end' : yearEnd, 'years' : yearsShow},
 					'seasons' : seasonItems,
 				}
 		except: Logger.error()
@@ -2212,7 +2338,6 @@ class MetaTools(object):
 
 	@classmethod
 	def _idCache(self, function, **kwargs):
-		from lib.modules.cache import Cache
 		return Cache.instance().cache(None, Cache.TimeoutWeek1, None, function, **kwargs)
 
 	@classmethod
@@ -2440,3 +2565,607 @@ class MetaTools(object):
 			except: Logger.error()
 
 		return result if result else None
+
+	###################################################################
+	# BUSY
+	###################################################################
+
+	'''
+		Scenario:
+			a. Clear the local metadata.db and load a show menu (eg: Highest Rated).
+			b. Since no local metadata is available, the metadata is now retrieved from script.gaia.metadata, returned immediatly, and the new metadata is retrieved/refreshed in the background.
+			c. When the menu is loaded/decorated, in playback.py -> _historyItems() -> each show in the list is retrieved again individually with Shows().metadata(...).
+			d. This causes eg 50 separate calls to Shows().metadata(), each of them retrieving the metadata from script.gaia.metadata and refreshing the metadata in the background for a second time.
+			e. The metadata is refreshed in the background again, since the original background threads for retrieving the metadata have not yet finished and have not written to MetaCache.
+			f. In metadataUpdate() the Memory class is used to check if there are multiple concurrent requests to the same show, and let any subsequent request wait and then just use the cached data without making all the provider requests again.
+			g. However, just starting background threads in metadata(), just for them to exit shortly after being started, requires a lot of time, making the "cached" menu still load slowly.
+		To solve this, we check if metadata is already retrieved by another thread, BEFORE starting the new background threads.
+		This is done with a local Memory variable, and will therefore only work for calls from within the same process/interpreter.
+		If eg loading the menu twice (either double clicking by accident, or opening a menu, immediatly going back and then reopening the menu before the previous call fully finished), multiple interpreters are started and this detection will not work, since the class variable is not shared.
+		In that case, bad luck, make the background threads start twice. New metadata retrieval should still be skipped inside the thread in metadataUpdate() where Memory is used.
+		We could use Memory(kodi = True) to make this work accross interpreters, but the time it takes for looking up and setting the global Kodi variable might not be worth the effort, and would only be used very few times.
+	'''
+
+	@classmethod
+	def busyClear(self):
+		Memory.clear(id = MetaTools.PropertyBusy, local = True, kodi = False)
+
+	@classmethod
+	def busyStart(self, media, item):
+		busy = False
+
+		values = Memory.get(id = MetaTools.PropertyBusy, local = True, kodi = False)
+		if not values:
+			values = {}
+			Memory.set(id = MetaTools.PropertyBusy, value = values, local = True, kodi = False)
+
+		for i in MetaTools.Providers:
+			try:
+				if item[i] and item[i] in values[media][i]:
+					busy = True
+					break
+			except: pass
+
+		if not busy:
+			for i in MetaTools.Providers:
+				try:
+					if item[i]:
+						if not media in values: values[media] = {}
+						if not i in values[media]: values[media][i] = {}
+						values[media][i][item[i]] = True
+				except: pass
+
+		return busy
+
+	@classmethod
+	def busyFinish(self, media, item):
+		values = Memory.get(id = MetaTools.PropertyBusy, local = True, kodi = False)
+		for i in MetaTools.Providers:
+			try: del values[media][i][item[i]]
+			except: pass
+
+	###################################################################
+	# BATCH
+	###################################################################
+
+	@classmethod
+	def batchPreload(self):
+		from lib.modules.tools import Hardware, Math
+		from lib.modules.interface import Dialog
+		from lib.modules.concurrency import Pool
+		from lib.indexers.movies import Movies
+		from lib.indexers.shows import Shows
+		from lib.indexers.episodes import Episodes
+
+		performance = Hardware.performance()
+		year = Time.year()
+
+		# Do not add more - this already takes 7 minutes on a fast device (if all options are enabled).
+		# Update: remove even more and only use the bare minimum.
+		# Not only does this slow down the device, but TMDb also has a rate limit based on the IP address, not API key.
+		menus = [
+			lambda : Movies().arrivals(menu = False),
+			lambda : Episodes().arrivals(menu = False),
+		]
+		if performance in [Hardware.PerformancePoor, Hardware.PerformanceMedium, Hardware.PerformanceGood, Hardware.PerformanceExcellent]:
+			menus.extend(menus = [
+				lambda : Movies().retrieve(link = 'new', menu = False),
+				lambda : Movies().retrieve(link = 'home', menu = False),
+				lambda : Episodes().home(menu = False),
+			])
+			if performance in [Hardware.PerformanceMedium, Hardware.PerformanceGood, Hardware.PerformanceExcellent]:
+				menus.extend(menus = [
+					lambda : Movies().year(year = year, menu = False),
+					#lambda : Movies().retrieve(link = 'popular', menu = False),
+					lambda : Shows().year(year = year, menu = False),
+					#lambda : Shows().retrieve(link = 'popular', menu = False),
+				])
+				if performance in [Hardware.PerformanceGood, Hardware.PerformanceExcellent]:
+					menus.extend(menus = [
+						#lambda : Movies().retrieve(link = 'oscars', menu = False),
+						#lambda : Movies().retrieve(link = 'rating', menu = False),
+						#lambda : Movies().retrieve(link = 'boxoffice', menu = False),
+						#lambda : Movies().retrieve(link = 'theaters', menu = False),
+						#lambda : Movies().retrieve(link = 'trending', menu = False),
+						#lambda : Movies().retrieve(link = 'featured', menu = False),
+						#lambda : Shows().retrieve(link = 'emmies', menu = False),
+						#lambda : Shows().retrieve(link = 'rating', menu = False),
+						#lambda : Shows().retrieve(link = 'airing', menu = False),
+						#lambda : Shows().retrieve(link = 'premiere', menu = False),
+						#lambda : Shows().retrieve(link = 'trending', menu = False),
+						#lambda : Shows().retrieve(link = 'featured', menu = False),
+					])
+					if performance in [Hardware.PerformanceExcellent]:
+						menus.extend(menus = [
+							#lambda : Movies().year(year = year - 1, menu = False),
+							#lambda : Shows().year(year = year - 1, menu = False),
+							#lambda : Episodes().retrieve(link = 'added', menu = False),
+						])
+
+		dialog = None
+		def _batchProgress(percent):
+			dialog = Dialog.progress(title = 35390, message = 33421, background = True, percent = percent)
+			Time.sleep(5)
+			try: dialog.close()
+			except: pass
+
+		# NB: Do this sequentially and not in concurrent threads.
+		# Uses less local resources, and reduces server load.
+		previous = None
+		total = len(menus)
+		for i in range(total):
+			if System.aborted(): return False
+			# Show dialog before execution, so that the 0% progress shows right at the start.
+			percent = min(99, Math.roundDownClosest((i / total) * 100, base = 5))
+			if previous is None or percent > previous:
+				previous = percent
+				Pool.thread(target = _batchProgress, kwargs = {'percent' : percent}, start = True)
+			try: menus[i]()
+			except: Logger.error()
+
+		try: dialog.close()
+		except: pass
+		Dialog.notification(title = 35390, message = 33993, icon = Dialog.IconSuccess)
+		return True
+
+	@classmethod
+	def batchGenerate(self, pagesMovie = None, pagesShow = None, yearsMovie = 70, yearsShow = 35, validation = 2, detail = DetailExtended, clear = False):
+		from lib.modules.tools import Math, File
+		from lib.modules.interface import Dialog, Format
+		from lib.modules.database import Database
+		from lib.modules.concurrency import Pool
+		from lib.indexers.movies import Movies
+		from lib.indexers.shows import Shows
+		from lib.indexers.seasons import Seasons
+		from lib.indexers.episodes import Episodes
+		from lib.meta.cache import MetaCache
+		from lib.modules import trakt
+
+		metacache = MetaCache.instance()
+		metacache._externalDisable() # Do not use the already preprocessed database.
+		if clear: metacache._deleteFile()
+
+		# Trakt has a rate limit of 1000 requests per 5 minutes.
+		#	https://trakt.docs.apiary.io/#introduction/rate-limiting
+		# TMDb does not have a rate limit anymore.
+		# But there are forum posts that says the CDN/Cloudflare might limit concurrent connections to 40 or 50.
+		#	https://developers.themoviedb.org/3/getting-started/request-rate-limiting
+		#	https://www.themoviedb.org/talk/62c7c1b258361b005fd2e747
+		# Cannot find any rate limit for TVDb.
+		# Cannot find any rate limit for Fanart.
+
+		# Wait if limit was reached and retry requests again.
+		# Otherwise after some time, many entries in the metacache do not have a Trakt ID.
+		# Trakt does not strictly enforce the limits. Sometimes a few thousand requests can be made before Trakt returns HTTP 429.
+		trakt._limitEnable()
+
+		year = Time.year()
+
+		# Try to reduce the number of pages, otherwise the database can become too large for devices with limited storage space, eg Firesticks (8GB).
+		# We do not want to retrieve too much, since the user will probably not use many of these, and it just uses up storage and increases processing time.
+		#	Movies:
+		#		70 years | [20, 15, 10, 5, 2] pages: 155 MB
+		#	Shows:
+		#		35 years | [10, 7, 5, 3, 2] pages: 135 MB
+		#		35 years | [10, 8, 6, 3, 2] pages: 145 MB (+ new season metadata for the newly added shows)
+		#		35 years | [12, 10, 8, 3, 2, 1] pages: 165 MB (+ new season metadata for the newly added shows)
+		#	Seasons:
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|50000: 15 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|30000: 20 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|20000: 31 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|15000: 36 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|10000: 43 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 0|5000: 52 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 20000|3000: 67 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 20000|2500: 70 MB
+		#	Episodes:
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|100000|100000|100000: 100 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|95000|85000|75000: 108 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|90000|80000|70000: 114 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|80000|70000|60000: 121 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|70000|60000|50000: 150 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|65000|55000|45000: 160 MB
+		#		35 years | [10, 7, 5, 3, 2] pages | year >= 1990 | votes >= 100000|60000|50000|40000: 170 MB
+		# NB: Keep the total compressed size to under 100 MB, since Github has file size restrictions.
+
+		if pagesMovie is None: pagesMovie = [20, 15, 10, 5, 2, 1]
+		elif Tools.isInteger(pagesMovie): pagesMovie = [pagesMovie, max(1, int(pagesMovie * 0.75)), max(1, int(pagesMovie * 0.50)), max(1, int(pagesMovie * 0.25)), min(2, pagesMovie)]
+		if pagesShow is None: pagesShow = [12, 10, 8, 3, 2, 1]
+		elif Tools.isInteger(pagesShow): pagesShow = [pagesShow, max(1, int(pagesShow * 0.75)), max(1, int(pagesShow * 0.50)), max(1, int(pagesShow * 0.25)), min(2, pagesShow)]
+
+		# Do not add more - this already takes 7 minutes on a fast device (if all options are enabled).
+		# Update: remove even more and only use the bare minimum.
+		# Not only does this slow down the device, but TMDb also has a rate limit based on the IP address, not API key.
+		menus = []
+
+		# Movies
+
+		menusMovie = [
+			{'data' : 'new',				'level' : 2},
+			{'data' : 'home',				'level' : 2},
+
+			{'data' : 'popular',			'level' : 0},
+			{'data' : 'oscars',				'level' : 0},
+			{'data' : 'rating',				'level' : 0},
+			{'data' : 'boxoffice',			'level' : 0},
+
+			{'data' : 'theaters',			'level' : 2},
+			{'data' : 'trending',			'level' : 2},
+			{'data' : 'featured',			'level' : 2},
+
+			{'data' : 'drugsgeneral',		'level' : 3},
+			{'data' : 'drugsalcohol',		'level' : 3},
+			{'data' : 'drugsmarijuana',		'level' : 3},
+			{'data' : 'drugspsychedelics',	'level' : 3},
+		]
+
+		values = Movies().genres(menu = False)
+		for i in values:
+			if 'link' in i and i['link']: menusMovie.append({'label' : 'Genre (%s)' % i['name'], 'data' : i['link'], 'level' : 1})
+
+		values = Movies().years(menu = False)[:yearsMovie]
+		counter = 0
+		for i in values:
+			counter += 1
+			if 'link' in i and i['link']: menusMovie.append({'label' : 'Year (%s)' % i['name'], 'data' : i['link'], 'level' : 1 if counter <= 10 else 2 if counter <= 20 else 3 if counter <= 35 else 4})
+
+		values = Movies().collections(menu = False)
+		for i in values:
+			if 'link' in i and i['link']: menusMovie.append({'label' : 'Collection (%s)' % i['name'], 'data' : i['link'], 'level' : 0})
+
+		menus.extend([{'class' : Movies, 'label' : i['label'] if 'label' in i else None, 'data' : i['data'], 'level' : i['level'], 'pages' : pagesMovie, 'years' : yearsMovie, 'year' : year - yearsMovie} for i in menusMovie])
+
+		# Shows
+
+		menusShow = [
+			{'data' : 'rating',		'level' : 0},
+			{'data' : 'popular',	'level' : 0},
+			{'data' : 'emmies',		'level' : 0},
+			{'data' : 'views',		'level' : 0},
+
+			{'data' : 'airing',		'level' : 2},
+			{'data' : 'premiere',	'level' : 2},
+			{'data' : 'trending',	'level' : 2},
+			{'data' : 'featured',	'level' : 2},
+			{'data' : 'active',		'level' : 2},
+
+			{'data' : 'random1',	'level' : 2},
+			{'data' : 'random2',	'level' : 2},
+			{'data' : 'random3',	'level' : 2},
+		]
+
+		values = Shows().genres(menu = False)
+		for i in values:
+			if i['name'].lower().startswith(('news', 'reality', 'talk', 'game', 'sport')): level = 5
+			elif i['name'].lower().startswith(('biography')): level = 4
+			elif i['name'].lower().startswith(('music', 'musical')): level = 3
+			else: level = 1
+			if 'link' in i and i['link']: menusShow.append({'label' : 'Genre (%s)' % i['name'], 'data' :i['link'], 'level' : level})
+
+		values = Shows().years(menu = False)[:yearsShow]
+		counter = 0
+		for i in values:
+			counter += 1
+			if 'link' in i and i['link']: menusShow.append({'label' : 'Year (%s)' % i['name'], 'data' :i['link'], 'level' : 0 if counter <= 2 else 1 if counter <= 10 else 2 if counter <= 15 else 3 if counter <= 20 else 4})
+
+		menus.extend([{'class' : Shows, 'label' : i['label'] if 'label' in i else None, 'data' : i['data'], 'level' : i['level'], 'pages' : pagesShow, 'years' : yearsShow, 'year' : year - yearsShow} for i in menusShow])
+
+		# Episodes
+
+		menusEpisode = [
+			{'data' : 'added',	'level' : 3},
+		]
+		menus.extend([{'class' : Episodes, 'label' : i['label'] if 'label' in i else None, 'data' : i['data'], 'level' : i['level'], 'pages' : pagesShow, 'years' : yearsShow, 'year' : year - yearsShow} for i in menusEpisode])
+
+		# Retrieve
+
+		total = len(menus)
+		title = 'Generating Metadata'
+		self.tMessage = 'Generating Metadata Database ...'
+		self.tPrevious = None
+		self.tDetail = detail
+		self.tLimit = 50
+		self.tEnded = Time.past(days = 30)
+		self.tLanguage = Language.CodeEnglish
+		self.tDialog = Dialog.progress(title = title, message = self.tMessage, background = False)
+
+		def _batchCanceled():
+			return System.aborted() or self.tDialog.iscanceled()
+
+		def _batchInitialize(instance):
+			instance.mDetail = self.tDetail
+			instance.mLimit = self.tLimit
+			instance.mLanguage = self.tLanguage
+			return instance
+
+		def _batchProgress(iteration, pages, message = None):
+			if _batchCanceled(): return False
+
+			# Show dialog before execution, so that the 0% progress shows right at the start.
+			percent = min(99, Math.roundDownClosest((iteration / (total * pages[0])) * 100, base = 1))
+			if self.tPrevious is None or percent > self.tPrevious:
+				self.tPrevious = percent
+				self.tDialog.update(percent, self.tMessage + Format.newline() + ('   Progress: [B]%d%%[/B]' % percent) + ((Format.newline() + message) if message else ''))
+				Logger.log('%s: %d%%' % (title, percent))
+			return True
+
+		def _batchShow(items, level = 0):
+			#return True
+
+			if _batchCanceled(): return False
+
+			if level <= 2 and (items and 'tvshowtitle' in items[0] and not 'season' in items[0]):
+				# Improve retrieval duration by multi-threading.
+				# Limit to 10 threads to reduce the number of concurrent API calls.
+				threads = []
+				for item in items:
+					try: year = item['year'] or 0
+					except: year = 0
+					try: votes = item['votes'] or 0
+					except: votes = 0
+
+					# Only retrieve season/episode data for newer shows.
+					# Only retrieve season/episode data for shows with a minimum vote count.
+					if (year and votes >= 20000) or (year >= 1990 and votes >= 2500):
+							while len(threads) >= 10:
+								Time.sleep(0.2)
+								threads = [thread for thread in threads if thread.alive()]
+							threads.append(Pool.thread(target = _batchShowRetrieve, args = (item, level), start = True))
+
+				[thread.join() for thread in threads]
+			return True
+
+		def _batchShowRetrieve(item, level = 0):
+			if _batchCanceled(): return False
+
+			try: idImdb = item['imdb']
+			except: idImdb = None
+			try: idTvdb = item['tvdb']
+			except: idTvdb = None
+
+			try: year = item['year'] or 0
+			except: year = 0
+			try: votes = item['votes'] or 0
+			except: votes = 0
+
+			if idImdb or idTvdb:
+				instance = _batchInitialize(Seasons())
+				seasons = instance.metadata(idImdb = idImdb, idTvdb = idTvdb)
+
+				#return True
+
+				if level <= 2 and seasons:
+					# Do not retrieve seasons for daytime shows that have yearly seasons since the 1970s.
+					# Only do this above 20 seasons, since 'Criminal Minds' or 'Its Always Sunny in Philadelphia' have 15+ seasons.
+					if len(seasons) < 20:
+						# Only retrieve season/episode data for shows with a minimum vote count.
+						# Must be greater-equal to the value in _batchShow().
+						if (year and votes >= 100000) or (year >= 1990 and votes >= 60000) or (year >= 2000 and votes >= 50000) or (year >= 2010 and votes >= 40000):
+							for season in seasons:
+								if _batchCanceled(): return False
+
+								# Only include finished seasons.
+								# Otherwise a season which didn't have any episodes while generating this database might be used instead of forcing a refresh of the data to get the latests episodes.
+								# Seasons do not have a 'status' attribute. Use premiered day instead.
+								try: status = season['status'].lower()
+								except:
+									try: status = item['status'].lower()
+									except: status = None
+								try: premiered = Time.timestamp(fixedTime = season['premiered'], format = Time.FormatDate)
+								except:
+									try: premiered = Time.timestamp(fixedTime = season['aired'], format = Time.FormatDate)
+									except: premiered = None
+
+								if status in [MetaData.StatusEnded, MetaData.StatusCanceled] or (premiered and premiered <= self.tEnded):
+									try: number = season['season']
+									except: number = None
+									if not number is None:
+										instance = _batchInitialize(Episodes())
+										instance.metadata(idImdb = idImdb, idTvdb = idTvdb, season = number)
+			return True
+
+		# NB: Do this sequentially and not in concurrent threads.
+		# Uses less local resources, and reduces server load.
+		for i in range(total):
+			class_ = menus[i]['class']
+			function = menus[i]['data']
+			level = menus[i]['level']
+			pages = menus[i]['pages']
+			label = '   Media: [B]%s[/B] | List: [B]%s[/B]%s   Level: [B]%d[/B] | Pages: [B]%s[/B] of [B]%d[/B]' % (class_.__name__, (menus[i]['label'] if 'label' in menus[i] and menus[i]['label'] else str(menus[i]['data']).capitalize()), Format.newline(), level, '%d', pages[level])
+
+			# Rerun every request multiple times, in case there is imcomplete metadata (eg: due to rate limits).
+			page = 0
+			iteration = 0
+			for j in range(validation):
+				if j == 0:
+					page = 1
+					iteration = i * pages[0]
+				if not _batchProgress(iteration = iteration, pages = pages, message = label % page): return False
+
+				try:
+					instance = _batchInitialize(class_())
+
+					if Tools.isString(function): items = instance.retrieve(link = function, menu = False)
+					else: items = function()
+
+					_batchShow(items = items, level = level)
+
+					for k in range(pages[level] - 1):
+						if j == 0:
+							page = (k + 2)
+							iteration = (i * pages[0]) + k
+						if not _batchProgress(iteration = iteration, pages = pages, message = label % page): return False
+
+						try: next = items[-1]['next']
+						except: next = None
+						if not next: break
+
+						items = instance.retrieve(link = next, menu = False)
+						_batchShow(items = items, level = level)
+				except: Logger.error()
+
+		Pool.join()
+
+		path = System.temporary(directory = 'metadata', gaia = True, make = True, clear = True)
+		path = File.joinPath(path, 'metadata.db')
+		File.copy(pathFrom = metacache._mPath, pathTo = path, overwrite = True)
+
+		queries = []
+		database = Database(path = path)
+		for i in database._tables():
+			primary = ''
+			extra1 = ''
+			extra2 = ''
+			extra3 = ''
+			if i == MetaCache.TypeMovie:
+				primary = 'idImdb, idTmdb'
+			elif i == MetaCache.TypeSet:
+				primary = 'idTmdb'
+			elif i == MetaCache.TypeShow or i == MetaCache.TypeSeason:
+				primary = 'idImdb, idTvdb'
+			elif i == MetaCache.TypeEpisode:
+				extra1 = 'season INTEGER, '
+				extra2 = 'season, '
+				extra3 = ', season'
+				primary = 'idImdb, idTvdb, season'
+
+			# Old SQLite does not have "DROP COLUMN", copy the table instead.
+			#queries.append('DELETE FROM `%s` WHERE complete != 1;' % i) # Many specials have incomplete metadata. Keep them. We now copy this value below.
+			queries.append('CREATE TABLE `backup_%s` (idImdb TEXT, idTmdb TEXT, idTvdb TEXT, idTrakt TEXT, idTvmaze TEXT, idSlug TEXT, %sdata TEXT, PRIMARY KEY(%s));' % (i, extra1, primary))
+
+			# Create MetaCache and additional indices.
+			# All the extra indices cannot hurt, since we only ever do reads from the database and not writes.
+			# And it will speed up some SELECT queries.
+			# UPDATE: All the extra indices substantially increase the file size. Do not add them, since they  will probably not be used anyway, since there are not SELECT queries for these indices.
+
+			'''queries.append('CREATE INDEX IF NOT EXISTS %s_index_01 ON `backup_%s`(idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_02 ON `backup_%s`(idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_03 ON `backup_%s`(idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_04 ON `backup_%s`(idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_05 ON `backup_%s`(idTvmaze%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_06 ON `backup_%s`(idSlug%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_07 ON `backup_%s`(idImdb, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_08 ON `backup_%s`(idImdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_09 ON `backup_%s`(idImdb, idTrakt%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_10 ON `backup_%s`(idTmdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_11 ON `backup_%s`(idTmdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_12 ON `backup_%s`(idTmdb, idTrakt%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_13 ON `backup_%s`(idTvdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_14 ON `backup_%s`(idTvdb, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_15 ON `backup_%s`(idTvdb, idTrakt%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_16 ON `backup_%s`(idTrakt, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_17 ON `backup_%s`(idTrakt, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_18 ON `backup_%s`(idTrakt, idTvdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_19 ON `backup_%s`(idImdb, idTmdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_20 ON `backup_%s`(idImdb, idTmdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_21 ON `backup_%s`(idImdb, idTvdb, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_22 ON `backup_%s`(idImdb, idTvdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_23 ON `backup_%s`(idImdb, idTrakt, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_24 ON `backup_%s`(idImdb, idTrakt, idTvdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_25 ON `backup_%s`(idTmdb, idImdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_26 ON `backup_%s`(idTmdb, idImdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_27 ON `backup_%s`(idTmdb, idTvdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_28 ON `backup_%s`(idTmdb, idTvdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_29 ON `backup_%s`(idTmdb, idTrakt, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_30 ON `backup_%s`(idTmdb, idTrakt, idTvdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_31 ON `backup_%s`(idTvdb, idImdb, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_32 ON `backup_%s`(idTvdb, idImdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_33 ON `backup_%s`(idTvdb, idTmdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_34 ON `backup_%s`(idTvdb, idTmdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_35 ON `backup_%s`(idTvdb, idTrakt, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_36 ON `backup_%s`(idTvdb, idTrakt, idTmdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_37 ON `backup_%s`(idTrakt, idImdb, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_38 ON `backup_%s`(idTrakt, idImdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_39 ON `backup_%s`(idTrakt, idTmdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_40 ON `backup_%s`(idTrakt, idTmdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_41 ON `backup_%s`(idTrakt, idTvdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_42 ON `backup_%s`(idTrakt, idTvdb, idTmdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_43 ON `backup_%s`(idImdb, idTmdb, idTvdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_44 ON `backup_%s`(idImdb, idTvdb, idTrakt, idTmdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_45 ON `backup_%s`(idImdb, idTrakt, idTmdb, idTvdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_46 ON `backup_%s`(idTmdb, idImdb, idTvdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_47 ON `backup_%s`(idTmdb, idTvdb, idTrakt, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_48 ON `backup_%s`(idTmdb, idTrakt, idImdb, idTvdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_49 ON `backup_%s`(idTvdb, idImdb, idTmdb, idTrakt%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_50 ON `backup_%s`(idTvdb, idTmdb, idTrakt, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_51 ON `backup_%s`(idTvdb, idTrakt, idImdb, idTmdb%s);' % (i, i, extra3))
+
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_52 ON `backup_%s`(idTrakt, idImdb, idTmdb, idTvdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_53 ON `backup_%s`(idTrakt, idTmdb, idTvdb, idImdb%s);' % (i, i, extra3))
+			queries.append('CREATE INDEX IF NOT EXISTS %s_index_54 ON `backup_%s`(idTrakt, idTvdb, idImdb, idTmdb%s);' % (i, i, extra3))
+
+			if extra3:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_55 ON `backup_%s`(idImdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_56 ON `backup_%s`(idTmdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_57 ON `backup_%s`(idTvdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_58 ON `backup_%s`(idTrakt);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_59 ON `backup_%s`(idTvmaze);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_60 ON `backup_%s`(idSlug);' % (i, i))
+
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_61 ON `backup_%s`(idImdb, idTmdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_62 ON `backup_%s`(idImdb, idTvdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_63 ON `backup_%s`(idImdb, idTrakt);' % (i, i))
+
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_64 ON `backup_%s`(idTmdb, idImdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_65 ON `backup_%s`(idTmdb, idTvdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_66 ON `backup_%s`(idTmdb, idTrakt);' % (i, i))
+
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_67 ON `backup_%s`(idTvdb, idImdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_68 ON `backup_%s`(idTvdb, idTmdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_69 ON `backup_%s`(idTvdb, idTrakt);' % (i, i))
+
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_70 ON `backup_%s`(idTrakt, idImdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_71 ON `backup_%s`(idTrakt, idTmdb);' % (i, i))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_72 ON `backup_%s`(idTrakt, idTvdb);' % (i, i))
+			'''
+
+			queries.append('INSERT INTO `backup_%s` SELECT idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, %sdata FROM `%s`;' % (i, extra2, i))
+			queries.append('DROP TABLE `%s`;' % i)
+			queries.append('ALTER TABLE `backup_%s` RENAME TO `%s`;' % (i, i))
+
+			if i == MetaCache.TypeMovie:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTmdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTmdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+			elif i == MetaCache.TypeSet:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idTmdb);' % (MetaCache.TypeSet, MetaCache.TypeSet))
+			elif i == MetaCache.TypeShow:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+			elif i == MetaCache.TypeSeason:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+			elif i == MetaCache.TypeEpisode:
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+				queries.append('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+
+		for query in queries: database._execute(query = query, commit = True, compress = False)
+		database._commit()
+		database._compress()
+
+		try: self.tDialog.close()
+		except: pass
+		Logger.log('%s: Done' % title)
+		Dialog.confirm(title = title, message = 'Metadata database generated successfully:' + Format.newline() + path)
+		return True

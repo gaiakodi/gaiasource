@@ -93,7 +93,7 @@
 			<!-- LIST -->
 
 			<!-- [GAIATYPESTATIC/] -->
-			<control type="list" id="52000">
+			<control type="fixedlist" id="52000">
 			<!-- [/GAIATYPESTATIC/] -->
 			<control type="wraplist" id="52000">
 			<!-- [/GAIATYPESTATIC] -->
@@ -104,15 +104,14 @@
 				<width>999</width>
 				<focusposition>2</focusposition>
 				<!-- [/GAIATYPELARGE/] -->
+				<left>256</left>
 				<width>767</width>
 				<focusposition>1</focusposition>
 
 				<!-- [GAIATYPESTATIC/] -->
 				<top>270</top>
-				<left>512</left>
 				<!-- [/GAIATYPESTATIC/] -->
 				<top>300</top>
-				<left>256</left>
 				<!-- [/GAIATYPESTATIC] -->
 
 				<!-- [/GAIATYPELARGE] -->

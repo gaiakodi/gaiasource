@@ -489,8 +489,20 @@ class MetaTvdb(MetaProvider):
 		return self._extract(data = data, type = ['slug'])
 
 	@classmethod
-	def _extractNumber(self, data, media = None):
-		return self._extract(data = data, type = ['seasonNumber' if media == MetaData.MediaSeason else 'number'])
+	def _extractNumber(self, data, media = None, number = None):
+		if number:
+			number = self._typeSeason(number = number)
+			if not number is None:
+				seasons = self._extract(data = data, type = ['seasons'])
+				if seasons:
+					for season in seasons:
+						try:
+							if self._extract(data = season, type = [['type', 'id']]) == number:
+								return self._extract(data = season, type = ['number'])
+						except: Logger.error()
+		else:
+			return self._extract(data = data, type = ['seasonNumber' if media == MetaData.MediaSeason else 'number'])
+		return None
 
 	@classmethod
 	def _extractLanguage(self, data, language = None, single = False):
@@ -1231,6 +1243,11 @@ class MetaTvdb(MetaProvider):
 
 	@classmethod
 	def _processNumber(self, metadata, data):
+		if metadata.mediaSeason() or metadata.mediaEpisode():
+			for number in MetaData.Numbers:
+				value = self._extractNumber(data = data, number = number)
+				if not value is None: metadata.numberSeasonSet(value = value, number = number)
+
 		metadata.numberSet(value = self._extractNumber(data = data))
 		metadata.numberSeasonSet(value = self._extractNumber(data = data, media = MetaData.MediaSeason))
 
@@ -1352,30 +1369,40 @@ class MetaTvdb(MetaProvider):
 			except: return None
 
 	@classmethod
-	def _typeSeason(self, index = None):
+	def _typeSeason(self, number = None, index = None):
 		try:
 			if MetaTvdb.DataSeason is None:
 				data = self._typeRequest(type = MetaTvdb.ParameterSeasons)
 				if data:
-					MetaTvdb.DataSeason = []
+					MetaTvdb.DataSeason = {}
+
 					for item in data:
-						if Regex.match(data = item['type'], expression = '(?:official|air|release)', cache = True):
-							MetaTvdb.DataSeason.append(item['id'])
-							break
-					for item in data:
-						if Regex.match(data = item['type'], expression = '(?<!alt)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True):
-							MetaTvdb.DataSeason.append(item['id'])
-							break
-					for item in data:
-						MetaTvdb.DataSeason.append(item['id'])
-					MetaTvdb.DataSeason = Tools.listUnique(MetaTvdb.DataSeason)
+						type = None
+
+						if Regex.match(data = item['type'], expression = '(?:official|air|release)', cache = True): type = MetaData.NumberOfficial
+						elif Regex.match(data = item['type'], expression = '(?:absolute)', cache = True): type = MetaData.NumberAbsolute
+						elif Regex.match(data = item['type'], expression = '(?:region)', cache = True): type = MetaData.NumberRegional
+						elif Regex.match(data = item['type'], expression = '(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberDisc
+						elif Regex.match(data = item['type'], expression = '(?:alt(?:ernat(?:e|ive))?)', cache = True): type = MetaData.NumberAlternative
+						elif Regex.match(data = item['type'], expression = '(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberAlternativeDisc
+
+						if type: MetaTvdb.DataSeason[type] = item['id']
+
+					order = []
+					for i in [MetaData.NumberOfficial, MetaData.NumberDisc, MetaData.NumberAlternative, MetaData.NumberAlternativeDisc, MetaData.NumberRegional, MetaData.NumberAbsolute]:
+						try: order.append(MetaTvdb.DataSeason[i])
+						except: pass
+					MetaTvdb.DataSeason['order'] = order
 		except: self._error()
 
-		if index is None:
-			return MetaTvdb.DataSeason
-		else:
-			try: return MetaTvdb.DataSeason[index]
+		if not number is None:
+			try: return MetaTvdb.DataSeason[number]
 			except: return None
+		elif not index is None:
+			try: return MetaTvdb.DataSeason['order'][index]
+			except: return None
+		else:
+			return MetaTvdb.DataSeason
 
 	@classmethod
 	def _typeSeasonPrimary(self):

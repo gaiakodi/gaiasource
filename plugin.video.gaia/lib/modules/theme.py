@@ -116,8 +116,11 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'posters', name + '.png')
-						if File.exists(path): result = path
+						path = File.joinPath(path, 'posters', name)
+						for i in ['.png', '.jpg']:
+							if File.exists(path + i):
+								result = path + i
+								break
 
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdThumbnail, value = result, local = True, kodi = True)
@@ -151,8 +154,11 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'posters', name + '.png')
-						if File.exists(path): result = path
+						path = File.joinPath(path, 'posters', name)
+						for i in ['.png', '.jpg']:
+							if File.exists(path + i):
+								result = path + i
+								break
 
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdPoster, value = result, local = True, kodi = True)
@@ -185,8 +191,11 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'banners', name + '.png')
-						if File.exists(path): result = path
+						path = File.joinPath(path, 'banners', name)
+						for i in ['.png', '.jpg']:
+							if File.exists(path + i):
+								result = path + i
+								break
 
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdBanner, value = result, local = True, kodi = True)
@@ -207,12 +216,11 @@ class Theme(object):
 		if Settings.getBoolean('theme.image.background'):
 			path = self.skinPath()
 			if not path is None:
-				pathNew = File.joinPath(path, 'background.jpg')
-				if File.exists(pathNew):
-					result = pathNew
-				else:
-					pathNew = File.joinPath(path, 'background.png') # Glass
-					if File.exists(pathNew): result = pathNew
+				path = File.joinPath(path, 'background')
+				for i in ['.png', '.jpg']:
+					if File.exists(path + i):
+						result = path + i
+						break
 
 		return Memory.set(id = Theme.IdFanart, value = result, local = True, kodi = True)
 
@@ -244,8 +252,11 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'next', 'banners', name + '.png')
-						if File.exists(path): result = path
+						path = File.joinPath(path, 'next', 'banners', name)
+						for i in ['.png', '.jpg']:
+							if File.exists(path + i):
+								result = path + i
+								break
 
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdNextBanner, value = result, local = True, kodi = True)
@@ -278,8 +289,11 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'next', 'poster', name + '.png')
-						if File.exists(path): result = path
+						path = File.joinPath(path, 'next', 'poster', name)
+						for i in ['.png', '.jpg']:
+							if File.exists(path + i):
+								result = path + i
+								break
 
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdNextPoster, value = result, local = True, kodi = True)

@@ -299,12 +299,53 @@ class Time(object):
 			return stringTime
 
 
+class Copier(object):
+
+	Dispatcher = None
+
+	@classmethod
+	def _copyList(self, data, dispatch):
+	    result = data.copy()
+	    for index, item in enumerate(result):
+	        copy = dispatch.get(type(item))
+	        if not copy is None: result[index] = copy(data = item, dispatch = dispatch)
+	    return result
+
+	@classmethod
+	def _copyDict(self, data, dispatch):
+	    result = data.copy()
+	    for key, value in result.items():
+	        copy = dispatch.get(type(value))
+	        if not copy is None: result[key] = copy(data = value, dispatch = dispatch)
+	    return result
+
+	@classmethod
+	def copy(self, data):
+		if Copier.Dispatcher is None:
+			Copier.Dispatcher = {
+				list : self._copyList,
+				dict : self._copyDict,
+			}
+		copy = Copier.Dispatcher.get(type(data))
+		if copy is None: return data
+		else: return copy(data = data, dispatch = Copier.Dispatcher)
+
+
 class Tools(object):
 
 	@classmethod
-	def copy(self, instance, deep = True):
-		import copy
-		return copy.deepcopy(instance) if deep else copy.copy(instance)
+	def copy(self, instance, deep = True, fast = True):
+		# Deep copy is slow in Python.
+		# https://stackoverflow.com/questions/45858084/what-is-a-fast-pythonic-way-to-deepcopy-just-data-from-a-python-dict-or-list
+		# When using "fast = True", the data must be primitive (no special objects that are not part of the standard Python data types), and cannot contain recursive structures.
+		# UPDATE: The fast copy option does not seem to be that much faster. Disable by default.
+		# UPDATE 2: The fast copy on 1000s of show metadata is 2-3 times faster. Enable by default.
+
+		if deep and fast:
+			return Copier.copy(data = instance)
+		else:
+			import copy
+			return copy.deepcopy(instance) if deep else copy.copy(instance)
 
 	@classmethod
 	def update(self, structure1, structure2, none = True, lists = False, unique = True):
@@ -313,7 +354,8 @@ class Tools(object):
 			for key, value in structure2.items():
 				if not none and key in structure1 and value is None: pass
 				elif not key in structure1 or structure1[key] is None: structure1[key] = value
-				elif Tools.isDictionary(value): structure1[key] = self.update(structure1 = structure1.get(key, {}), structure2 = value, lists = lists, unique = unique)
+				elif Tools.isDictionary(value):
+					structure1[key] = self.update(structure1 = structure1.get(key, {}), structure2 = value, lists = lists, unique = unique)
 				elif lists and Tools.isArray(value):
 					structure1[key] = (structure1.get(key, []) + value)
 					if unique: structure1[key] = self.listUnique(structure1[key], attribute = attribute, update = True, none = none, lists = lists, unique = unique)
@@ -464,40 +506,44 @@ class Tools(object):
 
 	@classmethod
 	def listUnique(self, data, attribute = None, update = False, none = True, lists = False, unique = True):
-		if attribute:
-			result = []
-			if update:
-				seen = {}
-				for i in range(len(data)):
-					item = data[i]
-					key = self.dictionaryGet(dictionary = item, keys = attribute)
-					if key in seen:
-						if self.isStructure(item):
-							Tools.update(result[seen[key]], item, none = none, lists = lists, unique = unique)
+		try:
+			if attribute:
+				result = []
+				if update:
+					seen = {}
+					for i in range(len(data)):
+						item = data[i]
+						key = self.dictionaryGet(dictionary = item, keys = attribute)
+						if key in seen:
+							if self.isStructure(item):
+								Tools.update(result[seen[key]], item, none = none, lists = lists, unique = unique)
+							else:
+								result[seen[key]] = item
 						else:
-							result[seen[key]] = item
-					else:
-						seen[key] = i
-						result.append(item)
+							seen[key] = i
+							result.append(item)
+				else:
+					seen = set()
+					add = seen.add
+					result = []
+					for i in data:
+						key = self.dictionaryGet(dictionary = i, keys = attribute)
+						if not key in seen:
+							result.append(i)
+							add(key)
+				return result
+			elif len(data) > 0 and self.isDictionary(data[0]):
+				result = []
+				for i in data:
+					if not i in result: result.append(i)
+				return result
 			else:
 				seen = set()
 				add = seen.add
-				result = []
-				for i in data:
-					key = self.dictionaryGet(dictionary = i, keys = attribute)
-					if not key in seen:
-						result.append(i)
-						add(key)
-			return result
-		elif len(data) > 0 and self.isDictionary(data[0]):
-			result = []
-			for i in data:
-				if not i in result: result.append(i)
-			return result
-		else:
-			seen = set()
-			add = seen.add
-			return [i for i in data if not (i in seen or add(i))]
+				return [i for i in data if not (i in seen or add(i))]
+		except:
+			Logger.error()
+			return data
 
 	@classmethod
 	def listFlatten(self, data, recursive = True):
@@ -776,6 +822,10 @@ class Math(object):
 	@classmethod
 	def thousand(self, value):
 		return '{:,}'.format(value)
+
+	@classmethod
+	def absolute(self, value):
+		return abs(value)
 
 	@classmethod
 	def scale(self, value, fromMinimum = 0, fromMaximum = 1, toMinimum = 0, toMaximum = 1):
@@ -3362,6 +3412,7 @@ class System(object):
 	GaiaExternals = 'script.gaia.externals'
 	GaiaBinaries = 'script.gaia.binaries'
 	GaiaResources = 'script.gaia.resources'
+	GaiaMetadata = 'script.gaia.metadata'
 	GaiaIcons = 'script.gaia.icons'
 	GaiaSkins = 'script.gaia.skins'
 
@@ -3654,6 +3705,10 @@ class System(object):
 		return self.path(System.GaiaResources)
 
 	@classmethod
+	def pathMetadata(self):
+		return self.path(System.GaiaMetadata)
+
+	@classmethod
 	def pathSkins(self):
 		return self.path(System.GaiaSkins)
 
@@ -3741,7 +3796,9 @@ class System(object):
 
 	@classmethod
 	def commandEncode(self, parameters):
-		return Converter.base64To(Converter.jsonTo(parameters))
+		# Make the command URL-safe, since base64 can also contain +/= characters.
+		# Without this, in the very rare case that the base64-encoded data has a +/=, Networker.linkDecode() in commandResolve() will assume the + as part of the URL instead of the data base64-encoded parameter, decode it, and then later Converter.base64From() fails, since the + is gone.
+		return Converter.base64To(Converter.jsonTo(parameters)).replace('+', '%2B').replace('/', '%2F').replace('=', '%3D')
 
 	@classmethod
 	def commandResolve(self, command = None):
@@ -4260,7 +4317,7 @@ class System(object):
 				# Preload Menus
 				# This preloads some menus so that menu navigation is not too slow on first use.
 				# NB: Do this AFTER the wizard is finished, so that Trakt is authenticated and Trakt menus (eg: Progress) can be loaded.
-				if self.tInitial: System.executePlugin(action = 'navigatorPreload')
+				if self.tInitial: System.executePlugin(action = 'metadataPreload')
 
 			# Backup - Export
 			if not hidden or changed:
@@ -4406,6 +4463,26 @@ class System(object):
 				from lib.providers.core.manager import Manager
 				Manager.streamsDatabaseClear()
 			except: Logger.error()
+
+		#gaiaremove - since pack and episode numbering changed.
+		if version['old']['number'] < 610 and version['new']['number'] >= 610:
+			try:
+				from lib.modules.cache import Cache
+				Cache.instance()._deleteFile()
+			except: Logger.error()
+
+			try:
+				from lib.meta.cache import MetaCache
+				MetaCache.instance()._deleteFile()
+			except: Logger.error()
+
+			try:
+				from lib.providers.core.manager import Manager
+				Manager.streamsDatabaseClear()
+			except: Logger.error()
+
+			from lib.modules.window import WindowMetaExternal
+			WindowMetaExternal.show()
 
 		_launchProgress(4) # 25%
 
@@ -5279,7 +5356,7 @@ class Settings(object):
 		return Database.instance(name = Settings.Database, create = '''
 			CREATE TABLE IF NOT EXISTS %s
 			(
-				id TEXT UNIQUE,
+				id TEXT PRIMARY KEY,
 				data TEXT
 			);
 			'''
@@ -9930,6 +10007,7 @@ class Extension(object):
 	IdGaiaBinaries = 'script.gaia.binaries'
 	IdGaiaExternals = 'script.gaia.externals'
 	IdGaiaResources = 'script.gaia.resources'
+	IdGaiaMetadata = 'script.gaia.metadata'
 	IdGaiaIcons = 'script.gaia.icons'
 	IdGaiaSkins = 'script.gaia.skins'
 	IdGaiaRepositoryCore = 'repository.gaia.core'
@@ -9962,6 +10040,17 @@ class Extension(object):
 	ConfirmRequired = 2 # Show a confirmation dialog with required account info.
 	ConfirmOptional = 3 # Show a confirmation dialog with optional account info.
 	ConfirmDefault = ConfirmBasic
+
+	@classmethod
+	def statistics(self, id = None):
+		from lib.modules.cache import Cache
+		from lib.modules.network import Networker
+		data = Cache.instance().cacheMedium(Networker().requestJson, link = Settings.getString('internal.link.statistics', raw = True))
+		if id:
+			try: return data[id]
+			except: return None
+		else:
+			return data
 
 	@classmethod
 	def settings(self, id, setting = None, category = None, wait = False):
@@ -9999,6 +10088,11 @@ class Extension(object):
 			return True
 		except:
 			return False
+
+	@classmethod
+	def size(self, id):
+		try: return File.sizeDirectory(path = System.path(id = id))
+		except: return 0
 
 	@classmethod
 	def installed(self, id, enabled = True):
@@ -10104,7 +10198,7 @@ class Extension(object):
 		if (wait or wait is None) and notification:
 			if installed:
 				Dialog.notification(title = 36231, message = Translation.string(36221) % Format.fontBold(name), icon = Dialog.IconSuccess)
-			else:
+			elif not '.gaia' in id:
 				Dialog.notification(title = 36220, message = Translation.string(36222) % Format.fontBold(name), icon = Dialog.IconError)
 				if not id == Extension.IdGaiaRepositoryFull and not self.installed(id = Extension.IdGaiaRepositoryFull, enabled = True):
 					if Dialog.option(title = 36220, message = 33272):
@@ -10176,7 +10270,14 @@ class Extension(object):
 				'id' : Extension.IdGaiaResources,
 				'name' : 'Gaia Resources',
 				'type' : Extension.TypeRequired,
-				'description' : 33726,
+				'description' : 33731,
+				'icon' : 'extensionsgaia.png',
+			},
+			{
+				'id' : Extension.IdGaiaMetadata,
+				'name' : 'Gaia Metadata',
+				'type' : Extension.TypeOptional,
+				'description' : 33732,
 				'icon' : 'extensionsgaia.png',
 			},
 			{
@@ -12437,7 +12538,7 @@ class Promotions(object):
 
 		current = Time.timestamp()
 		promotions = []
-		items = Tools.copy(self._cache()) # Deep copy becuase we append Orion.
+		items = Tools.copy(self._cache()) # Deep copy because we append Orion.
 
 		if provider.lower() == 'orion':
 			items.extend(self._fixed())

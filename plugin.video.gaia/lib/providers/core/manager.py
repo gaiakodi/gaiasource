@@ -177,19 +177,19 @@ class Manager(object):
 		if providers:
 			if not Manager.DatabaseProviders in Manager.Create or force:
 				Manager.Create[Manager.DatabaseProviders] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (version TEXT, data TEXT, UNIQUE(version));' % Manager.DatabaseProviders)
+				base._create('CREATE TABLE IF NOT EXISTS %s (version TEXT PRIMARY KEY, data TEXT);' % Manager.DatabaseProviders)
 		if links:
 			if not Manager.DatabaseLinks in Manager.Create or force:
 				Manager.Create[Manager.DatabaseLinks] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT, provider TEXT, time INTEGER, data TEXT, UNIQUE(id));' % Manager.DatabaseLinks)
+				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.DatabaseLinks)
 		if streams:
 			if not Manager.DatabaseStreams in Manager.Create or force:
 				Manager.Create[Manager.DatabaseStreams] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT, provider TEXT, time INTEGER, data TEXT, UNIQUE(id));' % Manager.DatabaseStreams)
+				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.DatabaseStreams)
 		if failures:
 			if not Manager.DatabaseFailures in Manager.Create or force:
 				Manager.Create[Manager.DatabaseFailures] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT, count INTEGER, time INTEGER, UNIQUE(id));' % Manager.DatabaseFailures)
+				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, count INTEGER, time INTEGER);' % Manager.DatabaseFailures)
 		return base
 
 	@classmethod

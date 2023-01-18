@@ -142,13 +142,13 @@ class Cache(Database):
 		self._create('''
 			CREATE TABLE IF NOT EXISTS %s
 			(
-				id TEXT,
+				id TEXT PRIMARY KEY,
 				time INTEGER,
-				data TEXT,
-				UNIQUE(id)
+				data TEXT
 			);
 			'''
 		)
+
 		self._create('''
 			CREATE TABLE IF NOT EXISTS %s
 			(
@@ -162,15 +162,15 @@ class Cache(Database):
 		self._create('''
 			CREATE TABLE IF NOT EXISTS %s
 			(
-				id TEXT,
+				id TEXT PRIMARY KEY,
 				val TEXT,
 				versionKodi TEXT,
 				versionAddon TEXT,
-				data TEXT,
-				UNIQUE(id)
+				data TEXT
 			);
 			''' % Cache.NameExpression
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON %s(id, versionKodi, versionAddon);' % (Cache.NameExpression, Cache.NameExpression))
 
 	def _insert(self, query, parameters = None, commit = True):
 		Cache.Updated = True

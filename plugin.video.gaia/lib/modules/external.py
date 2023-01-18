@@ -237,6 +237,10 @@ class Importer(object):
 		return self.module(module = 'externals.tldextract', error = error)
 
 	@classmethod
+	def moduleRequests(self, error = True):
+		return self.module(module = 'externals.requests', error = error)
+
+	@classmethod
 	def moduleSession(self, error = True):
 		return self.module(module = 'externals.requests', submodule = 'Session', error = error)
 

@@ -262,11 +262,12 @@ class Sets(object):
 						try: refreshing = item[MetaCache.Attribute][MetaCache.AttributeRefresh]
 						except: refreshing = MetaCache.RefreshForeground
 						if refreshing == MetaCache.RefreshForeground or refresh:
+							self.mMetatools.busyStart(media = self.mMedia, item = item)
 							semaphore.acquire()
 							threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground:
-							semaphore.acquire()
-							threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 				else:
 					items = Tools.listShuffle(items)
 					lookup = []
@@ -280,13 +281,13 @@ class Sets(object):
 							lookup.append(item)
 						elif refreshing == MetaCache.RefreshForeground and (counter is None or len(lookup) < counter):
 							if foreground:
+								self.mMetatools.busyStart(media = self.mMedia, item = item)
 								lookup.append(item)
 								semaphore.acquire()
 								threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
-							if background:
-								semaphore.acquire()
-								threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 					items = lookup
 
 				# Wait for metadata that does not exist in the metacache.
@@ -294,10 +295,17 @@ class Sets(object):
 				if metadataForeground: metacache.insert(type = MetaCache.TypeSet, items = metadataForeground)
 
 				# Let the refresh of old metadata run in the background for the next menu load.
+				# Only start the threads here, so that background threads do not interfere or slow down the foreground threads.
 				if threadsBackground:
 					def _metadataBackground():
+						for i in range(len(threadsBackground)):
+							semaphore.acquire()
+							threadsBackground[i] = Pool.thread(target = self.metadataUpdate, kwargs = threadsBackground[i], start = True)
 						[thread.join() for thread in threadsBackground]
 						if metadataBackground: metacache.insert(type = MetaCache.TypeSet, items = metadataBackground)
+
+					# Make a deep copy of the items, since the items can be edited below while these threads are still busy, and we do not want to store the extra details in the database.
+					for i in threadsBackground: i['item'] = Tools.copy(i['item'])
 					Pool.thread(target = _metadataBackground, start = True)
 
 				if filter: items = [i for i in items if 'tmdb' in i and i['tmdb']]
@@ -447,6 +455,7 @@ class Sets(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
+			self.mMetatools.busyFinish(media = self.mMedia, item = item)
 
 	def metadataDeveloper(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, item = None):
 		if self.mDeveloper:

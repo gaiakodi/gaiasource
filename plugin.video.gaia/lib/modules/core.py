@@ -992,7 +992,10 @@ class Core(object):
 				# Otherwise replacing the main title might result in only the director's name.
 				# Eg: Nineteen Eighty Four George Orwell -> George Orwell
 				# And this can return too many incorrect links (books, audio books, etc).
-				people = ['james cameron', 'george orwell', 'jack snyder', 'christopher nolan', 'stanley kubrick', 'steven spielberg', 'stephen king', 'clint wastwood', 'quentin tarantino', 'guillermo del toro', 'ridley scott', 'alfred hitchcock', 'peter jackson', 'spike lee', 'george lucas', 'woody allen', 'martin scorsese']
+				# Do not include: 'guillermo del toro', since there are 2 Pinocchios released in 2022:
+				#	Guillermo del Toro's Pinocchio (2022)
+				#	Pinocchio (2022)
+				people = ['james cameron', 'george orwell', 'jack snyder', 'christopher nolan', 'stanley kubrick', 'steven spielberg', 'stephen king', 'clint wastwood', 'quentin tarantino', 'ridley scott', 'alfred hitchcock', 'peter jackson', 'spike lee', 'george lucas', 'woody allen', 'martin scorsese']
 				for type in ['native', 'alias']:
 					if type in self.titles and self.titles[type]:
 						for key, values in self.titles[type].items():
@@ -1012,9 +1015,16 @@ class Core(object):
 										# Avatar - Extended Collector's Edition
 										# Avatar - Collector's Extended Edition
 										if not tools.Regex.match(data = titleStripped, expression = '(?:edition|version|cut|release|extended|collector|director|ece|special|ultimate|limited|theatrical|retail|imax|colecionador|estendida|colecionador|3d|edição|edicion|coleccionista|edi\u00e7\u00e3o|edicao|edio|wersja|specjalna|rozszerzona|ungeschnittene|fassung|unrated|uncensored|remastered|the\smovie|dvd|bluray|4k|2160p|1080p|disc)(?:\s|$)'):
-											self.titles[type][key].append(titleStripped)
-											if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
-											processedMain.append(titleStripped)
+											# Do not include short titles.
+											# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
+											#	Westworld: The Maze
+											#	Westworld: The Door
+											#	Westworld: The New World
+											# We do not want to search eg "The Door S01E01", since it might actually be a different show.
+											if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
+												self.titles[type][key].append(titleStripped)
+												if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
+												processedMain.append(titleStripped)
 							self.titles[type][key] = tools.Tools.listUnique(self.titles[type][key])
 
 				# Regex check what remains after unicode decoding, otherwise titles like "Harry Potter 1" might degress into "1:" or "1".
@@ -1172,10 +1182,16 @@ class Core(object):
 					temp = tools.Tools.copy(searchMain)
 					searchBasic = tools.Regex.remove(data = searchMain[0], expression = '^((?:the|an?)\s)')
 					for i in search:
+						searchBase = i
+						searchReplace = None
+
 						for j in searchMain:
+							searchReplace = j
 							i = tools.Tools.replaceInsensitive(data = i, value = j, replacement = '')
+
 							# Eg: "The Terminator": replace "Terminator" and not just the full "The Terminator".
 							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = '((?:the|an?)\s)'), replacement = '')
+
 						if i:
 							i = ' '.join([j for j in i.split(' ') if j])
 							if i:
@@ -1200,8 +1216,41 @@ class Core(object):
 								# Eg: "#9" -> "9".
 								if tools.Regex.match(data = i, expression = '^[\d\s\-\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
 
+								# Do not include short titles.
+								# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
+								#	Westworld: The Maze
+								#	Westworld: The Door
+								#	Westworld: The New World
+								# We do not want to search eg "The Door S01E01", since it might actually be a different show.
+								if searchReplace and tools.Regex.match(data = searchBase, expression = '^%s (the|an?)(\s*[a-z]+){1,2}$' % searchReplace): continue
+
 								if not i.lower() in people: temp.append(i)
 					search = tools.Tools.listUnique(temp)
+
+				# Remove specific titles.
+				# Each entry in "removals": if 1st value matches any of the search titles, exclude search titles that match the 2nd value.
+				# Eg: Guillermo del Toro's Pinocchio (2022)
+				# Trakt returns a US alias as "Pinocchio".
+				# However, another movie was released that year called "Pinocchio (2022)", and we want to exclude those results.
+				# These are special cases that cannot be eliminated with any of the code above, and needs to be hard-coded on a per-movie basis.
+				removals = [
+					('del\s+toro', '^pinocchio$'),
+				]
+				exclusions = []
+				temp = []
+				for i in search:
+					for j in removals:
+						if tools.Regex.match(data = i, expression = j[0]):
+							exclusions.append(j[1])
+				exclusions = tools.Tools.listUnique(exclusions)
+				for i in search:
+					add = True
+					for j in exclusions:
+						if tools.Regex.match(data = i, expression = j):
+							add = False
+							break
+					if add: temp.append(i)
+				search = temp
 
 				self.titles['search'] = {}
 				self.titles['search']['main'] = search
@@ -1706,8 +1755,8 @@ class Core(object):
 										'mean' : durationMean,
 									},
 									'year' : {
-										'minimum' :yearMinimum,
-										'maximum' : yearMaximum,
+										'start' :yearMinimum,
+										'end' : yearMaximum,
 										'years' : years,
 									},
 									'movies' : movies,

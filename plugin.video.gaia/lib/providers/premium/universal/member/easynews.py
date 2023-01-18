@@ -24,6 +24,7 @@ from lib.debrid.easynews import Core
 from lib.modules.stream import Stream
 from lib.modules.network import Networker
 from lib.modules.convert import ConverterDuration
+from lib.modules.tools import Tools
 
 '''
 	Version 2:
@@ -50,6 +51,10 @@ class Provider(ProviderPremium, ProviderJson):
 	_File						= {
 									ProviderJson.Version2 : '%s%s/%s%s',
 									ProviderJson.Version3 : '%s%s/%s?sid=%s&sig=%s',
+								}
+	_Curve						= {
+									ProviderJson.Version2 : ProviderJson.RequestCurveSecp512r1,
+									ProviderJson.Version3 : None,
 								}
 
 	_LimitOffset 				= 1000 # Number of items to return per page. Although higher numbers are possible in the query, the result JSON always say "perPage":"1000", so it seems 1000 is the limit.
@@ -96,14 +101,14 @@ class Provider(ProviderPremium, ProviderJson):
 
 	_AttributeSig				= {ProviderJson.Version2 : '0',			ProviderJson.Version3 : 'sig'}
 	_AttributeHash				= {ProviderJson.Version2 : '19',		ProviderJson.Version3 : 'hash'}
-	_AttributeFilename			= {ProviderJson.Version2 : '10',		ProviderJson.Version3 : 'filename'}
+	_AttributeFilename			= {ProviderJson.Version2 : '10',		ProviderJson.Version3 : 'fn'} # V3 changed 'filename' to 'fn'
 	_AttributeExtension			= {ProviderJson.Version2 : '11',		ProviderJson.Version3 : 'extension'}
 	_AttributeVideoCodec		= {ProviderJson.Version2 : '12',		ProviderJson.Version3 : 'vcodec'}
 	_AttributeAudioCodec		= {ProviderJson.Version2 : '18',		ProviderJson.Version3 : 'acodec'}
 	_AttributeAudioLanguage		= {ProviderJson.Version2 : 'alangs',	ProviderJson.Version3 : 'alang'}
 	_AttributeSubtitleLanguage	= {ProviderJson.Version2 : 'slangs',	ProviderJson.Version3 : 'slang'}
 	_AttributeSubject			= {ProviderJson.Version2 : '6',			ProviderJson.Version3 : 'subject'}
-	_AttributeSize				= {ProviderJson.Version2 : 'rawSize',	ProviderJson.Version3 : 'bytes'}
+	_AttributeSize				= {ProviderJson.Version2 : 'rawSize',	ProviderJson.Version3 : 'size'} # V3 changed 'bytes' to 'size'
 	_AttributePoster			= {ProviderJson.Version2 : '7',			ProviderJson.Version3 : 'poster'}
 	_AttributeTime				= {ProviderJson.Version2 : 'ts',		ProviderJson.Version3 : 'timestamp'}
 	_AttributeDuration			= {ProviderJson.Version2 : '14',		ProviderJson.Version3 : 'runtime'}
@@ -117,12 +122,20 @@ class Provider(ProviderPremium, ProviderJson):
 
 		version = self.customVersion(default = ProviderJson.VersionAutomatic)
 		if version == ProviderJson.VersionAutomatic:
-			version = core.accountVersion()
+			version = core.accountVersion(detect = True) # Always redetect, since the user might have changed the version preferences.
 			if version is None: version = ProviderJson.Version3
 			version = str(int(version))
 
 		self.mVersion = version
 		self.mSid = None
+
+		# Retrieve these values BEFORE calling ProviderPremium.initialize(...).
+		# Otherwise the call to ProviderPremium.initialize(...) replaces the custom settings, and when calling these functions in ProviderJson.initialize(...), they return None.
+		# Alternatively, also pass the "custom" list to ProviderPremium.initialize(...).
+		customDuplicates = self.custom(id = Provider._CustomDuplicates)
+		customGroup = self.custom(id = Provider._CustomGroup)
+		customSpam = self.custom(id = Provider._CustomSpam)
+		customStem = not self.custom(id = Provider._CustomStemmed)
 
 		ProviderPremium.initialize(self, core = core)
 		ProviderJson.initialize(self,
@@ -131,6 +144,8 @@ class Provider(ProviderPremium, ProviderJson):
 			performance				= ProviderJson.PerformanceExcellent,
 
 			link					= Provider._Link[version],
+
+			certificateCurve		= Provider._Curve[version], # More info in cloudflare.py.
 
 			accountOther			= ProviderJson.AccountInputCustom,
 			accountAuthentication	= {
@@ -192,6 +207,11 @@ class Provider(ProviderPremium, ProviderJson):
 			offsetStart				= 1,
 			offsetIncrease			= 1,
 
+			queryExtraEpisode		= [ # Some files only have the written-out format.
+										'%s season %s episode %s' % (ProviderJson.TermTitleShow, ProviderJson.TermSeason, ProviderJson.TermEpisode),
+										'%s season %s episode %s' % (ProviderJson.TermTitleShow, ProviderJson.TermSeasonZero, ProviderJson.TermEpisodeZero),
+									],
+
 			searchQuery				= {
 										ProviderJson.RequestPath : Provider._Path[version],
 										ProviderJson.RequestData : {
@@ -207,10 +227,10 @@ class Provider(ProviderPremium, ProviderJson):
 											Provider._ParameterSort2Order		: Provider._ParameterDescending[version],			# Second sort order: descending
 											Provider._ParameterSort3Value		: Provider._ParameterSortTime,						# Third sort attribute: time
 											Provider._ParameterSort3Order		: Provider._ParameterDescending[version],			# Third sort order: descending
-											Provider._ParameterDuplicates		: self.custom(id = Provider._CustomDuplicates),		# Remove duplicates
-											Provider._ParameterGroup			: self.custom(id = Provider._CustomGroup),			# Group exclusion filters
-											Provider._ParameterSpam				: self.custom(id = Provider._CustomSpam),			# Spam exclusion filters
-											Provider._ParameterStem				: not self.custom(id = Provider._CustomStemmed),	# Stemmed keyword searches.
+											Provider._ParameterDuplicates		: customDuplicates,									# Remove duplicates
+											Provider._ParameterGroup			: customGroup,										# Group exclusion filters
+											Provider._ParameterSpam				: customSpam,										# Spam exclusion filters
+											Provider._ParameterStem				: customStem,										# Stemmed keyword searches.
 										},
 									},
 			searchCategory			= Provider._CategoryVideo,
@@ -246,6 +266,20 @@ class Provider(ProviderPremium, ProviderJson):
 	# PROCESS
 	##############################################################################
 
+	def processInitial(self):
+		# Increase the number of queries when scraping episodes.
+		# Episodes are often difficult to find, due to there being few files, and files using other naming conventions.
+		# We therefore add additional "queryExtraEpisode" values to increase chances of finding files.
+		# These additional queries could lead to the lower queries being removed due to the query limit.
+		# Eg: For "Game of Thrones", the "GoT" alias title might not be used, since there are already too many queries.
+		# Additional queries to the EasyNews API should not take much extra time.
+		# Only use the increased limit if the user has not manually set a limit for the EasyNews provider.
+		if self.parameterMediaShow() and not self.scrapeQuery(settings = True, default = False):
+			limit = self.scrapeQuery(settings = False, default = True)
+			if limit:
+				value = min(16, max(6, limit * 2))
+				if value > limit: self.scrapeQuerySet(value = value, settings = True)
+
 	def processOffset(self, data, items):
 		if data[Provider._AttributePageNumber] >= data[Provider._AttributePageCount]: return ProviderJson.Skip
 
@@ -271,14 +305,15 @@ class Provider(ProviderPremium, ProviderJson):
 		# Ignore files with a duration less than 5 minutes.
 		if self.custom(id = Provider._CustomDuration):
 			try:
-				durationReal = ConverterDuration(item[Provider._AttributeDuration[self.mVersion]].replace(':', ' ')).value(ConverterDuration.UnitSecond)
+				durationReal = item[Provider._AttributeDuration[self.mVersion]]
+				if Tools.isString(durationReal): durationReal = ConverterDuration(durationReal.replace(':', ' ')).value(ConverterDuration.UnitSecond) # Older version had the runtime as HH:SS:MM. New version gives it in seconds already.
 				if durationReal:
 					if durationReal < 300: return ProviderJson.Skip
 					durationExpected = self.parameterDuration()
 					# EasyNews marks some movie duration between 40 to 60 minutes. However, if those files are played, they are longer.
 					# Do not exclude any files longer than 30 minutes (1800).
 					if durationExpected and durationReal < min(1800, durationExpected / 2): return ProviderJson.Skip
-			except: tools.Logger.error()
+			except: self.logError()
 
 	def processLink(self, value, item, details = None, entry = None):
 		if self.mVersion == ProviderJson.Version2: link = (value[3], value[2], value[1], value[2])
@@ -286,8 +321,8 @@ class Provider(ProviderPremium, ProviderJson):
 		link = Networker.linkQuote(Provider._File[self.mVersion] % link)
 		link = Provider._Download[self.mVersion] % (self.link(), link)
 		link = Networker.linkHeaders(link = link, headers = self.accountAuthenticationHeaders())
-		try: link = link.encode('utf-8')
-		except: pass
+		#try: link = link.encode('utf-8')# do not do this, otherwise it converts to bytes object instead of string.
+		#except: pass
 		return link
 
 	def processReleaseUploader(self, value, item, details = None, entry = None):

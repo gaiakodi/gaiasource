@@ -32,6 +32,8 @@ class MetaTmdb(object):
 	LinkSearchMovie	= 'https://api.themoviedb.org/3/search/movie'
 	LinkSearchShow	= 'https://api.themoviedb.org/3/search/tv'
 
+	LinkId			= 'https://api.themoviedb.org/3/find/%s'
+
 	LinkSetIds		= 'https://files.tmdb.org/p/exports/collection_ids_%s.json.gz'
 	LinkSetDetails	= 'https://api.themoviedb.org/3/collection/%s'
 
@@ -69,6 +71,51 @@ class MetaTmdb(object):
 		data['api_key'] = Tmdb().key()
 		if method is None: method = Networker.MethodGet
 		return Networker().requestJson(method = method, link = link, data = data)
+
+	##############################################################################
+	# ID
+	##############################################################################
+
+	@classmethod
+	def id(self, media, idImdb = None, idTvdb = None):
+		source = None
+		link = MetaTmdb.LinkId
+
+		if idImdb:
+			link = link % idImdb
+			source = 'imdb_id'
+		elif idTvdb and Media.typeTelevision(media):
+			link = link % idTvdb
+			source = 'tvdb_id'
+		else:
+			return None
+
+		data = self.request(method = Networker.MethodGet, link = link, data = {'external_source' : source})
+		if data:
+			if media == Media.TypeShow: result = 'tv_results'
+			elif media == Media.TypeSeason: result = 'tv_season_results'
+			elif media == Media.TypeEpisode: result = 'tv_episode_results'
+			else: result = 'movie_results'
+			try: return data[result][0].get('id')
+			except: pass
+
+		return None
+
+	@classmethod
+	def idMovie(self, idImdb = None, idTvdb = None):
+		return self.id(media = Media.TypeMovie, idImdb = idImdb, idTvdb = idTvdb)
+
+	@classmethod
+	def idShow(self, idImdb = None, idTvdb = None):
+		return self.id(media = Media.TypeShow, idImdb = idImdb, idTvdb = idTvdb)
+
+	@classmethod
+	def idSeason(self, idTvdb = None):
+		return self.id(media = Media.TypeSeason, idImdb = idImdb, idTvdb = idTvdb)
+
+	@classmethod
+	def idEpisode(self, idImdb = None, idTvdb = None):
+		return self.id(media = Media.TypeEpisode, idImdb = idImdb, idTvdb = idTvdb)
 
 	##############################################################################
 	# SEARCH

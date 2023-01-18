@@ -668,7 +668,7 @@ class Library(object):
 
 		try:
 			base = Database(name = Library.DatabaseName)
-			base._create('CREATE TABLE IF NOT EXISTS shows (id TEXT, items TEXT, UNIQUE(id));')
+			base._create('CREATE TABLE IF NOT EXISTS shows (id TEXT PRIMARY KEY, items TEXT);')
 		except:
 			Logger.error()
 			return

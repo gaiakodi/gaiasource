@@ -35,7 +35,7 @@ class Searches(database.Database):
 		database.Database.__init__(self, Searches.Name)
 
 	def _initialize(self):
-		self._createAll('CREATE TABLE IF NOT EXISTS %s (terms TEXT, time INTEGER, kids INTEGER, UNIQUE(terms));', [Searches.TypeMovies, Searches.TypeShows, Searches.TypeDocumentaries, Searches.TypeShorts, Searches.TypePeople])
+		self._createAll('CREATE TABLE IF NOT EXISTS %s (terms TEXT PRIMARY KEY, time INTEGER, kids INTEGER);', [Searches.TypeMovies, Searches.TypeShows, Searches.TypeDocumentaries, Searches.TypeShorts, Searches.TypePeople])
 
 	def insert(self, searchType, searchTerms, searchKids = tools.Selection.TypeUndefined):
 		searchTerms = searchTerms.strip()

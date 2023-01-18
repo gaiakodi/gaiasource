@@ -23,6 +23,7 @@ from lib.modules.interface import Translation, Loader, Dialog, Directory
 from lib.modules.database import Database
 from lib.modules.concurrency import Pool, Lock
 from lib.modules import trakt as Trakt
+from lib.meta.data import MetaData
 
 class Playback(Database):
 
@@ -155,6 +156,13 @@ class Playback(Database):
 			);
 			''' % Playback.Table
 		)
+
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON %s(idImdb);' % (Playback.Table, Playback.Table))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_2 ON %s(idTmdb);' % (Playback.Table, Playback.Table))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_3 ON %s(idTvdb);' % (Playback.Table, Playback.Table))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_4 ON %s(idTrakt);' % (Playback.Table, Playback.Table))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_5 ON %s(numberSeason);' % (Playback.Table, Playback.Table))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_6 ON %s(numberEpisode);' % (Playback.Table, Playback.Table))
 
 	def _lock(self):
 		try: self.mLock.acquire()
@@ -408,20 +416,20 @@ class Playback(Database):
 					if 'seasons' in pack:
 						plays = {}
 						for i in pack['seasons']:
-							if specials or not i['number'] == 0:
+							if specials or not i['number'][MetaData.NumberOfficial] == 0:
 								if 'episodes' in i:
 									for j in i['episodes']:
-										if specials or not j['number'] == 0:
-											plays[(i['number'], j['number'])] = 0
+										if specials or not j['number'][MetaData.NumberOfficial] == 0:
+											plays[(i['number'][MetaData.NumberOfficial], j['number'][MetaData.NumberOfficial])] = 0
 				elif episode is None:
 					if 'seasons' in pack:
 						plays = {}
 						for i in pack['seasons']:
-							if i['number'] == season:
+							if i['number'][MetaData.NumberOfficial] == season:
 								if 'episodes' in i:
 									for j in i['episodes']:
-										if specials or not j['number'] == 0:
-											plays[(i['number'], j['number'])] = 0
+										if specials or not j['number'][MetaData.NumberOfficial] == 0:
+											plays[(i['number'][MetaData.NumberOfficial], j['number'][MetaData.NumberOfficial])] = 0
 								break
 
 			if plays:
@@ -456,11 +464,11 @@ class Playback(Database):
 			pack = metadata['pack']
 			if 'seasons' in pack:
 				for i in pack['seasons']:
-					if (seasonStart is None or i['number'] >= seasonStart) and (seasonEnd is None or i['number'] <= seasonEnd):
+					if (seasonStart is None or i['number'][MetaData.NumberOfficial] >= seasonStart) and (seasonEnd is None or i['number'][MetaData.NumberOfficial] <= seasonEnd):
 						if 'episodes' in i:
 							for j in i['episodes']:
-								if (episodeStart is None or j['number'] >= episodeStart) and (episodeEnd is None or j['number'] <= episodeEnd):
-									result.append({'season' : i['number'], 'episode' : j['number']})
+								if (episodeStart is None or j['number'][MetaData.NumberOfficial] >= episodeStart) and (episodeEnd is None or j['number'][MetaData.NumberOfficial] <= episodeEnd):
+									result.append({'season' : i['number'][MetaData.NumberOfficial], 'episode' : j['number'][MetaData.NumberOfficial]})
 
 		return result
 
@@ -486,7 +494,7 @@ class Playback(Database):
 				if not episode is None:
 					if 'seasons' in pack and pack['seasons']:
 						for i in pack['seasons']:
-							if i['number'] == season:
+							if i['number'][MetaData.NumberOfficial] == season:
 								last = (episode == i['count']) and i['status'] == MetaData.StatusEnded
 								break
 
@@ -1304,9 +1312,9 @@ class Playback(Database):
 			metadata = Shows().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt)
 			if metadata and 'pack' in metadata:
 				for i in metadata['pack']['seasons']:
-					if season is None or season == i['number']:
+					if season is None or season == i['number'][MetaData.NumberOfficial]:
 						for j in i['episodes']:
-							items.append((i['number'], j['number']))
+							items.append((i['number'][MetaData.NumberOfficial], j['number'][MetaData.NumberOfficial]))
 						if not season is None: break
 		else:
 			items.append((season, episode))

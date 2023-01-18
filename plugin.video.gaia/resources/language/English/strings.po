@@ -625,7 +625,7 @@ msgid "Details Level"
 msgstr ""
 
 msgctxt "#32532"
-msgid "[GAIA-NO-LABEL]"
+msgid "Reduce"
 msgstr ""
 
 msgctxt "#32533"
@@ -1843,7 +1843,7 @@ msgid "Disabled Settings"
 msgstr ""
 
 msgctxt "#33301"
-msgid "[GAIA-NO-LABEL]"
+msgid "Preprocessed Metadata"
 msgstr ""
 
 msgctxt "#33302"
@@ -2803,83 +2803,83 @@ msgid "Monitor"
 msgstr ""
 
 msgctxt "#33541"
-msgid "[GAIA-NO-LABEL]"
+msgid "Use %s And %s Metadata"
 msgstr ""
 
 msgctxt "#33542"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Menu Loading"
 msgstr ""
 
 msgctxt "#33543"
-msgid "[GAIA-NO-LABEL]"
+msgid "Requires %s Download"
 msgstr ""
 
 msgctxt "#33544"
-msgid "[GAIA-NO-LABEL]"
+msgid "Requires %s Free Storage"
 msgstr ""
 
 msgctxt "#33545"
-msgid "[GAIA-NO-LABEL]"
+msgid "Addon Already Installed"
 msgstr ""
 
 msgctxt "#33546"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Storage Used"
 msgstr ""
 
 msgctxt "#33547"
-msgid "[GAIA-NO-LABEL]"
+msgid "Preprocessed"
 msgstr ""
 
 msgctxt "#33548"
-msgid "[GAIA-NO-LABEL]"
+msgid "Generated"
 msgstr ""
 
 msgctxt "#33549"
-msgid "[GAIA-NO-LABEL]"
+msgid "Only Use %s Metadata"
 msgstr ""
 
 msgctxt "#33550"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Additional Metadata"
 msgstr ""
 
 msgctxt "#33551"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Additional Download"
 msgstr ""
 
 msgctxt "#33552"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Additional Storage"
 msgstr ""
 
 msgctxt "#33553"
-msgid "[GAIA-NO-LABEL]"
+msgid "Faster"
 msgstr ""
 
 msgctxt "#33554"
-msgid "[GAIA-NO-LABEL]"
+msgid "Slower"
 msgstr ""
 
 msgctxt "#33555"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s free of %s"
 msgstr ""
 
 msgctxt "#33556"
-msgid "[GAIA-NO-LABEL]"
+msgid "You currently have %s free disk space, but need %s to install the metadata. There might not be enough disk space to successfully install the addon. Do you want to continue with the installation?"
 msgstr ""
 
 msgctxt "#33557"
-msgid "[GAIA-NO-LABEL]"
+msgid "You currently have %s free disk space and need %s to install the metadata. After installation, there will be barley enough free disk space for the operating system, Kodi, and other addons. Do you want to continue with the installation?"
 msgstr ""
 
 msgctxt "#33558"
-msgid "[GAIA-NO-LABEL]"
+msgid "You currently have %s free disk space and need %s to install the metadata. After installation, there will be little free disk space for the operating system, Kodi, and other addons. Do you want to continue with the installation?"
 msgstr ""
 
 msgctxt "#33559"
-msgid "[GAIA-NO-LABEL]"
+msgid "You have disabled preprocessed metadata, but have %s free disk space. It is recommended to install the metadata if you have enough free space to improve menu loading times. Do you want to continue to disable the metadata?"
 msgstr ""
 
 msgctxt "#33560"
-msgid "[GAIA-NO-LABEL]"
+msgid "You have disabled preprocessed metadata. Gaia cannot uninstall addons. Please manually uninstall %s  using the Kodi dependency manager if you want to free up %s disk space."
 msgstr ""
 
 msgctxt "#33561"
@@ -3563,7 +3563,7 @@ msgid "The addon provides additional skins and backgrounds for Gaia. The addon i
 msgstr ""
 
 msgctxt "#33731"
-msgid "[GAIA-NO-LABEL]"
+msgid "The addon provides preprocessed movie and show metadata to improve initial menu loading times."
 msgstr ""
 
 msgctxt "#33732"
@@ -3995,7 +3995,7 @@ msgid "The VPN is [B]reconnecting[/B] and you are [B]not anonymous[/B] yet."
 msgstr ""
 
 msgctxt "#33839"
-msgid "[GAIA-NO-LABEL]"
+msgid "Retrieving [B]Extended[/B] metadata takes about twice as long as [B]Standard[/B] metadata, increasing loading times of menus when opened for the first time. Do you want to keep the current metadata level or reduce it for faster menu loading?"
 msgstr ""
 
 msgctxt "#33840"
@@ -4019,7 +4019,7 @@ msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#33845"
-msgid "[GAIA-NO-LABEL]"
+msgid "Speedtest"
 msgstr ""
 
 msgctxt "#33846"
@@ -5583,7 +5583,7 @@ msgid "Automatically delete items if the download fails. Remove no, all, or only
 msgstr ""
 
 msgctxt "#34236"
-msgid "Exclude short special episodes from the interleaved menus. The [I]Lenient[/I]  option will remove all specials that are shorter than 25% of the average episode duration. The [I]Strict[/I]  option will remove all specials that are shorter than 50% of the average episode duration."
+msgid "Exclude short special episodes from the interleaved menus. The [I]Lenient[/I]  option will remove all specials that are shorter than 25% of the average episode duration. The [I]Strict[/I]  option will remove all specials that are shorter than 50% of the average episode duration. The [I]Automatic[/I]  option will show all specials for series menus, but apply strict filtering to other interleaved submenus."
 msgstr ""
 
 msgctxt "#34237"
@@ -6833,6 +6833,11 @@ msgstr ""
 msgctxt "#34558"
 msgid "Change how often the [I]bluetoothctl[/I]  program is executed in order to detect new devices that have come online. A lower interval will execute the [I]bluetoothctl[/I]  program more often, but will connect Bluetooth devices more quickly. A higher interval will execute the [I]bluetoothctl[/I]  program less often, but might take longer to connect Bluetooth devices."
 msgstr ""
+
+msgctxt "#34559"
+msgid "Install a database of preprocessed movie and show metadata to improve menu loading times. This option will install another Gaia addon which requires a substantial amount of free disk space."
+msgstr ""
+
 
 # [/GAIACODE]
 

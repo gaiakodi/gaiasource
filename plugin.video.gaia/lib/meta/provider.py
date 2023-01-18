@@ -469,11 +469,11 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheShow, function = self.__show, media = MetaData.MediaShow, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, level = level)
+	def show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None):
+		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheShow, function = self.__show, media = MetaData.MediaShow, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberAdjust = numberAdjust, level = level)
 
 	@classmethod
-	def __show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None):
+	def __show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None):
 		result = self._show(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
 		if result:
 			if level >= MetaProvider.Level5:
@@ -489,6 +489,11 @@ class MetaProvider(object):
 				if season:
 					season = self.season(id = season, level = level, cache = cache)
 					if season: result.seasonSet(value = season, unique = provider)
+
+		# TVDb uses the year as season number for some daytime shows.
+		# Eg: Coronation Street - https://thetvdb.com/series/coronation-street
+		if numberAdjust and result: result.numberAdjust()
+
 		return result
 
 	# Virtual

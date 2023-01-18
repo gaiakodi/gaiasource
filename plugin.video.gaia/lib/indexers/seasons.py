@@ -202,11 +202,12 @@ class Seasons(object):
 						try: refreshing = item[MetaCache.Attribute][MetaCache.AttributeRefresh]
 						except: refreshing = MetaCache.RefreshForeground
 						if refreshing == MetaCache.RefreshForeground or refresh:
+							self.mMetatools.busyStart(media = self.mMedia, item = item)
 							semaphore.acquire()
 							threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground:
-							semaphore.acquire()
-							threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 				else:
 					items = Tools.listShuffle(items)
 					lookup = []
@@ -220,13 +221,13 @@ class Seasons(object):
 							lookup.append(item)
 						elif refreshing == MetaCache.RefreshForeground and (counter is None or len(lookup) < counter):
 							if foreground:
+								self.mMetatools.busyStart(media = self.mMedia, item = item)
 								lookup.append(item)
 								semaphore.acquire()
 								threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
-							if background:
-								semaphore.acquire()
-								threadsBackground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'}, start = True))
+							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
 					items = lookup
 
 				# Wait for metadata that does not exist in the metacache.
@@ -234,10 +235,17 @@ class Seasons(object):
 				if metadataForeground: metacache.insert(type = MetaCache.TypeSeason, items = metadataForeground)
 
 				# Let the refresh of old metadata run in the background for the next menu load.
+				# Only start the threads here, so that background threads do not interfere or slow down the foreground threads.
 				if threadsBackground:
 					def _metadataBackground():
+						for i in range(len(threadsBackground)):
+							semaphore.acquire()
+							threadsBackground[i] = Pool.thread(target = self.metadataUpdate, kwargs = threadsBackground[i], start = True)
 						[thread.join() for thread in threadsBackground]
 						if metadataBackground: metacache.insert(type = MetaCache.TypeSeason, items = metadataBackground)
+
+					# Make a deep copy of the items, since the items can be edited below (added pack and seasonNext/seasonPrevious/seasonCurrent) while these threads are still busy, and we do not want to store the extra details in the database.
+					for i in threadsBackground: i['item'] = Tools.copy(i['item'])
 					Pool.thread(target = _metadataBackground, start = True)
 
 				if filter: items = [i for i in items if 'tvdb' in i and i['tvdb']]
@@ -334,6 +342,9 @@ class Seasons(object):
 				Memory.set(id = id, value = {}, local = True, kodi = False)
 				return False
 
+			try: pack = show['pack']
+			except: pack = None
+
 			if not title and show and 'tvshowtitle' in show: title = show['tvshowtitle']
 
 			if self.mDetail == MetaTools.DetailEssential:
@@ -366,7 +377,6 @@ class Seasons(object):
 				'user' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
 				'votes' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
 			}
-			pack = None
 			for i in ['tvmaze', 'metacritic', 'imdb', 'tmdb', 'fanart', 'trakt', 'tvdb']: # Keep a specific order. Later values replace newer values.
 				if i in datas:
 					values = datas[i]
@@ -379,8 +389,6 @@ class Seasons(object):
 							provider = value['provider']
 							value = Tools.copy(value['data']) # Copy, since we do title/plot/studio replacement below in another loop.
 							if value:
-								if 'pack' in value and value['pack']: pack = value['pack']
-
 								for season in value['seasons']:
 									number = season['season']
 
@@ -401,6 +409,20 @@ class Seasons(object):
 											Tools.update(j, season, none = True, lists = False, unique = False)
 											break
 									if not found: data['seasons'].append(season)
+
+			if pack:
+				# Copy the additional numbers (eg: season number given as the year) from the pack.
+				numbers = {i['number'][MetaData.NumberOfficial] : i['number'] for i in pack['seasons']}
+				for i in data['seasons']:
+					try: i['number'] = numbers[i['season']]
+					except: i['number'] = {MetaData.NumberOfficial : i['season']}
+
+				# Fanart sometimes has images for non-existing seasons.
+				# Eg: "How I Met Your Mother" has Fanart posters for Season 89.
+				# Remove these seasons.
+				numbers = list(numbers.keys())
+				numberMaximum = max(numbers) + 10
+				data['seasons'] = [i for i in data['seasons'] if i['season'] in numbers or i['season'] <= numberMaximum]
 
 			# Some values are often missing or incorrect on TVDb, and should be replaced with the Trakt/TMDb metadata.
 			# TVDb has often incorrect studios/networks for seasons (eg: Game of Thrones and Breaking Bad).
@@ -490,7 +512,6 @@ class Seasons(object):
 			if title: data['tvshowtitle'] = data['title'] = title
 			year = season['year'] if season and 'year' in season else None
 			if year: data['year'] = year
-			if pack: data['pack'] = pack
 
 			Memory.set(id = id, value = data, local = True, kodi = False)
 			item.update(data)
@@ -502,6 +523,7 @@ class Seasons(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
+			self.mMetatools.busyFinish(media = self.mMedia, item = item)
 
 	def metadataAggregate(self, items):
 		# Do not store duplicate or non-season data in the MetaCache database, otherwise too much unnecessary storage space will be used.
@@ -530,15 +552,16 @@ class Seasons(object):
 					for show in shows:
 						if show and MetaImage.Attribute in show:
 							if ('imdb' in show and show['imdb'] and show['imdb'] == idImdb) or ('tvdb' in show and show['tvdb'] and show['tvdb'] == show):
+								try: pack = show['pack']
+								except: pack = None
+								if pack:
+									for season in item['seasons']:
+										season['pack'] = pack
+
 								for season in item['seasons']:
 									MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(show[MetaImage.Attribute]), data = season, category = MetaImage.MediaShow) # Add show images.
-								break
 
-					try: pack = item['pack']
-					except: pack = None
-					if pack:
-						for season in item['seasons']:
-							season['pack'] = pack
+								break
 
 				except: Logger.error()
 		except: Logger.error()
@@ -591,17 +614,22 @@ class Seasons(object):
 		return result
 
 	def metadataRequest(self, link, data = None, headers = None, method = None, cache = True):
+		# HTTP error 429 can be thrown if too many requests were made in a short time.
+		# This should only happen with Trakt (which does not call this function), since TMDb/TVDb/Fanart should not have any API limits at the moment.
+		# Still check for it, since in special cases 429 might still happen (eg: the TMDb CDN/Cloudflare might block more than 50 concurrent connections).
+		# This should not be an issue with normal use, only with batch-generating the preprocessed database that makes 1000s of request every few minutes.
+
 		networker = Networker()
 		if cache:
 			if cache is True: cache = Cache.TimeoutLong
 			result = self.mCache.cache(mode = None, timeout = cache, refresh = None, function = networker.request, link = link, data = data, headers = headers, method = method)
-			if not result or result['error']['type'] in Networker.ErrorNetwork:
+			if not result or result['error']['type'] in Networker.ErrorNetwork or result['error']['code'] == 429:
 				# Delete the cache, otherwise the next call will return the previously failed request.
 				self.mCache.cacheDelete(networker.request, link = link, data = data, headers = headers, method = method)
 				return False
 		else:
 			result = networker.request(link = link, data = data, headers = headers, method = method)
-			if not result or result['error']['type'] in Networker.ErrorNetwork: return False
+			if not result or result['error']['type'] in Networker.ErrorNetwork or result['error']['code'] == 429: return False
 		return Networker.dataJson(result['data'])
 
 	def metadataId(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None):
@@ -778,10 +806,6 @@ class Seasons(object):
 					seasons = show.season(sort = True)
 					episodes = show.episode(sort = True)
 
-					# Only add the pack once for all seasons, to save storage space for the MetaCache database.
-					# The pack is later added to each individual season in metadataAggregate().
-					result['pack'] = self.mMetatools.pack(show = show, extended = True, idImdb = showIdImdb, idTmdb = showIdTmdb, idTvdb = showIdTvdb, idTrakt = showIdTrakt)
-
 					for season in seasons:
 						try:
 							episodesSeason = season.episode()
@@ -792,6 +816,7 @@ class Seasons(object):
 
 							resultSeason = {}
 							resultSeason['id'] = Tools.copy(showId) # Copy, since we edit it for each season by adding the season IDs.
+
 							resultSeason['season'] = season.numberSeason()
 
 							if showTitle: resultSeason['tvshowtitle'] = showTitle

@@ -197,6 +197,11 @@ class ProviderBase(object):
 	RequestHeaderReferer				= Networker.HeaderReferer
 	RequestHeaderLocation				= Networker.HeaderLocation
 
+	RequestCurve						= 'curve'
+	RequestCurvePrime256v1				= Networker.CurvePrime256v1
+	RequestCurveSecp384r1				= Networker.CurveSecp384r1
+	RequestCurveSecp512r1				= Networker.CurveSecp512r1
+
 	RequestCookiePhp					= Networker.CookiePhp
 
 	RequestLink							= 'link'
@@ -2732,7 +2737,7 @@ class ProviderBase(object):
 		return self.scrape(id = ProviderBase.ScrapePriority, settings = settings)
 
 	def scrapePrioritySet(self, priority, settings = True):
-		return self.scrape(id = ProviderBase.ScrapePriority, settings = settings, value = priority)
+		return self.scrapeSet(id = ProviderBase.ScrapePriority, settings = settings, value = priority)
 
 	@classmethod
 	def scrapePriorityInitialize(self, default = None):
@@ -2754,7 +2759,7 @@ class ProviderBase(object):
 		return self.scrape(id = ProviderBase.ScrapeTermination, settings = settings)
 
 	def scrapeTerminationSet(self, value, settings = True):
-		return self.scrape(id = ProviderBase.ScrapeTermination, settings = settings, value = value)
+		return self.scrapeSet(id = ProviderBase.ScrapeTermination, settings = settings, value = value)
 
 	@classmethod
 	def scrapeTerminationInitialize(self, default = None):
@@ -2778,7 +2783,7 @@ class ProviderBase(object):
 		return (factor * result) if result else result
 
 	def scrapeTimeSet(self, value, settings = True):
-		return self.scrape(id = ProviderBase.ScrapeTime, settings = settings, value = value)
+		return self.scrapeSet(id = ProviderBase.ScrapeTime, settings = settings, value = value)
 
 	@classmethod
 	def scrapeTimeInitialize(self, default = None):
@@ -2802,15 +2807,15 @@ class ProviderBase(object):
 		return result
 
 	def scrapeQuerySet(self, value, settings = True):
-		return self.scrape(id = ProviderBase.ScrapeQuery, settings = settings, value = value)
+		return self.scrapeSet(id = ProviderBase.ScrapeQuery, settings = settings, value = value)
 
 	def scrapeQueryHas(self):
 		return self.scrapeHas(id = ProviderBase.ScrapeQuery)
 
-	def scrapeQueryIncrease(self):
+	def scrapeQueryIncrease(self, value = 1):
 		id = self.idInstance()
 		if not id in ProviderBase.ScrapeCountQuery: ProviderBase.ScrapeCountQuery[id] = 0
-		ProviderBase.ScrapeCountQuery[id] += 1
+		ProviderBase.ScrapeCountQuery[id] += value
 
 	def scrapeQueryAllow(self, increase = False):
 		if self.verifyBusy(): return True
@@ -2844,15 +2849,15 @@ class ProviderBase(object):
 		return result
 
 	def scrapePageSet(self, value, settings = True):
-		return self.scrape(id = ProviderBase.ScrapePage, settings = settings, value = value)
+		return self.scrapeSet(id = ProviderBase.ScrapePage, settings = settings, value = value)
 
 	def scrapePageHas(self):
 		return self.scrapeHas(id = ProviderBase.ScrapePage)
 
-	def scrapePageIncrease(self):
+	def scrapePageIncrease(self, value = 1):
 		id = self.idInstance()
 		if not id in ProviderBase.ScrapeCountPages: ProviderBase.ScrapeCountPages[id] = 0
-		ProviderBase.ScrapeCountPages[id] += 1
+		ProviderBase.ScrapeCountPages[id] += value
 
 	def scrapePageAllow(self, increase = False):
 		if self.verifyBusy(): return True
@@ -2886,15 +2891,15 @@ class ProviderBase(object):
 		return result
 
 	def scrapeRequestSet(self, value, settings = True):
-		return self.scrape(id = ProviderBase.ScrapeRequest, settings = settings, value = value)
+		return self.scrapeSet(id = ProviderBase.ScrapeRequest, settings = settings, value = value)
 
 	def scrapeRequestHas(self):
 		return self.scrapeHas(id = ProviderBase.ScrapeRequest)
 
-	def scrapeRequestIncrease(self):
+	def scrapeRequestIncrease(self, value = 1):
 		id = self.id()
 		if not id in ProviderBase.ScrapeCountRequests: ProviderBase.ScrapeCountRequests[id] = 0
-		ProviderBase.ScrapeCountRequests[id] += 1
+		ProviderBase.ScrapeCountRequests[id] += value
 
 	def scrapeRequestAllow(self, increase = False):
 		if self.verifyBusy(): return True

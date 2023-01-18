@@ -33,6 +33,7 @@ from lib.modules.account import Trakt as Account
 TraktId = None
 TraktClient = None
 TraktAccount = None
+TraktLimit = None
 
 def reset(settings = True):
 	if settings:
@@ -60,7 +61,7 @@ def getTraktToken():
 def getTraktRefresh():
 	return getTraktAccount().dataRefresh()
 
-def getTrakt(url, post = None, cache = True, check = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong):
+def getTrakt(url, post = None, cache = True, check = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong, limit = None):
 	try:
 		if not url.startswith('https://api.trakt.tv'):
 			url = network.Networker.linkJoin('https://api.trakt.tv', url)
@@ -102,7 +103,14 @@ def getTrakt(url, post = None, cache = True, check = True, timestamp = None, ext
 		# Sometimes Trakt returns an HTML page containing something like: <title>api.trakt.tv | 502: Bad gateway</title>
 		# This is typically a temporay problem, sometimes only lasting a few seconds/minutes.
 		# Might be a Cloudflare redirection issue, or maybe a Trakt server restart.
-		if (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
+		if code == 429:
+			limit = _limit(url = url, data = result, wait = limit)
+			if limit:
+				return getTrakt(url = url, post = post, cache = cache, check = check, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
+			else:
+				if extended: return None, result['headers'], result['error']
+				else: return None
+		elif (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
 			_error(url = url, post = post, timestamp = timestamp, message = 33676)
 			if extended: return None, result['headers'], result['error']
 			else: return None
@@ -126,7 +134,14 @@ def getTrakt(url, post = None, cache = True, check = True, timestamp = None, ext
 			except: code = None
 		data = network.Networker.dataText(result['data'])
 
-		if (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
+		if code == 429:
+			limit = _limit(url = url, data = result, wait = limit)
+			if limit:
+				return getTrakt(url = url, post = post, cache = cache, check = check, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
+			else:
+				if extended: return None, result['headers'], result['error']
+				else: return None
+		elif (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
 			_error(url = url, post = post, timestamp = timestamp, message = 33676)
 			if extended: return None, result['headers'], result['error']
 			else: return None
@@ -177,6 +192,46 @@ def _cacheProcess():
 		item = Cache.instance().traktRetrieve()
 		if not item: break
 		getTrakt(url = item['link'], post = tools.Converter.jsonFrom(item['data']) if item['data'] else None, cache = True, check = False, timestamp = item['time'])
+
+def _limit(url = None, data = None, wait = False):
+	# https://trakt.docs.apiary.io/#introduction/rate-limiting
+	# Trakt does not strictly enforce these limits. Sometimes a few thousand requests can be made before Trakt returns HTTP 429.
+
+	try: limit = tools.Converter.jsonFrom(data['headers']['X-Ratelimit'])
+	except: limit = None
+	try: seconds = int(data['headers']['Retry-After'])
+	except: seconds = None
+
+	if wait is None:
+		global TraktLimit
+		wait = TraktLimit
+		if wait is None and not seconds is None:
+			if (limit and 'name' in limit and limit['name'] == 'AUTHED_API_POST_LIMIT'):
+				wait = 10 # Retry 10 times, sincer this is important (eg update watched status, progress, etc).
+			elif (seconds < 2):
+				wait = 1 # Retry only once, and then fail.
+
+	if wait and not seconds is None:
+		seconds += (0.5 if seconds < 3 else 1 if seconds < 10 else 2)
+		if wait is True: retry = 'an infinite number of times'
+		elif wait == 1: retry = '1 time'
+		else: retry = '%d times' % wait
+
+		tools.Logger.log('Trakt rate limit reached. Retrying %s in %d secs.' % (retry, seconds))
+		tools.Logger.log('     Link: %s' % str(url))
+		tools.Logger.log('     Response: %s' % tools.Converter.jsonTo(limit))
+
+		tools.Time.sleep(seconds)
+		return max(0, limit - 1) if tools.Tools.isInteger(limit) else True
+	else:
+		tools.Logger.log('Trakt rate limit reached. Aborting request without retrying.')
+		tools.Logger.log('     Link: %s' % str(url))
+		tools.Logger.log('     Response: %s' % tools.Converter.jsonTo(limit))
+		return False
+
+def _limitEnable(enabled = True):
+	global TraktLimit
+	TraktLimit = enabled
 
 def authentication(settings = True):
 	def _authenticationInitiate():

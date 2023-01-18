@@ -4357,14 +4357,14 @@ class WindowOptimization(WindowStep):
 		self.mPreferencesLabel = self._addLabel(text = '', x = x, y = y, width = dimension[0], height = 50, alignment = Window.AlignmentCenter, size = interface.Font.fontMedium(), bold = True)
 
 
-class WindowMetadata(WindowStep):
+class WindowMetaDetail(WindowStep):
 
 	DetailNone		= 0
 	DetailPartial	= 1
 	DetailComplete	= 2
 
 	def __init__(self, stepper = False, **kwargs):
-		super(WindowMetadata, self).__init__(title = 33161, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
+		super(WindowMetaDetail, self).__init__(title = 33161, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
 
 		from lib.meta.tools import MetaTools
 		self.mDetail = MetaTools.instance().settingsDetail()
@@ -4377,64 +4377,67 @@ class WindowMetadata(WindowStep):
 		self.mLevels = {
 			tools.Media.TypeMovie : {
 				MetaTools.DetailEssential : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailNone,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailNone,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailNone,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailNone,
 				},
 				MetaTools.DetailStandard : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailNone,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailComplete,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailNone,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailComplete,
 				},
 				MetaTools.DetailExtended : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailNone,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailComplete,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailNone,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailComplete,
 				},
 			},
 			tools.Media.TypeShow : {
 				MetaTools.DetailEssential : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailNone,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailNone,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailNone,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailNone,
 				},
 				MetaTools.DetailStandard : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailNone,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailComplete,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailNone,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailComplete,
 				},
 				MetaTools.DetailExtended : {
-					MetaTools.ProviderImdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTrakt		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderTmdb		: WindowMetadata.DetailPartial,
-					MetaTools.ProviderTvdb		: WindowMetadata.DetailComplete,
-					MetaTools.ProviderFanart	: WindowMetadata.DetailComplete,
+					MetaTools.ProviderImdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderTmdb		: WindowMetaDetail.DetailPartial,
+					MetaTools.ProviderTvdb		: WindowMetaDetail.DetailComplete,
+					MetaTools.ProviderFanart	: WindowMetaDetail.DetailComplete,
 				},
 			},
 		}
 
 	def _initializeEnd2(self):
-		super(WindowMetadata, self)._initializeEnd2()
+		super(WindowMetaDetail, self)._initializeEnd2()
 		self._setMetadata()
 
 	@classmethod
 	def show(self, wait = False, stepper = False, helper = False, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, **kwargs):
-		if not stepper:
+		callbackNexter = callbackNext # Otherwise lambda below has problems with callbackNext being the lambda function and the parameter inside the lambda function.
+		if stepper:
+			callbackNext = lambda : self._actionApply(close = False, callback = callbackNexter)
+		else:
 			navigationBack = False
 			navigationNext = {'label' : 33832, 'icon' : 'check'}
-			if callbackNext is None: callbackNext = self.close
+			callbackNext = lambda : self._actionApply(close = True, callback = callbackNexter)
 
-		return super(WindowMetadata, self).show(wait = wait, stepper = stepper, helper = helper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
+		return super(WindowMetaDetail, self).show(wait = wait, stepper = stepper, helper = helper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
 
 	def _actionHelp(self):
 		self._help(items = [
@@ -4508,6 +4511,22 @@ class WindowMetadata(WindowStep):
 			]},
 		])
 
+	@classmethod
+	def _actionApply(self, close = False, callback = None):
+		from lib.meta.tools import MetaTools
+
+		instance = self.instance()
+		apply = True
+
+		def _apply():
+			if close: instance.close()
+			if callback: callback()
+
+		if instance.mDetail == MetaTools.DetailExtended:
+			apply = interface.Dialog.option(title = 33161, message = 33839, labelConfirm = 33821, labelDeny = 32532)
+			if not apply: instance._selectMetadata(detail = MetaTools.DetailStandard)
+		if apply: _apply()
+
 	def _addItems(self):
 		self.itemAdd(item = self._addItem(label = 33015, callback = self._selectMetadata))
 		self._addSources()
@@ -4550,9 +4569,9 @@ class WindowMetadata(WindowStep):
 		self.mItems[0]['item'].setProperty('GaiaLabel', interface.Translation.string(label))
 
 		lables = {
-			WindowMetadata.DetailNone : interface.Format.font(33112, color = interface.Format.colorBad(), bold = True),
-			WindowMetadata.DetailPartial : interface.Format.font(33165, color = interface.Format.colorMedium(), bold = True),
-			WindowMetadata.DetailComplete : interface.Format.font(33166, color = interface.Format.colorGood(), bold = True),
+			WindowMetaDetail.DetailNone : interface.Format.font(33112, color = interface.Format.colorBad(), bold = True),
+			WindowMetaDetail.DetailPartial : interface.Format.font(33165, color = interface.Format.colorMedium(), bold = True),
+			WindowMetaDetail.DetailComplete : interface.Format.font(33166, color = interface.Format.colorGood(), bold = True),
 		}
 		for media in self.mSources.keys():
 			for provider in self.mSources[media].keys():
@@ -4560,12 +4579,219 @@ class WindowMetadata(WindowStep):
 				label = interface.Format.font(label + ': ', bold = True) + lables[self.mLevels[media][self.mDetail][provider]]
 				self._setLabel(control = self.mSources[media][provider], text = label)
 
-	def _selectMetadata(self):
+	def _selectMetadata(self, detail = None):
 		from lib.meta.tools import MetaTools
-		index = MetaTools.Details.index(self.mDetail) + 1
+
+		if detail is None: index = MetaTools.Details.index(self.mDetail) + 1
+		else: index = MetaTools.Details.index(detail)
+
 		if index >= len(MetaTools.Details): index = 0
 		self.mDetail = MetaTools.Details[index]
 		MetaTools.settingsDetailSet(self.mDetail)
+		self._setMetadata()
+
+
+class WindowMetaExternal(WindowStep):
+
+	Statistics = None
+
+	SizeDownload = 104857600 # 100 MB
+	SizeStorage = 629145600 # 600 MB
+	SizeMinimum = 262144000 # 250 MB
+	SizeRecommended = 524288000 # 500 MB
+
+	def __init__(self, stepper = False, **kwargs):
+		super(WindowMetaExternal, self).__init__(title = 33301, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
+
+		self.mControlDescription = None
+
+		from lib.meta.tools import MetaTools
+		metatools = MetaTools.instance()
+
+		self.mEnabled = None if metatools.settingsExternalHas() else metatools.settingsExternal()
+		self.mInstalled = tools.Extension.installed(id = tools.Extension.IdGaiaMetadata, enabled = False)
+		self.mSize = tools.Extension.size(id = tools.Extension.IdGaiaMetadata)
+
+	def _initializeEnd2(self):
+		super(WindowMetaExternal, self)._initializeEnd2()
+		self._setMetadata()
+
+	@classmethod
+	def show(self, wait = False, stepper = False, helper = False, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, **kwargs):
+		self.prepare()
+
+		callbackNexter = callbackNext # Otherwise lambda below has problems with callbackNext being the lambda function and the parameter inside the lambda function.
+		if stepper:
+			callbackNext = lambda : self._actionApply(close = False, callback = callbackNexter)
+		else:
+			navigationBack = False
+			navigationNext = {'label' : 33832, 'icon' : 'check'}
+			callbackNext = lambda : self._actionApply(close = True, callback = callbackNexter)
+
+		return super(WindowMetaExternal, self).show(wait = wait, stepper = stepper, helper = helper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
+
+	@classmethod
+	def prepare(self, update = True, wait = False):
+		if WindowMetaExternal.Statistics is None:
+			thread = Pool.thread(target = self._prepare, kwargs = {'update' : update}, start = True)
+			if wait: thread.join()
+
+	@classmethod
+	def _prepare(self, update = True):
+		if WindowMetaExternal.Statistics is None:
+			#WindowMetaExternal.Statistics = {"version":"6.1.0~beta1","time":1673445472,"size":{"compressed":91867561,"uncompressed":559236897},"data":{"count":{"movie":21140,"set":0,"show":10497,"season":16155,"episode":45133},"size":{"movie":149786624,"set":4096,"show":158257152,"season":75292672,"episode":171491328}}}
+			WindowMetaExternal.Statistics = tools.Extension.statistics(id = tools.Extension.IdGaiaMetadata)
+			if update:
+				try: self.instance()._setMetadata()
+				except: pass
+
+	@classmethod
+	def _storage(self):
+		return tools.Hardware.storage()
+
+	def _actionHelp(self):
+		self._help(items = [
+			{'type' : 'title', 'value' : 'Preprocessed Metadata', 'break' : 2},
+			{'type' : 'text', 'value' : 'Menus containing movies or shows can take a long time to load the first time they are opened, since a lot of metadata has to be retrieved in the background. Especially if you have [I]Extended Detail[/I]  enabled, metadata has to be retrieved from a range of different providers, which can result in 100s or sometimes even 1000s of requests per menu page. For some show or episode menus this can take upwards of a few minutes on some devices. Once the menu was loaded, all metadata is cached locally, and menus can then be reloaded in only a few seconds or less.', 'break' : 2},
+			{'type' : 'text', 'value' : 'To mitigate the long initial menu loading times, you can install the [I]Gaia Metadata[/I]  addon. This addon contains a large database or preprocessed [I]Extended[/I]  metadata in [I]English[/I]. If you have this addon installed and a menu is opened for the first time, Gaia will first check your local metadata database, and if the items cannot be found there, it will use the preprocessed database instead. This allows for substantially faster menu loading, if and only if the movies or shows in the menu are present in the preprocessed database. Newer or less-known movies or shows might not be in the preprocessed database and will still require longer loading times. If data is retrieved from the preprocessed database, Gaia will still make a background request to retrieve updated metadata according to your language and country settings. The newly retrieved metadata is stored it in the local database and used the next time you open the menu. This metadata refreshing happens in the background in order not to hold up the menu loading.', 'break' : 2},
+			{'type' : 'text', 'value' : 'The preprocessed database is only a fallback. Gaia will functional fully, even if the [I]Gaia Metadata[/I]  addon is not installed. In this case, Gaia will only use the locally generated metadata, which might result in longer loading times if the metadata is not yet cached.', 'break' : 2},
+			{'type' : 'text', 'value' : 'Note that the [I]Gaia Metadata[/I]  addon requires a substantial amount of free disk space. If you have previously installed the addon and want to uninstall it to free up space, it is not enough to just disable the option in Gaia\'s settings. You will also have to manually uninstall the addon using the dependency manager under Kodi\'s system settings.', 'break' : 2},
+		])
+
+	@classmethod
+	def _actionApply(self, close = False, callback = None):
+		from lib.meta.tools import MetaTools
+		from lib.modules.convert import ConverterSize
+
+		instance = self.instance()
+		apply = True
+		title = 33301
+
+		def _apply():
+			if close: instance.close()
+			if callback: callback()
+
+		try:
+			storage = self._storage()
+			storageRemaining = storage['usage']['free']['bytes'] - WindowMetaExternal.Statistics['size']['uncompressed']
+			storageFree = interface.Format.fontBold(ConverterSize(storage['usage']['free']['bytes']).stringOptimal())
+			storageRequired = interface.Format.fontBold(ConverterSize(WindowMetaExternal.Statistics['size']['uncompressed']).stringOptimal())
+		except:
+			storageRemaining = 0
+			storageFree = interface.Format.fontBold(33387)
+			storageRequired = interface.Format.fontBold(33387)
+
+		try:
+			if instance.mEnabled:
+				if not instance.mInstalled:
+					message = None
+					if storageRemaining <= 0: message = 33556
+					elif storageRemaining <= WindowMetaExternal.SizeMinimum: message = 33557
+					elif storageRemaining <= WindowMetaExternal.SizeRecommended: message = 33558
+					if message:
+						message = interface.Translation.string(message) % (storageFree, storageRequired)
+						apply = interface.Dialog.option(title = title, message = message, labelConfirm = 33821, labelDeny = 33743)
+			else:
+				if instance.mInstalled:
+					message = interface.Translation.string(33560) % (interface.Format.fontItalic(tools.Extension.IdGaiaMetadata), storageRequired)
+					interface.Dialog.confirm(title = title, message = message)
+				elif storageRemaining > WindowMetaExternal.SizeRecommended:
+					message = interface.Translation.string(33559) % storageFree
+					if interface.Dialog.option(title = title, message = message, labelConfirm = 33821, labelDeny = 33743): return _apply()
+					else: apply = False
+		except: tools.Logger.error()
+
+		if apply:
+			if tools.Extension.installed(id = tools.Extension.IdGaiaMetadata, enabled = True): _apply()
+			else: tools.Extension.enable(id = tools.Extension.IdGaiaMetadata, confirm = tools.Extension.ConfirmDisabled, notification = True, action = _apply, wait = True)
+		else:
+			instance._selectMetadata()
+
+	def _addItems(self):
+		self.itemAdd(item = self._addItem(label = 33015, callback = self._selectMetadata))
+
+	def _setMetadata(self):
+		try:
+			storage = self._storage()
+			storageRemaining = storage['usage']['free']['bytes'] - WindowMetaExternal.Statistics['size']['uncompressed']
+		except:
+			storage = None
+			storageRemaining = -1
+
+		# If the user has not enabled/disabled this setting yet, use the free disk space value to determine the default value.
+		if self.mEnabled is None and storageRemaining > 0: self.mEnabled = storageRemaining > WindowMetaExternal.SizeRecommended
+
+		if self.mEnabled:
+			from lib.modules.convert import ConverterSize
+
+			icon = 'checked'
+			label = 32301
+			labels = [
+				[interface.Translation.string(33542) % self._highlight(interface.Translation.string(33553)), interface.Translation.string(33541) % (self._highlight(interface.Translation.string(33547)), self._highlight(interface.Translation.string(33548)))],
+				[],
+				[],
+				[],
+			]
+
+			if self.mInstalled:
+				labels[2].append(33545)
+				labels[2].append(interface.Translation.string(33546) % self._highlight(ConverterSize(self.mSize).stringOptimal()) if self.mSize else interface.Translation.string(33387))
+			else:
+				try: sizeDownload = WindowMetaExternal.Statistics['size']['compressed']
+				except: sizeDownload = WindowMetaExternal.SizeDownload
+				sizeDownload = ConverterSize(sizeDownload).stringOptimal()
+				try: sizeStorage = WindowMetaExternal.Statistics['size']['uncompressed']
+				except: sizeStorage = WindowMetaExternal.SizeStorage
+				sizeStorage = ConverterSize(sizeStorage).stringOptimal()
+
+				labels[2].append(interface.Translation.string(33543) % self._highlight(sizeDownload))
+				labels[2].append(interface.Translation.string(33544) % self._highlight(sizeStorage))
+
+			for i in [(tools.Media.TypeMovie, 32001), (tools.Media.TypeSet, 33527), (tools.Media.TypeShow, 32002), (tools.Media.TypeSeason, 32054), (tools.Media.TypeEpisode, 32326)]:
+				try:
+					if WindowMetaExternal.Statistics['data']['count'][i[0]] > 0:
+						labels[1].append('%s %s' % (self._highlight(tools.Math.thousand(WindowMetaExternal.Statistics['data']['count'][i[0]])), interface.Translation.string(i[1])))
+				except: pass
+
+			try:
+				storageTotal = self._highlight(storage['usage']['total']['label'])
+				storageFree = storage['usage']['free']['label']
+
+				if WindowMetaExternal.Statistics:
+					if storageRemaining <= 0: storageFree = interface.Format.color(storageFree, color = interface.Format.colorBad())
+					elif storageRemaining <= WindowMetaExternal.SizeMinimum: storageFree = interface.Format.color(storageFree, color = interface.Format.colorPoor())
+					elif storageRemaining <= WindowMetaExternal.SizeRecommended: storageFree = interface.Format.color(storageFree, color = interface.Format.colorMedium())
+					else: storageFree = self._highlight(storageFree)
+				else: storageFree = self._highlight(storageFree)
+
+				labels[3] = (interface.Translation.string(33555).replace('%s', '*').title().replace('*', '%s') % (storageFree, storageTotal)) + ' ' + interface.Translation.string(33350)
+			except:
+				tools.Logger.error()
+		else:
+			icon = 'unchecked'
+			label = 32302
+			labels = [
+				[interface.Translation.string(33542) % self._highlight(interface.Translation.string(33554)), interface.Translation.string(33549) % self._highlight(interface.Translation.string(33548))],
+				[interface.Translation.string(33550) % self._highlight(interface.Translation.string(33342))],
+				[interface.Translation.string(33551) % self._highlight(interface.Translation.string(33342))],
+				[interface.Translation.string(33552) % self._highlight(interface.Translation.string(33342))],
+			]
+
+		item = self.mItems[0]['item']
+		item.setProperty('GaiaIcon', self._pathImage(['check', icon]))
+		item.setProperty('GaiaLabel', interface.Translation.string(label))
+
+		counter = 0
+		for i in labels:
+			if i:
+				counter += 1
+				item.setProperty('GaiaLabel%d' % counter, interface.Format.iconJoin(i))
+		for i in range(counter + 1, 5): item.setProperty('GaiaLabel%d' % i, '')
+
+	def _selectMetadata(self):
+		from lib.meta.tools import MetaTools
+		self.mEnabled = not self.mEnabled
+		MetaTools.settingsExternalSet(self.mEnabled)
 		self._setMetadata()
 
 
@@ -4973,7 +5199,7 @@ class WindowWizard(object):
 	ActionClosed = None
 
 	# Also used by WindowOptimization.
-	ProgressOptimization = {'introduction' : 60, 'diagnostics' : 65, 'rating' : 70, 'preferences' : 75}
+	ProgressOptimization = {'introduction' : 70, 'diagnostics' : 73, 'rating' : 76, 'preferences' : 78}
 
 	PropertyInitial = 'internal.initial.wizard'
 
@@ -5045,6 +5271,9 @@ class WindowWizard(object):
 		WindowAttribution.prepare(wait = False)
 		WindowDonation.prepare(wait = False)
 
+		# Get statistics for metadata addon, so that they are hopefully ready once we get to those windows.
+		WindowMetaExternal.prepare(wait = False)
+
 		# Some of the accounts take long to initialize (create an instance), since they import external modules or addons (eg: YouTube and Orion).
 		# This takes a few 100 ms and when the window is loaded, for a fraction of a second the window is empty while all the imports happen.
 		# Prepare will import all the modules, making subsequent window loading faster.
@@ -5071,29 +5300,36 @@ class WindowWizard(object):
 	@classmethod
 	def showLanguage(self):
 		WindowWizard.Window = WindowWizardLanguage
-		WindowWizardLanguage.show(progress = 20, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showIntro, callbackNext = self.showMetadata)
+		WindowWizardLanguage.show(progress = 20, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showIntro, callbackNext = self.showMetaDetail)
 		WindowWizardIntro.close()
-		WindowMetadata.close()
+		WindowMetaDetail.close()
 		tools.Disclaimer.agree()
 
 	@classmethod
-	def showMetadata(self):
-		WindowWizard.Window = WindowMetadata
-		WindowMetadata.show(progress = 30, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showLanguage, callbackNext = self.showAccount)
+	def showMetaDetail(self):
+		WindowWizard.Window = WindowMetaDetail
+		WindowMetaDetail.show(progress = 30, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showLanguage, callbackNext = self.showMetaExternal)
 		WindowWizardLanguage.close()
+		WindowMetaExternal.close()
+
+	@classmethod
+	def showMetaExternal(self):
+		WindowWizard.Window = WindowMetaExternal
+		WindowMetaExternal.show(progress = 40, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaDetail, callbackNext = self.showAccount)
+		WindowMetaDetail.close()
 		WindowWizardAccount.close()
 
 	@classmethod
 	def showAccount(self):
 		WindowWizard.Window = WindowWizardAccount
-		WindowWizardAccount.show(progress = 40, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetadata, callbackNext = self.showPremium)
-		WindowMetadata.close()
+		WindowWizardAccount.show(progress = 50, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaExternal, callbackNext = self.showPremium)
+		WindowMetaExternal.close()
 		WindowWizardPremium.close()
 
 	@classmethod
 	def showPremium(self):
 		WindowWizard.Window = WindowWizardPremium
-		WindowWizardPremium.show(progress = 50, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccount, callbackNext = self.showOptimization)
+		WindowWizardPremium.show(progress = 60, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccount, callbackNext = self.showOptimization)
 		WindowWizardAccount.close()
 		WindowOptimization.close()
 

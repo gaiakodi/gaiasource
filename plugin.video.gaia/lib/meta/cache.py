@@ -20,7 +20,7 @@
 
 from lib.modules.database import Database
 from lib.modules.concurrency import Lock
-from lib.modules.tools import Media, Time, Tools, Language, Country, Converter, Logger
+from lib.modules.tools import Media, Time, Tools, Language, Country, Converter, Logger, File, System, Settings
 from lib.meta.tools import MetaTools
 
 class MetaCache(Database):
@@ -39,6 +39,7 @@ class MetaCache(Database):
 	TypeShow			= Media.TypeShow
 	TypeSeason			= Media.TypeSeason
 	TypeEpisode			= Media.TypeEpisode
+	Types				= [TypeMovie, TypeSet, TypeShow, TypeSeason, TypeEpisode]
 
 	RefreshNone			= None
 	RefreshForeground	= 'foreground'
@@ -49,6 +50,7 @@ class MetaCache(Database):
 	StatusObsolete		= 'obsolete'	# Available in database, but is outdated and needs a foreground refresh.
 	StatusSettings		= 'settings'	# Available in database, but with a different settings configuration.
 	StatusIncomplete	= 'incompelte'	# Available in database, but is partial data and needs a background refresh.
+	StatusExternal		= 'external'	# Available in external preprocessed database, but might be outdated or not according to the user's settings and therefore needs a background refresh.
 	StatusInvalid		= 'invalid'		# Not in database at all.
 
 	# When the data outdated and should be refreshed in the background while the old cached data is still returned and displayed.
@@ -63,12 +65,13 @@ class MetaCache(Database):
 	# Keep this at a very long time, since one can always show the new data by reloading the menu after it wass refreshed in the background.
 	TimeObsolete		= 31556952		# 1 Year.
 	TimeObsoleteMovie	= TimeObsolete
-	TimeObsoleteSet	= TimeObsolete
+	TimeObsoleteSet		= TimeObsolete
 	TimeObsoleteShow	= TimeObsolete
 	TimeObsoleteSeason	= TimeObsolete
 	TimeObsoleteEpisode	= TimeObsolete
 
 	Instance			= None
+	External			= None
 	Settings			= None
 	Lock				= Lock()
 
@@ -89,7 +92,7 @@ class MetaCache(Database):
 
 	def _initialize(self):
 		self._create('''
-			CREATE TABLE IF NOT EXISTS %s
+			CREATE TABLE IF NOT EXISTS `%s`
 			(
 				time INTEGER,
 				complete BOOLEAN,
@@ -104,10 +107,15 @@ class MetaCache(Database):
 
 				data TEXT,
 
-				UNIQUE(settings, idImdb, idTmdb)
+				PRIMARY KEY(settings, idImdb, idTmdb)
 			);
 			''' % MetaCache.TypeMovie,
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTmdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTmdb);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeMovie, MetaCache.TypeMovie))
+
 		self._create('''
 			CREATE TABLE IF NOT EXISTS `%s`
 			(
@@ -124,12 +132,14 @@ class MetaCache(Database):
 
 				data TEXT,
 
-				UNIQUE(settings, idTmdb)
+				PRIMARY KEY(settings, idTmdb)
 			);
 			''' % MetaCache.TypeSet,
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idTmdb);' % (MetaCache.TypeSet, MetaCache.TypeSet))
+
 		self._create('''
-			CREATE TABLE IF NOT EXISTS %s
+			CREATE TABLE IF NOT EXISTS `%s`
 			(
 				time INTEGER,
 				complete BOOLEAN,
@@ -144,12 +154,18 @@ class MetaCache(Database):
 
 				data TEXT,
 
-				UNIQUE(settings, idImdb, idTvdb)
+				PRIMARY KEY(settings, idImdb, idTvdb)
 			);
 			''' % MetaCache.TypeShow,
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze);' % (MetaCache.TypeShow, MetaCache.TypeShow))
+
 		self._create('''
-			CREATE TABLE IF NOT EXISTS %s
+			CREATE TABLE IF NOT EXISTS `%s`
 			(
 				time INTEGER,
 				complete BOOLEAN,
@@ -164,12 +180,18 @@ class MetaCache(Database):
 
 				data TEXT,
 
-				UNIQUE(settings, idImdb, idTvdb)
+				PRIMARY KEY(settings, idImdb, idTvdb)
 			);
 			''' % MetaCache.TypeSeason,
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze);' % (MetaCache.TypeSeason, MetaCache.TypeSeason))
+
 		self._create('''
-			CREATE TABLE IF NOT EXISTS %s
+			CREATE TABLE IF NOT EXISTS `%s`
 			(
 				time INTEGER,
 				complete BOOLEAN,
@@ -186,10 +208,15 @@ class MetaCache(Database):
 
 				data TEXT,
 
-				UNIQUE(settings, idImdb, idTvdb, season)
+				PRIMARY KEY(settings, idImdb, idTvdb, season)
 			);
 			''' % MetaCache.TypeEpisode,
 		)
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_1 ON `%s`(idImdb, idTvdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_2 ON `%s`(idImdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_3 ON `%s`(idTvdb, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_4 ON `%s`(idTrakt, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
+		self._create('CREATE INDEX IF NOT EXISTS %s_index_5 ON `%s`(idTvmaze, season);' % (MetaCache.TypeEpisode, MetaCache.TypeEpisode))
 
 	##############################################################################
 	# RESET
@@ -199,6 +226,7 @@ class MetaCache(Database):
 	def reset(self, settings = True):
 		if settings:
 			MetaCache.Settings = None
+			MetaCache.External = None
 
 	##############################################################################
 	# SETTINGS
@@ -314,6 +342,35 @@ class MetaCache(Database):
 		except: season = None
 		return season
 
+	@classmethod
+	def _external(self):
+		if MetaCache.External is None:
+			MetaCache.Lock.acquire()
+			if MetaCache.External is None:
+				try:
+					path = File.joinPath(System.pathMetadata(), 'resources', 'data', 'metadata.db')
+					if File.exists(path):
+						if MetaTools.instance().settingsExternal():
+							MetaCache.External = Database(path = path)
+						else:
+							Logger.log('Preprocessed Metadata setting disabled although the Gaia Metadata addon is installed. Menus might load faster if you enable the Preprocessed Metadata setting.')
+							MetaCache.External = False
+					else:
+						MetaCache.External = False
+				except:
+					Logger.error()
+					MetaCache.External = False
+			MetaCache.Lock.release()
+		return MetaCache.External
+
+	@classmethod
+	def _externalEnable(self):
+		MetaCache.External = None
+
+	@classmethod
+	def _externalDisable(self):
+		MetaCache.External = False
+
 	##############################################################################
 	# INSERT
 	##############################################################################
@@ -329,32 +386,32 @@ class MetaCache(Database):
 			# Especially Trakt sometimes returns the incorrect IMDb/TMDb/TVDb ID, specfically for less-known titles or newley/not-yet released titles.
 			# First lookup with all available IDs and if not found, try to use individual IDs if order of importance.
 			if typeMovie:
-				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
-				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTmdb = ?;' % type
-				queryDelete2 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTmdb IS NULL;' % type
-				queryDelete3 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTmdb = ?;' % type
-				queryDelete4 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTmdb IS NULL AND idTvmaze = ?;' % type
+				queryInsert = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTmdb = ?;' % type
+				queryDelete2 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTmdb IS NULL;' % type
+				queryDelete3 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTmdb = ?;' % type
+				queryDelete4 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTmdb IS NULL AND idTvmaze = ?;' % type
 			elif typeSet:
-				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
-				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idTmdb = ?;' % type
+				queryInsert = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM `%s` WHERE settings = ? AND idTmdb = ?;' % type
 			elif typeShow:
-				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
-				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb = ?;' % type
-				queryDelete2 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL;' % type
-				queryDelete3 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb = ?;' % type
-				queryDelete4 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ?;' % type
+				queryInsert = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb = ?;' % type
+				queryDelete2 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL;' % type
+				queryDelete3 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb = ?;' % type
+				queryDelete4 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ?;' % type
 			elif typeSeason:
-				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
-				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb = ?;' % type
-				queryDelete2 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL;' % type
-				queryDelete3 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb = ?;' % type
-				queryDelete4 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ?;' % type
+				queryInsert = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb = ?;' % type
+				queryDelete2 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL;' % type
+				queryDelete3 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb = ?;' % type
+				queryDelete4 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ?;' % type
 			elif typeEpisode:
-				queryInsert = 'INSERT INTO %s (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, season, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
-				queryDelete1 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb = ? AND season = ?;' % type
-				queryDelete2 = 'DELETE FROM %s WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL AND season = ?;' % type
-				queryDelete3 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb = ? AND season = ?;' % type
-				queryDelete4 = 'DELETE FROM %s WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ? AND season = ?;' % type
+				queryInsert = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug, season, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);' % type
+				queryDelete1 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb = ? AND season = ?;' % type
+				queryDelete2 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb = ? AND idTvdb IS NULL AND season = ?;' % type
+				queryDelete3 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb = ? AND season = ?;' % type
+				queryDelete4 = 'DELETE FROM `%s` WHERE settings = ? AND idImdb IS NULL AND idTvdb IS NULL AND idTvmaze = ? AND season = ?;' % type
 
 			if not Tools.isArray(items): items = [items]
 			for item in items:
@@ -366,7 +423,10 @@ class MetaCache(Database):
 						except:
 							complete = True
 							Logger.log('METACACHE: Missing "complete" attribute')
+
 						try: del item[MetaCache.Attribute]
+						except: pass
+						try: del item['temp']
 						except: pass
 
 						queryDelete = None
@@ -436,38 +496,41 @@ class MetaCache(Database):
 			typeMovie, typeSet, typeShow, typeSeason, typeEpisode = self._type(type)
 
 			timeCurrent = Time.timestamp()
-			timeOutdated = self._timeOutdated(type)
 			timeObsolete = self._timeObsolete(type)
+			timeOutdated = self._timeOutdated(type)
 
 			# Sometimes the IDs are incorrect.
 			# Especially Trakt sometimes returns the incorrect IMDb/TMDb/TVDb ID, specfically for less-known titles or newley/not-yet released titles.
 			# First lookup with all available IDs and if not found, try to use individual IDs if order of importance.
 
 			# NB: Also lookup by TVmaze ID, since some shows/episodes retrieved from TVmaze do not have a IMDb/TVDb ID.
-			# Otherwise detailed metadata is always re-retrieved for some episodes from TVmaze liststhat only have a TVmaze ID, although the data is actually in the cache.
+			# Otherwise detailed metadata is always re-retrieved for some episodes from TVmaze lists that only have a TVmaze ID, although the data is actually in the cache.
 
 			if typeMovie:
-				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND idTmdb = ? ORDER BY time DESC;' % type
-				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? ORDER BY time DESC;' % type
-				querySelect3 = 'SELECT time, complete, settings, data FROM %s WHERE idTmdb = ? ORDER BY time DESC;' % type
-				querySelect4 = 'SELECT time, complete, settings, data FROM %s WHERE idTvmaze = ? ORDER BY time DESC;' % type
+				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTmdb = ? ORDER BY time DESC;' % type
+				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? ORDER BY time DESC;' % type
+				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
+				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
 			elif typeSet:
-				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idTmdb = ? ORDER BY time DESC;' % type
+				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
 			elif typeShow:
-				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
-				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? ORDER BY time DESC;' % type
-				querySelect3 = 'SELECT time, complete, settings, data FROM %s WHERE idTvdb = ? ORDER BY time DESC;' % type
-				querySelect4 = 'SELECT time, complete, settings, data FROM %s WHERE idTvmaze = ? ORDER BY time DESC;' % type
+				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
+				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? ORDER BY time DESC;' % type
+				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? ORDER BY time DESC;' % type
+				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
+				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? ORDER BY time DESC;' % type
 			elif typeSeason:
-				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
-				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? ORDER BY time DESC;' % type
-				querySelect3 = 'SELECT time, complete, settings, data FROM %s WHERE idTvdb = ? ORDER BY time DESC;' % type
-				querySelect4 = 'SELECT time, complete, settings, data FROM %s WHERE idTvmaze = ? ORDER BY time DESC;' % type
+				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
+				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? ORDER BY time DESC;' % type
+				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? ORDER BY time DESC;' % type
+				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
+				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? ORDER BY time DESC;' % type
 			elif typeEpisode:
-				querySelect1 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND idTvdb = ? AND season = ? ORDER BY time DESC;' % type
-				querySelect2 = 'SELECT time, complete, settings, data FROM %s WHERE idImdb = ? AND season = ? ORDER BY time DESC;' % type
-				querySelect3 = 'SELECT time, complete, settings, data FROM %s WHERE idTvdb = ? AND season = ? ORDER BY time DESC;' % type
-				querySelect4 = 'SELECT time, complete, settings, data FROM %s WHERE idTvmaze = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTvdb = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? AND season = ? ORDER BY time DESC;' % type
 
 			for i in range(len(items)):
 				try:
@@ -478,7 +541,7 @@ class MetaCache(Database):
 					parameters = None
 
 					if typeMovie:
-						if idImdb or idTmdb or idTvmaze:
+						if idImdb or idTmdb or idTrakt:
 							parameters = []
 							if idImdb and idTmdb:
 								query = querySelect1
@@ -489,9 +552,9 @@ class MetaCache(Database):
 							elif idTmdb:
 								query = querySelect3
 								parameters = [idTmdb]
-							elif idTvmaze:
+							elif idTrakt:
 								query = querySelect4
-								parameters = [idTvmaze]
+								parameters = [idTrakt]
 					elif typeSet:
 						if idTmdb:
 							parameters = []
@@ -499,7 +562,7 @@ class MetaCache(Database):
 								query = querySelect1
 								parameters = [idTmdb]
 					else:
-						if idImdb or idTvdb or idTvmaze:
+						if idImdb or idTvdb or idTrakt or idTvmaze:
 							parameters = []
 							if idImdb and idTvdb:
 								query = querySelect1
@@ -510,8 +573,11 @@ class MetaCache(Database):
 							elif idTvdb:
 								query = querySelect3
 								parameters = [idTvdb]
-							elif idTvmaze:
+							elif idTrakt:
 								query = querySelect4
+								parameters = [idTrakt]
+							elif idTvmaze:
+								query = querySelect5
 								parameters = [idTvmaze]
 							if typeEpisode:
 								season = self._season(items[i])
@@ -519,6 +585,16 @@ class MetaCache(Database):
 
 					if not parameters is None:
 						datas = self._select(query = query, parameters = parameters)
+
+						# Check the external preprocessed database.
+						if not datas:
+							external = self._external()
+							if external:
+								datas = external._select(query = query.replace('time, complete, settings,', '').replace(' ORDER BY time DESC', ''), parameters = parameters)
+								if datas:
+									for j in range(len(datas)):
+										datas[j] = [timeCurrent, True, None, datas[j][0]]
+
 						if datas:
 							selection = None
 
@@ -533,10 +609,16 @@ class MetaCache(Database):
 							if not selection: selection = datas[0]
 							time = selection[0]
 
+							# Data comes from the external preprocessed database.
+							# Always force a refresh, since external data might be outdated or not according to the users settings.
+							if selection[2] is None:
+								refresh = MetaCache.RefreshBackground
+								status = MetaCache.StatusExternal
+
 							# Data is available, but the data is incomplete.
 							# Refresh in the background.
 							# This shouldn't create too much extra network requests, since the partial data that was successfully retrieved, should still be available from the normal cache.
-							if not selection[1]:
+							elif not selection[1]:
 								refresh = MetaCache.RefreshBackground
 								status = MetaCache.StatusIncomplete
 
@@ -568,3 +650,31 @@ class MetaCache(Database):
 				except: Logger.error()
 		except: Logger.error()
 		return items
+
+	##############################################################################
+	# DELETE
+	##############################################################################
+
+	def delete(self, type, setting):
+		query = 'DELETE FROM `%s` WHERE setting = ?;' % type
+		return self._delete(query = query, parameters = [setting])
+
+	##############################################################################
+	# IMPORT
+	##############################################################################
+
+	def importData(self, path, type = None):
+		database = Database(path = path)
+
+		if type is None: type = MetaCache.Types
+		elif not Tools.isArray(type): type = [type]
+
+		for i in type:
+			episode = i == MetaCache.TypeEpisode
+			values = database._select(query = 'SELECT time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug%s, data FROM `%s`;' % (', season' if episode else '', i))
+			for value in values:
+				query = 'INSERT INTO `%s` (time, complete, settings, idImdb, idTmdb, idTvdb, idTrakt, idTvmaze, idSlug%s, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?%s, ?);' % (i, ', season' if episode else '', ', ?' if episode else '')
+				self._insert(query = query, commit = False, parameters = value)
+
+		self._commit()
+		self._compress()

@@ -4020,7 +4020,7 @@ msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#33845"
-msgid "[GAIA-NO-LABEL]"
+msgid "Speedtest"
 msgstr ""
 
 msgctxt "#33846"

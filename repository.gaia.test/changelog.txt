@@ -1,5 +1,6 @@
 
 [B][/B]
+- Updated XML structure.
 - Major version upgrade.
 
 [B]5.0.0[/B]

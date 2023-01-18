@@ -3573,6 +3573,8 @@ class Context(object):
 
 	def _load(self, mode = ModeNone, items = None, media = None, kids = None, video = None, link = None, library = None, playlist = None, source = None, metadata = None, orion = None, shortcutId = None, shortcutLabel = None, shortcutLocation = None, shortcutCreate = None, shortcutDelete = None):
 		try:
+			from lib.meta.tools import MetaTools
+
 			self.mMode = mode
 			self.mItems = items if items else []
 			self.mData = None
@@ -3586,7 +3588,6 @@ class Context(object):
 			self.mPlaylist = playlist
 
 			self.mSource = source
-			self.mMetadata = metadata
 			self.mOrion = orion
 
 			self.mShortcutId = shortcutId
@@ -3612,6 +3613,11 @@ class Context(object):
 			self.mTvdb = None
 			self.mTrakt = None
 			self.mSlug = None
+
+			# Removes the current/next/previous season data to reduce time to encode/decode the metadata.
+			# I do not think that this season data is used by any functions in the context menu. The data is only used to set the images of recap/extras a menu.
+			self.mMetadata = MetaTools.reduce(metadata)
+
 			if metadata:
 				if 'query' in metadata:
 					self.mTitle = metadata['query'] # Season Extras.

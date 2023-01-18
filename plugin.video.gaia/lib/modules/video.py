@@ -778,7 +778,7 @@ class Trailer(Video, Database):
 		self.mCinemaItems = []
 
 	def _initialize(self):
-		self._create('CREATE TABLE IF NOT EXISTS %s (imdb TEXT, time INTEGER, UNIQUE(imdb));' % Trailer.Name)
+		self._create('CREATE TABLE IF NOT EXISTS %s (imdb TEXT PRIMARY KEY, time INTEGER);' % Trailer.Name)
 
 	def watched(self, imdb):
 		return self._exists('SELECT imdb FROM %s WHERE imdb = "%s";' % (Trailer.Name, imdb))

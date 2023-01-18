@@ -62,6 +62,18 @@ class MetaData(Serializer):
 	MediaEntity					= [MediaPerson, MediaCharacter, MediaCompany]
 	MediaIndividual				= [MediaPerson, MediaCharacter]
 
+	# Number
+
+	NumberOfficial				= 'official'		# Officialy aired order with episodes divided into seasons.
+	NumberAbsolute				= 'absolute'		# Absolute order without seasons where episodes are numbered sequentially.
+	NumberDisc					= 'disc'			# Order as released on DVD or BluRay.
+	NumberYear					= 'year'			# The year is used as season number. sometimes used by TVDd for daytime shows.
+	NumberRegional				= 'regional'		# TVDb.
+	NumberAlternative			= 'alternative'		# TVDb.
+	NumberAlternativeDisc		= 'alternativedisc'	# TVDb.
+	NumberDefault				= NumberOfficial
+	Numbers						= [NumberOfficial, NumberAbsolute, NumberDisc, NumberYear, NumberRegional, NumberAlternative, NumberAlternativeDisc]
+
 	# Character
 
 	CharacterTypeActor			= 'actor'
@@ -1214,7 +1226,7 @@ class MetaData(Serializer):
 	###################################################################
 
 	def item(self, media, attribute = Default, sort = Default, selection = SelectionDefault):
-		return self.dataRetrieve(type = media, attribute = attribute, sort = 'number' if sort is True else sort, order = MetaData.OrderAscending, selection = selection)
+		return self.dataRetrieve(type = media, attribute = attribute, sort = ['number', 'relative'] if sort is True else sort, order = MetaData.OrderAscending, selection = selection)
 
 	def movie(self, attribute = Default, selection = SelectionDefault):
 		return self.item(media = MetaData.MediaMovie, attribute = attribute, selection = selection)
@@ -1257,10 +1269,12 @@ class MetaData(Serializer):
 		if self.mediaShow():
 			season = self.season(number = numberSeason, excludeSeason = excludeSeason, attribute = attribute, sort = sort, selection = MetaData.SelectionList)
 			if season:
+				if season and not Tools.isList(season): season = [season] # If an individual season is set to the show when retrieving from episodes.py.
 				result = []
 				for i in season:
-					episode = i.episode(number = numberEpisode, excludeEpisode = excludeEpisode, attribute = attribute, sort = sort)
-					if episode: result.extend(episode)
+					if i: # Sometimes None.
+						episode = i.episode(number = numberEpisode, excludeEpisode = excludeEpisode, attribute = attribute, sort = sort)
+						if episode: result.extend(episode)
 				return self.dataSelect(data = result, selection = selection)
 			else: return None
 
@@ -1836,8 +1850,8 @@ class MetaData(Serializer):
 	# NUMBER
 	###################################################################
 
-	def number(self, format = Default, media = MediaDefault):
-		if media is MetaData.MediaDefault and self.mediaEpisode() and format:
+	def number(self, number = NumberDefault, format = Default, media = MediaDefault):
+		if format and media is MetaData.MediaDefault and self.mediaEpisode():
 			numberSeason = self.numberSeason()
 			numberEpisode = self.numberEpisode()
 			try:
@@ -1847,27 +1861,124 @@ class MetaData(Serializer):
 				result = Media.number(season = numberSeason, episode = numberEpisode)
 				if not result: result = Media.numberUniversal(season = numberSeason, episode = numberEpisode) # Format selected that requires the title.
 				return result
+		elif number is MetaData.Default:
+			return self.dataRetrieve(type = ['number'], media = media)
 		else:
-			result = self.dataRetrieve(type = 'number', media = media)
+			result = self.dataRetrieve(type = ['number', number], media = media)
 			if not result is None and format:
 				if format is True: result = '%01d' % result
 				else: result = format % result
 			return result
 
-	def numberSeason(self, format = Default):
-		return self.number(format = format, media = MetaData.MediaSeason)
+	def numberSeason(self, number = NumberDefault, format = Default):
+		return self.number(number = number, format = format, media = MetaData.MediaSeason)
 
-	def numberEpisode(self, format = Default):
-		return self.number(format = format, media = MetaData.MediaEpisode)
+	def numberEpisode(self, number = NumberDefault, format = Default):
+		return self.number(number = number, format = format, media = MetaData.MediaEpisode)
 
-	def numberSet(self, value, media = MediaDefault):
-		if not value is None: self.dataUpdate(data = {'number' : value}, media = media)
+	def numbers(self, media = MediaDefault):
+		return self.number(number = MetaData.Default, media = media)
 
-	def numberSeasonSet(self, value):
-		self.numberSet(value = value, media = MetaData.MediaSeason)
+	def numbersSeason(self):
+		return self.numbers(media = MetaData.MediaSeason)
 
-	def numberEpisodeSet(self, value):
-		self.numberSet(value = value, media = MetaData.MediaEpisode)
+	def numbersEpisode(self):
+		return self.numbers(media = MetaData.MediaEpisode)
+
+	def numberSet(self, value, number = NumberDefault, media = MediaDefault):
+		if not value is None: self.dataUpdate(data = {'number' : {number : value}}, media = media)
+
+	def numberSeasonSet(self, value, number = NumberDefault):
+		self.numberSet(value = value, number = number, media = MetaData.MediaSeason)
+
+	def numberEpisodeSet(self, value, number = NumberDefault):
+		self.numberSet(value = value, number = number, media = MetaData.MediaEpisode)
+
+	def numberAdjust(self):
+		try:
+			# TVDb uses the year as season number for some daytime shows.
+			# Eg: Coronation Street - https://thetvdb.com/series/coronation-street
+			# Trakt/TMDb use the default abolsute numbering starting from 0, 1, 2, etc.
+			# IMDb also uses the year.
+			# Convert years to abolsute season numbers.
+			# This function also calculates the absolute order number.
+			# UPDATE: Now TVDb updated Coronation Street. The first half of the seasons still use the year as number, the last half of the episodes use the official number.
+			# UPDATE 2: Now TVDb has updated all seasons of Coronation Street to reflect the official number.
+			if self.mediaShow():
+				seasons = self.season(sort = True)
+				if seasons:
+					minimum = 1950
+
+					if seasons and not Tools.isList(seasons): seasons = [seasons] # If an individual season is set to the show when retrieving from episodes.py.
+					numbers = [season.numberSeason() for season in seasons if season] # Sometimes None.
+					try: numbers.remove(0)
+					except: pass
+
+					if numbers and any(i >= minimum for i in numbers) and len(numbers) < minimum:
+						# Only some season numbers are years.
+						# Eg: Coronation Street
+						# Sort by the first episodes air date, since seasons do not have a release date on TVDb.
+						if not len([i for i in numbers if i >= minimum]) == len(numbers):
+							releases = []
+							for season in seasons:
+								if season.numberSeason() > 0:
+									try: release = season.episode(sort = True)[0].releaseDateFirst(format = MetaData.FormatTimestamp)
+									except: release = None # No episodes.
+									if not release: return False # Missing release dates. Cannot sort. Give up.
+									releases.append((release, season))
+							if not releases: return False
+							releases = Tools.listSort(data = releases, key = lambda i : i[0])
+							numbers = [season[1].numberSeason() for season in releases]
+							try: numbers.remove(0)
+							except: pass
+
+						temp = {}
+						counter = 0
+						for number in numbers:
+							counter += 1
+							temp[number] = counter
+						numbers = temp
+
+						for season in seasons:
+							try:
+								if season:
+									numberYear = season.numberSeason()
+									if numberYear >= minimum:
+										numberOfficial = numbers[numberYear]
+										season.numberSeasonSet(value = numberYear, number = MetaData.NumberYear)
+										season.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+										episodes = season.episode()
+										if episodes:
+											for episode in episodes:
+												if episode:
+													episode.numberSeasonSet(value = numberYear, number = MetaData.NumberYear)
+													episode.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+							except: pass
+					else:
+						# The parent season might have already gone through numberAdjust() and now has the correct season number.
+						# However, the child episodes might still have the year as season number, extracted from their own individual TVDb request.
+						# Without this, TVDb detailed episodes will have the year as season number, and if episode menus are loaded, it will show both 1x02 (Trakt/IMDb) and 1960x02 (TVDb), eg (Coronation Street S01).
+						for season in seasons:
+							if season:
+								numberOfficial = season.numberSeason()
+								episodes = season.episode()
+								if episodes:
+									for episode in episodes:
+										if episode: episode.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+
+				# Calculating the absolute episode order here does not always work.
+				# When retrieving detailed episode metadata from episodes.py, only a single season and its episodes are retrieved.
+				# That means we cannot calculate the absolute number, since episodes from other seasons are not available.
+				# We now use the numbers from the pack to set the abolsute episode number in episodes.py.
+				'''episodes = self.episode(sort = True)
+				if episodes:
+					episodes = [episode for episode in episodes if episode.numberSeason() > 0]
+					counter = 0
+					for episode in episodes:
+						counter += 1
+						if not episode.numberSeason(number = MetaData.NumberAbsolute): episode.numberSeasonSet(value = 1, number = MetaData.NumberAbsolute)
+						episode.numberEpisodeSet(value = counter, number = MetaData.NumberAbsolute)'''
+		except: Logger.error()
 
 	###################################################################
 	# LANGUAGE
@@ -2871,13 +2982,17 @@ class MetaData(Serializer):
 				media = self.mediaDefault(media = media)
 
 				# TVDb returns artwork in the main structure (eg: show) that belongs to substructures (eg: season or episode).
-				if id and self.mediaContent():
-					item = self.item(media = media, attribute = {'id' : {provider : str(id)}}, selection = MetaData.SelectionSingle)
+				if self.mediaContent():
+					if id is None:
+						try: id = item['id']
+						except: pass
+					if id:
+						item = self.item(media = media, attribute = {'id' : {provider : str(id)}}, selection = MetaData.SelectionSingle)
 
-					# TVDb has character images but they have the person ID.
-					if not item and media == MetaData.MediaCharacter: item = self.item(media = media, attribute = {'person' : {'id' : {provider : str(id)}}}, selection = MetaData.SelectionSingle)
+						# TVDb has character images but they have the person ID.
+						if not item and media == MetaData.MediaCharacter: item = self.item(media = media, attribute = {'person' : {'id' : {provider : str(id)}}}, selection = MetaData.SelectionSingle)
 
-					if item: item.imageSet(item = itemDefault, media = media)
+						if item: item.imageSet(value = itemDefault, media = media)
 
 				# Character photos should be added to the main "image" list and not the "character" list.
 				if self.mediaContent() and (self.mediaEntity(media = media) or id): media = MetaData.MediaDefault
@@ -3357,9 +3472,14 @@ class MetaData(Serializer):
 	def releaseTimeSet(self, value, zone = ZoneDefault, media = MediaDefault):
 		if value:
 			if not Tools.isInteger(value):
+				value = value.replace('24:', '00:') # Sometimes TVDb has a time like 24:30.
 				date = '2020-05-15 '
 				offset = self.releaseZoneOffsetDefault(zone = zone)
-				value = ConverterTime(date + value, offset = offset).timestamp() - ConverterTime(date + '00:00').timestamp()
+				try:
+					value = ConverterTime(date + value, offset = offset).timestamp() - ConverterTime(date + '00:00').timestamp()
+				except:
+					Logger.error(message = '%s (%s : %s)' % (str(value), str(zone), str(offset)))
+					return
 			self.dataUpdate(data = {'release' : {'time' : value}}, media = media)
 
 	###################################################################

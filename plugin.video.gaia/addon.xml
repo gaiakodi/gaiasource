@@ -5,6 +5,8 @@
 
 		<import addon="script.gaia.resources" version="9.9.9" />
 		<import addon="script.gaia.externals" version="9.9.9" />
+
+		<import addon="script.gaia.metadata" version="9.9.9" optional="true" />
 		<import addon="script.gaia.binaries" version="9.9.9" optional="true" />
 		<import addon="script.gaia.icons" version="9.9.9" optional="true" />
 		<import addon="script.gaia.skins" version="9.9.9" optional="true" />

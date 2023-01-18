@@ -32,13 +32,12 @@ class History(Database):
 		self._createAll('''
 			CREATE TABLE IF NOT EXISTS %s
 			(
-				id TEXT,
+				id TEXT PRIMARY KEY,
 				kids INTEGER,
 				time INTEGER,
 				link TEXT,
 				metadata TEXT,
-				source TEXT,
-				UNIQUE(id)
+				source TEXT
 			);
 			''',
 			[Media.TypeMovie, Media.TypeShow, Media.TypeDocumentary, Media.TypeShort]

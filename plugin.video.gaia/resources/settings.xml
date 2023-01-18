@@ -3885,10 +3885,21 @@ The label is then added to the action element:
 			<group id="metadata.general" label="32310">
 				<setting id="metadata.general.detail" type="string" label="33161" help="34465">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetadata&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaDetail&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>Standard</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="metadata.general.external" type="string" label="33301" help="34559">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaExternal&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 32302]</default>
 					<level>1</level>
 					<constraints>
 						<allowempty>true</allowempty>
@@ -5338,13 +5349,14 @@ The label is then added to the action element:
 				</setting>
 				<setting id="navigation.show.interleave.duration" type="integer" label="33255" help="34236" parent="navigation.show.interleave">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>1</default>
 					<level>2</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
-							<option label="35439">1</option>
-							<option label="35441">2</option>
+							<option label="33800">1</option>
+							<option label="35439">2</option>
+							<option label="35441">3</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -8341,6 +8353,7 @@ The label is then added to the action element:
 
 				<setting id="internal.link.website" type="string"><default>https://gaiakodi.com</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.link.api" type="string"><default>http://127.0.0.1/gaia/api</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.statistics" type="string"><default>https://raw.githubusercontent.com/gaiakodi/gaiamain/master/stats.json</default><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.link.repository" type="string"><default>https://gaiakodi.com/repo</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.link.donation" type="string"><default>https://gaiakodi.com/donate</default><level>4</level><visible>false</visible></setting>

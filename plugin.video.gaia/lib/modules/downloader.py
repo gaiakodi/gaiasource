@@ -270,7 +270,7 @@ class Downloader(Database):
 	def _initialize(self):
 		self._createAll('''
 			CREATE TABLE IF NOT EXISTS %s (
-				id TEXT,
+				id TEXT PRIMARY KEY,
 				command TEXT,
 				timeStarted INTEGER,
 				timeUpdated INTEGER,
@@ -293,8 +293,7 @@ class Downloader(Database):
 				progressSizeRemaining INTEGER,
 				progressTimeCompleted INTEGER,
 				progressTimeRemaining INTEGER,
-				progressSpeed INTEGER,
-				UNIQUE(id)
+				progressSpeed INTEGER
 			);
 			''', [Downloader.TypeManual, Downloader.TypeCache])
 

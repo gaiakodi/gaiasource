@@ -894,8 +894,8 @@ class SpeedTesterDebrid(SpeedTester):
 	def _testLatency(self):
 		latencies = []
 		for i in range(SpeedTesterDebrid.LatencyTotal):
-			response = network.Networker().request(method = network.Networker.MethodHead, link = self.mLink)
-			latencies.append(response['status']['duration'])
+			response = network.Networker().request(method = network.Networker.MethodHead, link = self.mLink, process = False)
+			latencies.append(response['duration']['connection'])
 
 		latencies.sort()
 		last = latencies[:SpeedTesterDebrid.LatencyCount]
@@ -924,13 +924,16 @@ class SpeedTesterDebrid(SpeedTester):
 			if not network.Networker.linkIs(link): # Errors returned by debrid, eg: ErrorRealDebrid
 				return None
 
-			# NB: Do not use response['status']['duration'], since it only measures the time for the reply to return, not the time it takes to download the content.
-			timer = tools.Time(start = True)
-			response = network.Networker().request(link = link)
-			duration = timer.elapsed()
-			size = len(response['data']) if response['data'] else 0
+			response = network.Networker().request(link = link, process = False)
 
-			return int((size * 8) / float(duration))
+			#size = len(response['data']) if response['data'] else 0 # Does not work anymore, since we use "process = False" above.
+			try: size = int(response['headers'][network.Networker.HeaderContentLength])
+			except: size = 0
+
+			try: duration = int(response['duration']['request'])
+			except: duration = 0
+
+			return int((size * 8) / (duration / 1000.0)) if duration else 0
 		except:
 			tools.Logger.error()
 			return None
@@ -940,7 +943,7 @@ class SpeedTesterPremiumize(SpeedTesterDebrid):
 	Name = 'Premiumize'
 
 	Link = 'https://premiumize.me'
-	LinkServer = 'http://mirror.nforce.com/pub/speedtests/10mb.bin'
+	LinkServer = 'http://mirror.nforce.com/pub/speedtests/25mb.bin'
 
 	def __init__(self):
 		SpeedTesterDebrid.__init__(self, name = SpeedTesterPremiumize.Name, link = SpeedTesterPremiumize.Link)
@@ -1043,7 +1046,7 @@ class SpeedTesterEasyNews(SpeedTester):
 
 	Name = 'EasyNews'
 
-	Download = '/test/10M?_='
+	Download = '/test/20M?_=' # Use more than 10MB for more accurate measurement.
 
 	LinkUsWest = 'https://iad-dl-01.easynews.com'
 	LinkUsEast = 'https://lax-dl-01.easynews.com'
@@ -1060,8 +1063,8 @@ class SpeedTesterEasyNews(SpeedTester):
 	def _testLatency(self):
 		latencies = []
 		for i in range(SpeedTesterEasyNews.LatencyTotal):
-			response = network.Networker().request(method = network.Networker.MethodHead, link = self.mLinkLatency)
-			latencies.append(response['status']['duration'])
+			response = network.Networker().request(method = network.Networker.MethodHead, link = self.mLinkLatency, process = False)
+			latencies.append(response['duration']['connection'])
 
 		latencies.sort()
 		last = latencies[:SpeedTesterEasyNews.LatencyCount]
@@ -1070,13 +1073,16 @@ class SpeedTesterEasyNews(SpeedTester):
 		return self.mLatency
 
 	def _testDownload(self):
-		# NB: Do not use response['status']['duration'], since it only measures the time for the reply to return, not the time it takes to download the content.
-		timer = tools.Time(start = True)
-		response = network.Networker().request(link = self.mLinkDownload)
-		duration = timer.elapsed()
-		size = len(response['data']) if response['data'] else 0
+		response = network.Networker().request(link = self.mLinkDownload, process = False)
 
-		return int((size * 8) / float(duration))
+		#size = len(response['data']) if response['data'] else 0 # Does not work anymore, since we use "process = False" above.
+		try: size = int(response['headers'][network.Networker.HeaderContentLength])
+		except: size = 0
+
+		try: duration = int(response['duration']['request'])
+		except: duration = 0
+
+		return int((size * 8) / (duration / 1000.0)) if duration else 0
 
 	def _testSelection(self):
 		options = [
