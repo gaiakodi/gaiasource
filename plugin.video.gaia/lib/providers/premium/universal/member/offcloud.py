@@ -40,7 +40,7 @@ class Provider(ProviderDebrid):
 				self.thread(self.searchRetrieve, self.core().CategoryCloud, media, titles, years, numberSeason, numberEpisode, language),
 				self.thread(self.searchRetrieve, self.core().CategoryInstant, media, titles, years, numberSeason, numberEpisode, language)
 			]
-			self.threadExecute(threads)
+			self.threadExecute(threads, limit = self.concurrencyTasks(level = 1))
 		except: self.logError()
 
 	def searchRetrieve(self, category, media, titles, years, numberSeason, numberEpisode, language):
@@ -62,7 +62,7 @@ class Provider(ProviderDebrid):
 								else: threads.append(self.thread(self.searchDetails, category, item, media, titles, years, numberSeason, numberEpisode, language))
 
 				if self.verifyBusy(): self.verifyCore()
-				else: self.threadExecute(threads)
+				else: self.threadExecute(threads, limit = self.concurrencyTasks(level = 3))
 		except: self.logError()
 
 	def searchDetails(self, category, item, media, titles, years, numberSeason, numberEpisode, language):

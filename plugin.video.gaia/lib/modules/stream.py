@@ -15728,7 +15728,7 @@ class Stream(Serializer):
 				settings = None
 				try:
 					# Only do this for re.compile, since other cache functions might be too dependent on unique data (eg: file name).
-					# Do not do for developer, since changing the regex always requires the cahce database to be cleared in order to reload the new regex.
+					# Do not do for developer, since changing the regex always requires the cache database to be cleared in order to reload the new regex.
 					# This might be problematic, since if there is an error in the code below, it will only show up in the public release.
 					# Do not cache if "internal = True", since it might contain titles or something that is not generic.
 					if Stream.CacheFile:

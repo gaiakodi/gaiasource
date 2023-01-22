@@ -1,4 +1,14 @@
 
+[B]6.1.2 (2023.01.22)[/B]
+- Reduced thread usage.
+- Changed concurrency settings.
+- Improved scraping process.
+- Improved concurrency mechanisms.
+- List previous two episodes in mixed submenus.
+- Fixed position of recap and extras menu.
+- Changed metadata addon settings.
+- Changed provider order.
+
 [B]6.1.1 (2023.01.18)[/B]
 - Fixed preprocessed metadata setting.
 - Fixed EasyNews version detection.

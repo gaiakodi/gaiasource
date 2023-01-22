@@ -1619,7 +1619,7 @@ class Core(object):
 					if titleShow and (imdb or tvdb):
 						from lib.meta.data import MetaData
 						from lib.meta.manager import MetaManager
-						items = MetaManager(MetaManager.ProviderTvdb).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
+						items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
 						if items:
 							for key, val in items.items():
 								translations[key].extend(val)
@@ -1887,6 +1887,7 @@ class Core(object):
 
 			self.cacheCount = 0
 			self.cacheBusy = 0
+			self.cacheLookup = False
 
 			self.cacheEnabled = tools.Settings.getBoolean('scrape.cache.inspection')
 			self.cacheEnabledPremiumize = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.premiumize') == 1
@@ -1978,7 +1979,7 @@ class Core(object):
 			# Can be more than actual core count, since threads in python are run on a single core.
 			# Do not use too many, otherwise Kodi begins lagging (eg: the dialog is not updated very often, and the elapsed seconds are stuck).
 			# NB: Do not use None (aka unlimited). If 500+ links are found, too many threads are started, causing a major delay by having to switch between threads. Use a limited number of threads.
-			self.threadsLimit = max(tools.Hardware.processorCountCore() * 2, 8)
+			self.threadsLimit = max(tools.Hardware.processorCountCore() * 2, 10)
 
 			tools.File.makeDirectory(tools.System.profile())
 			self.sourceFile = Database.pathProviders()
@@ -2242,7 +2243,7 @@ class Core(object):
 							break
 
 						totalThreads = self.cacheCount + len(self.threadsAdjusted)
-						aliveCount = len([x for x in self.threadsAdjusted if x.is_alive()])
+						aliveCount = len([x for x in self.threadsAdjusted if not tools.Tools.isDictionary(x) and x.is_alive()])
 						self.streamsFinished = self.cacheCount + len([x for x in self.statusAdjusted if x == 'done'])
 						self.streamsBusy = totalThreads - self.streamsFinished
 
@@ -2278,7 +2279,7 @@ class Core(object):
 							break
 
 						totalThreads = self.cacheCount + len(self.threadsAdjusted)
-						aliveCount = len([x for x in self.threadsAdjusted if x.is_alive()])
+						aliveCount = len([x for x in self.threadsAdjusted if not tools.Tools.isDictionary(x) and x.is_alive()])
 						self.streamsFinished = self.cacheCount + len([x for x in self.statusAdjusted if x == 'done'])
 						self.streamsBusy = totalThreads - self.streamsFinished
 
@@ -2410,7 +2411,7 @@ class Core(object):
 			message = 'Saving Streams'
 			stringInput1 = ' ' # Must have space to remove line.
 			stringInput2 = 'Saving Streams'
-			timeout = 15
+			timeout = 60 # 30 secs sometimes too little for a few 1000 streams.
 			timerSingle.start()
 			thread = Pool.thread(target = self.adjustSourceDatabase) # Update Database
 			thread.start()
@@ -2715,12 +2716,25 @@ class Core(object):
 		except: tools.Logger.error()
 
 	def scrapeProviders(self, threads, labels, providers, media, titles, years, premiered, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
-		ProviderBase.concurrencyInitialize()
+		ProviderBase.concurrencyInitialize(tasks = len(providers))
 
+		temp1 = []
+		temp2 = []
+		temp3 = []
+		temp4 = []
+		temp5 = []
 		priorityMaximum = 0
 		for provider in providers:
 			priority = provider.scrapePriority()
 			if priority: priorityMaximum = max(priorityMaximum, priority)
+
+			# Always put certain providers first.
+			if provider.typeLocal(): temp1.append(provider)
+			elif provider.typeSpecial(): temp2.append(provider)
+			elif provider.typeCenter(): temp3.append(provider)
+			elif provider.typePremium(): temp4.append(provider)
+			else: temp5.append(provider)
+		providers = temp1 + temp2 + temp3 + temp4 + temp5
 
 		providersPriority = [[] for i in range(priorityMaximum + 1)]
 		providersNone = []
@@ -3987,7 +4001,7 @@ class Core(object):
 
 						if check and self.enabledExtra and not source['stream'].exclusionDuplicate():
 							index = len(self.threadsAdjusted)
-							thread = Pool.thread(target = self.adjustSource, args = (source, index))
+							thread = {'target' : self.adjustSource, 'args' : (source, index)} # Do not create a thread here. Only create it if we execute it.
 							self.priortityAdjusted.append(priority) # Give priority to HD links
 							self.statusAdjusted.append('queued')
 							self.threadsAdjusted.append(thread)
@@ -4068,6 +4082,8 @@ class Core(object):
 									self.sourcesAdjusted[i]['stream'].segmentSet(identifier['segment'])
 								break
 
+			self.cacheLookup = False
+			before = len(self.sourcesAdjusted)
 			threads = []
 			for i in range(len(self.cacheTypes)):
 				threads.append(Pool.thread(target = self._adjustSourceCache, args = (self.cacheObjects[i], self.cacheTypes[i], timeout, partial)))
@@ -4081,6 +4097,10 @@ class Core(object):
 			self.cacheBusy -= 1
 			self.adjustUnlock()
 			self.adjustTermination()
+
+			# Start another lookup if the previous one was successful, in order not to waste time until a new stream comes in to trigger this.
+			if partial and not self.cacheBusy and self.cacheLookup and len(self.sourcesAdjusted) > before:
+				Pool.thread(target = self.adjustSourceCache, args = (None, True), start = True)
 
 	def _adjustSourceCache(self, object, type, timeout, partial = False):
 		try:
@@ -4122,7 +4142,8 @@ class Core(object):
 
 			# Partial will inspect the cache will the scraping is still busy.
 			# Only check if there are a bunch of them, otherwise there are too many API calls (heavy load on both server and local machine).
-			if len(hashes) == 0 or (partial and len(hashes) < 40): return
+			if not hashes or (partial and len(hashes) < 40): return
+			self.cacheLookup = True
 
 			# NB: Set all statuses to false, otherwise the same links will be send multiple times for inspection, if multiple hosters finish in a short period of time before the previous inspection is done.
 			# This will exclude all currently-being-looked-up links from the next iteration in the for-loop above.
@@ -4166,24 +4187,24 @@ class Core(object):
 			self.adjustLock()
 
 			# HD links
-			running = [i for i in self.threadsAdjusted if i.is_alive()]
+			running = [i for i in self.threadsAdjusted if not tools.Tools.isDictionary(i) and i.is_alive()]
 			openSlots = None if self.threadsLimit is None else max(0, self.threadsLimit - len(running))
 			counter = 0
 			for j in range(len(self.threadsAdjusted)):
 				if self.priortityAdjusted is True and self.statusAdjusted[j] == 'queued':
 					self.statusAdjusted[j] = 'busy'
-					self.threadsAdjusted[j].start()
+					self.threadsAdjusted[j] = Pool.thread(target = self.threadsAdjusted[j]['target'], args = self.threadsAdjusted[j]['args'], start = True)
 					counter += 1
 					if not openSlots is None and counter > openSlots: return
 
 			# Non-HD links
-			running = [i for i in self.threadsAdjusted if i.is_alive()]
+			running = [i for i in self.threadsAdjusted if not tools.Tools.isDictionary(i) and i.is_alive()]
 			openSlots = None if self.threadsLimit is None else max(0, self.threadsLimit - len(running))
 			counter = 0
 			for j in range(len(self.threadsAdjusted)):
 				if self.statusAdjusted[j] == 'queued':
 					self.statusAdjusted[j] = 'busy'
-					self.threadsAdjusted[j].start()
+					self.threadsAdjusted[j] = Pool.thread(target = self.threadsAdjusted[j]['target'], args = self.threadsAdjusted[j]['args'], start = True)
 					counter += 1
 					if not openSlots is None and counter > openSlots: return
 		except: tools.Logger.error()
@@ -4259,9 +4280,10 @@ class Core(object):
 			self.adjustLock()
 
 			sources = {}
-			for i in range(len(self.sourcesAdjusted)):
+			items = self.sourcesAdjusted # In case self.sourcesAdjusted is reset to [] before this function finishes.
+			for i in range(len(items)):
 				try:
-					result = self.sourcesAdjusted[i]
+					result = items[i]
 					stream = result['stream']
 					if stream.infoCache(): continue
 

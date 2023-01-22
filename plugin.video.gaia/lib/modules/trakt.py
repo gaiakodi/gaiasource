@@ -115,7 +115,7 @@ def getTrakt(url, post = None, cache = True, check = True, timestamp = None, ext
 			if extended: return None, result['headers'], result['error']
 			else: return None
 		elif data and not (code == 401 or code == 405):
-			if check: _cacheCheck()
+			#if check: cacheUpdate() # Now checked at the end of the script execution.
 			if extended: return data, result['headers'], result['error']
 			else: return data
 		elif code == 404:
@@ -162,7 +162,7 @@ def getTrakt(url, post = None, cache = True, check = True, timestamp = None, ext
 
 		headers['Authorization'] = 'Bearer %s' % token
 		result = network.Networker().request(method = method, link = url, data = post, headers = headers, timeout = timeout)
-		if check: _cacheCheck()
+		#if check: cacheUpdate() # Now checked at the end of the script execution.
 		if extended: return network.Networker.dataText(result['data']), result['headers'], result['error']
 		else: return network.Networker.dataText(result['data'])
 	except: tools.Logger.error()
@@ -180,12 +180,12 @@ def _error(url, post, timestamp, message):
 	# Eg: Search Trakt, and if it fails, fall back to TMDb search, but keep the Loader visible.
 	#interface.Loader.hide()
 
+def cacheUpdate(wait = False):
+	if wait: _cacheProcess()
+	else: Pool.thread(target = _cacheProcess, start = True)
+
 def _cache(url, post = None, timestamp = None):
 	return Cache.instance().traktCache(link = url, data = post, timestamp = timestamp)
-
-def _cacheCheck():
-	thread = Pool.thread(target = _cacheProcess)
-	thread.start()
 
 def _cacheProcess():
 	while True:

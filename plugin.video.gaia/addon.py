@@ -26,7 +26,7 @@ if developer:
 
 from lib.modules import tools
 
-parameters = tools.System.commandResolve()
+parameters = tools.System.commandResolve(initialize = True)
 action = parameters.get('action')
 
 # For Gaia Eminence.
@@ -2665,6 +2665,11 @@ if developer: tools.Logger.log('EXECUTION FINISHING [Action: %s | Duration: %.3f
 try:
 	from lib.modules.vpn import Vpn
 	Vpn.killStop()
+
+	# Process all Trakt requests that were stored in the cache, since they could not be executed previously due to trakt being down.
+	# Do not call this function after each Trakt request, since it will start too many threads.
+	from lib.modules import trakt
+	trakt.cacheUpdate(wait = True)
 
 	from lib.modules.concurrency import Pool
 	Pool.join()

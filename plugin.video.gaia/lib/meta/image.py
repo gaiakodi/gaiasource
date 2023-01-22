@@ -890,7 +890,9 @@ class MetaImage(object):
 	###################################################################
 
 	@classmethod
-	def update(self, media, data = None, category = None, images = None):
+	def update(self, media, data = None, category = None, images = None, copy = False):
+		if copy: images = Tools.copy(images)
+
 		# Filter out invalid images (eg: SVG returned by create()).
 		for key, values in images.items():
 			images[key] = [i for i in values if i]

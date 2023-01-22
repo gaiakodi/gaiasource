@@ -45,7 +45,7 @@ class Concurrency(object):
 
 	Property		= 'GaiaConcurrency%s'
 
-	def __init__(self, target = None, group = None, name = None, daemon = None, args = (), kwargs = {}):
+	def __init__(self, target = None, group = None, name = None, daemon = None, synchronizer = None, args = (), kwargs = {}):
 		self._statusSet(Concurrency.StatusUnknown)
 		base = self.base()
 		if base:
@@ -53,6 +53,7 @@ class Concurrency(object):
 			self._statusSet(Concurrency.StatusInitial)
 		self.mParent = self.current()
 		self.mRank = self.currentRank() + 1
+		self.mSynchronizer = synchronizer
 
 	@classmethod
 	def initialize(self):
@@ -146,6 +147,20 @@ class Concurrency(object):
 	def _alive(self):
 		return self.is_alive()
 
+	def synchronizer(self):
+		return self.mSynchronizer
+
+	def synchronizerSet(self, synchronizer):
+		self.mSynchronizer = synchronizer
+
+	def _synchronizerAcquire(self):
+		try: self.mSynchronizer.acquire()
+		except: pass
+
+	def _synchronizerRelease(self):
+		try: self.mSynchronizer.release()
+		except: pass
+
 	def start(self, retry = RetryLimit):
 		# On low-end devices Python can run out of threads and will not be able to start a new thread.
 		# In such a case the exception is thrown: "RuntimeError Can't start new thread".
@@ -159,6 +174,7 @@ class Concurrency(object):
 		#	5. If we retried a number of times without success, give up and show the user a notification to restart the device. In this case we probably have a bunch of threads deadlocked.
 
 		self._statusSet(Concurrency.StatusStarted)
+		self._synchronizerAcquire()
 		try:
 			self.base().start(self)
 			if not retry is None and not retry == Concurrency.RetryLimit:
@@ -221,6 +237,7 @@ class Concurrency(object):
 		# Another idea is to call _finish() at the end of join(), since join() is called from the parent. However, join() can have a timeout and does not mean the thread/process is actually finished.
 		# We therefore try to call _finish() from any function that somehow handles the end of the thread/process (run, join, terminate, kill, close).
 		self._statusSet(status)
+		self._synchronizerRelease()
 		Pool.remove(self)
 
 	def _error(self, exception):
@@ -243,9 +260,15 @@ class Concurrency(object):
 				lock.release()
 				setting = Settings.getInteger(id = Pool.SettingNotifications)
 				if setting > 0:
-					from lib.modules.interface import Dialog
-					if setting == 1: Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000)
-					elif setting == 2: Dialog.confirm(title = 36037, message = 33246)
+					from lib.modules.tools import Regex
+					from lib.modules.interface import Dialog, Translation
+					if setting == 1:
+						Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000)
+					elif setting == 2:
+						message = Translation.string(33246)
+						if System.commandIsScrape(): message = message % (Regex.extract(data = Translation.string(36063), expression = '(.*?)(?:$|\s*\[)'), Translation.string(35539))
+						else: message = message % (Translation.string(36038), Translation.string(32310))
+						Dialog.confirm(title = 36037, message = message)
 
 
 class Thread(Concurrency, PyThread):
@@ -321,18 +344,26 @@ except:
 
 class Pool(object):
 
-	SettingLimit = 'general.concurrency.limit'
-	SettingNotifications = 'general.concurrency.notifications'
+	SettingTask				= 'general.concurrency.task'
+	SettingInstance			= 'general.concurrency.instance'
+	SettingNotifications	= 'general.concurrency.notifications'
 
-	PropertyNotification = 'GaiaConcurrencyNotification'
+	PropertyNotification	= 'GaiaConcurrencyNotification'
 
-	Instances = {}
-	Lock = None
-	Semaphore = None
-	Limit = None
+	LimitTask				= None
+	LimitInstance			= None
+	LimitInternal			= 200 # The internal limit of the maximum threads that should be created. Running more than these threads concurrently propbably means a design mistake.
+	LimitWarning			= 500 # After how many threads a warning message should be shown. Keep in mind that during scraping more threads are used.
 
-	GlobalLock = None
-	EventFinish = {}
+	CountTotal				= {Thread : 0, Process : 0}	# The total number of threads created during this execution.
+	CountConcurrent			= {Thread : 0, Process : 0}	# The maximum number of threads that were running concurrently during this execution.
+
+	Instances				= {}
+	Lock					= None
+	Semaphore				= None
+
+	GlobalLock				= None
+	EventFinish				= {}
 
 	@classmethod
 	def _log(self, message, prefix = True, developer = True):
@@ -342,17 +373,47 @@ class Pool(object):
 			Logger.log(message = message, type = Logger.TypeInfo, level = Logger.LevelExtended)
 
 	@classmethod
-	def limit(self):
-		if Pool.Limit is None:
-			from lib.modules.tools import Settings
-			limit = Settings.getCustom(id = Pool.SettingLimit)
-			return limit if limit else 0
-		else:
-			return Pool.Limit
+	def reset(self, settings = True):
+		if settings:
+			Pool.LimitTask = None
+			Pool.LimitInstance = None
+		Pool.CountTotal = {Thread : 0, Process : 0}
+		Pool.CountConcurrent = {Thread : 0, Process : 0}
 
 	@classmethod
-	def limitSet(self, limit):
-		Pool.Limit = limit
+	def limitTask(self):
+		if Pool.LimitTask is None:
+			from lib.modules.tools import Settings
+			limit = Settings.getCustom(id = Pool.SettingTask)
+
+			if not limit:
+				from lib.modules.tools import Hardware, Math
+
+				performance = Hardware.performanceRating()
+				limit = Math.scale(performance, fromMinimum = 0, fromMaximum = 1, toMinimum = 35, toMaximum = 50)
+
+				processor = Hardware.processorType()
+				if processor:
+					if processor in [Hardware.ProcessorArm, Hardware.ProcessorArc]: limit -= 5
+					elif processor in [Hardware.ProcessorIntel, Hardware.ProcessorAmd]: limit += 5
+
+				memory = Hardware.memoryBytes()
+				if memory:
+					adjust = Math.scale(memory, fromMinimum = 1073741824, fromMaximum = 4294967296, toMinimum = -10, toMaximum = 0)
+					if adjust < 0: limit += adjust
+
+				limit = max(20, min(50, int(limit)))
+
+			Pool.LimitTask = limit
+		return Pool.LimitTask
+
+	@classmethod
+	def limitInstance(self):
+		if Pool.LimitInstance is None:
+			from lib.modules.tools import Settings
+			limit = Settings.getCustom(id = Pool.SettingInstance)
+			Pool.LimitInstance = limit if limit else 0
+		return Pool.LimitInstance
 
 	# Returns the maximum number of threads allowed by the system.
 	# Returns None if there is probably no maximum limit, aka an unlimited number of threads can be created.
@@ -421,6 +482,17 @@ class Pool(object):
 						nonrunning = True
 				recheck = running and nonrunning
 
+			self._log('Total created instances')
+			self._log('   PROCESS: %s' % Pool.CountTotal[Process], prefix = False)
+			self._log('   THREAD: %s' % Pool.CountTotal[Thread], prefix = False)
+			self._log('Total concurrent instances')
+			self._log('   PROCESS: %s' % Pool.CountConcurrent[Process], prefix = False)
+			self._log('   THREAD: %s' % Pool.CountConcurrent[Thread], prefix = False)
+			Pool.CountTotal[Process] = 0
+			Pool.CountTotal[Thread] = 0
+			Pool.CountConcurrent[Process] = 0
+			Pool.CountConcurrent[Thread] = 0
+
 			System.windowPropertyClear(Pool.PropertyNotification)
 			self._log('Finished in %s seconds' % time.elapsed())
 		else:
@@ -430,12 +502,12 @@ class Pool(object):
 				instance.join()
 
 	@classmethod
-	def instance(self, type, target = None, args = (), kwargs = {}, start = False, join = False):
+	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
 		try:
 			Pool.Lock.acquire()
 
 			if Pool.Semaphore is None:
-				limit = self.limit()
+				limit = self.limitInstance()
 				if limit: Pool.Semaphore = Semaphore(limit)
 				else: Pool.Semaphore = True
 			try: Pool.Semaphore.acquire()
@@ -449,8 +521,34 @@ class Pool(object):
 					except: function = None
 				if function: name += ' | ' + str(function)
 
-			instance = type(target = target, name = name, args = args, kwargs = kwargs)
+			instance = type(target = target, name = name, synchronizer = synchronizer, args = args, kwargs = kwargs)
 			Pool.Instances[instance.id()] = instance
+
+			# On high-end Intel/AMD devices with a lot of memory, we can create a ton of threads without a problem.
+			# However, on low-end ARM devices with limited memory, there is mostly a limit to how many threads can be created.
+			# So how many threads is too many?
+			#	https://stackoverflow.com/questions/481970/how-many-threads-is-too-many
+			# According to the 2nd answer, under Linux, the default thread stack size is 8MB (Windows uses 1MB).
+			# The new Linux kernel for most ARM devices supports 4GB of virtual address space.
+			# However, some devices might have less memory (eg: 1.5GB - 3GB) or the OS/Kodi uses some of the available memory.
+			# Assuming 2GB memory is available, we can barley create 256 threads.
+			# Python threads might not always use the full 8MB stack size. The default thread stack size can be changed using: threading.stack_size(...).
+			# On a 4GB ARMv8 device, threads seem to run out after about 260 to 290 threads. So the generic calculation is more or less accurate.
+			# In any case, using more than 200 threads seem to be a design issue, and it should be reduced.
+			# The most common place to run out of threads is when loading an uncahced Trakt show progress list:
+			#	1. Each episode in the list will be retrieved.
+			#	2. For each episode, the metadata for all episodes in that season and the next season is retrieved.
+			#	3. For each episode, the metadata for all the seasons is retrieved.
+			#	4. For each episode, the metadata for the show is retrieved.
+			# If threads are used everywhere on the lowest level, this can spawn 100s of threads.
+			# This does not even include all the threads started by other parts of Gaia, like the Cache class.
+			# The indexer classes have now been updated to reduce/disable sub-threads.
+			# Only on the outer level in metadata(), threads are started for each movie/episode in the list. All sub-function calls do not use threads anymore if they were called from a parent thread.
+			count = self.count(type = type)
+			Pool.CountTotal[type] += 1
+			Pool.CountConcurrent[type] = max(Pool.CountConcurrent[type], count)
+			if count > Pool.LimitWarning: self._log('%d threads are running concurrently. This might be too many for low-end devices. Rethink the code and reduce the number of threads.' % count)
+
 			if start: instance.start()
 			if join:
 				# Release here, otherwise threads started from another thread will deadlock.
@@ -504,6 +602,11 @@ class Pool(object):
 		return len(self.instances(type = type).keys())
 
 	@classmethod
+	def available(self, type = None, percent = False):
+		available = max(0, Pool.LimitInternal - self.count(type = type))
+		return (available / float(Pool.LimitInternal)) if percent else available
+
+	@classmethod
 	def data(self, type = None):
 		if type is None: return Concurrency.data()
 		else: return type.data()
@@ -519,8 +622,8 @@ class Pool(object):
 		Pool.GlobalLock = Lock()
 
 	@classmethod
-	def thread(self, target = None, args = (), kwargs = {}, start = False, join = False):
-		return self.instance(type = Thread, target = target, args = args, kwargs = kwargs, start = start, join = join)
+	def thread(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
+		return self.instance(type = Thread, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join)
 
 	@classmethod
 	def threads(self):
@@ -529,6 +632,10 @@ class Pool(object):
 	@classmethod
 	def threadCount(self):
 		return self.count(type = Thread)
+
+	@classmethod
+	def threadAvailable(self, percent = False):
+		return self.available(type = Thread, percent = percent)
 
 	@classmethod
 	def threadData(self):
@@ -553,8 +660,8 @@ class Pool(object):
 		self.initialize()
 
 	@classmethod
-	def process(self, target = None, args = (), kwargs = {}, start = False, join = False):
-		return self.instance(type = Process, target = target, args = args, kwargs = kwargs, start = start, join = join)
+	def process(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
+		return self.instance(type = Process, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join)
 
 	@classmethod
 	def processes(self):
@@ -563,6 +670,10 @@ class Pool(object):
 	@classmethod
 	def processCount(self):
 		return self.count(type = Process)
+
+	@classmethod
+	def processAvailable(self, percent = False):
+		return self.available(type = Process, percent = percent)
 
 	@classmethod
 	def processData(self):

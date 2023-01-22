@@ -163,6 +163,7 @@ class ProviderBase(object):
 	ConcurrencyThread					= 1				# Should correspond with settings.xml.
 	ConcurrencyProcess					= 2				# Should correspond with settings.xml.
 	ConcurrencyLock						= None
+	ConcurrencyTasks					= 0				# How many providers are running concurrently.
 
 	# Rank
 	RankLimit							= 5
@@ -3576,11 +3577,31 @@ class ProviderBase(object):
 	##############################################################################
 
 	def thread(self, function, *args):
-		return Pool.thread(target = function, args = tuple(args))
+		# Do not create a thread object here already.
+		# Only create the thread in threadExecute().
+		#return Pool.thread(target = function, args = tuple(args))
+		return {'target' : function, 'args' : tuple(args)}
 
-	def threadExecute(self, threads, wait = True, factor = TimeFactorInternal):
-		[thread.start() for thread in threads]
-		if wait: self.threadWait(threads = threads, factor = factor)
+	def threadExecute(self, threads, wait = True, factor = TimeFactorInternal, limit = None, optimize = True):
+		# If there is only 1 thread or multiple threads, but only 1 thread should be executed at a time.
+		# Execute the target function directly without launching a new thread.
+		# Saves the overhead of creating a thread and reduces the overall threads created.
+		if optimize and wait and (len(threads) == 1 or limit == 1):
+			for thread in threads:
+				if Tools.isDictionary(thread): thread['target'](*thread['args'])
+				else: thread.run()
+		else:
+			synchronizer = None
+			if limit:
+				if Tools.isInteger(limit): synchronizer = Semaphore(limit)
+				else: synchronizer = limit
+
+			for i in range(len(threads)):
+				thread = threads[i]
+				if Tools.isDictionary(thread): threads[i] = thread = Pool.thread(target = thread['target'], args = thread['args'], synchronizer = synchronizer)
+				thread.start()
+
+			if wait: self.threadWait(threads = threads, factor = factor)
 
 	def threadWait(self, threads, factor = TimeFactorInternal):
 		[thread.join(self.timerRemaining(factor = factor)) for thread in threads]
@@ -3970,6 +3991,27 @@ class ProviderBase(object):
 	def concurrencyProcess(self):
 		return self.concurrency() == ProviderBase.ConcurrencyProcess
 
+	@classmethod
+	def concurrencyTasks(self, level = None):
+		if level is None: return ProviderBase.ConcurrencyTasks
+
+		tasks = 1
+
+		# Number of queries running concurrently for the same provider.
+		if level <= 1: tasks = (30.0 / ProviderBase.ConcurrencyTasks) * 10
+
+		# Number of streams to process concurrently from the results of a single query from a single provider.
+		elif level == 2: tasks = max(3, (10.0 / ProviderBase.ConcurrencyTasks) * 10)
+
+		# Number of sub-queries for each entry of a details page running concurrently.
+		elif level == 3: tasks = max(3, (10.0 / ProviderBase.ConcurrencyTasks) * 10)
+
+		return max(1, min(10, int(tasks)))
+
+	@classmethod
+	def concurrencyTasksSet(self, tasks):
+		ProviderBase.ConcurrencyTasks = tasks
+
 	def concurrencyLock(self):
 		ProviderBase.ConcurrencyLock.acquire()
 
@@ -3978,11 +4020,15 @@ class ProviderBase(object):
 		except: pass
 
 	@classmethod
-	def concurrencyInitialize(self):
-		if ProviderBase.ConcurrencyLock is None:
-			limit = self.settingsGlobalConcurrencyLimit()
-			if not limit: limit = 9999999
-			ProviderBase.ConcurrencyLock = Semaphore(limit)
+	def concurrencyInitialize(self, tasks = None):
+		limit = self.settingsGlobalConcurrencyLimit()
+
+		if tasks: tasks = [tasks]
+		else: tasks = []
+		if limit: tasks.append(limit)
+		self.concurrencyTasksSet(min(tasks))
+
+		if ProviderBase.ConcurrencyLock is None: ProviderBase.ConcurrencyLock = Semaphore(limit if limit else 9999999)
 
 	@classmethod
 	def concurrencyPrepare(self):

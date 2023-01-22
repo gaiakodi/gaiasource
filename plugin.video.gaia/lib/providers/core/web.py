@@ -2448,8 +2448,7 @@ class ProviderWeb(ProviderBase):
 						streams = []
 						if self.searchConcurrency():
 							threads = [self.thread(self.searchEntry, streams, stream, data, item, details, entry) for entry in entries]
-							[thread.start() for thread in threads]
-							[thread.join() for thread in threads]
+							self.threadExecute(threads = threads, limit = self.concurrencyTasks(level = 3))
 						else:
 							[self.searchEntry(streams, stream, data, item, details, entry) for entry in entries]
 						stream = streams
@@ -2532,7 +2531,7 @@ class ProviderWeb(ProviderBase):
 										if items and not items == ProviderBase.Skip and not self.stopped():
 											if self.searchConcurrency():
 												threads = [self.thread(self.searchProcess, added, item, validate) for item in items]
-												self.threadExecute(threads)
+												self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
 											else:
 												for item in items:
 													self.searchProcess(added = added, item = item, validate = validate)
@@ -2631,7 +2630,7 @@ class ProviderWeb(ProviderBase):
 
 			if len(threads) > 0 and not self.stopped():
 				if not self.accountAuthenticationModeScrape() or self.accountAuthenticationUpdate():
-					self.threadExecute(threads = threads, factor = ProviderBase.TimeFactorScrape)
+					self.threadExecute(threads = threads, factor = ProviderBase.TimeFactorScrape, limit = self.concurrencyTasks(level = 1))
 
 		except: self.logError()
 

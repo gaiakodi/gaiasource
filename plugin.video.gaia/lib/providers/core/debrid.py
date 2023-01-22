@@ -267,7 +267,7 @@ class ProviderDebrid(ProviderPremium):
 								else: self.searchAdd(id = id, stream = stream)
 						except: self.logError()
 
-				if not self.stopped(): self.threadExecute(threads)
+				if not self.stopped(): self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
 		except: self.logError()
 
 	# Can be overwritten by subsclasses if additional metadata has to be retrieved.

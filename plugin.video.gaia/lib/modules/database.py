@@ -205,9 +205,15 @@ class Database(object):
 			# There is a bug in SQLite for Python 3.6: cannot VACUUM from within a transaction
 			# Try to compress and if unsuccessful, try again after commit.
 			# https://github.com/ghaering/pysqlite/issues/109
-			if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
+			'''if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
 			if commit: self._commit()
-			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)
+			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)'''
+
+			# Update: does it not make sense to compress AFTER the commit?
+			# https://stackoverflow.com/questions/2250462/should-i-run-vacuum-in-transaction-or-after
+			if commit: self._commit()
+			if compress: self._compress(commit = True, lock = False, unlock = False)
+
 			return True
 		except Exception as error:
 			if log:

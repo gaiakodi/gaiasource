@@ -329,7 +329,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="general.cache.expression" type="integer" label="36135" help="34448">
 					<control type="spinner" format="string"/>
-					<default>2</default>
+					<default>1</default>
 					<level>3</level>
 					<constraints>
 						<options>
@@ -343,10 +343,22 @@ The label is then added to the action element:
 
 			<!---------- GENERAL - CONCURRENCY ---------->
 			<group id="general.concurrency" label="36042">
-				<setting id="general.concurrency.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="general.concurrency.limit.label" type="string" label="36037" help="34476">
+				<setting id="general.concurrency.task" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.concurrency.task.label" type="string" label="36038" help="34560">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.limit&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.task&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="general.concurrency.instance" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.concurrency.instance.label" type="string" label="36037" help="34476" parent="general.concurrency.task.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.instance&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 35221]</default>
@@ -355,7 +367,7 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="general.concurrency.notifications" type="integer" label="36169" help="34511">
+				<setting id="general.concurrency.notifications" type="integer" label="36169" help="34511" parent="general.concurrency.task.label">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3899,7 +3911,7 @@ The label is then added to the action element:
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaExternal&settings=true)</data>
 						<close>true</close>
 					</control>
-					<default>$ADDON[plugin.video.gaia 32302]</default>
+					<default>$ADDON[plugin.video.gaia 35859]</default>
 					<level>1</level>
 					<constraints>
 						<allowempty>true</allowempty>
@@ -5034,7 +5046,7 @@ The label is then added to the action element:
 						<heading>35384</heading>
 						<popup>true</popup>
 					</control>
-					<default>50</default>
+					<default>30</default> <!-- 50 is too much and makes menu loading slow. -->
 					<level>3</level>
 					<constraints>
 						<minimum>1</minimum>

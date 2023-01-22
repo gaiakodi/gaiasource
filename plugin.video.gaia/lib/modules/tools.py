@@ -2757,6 +2757,10 @@ class Logger(object):
 	Level				= None
 
 	@classmethod
+	def _exit(self):
+		Logger.Exited = True
+
+	@classmethod
 	def level(self):
 		if Logger.Level is None: Logger.Level = Settings.getInteger('general.log.level')
 		return Logger.Level
@@ -2802,7 +2806,7 @@ class Logger(object):
 		xbmc.log(message, type)
 
 	@classmethod
-	def error(self, message = None, exception = True, level = LevelEssential):
+	def error(self, message = None, exception = True, level = LevelEssential, exit = False):
 		if exception:
 			type, value, trace = sys.exc_info()
 			try: filename = trace.tb_frame.f_code.co_filename
@@ -2813,6 +2817,12 @@ class Logger(object):
 			except: name = None
 			try: errortype = type.__name__
 			except: errortype = None
+
+			# If the user eg loads a menu and canceles it before it is finished, a lot of threads will throw a SystemExit error.
+			# Do not log these.
+			# Other errors (eg: TypeError and IndexError) might still be thrown.
+			if not exit and errortype == 'SystemExit': return None
+
 			try: errormessage = value.message
 			except:
 				try:
@@ -3801,8 +3811,8 @@ class System(object):
 		return Converter.base64To(Converter.jsonTo(parameters)).replace('+', '%2B').replace('/', '%2F').replace('=', '%3D')
 
 	@classmethod
-	def commandResolve(self, command = None):
-		self.argumentsInitialize()
+	def commandResolve(self, command = None, initialize = False):
+		if initialize: self.argumentsInitialize()
 
 		from lib.modules.network import Networker
 		if command is None: command = self.arguments(2)
@@ -3836,6 +3846,7 @@ class System(object):
 	@classmethod
 	def commandIsScrape(self):
 		parameters = System.commandResolve()
+		if not parameters: return False
 		action = parameters.get('action')
 		return action and 'scrape' in action
 
@@ -4489,6 +4500,11 @@ class System(object):
 			from lib.modules.window import WindowMetaExternal
 			WindowMetaExternal.show()
 
+		#gaiaremove
+		if version['old']['number'] <= 611 and version['new']['number'] > 611:
+			Settings.default(id = 'navigation.page.episode')
+			Settings.default(id = 'general.cache.expression')
+
 		_launchProgress(4) # 25%
 
 		self.tStatus = []
@@ -4503,11 +4519,13 @@ class System(object):
 		# General Settings
 		def _launchSettings():
 			from lib.modules.view import View
+			from lib.meta.tools import MetaTools
 			Buffer.initialize()
 			Timeout.initialize()
 			Playlist.initialize()
 			YouTube.qualityUpdate()
 			View.settingsInitialize()
+			MetaTools.settingsInitialize()
 		_launchAdd(1, 'Initializing Settings Data', _launchSettings) # 43%
 
 		# Context Menu
@@ -5009,7 +5027,22 @@ class Settings(object):
 				'none' : SpecialAutomatic,
 			},
 		},
-		'general.concurrency.limit' : {
+		'general.concurrency.task' : {
+			'type' : CustomNumber,
+			'title' : 36037,
+			'label' : {
+				'suffix' : 32012,
+			},
+			'value' : {
+				'minimum' : 1,
+				'maximum' : 50,
+			},
+			'special' : {
+				'zero' : SpecialAutomatic,
+				'none' : SpecialAutomatic,
+			},
+		},
+		'general.concurrency.instance' : {
 			'type' : CustomNumber,
 			'title' : 36037,
 			'label' : {
@@ -5128,7 +5161,7 @@ class Settings(object):
 			'title' : 32312,
 			'value' : {
 				'unit' : UnitSecond,
-				'default' : 60,
+				'default' : 120, # 60 secs sometimes too little if there are a few 1000 streams.
 				'minimum' : 10,
 				'maximum' : 300,
 			},
@@ -5447,6 +5480,7 @@ class Settings(object):
 			from lib.debrid.debrid import Debrid
 			from lib.modules.stream import Stream
 			from lib.modules.cache import Cache, Memory
+			from lib.modules.concurrency import Pool
 			from lib.modules.account import Account
 			from lib.modules.cloudflare import Cloudflare
 			from lib.modules.core import Core
@@ -5463,7 +5497,7 @@ class Settings(object):
 				Account, Cloudflare, Core, Handler, Playback, Subtitle, Window, Trakt,
 				Font, Icon, Format, CoreDialog, Dialog, Context,
 				Streamer, SubtitlePlayer,
-				Cache, Memory,
+				Cache, Memory, Pool,
 				Language, Media,
 			]
 			for i in classes:
@@ -7256,7 +7290,7 @@ class Subprocess(object):
 			# Use "shell", otherwise Windows will show a CMD window popup.
 			from subprocess import check_output, CalledProcessError
 			return Converter.unicode(check_output(self.command(command), shell = True))
-		except subprocess.CalledProcessError:
+		except CalledProcessError:
 			# On Android this exception is thrown:
 			#	subprocess.CalledProcessError: Command 'lscpu' returned non-zero exit status 127.
 			# Do not print the error.

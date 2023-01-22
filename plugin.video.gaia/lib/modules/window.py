@@ -4608,7 +4608,7 @@ class WindowMetaExternal(WindowStep):
 		from lib.meta.tools import MetaTools
 		metatools = MetaTools.instance()
 
-		self.mEnabled = None if metatools.settingsExternalHas() else metatools.settingsExternal()
+		self.mEnabled = metatools.settingsExternal() if metatools.settingsExternalHas() else None
 		self.mInstalled = tools.Extension.installed(id = tools.Extension.IdGaiaMetadata, enabled = False)
 		self.mSize = tools.Extension.size(id = tools.Extension.IdGaiaMetadata)
 

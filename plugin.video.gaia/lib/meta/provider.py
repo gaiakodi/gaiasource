@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Tools, Time, Logger, Country, Language
+from lib.modules.tools import Tools, Logger, Country, Language
 from lib.modules.concurrency import Pool, Lock, Semaphore
 from lib.modules.cache import Cache
 from lib.modules.network import Networker
@@ -113,7 +113,7 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def _cache(self, timeout, function, result = [], thread = False, *args, **kwargs):
+	def _cache(self, timeout, function, result = [], threading = True, semaphore = None, *args, **kwargs):
 		# Use a lock when retrieving from cache.
 		# If the cache is empty (new installation or cache was just cleared), multiple equal requests might be executed in parallel.
 		# For instance, the TVDB authentication (token retrieval) might execute multiple times, since it is not in the cache yet.
@@ -135,7 +135,7 @@ class MetaProvider(object):
 
 			if not kwargs: kwargs = {}
 			kwargs['function_'] = function
-			kwargs['thread_'] = thread
+			kwargs['threading'] = threading
 
 			MetaProvider.CacheLocks[id].acquire()
 
@@ -152,18 +152,15 @@ class MetaProvider(object):
 			MetaProvider.CacheData[id] = data
 			MetaProvider.CacheLocks[id].release()
 
+		if semaphore: semaphore.release()
 		result.append(data)
 		return data
 
 	@classmethod
-	def _cacheThread(self, thread_, *args, **kwargs):
+	def _cacheThread(self, threading, *args, **kwargs):
 		kwargs['result_'] = result_ = []
-		if thread_: # Already running in a parent thread, do not start a new thread (since creating threads takes long).
-			self._cacheExecute(*args, **kwargs)
-		else:
-			thread = Pool.thread(target = self._cacheExecute, args = args, kwargs = kwargs)
-			thread.start()
-			thread.join()
+		if threading: Pool.thread(target = self._cacheExecute, args = args, kwargs = kwargs, start = True, join = True)
+		else: self._cacheExecute(*args, **kwargs) # Already running in a parent thread, do not start a new thread (since creating threads takes long). Or threading was disabled.
 		return result_[0]
 
 	@classmethod
@@ -171,7 +168,7 @@ class MetaProvider(object):
 		result_.append(function_(*args, **kwargs))
 
 	@classmethod
-	def _cacheDefault(self, cache, timeout, function, *args, **kwargs):
+	def _cacheDefault(self, threaded, cache, timeout, function, *args, **kwargs):
 		kwargs = self._idDefault(**kwargs)
 		parameter = self._cacheParameter(**kwargs)
 
@@ -186,6 +183,9 @@ class MetaProvider(object):
 				arguments[k] = v
 		if 'level' in arguments and arguments['level'] is None: arguments['level'] = MetaProvider.LevelDefault
 
+		# Pass on the "threaded" value to the function, since they internally retrieve further shows/season/episodes.
+		if 'threaded' in parameters: arguments['threaded'] = threaded
+
 		# Pass on the "cache" value to the function, since they internally retrieve further shows/season/episodes.
 		if function == self.__show or function == self.__season or function == self.__episode: arguments['cache'] = cache
 
@@ -193,25 +193,50 @@ class MetaProvider(object):
 			# Starting new threads can be slow, especially on low-end devices.
 			# Start threads here, since multiple resources can be requested at the same time, and sequentially requesting them is slower.
 			# Eg: When opening a show, all the shows seasons/episodes might be requested with a single call to this function.
-			# Pass "thread" in, in order not to create another sub-thread within _cache().
+			# Pass "threading" in, in order not to create another sub-thread within _cache().
+
 			results = []
 			threads = []
-			for i in self._cacheParameters(parameter, **arguments):
-				# Limit the number of concurrent threads, otherwise low-end devices might run out of threads and won't be able to create new ones.
-				threads = [thread for thread in threads if thread.alive()]
-				while len(threads) >= MetaProvider.LimitThread:
-					Time.sleep(0.2)
-					threads = [thread for thread in threads if thread.alive()]
+			parameter = self._cacheParameters(parameter, **arguments)
 
+			limit = 1
+			if threaded is True:
+				limit = MetaProvider.LimitThread
+			elif threaded is None:
+				# If a day-time show is retrieved that has 30 seasons, each containing 200 episodes.
+				# If the Trakt progress list is retrieved, this can mean a few 100 requests:
+				#	1. 200 individual detailed episode requests, plus a possible extra 200 requests if the next episode is in the next season instead of the current season.
+				#	2. 30 individual detailed season requests.
+				# If threading is completely disabled, 230+ requests have to be done sequentially.
+				# This can make a single episode/show in the list hold up the entire menu loading, while all other list entries are already finished and there are technically enough threads available.
+				# Allow a few extra threads here, depending on how many threads are currently running, and how many seasons/episodes need to be retrieved.
+				# Eg: retrieving S28 for Hollyoaks (tt0112004):
+				#	Full threading (max MetaProvider.LimitThread): 13 secs
+				#	Dynamic threading (4-8 threads): 32 secs
+				#	No threading (0 threads): 150 secs
+
+				threaded = True
+				counter = len(parameter)
+				maximum = 5 if counter < 50 else 6 if counter < 100 else 7 if counter < 150 else 8
+				available = Pool.threadAvailable(percent = True)
+				while available > 0.2 and counter > 0:
+					limit += 1
+					available -= 0.02
+					counter -= 10
+					if limit >= maximum: break # No more than 5 threads.
+			semaphore = Semaphore(limit)
+
+			for i in parameter:
+				semaphore.acquire() # Limit the number of concurrent threads, otherwise low-end devices might run out of threads and won't be able to create new ones.
 				result = []
 				results.append(result)
-				i.update({'result' : result, 'timeout' : timeout, 'function' : function, 'thread' : True})
-				thread = Pool.thread(target = self._cache, args = args, kwargs = i)
-				thread.start()
-				threads.append(thread)
+				i.update({'result' : result, 'timeout' : timeout, 'function' : function, 'threading' : False, 'semaphore' : semaphore})
+				if threaded: threads.append(Pool.thread(target = self._cache, args = args, kwargs = i, start = True))
+				else: self._cache(*args, **i)
 			[i.join() for i in threads]
 			return [i[0] for i in results]
 		else:
+			arguments['threading'] = threaded
 			return self._cache(timeout, function, *args, **arguments)
 
 	@classmethod
@@ -243,8 +268,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None):
-		if not cache is None: return self._cache(timeout = cache, function = MetaProvider._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies)
+	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
+		if not cache is None: return self._cache(threaded = threaded, timeout = cache, function = MetaProvider._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies)
 
 		result = None
 		try:
@@ -255,8 +280,8 @@ class MetaProvider(object):
 		return result
 
 	@classmethod
-	def _requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None):
-		response = MetaProvider._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, cache = cache)
+	def _requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
+		response = MetaProvider._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, cache = cache, threaded = threaded)
 		if response: return Networker.dataJson(response['data'])
 		else: return None
 
@@ -319,8 +344,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def language(self, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheLanguage, function = self._language, level = level)
+	def language(self, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheLanguage, function = self._language, level = level)
 
 	# Virtual
 	@classmethod
@@ -336,14 +361,14 @@ class MetaProvider(object):
 	# offset: the absolute offset starting at 0.
 	# Provide either a page or an offset.
 	@classmethod
-	def search(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None,  number = None, numberSeason = None, numberEpisode = None, media = None, limit = None, offset = None, page = None, level = None, cache = None):
+	def search(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None,  number = None, numberSeason = None, numberEpisode = None, media = None, limit = None, offset = None, page = None, level = None, cache = None, threaded = None):
 		if limit is None: limit = MetaProvider.LimitSearch
 		if offset is None: offset = ((limit * page) - 1) if page else 0
 		if page is None: page = int(offset / float(limit)) if offset else 1
 
 		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheSearch, function = self._search, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, limit = limit, offset = offset, page = page, level = level)
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSearch, function = self._search, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, limit = limit, offset = offset, page = page, level = level)
 
 	# Virtual
 	@classmethod
@@ -355,30 +380,30 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def id(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, extract = None, level = None, cache = None):
+	def id(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, extract = None, level = None, cache = None, threaded = None):
 		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
-		result = self._cacheDefault(cache = cache, timeout = MetaProvider.CacheId, function = self._id, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, level = level)
+		result = self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheId, function = self._id, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, level = level)
 		if extract:
 			try: return result[extract]
 			except: return None
 		return result
 
 	@classmethod
-	def idImdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderImdb, level = level, cache = cache)
+	def idImdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
+		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderImdb, level = level, cache = cache, threaded = threaded)
 
 	@classmethod
-	def idTmdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTmdb, level = level, cache = cache)
+	def idTmdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
+		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTmdb, level = level, cache = cache, threaded = threaded)
 
 	@classmethod
-	def idTvdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTvdb, level = level, cache = cache)
+	def idTvdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
+		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTvdb, level = level, cache = cache, threaded = threaded)
 
 	@classmethod
-	def idTrakt(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTrakt, level = level, cache = cache)
+	def idTrakt(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
+		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTrakt, level = level, cache = cache, threaded = threaded)
 
 	@classmethod
 	def _idDefault(self, **kwargs):
@@ -443,8 +468,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def movie(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheMovie, function = self._movie, media = MetaData.MediaMovie, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
+	def movie(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheMovie, function = self._movie, media = MetaData.MediaMovie, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
 
 	# Virtual
 	@classmethod
@@ -456,8 +481,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def collection(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheCollection, function = self._collection, media = MetaData.MediaCollection, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
+	def collection(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCollection, function = self._collection, media = MetaData.MediaCollection, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
 
 	# Virtual
 	@classmethod
@@ -469,11 +494,11 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheShow, function = self.__show, media = MetaData.MediaShow, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberAdjust = numberAdjust, level = level)
+	def show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheShow, function = self.__show, media = MetaData.MediaShow, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberAdjust = numberAdjust, level = level)
 
 	@classmethod
-	def __show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None):
+	def __show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None, threaded = None):
 		result = self._show(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
 		if result:
 			if level >= MetaProvider.Level5:
@@ -487,7 +512,7 @@ class MetaProvider(object):
 					season = result.idSeason(provider = provider)
 
 				if season:
-					season = self.season(id = season, level = level, cache = cache)
+					season = self.season(id = season, level = level, cache = cache, threaded = threaded)
 					if season: result.seasonSet(value = season, unique = provider)
 
 		# TVDb uses the year as season number for some daytime shows.
@@ -506,12 +531,12 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None):
+	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None, threaded = None):
 		numberSeason, _ = self._defaultNumber(media = MetaData.MediaSeason, number = number, numberSeason = numberSeason)
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheSeason, function = self.__season, media = MetaData.MediaSeason, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, level = level)
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSeason, function = self.__season, media = MetaData.MediaSeason, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, level = level)
 
 	@classmethod
-	def __season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, level = None, cache = None):
+	def __season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, level = None, cache = None, threaded = None):
 		result = self._season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, level = level)
 		if result:
 			if level >= MetaProvider.Level6:
@@ -519,13 +544,13 @@ class MetaProvider(object):
 
 				episode = result.idEpisode(provider = provider)
 				if episode:
-					episode = self.episode(id = episode, level = MetaProvider.Level6, cache = cache)
+					episode = self.episode(id = episode, level = MetaProvider.Level6, cache = cache, threaded = threaded)
 					if episode: result.episodeSet(value = episode, unique = provider)
 
 				if level >= MetaProvider.Level7:
 					show = result.idShow(provider = provider)
 					if show:
-						show = self.show(id = show, level = MetaProvider.Level3, cache = cache)
+						show = self.show(id = show, level = MetaProvider.Level3, cache = cache, threaded = threaded)
 						if show: result.showSet(value = show, unique = provider)
 		return result
 
@@ -539,12 +564,12 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, level = None, cache = None):
+	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, level = None, cache = None, threaded = None):
 		numberSeason, numberEpisode = self._defaultNumber(media = MetaData.MediaEpisode, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheEpisode, function = self.__episode, media = MetaData.MediaEpisode, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level)
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheEpisode, function = self.__episode, media = MetaData.MediaEpisode, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level)
 
 	@classmethod
-	def __episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, level = None, cache = None):
+	def __episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, level = None, cache = None, threaded = None):
 		result = self._episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level)
 		if result:
 			if level >= MetaProvider.Level7:
@@ -552,11 +577,11 @@ class MetaProvider(object):
 				season = result.idSeason(provider = provider)
 
 				if season:
-					season = self.season(id = season, level = MetaProvider.Level4)
+					season = self.season(id = season, level = MetaProvider.Level4, threaded = threaded)
 					if season:
 						show = result.idShow(provider = provider)
 						if show:
-							show = self.show(id = show, level = MetaProvider.Level4)
+							show = self.show(id = show, level = MetaProvider.Level4, threaded = threaded)
 							if show:
 								season.showSet(value = show, unique = provider)
 								result.showSet(value = show, unique = provider) # Set for the episode as well.
@@ -573,8 +598,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def character(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheCharacter, function = self._character, media = MetaData.MediaCharacter, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
+	def character(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCharacter, function = self._character, media = MetaData.MediaCharacter, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
 
 	# Virtual
 	@classmethod
@@ -586,8 +611,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def person(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CachePerson, function = self._person, media = MetaData.MediaPerson, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
+	def person(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CachePerson, function = self._person, media = MetaData.MediaPerson, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
 
 	# Virtual
 	@classmethod
@@ -599,8 +624,8 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def company(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None):
-		return self._cacheDefault(cache = cache, timeout = MetaProvider.CacheCompany, function = self._company, media = MetaData.MediaCompany, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
+	def company(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCompany, function = self._company, media = MetaData.MediaCompany, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
 
 	# Virtual
 	@classmethod
@@ -612,11 +637,11 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def translation(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, translation = None, language = None, limit = None, level = None, cache = None):
+	def translation(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, translation = None, language = None, limit = None, level = None, cache = None, threaded = None):
 		if translation is None: translation = MetaProvider.TranslationTitle
 		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, strict = False)
 
-		result = self._cacheDefault(cache = cache, timeout = MetaProvider.CacheTranslation, function = self._translation, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = translation, level = level)
+		result = self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheTranslation, function = self._translation, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = translation, level = level)
 
 		if result:
 			if not language is None:
@@ -660,12 +685,12 @@ class MetaProvider(object):
 		return result
 
 	@classmethod
-	def translationTitle(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None):
-		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationTitle, language = language, limit = limit, level = level, cache = cache)
+	def translationTitle(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None, threaded = None):
+		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationTitle, language = language, limit = limit, level = level, cache = cache, threaded = threaded)
 
 	@classmethod
-	def translationOverview(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None):
-		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationOverview, language = language, limit = limit, level = level, cache = cache)
+	def translationOverview(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None, threaded = None):
+		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationOverview, language = language, limit = limit, level = level, cache = cache, threaded = threaded)
 
 	# Virtual
 	@classmethod

@@ -144,7 +144,7 @@ class Episodes(object):
 
 					items = self.mMetatools.filterRelease(items = items) # Must be after detailed metadata retrieval, since TVmaze has the incorrect aired date.
 					items = self.mMetatools.filterDuplicate(items = items)
-					if limit is None: limit = self.mMetatools.settingsPageEpisode() # Since mutiple lists are requested, there can be too many items.
+					if limit is None: limit = self.mLimit # Since mutiple lists are requested, there can be too many items.
 
 			else:
 				if self.mInterleave and Math.negative(season):
@@ -154,7 +154,7 @@ class Episodes(object):
 
 			# Limit the number of episodes shown for indirect or flattened episode menus (eg Trakt Progress list).
 			# Otherwise menus with many episodes per season take too long to load and the user probably does not access the last episodes in the list anyway.
-			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if (episode is None or self.mInterleave) else self.mMetatools.settingsPageMixed()
+			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMixed()
 
 			items = self.mMetatools.filterNumber(items = items, season = season, episode = episode, single = single)
 		except: Logger.error()
@@ -207,7 +207,7 @@ class Episodes(object):
 		# Manually handle paging.
 
 		page = 1
-		if limit is None: limit = self.mMetatools.settingsPageEpisode()
+		if limit is None: limit = self.mLimit
 		parameters = Networker.linkParameters(link = link)
 		if 'limit' in parameters and 'page' in parameters: page = int(parameters['page'])
 
@@ -329,7 +329,7 @@ class Episodes(object):
 		if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 		items = self.sort(items = items, type = 'release')
 
-		if limit is None: limit = self.mMetatools.settingsPageEpisode()
+		if limit is None: limit = self.mLimit
 
 		# Filter by release date must be after detailed metadata retrieval, since TVmaze has the incorrect aired date.
 		return self.process(items = items, menu = menu, duplicate = True, release = True, limit = limit, refresh = refresh, mixed = True)
@@ -790,8 +790,7 @@ class Episodes(object):
 
 		result = []
 		threads = []
-		for link in links:
-			threads.append(Pool.thread(target = _tvmazeSchedule, kwargs = {'result' : result, 'link' : link, 'limit' : limit}, start = True))
+		for link in links: threads.append(Pool.thread(target = _tvmazeSchedule, kwargs = {'result' : result, 'link' : link, 'limit' : limit}, start = True))
 		[thread.join() for thread in threads]
 
 		return result
@@ -952,11 +951,11 @@ class Episodes(object):
 	# PACK
 	##############################################################################
 
-	def pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
-		if cache: return self.mCache.cacheLong(self._pack, idImdb = idImdb, idTvdb = idTvdb, title = title, year = year)
-		else: return self._pack(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year)
+	def pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True, threaded = True):
+		if cache: return self.mCache.cacheLong(self._pack, idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = threaded)
+		else: return self._pack(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = threaded)
 
-	def _pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None):
+	def _pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, threaded = True):
 		if not idTvdb:
 			ids = self.metadataId(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year)
 			if ids:
@@ -968,7 +967,7 @@ class Episodes(object):
 					if not idTrakt and 'trakt' in ids['id']: idTrakt = ids['id']['trakt']
 
 		if idTvdb:
-			manager = MetaManager(provider = MetaManager.ProviderTvdb)
+			manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = threaded)
 			show = manager.show(idTvdb = idTvdb, level = MetaManager.Level4)
 			if show: return self.mMetatools.pack(show = show, extended = self.mDetail == MetaTools.DetailExtended, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt)
 
@@ -1000,6 +999,7 @@ class Episodes(object):
 			if not item['season'] == 0:
 				if seasonLast is None or item['season'] > seasonLast: seasonLast = item['season']
 				if 'pack' in item and item['pack']: pack = item['pack']
+
 				if time:
 					time = Time.integer(time)
 					if not item['season'] == 1 and (timeStart is None or time < timeStart): timeStart = time # Include all specials prior to S01E01.
@@ -1059,14 +1059,17 @@ class Episodes(object):
 							result.append(item)
 
 						# For specials between seasons, determine if the special is closer to the current or the previous/next season.
-						elif (timeStart is None or time < timeStart) and timePrevious:
+						# Check for "time >= timePrevious"  and "time <= timeNext" for Trakt mixed submenus that are not devided strictly according to seasons.
+						elif (timeStart is None or time < timeStart) and timePrevious and time >= timePrevious:
 							differenceCurrent = abs(timeStart - time)
 							differencePrevious = abs(timePrevious - time)
-							if differenceCurrent < differencePrevious: result.append(item)
-						elif (timeEnd is None or time > timeEnd) and timeNext:
+							if differenceCurrent < differencePrevious:
+								result.append(item)
+						elif (timeEnd is None or time > timeEnd) and timeNext and time <= timeNext:
 							differenceCurrent = abs(timeEnd - time)
 							differenceNext = abs(timeNext - time)
-							if differenceCurrent < differenceNext: result.append(item)
+							if differenceCurrent < differenceNext:
+								result.append(item)
 				else:
 					result.append(item)
 		else:
@@ -1085,7 +1088,8 @@ class Episodes(object):
 	# The only reason for intermediary caching is if the metadata is imcomplete, and on subsequent menu loading, all of the show's metadata is requested again, even though some of them might have suceeded previously.
 	# quick = Quickly retrieve items from cache without holding up the process of retrieving detailed metadata in the foreground. This is useful if only a few random items are needed from the list and not all of them.
 	# quick = positive integer (retrieve the given number of items in the foreground and the rest in the background), negative integer (retrieve the given number of items in the foreground and do not retrieve the rest at all), True (retrieve whatever is in the cache and the rest in the background - could return no items at all), False (retrieve whatever is in the cache and the rest not at all - could return no items at all).
-	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, detailed = True, refresh = False, cache = False):
+	# threaded = If sub-function calls should use threads or not. None: threaded for single item, non-threaded for multiple items. True: threaded. False: non-threaded.
+	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, detailed = True, refresh = False, cache = False, threaded = None):
 		try:
 			pickSingle = False
 			pickSingles = False
@@ -1105,7 +1109,7 @@ class Episodes(object):
 				# Make sure this is not executed if +0.0 is passed in, meaning retrieve all episodes the Special season.
 				elif not season is None and Math.negative(season):
 					items = []
-					limit = self.mMetatools.settingsPageFlatten() if (episode is None or self.mInterleave) else self.mMetatools.settingsPageMixed()
+					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMixed()
 
 					if self.mInterleave: items.append({'imdb' : idImdb, 'tmdb' : idTmdb, 'tvdb' : idTvdb, 'trakt' : idTrakt, 'title' : title, 'year' : year, 'season' : 0})
 
@@ -1120,7 +1124,7 @@ class Episodes(object):
 					specialEpisode = self.mMetatools.settingsShowSpecialEpisode()
 
 					# Reduce the number of seasons to retrieve if they do not exist in the first place or if they are not included in the menu.
-					show = Shows().metadata(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year)
+					show = Shows().metadata(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = True)
 					if show and 'pack' in show and show['pack']:
 						seasonLast = max([i['number'][MetaData.NumberOfficial] for i in show['pack']['seasons']])
 						for i in show['pack']['seasons']: # Do in a separate loop, since the loop below breaks.
@@ -1152,19 +1156,26 @@ class Episodes(object):
 				# Not sure if there is any place where this function is called that actually wants None for seasonLast/episodeLast?
 				items = [item for item in items if (not 'seasonLast' in item or not item['seasonLast'] is None) and (not 'episodeLast' in item or not item['episodeLast'] is None)]
 
+				if threaded is None: threaded = len(items) == 1
+
 				lock = Lock()
 				locks = {}
-				semaphore = Semaphore(self.mMetatools.concurrencyTasks(media = self.mMedia, hierarchical = self.mModeHierarchical))
+				semaphore = Semaphore(self.mMetatools.concurrency(media = self.mMedia, hierarchical = self.mModeHierarchical))
 				metacache = MetaCache.instance()
 
 				if next and pickNext:
 					threadsNext = []
 					itemsNext = self.metadataIncrementing(items = items, filter = True)
 					if itemsNext:
-						for item in itemsNext:
+						if len(itemsNext) == 1:
 							semaphore.acquire()
-							threadsNext.append(Pool.thread(target = self.metadataIncrement, kwargs = {'item' : item, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache}, start = True))
-						[thread.join() for thread in threadsNext]
+							item = itemsNext[0]
+							self.metadataIncrement(item = item, lock = lock, locks = locks, semaphore = semaphore, cache = cache, threaded = threaded)
+						else:
+							for item in itemsNext:
+								semaphore.acquire()
+								threadsNext.append(Pool.thread(target = self.metadataIncrement, kwargs = {'item' : item, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache, 'threaded' : threaded}, start = True))
+							[thread.join() for thread in threadsNext]
 					items = [i for i in items if not 'invalid' in i or not i['invalid']] # No more episodes available.
 					items = [i for i in items if 'episode' in i and not i['episode'] is None] # metadataIncrement() can return without adding the 'invalid' attribute. Filter out all items without a valid episode number.
 
@@ -1175,6 +1186,7 @@ class Episodes(object):
 					threadsBackground = []
 
 					items = metacache.select(type = MetaCache.TypeEpisode, items = items)
+					threadsSingle = len(items) == 1
 
 					if quick is None:
 						for item in items:
@@ -1183,10 +1195,11 @@ class Episodes(object):
 							if refreshing == MetaCache.RefreshForeground or refresh:
 								self.mMetatools.busyStart(media = self.mMedia, item = item)
 								semaphore.acquire()
-								threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
+								if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
+								else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
 							elif refreshing == MetaCache.RefreshBackground:
 								if not self.mMetatools.busyStart(media = self.mMedia, item = item):
-									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
+									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 					else:
 						items = Tools.listShuffle(items)
 						lookup = []
@@ -1203,10 +1216,11 @@ class Episodes(object):
 									self.mMetatools.busyStart(media = self.mMedia, item = item)
 									lookup.append(item)
 									semaphore.acquire()
-									threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'foreground'}, start = True))
+									if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
+									else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
 							elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 								if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
-									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'mode' : 'background'})
+									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 						items = lookup
 
 					# Wait for metadata that does not exist in the metacache.
@@ -1217,10 +1231,14 @@ class Episodes(object):
 					# Only start the threads here, so that background threads do not interfere or slow down the foreground threads.
 					if threadsBackground:
 						def _metadataBackground():
-							for i in range(len(threadsBackground)):
+							if len(threadsBackground) == 1:
 								semaphore.acquire()
-								threadsBackground[i] = Pool.thread(target = self.metadataUpdate, kwargs = threadsBackground[i], start = True)
-							[thread.join() for thread in threadsBackground]
+								self.metadataUpdate(**threadsBackground[0])
+							else:
+								for i in range(len(threadsBackground)):
+									semaphore.acquire()
+									threadsBackground[i] = Pool.thread(target = self.metadataUpdate, kwargs = threadsBackground[i], start = True)
+								[thread.join() for thread in threadsBackground]
 							if metadataBackground: metacache.insert(type = MetaCache.TypeEpisode, items = metadataBackground)
 
 						# Make a deep copy of the items, since the items can be edited below (added pack and seasonNext/seasonPrevious/seasonCurrent) while these threads are still busy, and we do not want to store the extra details in the database.
@@ -1252,7 +1270,7 @@ class Episodes(object):
 					except: pass
 
 			# Add detailed season metadata.
-			self.metadataAggregate(items = items)
+			self.metadataAggregate(items = items, threaded = threaded)
 
 			# Re-add next page to individual episodes.
 			for item in items:
@@ -1304,7 +1322,7 @@ class Episodes(object):
 		except: Logger.error()
 		return None
 
-	def metadataUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, filter = None, cache = False, mode = None):
+	def metadataUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, filter = None, cache = False, threaded = None, mode = None):
 		try:
 			id = None
 			complete = True
@@ -1360,7 +1378,7 @@ class Episodes(object):
 			developer = self.metadataDeveloper(idImdb = idImdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, item = item, season = numberSeason)
 			if developer: Logger.log('EPISODE METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
 
-			season = Seasons().metadata(idImdb = idImdb, idTvdb = idTvdb, season = numberSeason)
+			season = Seasons().metadata(idImdb = idImdb, idTvdb = idTvdb, season = numberSeason, threaded = threaded)
 			if not season:
 				Memory.set(id = id, value = {}, local = True, kodi = False)
 				return False
@@ -1370,29 +1388,29 @@ class Episodes(object):
 
 			if self.mDetail == MetaTools.DetailEssential:
 				requests = [
-					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : False, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
+					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : False, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
 				]
 			elif self.mDetail == MetaTools.DetailStandard:
 				requests = [
-					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'trakt', 'function' : self.metadataTrakt, 'parameters' : {'idImdb' : idImdb, 'idTrakt' : idTrakt, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : False, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
+					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'trakt', 'function' : self.metadataTrakt, 'parameters' : {'idImdb' : idImdb, 'idTrakt' : idTrakt, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : False, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
 				]
 			elif self.mDetail == MetaTools.DetailExtended:
 				requests = [
-					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'trakt', 'function' : self.metadataTrakt, 'parameters' : {'idImdb' : idImdb, 'idTrakt' : idTrakt, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : True, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'tmdb', 'function' : self.metadataTmdb, 'parameters' : {'idTmdb' : idTmdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
-					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache}},
+					{'id' : 'tvdb', 'function' : self.metadataTvdb, 'parameters' : {'idImdb' : idImdb, 'idTvdb' : idTvdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'trakt', 'function' : self.metadataTrakt, 'parameters' : {'idImdb' : idImdb, 'idTrakt' : idTrakt, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'imdb', 'function' : self.metadataImdb, 'parameters' : {'idImdb' : idImdb, 'season' : numberSeason, 'full' : True, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'tmdb', 'function' : self.metadataTmdb, 'parameters' : {'idTmdb' : idTmdb, 'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
+					{'id' : 'tvmaze', 'function' : self.metadataTvmaze, 'parameters' : {'season' : numberSeason, 'item' : item, 'language' : self.mLanguage, 'cache' : cache, 'threaded' : threaded}},
 				]
 			else:
 				requests = []
 
-			datas = self.metadataRetrieve(requests = requests)
+			datas = self.metadataRetrieve(requests = requests, threaded = threaded)
 
 			data = {'episodes' : []}
 			images = {}
@@ -1549,7 +1567,7 @@ class Episodes(object):
 			if semaphore: semaphore.release()
 			self.mMetatools.busyFinish(media = self.mMedia, item = item)
 
-	def metadataAggregate(self, items):
+	def metadataAggregate(self, items, threaded = None):
 		# Adding the previous/current/next season metadata to individual episodes in metadataUpdate() is a bad idea, since the metadata is saved to the MetaCache database.
 		# This increases the database size to quickly grow beyond 1GB+.
 		# Especially for shows with many seasons, and seasons with a lot of episodes (eg S00 - Specials), this can easily increase the database size by more than 50%.
@@ -1575,7 +1593,7 @@ class Episodes(object):
 					seasons.append({'imdb' : idImdb, 'tvdb' : idTvdb})
 				except: Logger.error()
 			seasons = Tools.listUnique(seasons)
-			seasons = Seasons().metadata(items = seasons) if seasons else None
+			seasons = Seasons().metadata(items = seasons, threaded = threaded) if seasons else None
 
 			if seasons:
 				for item in items:
@@ -1644,7 +1662,7 @@ class Episodes(object):
 		return None
 
 	# requests = [{'id' : required-string, 'function' : required-function, 'parameters' : optional-dictionary}, ...]
-	def metadataRetrieve(self, requests):
+	def metadataRetrieve(self, requests, threaded = None):
 		def _metadataRetrieve(request, result):
 			try:
 				if 'parameters' in request: data = request['function'](**request['parameters'])
@@ -1653,12 +1671,18 @@ class Episodes(object):
 			except:
 				Logger.error()
 				result[request['id']] = None
+
 		result = {}
 		if requests:
-			threads = []
-			for request in requests:
-				threads.append(Pool.thread(target = _metadataRetrieve, kwargs = {'request' : request, 'result' : result}, start = True))
-			[thread.join() for thread in threads]
+			if threaded is None: threaded = len(requests) > 1
+			if threaded:
+				threads = []
+				for request in requests:
+					threads.append(Pool.thread(target = _metadataRetrieve, kwargs = {'request' : request, 'result' : result}, start = True))
+				[thread.join() for thread in threads]
+			else:
+				for request in requests:
+					_metadataRetrieve(request = request, result = result)
 		return result
 
 	def metadataRequest(self, link, data = None, headers = None, method = None, cache = True):
@@ -1717,7 +1741,7 @@ class Episodes(object):
 		except: Logger.error()
 		return result if filter else False
 
-	def metadataIncrement(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, item = None, lock = None, locks = None, semaphore = None, cache = False):
+	def metadataIncrement(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, item = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None):
 		try:
 			if idImdb is None: idImdb = str(item['imdb']) if item and 'imdb' in item and item['imdb'] else None
 			if idTmdb is None: idTmdb = str(item['tmdb']) if item and 'tmdb' in item and item['tmdb'] else None
@@ -1761,7 +1785,7 @@ class Episodes(object):
 
 			developer = self.metadataDeveloper(idImdb = idImdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, item = item)
 			try:
-				pack = Seasons().metadata(idImdb = idImdb, idTvdb = idTvdb, season = season, cache = cache)['pack']['seasons']
+				pack = Seasons().metadata(idImdb = idImdb, idTvdb = idTvdb, season = season, cache = cache, threaded = threaded)['pack']['seasons']
 				if not pack: raise Exception()
 			except:
 				if developer: Logger.log('CANNOT DETERMINE NEXT EPISODE: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
@@ -1816,7 +1840,7 @@ class Episodes(object):
 			if semaphore: semaphore.release()
 			return None
 
-	def metadataTrakt(self, idImdb = None, idTrakt = None, season = None, language = None, item = None, people = False, cache = False):
+	def metadataTrakt(self, idImdb = None, idTrakt = None, season = None, language = None, item = None, people = False, cache = False, threaded = None):
 		complete = True
 		result = None
 		try:
@@ -1830,7 +1854,7 @@ class Episodes(object):
 				# This actually gets the people for the season, since getting them for each episode requires multiple API calls.
 				if people: requests.append({'id' : 'people', 'function' : trakt.getPeopleShow, 'parameters' : {'id' : id, 'season' : season, 'full' : True, 'cache' : cache, 'failsafe' : True}})
 
-				data = self.metadataRetrieve(requests = requests)
+				data = self.metadataRetrieve(requests = requests, threaded = threaded)
 				if data:
 					dataSeason = data['season']
 					dataPeople = data['people'] if people else None
@@ -1921,12 +1945,12 @@ class Episodes(object):
 		except: Logger.error()
 		return {'provider' : 'trakt', 'complete' : complete, 'data' : result}
 
-	def metadataTvdb(self, idImdb = None, idTvdb = None, season = None, language = None, item = None, cache = False):
+	def metadataTvdb(self, idImdb = None, idTvdb = None, season = None, language = None, item = None, cache = False, threaded = None):
 		complete = True
 		result = None
 		try:
 			if idTvdb or idImdb:
-				manager = MetaManager(provider = MetaManager.ProviderTvdb)
+				manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDynamic if threaded is False else threaded)
 				show = manager.show(idTvdb = idTvdb, idImdb = idImdb, level = MetaManager.Level6, numberSeason = season, cache = cache)
 				if show and show.idTvdb():
 					seasons = show.season(sort = True)
@@ -2146,7 +2170,7 @@ class Episodes(object):
 		except: Logger.error()
 		return {'provider' : 'tvdb', 'complete' : complete, 'data' : result}
 
-	def metadataTmdb(self, idTmdb = None, season = None, language = None, item = None, cache = False):
+	def metadataTmdb(self, idTmdb = None, season = None, language = None, item = None, cache = False, threaded = None):
 		complete = True
 		result = None
 		try:
@@ -2157,9 +2181,10 @@ class Episodes(object):
 					if language: data['language'] = language
 					return self.metadataRequest(method = Networker.MethodGet, link = link, data = data, cache = cache)
 
-				data = self.metadataRetrieve(requests = [
+				requests = [
 					{'id' : 'season', 'function' : _metadataTmdb, 'parameters' : {'id' : idTmdb, 'season' : season, 'language' : language, 'cache' : cache}},
-				])
+				]
+				data = self.metadataRetrieve(requests = requests, threaded = threaded)
 
 				if data:
 					dataSeason = data['season']
@@ -2252,7 +2277,7 @@ class Episodes(object):
 		except: Logger.error()
 		return {'provider' : 'tmdb', 'complete' : complete, 'data' : result}
 
-	def metadataImdb(self, idImdb = None, season = None, language = None, full = False, item = None, cache = False):
+	def metadataImdb(self, idImdb = None, season = None, language = None, full = False, item = None, cache = False, threaded = None):
 		# Only do this if there is no IMDb rating in in the item, that is, the item does not come from a IMDb list.
 		# Retrieving the detailed IMDb data does not really add extra metadata above TMDb/Trakt, except for the rating/vote and the revenue (which is also on TMDb).
 		# A single IMDb page is more than 200KB.
@@ -2313,7 +2338,7 @@ class Episodes(object):
 
 		return results
 
-	def metadataTvmaze(self, season = None, language = None, item = None, cache = False):
+	def metadataTvmaze(self, season = None, language = None, item = None, cache = False, threaded = None):
 		complete = True
 		result = {'episodes' : []}
 		try:

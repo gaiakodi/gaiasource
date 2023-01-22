@@ -21,12 +21,12 @@
 from lib.meta.data import MetaData
 from lib.meta.image import MetaImage
 
-from lib.modules.tools import Media, Language, Country, Tools, Converter, Regex, Logger, System, Settings, Selection, Kids, Time, Hardware
+from lib.modules.tools import Media, Language, Country, Tools, Converter, Regex, Logger, System, Settings, Selection, Kids, Time
 from lib.modules.interface import Context, Directory, Icon, Format, Translation, Skin, Font
 from lib.modules.convert import ConverterTime
 from lib.modules.theme import Theme
 from lib.modules.cache import Cache, Memory
-from lib.modules.concurrency import Lock
+from lib.modules.concurrency import Pool, Lock
 from lib.modules.video import Recap, Review, Extra, Deleted, Making, Director, Interview, Explanation
 
 class MetaTools(object):
@@ -82,8 +82,7 @@ class MetaTools(object):
 	###################################################################
 
 	def __init__(self):
-		self.mPerformance = Hardware.performanceType()
-		self.mConcurrencyTasks = {}
+		self.mConcurrency = {}
 
 		self.mSettingsDetail = Settings.getString('metadata.general.detail').lower()
 		self.mSettingsExternal = not Settings.getString('metadata.general.external') == Translation.string(32302) # Enable by default if user has a different language set.
@@ -322,6 +321,10 @@ class MetaTools(object):
 	# SETTINGS
 	###################################################################
 
+	@classmethod
+	def settingsInitialize(self):
+		self.settingsExternalInitialize()
+
 	def settingsLanguage(self):
 		return self.mSettingsLanguage
 
@@ -394,8 +397,14 @@ class MetaTools(object):
 		Settings.set('metadata.general.external', Translation.string(32301 if enabled else 32302))
 
 	@classmethod
+	def settingsExternalInitialize(self):
+		from lib.modules.tools import Extension
+		if not Extension.installed(id = Extension.IdGaiaMetadata):
+			Settings.set('metadata.general.external', Translation.string(35859))
+
+	@classmethod
 	def settingsExternalHas(self):
-		return Settings.defaultIs('metadata.general.external')
+		return not Settings.defaultIs('metadata.general.external')
 
 	@classmethod
 	def settingsExternalShow(self, settings = False):
@@ -410,70 +419,16 @@ class MetaTools(object):
 	# Kodi can run out of threads if we load the Trakt show arrivals list the first time.
 	# Too many sub-threads are created to retrieve shows, seasons, and episodes, all within the same execution.
 	# hierarchical: retrieve a list of episodes from different shows, each of them retrieving their own season and show metadata.
-	def concurrencyTasks(self, media = None, hierarchical = False):
+	def concurrency(self, media = None, hierarchical = False):
 		id = str(media) + '_' + str(hierarchical)
-		if not id in self.mConcurrencyTasks:
-			tasks = 50
-			change = None
-			if media == Media.TypeEpisode:
-				change = {
-					Hardware.PerformanceBad : -30,
-					Hardware.PerformancePoor : -25,
-					Hardware.PerformanceMedium : -20,
-					Hardware.PerformanceGood : -10,
-					Hardware.PerformanceExcellent : 0,
-				}
-			elif media == Media.TypeSeason:
-				change = {
-					Hardware.PerformanceBad : -20,
-					Hardware.PerformancePoor : -15,
-					Hardware.PerformanceMedium : -10,
-					Hardware.PerformanceGood : -5,
-					Hardware.PerformanceExcellent : 0,
-				}
-			elif media == Media.TypeShow:
-				change = {
-					Hardware.PerformanceBad : -20,
-					Hardware.PerformancePoor : -15,
-					Hardware.PerformanceMedium : -10,
-					Hardware.PerformanceGood : -5,
-					Hardware.PerformanceExcellent : 0,
-				}
-			else:
-				change = {
-					Hardware.PerformanceBad : -10,
-					Hardware.PerformancePoor : -7,
-					Hardware.PerformanceMedium : -5,
-					Hardware.PerformanceGood : 0,
-					Hardware.PerformanceExcellent : 0,
-				}
-
-			try:
-				change = change[self.mPerformance]
-			except:
-				Logger.error()
-				change = 0
-
-			tasks += change
-
+		if not id in self.mConcurrency:
+			tasks = Pool.limitTask()
 			if hierarchical:
-				change = {
-					Hardware.PerformanceBad : 3.0,
-					Hardware.PerformancePoor : 2.5,
-					Hardware.PerformanceMedium : 2.0,
-					Hardware.PerformanceGood : 1.5,
-					Hardware.PerformanceExcellent : 1.0,
-				}
-				try:
-					change = change[self.mPerformance]
-				except:
-					Logger.error()
-					change = 1.0
-				tasks = max(10, int(tasks / change))
-
-			self.mConcurrencyTasks[id] = tasks
-
-		return self.mConcurrencyTasks[id]
+				from lib.modules.tools import Hardware, Math
+				adjust = Math.scale(Hardware.performanceRating(), fromMinimum = 0, fromMaximum = 1, toMinimum = 0.6, toMaximum = 0.9)
+				tasks = max(10, tasks * adjust)
+			self.mConcurrency[id] = max(3, int(tasks))
+		return self.mConcurrency[id]
 
 	###################################################################
 	# NETWORK
@@ -547,8 +502,21 @@ class MetaTools(object):
 				try: del parameters['episode']
 				except: pass
 			else: # Submenus for mixed episode menus.
-				parameters['season'] = -1 * float(metadata['season'] if 'season' in metadata else 1)
-				parameters['episode'] = -1 * float(metadata['episode'] + int(increment))
+				# Include the last 2 watched episodes, in case the user wants to rewatch them (aka fell asleep yesterday while watching).
+				season = metadata['season'] if 'season' in metadata else 1
+				episode = metadata['episode'] + int(increment)
+				if reduce is None:
+					episode -= 2
+					if season > 1 and episode <= 0 and 'pack' in metadata and metadata['pack']:
+						try:
+							for i in metadata['pack']['seasons']:
+								if i['number'][MetaData.NumberOfficial] == season:
+									season -= 1
+									episode = i['count'] + episode - 1
+									break
+						except: Logger.error()
+				parameters['season'] = -1 * float(season)
+				parameters['episode'] = -1 * float(max(1, episode))
 
 		# Season recaps and extras.
 		if 'query' in metadata: parameters['title'] = parameters['tvshowtitle'] = metadata['query']
@@ -726,8 +694,7 @@ class MetaTools(object):
 
 		seasons = []
 		items = []
-		itemRecap = None
-		itemExtra = None
+		itemsMore = []
 
 		for metadata in metadatas:
 			try:
@@ -767,29 +734,43 @@ class MetaTools(object):
 
 					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
 					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
+					# There can be multiple recaps/extras for mixed submenus (if the number of episodes listed is less than the navigation.page.mixed).
 					if recap or extra:
 						cleaned = Tools.update(self.copy(metadata), item['metadata'])
 						if recap:
 							item = self.itemRecap(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemRecap = (len(items) - 1, item)
+							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialRecap, 'item' : item})
 						if extra:
 							item = self.itemExtra(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemExtra = (len(items) + 1, item)
+							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialExtra, 'item' : item})
 			except: Logger.error()
 
-		# If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
-		offset = 0
-		if itemRecap:
-			index = itemRecap[0]
-			for i in range(index, -1, -1):
-				if seasons[i] == 0: index -= 1
-			items.insert(index, itemRecap[1])
-			offset = 1
-		if itemExtra:
-			index = itemExtra[0]
-			for i in range(index, len(seasons)):
-				if seasons[i] == 0: index += 1
-			items.insert(index + offset, itemExtra[1])
+		if itemsMore:
+			offset = 0
+			for itemMore in itemsMore:
+				index = 0
+				itemIndex = itemMore['index']
+				itemSeason = itemMore['season']
+				itemMedia = itemMore['media']
+				if itemMedia == Media.TypeSpecialRecap:
+					for i in range(itemIndex, -1, -1): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
+						if seasons[i] == 0: index -= 1
+						elif seasons[i] < itemSeason: break
+					for i in range(itemIndex, len(seasons)):
+						if seasons[i] > 0 and seasons[i] >= itemSeason:
+							index += i
+							break
+				elif itemMedia == Media.TypeSpecialExtra:
+					for i in range(itemIndex, len(seasons)): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
+						if seasons[i] == 0: index += 1
+						elif seasons[i] > itemSeason: break
+					for i in range(itemIndex, -1, -1):
+						if seasons[i] > 0 and seasons[i] <= itemSeason:
+							index += i + 1
+							break
+
+				items.insert(index + offset, itemMore['item'])
+				offset += 1
 
 		if next:
 			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids)
@@ -1495,10 +1476,11 @@ class MetaTools(object):
 						metadata = self.copy(metadataPrevious if metadataPrevious else metadataCurrent)
 						if not metadata: return None
 
-						if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(metadataCurrent[MetaImage.Attribute]), data = metadata)
-						if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow)
-						if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious)
-						if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext)
+						# Copy images, otherwise if there is an Extras from the previous season and a Recap from the next seasons (eg: Trakt progress submenu), the image dictionary is changed, causing exceptions.
+						if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+						if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow, copy = True)
+						if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious, copy = True)
+						if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext, copy = True)
 
 						for i in ['episode', 'premiered', 'aired', 'genre', 'duration', 'airs', 'voting', 'rating', 'votes', 'userrating', 'labelBefore', 'labelAfter', 'plotBefore', 'plotAfter']:
 							try: del metadata[i]
@@ -1573,10 +1555,11 @@ class MetaTools(object):
 							metadata = self.copy(metadataCurrent if metadataCurrent else metadataNext)
 							if not metadata: return None
 
-							if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(metadataCurrent[MetaImage.Attribute]), data = metadata)
-							if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow)
-							if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious)
-							if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext)
+							# Copy images, otherwise if there is an Extras from the previous season and a Recap from the next seasons (eg: Trakt progress submenu), the image dictionary is changed, causing exceptions.
+							if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+							if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow, copy = True)
+							if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious, copy = True)
+							if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext, copy = True)
 
 							for i in ['episode', 'premiered', 'aired', 'genre', 'duration', 'airs', 'voting', 'rating', 'votes', 'userrating', 'labelBefore', 'labelAfter', 'plotBefore', 'plotAfter']:
 								try: del metadata[i]
@@ -2572,7 +2555,7 @@ class MetaTools(object):
 				if idImdb or idTvdb or idTmdb: # TVDb does not have the Trakt ID.
 					if manager is None:
 						from lib.meta.manager import MetaManager
-						manager = MetaManager(provider = MetaManager.ProviderTvdb)
+						manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDisable)
 					lookup = True
 					data = manager.search(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, media = MetaData.MediaShow, limit = 1, cache = False)
 					if data:
@@ -2608,7 +2591,7 @@ class MetaTools(object):
 					from lib.modules.clean import Title
 					if manager is None:
 						from lib.meta.manager import MetaManager
-						manager = MetaManager(provider = MetaManager.ProviderTvdb)
+						manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDisable)
 					query = Title.clean(title)
 					years = [year, year + 1, year - 1] if year else [None]
 					found = False

@@ -49,7 +49,7 @@ msgid "Genres"
 msgstr ""
 
 msgctxt "#32012"
-msgid "[GAIA-NO-LABEL]"
+msgid "Tasks"
 msgstr ""
 
 msgctxt "#32013"
@@ -1623,7 +1623,7 @@ msgid "Thread limit reached. Restart Kodi."
 msgstr ""
 
 msgctxt "#33246"
-msgid "The thread limit has been reached. No new threads can be created due to hardware limitations and the addon might stop functioning correctly. Please restart Kodi. Try to experiment with the [I]Concurrency Limit[/I]  under the [I]General[/I]  setting if this problem persists."
+msgid "The thread limit has been reached. No new threads can be created due to hardware limitations and the addon might stop functioning correctly. Please restart Kodi. Try to reduce the [I]%s[/I]  setting under the [I]%s[/I]  tab if this problem persists."
 msgstr ""
 
 msgctxt "#33247"
@@ -6503,7 +6503,7 @@ msgid "Specify the concurrency mechanism to use when scraping providers in paral
 msgstr ""
 
 msgctxt "#34476"
-msgid "Limit the total number of threads that can run in parallel. Some low-end devices have a limit on the number of threads that can be created, and if exceeded, you might find [I]\"RuntimeError: can't start new thread\"[/I]  errors in your Kodi log. Note that setting this value too low can [B]slow down[/B] Gaia and can cause a [B]deadlock[/B] leading to Gaia freezing or becoming unresponsive. Only change this setting if absolutely necessary. A value of [I]0[/I]  will allow an unlimited number of threads."
+msgid "Limit the total number of threads that can run in parallel. Some low-end devices have a limit on the number of threads that can be created, and if exceeded, you might find [I]\"RuntimeError: can't start new thread\"[/I]  errors in your Kodi log. Note that setting this value too low can [B]slow down[/B] Gaia and can cause a [B]deadlock[/B] leading to Gaia freezing or becoming unresponsive. Only change this setting if absolutely necessary and try to keep it above [I]100[/I]. A value of [I]0[/I]  will allow an unlimited number of threads. Always reduce the [I]Concurrency Tasks[/I]  setting first before trying to adjust this setting.""
 msgstr ""
 
 msgctxt "#34477"
@@ -6836,6 +6836,10 @@ msgstr ""
 
 msgctxt "#34559"
 msgid "Install a database of preprocessed movie and show metadata to improve menu loading times. This option will install another Gaia addon which requires a substantial amount of free disk space."
+msgstr ""
+
+msgctxt "#34560"
+msgid "Limit the total number of tasks that can run in parallel. A task is a set of related code that has to be executed to achieve a single goal, like retrieving the metadata of a movie or show. Each task can have multiple threads running under it. Some low-end devices have a limit on the number of threads that can be created, and if exceeded, you might find [I]\"RuntimeError: can't start new thread\"[/I]  errors in your Kodi log. Note that setting this value too low can [B]slow down[/B] Gaia. Only change this setting if absolutely necessary and try to keep it above [I]20[/I]. A value of [I]0[/I]  will automatically calculate the limit based on your hardware. Always reduce this setting first before trying to adjust the [I]Concurrency Threads[/I]  setting."
 msgstr ""
 
 
@@ -10520,11 +10524,11 @@ msgid "Cache Limit"
 msgstr ""
 
 msgctxt "#36037"
-msgid "Concurrency Limit"
+msgid "Concurrency Threads"
 msgstr ""
 
 msgctxt "#36038"
-msgid "[GAIA-NO-LABEL]"
+msgid "Concurrency Tasks"
 msgstr ""
 
 msgctxt "#36039"

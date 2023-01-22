@@ -49,7 +49,7 @@ class Provider(ProviderDebrid):
 					except: self.logError()
 
 				if self.verifyBusy(): self.verifyCore()
-				else: self.threadExecute(threads)
+				else: self.threadExecute(threads, limit = self.concurrencyTasks(level = 3))
 		except: self.logError()
 
 	def searchRetrieve(self, id, media, titles, years, numberSeason, numberEpisode, language):

@@ -157,11 +157,8 @@ class Manager(object):
 		def _databaseClearOld():
 			self.streamsDatabaseClearOld()
 			self.linksDatabaseClearOld()
-		if wait:
-			_databaseClearOld()
-		else:
-			thread = Pool.thread(target = _databaseClearOld)
-			thread.start()
+		if wait: _databaseClearOld()
+		else: Pool.thread(target = _databaseClearOld, start = True)
 
 	@classmethod
 	def _database(self):
@@ -2316,10 +2313,10 @@ class Manager(object):
 		limitQuery = scale(rating = rating, minimum = 3, maximum = 10)
 		limitQueryLabel = str(limitQuery)
 
-		limitPage = scale(rating = rating, minimum = 1, maximum = 10)
+		limitPage = scale(rating = rating, minimum = 1, maximum = 8)
 		if tradeoff == Manager.TradeoffSpeed: limitPage -= 2
 		elif tradeoff == Manager.TradeoffResult: limitPage += 2
-		limitPage = min(max(limitPage, 2), 12)
+		limitPage = min(max(limitPage, 2), 10)
 		limitPageLabel = str(limitPage)
 
 		limitRequest = scale(rating = rating, minimum = 250, maximum = 10000, base = 250)
@@ -2413,7 +2410,7 @@ class Manager(object):
 		providersAll = [i[1] for i in providersAll]
 
 		providerMinimum = 5
-		providerMaximum = 50
+		providerMaximum = 40 # 50 upper limit is too much for show scraping, even for high-end devices.
 		providerRating = Math.power(1.5, rating) - 1
 		providerLimit = providerMinimum + scale(rating = providerRating, minimum = 0, maximum = providerMaximum)
 		providerLimit = max(providerMinimum, int(providerLimit))

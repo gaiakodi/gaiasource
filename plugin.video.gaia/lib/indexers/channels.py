@@ -245,7 +245,7 @@ class Channels(object):
 		try:
 			lock = Lock()
 			locks = {}
-			semaphore = Semaphore(self.mMetatools.concurrencyTasks())
+			semaphore = Semaphore(self.mMetatools.concurrency())
 
 			threads = []
 			for item in items:
