@@ -20,7 +20,7 @@ find ./ -type f -exec sed -i -e 's/register_treebuilders_from(_lxml)/#register_t
 #########################################################################################################################
 
 Kodi 19 does not seem to fully support LXML yet, with an error (builder/_lxml.py):
-	
+
 	from lxml import etree
 	SystemError: initialization of etree did not return an extension module
 
@@ -59,7 +59,7 @@ Since LXML is currently not used in Gaia, disable it completely. This could be e
 UPDATE:
 	1. The freeze might be caused by importing modules later on during executions (other modules have cause the same problem). Check what we do in addon.py -> Networker.modulePrepare().
 	2. Note that lxml might be available on Linux, if the package was installed via PIP, since Kodi under Linux uses the OS's Python environment. On windows, Kodi ships  with its own Python, which probably does not have lxml installed. Note that lxml might be avilable in Kodi 20.
-	3. When using the local Python environment with lxml installed, or when using precompiled .so/.pyd files, lxml can be succesfully imported once. Any subsequent imports throw the error:
+	3. When using the local Python environment with lxml installed, or when using precompiled .so/.pyd files, lxml can be successfully imported once. Any subsequent imports throw the error:
 			ImportError: Interpreter change detected - this module can only be loaded into one interpreter per process.
 	   Some more complex modules like lxml (or re2/pyre2) have this restriction. The module can only be imported by one Python interpreter.
 	   When using <reuselanguageinvoker>true</reuselanguageinvoker> for Gaia, this problem can be circumvented, and the already-imported module can be reused, since Kodi will "try" to reuse the interpreter.
@@ -70,12 +70,12 @@ UPDATE:
 		- When Gaia is launched in any other weird way (from skin-shortcuts or from the main menu in Eminence), Kodi starts a new interpreter.
 	   Because there are so many cases under which a new interpreter might be launched, using the local env or precompiled .so/.pyd lxml will not work 90% of the time, and not worth the effort to include it.
 	   Not sure if Kodi 20 will allow multiple interpreters with its native lxml.
-	
+
 
 
 In dammit.py, comment out the self.log.warning(...) statement, otherwise these errors end up in the Kodi log:
 
 2021-11-10 11:38:41.445 T:18200   ERROR <general>: Some characters could not be decoded, and were replaced with REPLACEMENT CHARACTER.
-2021-11-10 11:38:41.445 T:18200   ERROR <general>: 
+2021-11-10 11:38:41.445 T:18200   ERROR <general>:
 
 #########################################################################################################################

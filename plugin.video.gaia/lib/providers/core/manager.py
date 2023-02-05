@@ -2305,7 +2305,7 @@ class Manager(object):
 
 		# Limit
 		# The timeout should acutally be decreased if there is a speed tradeoff, since all the other parameters are decreased (aka smaller timeout needed).
-		limitTime = scale(rating = 1 - ratingOriginal, minimum = 120, maximum = 400) # Use 90 instead of 60 as the minimum, since scrapes, even on a good device, mostly take more than 60 secs. Use 120 instead of 90, since show scraping can take longer than 90 (with packs etc).
+		limitTime = scale(rating = 1 - ratingOriginal, minimum = 150, maximum = 400) # Use 90 instead of 60 as the minimum, since scrapes, even on a good device, mostly take more than 60 secs. Use 120 instead of 90, since show scraping can take longer than 90 (with packs etc). Use 150 instead of 120, since otherwise the timeout on high-end devices are too low.
 		limitTime = Math.roundClosest(value = limitTime * (1 + (tradeoffMultiplier * 1.5)), base = 5)
 		limitTime = min(max(limitTime, 90), 420)
 		limitTimeLabel = ProviderBase.settingsGlobalLimitTimeLabel(value = limitTime)
@@ -2342,7 +2342,15 @@ class Manager(object):
 			# 2x core-count + 1 (13): 87 seconds | 42% CPU load
 			# Unlimited: 84 seconds | 42% CPU load
 			concurrencyMode = ProviderBase.ConcurrencyThread
-			concurrencyLimit = 0
+
+			# Add a concurrency limit, since medium and low-end devices often have a maximum number of threads that can be created and run  in parallel.
+			#concurrencyLimit = 0
+			if performance['processor']['rating'] >= ProviderBase.Performance7:
+				concurrencyLimit = 0
+			else:
+				threads = min(max(threads, 3), 5)
+				concurrencyLimit = scale(rating = rating, minimum = max(2, threads * 1.5), maximum = max(8, threads * 4) + 1)
+
 		concurrencyConnection = 0
 		concurrencyLabel = Translation.string(36039 if concurrencyMode == ProviderBase.ConcurrencyThread else 36040)
 
@@ -2410,7 +2418,7 @@ class Manager(object):
 		providersAll = [i[1] for i in providersAll]
 
 		providerMinimum = 5
-		providerMaximum = 40 # 50 upper limit is too much for show scraping, even for high-end devices.
+		providerMaximum = 35 # 50 upper limit is too much for show scraping, even for high-end devices. 40 is still too much.
 		providerRating = Math.power(1.5, rating) - 1
 		providerLimit = providerMinimum + scale(rating = providerRating, minimum = 0, maximum = providerMaximum)
 		providerLimit = max(providerMinimum, int(providerLimit))

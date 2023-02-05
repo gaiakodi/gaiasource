@@ -14,7 +14,7 @@ There also does not exists a function in Python top unload a module. There is a 
 #########################################################################################################################
 
 When Gaia uses:
-	
+
 	<reuselanguageinvoker>true</reuselanguageinvoker>
 
 Kodi will attempt to reuse the invoker. So the LXML module can be loaded, stored in a global variable, and then reused for subsequent executions with the same interpreter without getting the previous error (since the interpreter obviously does not change). The problem with this approach is that Kodi only "attempts" to reuse the invoker, but does not guarantee it. These are just some cases where Kodi starts a new invoker:
@@ -63,8 +63,9 @@ Another solution would be to wait for Kodi 20. Since Kodi 15 people asked for LX
 
 https://forum.kodi.tv/showthread.php?tid=357725
 https://github.com/fuzzard/xbmc/commit/560f8ec338958a68d6c6888a43bbba4a862f6623
-https://github.com/fuzzard/xbmc/blob/560f8ec338958a68d6c6888a43bbba4a862f6623/tools/depends/target/pythonmodule-lxml/Makefile 
+https://github.com/fuzzard/xbmc/blob/560f8ec338958a68d6c6888a43bbba4a862f6623/tools/depends/target/pythonmodule-lxml/Makefile
 
 I'm not sure if this will solve the "Interpreter change detected" problem. Not even sure if the Kodi devs are aware of this. There seems to be nothing special in the Makefile to address this issue. Even the URL in the Makefile (https://github.com/lxml/lxml/archive) does not work anymore and they use LXML v4.6.2 which is old (2020).
+UPDATE: No, still "Interpreter change detected" problem.
 
 #########################################################################################################################

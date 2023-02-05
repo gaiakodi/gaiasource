@@ -18,6 +18,9 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+try: from xbmc import Actor, VideoStreamDetail, AudioStreamDetail, SubtitleStreamDetail # Kodi 20+
+except: pass
+
 from lib.meta.data import MetaData
 from lib.meta.image import MetaImage
 
@@ -76,6 +79,7 @@ class MetaTools(object):
 	TimeFuture				= 86400 # 1 day.
 
 	PropertyBusy			= 'GaiaMetadataBusy'
+	PropertySelect			= 'GaiaSelect'
 
 	###################################################################
 	# CONSTRUCTOR
@@ -83,6 +87,7 @@ class MetaTools(object):
 
 	def __init__(self):
 		self.mConcurrency = {}
+		self.mKodiNew = System.versionKodiMinimum(version = 20)
 
 		self.mSettingsDetail = Settings.getString('metadata.general.detail').lower()
 		self.mSettingsExternal = not Settings.getString('metadata.general.external') == Translation.string(32302) # Enable by default if user has a different language set.
@@ -92,6 +97,57 @@ class MetaTools(object):
 		self.mMetaAllowed = ['genre', 'country', 'year', 'episode', 'season', 'sortepisode', 'sortseason', 'episodeguide', 'showlink', 'top250', 'setid', 'tracknumber', 'rating', 'userrating', 'watched', 'playcount', 'overlay', 'cast', 'castandrole', 'director', 'mpaa', 'plot', 'plotoutline', 'title', 'originaltitle', 'sorttitle', 'duration', 'studio', 'tagline', 'writer', 'tvshowtitle', 'premiered', 'status', 'set', 'setoverview', 'tag', 'imdbnumber', 'code', 'aired', 'credits', 'lastplayed', 'album', 'artist', 'votes', 'path', 'trailer', 'dateadded', 'mediatype', 'dbid']
 		self.mMetaNonzero = ['genre', 'country', 'year', 'episodeguide', 'showlink', 'top250', 'cast', 'castandrole', 'director', 'mpaa', 'plot', 'plotoutline', 'title', 'originaltitle', 'sorttitle', 'duration', 'studio', 'tagline', 'writer', 'tvshowtitle', 'premiered', 'status', 'set', 'setoverview', 'tag', 'imdbnumber', 'aired', 'credits', 'path', 'trailer', 'dateadded', 'mediatype']
 		self.mMetaExclude = ['userrating', 'watched', 'playcount', 'overlay', 'duration', 'title']
+		self.mMetaFunctions = {
+			'genre'			: 'setGenres',
+			'country'		: 'setCountries',
+			'year'			: 'setYear',
+			'episode'		: 'setEpisode',
+			'season'		: 'setSeason',
+			'sortepisode'	: 'setSortEpisode',
+			'sortseason'	: 'setSortSeason',
+			'episodeguide'	: 'setEpisodeGuide',
+			'showlink'		: 'setShowLinks',
+			'top250'		: 'setTop250',
+			'setid'			: 'setSetId',
+			'tracknumber'	: 'setTrackNumber',
+			'rating'		: 'setRating',
+			'userrating'	: 'setUserRating',
+			'watched'		: None,
+			'playcount'		: 'setPlaycount',
+			'overlay'		: None,
+			'cast'			: None,
+			'castandrole'	: None,
+			'director'		: 'setDirectors',
+			'mpaa'			: 'setMpaa',
+			'plot'			: 'setPlot',
+			'plotoutline'	: 'setPlotOutline',
+			'title'			: 'setTitle',
+			'originaltitle'	: 'setOriginalTitle',
+			'sorttitle'		: 'setSortTitle',
+			'duration'		: 'setDuration',
+			'studio'		: 'setStudios',
+			'tagline'		: 'setTagLine',
+			'writer'		: 'setWriters',
+			'tvshowtitle'	: 'setTvShowTitle',
+			'premiered'		: 'setPremiered',
+			'status'		: 'setTvShowStatus',
+			'set'			: 'setSet',
+			'setoverview'	: 'setSetOverview',
+			'tag'			: 'setTags',
+			'imdbnumber'	: 'setIMDBNumber',
+			'code'			: 'setProductionCode',
+			'aired'			: 'setFirstAired',
+			'credits'		: None,
+			'lastplayed'	: 'setLastPlayed',
+			'album'			: 'setAlbum',
+			'artist'		: 'setArtists',
+			'votes'			: 'setVotes',
+			'path'			: 'setPath',
+			'trailer'		: 'setTrailer',
+			'dateadded'		: 'setDateAdded',
+			'mediatype'		: 'setMediaType',
+			'dbid'			: 'setDbId',
+		}
 
 		self.mStudioIgnore = [
 			'Duplass Brothers Productions',
@@ -502,11 +558,11 @@ class MetaTools(object):
 				try: del parameters['episode']
 				except: pass
 			else: # Submenus for mixed episode menus.
-				# Include the last 2 watched episodes, in case the user wants to rewatch them (aka fell asleep yesterday while watching).
+				# Include the last 3 watched episodes, in case the user wants to rewatch them (aka fell asleep yesterday while watching).
 				season = metadata['season'] if 'season' in metadata else 1
 				episode = metadata['episode'] + int(increment)
 				if reduce is None:
-					episode -= 2
+					episode -= 3
 					if season > 1 and episode <= 0 and 'pack' in metadata and metadata['pack']:
 						try:
 							for i in metadata['pack']['seasons']:
@@ -577,7 +633,7 @@ class MetaTools(object):
 			try: season = metadata['season']
 			except: season = None
 			series = season is None and not 'season' in metadata
-			label = Media.title(type = media, title = title, year = year, season = season, series = series, special = True)
+			label = Media.title(type = media, title = None if mixed else title, year = year, season = season, series = series, special = True)
 		elif media == Media.TypeEpisode:
 			try: title = metadata['title']
 			except: title = None
@@ -587,7 +643,7 @@ class MetaTools(object):
 			except: season = None
 			try: episode = metadata['episode']
 			except: episode = None
-			label = Media.title(type = media, title = title, year = year, season = season, episode = episode)
+			label = Media.title(type = media, title = None if mixed else title, year = year, season = season, episode = episode)
 		else:
 			try: year = metadata['year']
 			except: year = None
@@ -625,27 +681,62 @@ class MetaTools(object):
 		return label
 
 	###################################################################
+	# SELECT
+	###################################################################
+
+	def select(self, items, next = True):
+		index = None
+		for i in range(len(items)):
+			if items[i][1].getProperty(MetaTools.PropertySelect):
+				index = i
+				break
+		if next and not index is None and (index + 1) < len(items): index += 1
+		return index
+
+	###################################################################
 	# STREAM
 	###################################################################
 
-	@classmethod
 	def stream(self, duration = None, videoCodec = None, videoAspect = None, videoWidth = None, videoHeight = None, audioCodec = None, audioChannels = None, audioLanguage = None, subtitleLanguage = None):
 		# https://alwinesch.github.io/group__python__xbmcgui__listitem.html#ga99c7bf16729b18b6378ea7069ee5b138
 
-		video = {}
-		if duration: video[MetaTools.StreamDuration] = duration
-		if videoCodec: video[MetaTools.StreamCodec] = videoCodec
-		if videoAspect: video[MetaTools.StreamAspect] = videoAspect
-		if videoWidth: video[MetaTools.StreamWidth] = videoWidth
-		if videoHeight: video[MetaTools.StreamHeight] = videoHeight
+		audioLanguage = [audioLanguage] if audioLanguage and not Tools.isArray(audioLanguage) else []
+		subtitleLanguage = [subtitleLanguage] if subtitleLanguage and not Tools.isArray(subtitleLanguage) else []
 
-		audio = {}
-		if audioCodec: audio[MetaTools.StreamCodec] = audioCodec
-		if audioChannels: audio[MetaTools.StreamChannels] = audioChannels
-		if audioLanguage: audio[MetaTools.StreamLanguage] = audioLanguage
+		video = []
+		audio = []
+		subtitle = []
 
-		subtitle = {}
-		if subtitleLanguage: audio[MetaTools.StreamLanguage] = subtitleLanguage
+		# Video
+		data = {}
+		if duration: data[MetaTools.StreamDuration] = duration
+		if videoCodec: data[MetaTools.StreamCodec] = videoCodec
+		if videoAspect: data[MetaTools.StreamAspect] = videoAspect
+		if videoWidth: data[MetaTools.StreamWidth] = videoWidth
+		if videoHeight: data[MetaTools.StreamHeight] = videoHeight
+		if data:
+			if self.mKodiNew: data = VideoStreamDetail(**data) # Kodi 20+
+			video.append(data)
+
+		# Audio
+		for i in audioLanguage:
+			if i:
+				data = {}
+				if audioCodec: data[MetaTools.StreamCodec] = audioCodec
+				if audioChannels: data[MetaTools.StreamChannels] = audioChannels
+				data[MetaTools.StreamLanguage] = i
+				if data:
+					if self.mKodiNew: data = AudioStreamDetail(**data) # Kodi 20+
+					audio.append(data)
+
+		# Subtitle
+		for i in subtitleLanguage:
+			if i:
+				data = {}
+				data[MetaTools.StreamLanguage] = i
+				if data:
+					if self.mKodiNew: data = SubtitleStreamDetail(**data) # Kodi 20+
+					subtitle.append(data)
 
 		return {MetaTools.StreamVideo : video, MetaTools.StreamAudio : audio, MetaTools.StreamSubtitle : subtitle}
 
@@ -730,7 +821,7 @@ class MetaTools(object):
 				)
 				if item:
 					if 'season' in metadata: seasons.append(metadata['season'])
-					items.append([item['command'], item['item'], folder])
+					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], folder]})
 
 					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
 					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
@@ -739,10 +830,10 @@ class MetaTools(object):
 						cleaned = Tools.update(self.copy(metadata), item['metadata'])
 						if recap:
 							item = self.itemRecap(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialRecap, 'item' : item})
+							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialRecap, 'item' : {'data' : item}})
 						if extra:
 							item = self.itemExtra(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialExtra, 'item' : item})
+							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialExtra, 'item' : {'data' : item}})
 			except: Logger.error()
 
 		if itemsMore:
@@ -774,9 +865,38 @@ class MetaTools(object):
 
 		if next:
 			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids)
-			if itemNext: items.append(itemNext)
+			if itemNext: items.append({'data' : itemNext})
 
-		return items
+		# Specify the last watched item to  auto-select from view.py.
+		if media == Media.TypeEpisode:
+			plays = []
+			for i in range(len(items)):
+				item = items[i]
+				if 'metadata' in item:
+					metadata = item['metadata']
+					if metadata:
+						play = {'time' : 0, 'count' : 0, 'season' : metadata['season'], 'item' : item['data'][1]}
+						if 'lastplayed' in metadata: play['time'] = Time.integer(metadata['lastplayed'])
+						if 'playcount' in metadata: play['count'] = metadata['playcount']
+						plays.append(play)
+
+			# Ignore specials, except if we are in the specials menu.
+			if len(Tools.listUnique([play['season'] for play in plays])) > 1:
+				plays = [play for play in plays if not play['season'] == 0]
+
+			playItem = None
+			plays.reverse() # Pick the last one with max time/count.
+			try: play = max(plays, key = lambda i : i['time'])
+			except: play = None
+			if play and play['time'] > 0:
+				playItem = play['item']
+			else:
+				try: play = max(plays, key = lambda i : i['count'])
+				except: play = None
+				if play and play['count'] > 0: playItem = play['item']
+			if playItem: playItem.setProperty(MetaTools.PropertySelect, '1')
+
+		return [item['data'] for item in items]
 
 	def itemsExtra(self,
 		metadata,
@@ -913,6 +1033,7 @@ class MetaTools(object):
 					if future > -MetaTools.TimeUnreleased: return None # Released in the past 3 hours or sometime in the future.
 
 		if not item: item = self.itemCreate()
+		tag = self.itemTag(item = item)
 
 		if content:
 			# Add missing attributes.
@@ -920,7 +1041,7 @@ class MetaTools(object):
 			self.itemShow(media = media, item = item, metadata = metadata)
 
 			# Must be before clean() and setInfo().
-			self.itemPlayback(media = media, item = item, metadata = metadata)
+			self.itemPlayback(media = media, item = item, tag = tag, metadata = metadata)
 
 			# Must be before setInfo() and itemPlot().
 			# Must be after itemPlayback().
@@ -968,12 +1089,12 @@ class MetaTools(object):
 		# NB: call setInfo() first, before any of the other functions below.
 		# Otherwise Kodi might replace values set by the other functions with the values from setInfo().
 		# For instance, setInfo() will replace the values set by setCast(), and then actor thumbnails do not show in the Kodi info dialog.
-		item.setInfo(type = 'video', infoLabels = cleaned)
+		self.itemInfo(item = item, tag = tag, metadata = cleaned)
 
-		self.itemId(item = item, metadata = metadata)
-		self.itemVoting(item = item, metadata = metadata)
-		self.itemCast(item = item, metadata = metadata)
-		self.itemStream(item = item, stream = stream)
+		self.itemId(item = item, tag = tag, metadata = metadata)
+		self.itemVoting(item = item, tag = tag, metadata = metadata)
+		self.itemCast(item = item, tag = tag, metadata = metadata)
+		self.itemStream(item = item, tag = tag, stream = stream)
 		self.itemProperty(item = item, properties = properties, playable = playable)
 
 		images = self.itemImage(item = item, media = media, metadata = metadata, images = images, video = video)
@@ -1027,6 +1148,12 @@ class MetaTools(object):
 
 	def itemCreate(self):
 		return self.mDirectory.item()
+
+	def itemTag(self, item):
+		if self.mKodiNew:
+			try: return item.getVideoInfoTag() # Kodi 20+
+			except: pass
+		return False
 
 	def itemShow(self, media, metadata, item):
 		if media == Media.TypeShow or media == Media.TypeSeason:
@@ -1150,17 +1277,31 @@ class MetaTools(object):
 				if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = metadata['plotAfter']
 				else: metadata['plot'] = metadata['plot'] + '\n\n' + metadata['plotAfter']
 
-	def itemId(self, metadata, item):
+	def itemId(self, metadata, item, tag = None):
 		try:
+			if tag is None: tag = self.itemTag(item = item)
 			ids = {}
 			imdb = None
-			for id in ['imdb', 'tmdb', 'tvdb']:
-				if id in metadata and metadata[id]:
+			for id in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
+				if id and id in metadata and metadata[id]:
 					ids[id] = metadata[id]
-					if id == 'imdb': imdb = metadata[id]
-			item.setUniqueIDs(ids, 'imdb')
+					if id == MetaTools.RatingImdb: imdb = metadata[id]
+			try: tag.setUniqueIDs(ids, 'imdb') # Kodi 20+
+			except: item.setUniqueIDs(ids, 'imdb') # Kodi 19
 			if imdb: metadata['imdbnumber'] = imdb
 		except: Logger.error()
+
+	def itemInfo(self, metadata, item, tag = None, type = None):
+		if tag is None: tag = self.itemTag(item = item)
+		if tag: # Kodi 20+
+			for key, value in metadata.items():
+				try:
+					if not value is None:
+						function = self.mMetaFunctions[key]
+						if function: Tools.executeFunction(tag, function, value)
+				except: Logger.error(key)
+		else: # Kodi 19
+			item.setInfo(type = type if type else 'video', infoLabels = metadata)
 
 	def itemFuture(self, metadata, media = None):
 		if 'status' in metadata and MetaData.statusExtract(metadata['status']) == MetaData.StatusEnded: return True
@@ -1197,16 +1338,18 @@ class MetaTools(object):
 
 		return time - self.mTimeCurrent
 
-	def itemVoting(self, metadata, item):
+	def itemVoting(self, metadata, item, tag = None):
 		try:
 			if 'voting' in metadata:
-				for i in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb]:
-					if i in metadata['voting']['rating']:
+				if tag is None: tag = self.itemTag(item = item)
+				for i in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
+					if i  and i in metadata['voting']['rating']:
 						rating = metadata['voting']['rating'][i]
 						if not rating is None and i in metadata['voting']['votes']:
 							votes = metadata['voting']['votes'][i]
 							if votes is None: votes = 0
-							item.setRating(i, rating, votes, False)
+							try: tag.setRating(rating, votes, i, False) # Kodi 20+
+							except: item.setRating(i, rating, votes, False) # Kodi 19
 		except: Logger.error()
 
 	def itemImage(self, media, metadata, item, images = True, video = None):
@@ -1220,7 +1363,7 @@ class MetaTools(object):
 			else: return MetaImage.setExtra(data = metadata, item = item)
 		return None
 
-	def itemCast(self, metadata, item):
+	def itemCast(self, metadata, item, tag = None):
 		# There is a bug in Kodi when setting a ListItem in the Player.
 		# When setting the cast, the name/role/order is added correctly, but for some unknown reason the thumbnail is removed.
 		# This only happens in Kodi's player. The cast thumbnails are correct when creating a directory or showing the movie/show info dialog.
@@ -1253,12 +1396,24 @@ class MetaTools(object):
 					else: castDetail = [{'name' : i} for i in cast]
 
 				# There is a bug in Kodi that the thumbnails are not shown, even if they were set.
-				item.setCast(castDetail)
+				if tag is None: tag = self.itemTag(item = item)
+				try: tag.setCast([Actor(**i) for i in castDetail]) # Kodi 20+
+				except: item.setCast(castDetail) # Kodi 19
 
-	def itemStream(self, stream, item):
+	def itemStream(self, stream, item, tag = None):
 		if stream:
-			for type, data in stream.items():
-				item.addStreamInfo(type, data)
+			if tag is None: tag = self.itemTag(item = item)
+			if tag: # Kodi 20+
+				for type, datas in stream.items():
+					if type == MetaTools.StreamVideo:
+						for data in datas: tag.addVideoStream(data)
+					elif type == MetaTools.StreamAudio:
+						for data in datas: tag.addAudioStream(data)
+					elif type == MetaTools.StreamSubtitle:
+						for data in datas: tag.addSubtitleStream(data)
+			else: # Kodi 19
+				for type, datas in stream.items():
+					for data in datas: item.addStreamInfo(type, data)
 
 	def itemProperty(self, properties, item, playable = None):
 		if not properties: properties = {}
@@ -1267,7 +1422,9 @@ class MetaTools(object):
 			properties['IsPlayable'] = 'true' if playable else 'false'
 		item.setProperties(properties)
 
-	def itemPlayback(self, media, metadata, item):
+	def itemPlayback(self, media, metadata, item, tag = None):
+		if tag is None: tag = self.itemTag(item = item)
+
 		try: idImdb = metadata['imdb']
 		except: idImdb = None
 		try: idTmdb = metadata['tmdb']
@@ -1315,7 +1472,8 @@ class MetaTools(object):
 			if not media == Media.TypeShow and not media == Media.TypeSeason:
 				if 'duration' in metadata and metadata['duration']: resume = progress * metadata['duration']
 				else: resume = progress * (3600 if Media.typeTelevision(media) else 7200)
-				item.setProperty('ResumeTime', str(int(resume)))
+				try: tag.setResumePoint(int(resume))
+				except: item.setProperty('ResumeTime', str(int(resume)))
 
 			# Used by the context menu to add a "Clear Progress" option.
 			if not media == Media.TypeShow and not media == Media.TypeSeason: metadata['progress'] = progress
@@ -1371,7 +1529,9 @@ class MetaTools(object):
 					count, remaining = self.mItemPlayback.count(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, specials = self.mShowCounterSpecial, metadata = metadata, history = playback['history'])
 					metadata['playcount'] = count
 
-				if episodesWatched and episodesUnwatched: item.setProperty('ResumeTime', str(1))
+				if episodesWatched and episodesUnwatched:
+					try: tag.setResumePoint(1)
+					except: item.setProperty('ResumeTime', str(1))
 
 	def itemContext(self,
 		item,
@@ -1407,25 +1567,29 @@ class MetaTools(object):
 		try:
 			if link is None:
 				if not Tools.isArray(metadata): metadata = [metadata]
-				linkFallback = None
+				linkFallback1 = None
+				linkFallback2 = None
 				for value in reversed(metadata): # Do reverse, since in flattened show menus the 'next' attribute might be different for each episode.
 					# Do not check if 'next' has a value, since scanning should stop after the first (or rather last) 'next' has been found.
 					# in episodes.py 'next' can be set to None to avoid a 'Next Page' to be show in flattened show menus if we are on the last page no more seasons).
 					#if 'next' in value and value['next']:
 					if 'next' in value:
-						linkFallback = value['next']
+						if not linkFallback1 or not 'season' in value or not value['season'] == 0: linkFallback1 = value['next']
+						linkFallback2 = value['next']
 						if not self.mShowInterleave or not 'season' in value or not value['season'] == 0: # Skip interleaved special episodes.
 							link = value['next']
 							break
-				if not link: link = linkFallback
+				if not link: link = linkFallback1 or linkFallback2
 
 			if link:
 				if not item: item = self.itemCreate()
+				tag = self.itemTag(item = item)
 				if not media: media = self.media(metadata = metadata[0])
 
 				title = Format.fontItalic(32306)
 				item.setLabel(title)
-				item.setInfo(type = 'video', infoLabels = {'title' : title, 'tagline' : Translation.string(35317), 'plot' : Translation.string(35318)})
+
+				self.itemInfo(item = item, tag = tag, metadata = {'title' : title, 'tagline' : Translation.string(35317), 'plot' : Translation.string(35318)})
 
 				icon = Icon.pathIcon(icon = 'next.png', default = 'DefaultFolder.png')
 				images = {
@@ -1876,13 +2040,13 @@ class MetaTools(object):
 								studios[i] = value
 
 				# Studio logos do not work if there are multiple studios.
-				if studios: metadata['studio'] = studios[0]
+				if studios and not self.mKodiNew: metadata['studio'] = studios[0]
 
 			# Some skins, like Aeon Nox (List View), show the poster in the menu when there is no studio.
 			# This looks ugly, so set an empty studio.
 			# Do not use space or empty string, since it will be ignored by the skin.
 			# Do not use a string that contains visible characters (eg: '0'), since some view types (eg: Aeon Nox - Icons) will show the studio as text if no icon is availble.
-			if empty and not 'studio' in metadata: metadata['studio'] = '\u200c'
+			if empty and not 'studio' in metadata: metadata['studio'] = ['\u200c'] if self.mKodiNew else '\u200c'
 		except: Logger.error()
 
 	@classmethod

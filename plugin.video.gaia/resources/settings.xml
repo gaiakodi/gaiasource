@@ -1,4 +1,4 @@
-<!---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+<!-- ########################################################################################################################################################################################################
 
 GAIA NOTES
 
@@ -20,7 +20,7 @@ There are some problems with Kodi's settings:
 		<setting id="dummy" default="true">false</setting>
 	This is probably a bug in Kodi and might be fixed in the future.
 
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#############################################################################################################################################################################################################
 
 Hidden interval values are defined as:
 
@@ -32,7 +32,7 @@ Add the following if the setting should not be reset on the Default button of th
 
 	<level>4</level>
 
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#############################################################################################################################################################################################################
 
 Kodi is very inefficient with reading/writing settings, or at least that was the case with pre Kodi 19 releases. Old Kodi
 versions did not properly  cache settings and there was disk I/O every time a setting was accessed. The entire addon
@@ -73,16 +73,16 @@ The label is then added to the action element:
 
 	tools.Settings.setData(id = 'dummy', value = {...}, label = 'Custom Settings')
 
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------->
+######################################################################################################################################################################################################## -->
 
 <?xml version="1.0" ?>
 <settings version="1">
 	<section id="plugin.video.gaia">
 
-		<!---------- GENERAL ---------->
+		<!-- ########## GENERAL ########## -->
 		<category id="general" label="32310" help="34090">
 
-			<!---------- GENERAL - LAUNCH ---------->
+			<!-- ########## GENERAL - LAUNCH ########## -->
 			<group id="general.launch" label="33256">
 				<setting id="general.launch.automatic" type="boolean" label="33257" help="34041">
 					<control type="toggle"/>
@@ -125,7 +125,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - LANGUAGE ---------->
+			<!-- ########## GENERAL - LANGUAGE ########## -->
 			<group id="general.language" label="33787">
 				<setting id="general.language.primary" type="string" label="32356" help="34221">
 					<control type="button" format="action">
@@ -153,7 +153,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - KIDS ---------->
+			<!-- ########## GENERAL - KIDS ########## -->
 			<group id="general.kids" label="33429">
 				<setting id="general.kids.locked" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>4</level></setting> <!-- Level 4 to not reset on default -->
 				<setting id="general.kids.enabled" type="boolean" label="33438" help="34124">
@@ -243,7 +243,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - ANNOUNCEMENT ---------->
+			<!-- ########## GENERAL - ANNOUNCEMENT ########## -->
 			<group id="general.announcement" label="35201">
 				<setting id="general.announcement.enabled" type="boolean" label="35276" help="34470">
 					<control type="toggle"/>
@@ -268,7 +268,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - SETTINGS ---------->
+			<!-- ########## GENERAL - SETTINGS ########## -->
 			<group id="general.settings" label="33011">
 				<setting id="general.settings.cache" type="boolean" label="33937" help="34302">
 					<control type="toggle"/>
@@ -313,7 +313,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - CACHE ---------->
+			<!-- ########## GENERAL - CACHE ########## -->
 			<group id="general.cache" label="33016">
 				<setting id="general.cache.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
 				<setting id="general.cache.limit.label" type="string" label="36036" help="34473">
@@ -341,7 +341,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - CONCURRENCY ---------->
+			<!-- ########## GENERAL - CONCURRENCY ########## -->
 			<group id="general.concurrency" label="36042">
 				<setting id="general.concurrency.task" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
 				<setting id="general.concurrency.task.label" type="string" label="36038" help="34560">
@@ -381,7 +381,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - PERFORMANCE ---------->
+			<!-- ########## GENERAL - PERFORMANCE ########## -->
 			<group id="general.performance" label="33116">
 				<setting id="general.performance.interpreter" type="string" label="33454" help="34553">
 					<control type="button" format="action">
@@ -410,7 +410,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- GENERAL - LOG ---------->
+			<!-- ########## GENERAL - LOG ########## -->
 			<group id="general.log" label="36088">
 				<setting id="general.log.level" type="integer" label="36089" help="34483">
 					<control type="spinner" format="string"/>
@@ -430,10 +430,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- ACCOUNT ---------->
+		<!-- ########## ACCOUNT ########## -->
 		<category id="account" label="32346" help="34089">
 
-			<!---------- ACCOUNT - TRAKT ---------->
+			<!-- ########## ACCOUNT - TRAKT ########## -->
 			<group id="account.trakt" label="32315">
 				<setting id="account.trakt.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -496,7 +496,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - IMDB ---------->
+			<!-- ########## ACCOUNT - IMDB ########## -->
 			<group id="account.imdb" label="32034">
 				<setting id="account.imdb.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -527,7 +527,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - TMDB ---------->
+			<!-- ########## ACCOUNT - TMDB ########## -->
 			<group id="account.tmdb" label="33508">
 				<setting id="account.tmdb.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -558,7 +558,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - TVDB ---------->
+			<!-- ########## ACCOUNT - TVDB ########## -->
 			<group id="account.tvdb" label="35668">
 				<setting id="account.tvdb.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -589,7 +589,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - FANART ---------->
+			<!-- ########## ACCOUNT - FANART ########## -->
 			<group id="account.fanart" label="35260">
 				<setting id="account.fanart.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -620,7 +620,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - YOUTUBE ---------->
+			<!-- ########## ACCOUNT - YOUTUBE ########## -->
 			<group id="account.youtube" label="35296">
 				<setting id="account.youtube.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -651,7 +651,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACCOUNT - OPENSUBTITLES ---------->
+			<!-- ########## ACCOUNT - OPENSUBTITLES ########## -->
 			<group id="account.opensubtitles" label="35683">
 				<setting id="account.opensubtitles.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -685,10 +685,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- PREMIUM ---------->
+		<!-- ########## PREMIUM ########## -->
 		<category id="premium" label="33768" help="34104">
 
-			<!---------- PREMIUM - ORION ---------->
+			<!-- ########## PREMIUM - ORION ########## -->
 			<group id="premium.orion" label="35400">
 				<setting id="premium.orion.promotion" type="boolean"><default>true</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="premium.orion.link" type="string" label="">
@@ -753,7 +753,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PREMIUM - PREMIUMIZE ---------->
+			<!-- ########## PREMIUM - PREMIUMIZE ########## -->
 			<group id="premium.premiumize" label="33566">
 				<setting id="premium.premiumize.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -908,7 +908,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PREMIUM - OFFCLOUD ---------->
+			<!-- ########## PREMIUM - OFFCLOUD ########## -->
 			<group id="premium.offcloud" label="35200">
 				<setting id="premium.offcloud.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -1050,7 +1050,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PREMIUM - REALDEBRID ---------->
+			<!-- ########## PREMIUM - REALDEBRID ########## -->
 			<group id="premium.realdebrid" label="33567">
 				<setting id="premium.realdebrid.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -1158,7 +1158,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PREMIUM - EASYNEWS ---------->
+			<!-- ########## PREMIUM - EASYNEWS ########## -->
 			<group id="premium.easynews" label="33794">
 				<setting id="premium.easynews.link" type="string" label="">
 					<control type="button" format="action"></control>
@@ -1189,7 +1189,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PREMIUM - EXTERNAL ---------->
+			<!-- ########## PREMIUM - EXTERNAL ########## -->
 			<group id="premium.external" label="35354">
 				<!-- This setting is important, otherwise if ResolveUrl and UrlResolver are not installed, scrolling to EasyNews is not visible. -->
 				<setting id="premium.external.install" type="string" label="35865" help="34468">
@@ -1225,7 +1225,7 @@ The label is then added to the action element:
 					</dependencies>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - PREMIUMIZE ---------->
+				<!-- ########## PREMIUM - EXTERNAL - PREMIUMIZE ########## -->
 				<setting id="premium.external.premiumize.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://premiumize.me</default>
@@ -1242,7 +1242,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - REALDEBRID ---------->
+				<!-- ########## PREMIUM - EXTERNAL - REALDEBRID ########## -->
 				<setting id="premium.external.realdebrid.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://real-debrid.com</default>
@@ -1259,7 +1259,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - DEBRIDLINK ---------->
+				<!-- ########## PREMIUM - EXTERNAL - DEBRIDLINK ########## -->
 				<setting id="premium.external.debridlink.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://debrid-link.fr</default>
@@ -1276,7 +1276,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - ALLDEBRID ---------->
+				<!-- ########## PREMIUM - EXTERNAL - ALLDEBRID ########## -->
 				<setting id="premium.external.alldebrid.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://alldebrid.com</default>
@@ -1293,7 +1293,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - LINKSNAPPY ---------->
+				<!-- ########## PREMIUM - EXTERNAL - LINKSNAPPY ########## -->
 				<setting id="premium.external.linksnappy.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://linksnappy.com</default>
@@ -1310,7 +1310,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - MEGADEBRID ---------->
+				<!-- ########## PREMIUM - EXTERNAL - MEGADEBRID ########## -->
 				<setting id="premium.external.megadebrid.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://mega-debrid.eu</default>
@@ -1327,7 +1327,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - RAPIDPREMIUM ---------->
+				<!-- ########## PREMIUM - EXTERNAL - RAPIDPREMIUM ########## -->
 				<setting id="premium.external.rapidpremium.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://rpnet.biz</default>
@@ -1344,7 +1344,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - SIMPLYDEBRID ---------->
+				<!-- ########## PREMIUM - EXTERNAL - SIMPLYDEBRID ########## -->
 				<setting id="premium.external.simplydebrid.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://simply-debrid.com</default>
@@ -1361,7 +1361,7 @@ The label is then added to the action element:
 					<level>0</level>
 				</setting>
 
-				<!---------- PREMIUM - EXTERNAL - SMOOZED ---------->
+				<!-- ########## PREMIUM - EXTERNAL - SMOOZED ########## -->
 				<setting id="premium.external.smoozed.link" type="string" label="">
 					<control type="button" format="action"></control>
 					<default>https://smoozed.com</default>
@@ -1383,10 +1383,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- PROVIDER ---------->
+		<!-- ########## PROVIDER ########## -->
 		<category id="provider" label="32345" help="34036">
 
-			<!---------- PROVIDER - OPTIMIZATION ---------->
+			<!-- ########## PROVIDER - OPTIMIZATION ########## -->
 			<group id="provider.optimization" label="35016">
 				<setting id="provider.optimization.optimize" type="string" label="35412" help="34469">
 					<control type="button" format="action">
@@ -1401,7 +1401,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PROVIDER - CONFIGURATION ---------->
+			<!-- ########## PROVIDER - CONFIGURATION ########## -->
 			<group id="provider.configuration" label="33802">
 				<setting id="provider.configuration.data" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="provider.configuration.data.label" type="string" label="36078" help="34288">
@@ -1417,7 +1417,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PROVIDER - PRESETS ---------->
+			<!-- ########## PROVIDER - PRESETS ########## -->
 			<group id="provider.presets" label="33682">
 				<setting id="provider.presets.enabled" type="boolean" label="33192" help="34177">
 					<control type="toggle"/>
@@ -1441,7 +1441,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PROVIDER - MIRROR ---------->
+			<!-- ########## PROVIDER - MIRROR ########## -->
 			<group id="provider.mirror" label="35830">
 				<setting id="provider.mirror.domain" type="boolean" label="36060" help="34111">
 					<control type="toggle"/>
@@ -1530,7 +1530,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PROVIDER - TERMINATION ---------->
+			<!-- ########## PROVIDER - TERMINATION ########## -->
 			<group id="provider.termination" label="33217">
 				<setting id="provider.termination.preemption" type="boolean" label="36080" help="34201">
 					<control type="toggle"/>
@@ -1627,7 +1627,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PROVIDER - FAILURE ---------->
+			<!-- ########## PROVIDER - FAILURE ########## -->
 			<group id="provider.failure" label="35676">
 				<setting id="provider.failure.detection" type="boolean" label="33669" help="34170">
 					<control type="toggle"/>
@@ -1670,10 +1670,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- SCRAPE ---------->
+		<!-- ########## SCRAPE ########## -->
 		<category id="scrape" label="35539" help="34200">
 
-			<!---------- SCRAPE - OPTIMIZATION ---------->
+			<!-- ########## SCRAPE - OPTIMIZATION ########## -->
 			<group id="scrape.optimization" label="35016">
 				<setting id="scrape.optimization.optimize" type="string" label="33996" help="34212">
 					<control type="button" format="action">
@@ -1688,7 +1688,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - FILTER ---------->
+			<!-- ########## SCRAPE - FILTER ########## -->
 			<group id="scrape.filter" label="35477">
 				<setting id="scrape.filter.configuration" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
 				<setting id="scrape.filter.configuration.label" type="string" label="33119" help="34108">
@@ -1717,7 +1717,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - LIMIT ---------->
+			<!-- ########## SCRAPE - LIMIT ########## -->
 			<group id="scrape.limit" label="35220">
 				<setting id="scrape.limit.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
 				<setting id="scrape.limit.time.label" type="string" label="36057" help="34012">
@@ -1769,7 +1769,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - CONCURRENCY ---------->
+			<!-- ########## SCRAPE - CONCURRENCY ########## -->
 			<group id="scrape.concurrency" label="36042">
 				<setting id="scrape.concurrency.mode" type="integer" label="36062" help="34475">
 					<control type="spinner" format="string"/>
@@ -1809,7 +1809,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - PACK ---------->
+			<!-- ########## SCRAPE - PACK ########## -->
 			<group id="scrape.pack" label="33167">
 				<setting id="scrape.pack.enabled" type="boolean" label="36064" help="34305">
 					<control type="toggle"/>
@@ -1842,7 +1842,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - QUERY ---------->
+			<!-- ########## SCRAPE - QUERY ########## -->
 			<group id="scrape.query.title" label="32035">
 				<setting id="scrape.query.title" type="boolean" label="36068" help="34039">
 					<control type="toggle"/>
@@ -1981,7 +1981,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- SCRAPE - CACHE ---------->
+			<!-- ########## SCRAPE - CACHE ########## -->
 			<group id="scrape.cache" label="33016">
 				<setting id="scrape.cache.inspection" type="boolean" label="33270" help="34065">
 					<control type="toggle"/>
@@ -2083,10 +2083,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- STREAM ---------->
+		<!-- ########## STREAM ########## -->
 		<category id="stream" label="33487" help="34129">
 
-			<!---------- STREAM - GENERAL ---------->
+			<!-- ########## STREAM - GENERAL ########## -->
 			<group id="stream.general" label="32310">
 				<setting id="stream.general.selection" type="integer" label="33940" help="34232">
 					<control type="spinner" format="string"/>
@@ -2205,7 +2205,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - GAIA ---------->
+			<!-- ########## STREAM - GAIA ########## -->
 			<group id="stream.gaia" label="35639">
 				<setting id="stream.gaia.handle" type="integer" label="33108" help="34146">
 					<control type="spinner" format="string"/>
@@ -2351,7 +2351,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - ORION ---------->
+			<!-- ########## STREAM - ORION ########## -->
 			<group id="stream.orion" label="35400">
 				<setting id="stream.orion.installation" type="string" label="35865" help="34371">
 					<control type="button" format="action">
@@ -2496,7 +2496,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - RESOLVEURL ---------->
+			<!-- ########## STREAM - RESOLVEURL ########## -->
 			<group id="stream.resolveurl" label="35310">
 				<setting id="stream.resolveurl.installation" type="string" label="35865" help="34371">
 					<control type="button" format="action">
@@ -2617,7 +2617,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - URLRESOLVER ---------->
+			<!-- ########## STREAM - URLRESOLVER ########## -->
 			<group id="stream.urlresolver" label="33747">
 				<setting id="stream.urlresolver.installation" type="string" label="35865" help="34303">
 					<control type="button" format="action">
@@ -2738,7 +2738,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - ELEMENTUM ---------->
+			<!-- ########## STREAM - ELEMENTUM ########## -->
 			<group id="stream.elementum" label="35316">
 				<setting id="stream.elementum.installation" type="string" label="35865" help="34311">
 					<control type="button" format="action">
@@ -2825,7 +2825,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - QUASAR ---------->
+			<!-- ########## STREAM - QUASAR ########## -->
 			<group id="stream.quasar" label="33570">
 				<setting id="stream.quasar.installation" type="string" label="35865" help="34140">
 					<control type="button" format="action">
@@ -2912,7 +2912,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- STREAM - YOUTUBE ---------->
+			<!-- ########## STREAM - YOUTUBE ########## -->
 			<group id="stream.youtube" label="35296">
 				<setting id="stream.youtube.installation" type="string" label="35865" help="34466">
 					<control type="button" format="action">
@@ -2974,10 +2974,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- PLAYBACK ---------->
+		<!-- ########## PLAYBACK ########## -->
 		<category id="playback" label="32330" help="34424">
 
-			<!---------- PLAYBACK - AUTOPLAY ---------->
+			<!-- ########## PLAYBACK - AUTOPLAY ########## -->
 			<group id="playback.autoplay" label="35848">
 				<setting id="playback.autoplay.enabled" type="boolean" label="33461" help="34035">
 					<control type="toggle"/>
@@ -3025,7 +3025,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - RETRY ---------->
+			<!-- ########## PLAYBACK - RETRY ########## -->
 			<group id="playback.retry" label="35678">
 				<setting id="playback.retry.enabled" type="boolean" label="35290" help="34297">
 					<control type="toggle"/>
@@ -3066,7 +3066,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - BINGE ---------->
+			<!-- ########## PLAYBACK - BINGE ########## -->
 			<group id="playback.binge" label="35580">
 				<setting id="playback.binge.enabled" type="boolean" label="35579" help="34407">
 					<control type="toggle"/>
@@ -3207,7 +3207,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - AUDIO ---------->
+			<!-- ########## PLAYBACK - AUDIO ########## -->
 			<group id="playback.audio" label="35715">
 				<setting id="playback.audio.stream" type="integer" label="36111" help="34487">
 					<control type="spinner" format="string"/>
@@ -3284,7 +3284,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - SUBTITLE ---------->
+			<!-- ########## PLAYBACK - SUBTITLE ########## -->
 			<group id="playback.subtitle" label="32353">
 				<setting id="playback.subtitle.stream" type="integer" label="36112" help="34488">
 					<control type="spinner" format="string"/>
@@ -3421,7 +3421,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - DETAILS ---------->
+			<!-- ########## PLAYBACK - DETAILS ########## -->
 			<group id="playback.details" label="33379">
 				<setting id="playback.details.description" type="integer" label="33416" help="34531">
 					<control type="spinner" format="string"/>
@@ -3545,7 +3545,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - BUFFER ---------->
+			<!-- ########## PLAYBACK - BUFFER ########## -->
 			<group id="playback.buffer" label="35415">
 				<setting id="playback.buffer.size" type="string" label="33264" help="34513">
 					<control type="button" format="action">
@@ -3592,7 +3592,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - TIMEOUT ---------->
+			<!-- ########## PLAYBACK - TIMEOUT ########## -->
 			<group id="playback.time" label="33273">
 				<setting id="playback.time.wait" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
 				<setting id="playback.time.wait.label" type="string" label="35289" help="34296">
@@ -3616,7 +3616,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- PLAYBACK - PLAYLIST ---------->
+			<!-- ########## PLAYBACK - PLAYLIST ########## -->
 			<group id="playback.playlist" label="35515">
 				<setting id="playback.playlist.error" type="string" label="35532" help="34463">
 					<control type="button" format="action">
@@ -3631,10 +3631,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- ACTIVITY ---------->
+		<!-- ########## ACTIVITY ########## -->
 		<category id="activity" label="35051" help="34550">
 
-			<!---------- ACTIVITY - HISTORY ---------->
+			<!-- ########## ACTIVITY - HISTORY ########## -->
 			<group id="activity.history" label="32036">
 				<setting id="activity.history.enabled" type="boolean" label="35631" help="34154">
 					<control type="toggle"/>
@@ -3772,7 +3772,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- ACTIVITY - RATING ---------->
+			<!-- ########## ACTIVITY - RATING ########## -->
 			<group id="activity.rate" label="35187">
 				<setting id="activity.rating.enabled" type="boolean" label="35041" help="34543">
 					<control type="toggle"/>
@@ -3890,10 +3890,10 @@ The label is then added to the action element:
 
 		</category>
 
-		<!---------- METADATA ---------->
+		<!-- ########## METADATA ########## -->
 		<category id="metadata" label="33015" help="34358">
 
-			<!---------- METADATA - GENERAL ---------->
+			<!-- ########## METADATA - GENERAL ########## -->
 			<group id="metadata.general" label="32310">
 				<setting id="metadata.general.detail" type="string" label="33161" help="34465">
 					<control type="button" format="action">
@@ -3919,7 +3919,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- METADATA - LOCATION ---------->
+			<!-- ########## METADATA - LOCATION ########## -->
 			<group id="metadata.location" label="33874">
 				<setting id="metadata.location.language" type="string" label="33238" help="34001">
 					<control type="button" format="action">
@@ -3939,7 +3939,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- METADATA - LABEL ---------->
+			<!-- ########## METADATA - LABEL ########## -->
 			<group id="metadata.label" label="35546">
 				<setting id="metadata.label.force" type="integer" label="33106" help="34408">
 					<control type="spinner" format="string"/>
@@ -4145,7 +4145,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- METADATA - DETAIL ---------->
+			<!-- ########## METADATA - DETAIL ########## -->
 			<group id="metadata.detail" label="33379">
 				<setting id="metadata.detail.enabled" type="boolean" label="32359" help="34319">
 					<control type="toggle"/>
@@ -4366,7 +4366,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- METADATA - RATING ---------->
+			<!-- ########## METADATA - RATING ########## -->
 			<group id="metadata.rating" label="35602">
 				<setting id="metadata.rating.movie" type="integer" label="35666" help="34422">
 					<control type="spinner" format="string"/>
@@ -4464,7 +4464,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- METADATA - VIDEO ---------->
+			<!-- ########## METADATA - VIDEO ########## -->
 			<group id="metadata.video" label="35351">
 				<setting id="metadata.video.quality" type="string" label="33889" help="34512">
 					<control type="button" format="action">
@@ -4744,10 +4744,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- IMAGE ---------->
+		<!-- ########## IMAGE ########## -->
 		<category id="image" label="36202" help="34398">
 
-			<!---------- IMAGE - LOCATION ---------->
+			<!-- ########## IMAGE - LOCATION ########## -->
 			<group id="image.location" label="33874">
 				<setting id="image.location.language" type="string" label="35381" help="34062">
 					<control type="button" format="action">
@@ -4759,7 +4759,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- IMAGE - GENERAL ---------->
+			<!-- ########## IMAGE - GENERAL ########## -->
 			<group id="image.general" label="32310">
 				<setting id="image.general.limit" type="integer" label="32313" help="34063">
 					<control type="spinner" format="string"/>
@@ -4778,7 +4778,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- IMAGE - STYlE ---------->
+			<!-- ########## IMAGE - STYlE ########## -->
 			<group id="image.style" label="35202">
 				<setting id="image.style.movie" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.style.movie.label" type="string" label="35594" help="34315">
@@ -4830,7 +4830,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- IMAGE - SELECTION ---------->
+			<!-- ########## IMAGE - SELECTION ########## -->
 			<group id="image.selection" label="35143">
 				<setting id="image.selection.movie" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.selection.movie.label" type="string" label="35588" help="34349">
@@ -4919,7 +4919,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- IMAGE - SPECIAL ---------->
+			<!-- ########## IMAGE - SPECIAL ########## -->
 			<group id="image.special" label="35637">
 				<setting id="image.special.season" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.season.label" type="string" label="35590" help="34417">
@@ -4989,10 +4989,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- NAVIGATION ---------->
+		<!-- ########## NAVIGATION ########## -->
 		<category id="navigation" label="33232" help="33943">
 
-			<!---------- NAVIGATION - GENERAL ---------->
+			<!-- ########## NAVIGATION - GENERAL ########## -->
 			<group id="navigation.general" label="32310">
 				<setting id="navigation.general.shortcut" type="boolean" label="36192" help="34514">
 					<control type="toggle"/>
@@ -5013,7 +5013,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NAVIGATION - PAGE ---------->
+			<!-- ########## NAVIGATION - PAGE ########## -->
 			<group id="navigation.page" label="33666">
 				<setting id="navigation.page.movie" type="integer" label="35382" help="34155">
 					<control type="slider" format="integer">
@@ -5102,7 +5102,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NAVIGATION - MENU ---------->
+			<!-- ########## NAVIGATION - MENU ########## -->
 			<group id="navigation.menu" label="32319">
 				<setting id="navigation.menu.movie" type="boolean" label="32001" help="34125">
 					<control type="toggle"/>
@@ -5159,7 +5159,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NAVIGATION - ARRIVAL ---------->
+			<!-- ########## NAVIGATION - ARRIVAL ########## -->
 			<group id="navigation.arrival" label="33490">
 				<setting id="navigation.arrival.movie" type="integer" label="32320" help="34005">
 					<control type="spinner" format="string"/>
@@ -5247,7 +5247,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NAVIGATION - SHOW ---------->
+			<!-- ########## NAVIGATION - SHOW ########## -->
 			<group id="navigation.show" label="32002">
 				<setting id="navigation.show.direct" type="boolean" label="35492" help="34393">
 					<control type="toggle"/>
@@ -5425,7 +5425,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NAVIGATION - SORT ---------->
+			<!-- ########## NAVIGATION - SORT ########## -->
 			<group id="navigation.sort" label="35189">
 				<setting id="navigation.sort.favourite" type="boolean" label="35841" help="34286">
 					<control type="toggle"/>
@@ -5643,10 +5643,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- INTERFACE ---------->
+		<!-- ########## INTERFACE ########## -->
 		<category id="interface" label="33223" help="34085">
 
-			<!---------- INTERFACE - SCRAPE ---------->
+			<!-- ########## INTERFACE - SCRAPE ########## -->
 			<group id="interface.scrape" label="35514">
 				<setting id="interface.scrape.interface" type="integer" label="32335" help="34004">
 					<control type="spinner" format="string"/>
@@ -5761,7 +5761,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- INTERFACE - STREAM ---------->
+			<!-- ########## INTERFACE - STREAM ########## -->
 			<group id="interface.stream" label="33481">
 				<setting id="interface.stream.interface" type="integer" label="33224" help="34003">
 					<control type="spinner" format="string"/>
@@ -5925,7 +5925,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- INTERFACE - PLAYBACK ---------->
+			<!-- ########## INTERFACE - PLAYBACK ########## -->
 			<group id="interface.playback" label="32330">
 				<setting id="interface.playback.interface" type="integer" label="35473" help="34376">
 					<control type="spinner" format="string"/>
@@ -5957,7 +5957,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- INTERFACE - RATING ---------->
+			<!-- ########## INTERFACE - RATING ########## -->
 			<group id="interface.rating" label="35187">
 				<setting id="interface.rating.interface" type="integer" label="35469" help="34400">
 					<control type="spinner" format="string"/>
@@ -6002,7 +6002,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- INTERFACE - CONTEXT ---------->
+			<!-- ########## INTERFACE - CONTEXT ########## -->
 			<group id="interface.context" label="35839">
 				<setting id="interface.context.enabled" type="boolean" label="35352" help="34325">
 					<control type="toggle"/>
@@ -6107,7 +6107,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- INTERFACE - LABEL ---------->
+			<!-- ########## INTERFACE - LABEL ########## -->
 			<group id="interface.label" label="35546">
 				<setting id="interface.label.layout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
 				<setting id="interface.label.layout.label" type="string" label="35055" help="34025">
@@ -6262,10 +6262,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- THEME ---------->
+		<!-- ########## THEME ########## -->
 		<category id="theme" label="33233" help="34523">
 
-			<!---------- THEME - GENERAL ---------->
+			<!-- ########## THEME - GENERAL ########## -->
 			<group id="theme.general" label="32310">
 				<setting id="theme.general.skin" type="string" label="33337" help="34000">
 					<control type="button" format="action">
@@ -6300,7 +6300,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- THEME - IMAGE ---------->
+			<!-- ########## THEME - IMAGE ########## -->
 			<group id="theme.image" label="36202">
 				<setting id="theme.image.background" type="boolean" label="35825" help="34301">
 					<control type="toggle"/>
@@ -6339,7 +6339,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- THEME - COLOR ---------->
+			<!-- ########## THEME - COLOR ########## -->
 			<group id="theme.color" label="35237">
 				<setting id="theme.color.enabled" type="boolean" label="35238" help="34294">
 					<control type="toggle"/>
@@ -6530,7 +6530,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- THEME - ICON ---------->
+			<!-- ########## THEME - ICON ########## -->
 			<group id="theme.icon" label="35367">
 				<setting id="theme.icon.enabled" type="boolean" label="36085" help="34477">
 					<control type="toggle"/>
@@ -6557,10 +6557,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- VIEW ---------->
+		<!-- ########## VIEW ########## -->
 		<category id="view" label="33012" help="34405">
 
-			<!---------- VIEW - GENERAL ---------->
+			<!-- ########## VIEW - GENERAL ########## -->
 			<group id="view.general" label="32310">
 				<setting id="view.general.selection" type="integer" label="32331" help="34159">
 					<control type="spinner" format="string"/>
@@ -6574,9 +6574,24 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
+				<setting id="view.general.selection.episode" type="integer" label="32533" help="34198" parent="view.general.selection">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="32329">1</option>
+							<option label="32017">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="view.general.selection" operator="gt">0</dependency>
+					</dependencies>
+				</setting>
 			</group>
 
-			<!---------- VIEW - LAYOUT ---------->
+			<!-- ########## VIEW - LAYOUT ########## -->
 			<group id="view.layout" label="35202">
 				<setting id="view.style.general" type="integer" label="36194" help="34516">
 					<control type="spinner" format="string"/>
@@ -6852,10 +6867,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- LIBRARY ---------->
+		<!-- ########## LIBRARY ########## -->
 		<category id="library" label="35170" help="34256">
 
-			<!---------- LIBRARY - GENERAL ---------->
+			<!-- ########## LIBRARY - GENERAL ########## -->
 			<group id="library.general" label="32310">
 				<setting id="library.general.enabled" type="boolean" label="33244" help="34257">
 					<control type="toggle"/>
@@ -6896,7 +6911,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- LIBRARY - UPDATE ---------->
+			<!-- ########## LIBRARY - UPDATE ########## -->
 			<group id="library.update" label="35174">
 				<setting id="library.update.automatic" type="boolean" label="33253" help="34261">
 					<control type="toggle"/>
@@ -6944,7 +6959,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- LIBRARY - LOCATION ---------->
+			<!-- ########## LIBRARY - LOCATION ########## -->
 			<group id="library.location" label="33250">
 				<setting id="library.location.selection" type="integer" label="35869" help="34264">
 					<control type="spinner" format="string"/>
@@ -7060,10 +7075,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- DOWNLOAD ---------->
+		<!-- ########## DOWNLOAD ########## -->
 		<category id="download" label="32347" help="34088">
 
-			<!---------- DOWNLOAD - MANUAL ---------->
+			<!-- ########## DOWNLOAD - MANUAL ########## -->
 			<group id="download.manual" label="33290">
 				<setting id="download.manual.enabled" type="boolean" label="33247" help="34068">
 					<control type="toggle"/>
@@ -7257,7 +7272,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- DOWNLOAD - CACHE ---------->
+			<!-- ########## DOWNLOAD - CACHE ########## -->
 			<group id="download.cache" label="33016">
 				<setting id="download.cache.help" type="string" label="" help="33376">
 					<control type="button" format="action"></control>
@@ -7482,10 +7497,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- NETWORK ---------->
+		<!-- ########## NETWORK ########## -->
 		<category id="network" label="33719" help="34092">
 
-			<!---------- NETWORK - GENERAL ---------->
+			<!-- ########## NETWORK - GENERAL ########## -->
 			<group id="network.general" label="32310">
 				<setting id="network.general.certificates" type="integer" label="35768" help="34173">
 					<control type="spinner" format="string"/>
@@ -7507,7 +7522,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NETWORK - GEOLOCATION ---------->
+			<!-- ########## NETWORK - GEOLOCATION ########## -->
 			<group id="network.geolocation" label="33936">
 				<setting id="network.geolocation.primary" type="integer" label="36155" help="33968">
 					<control type="spinner" format="string"/>
@@ -7607,7 +7622,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NETWORK - VPN ---------->
+			<!-- ########## NETWORK - VPN ########## -->
 			<group id="network.vpn" label="33801">
 				<setting id="network.vpn.detection" type="integer" label="35863" help="34192">
 					<control type="spinner" format="string"/>
@@ -7894,7 +7909,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- NETWORK - CLOUDFLARE ---------->
+			<!-- ########## NETWORK - CLOUDFLARE ########## -->
 			<group id="network.cloudflare" label="35689">
 				<setting id="network.cloudflare.enabled" type="boolean" label="35692" help="34449">
 					<control type="toggle"/>
@@ -7950,10 +7965,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- BLUETOOTH ---------->
+		<!-- ########## BLUETOOTH ########## -->
 		<category id="bluetooth" label="33529" help="34554">
 
-			<!---------- BLUETOOTH - GENERAL ---------->
+			<!-- ########## BLUETOOTH - GENERAL ########## -->
 			<group id="bluetooth.general" label="32310">
 				<setting id="bluetooth.general.enabled" type="boolean" label="33539" help="34555">
 					<control type="toggle"/>
@@ -7962,7 +7977,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- BLUETOOTH - DEVICE ---------->
+			<!-- ########## BLUETOOTH - DEVICE ########## -->
 			<group id="bluetooth.device" label="33536">
 				<setting id="bluetooth.device.list" type="string" label="33532" help="34556">
 					<control type="button" format="action">
@@ -7981,7 +7996,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- BLUETOOTH - MONITOR ---------->
+			<!-- ########## BLUETOOTH - MONITOR ########## -->
 			<group id="bluetooth.monitor" label="33540">
 				<setting id="bluetooth.monitor.enabled" type="boolean" label="33537" help="34557">
 					<control type="toggle"/>
@@ -8018,10 +8033,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- AMBILIGHT ---------->
+		<!-- ########## AMBILIGHT ########## -->
 		<category id="ambilight" label="33311" help="34239">
 
-			<!---------- AMBILIGHT - LIGHTPACK ---------->
+			<!-- ########## AMBILIGHT - LIGHTPACK ########## -->
 			<group id="ambilight.lightpack" label="33406">
 				<setting id="ambilight.lightpack.enabled" type="boolean" label="33312" help="34094">
 					<control type="toggle"/>
@@ -8201,10 +8216,10 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- DEVELOPER ---------->
+		<!-- ########## DEVELOPER ########## -->
 		<category id="developer" label="36041" help="34484">
 
-			<!---------- DEVELOPER - ACCESS ---------->
+			<!-- ########## DEVELOPER - ACCESS ########## -->
 			<group id="developer.access" label="36093">
 				<setting id="developer.access.help" type="string" label="" help="34485">
 					<control type="button" format="action"></control>
@@ -8224,7 +8239,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- DEVELOPER - PRECHECK ---------->
+			<!-- ########## DEVELOPER - PRECHECK ########## -->
 			<group id="developer.preload" label="36094">
 				<setting id="developer.preload.container" type="boolean" label="36095" help="34486">
 					<control type="toggle"/>
@@ -8262,7 +8277,7 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!---------- DEVELOPER - PRECHECK ---------->
+			<!-- ########## DEVELOPER - PRECHECK ########## -->
 			<group id="developer.precheck" label="35831">
 				<setting id="developer.precheck.link" type="boolean" label="33259" help="34043">
 					<control type="toggle"/>
@@ -8325,7 +8340,7 @@ The label is then added to the action element:
 		</category>
 
 
-		<!---------- INTERNAL ---------->
+		<!-- ########## INTERNAL ########## -->
 		<category id="internal" label="33336">
 			<group id="internal" label="33336">
 

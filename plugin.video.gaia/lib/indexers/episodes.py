@@ -149,7 +149,6 @@ class Episodes(object):
 			else:
 				if self.mInterleave and Math.negative(season):
 					if limit: reduce = True
-					if season == -0.0: season = -1
 				items = self.metadata(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, season = season, episode = episode, clean = clean, quick = quick, reduce = reduce, refresh = refresh)
 
 			# Limit the number of episodes shown for indirect or flattened episode menus (eg Trakt Progress list).
@@ -977,13 +976,22 @@ class Episodes(object):
 	# INTERLEAVE
 	##############################################################################
 
-	def interleave(self, items, reduce = None):
+	def interleave(self, items, reduce = None, season = None, episode = None):
 		timeStart = None
 		timeEnd = None
 		timePrevious = None
 		timeNext = None
+		timeLimit = None
 		seasonLast = None
 		pack = None
+
+		offset = not episode is None and Math.negative(episode)
+		if (not season is None and Math.negative(season)) and (not episode is None and Math.negative(episode)) and not(season == -1 and episode == -1):
+			season = abs(season)
+			episode = abs(episode)
+		else:
+			season = None
+			episode = None
 
 		result = []
 		for item in items:
@@ -1001,9 +1009,12 @@ class Episodes(object):
 				if 'pack' in item and item['pack']: pack = item['pack']
 
 				if time:
-					time = Time.integer(time)
-					if not item['season'] == 1 and (timeStart is None or time < timeStart): timeStart = time # Include all specials prior to S01E01.
-					if timeEnd is None or time > timeEnd: timeEnd = time
+					timeValue = Time.integer(time)
+					if not item['season'] == 1 and (timeStart is None or timeValue < timeStart): timeStart = timeValue # Include all specials prior to S01E01.
+					if timeEnd is None or timeValue > timeEnd: timeEnd = timeValue
+
+			if time and not season is None and item['season'] == season and item['episode'] == episode:
+				timeLimit = Time.integer(time)
 
 			result.append(item)
 		items = result
@@ -1012,10 +1023,10 @@ class Episodes(object):
 			seasonCurrent = None
 			seasonPrevious = None
 			seasonNext = None
-			for season in pack['seasons']:
-				if season['number'][MetaData.NumberOfficial] == seasonLast: seasonCurrent = season
-				elif season['number'][MetaData.NumberOfficial] > 0 and season['number'][MetaData.NumberOfficial] == seasonLast - 1: seasonPrevious = season
-				elif season['number'][MetaData.NumberOfficial] == seasonLast + 1: seasonNext = season
+			for i in pack['seasons']:
+				if i['number'][MetaData.NumberOfficial] == seasonLast: seasonCurrent = i
+				elif i['number'][MetaData.NumberOfficial] > 0 and i['number'][MetaData.NumberOfficial] == seasonLast - 1: seasonPrevious = i
+				elif i['number'][MetaData.NumberOfficial] == seasonLast + 1: seasonNext = i
 
 			if seasonCurrent:
 				if seasonPrevious:
@@ -1028,7 +1039,11 @@ class Episodes(object):
 				else:
 					timeEnd = None # Is the last season. Inluce all remaining specials.
 
-		if timeStart or timeEnd:
+		if timeLimit:
+			if timeStart: timeStart = max(timeStart, timeLimit)
+			else: timeStart = timeLimit
+
+		if timeStart or timeEnd or offset:
 			supplementary = self.mMetatools.settingsShowInterleaveSupplementary()
 			unofficial = self.mMetatools.settingsShowInterleaveUnofficial()
 			duration = self.mMetatools.settingsShowInterleaveDuration()
@@ -1041,6 +1056,11 @@ class Episodes(object):
 
 			result = []
 			for item in items:
+				# In case multiple specials have the same release date.
+				if timeLimit:
+					if not item['season'] == 0 and item['season'] < season: continue
+					elif item['season'] == 0 and item['episode'] < episode: continue
+
 				if item['season'] == 0:
 					if supplementary and (not 'story' in item or not item['story']): continue
 					if unofficial and (not 'episode' in item['id'] or not 'tvdb' in item['id']['episode'] or not item['id']['episode']['tvdb']): continue
@@ -1076,6 +1096,16 @@ class Episodes(object):
 			result = items
 
 		result = sorted(result, key = lambda i : (Time.integer(i['aired']) if i['aired'] else 0, i['season'] if i['season'] else 0, i['episode'] if i['episode'] else 0))
+
+		# Limit the maximum number of specials before the 1st official episode to 3.
+		# Otherwise the submenu under Arrivals might only show 10 specials, and the user has to page to the next page to get the actual episode to watch.
+		if offset:
+			index = 0
+			for item in result:
+				if item['season'] == 0: index += 1
+				else: break
+			if index >= 3: result = result[index - 3:]
+
 		return result
 
 	##############################################################################
@@ -1108,13 +1138,10 @@ class Episodes(object):
 				# Negative values mean the season offset for flattened show menus. "-0.0" means offset from the Special season.
 				# Make sure this is not executed if +0.0 is passed in, meaning retrieve all episodes the Special season.
 				elif not season is None and Math.negative(season):
-					items = []
 					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMixed()
 
-					if self.mInterleave: items.append({'imdb' : idImdb, 'tmdb' : idTmdb, 'tvdb' : idTvdb, 'trakt' : idTrakt, 'title' : title, 'year' : year, 'season' : 0})
-
 					pickMultiple = True
-					seasonStart = abs(int(season))
+					seasonStart = abs(int(-1 if season == -0.0  else season))
 					seasonEnd = seasonStart + 2
 					seasonLast = None
 					episodeStart = None if episode is None else abs(int(episode))
@@ -1142,6 +1169,8 @@ class Episodes(object):
 						seasonStart += 1
 						seasonEnd = seasonStart + 1
 
+					items = []
+					if self.mInterleave and not seasonStart == 0: items.append({'imdb' : idImdb, 'tmdb' : idTmdb, 'tvdb' : idTvdb, 'trakt' : idTrakt, 'title' : title, 'year' : year, 'season' : 0})
 					items.extend([{'imdb' : idImdb, 'tmdb' : idTmdb, 'tvdb' : idTvdb, 'trakt' : idTrakt, 'title' : title, 'year' : year, 'season' : i} for i in range(seasonStart, seasonEnd)])
 				else:
 					pickSingle = True
@@ -1315,7 +1344,7 @@ class Episodes(object):
 					else: command = self.mMetatools.command(metadata = item, media = Media.TypeShow if episode is None else Media.TypeEpisode, submenu = True, reduce = reduce, increment = True)
 					item['next'] = command
 
-				if self.mInterleave: result = self.interleave(items = result, reduce = reduce)
+				if self.mInterleave: result = self.interleave(items = result, reduce = reduce, season = season, episode = episode)
 				return result
 			else:
 				return [item['episodes'] for item in items]
@@ -2388,9 +2417,10 @@ class Episodes(object):
 		metadatas = self.check(metadatas = metadatas)
 		if metadatas:
 			mixed = self.mMetatools.mixed(metadatas) if mixed is None else mixed
+			items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, mixed = mixed, submenu = submenu, next = next, recap = recap, extra = extra, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, hideWatched = self.mModeWatched, contextPlaylist = True, contextShortcutCreate = True)
 			directory = Directory(content = Directory.ContentSettings, media = Media.TypeMixed if mixed else Media.TypeEpisode, cache = True, lock = False)
-			directory.addItems(items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, mixed = mixed, submenu = submenu, next = next, recap = recap, extra = extra, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, hideWatched = self.mModeWatched, contextPlaylist = True, contextShortcutCreate = True))
-			directory.finish()
+			directory.addItems(items = items)
+			directory.finish(select = self.mMetatools.select(items = items))
 
 	def directory(self, metadatas):
 		metadatas = self.check(metadatas = metadatas)

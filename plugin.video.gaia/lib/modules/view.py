@@ -190,12 +190,12 @@ class View(object):
 		return None
 
 	@classmethod
-	def set(self, media, content = None, id = None, views = None, thread = True):
-		if thread: Pool.thread(target = self._setView, kwargs = {'media' : media, 'content' : content, 'id' : id, 'views' : views}, start = True)
+	def set(self, media, content = None, id = None, views = None, select = None, thread = True):
+		if thread: Pool.thread(target = self._setView, kwargs = {'media' : media, 'content' : content, 'id' : id, 'views' : views, 'select' : select}, start = True)
 		else: self._setView(media = media, content = content, id = id, views = views)
 
 	@classmethod
-	def _setView(self, media, content = None, id = None, views = None):
+	def _setView(self, media, content = None, id = None, views = None, select = None):
 		try:
 			skin = Skin.id()
 			if not content: content = self.convert(media)
@@ -210,9 +210,11 @@ class View(object):
 				mode = self.settingsGet(media = media)
 				if mode == View.ModeCustom:
 					try:
-						view = self.settingsTypeGet(media = media)[skin]
-						if content in view: view = view[content]['id']
-						else: view = view[Directory.ContentDefault]['id'] # When the View Layout is set to Default.
+						view = self.settingsTypeGet(media = media)
+						if not view is None:
+							view = view[skin]
+							if content in view: view = view[content]['id']
+							else: view = view[Directory.ContentDefault]['id'] # When the View Layout is set to Default.
 					except:
 						view = None
 						Logger.error()
@@ -236,13 +238,13 @@ class View(object):
 					return False
 				else:
 					System.execute(command)
-					self._setSelection()
+					self._setSelection(index = select)
 					return True
 			elif not self.settingsSelection() == View.SelectionNone: # Avoid waiting if the setting was disabled.
 				if self._wait(id = id, container = container, layout = layout) is False:
 					return False
 				else:
-					self._setSelection()
+					self._setSelection(index = select)
 					return None
 			return None
 		except:
@@ -250,9 +252,15 @@ class View(object):
 			return False
 
 	@classmethod
-	def _setSelection(self):
+	def _setSelection(self, index = None):
 		try:
-			selection = self.settingsSelection()
+
+			selection = self.settingsSelection(episode = False)
+			if not index is None:
+				selectionEpisode = self.settingsSelection(episode = True)
+				if selectionEpisode == View.SelectionNone: index = None
+				else: selection = selectionEpisode
+
 			if not selection == View.SelectionNone:
 				# Only change the position if the default position is 0, aka the back navigation.
 				# If menus are cached, Kodi will remember the previous position.
@@ -269,7 +277,11 @@ class View(object):
 						window = xbmcgui.Window(xbmcgui.getCurrentWindowId())
 						try: list = window.getControl(id)
 						except: list = None # Sometimes cannot get the control.
-						if list: list.selectItem(1)
+
+						if list:
+							if index is None: index = 1
+							else: index += 1 # Index 0 is the back navigation.
+							list.selectItem(index)
 		except:
 			# This error message might show often if a keyboard/mouse is use, since moving the mouse might change focus to another control.
 			# Eg: System.CurrentControlID might return None.
@@ -339,8 +351,8 @@ class View(object):
 				self.settingsTypeSet(media = media, label = False)
 
 	@classmethod
-	def settingsSelection(self):
-		return Settings.getInteger('view.general.selection')
+	def settingsSelection(self, episode = False):
+		return Settings.getInteger('view.general.selection' + ('.episode' if episode else ''))
 
 	@classmethod
 	def settingsId(self, media):

@@ -17121,7 +17121,8 @@ class Stream(Serializer):
 		parameters['filePack'] = bool(parameters['filePack'])
 
 		# gaiaremove - pack sizes are esitmated. Exclude for now.
-		parameters['fileSize'] = None
+		# Update: we now use the size, since we want to update the incorrectly estimated file size from Orion.
+		#parameters['fileSize'] = None
 
 		# The trackers/ports can differ in magnet links. Eg: TorrentApi mostly returns different tracker ports on each request.
 		if parameters['hash']: parameters['link'] = None
@@ -31636,8 +31637,15 @@ class Manager(object):
 
 				for item in streams:
 					stream = item['stream']
-					exact = stream.fileSize(exact = Stream.ExactYes)
-					inexact = stream.fileSize(exact = Stream.ExactNo)
+
+					# Always recalculate the size of Orion links, since they still have old streams with incorrectly estimated pack sizes.
+					if stream.filePack() and stream.idOrion():
+						exact = None
+						inexact = None
+					else:
+						exact = stream.fileSize(exact = Stream.ExactYes, estimate = False)
+						inexact = stream.fileSize(exact = Stream.ExactNo, estimate = False)
+
 					if exact is None: missing = True
 
 					if not sizeExact and exact: sizeExact = exact
@@ -31647,11 +31655,16 @@ class Manager(object):
 					if sizeExact:
 						for item in streams:
 							stream = item['stream']
-							if not stream.fileSize(exact = Stream.ExactYes): stream.fileSizeSet(value = sizeExact, exact = Stream.ExactYes)
+							orion = stream.filePack() and stream.idOrion()
+							if not stream.fileSize(exact = Stream.ExactYes, estimate = False) or orion:
+								stream.fileSizeSet(value = sizeExact, exact = Stream.ExactYes)
+								if orion: stream.fileSizeSet(value = sizeInexact, exact = Stream.ExactNo)
 					elif sizeInexact:
 						for item in streams:
 							stream = item['stream']
-							if not stream.fileSize(exact = Stream.ExactNo): stream.fileSizeSet(value = sizeInexact, exact = Stream.ExactNo)
+							orion = stream.filePack() and stream.idOrion()
+							if not stream.fileSize(exact = Stream.ExactNo, estimate = False) or orion:
+								stream.fileSizeSet(value = sizeInexact, exact = Stream.ExactNo)
 			except: tools.Logger.error()
 
 		def _excludeDuplicateCache(streams):

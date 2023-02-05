@@ -23,7 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderJson):
 
-	_Link					= ['https://torrentproject2.com', 'https://torrentproject2.se', 'http://torrentproject2.org', 'https://torrentproject.info']
+	_Link					= ['https://torrentproject.cc', 'https://torrentproject2.com', 'https://torrentproject2.se', 'http://torrentproject2.org', 'https://torrentproject.info']
 
 	_LimitApproval			= 2
 

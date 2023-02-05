@@ -1945,7 +1945,7 @@ class WindowRating(Window):
 			if 'time' in self.mRating and self.mRating['time']: self.propertySet('GaiaPreviousTime', tools.Time.format(self.mRating['time'], format = tools.Time.FormatDate))
 			self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
 
-		default = int(tools.Math.roundDown(default))
+		default = int(tools.Math.roundClosest(value = default, base = 1))
 		self.propertySet('GaiaRatingDefault', default)
 		self.focus(WindowRating.IdButtons[default - 1])
 
@@ -4712,12 +4712,10 @@ class WindowMetaExternal(WindowStep):
 		self.itemAdd(item = self._addItem(label = 33015, callback = self._selectMetadata))
 
 	def _setMetadata(self):
-		try:
-			storage = self._storage()
-			storageRemaining = storage['usage']['free']['bytes'] - WindowMetaExternal.Statistics['size']['uncompressed']
-		except:
-			storage = None
-			storageRemaining = -1
+		try: storage = self._storage()
+		except: storage = None
+		try: storageRemaining = storage['usage']['free']['bytes'] - WindowMetaExternal.Statistics['size']['uncompressed']
+		except: storageRemaining = -1
 
 		# If the user has not enabled/disabled this setting yet, use the free disk space value to determine the default value.
 		if self.mEnabled is None and storageRemaining > 0: self.mEnabled = storageRemaining > WindowMetaExternal.SizeRecommended

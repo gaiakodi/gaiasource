@@ -451,7 +451,7 @@ class Player(xbmc.Player):
 			if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
 			else: metadata['plot'] = metadata['plot'] + separator + details + newline
 
-			self.item.setInfo(type = 'Video', infoLabels = metadata)
+			self.metatools.itemInfo(item = self.item, metadata = metadata)
 			try: self.updateInfoTag(self.item)
 			except: pass # Not yet playing.
 		except: tools.Logger.error()

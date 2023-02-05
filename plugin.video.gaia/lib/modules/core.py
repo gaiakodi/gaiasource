@@ -3353,8 +3353,8 @@ class Core(object):
 					videoHeight = height,
 					audioCodec = stream.audioCodec(format = Stream.FormatKodi),
 					audioChannels = stream.audioChannels(format = Stream.FormatKodi),
-					audioLanguage = audioLanguage[0] if audioLanguage else None,
-					subtitleLanguage = subtitleLanguage[0] if subtitleLanguage else None,
+					audioLanguage = audioLanguage,
+					subtitleLanguage = subtitleLanguage,
 				)
 
 				# NB: playable = False: Needed to transfer the addon handle ID to play.

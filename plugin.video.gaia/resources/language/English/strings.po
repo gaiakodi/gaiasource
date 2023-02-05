@@ -629,7 +629,7 @@ msgid "Reduce"
 msgstr ""
 
 msgctxt "#32533"
-msgid "[GAIA-NO-LABEL]"
+msgid "Autoselect Episode"
 msgstr ""
 
 msgctxt "#32534"
@@ -5431,7 +5431,7 @@ msgid "Continuously verify the VPN status in the background on an interval. A va
 msgstr ""
 
 msgctxt "#34198"
-msgid "[GAIA-NO-LABEL]"
+msgid "Automatically select the next unwatched episode from a list when a menu is loaded. The [I]Disabled[/I]  option does not select anything by default and lets Kodi handle the selection. The [I]Unselected[/I]  option only moves to the first item if the back navigation is selected by default, but ignores any other position if the menu was cached and Kodi remembers the previously selected item. The [I]Always[/I]  option will always select the first item, even if Kodi remembers the previously selected item."
 msgstr ""
 
 msgctxt "#34199"

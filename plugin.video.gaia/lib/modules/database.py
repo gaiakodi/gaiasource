@@ -248,9 +248,13 @@ class Database(object):
 			# There is a bug in SQLite for Python 3.6: cannot VACUUM from within a transaction
 			# Try to compress and if unsuccessful, try again after commit.
 			# https://github.com/ghaering/pysqlite/issues/109
-			if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
+			'''if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
 			if commit: self._commit()
-			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)
+			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)'''
+
+			if commit: self._commit()
+			if compress: self._compress(commit = True, lock = False, unlock = False)
+
 			return result
 		finally:
 			if unlock: self.__unlock()
@@ -319,7 +323,7 @@ class Database(object):
 	# tables can be None, table name, or list of tables names.
 	# If tables is None, deletes all rows in all tables.
 	def _deleteAll(self, query = None, tables = None, parameters = None, commit = True, compress = True):
-		if query is None: query = 'DELETE FROM %s;'
+		if query is None: query = 'DELETE FROM `%s`;'
 		return self._executeAll(query, tables, parameters = parameters, commit = commit, compress = compress)
 
 	def _deleteFile(self):
@@ -328,11 +332,11 @@ class Database(object):
 
 	# Drops single table.
 	def _drop(self, table, parameters = None, commit = True, compress = True):
-		return self._execute('DROP TABLE IF EXISTS %s;' % table, parameters = parameters, commit = commit, compress = compress)
+		return self._execute('DROP TABLE IF EXISTS `%s`;' % table, parameters = parameters, commit = commit, compress = compress)
 
 	# Drops all tables.
 	def _dropAll(self, parameters = None, commit = True, compress = True):
-		return self._executeAll('DROP TABLE IF EXISTS %s;', parameters = parameters, commit = commit, compress = compress)
+		return self._executeAll('DROP TABLE IF EXISTS `%s`;', parameters = parameters, commit = commit, compress = compress)
 
 	# tables can be None, table name, or list of tables names.
 	# If tables is provided, only clears the specific table(s), otherwise clears all tables.
@@ -360,7 +364,7 @@ class Dummy(Database):
 		Database.__init__(self, Dummy.Name)
 
 	def _initialize(self):
-		self._createAll('CREATE TABLE IF NOT EXISTS %s (value INTEGER);', [Dummy.Name])
+		self._createAll('CREATE TABLE IF NOT EXISTS `%s` (value INTEGER);', [Dummy.Name])
 
 	def _result(self, result):
 		self._deleteFile()
@@ -369,6 +373,6 @@ class Dummy(Database):
 	def test(self):
 		if not xbmcvfs.exists(self._mPath): return self._result(False)
 		value = 9
-		self._insert('INSERT INTO %s (value) VALUES (?);', parameters = (value,))
-		result = self._selectValue('SELECT value FROM %s;')
+		self._insert('INSERT INTO `%s` (value) VALUES (?);', parameters = (value,))
+		result = self._selectValue('SELECT value FROM `%s`;')
 		return self._result(result == value)

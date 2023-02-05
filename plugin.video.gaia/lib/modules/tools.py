@@ -3177,39 +3177,35 @@ class File(object):
 	@classmethod
 	def deleteDirectory(self, path, force = True, check = True):
 		try:
+			valid = not check or self.existsDirectory(path)
+
 			# For samba paths
 			try:
-				if not check or self.existsDirectory(path):
+				if valid:
 					xbmcvfs.rmdir(path)
-					if not self.existsDirectory(path):
-						return True
-			except:
-				pass
+					if not self.existsDirectory(path): return True
+			except: pass
 
 			try:
-				if not check or self.existsDirectory(path):
+				if valid:
 					import shutil
 					shutil.rmtree(path)
-					if not self.existsDirectory(path):
-						return True
-			except:
-				pass
+					if not self.existsDirectory(path): return True
+			except: pass
 
 			# All with force
 			try:
-				if not check or self.existsDirectory(path):
+				if valid:
 					if force:
 						import stat
 						os.chmod(path, stat.S_IWRITE) # Remove read only.
 					os.rmdir(path)
-					if not self.existsDirectory(path):
-						return True
-			except:
-				pass
+					if not self.existsDirectory(path): return True
+			except: pass
 
 			# Try individual delete
 			try:
-				if not check or self.existsDirectory(path):
+				if valid:
 					directories, files = self.listDirectory(path)
 					for i in files:
 						self.delete(os.path.join(path, i), force = force)
@@ -3223,8 +3219,7 @@ class File(object):
 					except: pass
 					try: os.rmdir(path)
 					except: pass
-			except:
-				pass
+			except: pass
 
 			return not self.existsDirectory(path)
 		except:
@@ -3638,6 +3633,14 @@ class System(object):
 				try: System.KodiVersion = float(re.search('^(\d+\.?\d+)', self.infoLabel('System.BuildVersion')).group(0))
 				except: pass
 			return System.KodiVersion
+
+	@classmethod
+	def versionKodiMinimum(self, version):
+		return self.versionKodi(full = False) >= version
+
+	@classmethod
+	def versionKodiMaximum(self, version):
+		return self.versionKodi(full = False) <= version
 
 	@classmethod
 	def home(self):
@@ -4401,32 +4404,15 @@ class System(object):
 				ExternalLoader.clear()
 			except: Logger.error()
 
-		# gaiaremove
-		# Can be removed in later versions.
-		if version['old']['number'] < 600 and version['new']['number'] >= 600:
-			try: Settings.clear()
-			except: Logger.error()
+		# Do not do this if Gaia was installed from scratch without having and old version.
+		if version['old']['number'] and version['old']['number'] >= 500:
+			# gaiaremove - Can be removed in later versions.
+			if version['old']['number'] < 600 and version['new']['number'] >= 600:
+				try: Settings.clear()
+				except: Logger.error()
 
-			try: Backup.automaticClear()
-			except: Logger.error()
-
-			try:
-				from lib.modules.cache import Cache
-				Cache.instance()._deleteFile()
-			except: Logger.error()
-
-			try:
-				from lib.meta.cache import MetaCache
-				MetaCache.instance()._deleteFile()
-			except: Logger.error()
-
-			try:
-				from lib.modules.history import History
-				History()._deleteFile()
-			except: Logger.error()
-		if version['old']['prerelease'] and version['new']['prerelease']:
-			if version['old']['number'] < 600.2 and version['new']['number'] >= 600.2: # Beta 2
-				Settings.set('network.vpn.detection', 0)
+				try: Backup.automaticClear()
+				except: Logger.error()
 
 				try:
 					from lib.modules.cache import Cache
@@ -4438,72 +4424,90 @@ class System(object):
 					MetaCache.instance()._deleteFile()
 				except: Logger.error()
 
-			if version['old']['number'] < 600.6 and version['new']['number'] >= 600.6:
+				try:
+					from lib.modules.history import History
+					History()._deleteFile()
+				except: Logger.error()
+			if version['old']['prerelease'] and version['new']['prerelease']:
+				if version['old']['number'] < 600.2 and version['new']['number'] >= 600.2: # Beta 2
+					Settings.set('network.vpn.detection', 0)
+
+					try:
+						from lib.modules.cache import Cache
+						Cache.instance()._deleteFile()
+					except: Logger.error()
+
+					try:
+						from lib.meta.cache import MetaCache
+						MetaCache.instance()._deleteFile()
+					except: Logger.error()
+
+				if version['old']['number'] < 600.6 and version['new']['number'] >= 600.6:
+					try:
+						from lib.modules.playback import Playback
+						Playback.clear()
+					except: Logger.error()
+			if version['old']['prerelease'] and version['old']['number'] < 601 and not version['new']['prerelease'] and version['new']['number'] >= 600: # From beta to stable 6.0.0.
+				try: Settings.clear()
+				except: Logger.error()
+
+				try: Backup.automaticClear()
+				except: Logger.error()
+
+				try:
+					from lib.modules.cache import Cache
+					Cache.instance()._deleteFile()
+				except: Logger.error()
+
+				try:
+					from lib.meta.cache import MetaCache
+					MetaCache.instance()._deleteFile()
+				except: Logger.error()
+
 				try:
 					from lib.modules.playback import Playback
-					Playback.clear()
+					Playback._deleteFile()
 				except: Logger.error()
-		if version['old']['prerelease'] and version['old']['number'] < 601 and not version['new']['prerelease'] and version['new']['number'] >= 600: # From beta to stable 6.0.0.
-			try: Settings.clear()
-			except: Logger.error()
 
-			try: Backup.automaticClear()
-			except: Logger.error()
+				try:
+					from lib.modules.history import History
+					History()._deleteFile()
+				except: Logger.error()
 
-			try:
-				from lib.modules.cache import Cache
-				Cache.instance()._deleteFile()
-			except: Logger.error()
+				try:
+					from lib.providers.core.manager import Manager
+					Manager.streamsDatabaseClear()
+				except: Logger.error()
 
-			try:
-				from lib.meta.cache import MetaCache
-				MetaCache.instance()._deleteFile()
-			except: Logger.error()
+			#gaiaremove - since pack and episode numbering changed.
+			if version['old']['number'] < 610 and version['new']['number'] >= 610:
+				try:
+					from lib.modules.cache import Cache
+					Cache.instance()._deleteFile()
+				except: Logger.error()
 
-			try:
-				from lib.modules.playback import Playback
-				Playback._deleteFile()
-			except: Logger.error()
+				try:
+					from lib.meta.cache import MetaCache
+					MetaCache.instance()._deleteFile()
+				except: Logger.error()
 
-			try:
-				from lib.modules.history import History
-				History()._deleteFile()
-			except: Logger.error()
+				try:
+					from lib.providers.core.manager import Manager
+					Manager.streamsDatabaseClear()
+				except: Logger.error()
 
-			try:
-				from lib.providers.core.manager import Manager
-				Manager.streamsDatabaseClear()
-			except: Logger.error()
+				from lib.modules.window import WindowMetaExternal
+				WindowMetaExternal.show()
 
-		#gaiaremove - since pack and episode numbering changed.
-		if version['old']['number'] < 610 and version['new']['number'] >= 610:
-			try:
-				from lib.modules.cache import Cache
-				Cache.instance()._deleteFile()
-			except: Logger.error()
+			#gaiaremove
+			if version['old']['number'] == 610 and version['new']['number'] > 610:
+				from lib.modules.window import WindowMetaExternal
+				WindowMetaExternal.show()
 
-			try:
-				from lib.meta.cache import MetaCache
-				MetaCache.instance()._deleteFile()
-			except: Logger.error()
-
-			try:
-				from lib.providers.core.manager import Manager
-				Manager.streamsDatabaseClear()
-			except: Logger.error()
-
-			from lib.modules.window import WindowMetaExternal
-			WindowMetaExternal.show()
-
-		#gaiaremove
-		if version['old']['number'] == 610 and version['new']['number'] > 610:
-			from lib.modules.window import WindowMetaExternal
-			WindowMetaExternal.show()
-
-		#gaiaremove
-		if version['old']['number'] <= 611 and version['new']['number'] > 611:
-			Settings.default(id = 'navigation.page.episode')
-			Settings.default(id = 'general.cache.expression')
+			#gaiaremove
+			if version['old']['number'] <= 611 and version['new']['number'] > 611:
+				Settings.default(id = 'navigation.page.episode')
+				Settings.default(id = 'general.cache.expression')
 
 		_launchProgress(4) # 25%
 
@@ -12021,34 +12025,6 @@ class Backup(object):
 		from lib.modules import interface
 		self._import(path)
 		interface.Dialog.notification(title = 33773, message = 35326, icon = interface.Dialog.IconSuccess, duplicates = True)
-
-	'''
-	msgctxt "#33229"
-	msgid "This option will replace the internal settings structure of Gaia with a structure from a remote source. You can therefore use other third-party developers' settings instead of the one provided by Gaia."
-
-	msgctxt "#33230"
-	msgid "Only continue if you know what you are doing and if you have informed yourself on Reddit or similar site about this feature."
-
-	msgctxt "#35538"
-	msgid "Settings Replacement Successful - Restart Kodi"
-
-	msgctxt "#35539"
-	msgid "Settings Replacement Failure"
-
-	@classmethod
-	def replace(self):
-		from lib.modules import interface
-		from lib.modules import network
-		if interface.Dialog.option(title = 33011, message = 33229, labelConfirm = 33821, labelDeny = 33743):
-			if interface.Dialog.option(title = 33011, message = 33230, labelConfirm = 33821, labelDeny = 33743):
-				link = interface.Dialog.input(title = 35540)
-				interface.Loader.show()
-				success = network.Networker().download(link = link, path = Settings.pathAddon())
-				interface.Loader.hide()
-				if success: interface.Dialog.notification(title = 33011, message = 35538, icon = interface.Dialog.IconSuccess)
-				else: interface.Dialog.notification(title = 33011, message = 35539, icon = interface.Dialog.IconError)
-				return success
-		return False'''
 
 ###################################################################
 # DONATIONS

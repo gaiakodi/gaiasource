@@ -828,7 +828,7 @@ try:
 						subtitleLanguage	= data['subtitle']['languages'],
 
 						fileName			= data['file']['name'],
-						fileSize			= data['file']['size'],
+						fileSize			= stream.fileSize(estimate = True), # Use the estimated size, to invalidate the Orion ID (force = True) if the new estimated pack size changed.
 						filePack			= data['file']['pack'],
 
 						releaseType			= data['meta']['release'],

@@ -294,7 +294,10 @@ def manager(imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, 
 				})
 		except: tools.Logger.error()
 
-		media = tools.Media.TypeMovie if (tvdb is None and season is None) else tools.Media.TypeShow
+		if not episode is None: media = tools.Media.TypeEpisode
+		elif not season is None: media = tools.Media.TypeSeason
+		elif tvdb: media = tools.Media.TypeShow
+		else: media = tools.Media.TypeMovie
 
 		items = [
 			{'title' : interface.Dialog.prefixBack(33486), 'close' : True},

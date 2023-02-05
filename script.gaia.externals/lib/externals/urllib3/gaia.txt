@@ -6,3 +6,15 @@ Used By:			Gaia, Requests, RequestsToolbelt, CfScrape, CloudScraper
 
 #########################################################################################################################
 
+Python 3.10 (Kodi 20) changes.
+
+find ./ -type f -exec sed -i -e 's/from collections import namedtuple, Mapping/from collections import namedtuple\ntry: from collections.abc import Mapping\nexcept: from collections import Mapping/g' {} \;
+
+find ./ -type f -exec sed -i -e 's/try: from collections.abc import Mapping, MutableMapping
+except: from collections import Mapping, MutableMapping/try: from collections.abc import Mapping, MutableMapping\nexcept: try: from collections.abc import Mapping, MutableMapping
+except: from collections import Mapping, MutableMapping/g' {} \;
+
+
+
+#########################################################################################################################
+

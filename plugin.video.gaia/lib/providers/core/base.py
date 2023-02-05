@@ -1887,7 +1887,9 @@ class ProviderBase(object):
 		else: self.mSettings['account'] = None
 
 	def accountHas(self):
-		try: return any(list(self.mData['account'].values()))
+		try:
+			values = list(self.mData['account'].keys())
+			return any(i in ProviderBase.AccountTypeOrder and self.mData['account'][i] for i in values)
 		except: return False
 
 	def accountEnabled(self, type = None):
@@ -3993,7 +3995,7 @@ class ProviderBase(object):
 
 	@classmethod
 	def concurrencyTasks(self, level = None):
-		if level is None: return ProviderBase.ConcurrencyTasks
+		if level is None or not ProviderBase.ConcurrencyTasks: return ProviderBase.ConcurrencyTasks
 
 		tasks = 1
 
@@ -4026,7 +4028,7 @@ class ProviderBase(object):
 		if tasks: tasks = [tasks]
 		else: tasks = []
 		if limit: tasks.append(limit)
-		self.concurrencyTasksSet(min(tasks))
+		if tasks: self.concurrencyTasksSet(min(tasks))
 
 		if ProviderBase.ConcurrencyLock is None: ProviderBase.ConcurrencyLock = Semaphore(limit if limit else 9999999)
 

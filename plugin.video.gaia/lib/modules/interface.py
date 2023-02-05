@@ -3040,7 +3040,9 @@ class Directory(object):
 			infoLabels = info[1]
 		if description and self.mDescription:
 			infoLabels['plot'] = Translation.string(description)
-		if infoLabels: item.setInfo(type = infoType, infoLabels = infoLabels)
+		if infoLabels:
+			from lib.meta.tools import MetaTools
+			MetaTools.instance().itemInfo(item = item, metadata = infoLabels, type = infoType)
 
 		if link is None: link = tools.System.commandPlugin(action = action, parameters = parameters, call = False)
 		self.addItem(link = link, item = item, folder = folder)
@@ -3059,7 +3061,7 @@ class Directory(object):
 			self.mId = str(tools.Time.timestamp()) #  Must be string for comparison.
 			item.setProperty(Directory.PropertyId, self.mId)
 
-	def finish(self, content = None, cache = None, update = None, view = None, loader = False):
+	def finish(self, content = None, cache = None, update = None, view = None, loader = False, select = None):
 		# Manually set sorting method, otherwise Kodi's default skin shows a "Sort by Date" label, although it is not always sorted by date.
 		sorting = ['SORT_METHOD_UNSORTED']
 		if self.mMedia == tools.Media.TypeMovie or self.mMedia == tools.Media.TypeShow or self.mMedia == tools.Media.TypeSeason or self.mMedia == tools.Media.TypeEpisode:
@@ -3120,7 +3122,7 @@ class Directory(object):
 		if view is None: view = self.mView
 		if view:
 			from lib.modules.view import View
-			View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId)
+			View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId, select = select)
 
 	# clear: Clear the path history. Can also be a path to reset to.
 	# position: After refresh, go to the previously selected position, becuase Kodi always jumps back to the top after refresh. Not perfect, since the list can become unfocused, or the user moves the mosue over another item before this code is executed.
