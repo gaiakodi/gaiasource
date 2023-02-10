@@ -21,6 +21,8 @@
 from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter
 from lib.modules.account import Tmdb
 from lib.modules.network import Networker
+from lib.modules.cache import Cache
+from lib.modules.concurrency import Lock
 
 class MetaTmdb(object):
 
@@ -30,12 +32,19 @@ class MetaTmdb(object):
 	LinkEpisode		= 'https://themoviedb.org/tv/%s/season/%d/episode/%d'
 
 	LinkSearchMovie	= 'https://api.themoviedb.org/3/search/movie'
+	LinkSearchSet	= 'https://api.themoviedb.org/3/search/collection'
 	LinkSearchShow	= 'https://api.themoviedb.org/3/search/tv'
 
 	LinkId			= 'https://api.themoviedb.org/3/find/%s'
 
 	LinkSetIds		= 'https://files.tmdb.org/p/exports/collection_ids_%s.json.gz'
 	LinkSetDetails	= 'https://api.themoviedb.org/3/collection/%s'
+	LinkSetImages	= 'https://api.themoviedb.org/3/collection/%s/images'
+
+	LinkGenreMovie	= 'https://api.themoviedb.org/3/genre/movie/list'
+	LinkGenreShow	= 'https://api.themoviedb.org/3/genre/tv/list'
+
+	Lock			= Lock()
 
 	##############################################################################
 	# GENERAL
@@ -66,7 +75,16 @@ class MetaTmdb(object):
 	##############################################################################
 
 	@classmethod
-	def request(self, link, data = None, method = None):
+	def request(self, link, data = None, method = None, cache = None, lock = False):
+		try:
+			if lock: MetaTmdb.Lock.acquire()
+			if cache is None: return self._request(link = link, data = data, method = method)
+			else: return Cache.instance().cacheSeconds(timeout = cache, function = self._request, link = link, data = data, method = method)
+		finally:
+			if lock: MetaTmdb.Lock.release()
+
+	@classmethod
+	def _request(self, link, data = None, method = None):
 		if not data: data = {}
 		data['api_key'] = Tmdb().key()
 		if method is None: method = Networker.MethodGet
@@ -139,7 +157,7 @@ class MetaTmdb(object):
 
 			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchMovie, data = data)
 			if data:
-				page +=1
+				page += 1
 				next = None
 				if 'total_pages' in data and data['total_pages'] >= page:
 					next = '%s/%s/%s' % (MetaTmdb.LinkSearchMovie, Networker.linkQuote(query), page)
@@ -180,6 +198,64 @@ class MetaTmdb(object):
 		return results
 
 	@classmethod
+	def searchSet(self, query = None, page = 1, link = None, language = None):
+		results = None
+		try:
+			if link:
+				parts = Networker.linkParts(link = link)
+				try:
+					query = Networker.linkUnquote(parts[-2])
+					page = int(parts[-1])
+				except:
+					Logger.error()
+					return results
+
+			data = {'query' : query, 'page' : page}
+			if language: data['language'] = language
+
+			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchSet, data = data)
+			if data:
+				page += 1
+				next = None
+				if 'total_pages' in data and data['total_pages'] >= page:
+					next = '%s/%s/%s' % (MetaTmdb.LinkSearchSet, Networker.linkQuote(query), page)
+
+				results = []
+				for item in data['results']:
+					try:
+						result = {}
+
+						ids = {}
+						idTmdb = item.get('id')
+						if idTmdb: result['tmdb'] = ids['tmdb'] = str(idTmdb)
+						if ids: result['id'] = ids
+
+						title = item.get('name')
+						if title: result['title'] = Networker.htmlDecode(title)
+
+						originaltitle = item.get('original_name')
+						if originaltitle: result['originaltitle'] = Networker.htmlDecode(originaltitle)
+
+						plot = item.get('overview')
+						if plot: result['plot'] = Networker.htmlDecode(plot)
+
+						premiered = item.get('release_date')
+						if premiered:
+							premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+							if premiered:
+								result['premiered'] = premiered
+								year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
+								if year: result['year'] = int(year)
+
+						if next: result['next'] = next
+
+						if result: results.append(result)
+					except: Logger.error()
+		except: Logger.error()
+
+		return results
+
+	@classmethod
 	def searchShow(self, query = None, page = 1, link = None, language = None):
 		results = None
 		try:
@@ -197,7 +273,7 @@ class MetaTmdb(object):
 
 			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchShow, data = data)
 			if data:
-				page +=1
+				page += 1
 				next = None
 				if 'total_pages' in data and data['total_pages'] >= page:
 					next = '%s/%s/%s' % (MetaTmdb.LinkSearchShow, Networker.linkQuote(query), page)
@@ -256,7 +332,7 @@ class MetaTmdb(object):
 						data = data.replace('\n', ',\n')
 						data = data.strip('\n').strip(',').strip('\n')
 						data = Converter.jsonFrom('[' + data + ']')
-						if data: result = [{'tmdb' : i['id'], 'title' : i['name']} for i in data]
+						if data: result = data
 		except: Logger.error()
 		return result
 
@@ -265,3 +341,43 @@ class MetaTmdb(object):
 		data = {'language' : language} if language else None
 		data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSetDetails % id, data = data)
 		return data
+
+	@classmethod
+	def setImages(self, id, language = None):
+		data = {'language' : language} if language else None
+		data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSetImages % id, data = data)
+		return data
+
+	##############################################################################
+	# GENRE
+	##############################################################################
+
+	@classmethod
+	def generes(self, media = None, language = None, cache = True):
+		link = MetaTmdb.LinkGenreShow if Media.typeTelevision(media) else MetaTmdb.LinkGenreMovie
+		data = {'language' : language} if language else None
+		data = self.request(method = Networker.MethodGet, link = link, data = data, cache = Cache.TimeoutLong if cache else None, lock = cache)
+		if data: data = {i['id'] : i['name'] for i in data['genres']}
+		return data
+
+	@classmethod
+	def generesMovie(self, language = None, cache = True):
+		return self.generes(media = Media.TypeMovie, language = language, cache = cache)
+
+	@classmethod
+	def generesShow(self, language = None, cache = True):
+		return self.generes(media = Media.TypeShow, language = language, cache = cache)
+
+	@classmethod
+	def genere(self, id, media = None, language = None, cache = True):
+		genres = self.generes(media = media, language = language, cache = cache)
+		try: return generes[id]
+		except: return None
+
+	@classmethod
+	def genereMovie(self, id, language = None, cache = True):
+		return self.genere(id =  id, media = Media.TypeMovie, language = language, cache = cache)
+
+	@classmethod
+	def genereShow(self, id, language = None, cache = True):
+		return self.genere(id =  id, media = Media.TypeShow, language = language, cache = cache)

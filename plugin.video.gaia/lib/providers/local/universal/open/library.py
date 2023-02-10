@@ -248,9 +248,10 @@ class Provider(ProviderBase):
 				if Library.pathStrm(path):
 					data = File.readNow(path)
 					if data:
+						command = System.commandResolve(command = data, initialize = False)
 						data = data.lower()
 						if data.startswith(pluginGaia):
-							if 'action=scrape' in data:
+							if command and 'action' in command and command['action'] == 'scrape':
 								if strmScrape: result.append(file)
 							else:
 								if strmStream: result.append(file)
@@ -279,9 +280,9 @@ class Provider(ProviderBase):
 			if Library.pathStrm(path):
 				data = Library().resolveMeta(path)
 				if data:
-					parameters = Networker.linkDecode(data)
+					parameters = System.commandResolve(command = data, initialize = False)
 					if 'source' in parameters:
-						source = Converter.jsonFrom(parameters['source'])
+						source = parameters['source']
 						if 'stream' in source: return source['stream']
 		except: self.logError()
 		return None

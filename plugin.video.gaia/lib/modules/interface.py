@@ -3064,7 +3064,7 @@ class Directory(object):
 	def finish(self, content = None, cache = None, update = None, view = None, loader = False, select = None):
 		# Manually set sorting method, otherwise Kodi's default skin shows a "Sort by Date" label, although it is not always sorted by date.
 		sorting = ['SORT_METHOD_UNSORTED']
-		if self.mMedia == tools.Media.TypeMovie or self.mMedia == tools.Media.TypeShow or self.mMedia == tools.Media.TypeSeason or self.mMedia == tools.Media.TypeEpisode:
+		if self.mMedia == tools.Media.TypeMovie or self.mMedia == tools.Media.TypeSet or self.mMedia == tools.Media.TypeShow or self.mMedia == tools.Media.TypeSeason or self.mMedia == tools.Media.TypeEpisode:
 			tools.System.pluginPropertySet(property = 'GaiaMenuMedia', value = self.mMedia) # For Gaia Eminence.
 			sorting.extend([
 				'SORT_METHOD_LABEL',
@@ -4364,15 +4364,16 @@ class Context(object):
 	def addItem(self):
 		try:
 			self.addInformation()
-			self.addVideos()
-			self.addBrowse()
-			self.addBinge()
-			self.addScrape()
-			self.addLink()
-			self.addActivity()
-			self.addTrakt()
-			self.addLibrary()
-			self.addPlaylist()
+			if not self.mMedia == tools.Media.TypeSet:
+				self.addVideos()
+				self.addBrowse()
+				self.addBinge()
+				self.addScrape()
+				self.addLink()
+				self.addActivity()
+				self.addTrakt()
+				self.addLibrary()
+				self.addPlaylist()
 			self.addShortcut()
 			self.addDownloads()
 			self.addRefresh()
@@ -4414,7 +4415,7 @@ class Context(object):
 			if not self.mEpisode is None: items.insert(0, {'label' : 35509, 'command' : 'commandInformationEpisode', 'loader' : True})
 			if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
 			if not self.mTvdb is None: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
-			if not self.mImdb is None and self.mTvdb is None and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
+			if (self.mImdb is None or not self.mTmdb is None) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
 		if self.mMode == Context.ModeStream: items.insert(0, {'label' : 33415, 'command' : 'commandInformationStream', 'loader' : True})
 
 		if items:

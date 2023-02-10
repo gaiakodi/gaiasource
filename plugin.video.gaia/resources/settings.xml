@@ -4792,6 +4792,18 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
+				<setting id="image.style.set" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.style.set.label" type="string" label="36083" help="34561">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=style&media=set&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
 				<setting id="image.style.show" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.style.show.label" type="string" label="35595" help="34316">
 					<control type="button" format="action">
@@ -4836,6 +4848,18 @@ The label is then added to the action element:
 				<setting id="image.selection.movie.label" type="string" label="35588" help="34349">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=movie&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="image.selection.set" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.selection.set.label" type="string" label="36084" help="34562">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=set&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -5423,6 +5447,18 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
+				<setting id="navigation.show.discrepancy" type="integer" label="32534" help="34565">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35439">1</option>
+							<option label="35441">2</option>
+						</options>
+					</constraints>
+				</setting>
 			</group>
 
 			<!-- ########## NAVIGATION - SORT ########## -->
@@ -5574,7 +5610,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="navigation.sort.favourite.progress.type" type="integer" label="35572" help="34169">
 					<control type="spinner" format="string"/>
-					<default>6</default>
+					<default>7</default>
 					<level>2</level>
 					<constraints>
 						<options>
@@ -5585,6 +5621,7 @@ The label is then added to the action element:
 							<option label="35391">4</option>
 							<option label="35392">5</option>
 							<option label="35393">6</option>
+							<option label="35463">7</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -5593,7 +5630,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="navigation.sort.favourite.progress.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.progress.type">
 					<control type="spinner" format="string"/>
-					<default>1</default>
+					<default>0</default>
 					<level>2</level>
 					<constraints>
 						<options>
@@ -5605,7 +5642,7 @@ The label is then added to the action element:
 						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.calendar.type" type="integer" label="35573" help="34169">
+				<setting id="navigation.sort.favourite.calendar.type" type="integer" label="35573" help="34563">
 					<control type="spinner" format="string"/>
 					<default>4</default>
 					<level>2</level>
@@ -5618,6 +5655,7 @@ The label is then added to the action element:
 							<option label="35391">4</option>
 							<option label="35392">5</option>
 							<option label="35393">6</option>
+							<option label="35463">7</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6617,9 +6655,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6662,9 +6701,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6675,6 +6715,52 @@ The label is then added to the action element:
 				<setting id="view.style.movie.type.label" type="string" label="36200" help="34522" parent="view.style.movie">
 					<control type="button" format="action">
 						<data>Container.Update(plugin://plugin.video.gaia/?action=settingsView&media=movie&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<dependencies>
+						<dependency type="visible" setting="view.style.movie">2</dependency>
+					</dependencies>
+				</setting>
+				<setting id="view.style.set" type="integer" label="36213" help="34564">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="36113">1</option>
+							<option label="35233">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="view.style.set.layout" type="integer" label="36199" help="34521" parent="view.style.set">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35640">1</option>
+							<option label="33319">2</option>
+							<option label="33320">3</option>
+							<option label="35351">4</option>
+							<option label="32001">5</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="view.style.set" operator="!is">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="view.style.set.type" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="view.style.set.type.label" type="string" label="36200" help="34522" parent="view.style.set">
+					<control type="button" format="action">
+						<data>Container.Update(plugin://plugin.video.gaia/?action=settingsView&media=set&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -6707,9 +6793,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6752,9 +6839,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6797,9 +6885,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -6842,9 +6931,10 @@ The label is then added to the action element:
 							<option label="33320">3</option>
 							<option label="35351">4</option>
 							<option label="32001">5</option>
-							<option label="32002">6</option>
-							<option label="32054">7</option>
-							<option label="32326">8</option>
+							<option label="33527">6</option>
+							<option label="32002">7</option>
+							<option label="32054">8</option>
+							<option label="32326">9</option>
 						</options>
 					</constraints>
 					<dependencies>

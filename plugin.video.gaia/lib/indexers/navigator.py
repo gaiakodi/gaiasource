@@ -102,9 +102,9 @@ class Navigator(object):
 		self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('moviesArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
 		self.addDirectoryItem(name = 33001, description = 36011, query = self.parameterize('moviesCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
 		self.addDirectoryItem(name = 33002, description = 36012, query = self.parameterize('moviesLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
-		#self.addDirectoryItem(name = 33527, description = 33528, query = self.parameterize('moviesSets'), icon = 'collections.png', iconDefault = 'DefaultVideoPlaylists.png')#gaiaremove
+		if self.mMedia == Media.TypeMovie: self.addDirectoryItem(name = 33527, description = 33528, query = self.parameterize('sets'), icon = 'sets.png', iconDefault = 'DefaultVideoPlaylists.png')
 		self.addDirectoryItem(name = 32013, description = 36013, query = self.parameterize('moviesPeople'), icon = 'people.png', iconDefault = 'DefaultActor.png')
-		if lite == False: self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('moviesSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
+		if lite is False: self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('moviesSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
 
 	def moviesFavourites(self, lite = False):
@@ -236,6 +236,7 @@ class Navigator(object):
 
 	def search(self):
 		self.addDirectoryItem(name = 32001, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeMovie), icon = 'searchmovies.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 33527, description = 36018, query = self.parameterize('setsSearch', media = Media.TypeSet), icon = 'searchsets.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(name = 32002, description = 36018, query = self.parameterize('showsSearch', media = Media.TypeShow), icon = 'searchshows.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(name = 33470, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeDocumentary), icon = 'searchdocumentaries.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(name = 33471, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeShort), icon = 'searchshorts.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
@@ -259,6 +260,9 @@ class Navigator(object):
 			if item[0] == Searches.TypeMovies:
 				icon = 'searchmovies.png'
 				action = self.parameterize('moviesSearch', media = Media.TypeMovie)
+			elif item[0] == Searches.TypeSets:
+				icon = 'searchsets.png'
+				action = self.parameterize('setsSearch', media = Media.TypeSet)
 			elif item[0] == Searches.TypeShows:
 				icon = 'searchshows.png'
 				action = self.parameterize('showsSearch', media = Media.TypeShow)
@@ -290,10 +294,15 @@ class Navigator(object):
 			searches = Searches().retrieveShorts(kids = self.mKids)
 		else:
 			icon = 'searchmovies.png'
-			searches = Searches().retrieveMovies(kids = self.mKids)
+			#searches = Searches().retrieveMovies(kids = self.mKids)
+			searches = Searches().retrieveAll(kids = self.mKids, type = [Searches.TypeMovies, Searches.TypeSets])
 
 		for item in searches:
-			self.addDirectoryItem(item[0], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			if len(item) == 3:
+				if item[0] == Searches.TypeSets: self.addDirectoryItem(item[1], self.parameterize('setsSearch&terms=%s' % Networker.linkQuote(item[1], plus = True), media = Media.TypeSet), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+				else: self.addDirectoryItem(item[1], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[1], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			else:
+				self.addDirectoryItem(item[0], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def searchHistoryShows(self):
@@ -379,7 +388,7 @@ class Navigator(object):
 			self.addDirectoryItem(33662, self.parameterize('moviesRetrieve&link=traktrecommendations'), 'traktfeatured.png', 'DefaultAddonWebSkin.png', library = 'traktrecommendations')
 			self.addDirectoryItem(32036, self.parameterize('moviesRetrieve&link=trakthistory'), 'trakthistory.png', 'DefaultAddonWebSkin.png', library = 'trakthistory')
 			self.addDirectoryItem(35308, self.parameterize('moviesRetrieve&link=traktunfinished'), 'traktunfinished.png', 'DefaultAddonWebSkin.png', library = 'traktunfinished')
-			self.addDirectoryItem(32032, self.parameterize('moviesRetrieve&link=traktcollection'), 'traktcollections.png', 'DefaultAddonWebSkin.png', library = 'traktcollection')
+			self.addDirectoryItem(32032, self.parameterize('moviesRetrieve&link=traktcollection'), 'traktcollection.png', 'DefaultAddonWebSkin.png', library = 'traktcollection')
 			self.addDirectoryItem(32033, self.parameterize('moviesRetrieve&link=traktwatchlist'), 'traktwatch.png', 'DefaultVideoPlaylists.png', library = 'traktwatchlist')
 			self.addDirectoryItem(33002, self.parameterize('traktMoviesLists'), 'traktlists.png', 'DefaultAddonWebSkin.png')
 			self.endDirectory()
@@ -402,7 +411,7 @@ class Navigator(object):
 			self.addDirectoryItem(32027, self.parameterize('episodesRetrieve&link=mycalendar'), 'traktcalendar.png', 'DefaultAddonWebSkin.png', library = 'mycalendar')
 			self.addDirectoryItem(32036, self.parameterize('episodesRetrieve&link=trakthistory'), 'trakthistory.png', 'DefaultAddonWebSkin.png', library = 'trakthistory')
 			self.addDirectoryItem(35308, self.parameterize('episodesRetrieve&link=traktunfinished'), 'traktunfinished.png', 'DefaultAddonWebSkin.png', library = 'traktunfinished')
-			self.addDirectoryItem(32032, self.parameterize('showsRetrieve&link=traktcollection'), 'traktcollections.png', 'DefaultAddonWebSkin.png', library = 'traktcollection')
+			self.addDirectoryItem(32032, self.parameterize('showsRetrieve&link=traktcollection'), 'traktcollection.png', 'DefaultAddonWebSkin.png', library = 'traktcollection')
 			self.addDirectoryItem(32033, self.parameterize('showsRetrieve&link=traktwatchlist'), 'traktwatch.png', 'DefaultVideoPlaylists.png', library = 'traktwatchlist')
 			self.addDirectoryItem(33002, self.parameterize('traktTvLists'), 'traktlists.png', 'DefaultAddonWebSkin.png')
 			self.endDirectory()
@@ -428,7 +437,7 @@ class Navigator(object):
 		if self.imdbAccount():
 			self.addDirectoryItem(33662, self.parameterize('moviesRetrieve&link=featured'), 'imdbfeatured.png', 'DefaultMovies.png', library = 'featured')
 			self.addDirectoryItem(35602, self.parameterize('moviesRetrieve&link=imdbratings'), 'imdbrated.png', 'DefaultMovies.png', library = 'imdbratings')
-			self.addDirectoryItem(32032, self.parameterize('moviesRetrieve&link=imdbcollection'), 'imdbcollections.png', 'DefaultMovies.png', library = 'imdbcollection')
+			self.addDirectoryItem(32032, self.parameterize('moviesRetrieve&link=imdbcollection'), 'imdbcollection.png', 'DefaultMovies.png', library = 'imdbcollection')
 			self.addDirectoryItem(32033, self.parameterize('moviesRetrieve&link=imdbwatchlist'), 'imdbwatch.png', 'DefaultMovies.png', library = 'imdbwatchlist')
 			self.addDirectoryItem(33002, self.parameterize('moviesUserlists&mode=imdb'), 'imdblists.png', 'DefaultAddonWebSkin.png')
 			self.addDirectoryItem(35212, self.parameterize('imdbExport'), 'imdbexport.png', 'DefaultTVShows.png')
@@ -438,7 +447,7 @@ class Navigator(object):
 		if self.imdbAccount():
 			self.addDirectoryItem(33662, self.parameterize('showsRetrieve&link=featured'), 'imdbfeatured.png', 'DefaultTVShows.png', library = 'featured')
 			self.addDirectoryItem(35602, self.parameterize('showsRetrieve&link=imdbratings'), 'imdbrated.png', 'DefaultTVShows.png', library = 'imdbratings')
-			self.addDirectoryItem(32032, self.parameterize('showsRetrieve&link=imdbcollection'), 'imdbcollections.png', 'DefaultTVShows.png', library = 'imdbcollection')
+			self.addDirectoryItem(32032, self.parameterize('showsRetrieve&link=imdbcollection'), 'imdbcollection.png', 'DefaultTVShows.png', library = 'imdbcollection')
 			self.addDirectoryItem(32033, self.parameterize('showsRetrieve&link=imdbwatchlist'), 'imdblists.png', 'DefaultTVShows.png', library = 'imdbwatchlist')
 			self.addDirectoryItem(33002, self.parameterize('showsUserlists&mode=imdb'), 'imdblists.png', 'DefaultAddonWebSkin.png')
 			self.addDirectoryItem(35212, self.parameterize('imdbExport'), 'imdbexport.png', 'DefaultTVShows.png')
@@ -447,9 +456,7 @@ class Navigator(object):
 	def moviesCategories(self):
 		self.addDirectoryItem(32011, self.parameterize('moviesGenres'), 'genres.png', 'DefaultGenre.png')
 		self.addDirectoryItem(35526, self.parameterize('moviesYears'), 'calendar.png', 'DefaultYear.png')
-		if self.mMedia == Media.TypeMovie and not self.kidsOnly():
-			self.addDirectoryItem(32016, self.parameterize('channels'), 'networks.png', 'DefaultNetwork.png')
-			self.addDirectoryItem(33504, self.parameterize('moviesCollections'), 'collections.png', 'DefaultSets.png')
+		if self.mMedia == Media.TypeMovie and not self.kidsOnly(): self.addDirectoryItem(32016, self.parameterize('channels'), 'networks.png', 'DefaultNetwork.png')
 		self.addDirectoryItem(32014, self.parameterize('moviesLanguages'), 'languages.png', 'DefaultCountry.png')
 		self.addDirectoryItem(32013, self.parameterize('moviesPersons'), 'people.png', 'DefaultActor.png')
 		self.addDirectoryItem(32015, self.parameterize('moviesCertificates'), 'certificates.png', 'DefaultFile.png')
@@ -471,10 +478,6 @@ class Navigator(object):
 		self.addDirectoryItem(32321, self.parameterize('moviesRetrieve&link=featured'), 'featured.png', 'DefaultVideoPlaylists.png', library = 'featured')
 		self.endDirectory()
 
-	def moviesSets(self):
-		self.addDirectoryItem(33003, self.parameterize('moviesRetrieve&link=sets'), 'browse.png', 'DefaultAddonContextItem.png')
-		self.endDirectory()
-
 	def moviesDrugs(self):
 		if self.mMedia == Media.TypeMovie and not self.kidsOnly():
 			self.addDirectoryItem(32310, self.parameterize('moviesRetrieve&link=drugsgeneral'), 'drugs.png', 'DefaultVideoPlaylists.png', library = 'drugsgeneral')
@@ -491,9 +494,18 @@ class Navigator(object):
 	def moviesSearches(self):
 		self.addDirectoryItem(33039, self.parameterize('moviesSearch'), 'searchtitle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		#self.addDirectoryItem(33040, self.parameterize('moviesSearch'), 'searchdescription.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(33527, self.parameterize('setsSearch'), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(32013, self.parameterize('moviesPerson'), 'searchpeople.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(32036, self.parameterize('searchHistoryMovies'), 'searchhistory.png', 'DefaultAddonsSearch.png')
 		self.addDirectoryItem(35157, self.parameterize('scrapeExact', media = self.mMedia), 'searchexact.png', 'DefaultAddonsSearch.png')
+		self.endDirectory()
+
+	def sets(self):
+		self.addDirectoryItem(33003, self.parameterize('setsRetrieve&link=browse'), 'browse.png', 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(33490, self.parameterize('setsRetrieve&link=arrivals'), 'new.png', 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(35375, self.parameterize('setsRetrieve&link=random'), 'random.png', 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(33565, self.parameterize('setsAlphabetic'), 'alphabet.png', 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(32010, self.parameterize('setsSearch'), 'search.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def shows(self, lite = False):

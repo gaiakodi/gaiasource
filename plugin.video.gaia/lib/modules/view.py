@@ -36,6 +36,7 @@ class View(object):
 		'skin.estuary' : {
 			Directory.ContentGeneral : 55, # WideList
 			Directory.ContentMovies : 51, # Poster
+			Directory.ContentSets : 51, # Poster
 			Directory.ContentShows : 51, # Poster
 			Directory.ContentSeasons : 50, # List
 			Directory.ContentEpisodes : 55, # WideList
@@ -43,6 +44,7 @@ class View(object):
 		'skin.estouchy' : {
 			Directory.ContentGeneral : 9000, # Unknown
 			Directory.ContentMovies : 50, # Unknown
+			Directory.ContentSets : 50, # Unknown
 			Directory.ContentShows : 50, # Unknown
 			Directory.ContentSeasons : 50, # Unknown
 			Directory.ContentEpisodes : 50, # Unknown
@@ -50,6 +52,7 @@ class View(object):
 		'skin.confluence' : {
 			Directory.ContentGeneral : 500, # Thumbnail
 			Directory.ContentMovies : 515, # MediaInfo3
+			Directory.ContentSets : 515, # MediaInfo3
 			Directory.ContentShows : 515, # MediaInfo3
 			Directory.ContentSeasons : 2, # MediaInfo2
 			Directory.ContentEpisodes : 2, # MediaInfo2
@@ -57,6 +60,7 @@ class View(object):
 		'skin.aeon.nox.silvo' : {
 			Directory.ContentGeneral : 50, # List
 			Directory.ContentMovies : 501, # LowList
+			Directory.ContentSets : 501, # LowList
 			Directory.ContentShows : 501, # LowList
 			Directory.ContentSeasons : 501, # LowList
 			Directory.ContentEpisodes : 501, # LowList
@@ -64,6 +68,7 @@ class View(object):
 		'skin.arctic.horizon' : {
 			Directory.ContentGeneral : 500, # SquareList
 			Directory.ContentMovies : 52, # PosterRow
+			Directory.ContentSets : 52, # PosterRow
 			Directory.ContentShows : 52, # PosterRow
 			Directory.ContentSeasons : 53, # LandscapeIntegrated
 			Directory.ContentEpisodes : 53, # LandscapeIntegrated
@@ -342,7 +347,7 @@ class View(object):
 	@classmethod
 	def settingsInitialize(self):
 		# In case the skin was changed, change the view name/label in the settings.
-		for media in [Directory.ContentGeneral, Media.TypeMovie, Media.TypeShow, Media.TypeSeason, Media.TypeEpisode]:
+		for media in [Directory.ContentGeneral, Media.TypeMovie, Media.TypeSet, Media.TypeShow, Media.TypeSeason, Media.TypeEpisode]:
 			settings = self.settingsTypeGet(media = media)
 			try:
 				view = settings[Skin.id()][self.settingsLayoutGet(media = media)]['name']
@@ -380,6 +385,7 @@ class View(object):
 			Directory.ContentGames,
 			Directory.ContentVideos,
 			Directory.ContentMovies,
+			Directory.ContentSets,
 			Directory.ContentShows,
 			Directory.ContentSeasons,
 			Directory.ContentEpisodes,
@@ -412,6 +418,7 @@ class View(object):
 	def convert(self, media):
 		if media:
 			if media.startswith('movie') or media.startswith('docu') or media.startswith('short'): return Directory.ContentMovies
+			elif media.startswith('set'): return Directory.ContentSets
 			elif media.startswith('tvshow') or media.startswith('show'): return Directory.ContentShows
 			elif media.startswith('season'): return Directory.ContentSeasons
 			elif media.startswith('episode'): return Directory.ContentEpisodes

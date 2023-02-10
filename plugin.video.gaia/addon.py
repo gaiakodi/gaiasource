@@ -128,10 +128,6 @@ elif action.startswith('movies'):
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
 		Movies(media = media, kids = kids).arrivals(refresh = refresh)
 
-	elif action == 'moviesCollections':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).collections()
-
 	elif action == 'moviesGenres':
 		from lib.indexers.movies import Movies
 		Movies(media = media, kids = kids).genres()
@@ -174,19 +170,35 @@ elif action.startswith('movies'):
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids, menu = menu).moviesLists()
 
-	elif action == 'moviesSets':
-		#gaiaremove
-		#from lib.indexers.navigator import Navigator
-		#Navigator(media = media, kids = kids, menu = menu).moviesSets()
-		#from lib.meta.processors.tmdb import MetaTmdb
-		from lib.meta.tools import MetaTools
-		#x =MetaTmdb.set(id = 10)
-		x=MetaTools.idSet(title = 'Star Wars', cache = False)
-		tools.Logger.log("UUUUUUUUUUUUUUU: "+tools.Converter.jsonTo(x))
-
 	elif action == 'moviesPeople':
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids, menu = menu).moviesPeople()
+
+####################################################
+# SETS
+####################################################
+
+elif action.startswith('sets'):
+
+	if action == 'sets':
+		from lib.indexers.navigator import Navigator
+		Navigator(media = media, kids = kids, menu = menu).sets()
+
+	elif action == 'setsRetrieve':
+		from lib.indexers.sets import Sets
+		link = parameters.get('link')
+		tmdb = parameters.get('tmdb')
+		character = parameters.get('character')
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Sets(kids = kids).retrieve(link = link, idTmdb = tmdb, character = character, refresh = refresh)
+
+	elif action == 'setsAlphabetic':
+		from lib.indexers.sets import Sets
+		Sets(kids = kids).alphabetic()
+
+	elif action == 'setsSearch':
+		from lib.indexers.sets import Sets
+		Sets(kids = kids).search(parameters.get('terms'))
 
 ####################################################
 # SHOW

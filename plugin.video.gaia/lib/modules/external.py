@@ -26,6 +26,12 @@ class Importer(object):
 	Lock = Lock()
 	Modules = {}
 
+	# Exceptions to not print to log.
+	Exceptions = [
+		# On AppleTV: py-cpuinfo currently only works on X86 and some ARM/PPC/S390X/MIPS CPUs.
+		'cpuinfo currently only works on',
+	]
+
 	###################################################################
 	# INTERNAL
 	###################################################################
@@ -54,7 +60,15 @@ class Importer(object):
 		except Exception as exception:
 			if error is True:
 				from lib.modules.tools import Logger
-				Logger.error()
+
+				exclude = False
+				message = str(exception)
+				for i in Importer.Exceptions:
+					if i in message:
+						exclude = True
+						break
+
+				if not exclude: Logger.error()
 			elif not error is False and not not error is None:
 				try: error(error = exception)
 				except: error()

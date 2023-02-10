@@ -4636,7 +4636,6 @@ class Core(object):
 
 				if not error:
 					result = sourceHandler.handle(link = url, item = item, name = handle, download = download, popups = popups, close = handleClose, mode = handleMode, cloud = cloud, strict = strict)
-
 					if 'loader' in result and result['loader']:
 						loader = True
 						interface.Loader.show()

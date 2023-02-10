@@ -166,7 +166,7 @@ class Player(xbmc.Player):
 			Audio.languageSet(self.source['stream'].metaLanguage())
 
 			# For Emby/Jellyfin.
-			if self.service.lower() == 'automatic':
+			if self.service and self.service.lower() == 'automatic':
 				if self.source['stream'].accessTypeDirect():
 					origin = self.source['stream'].sourceOrigin()
 					if origin and origin.lower() in ['emby', 'jellyfin']: self.service = origin

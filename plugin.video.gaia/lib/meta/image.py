@@ -51,6 +51,7 @@ class MetaImage(object):
 	Selections						= [SelectionPreference, SelectionFallback]
 
 	MediaMovie						= Media.TypeMovie
+	MediaSet						= Media.TypeSet
 	MediaShow						= Media.TypeShow
 	MediaSeason						= Media.TypeSeason
 	MediaEpisode					= Media.TypeEpisode
@@ -59,7 +60,7 @@ class MetaImage(object):
 	MediaSpecialEpisode				= Media.TypeSpecialEpisode
 	MediaSpecialRecap				= Media.TypeSpecialRecap
 	MediaSpecialExtra				= Media.TypeSpecialExtra
-	Medias							= {ModeStyle : [MediaMovie, MediaShow, MediaSeason, MediaEpisode], ModeSelection : [MediaMovie, MediaShow, MediaSeason, MediaEpisode, MediaSpecialSeason, MediaSpecialEpisode, MediaSpecialRecap, MediaSpecialExtra, MediaMixed]}
+	Medias							= {ModeStyle : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode], ModeSelection : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode, MediaSpecialSeason, MediaSpecialEpisode, MediaSpecialRecap, MediaSpecialExtra, MediaMixed]}
 
 	TypePoster						= 'poster'
 	TypeThumb						= 'thumb'
@@ -85,7 +86,7 @@ class MetaImage(object):
 	ProviderTrakt					= 'trakt'
 	ProviderFanart					= 'fanart'
 	Providers						= [ProviderImdb, ProviderTmdb, ProviderTvdb, ProviderTvmaze, ProviderTrakt, ProviderFanart]
-	ProvidersDefault				= {MediaMovie : ProviderTmdb, MediaShow : ProviderTvdb, MediaSeason : ProviderTvdb, MediaEpisode : ProviderTvdb}
+	ProvidersDefault				= {MediaMovie : ProviderTmdb, MediaSet : ProviderTmdb, MediaShow : ProviderTvdb, MediaSeason : ProviderTvdb, MediaEpisode : ProviderTvdb}
 
 	# Should correspond with Metadata.Sort values.
 	SortNone						= 'none'
@@ -163,12 +164,14 @@ class MetaImage(object):
 	SettingsLimit					= 'image.general.limit'
 
 	SettingsStyleMovie				= 'image.style.movie'
+	SettingsStyleSet				= 'image.style.set'
 	SettingsStyleShow				= 'image.style.show'
 	SettingsStyleSeason				= 'image.style.season'
 	SettingsStyleEpisode			= 'image.style.episode'
-	SettingsStyle					= {MediaMovie : SettingsStyleMovie, MediaShow : SettingsStyleShow, MediaSeason : SettingsStyleSeason, MediaEpisode : SettingsStyleEpisode}
+	SettingsStyle					= {MediaMovie : SettingsStyleMovie, MediaSet : SettingsStyleSet, MediaShow : SettingsStyleShow, MediaSeason : SettingsStyleSeason, MediaEpisode : SettingsStyleEpisode}
 
 	SettingsSelectionMovie			= 'image.selection.movie'
+	SettingsSelectionSet			= 'image.selection.set'
 	SettingsSelectionShow			= 'image.selection.show'
 	SettingsSelectionSeason			= 'image.selection.season'
 	SettingsSelectionEpisode		= 'image.selection.episode'
@@ -177,7 +180,7 @@ class MetaImage(object):
 	SettingsSpecialEpisode			= 'image.special.episode'
 	SettingsSpecialRecap			= 'image.special.recap'
 	SettingsSpecialExtra			= 'image.special.extra'
-	SettingsSelection				= {MediaMovie : SettingsSelectionMovie, MediaShow : SettingsSelectionShow, MediaSeason : SettingsSelectionSeason, MediaEpisode : SettingsSelectionEpisode, MediaMixed : SettingsSelectionMixed, MediaSpecialSeason : SettingsSpecialSeason, MediaSpecialEpisode : SettingsSpecialEpisode, MediaSpecialRecap : SettingsSpecialRecap, MediaSpecialExtra : SettingsSpecialExtra}
+	SettingsSelection				= {MediaMovie : SettingsSelectionMovie, MediaSet : SettingsSelectionSet, MediaShow : SettingsSelectionShow, MediaSeason : SettingsSelectionSeason, MediaEpisode : SettingsSelectionEpisode, MediaMixed : SettingsSelectionMixed, MediaSpecialSeason : SettingsSpecialSeason, MediaSpecialEpisode : SettingsSpecialEpisode, MediaSpecialRecap : SettingsSpecialRecap, MediaSpecialExtra : SettingsSpecialExtra}
 
 	SettingsData					= {}
 	SettingsDefault					= {}
@@ -238,7 +241,7 @@ class MetaImage(object):
 	def settingsInternal(self):
 		# All settings that require the metacache to be cleared to get the new values.
 		data = {}
-		for media in [MetaImage.MediaMovie, MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode]:
+		for media in [MetaImage.MediaMovie, MetaImage.MediaSet, MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode]:
 			data[media] = self.settings(mode = MetaImage.ModeStyle, media = media)
 		return data
 
@@ -369,6 +372,7 @@ class MetaImage(object):
 		self.mMedia = media
 
 		if media == MetaImage.MediaMovie: self.mTitle = 35594 if mode == MetaImage.ModeStyle else 35588
+		elif media == MetaImage.MediaSet: self.mTitle = 36083 if mode == MetaImage.ModeStyle else 36084
 		elif media == MetaImage.MediaShow: self.mTitle = 35595 if mode == MetaImage.ModeStyle else 35589
 		elif media == MetaImage.MediaSeason: self.mTitle = 35596 if mode == MetaImage.ModeStyle else 35590
 		elif media == MetaImage.MediaEpisode: self.mTitle = 35597 if mode == MetaImage.ModeStyle else 35591
@@ -416,7 +420,7 @@ class MetaImage(object):
 					{'type' : 'text', 'value' : 'Images come from the following sources:', 'break' : 2},
 					{'type' : 'list', 'value' : [
 						{'title' : 'IMDb', 'value' : 'Only provides movie and show posters that are often cluttered with decor and additional text, like the posters used in physical movie theaters. IMDb only has a single poster and these are only available for menus with IMDb lists. Posters contain text in the language specified by the main [I]Metadata Language[/I]  setting if available, otherwise the English version is returned.'},
-						{'title' : 'TMDb', 'value' : 'Provides posters, backgrounds, and logos for movies. Multiple images are available from a range of languages.'},
+						{'title' : 'TMDb', 'value' : 'Provides posters, backgrounds, and logos for movies and sets. Multiple images are available from a range of languages.'},
 						{'title' : 'TVDb', 'value' : 'Provides posters, thumbnails, backgrounds, banners, logos, and clear art for shows, seasons, and episodes. Multiple images are available from a range of languages. Images are often not grouped and different styled images might be displayed for seasons.'},
 						{'title' : 'TVmaze', 'value' : 'Only provides show posters for menus under the [I]Channels[/I]  section. TVmaze only has a single poster and it is typically in English.'},
 						{'title' : 'Fanart', 'value' : 'Provides posters, thumbnails, backgrounds, banners, logos, clear art, and disc art for movies, shows, and seasons. Multiple images are available from a range of languages. Fanart mostly has images in their original solution with a large file size and might therefore take slightly longer to download. If you intend on using Fanart images, you should consider authenticating a Fanart account, since it will return more recent images.'},
@@ -489,6 +493,7 @@ class MetaImage(object):
 			if value is None: return 33564
 
 			elif value == MetaImage.MediaMovie: return 35496
+			elif value == MetaImage.MediaSet: return 35534
 			elif value == MetaImage.MediaShow: return 35498
 			elif value == MetaImage.MediaSeason: return 32055
 			elif value == MetaImage.MediaEpisode: return 33028
@@ -576,6 +581,7 @@ class MetaImage(object):
 			from lib.modules.interface import Translation
 
 			if value == MetaImage.MediaMovie: return Translation.string(32322) % Translation.string(35496).lower()
+			elif value == MetaImage.MediaSet: return Translation.string(32322) % Translation.string(35534).lower()
 			elif value == MetaImage.MediaShow: return Translation.string(32322) % Translation.string(35498).lower()
 			elif value == MetaImage.MediaSeason: return Translation.string(32322) % Translation.string(32055).lower()
 			elif value == MetaImage.MediaEpisode: return Translation.string(32322) % Translation.string(33028).lower()
@@ -701,8 +707,9 @@ class MetaImage(object):
 					elif provider == MetaImage.ProviderFanart: values = [MetaImage.SortNone, MetaImage.SortIndex, MetaImage.SortId, MetaImage.SortVote, MetaImage.SortVoteIndex, MetaImage.SortVoteId]
 				elif option == MetaImage.OptionProvider:
 					values = []
-					if type == MetaImage.TypePoster: values.append(MetaImage.ProviderImdb) # IMDb only has posters.
+					if type == MetaImage.TypePoster and not self.mMedia == Media.TypeSet: values.append(MetaImage.ProviderImdb) # IMDb only has posters.
 					if Media.typeTelevision(self.mMedia): values.extend([MetaImage.ProviderTvdb, MetaImage.ProviderTvmaze, MetaImage.ProviderFanart])
+					elif self.mMedia == Media.TypeSet: values.extend([MetaImage.ProviderTmdb])
 					else: values.extend([MetaImage.ProviderTmdb, MetaImage.ProviderFanart])
 				elif option == MetaImage.OptionMedia:
 					values = []
@@ -1024,7 +1031,9 @@ class MetaImage(object):
 						if 'episode' in data: media = MetaImage.MediaEpisode
 						else: media = MetaImage.MediaSeason
 					else: media = MetaImage.MediaShow
-				else: media = MetaImage.MediaMovie
+				else:
+					if 'set' in data and data['set'] and 'tmdb' in data and data['tmdb'] and not('imdb' in data and data['tmdb']) and not('trakt' in data and data['trakt']): media = MetaImage.MediaSet
+					else: media = MetaImage.MediaMovie
 
 			television = Media.typeTelevision(media) or media == MetaImage.MediaMixed
 
@@ -1195,7 +1204,12 @@ class MetaImage(object):
 	@classmethod
 	def extractDefault(self, images):
 		if not MetaImage.TypePoster in images: images[MetaImage.TypePoster] = Theme.poster()
-		if not MetaImage.TypeThumb in images: images[MetaImage.TypeThumb] = Theme.thumbnail()
+
+		# Rather use landscape image (fanart) than potrait image (poster), otherwise the image ratio between available and missing thumbbnails will differ.
+		# Important for sets without a thumb/fanart.
+		#if not MetaImage.TypeThumb in images: images[MetaImage.TypeThumb] = Theme.thumbnail()
+		if not MetaImage.TypeThumb in images: images[MetaImage.TypeThumb] = Theme.fanart()
+
 		if not MetaImage.TypeBanner in images: images[MetaImage.TypeBanner] = Theme.banner()
 		if not MetaImage.TypeFanart in images: images[MetaImage.TypeFanart] = Theme.fanart()
 		if not MetaImage.TypeLandscape in images: images[MetaImage.TypeLandscape] = Theme.fanart()
@@ -1317,6 +1331,7 @@ class MetaImage(object):
 	@classmethod
 	def setMedia(self, media, data, item = None, default = True, mixed = False, show = None, season = None, episode = True, previous = True, next = True):
 		if Media.typeMovie(media): return self.setMovie(data = data, item = item, default = default)
+		elif media == MetaImage.MediaSet: return self.setSet(data = data, item = item, default = default)
 		elif media == MetaImage.MediaShow: return self.setShow(data = data, item = item, default = default)
 		elif media == MetaImage.MediaSeason: return self.setSeason(data = data, item = item, default = default, show = show)
 		elif media == MetaImage.MediaEpisode: return self.setEpisode(data = data, item = item, default = default, mixed = mixed, show = show, season = season, episode = episode, previous = previous, next = next)
@@ -1326,6 +1341,10 @@ class MetaImage(object):
 	@classmethod
 	def setMovie(self, data, item = None, default = True):
 		return self._set(media = MetaImage.MediaMovie, data = data, item = item, default = default)
+
+	@classmethod
+	def setSet(self, data, item = None, default = True):
+		return self._set(media = MetaImage.MediaSet, data = data, item = item, default = default)
 
 	@classmethod
 	def setShow(self, data, item = None, default = True):

@@ -26,6 +26,7 @@ from lib.modules.window import Window
 class Informer(object):
 
 	TypeMovie		= Media.TypeMovie
+	TypeSet			= Media.TypeSet
 	TypeShow		= Media.TypeShow
 	TypeSeason		= Media.TypeSeason
 	TypeEpisode		= Media.TypeEpisode
@@ -193,6 +194,7 @@ class Informer(object):
 				elif type == 'season': type = Informer.TypeSeason
 				elif type == 'episode': type = Informer.TypeEpisode
 				elif type == 'person': type = Informer.TypePerson
+				elif type == 'set': type = Informer.TypeSet
 				else: type = Informer.TypeMovie
 
 				try:
@@ -236,6 +238,7 @@ class Informer(object):
 				elif type == 'season': type = Informer.TypeSeason
 				elif type == 'episode': type = Informer.TypeEpisode
 				elif type == 'person': type = Informer.TypePerson
+				elif type == 'set': type = Informer.TypeSet
 				else: type = Informer.TypeMovie
 
 				tmdb = None

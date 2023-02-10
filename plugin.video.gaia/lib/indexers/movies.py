@@ -162,10 +162,10 @@ class Movies(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
+	def retrieve(self, link = None, items = None, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
 		try:
 			self.mModeRelease = link in ['new', 'home', 'disc']
-			items = []
+			if items is None: items = []
 
 			try: link = getattr(self, link + '_link')
 			except: pass
@@ -275,11 +275,20 @@ class Movies(object):
 
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
+			elif items:
+				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
 		except: Logger.error()
 
-		genre = self.search_link in link and not self.persons_link in link and not self.personlist_link in link
-		kids = not self.persons_link in link and not self.personlist_link in link
-		search = self.search_link in link
+		if link:
+			genre = self.search_link in link and not self.persons_link in link and not self.personlist_link in link
+			kids = not self.persons_link in link and not self.personlist_link in link
+			search = self.search_link in link
+		else:
+			genre = False
+			kids = False
+			search = False
+
 		return self.process(items = items, menu = menu, genre = genre, kids = kids, search = search, refresh = refresh)
 
 	# genre: Filter by genre depending on wether the items are movies, docus, or shorts.
@@ -342,7 +351,7 @@ class Movies(object):
 		items = items[(page - 1) * limit : page * limit]
 
 		# Sort first, since we want to page in accordance to the user's preferred sorting.
-		if sort: self.sort(items = items, type = sort)
+		if sort: items = self.sort(items = items, type = sort)
 
 		if len(items) >= limit and (not maximum or (page + 1) * limit <= maximum):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
@@ -357,36 +366,30 @@ class Movies(object):
 	def sort(self, items):
 		try:
 			if Settings.getBoolean('navigation.sort.favourite'):
+				dummyString = 'zzzzzzzzzz'
+
 				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % self.mMedia)
 				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % self.mMedia) == 1
+
 				if attribute > 0:
 					if attribute == 1:
 						if Settings.getBoolean('navigation.sort.favourite.article'):
-							items = sorted(items, key = lambda k: Regex.remove(data = k['title'], expression = '(^the\s|^an?\s)', group = 1), reverse = reverse)
+							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
-							items = sorted(items, key = lambda k: k['title'].lower(), reverse = reverse)
+							items = sorted(items, key = lambda k : (k.get('title') or '').lower() or dummyString, reverse = reverse)
 					elif attribute == 2:
-						for i in range(len(items)):
-							if not 'rating' in items[i]: items[i]['rating'] = None
-						items = sorted(items, key = lambda k: float(k['rating']), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						for i in range(len(items)):
-							if not 'votes' in items[i]: items[i]['votes'] = None
-						items = sorted(items, key = lambda k: int(k['votes']), reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 					elif attribute == 4:
-						for i in range(len(items)):
-							if not 'premiered' in items[i]: items[i]['premiered'] = None
-						items = sorted(items, key = lambda k: k['premiered'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('premiered') or dummyString, reverse = reverse)
 					elif attribute == 5:
-						for i in range(len(items)):
-							if not 'added' in items[i]: items[i]['added'] = None
-						items = sorted(items, key = lambda k: k['added'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
 					elif attribute == 6:
-						for i in range(len(items)):
-							if not 'watched' in items[i]: items[i]['watched'] = None
-						items = sorted(items, key = lambda k: k['watched'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('timeWatched') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
+
 		except: Logger.error()
 		return items
 
@@ -506,139 +509,6 @@ class Movies(object):
 		except:
 			Logger.error()
 			return None
-
-	##############################################################################
-	# COLLECTION
-	##############################################################################
-
-	def collections(self, menu = True):
-		collections = []
-
-		if not self.mKidsOnly or self.mRestriction >= 0:
-			collections.extend([
-				('Disney', 'keywords=disney&num_votes=1000,'),
-				('The Lion King', 'title_type=feature,movie,tv_movie,video&num_votes=1000,&title=the%20lion%20king'),
-				('Toy Story', 'num_votes=1000,&title=toy%20story'),
-				('Land Before Time', 'title_type=feature,movie,tv_movie,video&title=land%20before%20time'),
-			])
-		if not self.mKidsOnly or self.mRestriction >= 1:
-			collections.extend([
-				('Harry Potter', 'num_votes=1000,&title=harry%20potter'),
-				('Star Wars', 'num_votes=1000,&title=star%20wars'),
-				('Back To The Future', 'num_votes=1000,&title=back%20to%20the%20future'),
-				('Rocky', 'num_votes=1000,&title=rocky&genres=sport'),
-				('Karate Kid', 'num_votes=1000,&title=karate%20kid'),
-				('Narnia', 'num_votes=1000,&title=narnia'),
-				('Shrek', 'num_votes=1000,&title=shrek'),
-				('Kung Fu Panda', 'num_votes=1000,&title=kung%20fu%20panda'),
-				('Alvin and the Chipmunks', 'num_votes=1000,&title=chipmunks'),
-				('The Mighty Ducks', 'num_votes=1000,&title=the%20mighty%20ducks'),
-			])
-		if not self.mKidsOnly or self.mRestriction >= 2:
-			collections.extend([
-				('Marvel Comics', 'keywords=marvel-comics&num_votes=1000,'),
-				('Avengers', 'keywords=marvel-comics&num_votes=1000,&title=avengers&release_date=2012,'),
-				('X-Men', 'keywords=marvel-comics,x-men&num_votes=1000,&release_date=2000,'),
-				('Spider-Man', 'keywords=marvel-comics&num_votes=1000,&title=spider-man'),
-				('Fantastic Four', 'keywords=marvel-comics&num_votes=1000,&title=fantastic%20four'),
-				('Hulk', 'keywords=marvel-comics&num_votes=1000,&title=hulk'),
-				('Iron Man', 'keywords=marvel-comics&num_votes=1000,&title=iron%20man'),
-				('Captain America', 'keywords=marvel-comics&num_votes=1000,&title=captain%20america'),
-				('Thor', 'keywords=marvel-comics&num_votes=1000,&title=thor'),
-				('Deadpool', 'keywords=marvel-comics&num_votes=1000,&title=deadpool'),
-
-				('DC Comics', 'keywords=dc-comics&num_votes=1000,'),
-				('Batman', 'num_votes=1000,&title=batman'),
-				('Superman', 'num_votes=1000,&title=superman'),
-
-				('Dark Horse Comics', 'keywords=dark-horse-comics&num_votes=1000,'),
-				('Hellboy', 'num_votes=1000,&title=hellboy'),
-				('Sin City', 'num_votes=1000,&title=sin%20city'),
-				('300', 'num_votes=1000,&title=300'),
-
-				('Middle Earth', 'keywords=hobbit&num_votes=1000,&user_rating=4.0,'),
-				('The Lord Of The Rings', 'num_votes=1000,&title=the%20lord%20of%20the%20rings&release_date=2000,'),
-				('The Hobbit', 'num_votes=1000,&title=the%20hobbit&release_date=2000,'),
-
-				('Star Trek', 'num_votes=1000,&title=star%20trek'),
-				('Matrix', 'num_votes=1000,&title=matrix'),
-				('Fast And Furious', 'num_votes=1000,&title=fast%20furious'),
-				('007', 'keywords=007&num_votes=1000,'),
-				('James Bond', 'keywords=007&num_votes=1000,'),
-				('Jurassic Park', 'keywords=jurassic-park&num_votes=1000,'),
-				('Hunger Games', 'num_votes=1000,&title=hunger%20games'),
-				('Terminator', 'genres=action&keywords=the-terminator&num_votes=1000,'),
-				('Rambo', 'genres=action&keywords=rambo&num_votes=1000,'),
-				('Mission Impossible', 'num_votes=1000,&title=mission%20impossible'),
-				('Indiana Jones', 'num_votes=1000,&plot=indiana%20jones&role=nm0000148'),
-				('Bourne', 'num_votes=1000,&title=bourne'),
-				('Twilight', 'num_votes=1000,&role=nm0829576&title=twilight'),
-				('Pirates Of The Caribbean', 'num_votes=1000,&title=pirates%20caribbean'),
-				('Rush Hour', 'num_votes=1000,&title=rush%20hour'),
-				('Transformers', 'num_votes=1000,&title=transformers'),
-				('Ace Ventura', 'num_votes=1000,&title=ace%20ventura'),
-				('Dan Brown', 'num_votes=1000,&role=nm1467010'),
-				('Ocean\'s', 'num_votes=1000,&title=ocean%27s&genres=crime'),
-				('Mummy', 'num_votes=1000,&title=the%20mummy&genres=fantasy,adventure'),
-				('Austin Powers', 'num_votes=1000,&title=austin%20powers'),
-				('Transporter', 'num_votes=1000,&title=transporter'),
-				('Taxi', 'num_votes=1000,&title=taxi&genres=action,comedy'),
-				('Men In Black', 'num_votes=1000,&title=men%20in%20black'),
-				('Space Odyssey', 'num_votes=1000,&role=nm0002009'),
-				('Godzilla', 'num_votes=1000,&title=godzilla'),
-				('King Kong', 'num_votes=1000,&title=king%20kong'),
-				('Planet Of The Apes', 'num_votes=1000,&title=planet%20apes'),
-				('Tron', 'num_votes=1000,&title=tron'),
-				('Naked Gun', 'num_votes=1000,&title=naked%20gun'),
-				('Final Fantasy', 'title=final%20fantasy'),
-				('Jersey', 'keywords=silent-bob-character&genres=comedy'),
-				('Bergman', 'num_votes=1000,&role=nm0000005&release_date=1961,1963&genres=drama'),
-				('Internal Affairs', 'num_votes=1000,&title=infernal%20affairs'),
-				('Vengeance', 'num_votes=1000,&role=nm0661791&release_date=2002,2005&genres=drama'),
-				('Dollars', 'num_votes=1000,&role=nm0001466&genres=western&release_date=1964,1966'),
-
-			])
-		if not self.mKidsOnly or self.mRestriction >= 3:
-			collections.extend([
-				('Predator', 'num_votes=1000,&title=predator&genres=action'),
-				('Saw', 'num_votes=1000,&title=saw&genres=horror'),
-				('The Godfather', 'num_votes=1000,&title=the%20godfather&genres=crime,drama'),
-				('Underworld', 'num_votes=1000,&title=underworld&title_type=feature&genres=action'),
-				('Alien', 'num_votes=1000,&title=alien&genres=sci_fi'),
-				('Mad Max', 'num_votes=1000,&title=mad%20max'),
-				('Blade', 'num_votes=1000,&title=blade&genres=horror,action'),
-				('Hannibal Lecter', 'num_votes=1000,&plot=hannibal%20lecter&genres=crime'),
-				('Harold And Kumar', 'num_votes=1000,&title=kumar'),
-				('Resident Evil', 'num_votes=1000,&title=resident%20evil'),
-				('Kill Bill', 'num_votes=1000,&title=kill%20bill'),
-				('Scream', 'num_votes=10000,&title=scream&genres=horror,mystery'),
-				('Die Hard', 'num_votes=1000,&title=die%20hard&genres=action'),
-				('Lethal Weapon', 'num_votes=1000,&title=lethal%20weapon'),
-				('Three Colors', 'num_votes=1000,&title=three%20colors'),
-				('Butterfly Effect', 'num_votes=1000,&title=butterfly%20effect'),
-				('Beverly Hills Cop', 'num_votes=1000,&title=beverly%20hill%20cop'),
-				('American Pie', 'num_votes=1000,&title=american&role=nm0004755'),
-				('Scary Movie', 'num_votes=1000,&title=scary%20movie'),
-				('Final Destination', 'num_votes=50000,&title=final%20destination'),
-				('Man With No Name', 'genres=western&num_votes=1000,&release_date=1964,1966&role=nm0001466'),
-				('Mariachi', 'keywords=mariachi&release_date=1992,2003&role=nm0001675&genre=actions,thriller'),
-				('Millennium', 'num_votes=1000,&role=nm2297183'),
-				('Halloween', 'num_votes=1000,&title=halloween'),
-				('Friday The 13th', 'num_votes=1000,&title=friday%20the%2013th'),
-				('Nightmare On Elm Street', 'num_votes=1000,&title=nightmare%20elm'),
-				('Chronicles Of Riddick', 'num_votes=1000,&title=riddick'),
-				('Paranormal Activity', 'num_votes=1000,&title=paranormal%20activity'),
-				('The Dead', 'num_votes=1000,&role=nm0001681&release_date=1968,1985&title=dead'),
-				('Evil Dead', 'num_votes=100000,&role=role=nm0000600,nm0132257&genres=horror&keywords=evil&release_date=1981,1992'),
-			])
-
-		collections = [(i[0], 'https://www.imdb.com/search/title?%s%s&production_status=released&sort=release_date,desc' % (i[1], '' if 'title_type' in i[1] else '&title_type=feature,movie,tv_movie')) for i in collections]
-		collections = sorted(collections, key = lambda i : i[0])
-
-		items = []
-		for i in collections: items.append({'name': i[0], 'link': i[1], 'image': 'collections.png', 'action': 'moviesRetrieve'})
-		if menu: self.directory(items)
-		return items
 
 	##############################################################################
 	# GENRE
@@ -911,6 +781,22 @@ class Movies(object):
 				try: premiered = Regex.extract(data = item['released'], expression = '(\d{4}-\d{2}-\d{2})', group = 1)
 				except: premiered = None
 
+				try: added = Time.timestamp(fixedTime = item['last_updated_at'], iso = True)
+				except:
+					try: added = Time.timestamp(item['movie']['last_updated_at'], iso = True)
+					except: added = None
+
+				try: watched = Time.timestamp(item['last_watched_at'], iso = True)
+				except:
+					try: watched = Time.timestamp(item['movie']['last_watched_at'], iso = True)
+					except: watched = None
+
+				# This seems to be always null.
+				try: rewatched = Time.timestamp(item['reset_at'], iso = True)
+				except:
+					try: rewatched = Time.timestamp(item['movie']['reset_at'], iso = True)
+					except: rewatched = None
+
 				try: genre = [i.title() for i in item['genres']]
 				except: genre = None
 
@@ -941,6 +827,10 @@ class Movies(object):
 					'genre' : genre,
 					'duration' : duration,
 					'mpaa' : mpaa,
+
+					'timeAdded' : added,
+					'timeWatched' : watched,
+					'timeRewatched' : rewatched,
 
 					'next' : next,
 					'progress' : progress,
@@ -1915,7 +1805,7 @@ class Movies(object):
 							if languages:
 								languages = [languages]
 								if 'language' in result: Tools.listUnique(languages + result['language'])
-								else: result['language'] = result['language'] = languages
+								else: result['language'] = languages
 
 							homepage = dataMovie.get('homepage')
 							if homepage: result['homepage'] = homepage

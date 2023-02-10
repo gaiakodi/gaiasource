@@ -3766,7 +3766,7 @@ class System(object):
 		return not self.origin()
 
 	@classmethod
-	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon):
+	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, optimize = True):
 		'''
 			The URL encoding and quote functions in urllib are very slow.
 			This is not an issue if we only have to encode a few small commands.
@@ -3794,7 +3794,7 @@ class System(object):
 
 			# Only do this with Gaia commands.
 			# Otyherwise call to eg ResolveUrl authentication fails if base64 encoded.
-			if id == System.GaiaAddon:
+			if optimize and id == System.GaiaAddon:
 				data = [self.commandEncode(parameters)]
 				if encoded:
 					if Tools.isArray(encoded): data.extend(encoded)
@@ -6375,10 +6375,13 @@ class Cleanup(object):
 		subitems.append({'title' : 33898, 'size' : self.folderQrSize, 'clean' : self.folderQrClean, 'message' : 33973})
 		items.append({'title' : 33895, 'items' : subitems})
 
+		from lib.modules.interface import Translation#gaiaremove
 		for i in range(len(items)):
 			if 'items' in items[i]:
 				for j in range(len(items[i]['items'])):
+					t = Time(start = True)#gaiaremove
 					items[i]['items'][j]['value'] = self._size(items[i]['items'][j]['size']())
+					Logger.log("Cleanup (%s - %s): %d" % (Translation.string(items[i]['title']), Translation.string(items[i]['items'][j]['title']), t.elapsed(True)))#gaiaremove
 					if not 'message' in items[i]['items'][j]: items[i]['items'][j]['message'] = None
 					if not 'confirm' in items[i]['items'][j]: items[i]['items'][j]['confirm'] = None
 					# NB: Pass values in as lambda parameters and not in the call of self.clean(...) itself, otherwise the function will always execute with the last values set in this for-loop (aka QR code values).
@@ -6924,7 +6927,9 @@ class Media(object):
 		if metadata: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = title, year = year, season = season, episode = episode, encode = encode)
 
-		if type == Media.TypeNone:
+		if type == Media.TypeSet:
+			type = Media.TypeMovie
+		elif type == Media.TypeNone:
 			pack = (pack and packs)
 			if not season is None and not episode is None and not pack:
 				type = Media.TypeEpisode
@@ -7143,7 +7148,7 @@ class Lightpack(object):
 								os.system('prismatik') # Global path
 						else:
 							os.system(command % self.mPrismatikLocation)
-					elif 'darwin' in sys.platform or 'max' in sys.platform:
+					elif 'darwin' in sys.platform or 'mac' in sys.platform:
 						os.system('open "' + self.mPrismatikLocation + '"')
 					else:
 						command = '"%s" &'
@@ -7315,6 +7320,29 @@ class Subprocess(object):
 		except:
 			if not timeout: Logger.error()
 			return None
+
+	@classmethod
+	def fallback(self, command):
+		# On AppleTV we get the following error:
+		#	python3.11/subprocess.py", line 816, in __init__    raise OSError(OSError: [Errno 45] darwin does not support processes.
+		# Try os.system() if the subprocess does not work.
+		# Not sure if os.system uses processes in the background and has the same issue.
+		# os.system also does not return the output, so we have to write it to file.
+		result = None
+		try:
+			from subprocess import check_output
+			raise Exception()
+			return Converter.unicode(check_output(self.command(command), shell = True))
+		except:
+			try:
+				path = System.temporary(directory = 'subprocess', file = str(Hash.random()) + '.dat', gaia = True, make = True)
+				os.system(command + ' > ' + path)
+				if File.exists(path):
+					result = Converter.unicode(File.readNow(path))
+					File.delete(path)
+			except:
+				Logger.error()
+		return result
 
 ###################################################################
 # PLATFORM
@@ -8023,16 +8051,16 @@ class Platform(object):
 
 			# Linux
 			if not id or ' ' in id or id == 'None':
-				try: id = Subprocess.open('hal-get-property --udi /org/freedesktop/Hal/devices/computer --key system.hardware.uuid')
+				try: id = Subprocess.fallback('hal-get-property --udi /org/freedesktop/Hal/devices/computer --key system.hardware.uuid')
 				except: pass
 			if not id or ' ' in id or id == 'None':
-				try: id = Subprocess.open('/sys/class/dmi/id/board_serial')
+				try: id = Subprocess.fallback('/sys/class/dmi/id/board_serial')
 				except: pass
 			if not id or ' ' in id or id == 'None':
-				try: id = Subprocess.open('/sys/class/dmi/id/product_uuid')
+				try: id = Subprocess.fallback('/sys/class/dmi/id/product_uuid')
 				except: pass
 			if not id or ' ' in id or id == 'None':
-				try: id = Subprocess.open('cat /var/lib/dbus/machine-id')
+				try: id = Subprocess.fallback('cat /var/lib/dbus/machine-id')
 				except: pass
 
 			# If still not found, get the MAC address.
@@ -8129,6 +8157,9 @@ class Platform(object):
 					version = platform.mac_ver()
 					versionName = version[0]
 					versionNumber = version[1]
+					if versionNumber and Tools.isArray(versionNumber):
+						if not versionNumber[0]: versionNumber = version[0]
+						else: versionNumber = '.'.join(versionNumber)
 				except: Logger.error()
 			elif self.detectLinux():
 				familyType = Platform.FamilyUnix
@@ -8178,6 +8209,12 @@ class Platform(object):
 				if Regex.match(data = architectureName, expression = '(intel|x86|i\d{3}|ulv|atom|ia.32|amd)'): architectureType = Platform.ArchitectureX86
 				elif Regex.match(data = architectureName, expression = '(arm|aarch|risc|acorn|a32|a64)'): architectureType = Platform.ArchitectureArm
 				elif Regex.match(data = architectureName, expression = '(arc)'): architectureType = Platform.ArchitectureArc
+
+				# AppleTV
+				# Eg: AppleTV14,1
+				if not architectureType:
+					if Regex.match(data = architectureName, expression = '(appletv1,)'): architectureType = Platform.ArchitectureX86 # Pentium M.
+					elif Regex.match(data = architectureName, expression = '(appletv)'): architectureType = Platform.ArchitectureArm # Native ARM or new Apple A ARM-based processors .
 
 				architectureLabel = architectureName
 				if architectureBits: architectureLabel = '%s (%dbit)' % (architectureLabel, architectureBits)
@@ -8706,7 +8743,7 @@ class Hardware(object):
 	########################################
 
 	@classmethod
-	def performance(self, processor = True, processorTotal = True, processorSingle = True, memory = True, storage = False, storageRead = True, storageWrite = True, connection = False, connectionLatency = True, connectionSpeed = True, connectionIterations = 2, callback = None):
+	def performance(self, processor = True, processorTotal = True, processorSingle = True, memory = True, storage = False, storageRead = True, storageWrite = True, connection = False, connectionLatency = True, connectionSpeed = True, connectionIterations = 2, callback = None, fallback = True):
 		from lib.modules.interface import Translation, Format
 		from lib.modules.speedtest import SpeedTesterGlobal
 
@@ -8814,6 +8851,64 @@ class Hardware(object):
 		else:
 			connectionSpeed = None
 
+		# Fallback
+
+		# On some devices some hardware cannot be detected.
+		# Use fallback ratings, otherwise various code (like provider optimization) will have ratings that are too high, since some hardware values are excluded.
+		# Eg: On Nvidia Shield and AppleTV the CPU (at least the clock) cannot be detected.
+
+		processorTotalFallback = None
+		processorSingleFallback = None
+		memoryFallback = None
+		storageReadFallback = None
+		storageWriteFallback = None
+		connectionLatencyFallback = None
+		connectionSpeedFallback = None
+		if fallback:
+			if processorTotal is None or processorSingle is None:
+				processorType = self.processorType()
+				processorCount = self.processorCountCore() or 0
+				if processorType == Hardware.ProcessorIntel or processorType == Hardware.ProcessorAmd:
+					if processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.6
+						if processorSingle is None: processorSingleFallback = 0.6
+					else:
+						if processorTotal is None: processorTotalFallback = 0.5
+						if processorSingle is None: processorSingleFallback = 0.5
+				elif processorType == Hardware.ProcessorArm:
+					if processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.25
+						if processorSingle is None: processorSingleFallback = 0.25
+					elif processorCount >= 4:
+						if processorTotal is None: processorTotalFallback = 0.2
+						if processorSingle is None: processorSingleFallback = 0.2
+					else:
+						if processorTotal is None: processorTotalFallback = 0.15
+						if processorSingle is None: processorSingleFallback = 0.15
+				else:
+					if processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.2
+						if processorSingle is None: processorSingleFallback = 0.2
+					elif processorCount >= 4:
+						if processorTotal is None: processorTotalFallback = 0.15
+						if processorSingle is None: processorSingleFallback = 0.15
+					else:
+						if processorTotal is None: processorTotalFallback = 0.1
+						if processorSingle is None: processorSingleFallback = 0.1
+			if memory is None: memoryFallback = 0.3
+			if storageRead is None: storageReadFallback = 0.5
+			if storageWrite is None: storageWriteFallback = 0.2
+			if connectionLatency is None: connectionLatencyFallback = 0.5
+			if connectionSpeed is None: connectionSpeedFallback = 0.5
+
+		processorTotalRater = processorTotalFallback if fallback and processorTotal is None else processorTotal
+		processorSingleRater = processorSingleFallback if fallback and processorSingle is None else processorSingle
+		memoryRater = memoryFallback if fallback and memory is None else memory
+		storageReadRater = storageReadFallback if fallback and storageRead is None else storageRead
+		storageWriteRater = storageWriteFallback if fallback and storageWrite is None else storageWrite
+		connectionLatencyRater = connectionLatencyFallback if fallback and connectionLatency is None else connectionLatency
+		connectionSpeedRater = connectionSpeedFallback if fallback and connectionSpeed is None else connectionSpeed
+
 		# Weight
 
 		weightProcessorTotal = Hardware.Performance['processor']['total']['weight']
@@ -8828,46 +8923,44 @@ class Hardware(object):
 		weightConnection = weightConnectionLatency + weightConnectionSpeed
 
 		weights = []
-		if not processorTotal is None: weights.append(weightProcessorTotal)
-		if not processorSingle is None: weights.append(weightProcessorSingle)
-		if not memory is None: weights.append(weightMemory)
-		if not storageRead is None: weights.append(weightStorageRead)
-		if not storageWrite is None: weights.append(weightStorageWrite)
-		if not connectionLatency is None: weights.append(weightConnectionLatency)
-		if not connectionSpeed is None: weights.append(weightConnectionSpeed)
+		if not processorTotalRater is None: weights.append(weightProcessorTotal)
+		if not processorSingleRater is None: weights.append(weightProcessorSingle)
+		if not memoryRater is None: weights.append(weightMemory)
+		if not storageReadRater is None: weights.append(weightStorageRead)
+		if not storageWriteRater is None: weights.append(weightStorageWrite)
+		if not connectionLatencyRater is None: weights.append(weightConnectionLatency)
+		if not connectionSpeedRater is None: weights.append(weightConnectionSpeed)
 		weights = sum(weights)
 
 		# Rating
 
 		rating = []
-		ratingProcessor = None if (processorTotal is None and processorSingle is None) else 0
-		ratingProcessorTotal = None
-		ratingProcessorSingle = None
+		ratingProcessor = None if (processorTotalRater is None and processorSingleRater is None) else 0
 		ratingMemory = None
-		ratingStorage = None if (storageRead is None and storageWrite is None) else 0
-		ratingConnection = None if (connectionLatency is None and connectionSpeed is None) else 0
+		ratingStorage = None if (storageReadRater is None and storageWriteRater is None) else 0
+		ratingConnection = None if (connectionLatencyRater is None and connectionSpeedRater is None) else 0
 
-		if not processorTotal is None:
-			rating.append(processorTotal * (weightProcessorTotal / weights))
-			ratingProcessor += processorTotal * (weightProcessorTotal / weightProcessor)
-		if not processorSingle is None:
-			rating.append(processorSingle * (weightProcessorSingle / weights))
-			ratingProcessor += processorSingle * (weightProcessorSingle / weightProcessor)
-		if not memory is None:
-			rating.append(memory * (weightMemory / weights))
-			ratingMemory = memory
-		if not storageRead is None:
-			rating.append(storageRead * (weightStorageRead / weights))
-			ratingStorage += storageRead * (weightStorageRead / weightStorage)
-		if not storageWrite is None:
-			rating.append(storageWrite * (weightStorageWrite / weights))
-			ratingStorage += storageWrite * (weightStorageWrite / weightStorage)
-		if not connectionLatency is None:
-			rating.append(connectionLatency * (weightConnectionLatency / weights))
-			ratingConnection += connectionLatency * (weightConnectionLatency / weightConnection)
-		if not connectionSpeed is None:
-			rating.append(connectionSpeed * (weightConnectionSpeed / weights))
-			ratingConnection += connectionSpeed * (weightConnectionSpeed / weightConnection)
+		if not processorTotalRater is None:
+			rating.append(processorTotalRater * (weightProcessorTotal / weights))
+			ratingProcessor += processorTotalRater * (weightProcessorTotal / weightProcessor)
+		if not processorSingleRater is None:
+			rating.append(processorSingleRater * (weightProcessorSingle / weights))
+			ratingProcessor += processorSingleRater * (weightProcessorSingle / weightProcessor)
+		if not memoryRater is None:
+			rating.append(memoryRater * (weightMemory / weights))
+			ratingMemory = memoryRater
+		if not storageReadRater is None:
+			rating.append(storageReadRater * (weightStorageRead / weights))
+			ratingStorage += storageReadRater * (weightStorageRead / weightStorage)
+		if not storageWriteRater is None:
+			rating.append(storageWriteRater * (weightStorageWrite / weights))
+			ratingStorage += storageWriteRater * (weightStorageWrite / weightStorage)
+		if not connectionLatencyRater is None:
+			rating.append(connectionLatencyRater * (weightConnectionLatency / weights))
+			ratingConnection += connectionLatencyRater * (weightConnectionLatency / weightConnection)
+		if not connectionSpeedRater is None:
+			rating.append(connectionSpeedRater * (weightConnectionSpeed / weights))
+			ratingConnection += connectionSpeedRater * (weightConnectionSpeed / weightConnection)
 
 		rating = sum([i for i in rating if i])
 		rating = Math.round(rating, places = 2)
@@ -8909,7 +9002,16 @@ class Hardware(object):
 			labelStorageDevice = self.storageLabel()
 			labelStorageRating = self._labelPercent(ratingStorage)
 		if not ratingConnection is None:
-			labelConnectionDevice = '%s @ %s' % (SpeedTesterGlobal._formatSpeed(connectionSpeedValue), SpeedTesterGlobal._formatLatency(connectionLatencyValue))
+			labelConnection1 = SpeedTesterGlobal._formatSpeed(connectionSpeedValue)
+			labelConnection2 = SpeedTesterGlobal._formatLatency(connectionLatencyValue)
+			if labelConnection1 == SpeedTesterGlobal.UnknownCapitalize and labelConnection2 == SpeedTesterGlobal.UnknownCapitalize:
+				labelConnectionDevice = labelConnection1
+			elif labelConnection1 == SpeedTesterGlobal.UnknownCapitalize:
+				labelConnectionDevice = labelConnection2
+			elif labelConnection2 == SpeedTesterGlobal.UnknownCapitalize:
+				labelConnectionDevice = labelConnection1
+			else:
+				labelConnectionDevice = '%s @ %s' % (labelConnection1, labelConnection2)
 			labelConnectionRating = self._labelPercent(ratingConnection)
 
 		# Performance
@@ -9108,6 +9210,8 @@ class Hardware(object):
 				elif Regex.match(data = model, expression = '(amd)'): type = Hardware.ProcessorAmd
 				elif Regex.match(data = model, expression = '(arm|aarch|risc|acorn|a32|a64)'): type = Hardware.ProcessorArm
 				elif Regex.match(data = model, expression = '(arc)'): type = Hardware.ProcessorArc
+				elif Regex.match(data = model, expression = '(appletv1,)'): type = Hardware.ProcessorIntel # AppleTV: Pentium M.
+				elif Regex.match(data = model, expression = '(appletv)'): type = Hardware.ProcessorArm # AppleTV: Native ARM or new Apple A ARM-based processors .
 		except: Logger.error()
 
 		return type
@@ -9151,16 +9255,26 @@ class Hardware(object):
 		# Mac
 		try:
 			if mac:
-				import os
-				os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
-				result = Subprocess.output('sysctl -n machdep.cpu.brand_string').strip()
-				if result: return result
+				try:
+					import os
+					os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
+				except: pass
+				try:
+					result = Subprocess.fallback('sysctl -n machdep.cpu.brand_string').strip()
+					if result: return result
+				except: pass
+				try:
+					data = Subprocess.fallback('system_profiler').strip()
+					if data:
+						result = Regex.extract(data = data, expression = 'processor\s*name\s*:?\s*(.*?)(?:$|\n)')
+						if result: return result
+				except: pass
 		except: pass
 
 		# Linux
 		try:
-			if linux or android:
-				data = Subprocess.output('cat /proc/cpuinfo').strip()
+			if linux or android or mac:
+				data = Converter.unicode(open('/proc/cpuinfo').read())
 				if data:
 					result = Regex.extract(data = data, expression = 'model\s*name\s*:\s*(.*?)[\n\r]')
 					if result: return result.strip()
@@ -9280,7 +9394,7 @@ class Hardware(object):
 
 		# BSD
 		try:
-			result = Subprocess.open('sysctl -n hw.ncpu')
+			result = Subprocess.fallback('sysctl -n hw.ncpu')
 			result = _result(result)
 			if result and result['core']: return result
 		except: pass
@@ -9307,7 +9421,7 @@ class Hardware(object):
 			try:
 				dmesg = Converter.unicode(open('/var/run/dmesg.boot').read())
 			except IOError:
-				dmesg = Subprocess.open('dmesg')
+				dmesg = Subprocess.fallback('dmesg')
 			result = 0
 			while '\ncpu' + str(result) + ':' in dmesg:
 				result += 1
@@ -9459,7 +9573,7 @@ class Hardware(object):
 					try:
 						import os
 						os.environ['PATH'] = os.environ['PATH'] + os.pathsep + '/usr/sbin'
-						result = Subprocess.output('sysctl ' + clock).strip()
+						result = Subprocess.fallback('sysctl ' + clock).strip()
 						result = _result(result, unit = 'hz', count = count)
 						if result and result['total']: return result
 					except: pass
@@ -9467,10 +9581,15 @@ class Hardware(object):
 
 		# Linux
 		try:
-			if linux or android:
-				for info in ['lscpu', 'cat /proc/cpuinfo']:
+			if linux or android or mac:
+				infos = []
+				try: infos.append(Subprocess.fallback('lscpu'))
+				except: pass
+				try: infos.append(Converter.unicode(open('/proc/cpuinfo').read()))
+				except: pass
+				for info in infos:
 					try:
-						data = Subprocess.output(info).strip()
+						data = info.strip()
 						if data:
 							result = Regex.extract(data = data, expression = 'cpu\s*mhz.*?([\d\.]+)')
 							result = _result(result, unit = 'mhz', count = count)
@@ -9950,11 +10069,13 @@ class Hardware(object):
 					received = int(after[0]) - int(before[0])
 					rates['main'] = {'download' : received / duration, 'upload' : sent / duration}
 				else:
-					command = 'cat /proc/net/dev'
+					command = '/proc/net/dev'
 					timer = Time(mode = Time.ModeSystem, start = True) # In case threads are interleaved, get the real elapsed time to also include sleep time.
-					before = Subprocess.output(command)
+					try: before = Converter.unicode(open(command).read())
+					except: before = ''
 					Time.sleep(duration)
-					after = Subprocess.output(command)
+					try: after = Converter.unicode(open(command).read())
+					except: after = ''
 					duration = timer.elapsed(milliseconds = True) / 1000.0
 
 					def _detectNetworkExtract(data):

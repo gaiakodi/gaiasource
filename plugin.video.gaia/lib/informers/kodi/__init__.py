@@ -45,6 +45,7 @@ class Informer(InformerBase):
 		parameters = {}
 
 		if type == InformerBase.TypeMovie: parameters['call'] = 'movie'
+		elif type == InformerBase.TypeSet: parameters['call'] = 'set'
 		elif type == InformerBase.TypeShow or type == InformerBase.TypeSeason: parameters['call'] = 'tv'
 		elif type == InformerBase.TypePerson: parameters['call'] = 'person'
 		else: return None # Not supported.
@@ -75,9 +76,10 @@ class Informer(InformerBase):
 				elif type == 'season': type = Informer.TypeSeason
 				elif type == 'episode': type = Informer.TypeEpisode
 				elif type == 'person': type = Informer.TypePerson
+				elif type == 'set': type = Informer.TypeSet
 				else: type = Informer.TypeMovie
 
-		if type in [InformerBase.TypeMovie, InformerBase.TypeShow, InformerBase.TypeSeason, InformerBase.TypeEpisode]:
+		if type in [InformerBase.TypeSet, InformerBase.TypeMovie, InformerBase.TypeShow, InformerBase.TypeSeason, InformerBase.TypeEpisode]:
 			# Wait to determine if WindowStreams is showing.
 			# Otheriwse the current dialog will be the Loader.
 			# Keep the loader when the calls comes from external widgets, since widgets need longer to load the infi dialog.

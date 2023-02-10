@@ -633,7 +633,7 @@ msgid "Autoselect Episode"
 msgstr ""
 
 msgctxt "#32534"
-msgid "[GAIA-NO-LABEL]"
+msgid "Hide Discrepancies"
 msgstr ""
 
 # [GAIACODE]
@@ -2899,7 +2899,7 @@ msgid "Default"
 msgstr ""
 
 msgctxt "#33565"
-msgid "[GAIA-NO-LABEL]"
+msgid "Alphabetic"
 msgstr ""
 
 msgctxt "#33566"
@@ -5315,7 +5315,7 @@ msgid "Automatically delete transfers and files from your account on the RealDeb
 msgstr ""
 
 msgctxt "#34169"
-msgid "Sorts the Trakt show progress lists according to a specific attribute."
+msgid "Sorts the Trakt show progress lists according to a specific attribute. The [I]Interest[/I]  option combines your last watched activity and the release date in order to list episodes you are most likely to watch first."
 msgstr ""
 
 msgctxt "#34170"
@@ -6840,6 +6840,26 @@ msgstr ""
 
 msgctxt "#34560"
 msgid "Limit the total number of tasks that can run in parallel. A task is a set of related code that has to be executed to achieve a single goal, like retrieving the metadata of a movie or show. Each task can have multiple threads running under it. Some low-end devices have a limit on the number of threads that can be created, and if exceeded, you might find [I]\"RuntimeError: can't start new thread\"[/I]  errors in your Kodi log. Note that setting this value too low can [B]slow down[/B] Gaia. Only change this setting if absolutely necessary and try to keep it above [I]20[/I]. A value of [I]0[/I]  will automatically calculate the limit based on your hardware. Always reduce this setting first before trying to adjust the [I]Concurrency Threads[/I]  setting."
+msgstr ""
+
+msgctxt "#34561"
+msgid "Change the provider, decor, and language for different set image types. Changing this setting will cause menus to temporarily load slow until the cache fills up with the new images. Menus might have to be reloaded for the new images to be displayed."
+msgstr ""
+
+msgctxt "#34562"
+msgid "Change the limit, preferred and fallback selections for different set image types. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
+msgstr ""
+
+msgctxt "#34563"
+msgid "Sorts the Trakt show calendar lists according to a specific attribute. The [I]Interest[/I]  option combines your last watched activity and the release date in order to list episodes you are most likely to watch first."
+msgstr ""
+
+msgctxt "#34564"
+msgid "Change the view of set menus. The [I]Default[/I]  option uses the view that was manually selected through the Kodi sidebar in the addon menus. Each submenu has to be set separately and changes through the Kodi sidebar will be persistent if the menu is reloaded. The [I]Fixed[/I]  option uses the hardcoded view as specified by Gaia. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded. The [I]Custom[/I]  option uses a custom view specified by you. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded."
+msgstr ""
+
+msgctxt "#34565"
+msgid "Hide episodes with playcount discrepancies from the Trakt progress menu. If all episodes of a show were watched N times, except one episode which was watched N+1 times, the show will be listed under the Trakt progress. This setting can be used to hide these shows from the Trakt progress. The [I]Disabled[/I]  option will always list all shows, even those with discrepancies. The [I]Lenient[/I]  option will only hide shows with major discrepancies.  The [I]Strict[/I] option will hide shows with minor or major discrepancies."
 msgstr ""
 
 
@@ -8699,7 +8719,7 @@ msgid "Account Authentication Successful"
 msgstr ""
 
 msgctxt "#35463"
-msgid "[GAIA-NO-LABEL]"
+msgid "Interest"
 msgstr ""
 
 msgctxt "#35464"
@@ -8983,7 +9003,7 @@ msgid "Spoilers"
 msgstr ""
 
 msgctxt "#35534"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set"
 msgstr ""
 
 msgctxt "#35535"
@@ -10708,11 +10728,11 @@ msgid "Native Title [COLOR FFA0C12C][B]↑[/B][/COLOR]"
 msgstr ""
 
 msgctxt "#36083"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set Style"
 msgstr ""
 
 msgctxt "#36084"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set Images"
 msgstr ""
 
 msgctxt "#36085"
@@ -11228,7 +11248,7 @@ msgid "Debrid Resolving"
 msgstr ""
 
 msgctxt "#36213"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set View"
 msgstr ""
 
 msgctxt "#36214"

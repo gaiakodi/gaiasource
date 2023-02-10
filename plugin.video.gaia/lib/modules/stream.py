@@ -3485,7 +3485,7 @@ class Stream(Serializer):
 		},
 
 		'expression' : (
-			(FilePackCollection, u'((?:{2number}|{3number}|{4number}|{5number}|{6number}|{7number}|{8number}|{9number}|{10number}|antho){logy}|{complete}|(?<!criterion{separator})coll?ecti(?:on|e)s?|sagas?|(?:(?:sub|{double}|{tripple}|{quadruple}){separator}*)?{pack}|batch(?:es)?|saga|(?<!pandoras.)(?<!pandora.s.)box|set|(?:box|discs?|dvds?|blurays?|collect[eo]r(?:.s{separator}|\\\?(?:\.|\'|\`|.?\xB4)?s?)?){separator}*set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|sammlung|komplett|verzameling|kolekcja|трилогия|коллекция|полный|int(?:e|é)grale?)'),
+			(FilePackCollection, u'((?:{2number}|{3number}|{4number}|{5number}|{6number}|{7number}|{8number}|{9number}|{10number}|antho){logy}|{complete}|(?<!criterion{separator})coll?ecti(?:on|e)s?|sagas?|(?:(?:sub|{double}|{tripple}|{quadruple}){separator}*)?{pack}|batch(?:es)?|saga|(?<!pandoras.)(?<!pandora.s.)box|set|(?:box|discs?|dvds?|blurays?|collect[eo]r(?:.s{separator}|\\\?(?:\.|\'|\`|.?\xB4)?s?)?){separator}*set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|sammlung|(?:film)?reihe|komplett|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный|int(?:e|é)grale?)'),
 		),
 
 		'collection' : (
@@ -3502,7 +3502,7 @@ class Stream(Serializer):
 
 		# If this expression matches and the file name contains a single year, the file is not considered to be a pack.
 		'exception' : '(complee?t(?:e|a|o|are)?)',
-		'completeless' : u'((?:d(?:i|uo)|tr[iy]|quadri|tetra|penta|hexa|hepta|oct[ao]|enn?ea|deca|antho)log(?:(?:i|í)[ae]?|y)s?|collecti(?:on|e)s?|sagas?|(?:(?:sub|d(?:ou|uo)(?:ble)?|tri(?:pp?le)?|quad(?:ruple)?){separator}*)?pack(?:age)?|batch(?:es)?|saga|(?<!pandoras.)(?<!pandora.s.)box|set|(?:box|discs?|dvds?|blurays?|collect[eo]r(?:.s{separator}|\\\?(?:\.|\'|\`|.?\xB4)?s?)?){separator}*set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|sammlung|verzameling|kolekcja|трилогия|коллекция|полный|int(?:e|é)grale?)',
+		'completeless' : u'((?:d(?:i|uo)|tr[iy]|quadri|tetra|penta|hexa|hepta|oct[ao]|enn?ea|deca|antho)log(?:(?:i|í)[ae]?|y)s?|collecti(?:on|e)s?|sagas?|(?:(?:sub|d(?:ou|uo)(?:ble)?|tri(?:pp?le)?|quad(?:ruple)?){separator}*)?pack(?:age)?|batch(?:es)?|saga|(?<!pandoras.)(?<!pandora.s.)box|set|(?:box|discs?|dvds?|blurays?|collect[eo]r(?:.s{separator}|\\\?(?:\.|\'|\`|.?\xB4)?s?)?){separator}*set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|sammlung|(?:film)?reihe|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный|int(?:e|é)grale?)',
 	}
 
 	LabelFilePack = {

@@ -103,6 +103,7 @@ class Episodes(object):
 						items = self.cache('cacheRefreshShort', refresh, self.traktListProgress, link = self.progress_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items, sort = 'progress')
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh, next = False) # 'next' was already done in self.page(). Do  not do it again, otherwise the 2nd-next episode is listed.
+						items = self.sort(items = items, type = 'progress') # Sort again, since sorting in self.page() might not have all the metadata yet, like the rating.
 
 					elif self.mycalendar_link in link:
 						self.mModeHierarchical = True
@@ -110,6 +111,7 @@ class Episodes(object):
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.mycalendar_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items, sort = 'calendar')
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+						items = self.sort(items = items, type = 'calendar') # Sort again, since sorting in self.page() might not have all the metadata yet, like the rating.
 
 					elif link and '/users/' in link:
 						self.mModeHierarchical = True
@@ -221,29 +223,44 @@ class Episodes(object):
 		# If eg the Trakt Progress list has 100s or even 1000s of items, a lot of show/season metadata has to be retrieved before we apply the page/limit below.
 		# This can make the progress list load very long (10+ mins).
 		# Instead, only try to retrieve 'limit' number of shows.
-		# We do this in a loop, since the number of items returned by self.metadata() can be lower than the number of items passed in (finihsed shows or those without new unwatched episodes are removed).
+		# We do this in a loop, since the number of items returned by self.metadata() can be lower than the number of items passed in (finished shows or those without new unwatched episodes are removed).
 		if self.metadataIncrementing(items = items):
-			#items = self.metadata(items = items, clean = False, detailed = False)
+			# Sometimes a show that was watched a long time ago has a new season.
+			# This newley released season should be placed at the top.
+			# However, since the new episode is at the end of the list, it will only show once the users pages.
+			# Do preliminary sorting here to try to pull those episodes to the top.
+			# Only retrieve cached metadata (quick = True) in order not to increase menu loading times.
+			# This means the pulled-up episodes will not show the 1st time the menu is opened, but only later once the metadata is cached.
+			if sort:
+				self.metadata(items = items, clean = False, quick = True) # Do not "items = self.metadata()", since the returned list can contain only a subset of the items.
+				items = self.sort(items = items, type = sort)
 
 			itemsDone = []
+			stopped = False
 			for i in range(5):
 				step = (i * limit)
-				try: itemsChunk = items[start + step : end + step]
+				try: itemsChunk = items[i * limit : (i + 1) * limit]
 				except: itemsChunk = None
-				if not itemsChunk: break
+				if not itemsChunk:
+					stopped = True
+					break
 
 				itemsChunk = self.metadata(items = itemsChunk, clean = False, detailed = False)
 				if itemsChunk:
-					itemsDone.extend(itemsChunk)
-					if len(itemsDone) >= end: break
+					itemsChunk = [item for item in itemsChunk if not 'invalid' in item or not item['invalid']]
+					if itemsChunk:
+						itemsDone.extend(itemsChunk)
+						if len(itemsDone) >= end:
+							stopped = True
+							break
 			items = itemsDone
 
 		items = items[start : end]
 
 		# Sort first, since we want to page in accordance to the user's preferred sorting.
-		if sort: self.sort(items = items, type = sort)
+		if sort: items = self.sort(items = items, type = sort)
 
-		if len(items) >= limit and (not maximum or (page + 1) * limit <= maximum):
+		if (len(items) >= limit or not stopped) and (not maximum or (page + 1) * limit <= maximum):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
 			for item in items: item['next'] = next
 
@@ -263,43 +280,72 @@ class Episodes(object):
 				reverse = True
 
 			if force or Settings.getBoolean('navigation.sort.favourite'):
+				dummyString = 'zzzzzzzzzz'
+				dummyNumber = 9999999999
+
 				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % type) if attribute is None else attribute
 				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % type) == 1 if reverse is None else reverse
+
 				if attribute > 0:
 					if attribute == 1:
 						if Settings.getBoolean('navigation.sort.favourite.article'):
-							try: items = sorted(items, key = lambda k: Regex.remove(data = k['tvshowtitle'], expression = '(^the\s|^an?\s)', group = 1), reverse = reverse)
-							except: items = sorted(items, key = lambda k: Regex.remove(data = k['title'], expression = '(^the\s|^an?\s)', group = 1), reverse = reverse)
+							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('tvshowtitle') or k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
-							try: items = sorted(items, key = lambda k: k['tvshowtitle'].lower(), reverse = reverse)
-							except: items = sorted(items, key = lambda k: k['title'].lower(), reverse = reverse)
+							items = sorted(items, key = lambda k : (k.get('tvshowtitle') or k.get('title') or '').lower() or dummyString, reverse = reverse)
 					elif attribute == 2:
-						for i in range(len(items)):
-							if not 'rating' in items[i]: items[i]['rating'] = None
-						items = sorted(items, key = lambda k: float(k['rating']), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						for i in range(len(items)):
-							if not 'votes' in items[i]: items[i]['votes'] = None
-						items = sorted(items, key = lambda k: int(k['votes']), reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 
 					# Add he season and episode numbers.
 					# This is especially important for "premiered" sorting of Trakt calendars.
 					# All episodes of a show might be released on the same day and then they are listed in random order.
 					# Adding the season/episode numbers first sorts by date, and then makes sure episodes from the same show are listed sequentially.
 					elif attribute == 4:
-						for i in range(len(items)):
-							if not 'premiered' in items[i] or not items[i]['premiered']: items[i]['premiered'] = items[i]['aired'] if 'aired' in items[i] else None
-						items = sorted(items, key = lambda k: '%s_%s_%s_%s' % (k['premiered'], k['tvshowtitle'], k['season'], k['episode']), reverse = reverse)
+						items = sorted(items, key = lambda k : (k.get('premiered') or k.get('aired') or dummyString, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
 					elif attribute == 5:
-						for i in range(len(items)):
-							if not 'timeAdded' in items[i]: items[i]['timeAdded'] = None
-						items = sorted(items, key = lambda k: '%s_%s_%s_%s' % (k['timeAdded'], k['tvshowtitle'], k['season'], k['episode']), reverse = reverse)
+						items = sorted(items, key = lambda k : (k.get('timeAdded') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
 					elif attribute == 6:
+						items = sorted(items, key = lambda k : (k.get('timeWatched') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
+					elif attribute == 7:
+						time = Time.timestamp()
 						for i in range(len(items)):
-							if not 'timeWatched' in items[i]: items[i]['timeWatched'] = None
-						items = sorted(items, key = lambda k: '%s_%s_%s_%s' % (k['timeWatched'], k['tvshowtitle'], k['season'], k['episode']), reverse = reverse)
+							value = [315569520, 315569520, 315569520]
+
+							if 'timeWatched' in items[i] and items[i]['timeWatched']:
+								seconds = time - items[i]['timeWatched']
+								if seconds < 172800: value[0] = seconds # Always place shows that were watched in the past 48 hours at the top.
+								value[2] = seconds
+
+							# Place shows with a recent release of a new season close to the top.
+							try: idImdb = items[i]['imdb']
+							except: idImdb = None
+							try: idTmdb = items[i]['tmdb']
+							except: idTmdb = None
+							try: idTvdb = items[i]['tvdb']
+							except: idTvdb = None
+							try: idTrakt = items[i]['trakt']
+							except: idTrakt = None
+							show = Shows(kids = self.mKids).metadata(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, quick = True) # Only quick - do not hold up the process.
+							if show and 'pack' in show and show['pack']:
+								release = 0
+								for season in show['pack']['seasons']:
+									try: release = max(release, season['time']['start'])
+									except: pass
+								if release:
+									seconds = time - release
+									if seconds > 0:
+										if seconds < 259200: value[0] = min(value[0], seconds) # Place new seasons released the past 3 days at the top, maybe even before the recentley watched.
+										elif seconds < 1209600: value[1] = seconds # Place new seasons released the past 2 weeks second after the recentley watched.
+										elif seconds < 4838400: value[2] = min(value[2], seconds) # Move new seasons released the past 8 weeks closer to the top.
+
+							items[i]['sort'] = value
+							if not 'premiered' in items[i] or not items[i]['premiered']: items[i]['premiered'] = items[i]['aired'] if 'aired' in items[i] else None
+
+						items = sorted(items, key = lambda k : tuple(k.get('sort', []) + [k.get('premiered') or dummyString, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber]), reverse = reverse)
 				elif reverse:
 					items.reverse()
+
 		except: Logger.error()
 		return items
 
@@ -1824,8 +1870,10 @@ class Episodes(object):
 			# If the next episode is in the same season as the last watched episode, continue like normal and retrieve all episodes for the current season.
 			# If the next episode is in the next season (aka last watched episode was the last episode from the previous season), retrieve the all episodes for next season.
 			seasonNext = season + 1
+			seasonSelect = None
 			episodeNext = episode + 1
 			episodeFirst = 1
+			episodeSelect = None
 			found = 0
 
 			# Next episode in the same season.
@@ -1833,7 +1881,10 @@ class Episodes(object):
 				if i['number'][MetaData.NumberOfficial] == season:
 					if i['episodes']:
 						episodeLast = max([j['number'][MetaData.NumberOfficial] for j in i['episodes']])
-						if episodeNext <= episodeLast: found = 1
+						if episodeNext <= episodeLast:
+							seasonSelect = season
+							episodeSelect = episodeNext
+							found = 1
 					break
 
 			# First episode in the next season.
@@ -1842,8 +1893,48 @@ class Episodes(object):
 					if i['number'][MetaData.NumberOfficial] == seasonNext:
 						if i['episodes']:
 							episodeLast = max([j['number'][MetaData.NumberOfficial] for j in i['episodes']])
-							if episodeFirst <= episodeLast: found = 2
+							if episodeFirst <= episodeLast:
+								seasonSelect = seasonNext
+								episodeSelect = episodeFirst
+								found = 2
 						break
+
+			# If all episodes in a show are watched 1 time, the show is hidden from the Arrivals menu.
+			# If a single episode in the show was watched 2 times while the rest werre only watched 1 time (maybe by accident or rewatched after a long time), it shows up again in the Arrivals menu.
+			# Hide these shows where the previous N episodes have a lower playcount than the current/last-watched episode.
+			discrepancy = self.mMetatools.settingsShowDiscrepancy()
+			if discrepancy and found and seasonSelect and episodeSelect:
+				from lib.modules.playback import Playback
+				playback = Playback.instance()
+				countCurrent = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode)
+				if countCurrent:
+					countNext = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = seasonSelect, episode = episodeSelect)
+					if countNext and countNext['count']['total']: # Only do this if the next episode was already watched (aka rewatch).
+						countCurrent = countCurrent['count']['total']
+						if countCurrent > 1:
+							lookups = []
+							seasonCounter = season
+							episodeCounter = episode
+							for i in range(5):
+								episodeCounter -= 1
+								if episodeCounter <= 0:
+									if seasonCounter == 1: break
+									seasonCounter -= 1
+									for j in pack:
+										if j['number'][MetaData.NumberOfficial] == seasonCounter:
+											episodeCounter = max([k['number'][MetaData.NumberOfficial] for k in j['episodes']])
+											break
+								lookups.append({'season' : seasonCounter, 'episode' : episodeCounter})
+
+							counter = 0
+							for i in lookups:
+								value = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = i['season'], episode = i['episode'])
+								if value and value['count']['total'] and value['count']['total'] >= countCurrent: counter += 1
+
+							# 0.4: less than 2 out of 5.
+							if (discrepancy == MetaTools.DiscrepancyLenient and counter == 0 and lookups) or (discrepancy == MetaTools.DiscrepancyStrict and counter < len(lookups) * 0.4):
+								if developer: Logger.log('EPISODE HIDDEN: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
+								found = 0
 
 			if found == 0:
 				data = {'invalid' : True}
@@ -2038,7 +2129,7 @@ class Episodes(object):
 								if not seasonPlot: seasonPlot = showPlot
 
 								seasonPremiered = season.releaseDateFirst(zone = MetaData.ZoneOriginal, format = MetaData.FormatDate)
-								if not seasonPremiered: seasonPremiered = showPremiered
+								if not seasonPremiered and season.numberSeason() == 1: seasonPremiered = showPremiered # Do not do this for later seasons. Otherwise new unaired season/episodes without a release date yet, will get the 1st season's date.
 								if seasonPremiered: seasonPremiered = Regex.extract(data = seasonPremiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
 
 								seasonAirs = {}
@@ -2420,7 +2511,7 @@ class Episodes(object):
 			items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, mixed = mixed, submenu = submenu, next = next, recap = recap, extra = extra, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, hideWatched = self.mModeWatched, contextPlaylist = True, contextShortcutCreate = True)
 			directory = Directory(content = Directory.ContentSettings, media = Media.TypeMixed if mixed else Media.TypeEpisode, cache = True, lock = False)
 			directory.addItems(items = items)
-			directory.finish(select = self.mMetatools.select(items = items))
+			directory.finish(select = None if mixed else self.mMetatools.select(items = items))
 
 	def directory(self, metadatas):
 		metadatas = self.check(metadatas = metadatas)

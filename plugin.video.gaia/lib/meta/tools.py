@@ -75,6 +75,10 @@ class MetaTools(object):
 	RatingProviders			= [RatingImdb, RatingTmdb, RatingTvdb, RatingTrakt, RatingTvmaze, RatingMetacritic]
 	RatingVotes				= 10 # Default vote count if there is a rating by no vote count (eg Metacritic or Tvmaze).
 
+	DiscrepancyDisabbled	= 0
+	DiscrepancyLenient		= 1
+	DiscrepancyStrict		= 2
+
 	TimeUnreleased			= 10800 # 3 hours.
 	TimeFuture				= 86400 # 1 day.
 
@@ -287,6 +291,8 @@ class MetaTools(object):
 		self.mShowCounterUnwatched = Settings.getBoolean('navigation.show.counter.unwatched')
 		self.mShowCounterLimit = Settings.getBoolean('navigation.show.counter.limit')
 
+		self.mShowDiscrepancy = Settings.getInteger('navigation.show.discrepancy')
+
 		self.mLabelForce = Settings.getInteger('metadata.label.force')
 		if self.mLabelForce == 2: self.mLabelForce = not Skin.supportLabelCustom(default = True)
 		else: self.mLabelForce = bool(self.mLabelForce)
@@ -432,6 +438,9 @@ class MetaTools(object):
 	def settingsShowSpecialEpisode(self):
 		return self.mShowSpecialEpisode
 
+	def settingsShowDiscrepancy(self):
+		return self.mShowDiscrepancy
+
 	def settingsDetail(self):
 		return self.mSettingsDetail
 
@@ -535,6 +544,7 @@ class MetaTools(object):
 			elif media == Media.TypeSpecialExtra: action = 'seasonsExtras'
 			elif media == Media.TypeShow: action = 'seasonsRetrieve'
 			elif media == Media.TypeSeason: action = 'episodesRetrieve'
+			elif media == Media.TypeSet: action = 'setsRetrieve'
 			if not action: action = 'scrape'
 
 		parameters = {}
@@ -678,6 +688,32 @@ class MetaTools(object):
 		if media == Media.TypeEpisode and season == 0:
 			if not 'story' in metadata or not metadata['story']: label = Format.fontItalic(label)
 
+		# Mark new episodes/seasons in mixed menus as bold.
+		if media == Media.TypeEpisode and (not future or future < 0):
+			new = False
+			time = Time.timestamp()
+
+			# New episode.
+			if not new and not 'playcount' in metadata or not metadata['playcount']:
+				if 'premiered' in metadata and metadata['premiered']: date = metadata['premiered']
+				elif 'aired' in metadata and metadata['aired']: date = metadata['aired']
+				else: date = None
+				if date:
+					date = time - Time.timestamp(date, format = '%Y-%m-%d')
+					if date > 0 and date < 604800: new = True # 1 week.
+
+			# New Season.
+			if not new and 'pack' in metadata and metadata['pack']:
+				date = 0
+				for season in metadata['pack']['seasons']:
+					if season['time']['start'] and season['time']['start'] < time:
+						date = max(date, season['time']['start'])
+				if date:
+					date = time - date
+					if date > 0 and date < 2419200: new = True # 4 weeks.
+
+			if new: label = Format.fontBold(label)
+
 		return label
 
 	###################################################################
@@ -781,7 +817,7 @@ class MetaTools(object):
 		if media is None: media = self.media(metadata = metadatas)
 		if mixed is None: mixed = self.mixed(metadata = metadatas) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
 		if submenu is None: submenu = self.submenu(media = media, mixed = mixed)
-		folder = submenu or (media == Media.TypeShow or media == Media.TypeSeason)
+		folder = submenu or (media == Media.TypeSet or media == Media.TypeShow or media == Media.TypeSeason)
 
 		seasons = []
 		items = []
@@ -893,7 +929,7 @@ class MetaTools(object):
 			else:
 				try: play = max(plays, key = lambda i : i['count'])
 				except: play = None
-				if play and play['count'] > 0: playItem = play['item']
+				if play and play['count'] and play['count'] > 0: playItem = play['item']
 			if playItem: playItem.setProperty(MetaTools.PropertySelect, '1')
 
 		return [item['data'] for item in items]
@@ -1284,7 +1320,7 @@ class MetaTools(object):
 			imdb = None
 			for id in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
 				if id and id in metadata and metadata[id]:
-					ids[id] = metadata[id]
+					ids[id] = str(metadata[id])
 					if id == MetaTools.RatingImdb: imdb = metadata[id]
 			try: tag.setUniqueIDs(ids, 'imdb') # Kodi 20+
 			except: item.setUniqueIDs(ids, 'imdb') # Kodi 19
@@ -1612,6 +1648,7 @@ class MetaTools(object):
 					if not kids is None: parameters['kids'] = kids
 					if media == Media.TypeShow or media == Media.TypeSeason: action = 'showsRetrieve'
 					elif media == Media.TypeEpisode: action = 'episodesRetrieve'
+					elif media == Media.TypeSet: action = 'setsRetrieve'
 					else: action = 'moviesRetrieve'
 					command = System.command(action = action, parameters = parameters)
 
@@ -1694,6 +1731,7 @@ class MetaTools(object):
 								try: premiered = metadata['premiered']
 								except: premiered = None
 							if premiered and Time.timestamp(fixedTime = premiered, format = Time.FormatDate) > Time.timestamp(): ended = False
+							if not premiered and metadata['episode'] == 1: ended = False # Only a single new unaired episode without a release date.
 
 						# If the current last episode is lower than the available episodes in the season, do not show extras.
 						if ended and 'pack' in metadata and metadata['pack']:
@@ -1946,7 +1984,7 @@ class MetaTools(object):
 		self.cleanCountry(metadata = metadata)
 		self.cleanCast(metadata = metadata)
 		self.cleanCrew(metadata = metadata)
-		self.cleanStudio(metadata = metadata, empty = studio)
+		self.cleanStudio(metadata = metadata, media = media, empty = studio)
 
 		return metadata
 
@@ -2015,7 +2053,7 @@ class MetaTools(object):
 					else: del metadata[i]
 		except: Logger.error()
 
-	def cleanStudio(self, metadata, empty = True):
+	def cleanStudio(self, metadata, media = None, empty = True):
 		try:
 			# Some studio names are not detected and no logos are shown in the menus (eg: Aeon Nox).
 			if 'studio' in metadata and metadata['studio']:
@@ -2040,13 +2078,14 @@ class MetaTools(object):
 								studios[i] = value
 
 				# Studio logos do not work if there are multiple studios.
-				if studios and not self.mKodiNew: metadata['studio'] = studios[0]
+				# Eg:  DoWork - Direct texture file loading failed for resource://resource.images.studios.white/Columbia Pictures / Relativity Media / Pariah.png
+				if studios: metadata['studio'] = [studios[0]] if self.mKodiNew else studios[0]
 
 			# Some skins, like Aeon Nox (List View), show the poster in the menu when there is no studio.
 			# This looks ugly, so set an empty studio.
 			# Do not use space or empty string, since it will be ignored by the skin.
 			# Do not use a string that contains visible characters (eg: '0'), since some view types (eg: Aeon Nox - Icons) will show the studio as text if no icon is availble.
-			if empty and not 'studio' in metadata: metadata['studio'] = ['\u200c'] if self.mKodiNew else '\u200c'
+			if empty and not 'studio' in metadata  and not media == Media.TypeSet: metadata['studio'] = ['\u200c'] if self.mKodiNew else '\u200c'
 		except: Logger.error()
 
 	@classmethod
@@ -2140,8 +2179,10 @@ class MetaTools(object):
 				if rating:
 					votes = 0
 					if provider in voting['votes']: votes = voting['votes'][provider]
-					result['rating'].append(rating)
-					result['votes'].append(votes if votes else MetaTools.RatingVotes)
+					if Tools.isArray(rating): result['rating'].extend(rating)
+					else: result['rating'].append(rating)
+					if Tools.isArray(votes): result['votes'].extend(votes)
+					else: result['votes'].append(votes if votes else MetaTools.RatingVotes)
 
 		return result
 
@@ -2160,7 +2201,7 @@ class MetaTools(object):
 		rating = 0
 		for i in range(len(result['rating'])):
 			rating += result['rating'][i] * result['votes'][i]
-		rating /= float(votes)
+		if votes: rating /= float(votes)
 
 		result['rating'] = rating
 		result['votes'] = votes
@@ -2937,15 +2978,28 @@ class MetaTools(object):
 		from lib.modules.database import Database
 		from lib.modules.concurrency import Pool
 		from lib.indexers.movies import Movies
+		from lib.indexers.sets import Sets
 		from lib.indexers.shows import Shows
 		from lib.indexers.seasons import Seasons
 		from lib.indexers.episodes import Episodes
 		from lib.meta.cache import MetaCache
 		from lib.modules import trakt
 
+		Settings.default('general.language.primary')
+		Settings.default('general.language.secondary')
+		Settings.default('general.language.tertiary')
+		Settings.default('metadata.location.country')
+		self.settingsDetailSet(MetaTools.DetailExtended)
+
 		metacache = MetaCache.instance()
+		MetaCache.External = False
 		metacache._externalDisable() # Do not use the already preprocessed database.
 		if clear: metacache._deleteFile()
+
+		time = Time.timestamp()
+		settings = metacache.settingsId()
+		for i in MetaCache.Types:
+			metacache._update('UPDATE `%s` SET time = %d, settings = "%s";' % (i, time, settings))
 
 		# Trakt has a rate limit of 1000 requests per 5 minutes.
 		#	https://trakt.docs.apiary.io/#introduction/rate-limiting
@@ -3031,11 +3085,19 @@ class MetaTools(object):
 			counter += 1
 			if 'link' in i and i['link']: menusMovie.append({'label' : 'Year (%s)' % i['name'], 'data' : i['link'], 'level' : 1 if counter <= 10 else 2 if counter <= 20 else 3 if counter <= 35 else 4})
 
-		values = Movies().collections(menu = False)
-		for i in values:
-			if 'link' in i and i['link']: menusMovie.append({'label' : 'Collection (%s)' % i['name'], 'data' : i['link'], 'level' : 0})
-
 		menus.extend([{'class' : Movies, 'label' : i['label'] if 'label' in i else None, 'data' : i['data'], 'level' : i['level'], 'pages' : pagesMovie, 'years' : yearsMovie, 'year' : year - yearsMovie} for i in menusMovie])
+
+		# Sets
+		menusSets = [
+			{'data' : 'browse',				'level' : 0},
+			{'data' : 'arrivals',			'level' : 0},
+		]
+
+		values = Sets().alphabetic(menu = False)
+		for i in values:
+			if 'link' in i and i['link']: menusSets.append({'label' : 'Character (%s)' % i['name'], 'data' : i['link'], 'level' : 0})
+
+		menus.extend([{'class' : Sets, 'label' : i['label'] if 'label' in i else None, 'data' : i['data'], 'level' : i['level'], 'pages' : [j * 2 for j in pagesMovie], 'years' : yearsMovie, 'year' : year - yearsMovie} for i in menusSets])
 
 		# Shows
 

@@ -2328,7 +2328,7 @@ class Manager(object):
 		# 	20 providers with slowest ones disabled.
 		# 	Default scrape settings (packs, titles, keywords), except the page limit set to 5.
 		#	Scraping episode and returning 1000+ links.
-		threads = Hardware.processorCountThread()
+		threads = Hardware.processorCountThread() or 0
 		if Platform.pythonConcurrencyProcess() and threads >= 4 and performance['processor']['rating'] >= ProviderBase.Performance7:
 			# 0.5x core-count (3): 100 seconds | 51% CPU load
 			# 1x core-count + 1 (7): 68 seconds | 72% CPU load

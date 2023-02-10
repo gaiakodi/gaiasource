@@ -103,6 +103,22 @@ class Cloudflare(object):
 	RetryMinimum = 1
 	RetryMaximum = 10
 
+	# Sometimes Gaia and Kodi stop working, because of:
+	#	OSError: [Errno 24] Too many open files
+	# This is sporadic and mostly happens during dev/testing where menus are constantly loaded and reloaded.
+	# When executing the following command:
+	#	lsof -p $(pidof kodi.bin)
+	# there are 100s of CLOSE_WAIT requests:
+	#	gaia:57464->server-99-86-4-35.fra6.r.cloudfront.net:https (CLOSE_WAIT)
+	#	gaia:56584->webservice.fanart.tv:https (CLOSE_WAIT)
+	# This post on requests says that instead of using a global Session, create a new session for every client.
+	#	https://github.com/psf/requests/issues/4575
+	#	https://github.com/psf/requests/issues/239
+	#	https://stackoverflow.com/questions/10115126/python-requests-close-http-connection/45684352#45684352
+	# The error is probably caused by reusing the sessions too often.
+	# If the error is observed again, reduce ReuseLimit or disabble ReuseEnabled.
+	ReuseEnabled = True
+	ReuseLimit = 10 # 20 too much.
 	ReuseLock = Lock()
 	ReuseScrapers = {}
 
@@ -115,7 +131,7 @@ class Cloudflare(object):
 	ValidateLenient				= 1	# Lenient verification. Like ValidateModerate, but uses the old insecure TLSv1 which avoids certain SSL errors (eg: sslv3 alert handshake failure).
 	ValidateNone				= 0	# Not implemented yet. Not sure if it can be switched off completley. Currently will fall back to ValidateLenient.
 
-	def __init__(self, engine = None, validate = ValidateStrict, reuse = True):
+	def __init__(self, engine = None, validate = ValidateStrict, reuse = ReuseEnabled):
 		self.mEngine = engine
 		self.mValidate = validate
 		self.mReuse = reuse
@@ -203,6 +219,7 @@ class Cloudflare(object):
 		cloudscraper = self.module()
 		interpreter = self._engine(engine)
 
+		counter = 0
 		scraper = None
 		if self.mReuse:
 			domain = self._scraperDomain(link = link, domain = domain)
@@ -210,17 +227,28 @@ class Cloudflare(object):
 			if not engine in Cloudflare.ReuseScrapers: Cloudflare.ReuseScrapers[engine] = {}
 			if not domain in Cloudflare.ReuseScrapers[engine]: Cloudflare.ReuseScrapers[engine][domain] = {}
 			if not curve in Cloudflare.ReuseScrapers[engine][domain]: Cloudflare.ReuseScrapers[engine][domain][curve] = []
-			if Cloudflare.ReuseScrapers[engine][domain][curve]: scraper = Cloudflare.ReuseScrapers[engine][domain][curve].pop()
+			if Cloudflare.ReuseScrapers[engine][domain][curve]:
+				instance = Cloudflare.ReuseScrapers[engine][domain][curve].pop()
+				scraper = instance['scraper']
+				counter = instance['counter']
 			Cloudflare.ReuseLock.release()
 
 		if not scraper:
 			if curve: scraper = cloudscraper.create_scraper(interpreter = interpreter, ssl_verify = certificate, ecdhCurve = curve)
 			else: scraper = cloudscraper.create_scraper(interpreter = interpreter, ssl_verify = certificate)
 
-		return scraper, domain
+		return {'scraper' : scraper, 'domain' : domain, 'counter' : counter, 'engine' : engine, 'certificate' : certificate, 'curve' : curve}
 
-	def _scraperReuse(self, scraper, engine = None, link = None, domain = None, curve = None):
-		if self.mReuse: Cloudflare.ReuseScrapers[engine][self._scraperDomain(link = link, domain = domain)][curve].append(scraper)
+	def _scraperReuse(self, scraper, engine = None, certificate = None, link = None, domain = None, curve = None, counter = None):
+		if self.mReuse:
+			counter += 1
+			if counter < Cloudflare.ReuseLimit:
+				domain = self._scraperDomain(link = link, domain = domain)
+				Cloudflare.ReuseScrapers[engine][domain][curve].append({'scraper' : scraper, 'domain' : domain, 'counter' : counter, 'engine' : engine, 'certificate' : certificate, 'curve' : curve})
+			else:
+				scraper.close()
+		else:
+			scraper.close()
 
 	def _scraperDomain(self, link = None, domain = None):
 		if domain:
@@ -324,7 +352,7 @@ class Cloudflare(object):
 			for link in Cloudflare.Links:
 				if System.aborted(): break
 
-				scraper, domain = self._scraper(engine = engine, certificate = certificate, curve = curve)
+				scraper = self._scraper(engine = engine, certificate = certificate, curve = curve)['scraper']
 				if retry is None: retry = self._settingsRetry()
 				if timeout is None: timeout = self._timeout()
 				delay = self._delay(retry = retry)
@@ -390,7 +418,8 @@ class Cloudflare(object):
 
 		if certificate is None: certificate = self.mValidate
 
-		scraper, domain = self._scraper(engine = engine, certificate = certificate, curve = curve, link = link)
+		instance = self._scraper(engine = engine, certificate = certificate, curve = curve, link = link)
+		scraper = instance['scraper']
 
 		duration = None
 		if retry is None: retry = self._settingsRetry()
@@ -420,6 +449,6 @@ class Cloudflare(object):
 		try: cookies = scraper.cookies.get_dict()
 		except: cookies = None
 
-		self._scraperReuse(scraper = scraper, engine = engine, domain = domain, curve = curve)
+		self._scraperReuse(**instance)
 
 		return {'response' : response, 'cookies' : cookies, 'duration' : duration}

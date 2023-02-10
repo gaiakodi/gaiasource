@@ -272,7 +272,7 @@ class Shows(object):
 		items = items[(page - 1) * limit : page * limit]
 
 		# Sort first, since we want to page in accordance to the user's preferred sorting.
-		if sort: self.sort(items = items, type = sort)
+		if sort: items = self.sort(items = items, type = sort)
 
 		if len(items) >= limit and (not maximum or (page + 1) * limit <= maximum):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
@@ -287,38 +287,30 @@ class Shows(object):
 	def sort(self, items):
 		try:
 			if Settings.getBoolean('navigation.sort.favourite'):
+				dummyString = 'zzzzzzzzzz'
+
 				attribute = Settings.getInteger('navigation.sort.favourite.show.type')
 				reverse = Settings.getInteger('navigation.sort.favourite.show.order') == 1
+
 				if attribute > 0:
 					if attribute == 1:
 						if Settings.getBoolean('navigation.sort.favourite.article'):
-							try: items = sorted(items, key = lambda k: Regex.remove(data = k['tvshowtitle'], expression = '(^the\s|^an?\s)', group = 1), reverse = reverse)
-							except: items = sorted(items, key = lambda k: Regex.remove(data = k['title'], expression = '(^the\s|^an?\s)', group = 1), reverse = reverse)
+							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('tvshowtitle') or k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
-							try: items = sorted(items, key = lambda k: k['tvshowtitle'].lower(), reverse = reverse)
-							except: items = sorted(items, key = lambda k: k['title'].lower(), reverse = reverse)
+							items = sorted(items, key = lambda k : (k.get('tvshowtitle') or k.get('title') or '').lower() or dummyString, reverse = reverse)
 					elif attribute == 2:
-						for i in range(len(items)):
-							if not 'rating' in items[i]: items[i]['rating'] = None
-						items = sorted(items, key = lambda k: float(k['rating']), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						for i in range(len(items)):
-							if not 'votes' in items[i]: items[i]['votes'] = None
-						items = sorted(items, key = lambda k: int(k['votes']), reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 					elif attribute == 4:
-						for i in range(len(items)):
-							if not 'premiered' in items[i]: items[i]['premiered'] = None
-						items = sorted(items, key = lambda k: k['premiered'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('premiered') or k.get('aired') or dummyString, reverse = reverse)
 					elif attribute == 5:
-						for i in range(len(items)):
-							if not 'added' in items[i]: items[i]['added'] = None
-						items = sorted(items, key = lambda k: k['added'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
 					elif attribute == 6:
-						for i in range(len(items)):
-							if not 'watched' in items[i]: items[i]['watched'] = None
-						items = sorted(items, key = lambda k: k['watched'], reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('timeWatched') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
+
 		except: Logger.error()
 		return items
 
@@ -2014,7 +2006,7 @@ class Shows(object):
 							if languages:
 								languages = [languages]
 								if 'language' in result: Tools.listUnique(languages + result['language'])
-								else: result['language'] = result['language'] = languages
+								else: result['language'] = languages
 
 							homepage = dataShow.get('homepage')
 							if homepage: result['homepage'] = homepage
