@@ -348,12 +348,16 @@ class MetaCache(Database):
 			MetaCache.Lock.acquire()
 			if MetaCache.External is None:
 				try:
-					path = File.joinPath(System.pathMetadata(), 'resources', 'data', 'metadata.db')
-					if File.exists(path):
-						if MetaTools.instance().settingsExternal():
-							MetaCache.External = Database(path = path)
+					path = System.pathMetadata()
+					if path:
+						path = File.joinPath(path, 'resources', 'data', 'metadata.db')
+						if File.exists(path):
+							if MetaTools.instance().settingsExternal():
+								MetaCache.External = Database(path = path)
+							else:
+								Logger.log('Preprocessed Metadata setting disabled although the Gaia Metadata addon is installed. Menus might load faster if you enable the Preprocessed Metadata setting.')
+								MetaCache.External = False
 						else:
-							Logger.log('Preprocessed Metadata setting disabled although the Gaia Metadata addon is installed. Menus might load faster if you enable the Preprocessed Metadata setting.')
 							MetaCache.External = False
 					else:
 						MetaCache.External = False

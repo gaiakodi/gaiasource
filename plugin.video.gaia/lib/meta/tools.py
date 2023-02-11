@@ -1050,8 +1050,8 @@ class MetaTools(object):
 		if not media: media = mediaOriginal = self.media(metadata = metadata)
 
 		# Hide special seasons and episodes.
-		if (media == Media.TypeSeason or media == Media.TypeEpisode) and not self.mShowSpecialSeason and metadata['season'] == 0: return None
-		elif media == Media.TypeEpisode and not self.mShowSpecialEpisode and metadata['episode'] == 0: return None
+		if (media == Media.TypeSeason or media == Media.TypeEpisode) and not self.mShowSpecialSeason and (not 'season' in metadata or metadata['season'] == 0): return None
+		elif media == Media.TypeEpisode and not self.mShowSpecialEpisode and (not 'episode' in metadata or metadata['episode'] == 0): return None
 
 		if not extend:
 			extendLabel = extend

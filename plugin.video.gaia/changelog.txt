@@ -1,4 +1,9 @@
 
+[B]6.1.5 (2023.02.11)[/B]
+- External metadata database fix.
+- Further improvements for episode arrivals menu.
+- Fixed sequential playback.
+
 [B]6.1.4 (2023.02.10)[/B]
 - Added advanced movie set features.
 - Fixed unaired episode release date.

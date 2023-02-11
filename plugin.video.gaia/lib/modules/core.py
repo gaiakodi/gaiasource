@@ -3512,6 +3512,11 @@ class Core(object):
 			interface.Player.canceledClear()
 			if autoplay and not autopack: return self._autoplay(library = library, new = new, add = add, binge = binge)
 
+			if tools.Tools.isDictionary(source) and 'stream' in source and tools.Tools.isDictionary(source['stream']):
+				stream = Stream()
+				stream.dataImport(data = source['stream'], full = True)
+				source['stream'] = stream
+
 			self.downloadCanceled = False
 			sequential = tools.Settings.getBoolean('playback.autoplay.sequential')
 			if sequential:

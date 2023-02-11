@@ -1906,11 +1906,15 @@ class Episodes(object):
 			if discrepancy and found and seasonSelect and episodeSelect:
 				from lib.modules.playback import Playback
 				playback = Playback.instance()
+
 				countCurrent = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode)
 				if countCurrent:
 					countNext = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = seasonSelect, episode = episodeSelect)
 					if countNext and countNext['count']['total']: # Only do this if the next episode was already watched (aka rewatch).
+						countNext = countNext['count']['total']
 						countCurrent = countCurrent['count']['total']
+
+						# Previous episodes have a lower count.
 						if countCurrent > 1:
 							lookups = []
 							seasonCounter = season
@@ -1933,7 +1937,49 @@ class Episodes(object):
 
 							# 0.4: less than 2 out of 5.
 							if (discrepancy == MetaTools.DiscrepancyLenient and counter == 0 and lookups) or (discrepancy == MetaTools.DiscrepancyStrict and counter < len(lookups) * 0.4):
-								if developer: Logger.log('EPISODE HIDDEN: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
+								if developer: Logger.log('EPISODE HIDDEN (PREVIOUS): ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
+								found = 0
+
+						# Next episosdes have the same playcount.
+						# A previous season/episode might have been marked as watched at a later date than the next season/episode.
+						# Hide these as well.
+						if countCurrent == countNext:
+							lookups = []
+							seasonCounter = season
+							episodeCounter = episode
+
+							# Do this for a
+							for i in range(10):
+								add = True
+								end = False
+								episodeCounter += 1
+								for j in pack:
+									if j['number'][MetaData.NumberOfficial] == seasonCounter:
+										if episodeCounter > max([k['number'][MetaData.NumberOfficial] for k in j['episodes']]):
+											seasonCounter += 1
+											if seasonCounter > max([k['number'][MetaData.NumberOfficial] for k in pack]):
+												add = False
+												end = True
+												break
+											else:
+												episodeCounter = 1
+										break
+								if add: lookups.append({'season' : seasonCounter, 'episode' : episodeCounter})
+								if end: break
+
+							counter = 0
+							for i in lookups:
+								countContinue = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = i['season'], episode = i['episode'])
+								if countContinue:
+									countContinue = countContinue['count']['total']
+									if not countContinue == countCurrent:
+										counter += countContinue
+										break
+								else:
+									counter += 1
+
+							if (discrepancy == MetaTools.DiscrepancyLenient and counter == 0) or (discrepancy == MetaTools.DiscrepancyStrict and counter > 0):
+								if developer: Logger.log('EPISODE HIDDEN (NEXT): ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
 								found = 0
 
 			if found == 0:
