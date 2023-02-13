@@ -1795,7 +1795,7 @@ class MetaTools(object):
 		items = []
 		for metadata in metadatas:
 			try:
-				item = self.directory( media = media, kids = kids, metadata = metadata)
+				item = self.directory(media = media, kids = kids, metadata = metadata)
 				if item: items.append([item['command'], item['item'], True])
 			except: Logger.error()
 		return items
@@ -1826,9 +1826,11 @@ class MetaTools(object):
 			}
 			MetaImage.set(item = item, images = images)
 
-			parameters = {'media' : media}
-			if link: parameters['link']= link
-			if not kids is None: parameters['kids']= kids
+			try: parameters = metadata['parameters']
+			except: parameters = {}
+			if not 'media' in parameters: parameters['media'] = media
+			if not 'link' in parameters and link: parameters['link']= link
+			if not 'kids' in parameters and not kids is None: parameters['kids']= kids
 			command = System.command(action = metadata['action'], parameters = parameters)
 
 			context = self.itemContext(item = item, context = context, mode = Context.ModeGeneric, media = media, kids = kids, command = command, library = link, shortcutLabel = name, shortcutCreate = True)

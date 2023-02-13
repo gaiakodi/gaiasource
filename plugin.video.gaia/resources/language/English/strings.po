@@ -1847,7 +1847,7 @@ msgid "Preprocessed Metadata"
 msgstr ""
 
 msgctxt "#33302"
-msgid "[GAIA-NO-LABEL]"
+msgid "Awards"
 msgstr ""
 
 msgctxt "#33303"
@@ -1935,19 +1935,19 @@ msgid "DiamondInfo"
 msgstr ""
 
 msgctxt "#33324"
-msgid "[GAIA-NO-LABEL]"
+msgid "Academy Awards"
 msgstr ""
 
 msgctxt "#33325"
-msgid "[GAIA-NO-LABEL]"
+msgid "Golden Globes"
 msgstr ""
 
 msgctxt "#33326"
-msgid "[GAIA-NO-LABEL]"
+msgid "Emmy Awards"
 msgstr ""
 
 msgctxt "#33327"
-msgid "[GAIA-NO-LABEL]"
+msgid "Razzie Awards"
 msgstr ""
 
 msgctxt "#33328"
@@ -2423,7 +2423,7 @@ msgid "The parental control is now locked. Only the kids menu is accessible."
 msgstr ""
 
 msgctxt "#33446"
-msgid "[GAIA-NO-LABEL]"
+msgid "National Film"
 msgstr ""
 
 msgctxt "#33447"
@@ -3431,15 +3431,15 @@ msgid "Include the original and transcoded files"
 msgstr ""
 
 msgctxt "#33698"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Picture"
 msgstr ""
 
 msgctxt "#33699"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Director"
 msgstr ""
 
 msgctxt "#33700"
-msgid "[GAIA-NO-LABEL]"
+msgid "All Categories"
 msgstr ""
 
 msgctxt "#33701"
@@ -4179,11 +4179,11 @@ msgid "Cached"
 msgstr ""
 
 msgctxt "#33885"
-msgid "[GAIA-NO-LABEL]"
+msgid "Winners"
 msgstr ""
 
 msgctxt "#33886"
-msgid "[GAIA-NO-LABEL]"
+msgid "Nominees"
 msgstr ""
 
 msgctxt "#33887"

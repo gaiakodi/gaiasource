@@ -108,6 +108,7 @@ class Shows(object):
 		self.year_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&num_votes=100,&production_status=released&year=%s,%s&sort=moviemeter,asc&count=%d&start=1%s' % ('%s', '%s', self.mLimit, '%s')
 		self.language_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=100,&production_status=released&languages=%s&sort=moviemeter,asc&count=%d&start=1%s' % ('%s', self.mLimit, '%s')
 		self.emmies_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&production_status=released&groups=emmy_winners&sort=year,desc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
+		self.award_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % ('%s', self.mLimit, self.mCertificates)
 
 		self.random1_link = 'https://www.imdb.com/list/ls067413463/'
 		self.random2_link = 'https://www.imdb.com/list/ls080165495/'
@@ -607,6 +608,31 @@ class Shows(object):
 
 	def year(self, year, menu = True, refresh = False):
 		return self.retrieve(self.year_link % (str(year), str(year), self.mCertificates), menu = menu, refresh = refresh)
+
+	##############################################################################
+	# AWARD
+	##############################################################################
+
+	def awards(self, type = None, category = None, menu = True):
+		awards = {
+			'emmyawards' : {'winner' : 'emmy_winner', 'nominee' : 'emmy_nominee'},
+		}
+
+		if type is None:
+			items = [
+				{'name' : Translation.string(33326), 'image' : 'emmyawards.png', 'action' : 'showsAwards', 'parameters' : {'type' : 'emmyawards'}},
+			]
+		elif type:
+			awards = awards[type]
+			if category: awards = awards[category]
+			items = [
+				{'name' : Translation.string(33029), 'image' : '%sall.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % ','.join([awards['winner'], awards['nominee']])},
+				{'name' : Translation.string(33885), 'image' : '%swinner.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['winner']},
+				{'name' : Translation.string(33886), 'image' : '%snominee.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['nominee']},
+			]
+
+		if menu: self.directory(items)
+		return items
 
 	##############################################################################
 	# PEOPLE

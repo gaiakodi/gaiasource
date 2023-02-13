@@ -1097,7 +1097,7 @@ class Player(xbmc.Player):
 						if not visibleWas and visible: visibleWas = True
 						if not streamsHas and playback and visibleWas and not visible:
 							streamsHas = True
-							self._showStreams()
+							if self.statusStarted and not self.error: self._showStreams() # Do not do this (eg reload stream window) if playback failed.
 						elif streamsHas and visible:
 							streamsHas = False
 							interface.Dialog.closeAll()
@@ -1418,7 +1418,7 @@ class Player(xbmc.Player):
 			self.streamStop()
 
 			# Do not do this (eg reload stream window) if playback failed.
-			if self.statusStarted:
+			if self.statusStarted and not self.error:
 				self.progressUpdate()
 
 				# Must be BEFORE _showStreams() and _bingePlay(), since we want to wait for the rating dialog to close before we continue.

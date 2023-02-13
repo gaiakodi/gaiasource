@@ -456,6 +456,7 @@ class Navigator(object):
 	def moviesCategories(self):
 		self.addDirectoryItem(32011, self.parameterize('moviesGenres'), 'genres.png', 'DefaultGenre.png')
 		self.addDirectoryItem(35526, self.parameterize('moviesYears'), 'calendar.png', 'DefaultYear.png')
+		self.addDirectoryItem(33302, self.parameterize('moviesAwards'), 'awards.png', 'DefaultFile.png')
 		if self.mMedia == Media.TypeMovie and not self.kidsOnly(): self.addDirectoryItem(32016, self.parameterize('channels'), 'networks.png', 'DefaultNetwork.png')
 		self.addDirectoryItem(32014, self.parameterize('moviesLanguages'), 'languages.png', 'DefaultCountry.png')
 		self.addDirectoryItem(32013, self.parameterize('moviesPersons'), 'people.png', 'DefaultActor.png')
@@ -532,6 +533,7 @@ class Navigator(object):
 	def showsCategories(self):
 		self.addDirectoryItem(32011, self.parameterize('showsGenres'), 'genres.png', 'DefaultGenre.png')
 		self.addDirectoryItem(35526, self.parameterize('showsYears'), 'calendar.png', 'DefaultYear.png')
+		self.addDirectoryItem(33302, self.parameterize('showsAwards'), 'awards.png', 'DefaultFile.png')
 		self.addDirectoryItem(32016, self.parameterize('showsNetworks'), 'networks.png', 'DefaultNetwork.png')
 		self.addDirectoryItem(32014, self.parameterize('showsLanguages'), 'languages.png', 'DefaultCountry.png')
 		self.addDirectoryItem(32013, self.parameterize('showsPersons'), 'people.png', 'DefaultActor.png')

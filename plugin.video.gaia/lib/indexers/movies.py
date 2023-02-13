@@ -112,6 +112,7 @@ class Movies(object):
 		self.oscars_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, self.mAwards, self.mLimit, self.mCertificates)
 		self.theaters_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&release_date=date[365],date[0]&sort=release_date_us,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mLimit, self.mCertificates)
 		self.rating_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=%d,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mVotes, self.mLimit, self.mCertificates)
+		self.award_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, self.mCertificates)
 
 		self.drugsgeneral_link = 'https://www.imdb.com/list/ls052149893/'
 		self.drugsalcohol_link = 'https://www.imdb.com/list/ls000527140/'
@@ -615,6 +616,47 @@ class Movies(object):
 
 	def year(self, year, menu = True, refresh = False):
 		return self.retrieve(self.year_link % (str(year), str(year), self.mCertificates), menu = menu, refresh = refresh)
+
+	##############################################################################
+	# AWARD
+	##############################################################################
+
+	def awards(self, type = None, category = None, menu = True):
+		awards = {
+			'academyawards' : {
+				'global' : {'winner' : 'oscar_winner', 'nominee' : 'oscar_nominee'},
+				'picture' : {'winner' : 'best_picture_winner', 'nominee' : 'oscar_best_picture_nominees'},
+				'director' : {'winner' : 'best_director_winner', 'nominee' : 'oscar_best_director_nominees'},
+			},
+			'goldenglobes' : {'winner' : 'golden_globe_winner', 'nominee' : 'golden_globe_nominee'},
+			'razzieawards' : {'winner' : 'razzie_winner', 'nominee' : 'razzie_nominee'},
+			'nationalfilm' : {'winner' : 'national_film_preservation_board_winner'},
+		}
+
+		if type is None:
+			items = [
+				{'name' : Translation.string(33324), 'image' : 'academyawards.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'academyawards'}},
+				{'name' : Translation.string(33325), 'image' : 'goldenglobes.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'goldenglobes'}},
+				{'name' : Translation.string(33327), 'image' : 'razzieawards.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'razzieawards'}},
+				{'name' : Translation.string(33446), 'image' : 'nationalfilm.png', 'action' : 'moviesRetrieve', 'link' : self.award_link % awards['nationalfilm']['winner']},
+			]
+		elif type == 'academyawards' and category is None:
+			items = [
+				{'name' : Translation.string(33700), 'image' : 'academyawardsall.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'global'}},
+				{'name' : Translation.string(33698), 'image' : 'academyawardspicture.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'picture'}},
+				{'name' : Translation.string(33699), 'image' : 'academyawardsdirector.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'director'}},
+			]
+		elif type:
+			awards = awards[type]
+			if category: awards = awards[category]
+			items = [
+				{'name' : Translation.string(33029), 'image' : '%sall.png' % type, 'action' : 'moviesRetrieve', 'link' : self.award_link % ','.join([awards['winner'], awards['nominee']])},
+				{'name' : Translation.string(33885), 'image' : '%swinner.png' % type, 'action' : 'moviesRetrieve', 'link' : self.award_link % awards['winner']},
+				{'name' : Translation.string(33886), 'image' : '%snominee.png' % type, 'action' : 'moviesRetrieve', 'link' : self.award_link % awards['nominee']},
+			]
+
+		if menu: self.directory(items)
+		return items
 
 	##############################################################################
 	# PEOPLE

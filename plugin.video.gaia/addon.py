@@ -148,6 +148,12 @@ elif action.startswith('movies'):
 		from lib.indexers.movies import Movies
 		Movies(media = media, kids = kids).years()
 
+	elif action == 'moviesAwards':
+		from lib.indexers.movies import Movies
+		type = parameters.get('type')
+		category = parameters.get('category')
+		Movies(media = media, kids = kids).awards(type = type, category = category)
+
 	elif action == 'moviesUserlists':
 		from lib.indexers.movies import Movies
 		mode = parameters.get('mode')
@@ -294,6 +300,12 @@ elif action.startswith('shows'):
 	elif action == 'showsYears':
 		from lib.indexers.shows import Shows
 		Shows(kids = kids).years()
+
+	elif action == 'showsAwards':
+		from lib.indexers.shows import Shows
+		type = parameters.get('type')
+		category = parameters.get('category')
+		Shows(media = media, kids = kids).awards(type = type, category = category)
 
 	elif action == 'showsLanguages':
 		from lib.indexers.shows import Shows

@@ -1,4 +1,8 @@
 
+[B]6.1.6 (2023.02.13)[/B]
+- Added awards category.
+- Possible fix for reload on playback failure.
+
 [B]6.1.5 (2023.02.11)[/B]
 - External metadata database fix.
 - Further improvements for episode arrivals menu.
