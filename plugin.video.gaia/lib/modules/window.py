@@ -843,7 +843,7 @@ class Window(object):
 		try:
 			if tools.Tools.isInteger(control): result = self._instance().mWindow.setFocusId(control)
 			else: result = self._instance().mWindow.setFocus(control)
-			if sleep: tools.Time.sleep(0.01) # Otherwise the control is not yet focused when later code requires the focus somehow (eg: opening the context menu).
+			if sleep: tools.Time.sleep(0.01 if sleep is True else sleep) # Otherwise the control is not yet focused when later code requires the focus somehow (eg: opening the context menu).
 			return result
 		except: pass
 
@@ -1776,7 +1776,6 @@ class WindowRating(Window):
 	IdLabelDescription1 = 51003
 	IdLabelDescription2 = 51004
 	IdLabelDescription3 = 51005
-	IdLabelDescription4 = 51006
 
 	IdImageGlobal = 51201
 	IdImageTrakt = 51311
@@ -1850,7 +1849,6 @@ class WindowRating(Window):
 			WindowRating.IdLabelDescription1,
 			WindowRating.IdLabelDescription2,
 			WindowRating.IdLabelDescription3,
-			WindowRating.IdLabelDescription4,
 
 			WindowRating.IdGroupRater,
 
@@ -1888,7 +1886,6 @@ class WindowRating(Window):
 			{'id' : WindowRating.IdLabelDescription1, 'side' : 1, 'offset' : 220},
 			{'id' : WindowRating.IdLabelDescription2, 'side' : 1, 'offset' : 220},
 			{'id' : WindowRating.IdLabelDescription3, 'side' : 1, 'offset' : 220},
-			{'id' : WindowRating.IdLabelDescription4, 'side' : 1, 'offset' : 220},
 
 			{'id' : WindowRating.IdGroupRater, 'side' : 0, 'offset' : 186 - offset},
 			{'id' : WindowRating.IdGroupGlobal, 'side' : 0, 'offset' : 186 - offset2},
@@ -1906,6 +1903,7 @@ class WindowRating(Window):
 		for button in WindowRating.IdButtons:
 			self._onClick(button, self._rate)
 
+		rated = self.mRating and 'rating' in self.mRating and self.mRating['rating']
 		colorPrimary = interface.Format.colorPrimary()
 		colorSecondary = interface.Format.colorSecondary()
 
@@ -1916,6 +1914,8 @@ class WindowRating(Window):
 		self.propertySet('GaiaColorPrimary', colorPrimary)
 		self.propertySet('GaiaColorSecondary', colorSecondary)
 		self.propertySet('GaiaColorRating', interface.Format.colorRating())
+		self.propertySet('GaiaColorRated', interface.Format.colorSpecial())
+		self.propertySet('GaiaColorDefault', interface.Format.colorSpecial() if rated else colorPrimary)
 		self.propertySet('GaiaSeparator', interface.Format.iconSeparator(pad = True, color = True))
 		self.propertySet('GaiaIndicator', int(self.mAnimation)) # Do not use "GaiaAnimation", since the parent Window class already has that attribute.
 
@@ -1939,11 +1939,13 @@ class WindowRating(Window):
 			except: pass
 			if rating: self.propertySet('GaiaRating' + i.capitalize(), rating + ' ') # Add space, otherwise the last rating (TMDb) is sometimes cut off.
 
-		if self.mRating and 'rating' in self.mRating and self.mRating['rating']:
+		if rated:
 			default = self.mRating['rating']
 			self.propertySet('GaiaPreviousRating', int(default))
 			if 'time' in self.mRating and self.mRating['time']: self.propertySet('GaiaPreviousTime', tools.Time.format(self.mRating['time'], format = tools.Time.FormatDate))
 			self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
+		else:
+			self.propertySet('GaiaUnratedLabel', interface.Translation.string(33447))
 
 		default = int(tools.Math.roundClosest(value = default, base = 1))
 		self.propertySet('GaiaRatingDefault', default)

@@ -61,7 +61,7 @@ def getTraktToken():
 def getTraktRefresh():
 	return getTraktAccount().dataRefresh()
 
-def getTrakt(url, post = None, cache = True, check = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong, limit = None):
+def getTrakt(url, post = None, headers = None, cache = True, check = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong, limit = None):
 	try:
 		if not url.startswith('https://api.trakt.tv'):
 			url = network.Networker.linkJoin('https://api.trakt.tv', url)
@@ -78,7 +78,10 @@ def getTrakt(url, post = None, cache = True, check = True, timestamp = None, ext
 				token = getTraktToken()
 				refresh = getTraktRefresh()
 
-		headers = {'Content-Type': 'application/json', 'trakt-api-key': getTraktId(), 'trakt-api-version': '2'}
+		if headers  is None: headers = {}
+		headers['Content-Type'] = 'application/json'
+		headers['trakt-api-key'] = getTraktId()
+		headers['trakt-api-version'] = '2'
 
 		if not post is None: post = tools.Converter.jsonTo(post)
 
@@ -675,10 +678,9 @@ def title_key(title):
 	except:
 		return title
 
-
-def getTraktAsJson(url, post = None, direct = False, authentication = None, extended = False, method = None, timeout = network.Networker.TimeoutLong):
+def getTraktAsJson(url, post = None, headers = None, direct = False, authentication = None, extended = False, method = None, timeout = network.Networker.TimeoutLong):
 	try:
-		data, headers, error = getTrakt(url = url, post = post, extended = True, direct = direct, authentication = authentication, method = method, timeout = timeout)
+		data, headers, error = getTrakt(url = url, post = post, headers = headers, extended = True, direct = direct, authentication = authentication, method = method, timeout = timeout)
 		data = tools.Converter.jsonFrom(data)
 		if headers:
 			headers = dict((k.lower(), v) for k, v in headers.items())
@@ -823,14 +825,14 @@ def timeFormat(timestamp):
 # REFRESH
 ##############################################################################
 
-def refresh(media = None, wait = True):
+def refresh(media = None, wait = True, reload = False):
 	threads = []
 	if not media or tools.Media.typeMovie(media):
 		threads.append(Pool.thread(target = historyRefreshMovie, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = progressRefreshMovie, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = ratingRefreshMovie, kwargs = {'wait' : True}, start = True))
 	if not media or tools.Media.typeTelevision(media):
-		threads.append(Pool.thread(target = historyRefreshShow, kwargs = {'wait' : True}, start = True))
+		threads.append(Pool.thread(target = historyRefreshShow, kwargs = {'wait' : True, 'reload' : reload}, start = True))
 		threads.append(Pool.thread(target = progressRefreshShow, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = ratingRefreshShow, kwargs = {'wait' : True}, start = True))
 	if wait: [thread.join() for thread in threads]
@@ -883,18 +885,27 @@ def historyClearShow(wait = True):
 # HISTORY - REFRESH
 ##############################################################################
 
-def historyRefresh(media = None, wait = True):
-	def _historyRefresh(media):
+def historyRefresh(media = None, wait = True, reload = True):
+	def _historyRefresh(media, reload):
 		historyClear(media = media, wait = True)
 		historyRetrieve(media = media)
-	if wait: _historyRefresh(media = media)
-	else: Pool.thread(target = _historyRefresh, kwargs = {'media' : media}, start = True)
+
+		# When we watch an episode and afterwards load the Trakt progress menu, the previously watched show is not listed.
+		# This is probably because Gaia thinks there are no new episodes, since the last episode it knows of, has just been watched.
+		# If the progress menu is reloaded manually (navigate back and load menu again), the show is listed again.
+		# Auto reload here if the history changed, so that the user does not have to manually reload the list.
+		if reload and tools.Media.typeTelevision(media):
+			from lib.indexers.episodes import Episodes
+			Episodes().arrivalsRefresh()
+
+	if wait: _historyRefresh(media = media, reload = reload)
+	else: Pool.thread(target = _historyRefresh, kwargs = {'media' : media, 'reload' : reload}, start = True)
 
 def historyRefreshMovie(wait = True):
 	historyRefresh(media = tools.Media.TypeMovie, wait = wait)
 
-def historyRefreshShow(wait = True):
-	historyRefresh(media = tools.Media.TypeShow, wait = wait)
+def historyRefreshShow(wait = True, reload = True):
+	historyRefresh(media = tools.Media.TypeShow, wait = wait, reload = reload)
 
 ##############################################################################
 # HISTORY - RETRIEVE

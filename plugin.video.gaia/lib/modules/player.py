@@ -1641,7 +1641,12 @@ class Audio(Streamer):
 					for stream in streams:
 						if code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
 							if best is None:
-								best = stream
+								if stream['name']: # Ingore commentary audio.
+									lower = stream['name'].lower()
+									if not 'comment' in lower  and not 'director' in lower:
+										best = stream
+								else:
+									best = stream
 							else:
 								better = False
 								if stream['channels'] and best['channels']:

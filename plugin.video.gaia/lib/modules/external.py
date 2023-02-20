@@ -474,6 +474,7 @@ class Loader(object):
 	SystemArm		= 'arm'
 
 	Adapted			= '__gaia__'
+	Python			= ('.py',)
 	Library			= ('.pyd', '.so', '.dll')
 	Property		= 'GaiaExternal'
 	Modules			= {}
@@ -570,9 +571,16 @@ class Loader(object):
 		return True
 
 	@classmethod
-	def moduleLibraries(self, path):
+	def modulePython(self, path, absolute = False):
 		from lib.modules.tools import File
-		_, files = File.listDirectory(path = path, absolute = False)
+		_, files = File.listDirectory(path = path, absolute = absolute)
+		try: return [i for i in files if i.endswith(Loader.Python)]
+		except: return []
+
+	@classmethod
+	def moduleLibraries(self, path, absolute = False):
+		from lib.modules.tools import File
+		_, files = File.listDirectory(path = path, absolute = absolute)
 		try: return [i for i in files if i.endswith(Loader.Library)]
 		except: return []
 
@@ -615,7 +623,9 @@ class Loader(object):
 						libraryTo = File.joinPath(pathTo, Regex.replace(data = library, expression = '\.(?:cpython|cp)\-?(\d+[a-z]?)\-', replacement = replacement, group = 1))
 						File.move(pathFrom = libraryFrom, pathTo = libraryTo, replace = False)
 
-				if File.existsDirectory(pathTo) and self.moduleLibraries(path = pathTo): return system
+				if File.existsDirectory(pathTo) and self.moduleLibraries(path = pathTo):
+					self.moduleAdaptImport(path = pathTo)
+					return system
 		except:
 			from lib.modules.tools import Logger
 			Logger.error()
@@ -655,11 +665,35 @@ class Loader(object):
 									data = redll(data, {bytes('python%s.dll' % versionNew, 'ascii') : bytes('python%s.dll' % (versionNew[0] + '.' + versionNew[1:]), 'ascii')})
 									with open(pathLibrary, 'wb') as file: file.write(data)
 
-				if self.moduleLibraries(path = pathNew): return systemNew
+				if self.moduleLibraries(path = pathNew):
+					self.moduleAdaptImport(path = pathNew)
+					return systemNew
 		except:
 			from lib.modules.tools import Logger
 			Logger.error()
 		return None
+
+	def moduleAdaptImport(self, path):
+		'''
+			Change the psutil sys.modules['xxx'] in _common.py.
+		'''
+
+		from lib.modules.tools import File, Regex
+		separator = File.separator()
+		files = self.modulePython(path = path, absolute = True)
+		for file in files:
+			try:
+				data = File.readNow(file)
+				if data and Regex.match(data = data, expression = 'sys\.modules\[[\'"]externals.'):
+					parts = Regex.extract(data = file, expression = 'lib\%s(externals\%s.*)\%s' % (separator, separator, separator))
+					parts = parts.split(separator)
+					parts = '.'.join(parts)
+					if parts:
+						data = Regex.replace(data = data, expression = 'sys\.modules\[(.*?)]', replacement = '\'%s\'' % parts, group = 1)
+						File.writeNow(file, data)
+			except:
+				from lib.modules.tools import Logger
+				Logger.error()
 
 	def moduleDetect(self, wait = True):
 		# Execute in a separate process/execution, since the repeated imports of different psutil library architectures gives the following error:

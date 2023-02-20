@@ -39,7 +39,7 @@ if developer: tools.Logger.log('EXECUTION STARTED [Action: %s]' % str(action))
 if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search'): tools.System.launch()
 
 # For Gaia Eminence.
-menu = tools.System.menu(action = action, menu = parameters.get('menu'))
+tools.System.menuResolve(action = action, menu = parameters.get('menu'))
 
 # Otherwise importing modules in sub-threads might cause the execution to deadlock.
 # Check the modulePrepare() function for more info.
@@ -68,7 +68,7 @@ shortcuts.Shortcuts.process(parameters)
 
 if action is None or action == 'home':
 	from lib.indexers.navigator import Navigator
-	Navigator(media = media, kids = kids, menu = menu).root()
+	Navigator(media = media, kids = kids).root()
 
 	# Reset the restart flag here, since an addon restart will end up in this function.
 	tools.System.restartFinish()
@@ -87,12 +87,12 @@ elif action.startswith('movies'):
 	if action == 'movies':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).movies(lite = lite)
+		Navigator(media = media, kids = kids).movies(lite = lite)
 
 	elif action == 'moviesFavourites':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).moviesFavourites(lite = lite)
+		Navigator(media = media, kids = kids).moviesFavourites(lite = lite)
 
 	elif action == 'moviesRetrieve':
 		from lib.indexers.movies import Movies
@@ -107,7 +107,7 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesSearches':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).moviesSearches()
+		Navigator(media = media, kids = kids).moviesSearches()
 
 	elif action == 'moviesPerson':
 		from lib.indexers.movies import Movies
@@ -152,7 +152,23 @@ elif action.startswith('movies'):
 		from lib.indexers.movies import Movies
 		type = parameters.get('type')
 		category = parameters.get('category')
-		Movies(media = media, kids = kids).awards(type = type, category = category)
+		subcategory = parameters.get('subcategory')
+		generic = tools.Converter.boolean(parameters.get('generic'))
+		Movies(media = media, kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
+
+	elif action == 'moviesNetworks':
+		from lib.indexers.movies import Movies
+		Movies(media = media, kids = kids).networks()
+
+	elif action == 'moviesStreamers':
+		from lib.indexers.movies import Movies
+		service = parameters.get('service')
+		country = parameters.get('country')
+		Movies(media = media, kids = kids).networksStreamers(service = service, country = country)
+
+	elif action == 'moviesBroadcasters':
+		from lib.indexers.movies import Movies
+		Movies(media = media, kids = kids).networksBroadcasters()
 
 	elif action == 'moviesUserlists':
 		from lib.indexers.movies import Movies
@@ -162,7 +178,7 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesDrugs':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).moviesDrugs()
+		Navigator(media = media, kids = kids).moviesDrugs()
 
 	elif action == 'moviesRandom':
 		from lib.indexers.movies import Movies
@@ -170,15 +186,23 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesCategories':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).moviesCategories()
+		Navigator(media = media, kids = kids).moviesCategories()
 
 	elif action == 'moviesLists':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).moviesLists()
+		Navigator(media = media, kids = kids).moviesLists()
 
 	elif action == 'moviesPeople':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).moviesPeople()
+		Navigator(media = media, kids = kids).moviesPeople()
+
+	elif action == 'moviesFamous':
+		from lib.indexers.movies import Movies
+		Movies(media = media, kids = kids).famous()
+
+	elif action == 'moviesGenders':
+		from lib.indexers.movies import Movies
+		Movies(media = media, kids = kids).genders()
 
 ####################################################
 # SETS
@@ -188,7 +212,7 @@ elif action.startswith('sets'):
 
 	if action == 'sets':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).sets()
+		Navigator(media = media, kids = kids).sets()
 
 	elif action == 'setsRetrieve':
 		from lib.indexers.sets import Sets
@@ -215,12 +239,12 @@ elif action.startswith('shows'):
 	if action == 'shows':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).shows(lite = lite)
+		Navigator(media = media, kids = kids).shows(lite = lite)
 
 	elif action == 'showsFavourites':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).showsFavourites(lite = lite)
+		Navigator(media = media, kids = kids).showsFavourites(lite = lite)
 
 	elif action == 'showsRetrieve':
 		from lib.indexers.shows import Shows
@@ -234,7 +258,7 @@ elif action.startswith('shows'):
 
 	elif action == 'showsSearches':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).showsSearches()
+		Navigator(media = media, kids = kids).showsSearches()
 
 	elif action == 'showsGenres':
 		from lib.indexers.shows import Shows
@@ -243,6 +267,16 @@ elif action.startswith('shows'):
 	elif action == 'showsNetworks':
 		from lib.indexers.shows import Shows
 		Shows(kids = kids).networks()
+
+	elif action == 'showsStreamers':
+		from lib.indexers.shows import Shows
+		service = parameters.get('service')
+		country = parameters.get('country')
+		Shows(kids = kids).networksStreamers(service = service, country = country)
+
+	elif action == 'showsBroadcasters':
+		from lib.indexers.shows import Shows
+		Shows(kids = kids).networksBroadcasters()
 
 	elif action == 'showsCertificates':
 		from lib.indexers.shows import Shows
@@ -287,15 +321,23 @@ elif action.startswith('shows'):
 
 	elif action == 'showsCategories':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).showsCategories()
+		Navigator(media = media, kids = kids).showsCategories()
 
 	elif action == 'showsLists':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).showsLists()
+		Navigator(media = media, kids = kids).showsLists()
 
 	elif action == 'showsPeople':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).showsPeople()
+		Navigator(media = media, kids = kids).showsPeople()
+
+	elif action == 'showsFamous':
+		from lib.indexers.shows import Shows
+		Shows(media = media, kids = kids).famous()
+
+	elif action == 'showsGenders':
+		from lib.indexers.shows import Shows
+		Shows(media = media, kids = kids).genders()
 
 	elif action == 'showsYears':
 		from lib.indexers.shows import Shows
@@ -305,7 +347,9 @@ elif action.startswith('shows'):
 		from lib.indexers.shows import Shows
 		type = parameters.get('type')
 		category = parameters.get('category')
-		Shows(media = media, kids = kids).awards(type = type, category = category)
+		subcategory = parameters.get('subcategory')
+		generic = tools.Converter.boolean(parameters.get('generic'))
+		Shows(media = media, kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
 
 	elif action == 'showsLanguages':
 		from lib.indexers.shows import Shows
@@ -438,7 +482,7 @@ elif action.startswith('system'):
 
 	if action == 'systemNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).systemNavigator()
+		Navigator(media = media, kids = kids).systemNavigator()
 
 	elif action == 'systemInformation':
 		tools.System.information()
@@ -475,7 +519,7 @@ elif action.startswith('log'):
 
 	if action == 'logNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).logNavigator()
+		Navigator(media = media, kids = kids).logNavigator()
 
 	elif action == 'logScrape':
 		tools.Logger.dialogScrape()
@@ -491,7 +535,7 @@ elif action.startswith('utility'):
 
 	if action == 'utilityNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).utilityNavigator()
+		Navigator(media = media, kids = kids).utilityNavigator()
 
 ####################################################
 # NFORMATION
@@ -501,11 +545,11 @@ elif action.startswith('information'):
 
 	if action == 'informationNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).informationNavigator()
+		Navigator(media = media, kids = kids).informationNavigator()
 
 	elif action == 'informationPremium':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).informationPremium()
+		Navigator(media = media, kids = kids).informationPremium()
 
 	elif action == 'informationChangelog':
 		from lib.modules import interface
@@ -700,7 +744,7 @@ elif action.startswith('verification'):
 
 	if action == 'verificationNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).verificationNavigator()
+		Navigator(media = media, kids = kids).verificationNavigator()
 
 	elif action == 'verificationAccounts':
 		from lib.modules.account import Account
@@ -714,23 +758,23 @@ elif action.startswith('search'):
 
 	if action == 'search':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).search()
+		Navigator(media = media, kids = kids).search()
 
 	elif action == 'searchExact':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).searchExact()
+		Navigator(media = media, kids = kids).searchExact()
 
 	elif action == 'searchHistory':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).searchHistory()
+		Navigator(media = media, kids = kids).searchHistory()
 
 	elif action == 'searchHistoryMovies':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).searchHistoryMovies()
+		Navigator(media = media, kids = kids).searchHistoryMovies()
 
 	elif action == 'searchHistoryShows':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).searchHistoryShows()
+		Navigator(media = media, kids = kids).searchHistoryShows()
 
 ####################################################
 # PROVIDERS
@@ -811,7 +855,7 @@ elif action.startswith('download'):
 	elif action == 'downloads':
 		from lib.indexers.navigator import Navigator
 		downloadType = parameters.get('downloadType')
-		Navigator(media = media, kids = kids, menu = menu).downloads(downloadType)
+		Navigator(media = media, kids = kids).downloads(downloadType)
 
 	elif action == 'downloadsManager':
 		from lib.modules import downloader
@@ -824,14 +868,14 @@ elif action.startswith('download'):
 		from lib.indexers.navigator import Navigator
 		downloadType = parameters.get('downloadType')
 		downloadError = parameters.get('downloadError')
-		Navigator(media = media, kids = kids, menu = menu).downloadsBrowse(downloadType, downloadError)
+		Navigator(media = media, kids = kids).downloadsBrowse(downloadType, downloadError)
 
 	elif action == 'downloadsList':
 		downloadType = parameters.get('downloadType')
 		downloadStatus = parameters.get('downloadStatus')
 		if downloadStatus is None:
 			from lib.indexers.navigator import Navigator
-			Navigator(media = media, kids = kids, menu = menu).downloadsList(downloadType)
+			Navigator(media = media, kids = kids).downloadsList(downloadType)
 		else:
 			from lib.modules import downloader
 			downer = downloader.Downloader(downloadType)
@@ -846,7 +890,7 @@ elif action.startswith('download'):
 		downloadStatus = parameters.get('downloadStatus')
 		if downloadStatus is None:
 			from lib.indexers.navigator import Navigator
-			Navigator(media = media, kids = kids, menu = menu).downloadsClear(downloadType)
+			Navigator(media = media, kids = kids).downloadsClear(downloadType)
 		else:
 			from lib.modules import downloader
 			downer = downloader.Downloader(downloadType)
@@ -873,7 +917,7 @@ elif action.startswith('ambilight'):
 
 	if action == 'ambilightNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).ambilightNavigator()
+		Navigator(media = media, kids = kids).ambilightNavigator()
 
 ####################################################
 # LIGHTPACK
@@ -883,7 +927,7 @@ elif action.startswith('lightpack'):
 
 	if action == 'lightpackNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).lightpackNavigator()
+		Navigator(media = media, kids = kids).lightpackNavigator()
 
 	elif action == 'lightpackSwitchOn':
 		tools.Lightpack().switchOn(message = True)
@@ -907,7 +951,7 @@ elif action.startswith('kids'):
 
 	if action == 'kids':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).kids()
+		Navigator(media = media, kids = kids).kids()
 
 	elif action == 'kidsLock':
 		tools.Kids.lock()
@@ -923,7 +967,7 @@ elif action.startswith('documentaries'):
 
 	if action == 'documentaries':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = tools.Media.TypeDocumentary, kids = kids, menu = menu).movies()
+		Navigator(media = tools.Media.TypeDocumentary, kids = kids).movies()
 
 ####################################################
 # SHORTS
@@ -933,7 +977,7 @@ elif action.startswith('shorts'):
 
 	if action == 'shorts':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = tools.Media.TypeShort, kids = kids, menu = menu).movies()
+		Navigator(media = tools.Media.TypeShort, kids = kids).movies()
 
 ####################################################
 # SHORTS
@@ -943,7 +987,7 @@ elif action.startswith('channels'):
 
 	if action == 'channels':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).channels()
+		Navigator(media = media, kids = kids).channels()
 
 	elif action == 'channelsIndividuals':
 		from lib.indexers.channels import Channels
@@ -966,27 +1010,27 @@ elif action.startswith('services'):
 
 	if action == 'servicesNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesNavigator()
+		Navigator(media = media, kids = kids).servicesNavigator()
 
 	elif action == 'servicesPremiumNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesPremiumNavigator()
+		Navigator(media = media, kids = kids).servicesPremiumNavigator()
 
 	elif action == 'servicesScraperNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesScraperNavigator()
+		Navigator(media = media, kids = kids).servicesScraperNavigator()
 
 	elif action == 'servicesResolverNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesResolverNavigator()
+		Navigator(media = media, kids = kids).servicesResolverNavigator()
 
 	elif action == 'servicesDownloaderNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesDownloaderNavigator()
+		Navigator(media = media, kids = kids).servicesDownloaderNavigator()
 
 	elif action == 'servicesUtilityNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).servicesUtilityNavigator()
+		Navigator(media = media, kids = kids).servicesUtilityNavigator()
 
 ####################################################
 # PREMIUMIZE
@@ -1001,12 +1045,12 @@ elif action.startswith('premiumize'):
 
 	elif action == 'premiumizeNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).premiumizeNavigator()
+		Navigator(media = media, kids = kids).premiumizeNavigator()
 
 	elif action == 'premiumizeDownloadsNavigator':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).premiumizeDownloadsNavigator(lite = lite)
+		Navigator(media = media, kids = kids).premiumizeDownloadsNavigator(lite = lite)
 
 	elif action == 'premiumizeList':
 		from lib.debrid import premiumize
@@ -1068,13 +1112,13 @@ elif action.startswith('offcloud'):
 
 	elif action == 'offcloudNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).offcloudNavigator()
+		Navigator(media = media, kids = kids).offcloudNavigator()
 
 	elif action == 'offcloudDownloadsNavigator':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
 		category = parameters.get('category')
-		Navigator(media = media, kids = kids, menu = menu).offcloudDownloadsNavigator(lite = lite, category = category)
+		Navigator(media = media, kids = kids).offcloudDownloadsNavigator(lite = lite, category = category)
 
 	elif action == 'offcloudList':
 		from lib.debrid import offcloud
@@ -1144,12 +1188,12 @@ elif action.startswith('realdebrid'):
 
 	elif action == 'realdebridNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).realdebridNavigator()
+		Navigator(media = media, kids = kids).realdebridNavigator()
 
 	elif action == 'realdebridDownloadsNavigator':
 		from lib.indexers.navigator import Navigator
 		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids, menu = menu).realdebridDownloadsNavigator(lite = lite)
+		Navigator(media = media, kids = kids).realdebridDownloadsNavigator(lite = lite)
 
 	elif action == 'realdebridList':
 		from lib.debrid import realdebrid
@@ -1196,7 +1240,7 @@ elif action.startswith('easynews'):
 
 	elif action == 'easynewsNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).easynewsNavigator()
+		Navigator(media = media, kids = kids).easynewsNavigator()
 
 	elif action == 'easynewsAccount':
 		from lib.debrid import easynews
@@ -1221,7 +1265,7 @@ elif action.startswith('emby'):
 
 	if action == 'embyNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).embyNavigator()
+		Navigator(media = media, kids = kids).embyNavigator()
 
 	elif action == 'embySettings':
 		from lib.modules.center import Emby
@@ -1239,7 +1283,7 @@ elif action.startswith('jellyfin'):
 
 	if action == 'jellyfinNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).jellyfinNavigator()
+		Navigator(media = media, kids = kids).jellyfinNavigator()
 
 	elif action == 'jellyfinSettings':
 		from lib.modules.center import Jellyfin
@@ -1257,7 +1301,7 @@ elif action.startswith('elementum'):
 
 	if action == 'elementumNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).elementumNavigator()
+		Navigator(media = media, kids = kids).elementumNavigator()
 
 	elif action == 'elementumConnect':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1285,7 +1329,7 @@ elif action.startswith('quasar'):
 
 	if action == 'quasarNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).quasarNavigator()
+		Navigator(media = media, kids = kids).quasarNavigator()
 
 	elif action == 'quasarConnect':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1335,7 +1379,7 @@ elif action.startswith('resolveurl'):
 
 	if action == 'resolveurlNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).resolveurlNavigator()
+		Navigator(media = media, kids = kids).resolveurlNavigator()
 
 	elif action == 'resolveurlSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1358,7 +1402,7 @@ elif action.startswith('urlresolver'):
 
 	if action == 'urlresolverNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).urlresolverNavigator()
+		Navigator(media = media, kids = kids).urlresolverNavigator()
 
 	elif action == 'urlresolverSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1381,7 +1425,7 @@ elif action.startswith('opescrapers'):
 
 	if action == 'opescrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).opescrapersNavigator()
+		Navigator(media = media, kids = kids).opescrapersNavigator()
 
 	elif action == 'opescrapersSettings':
 		tools.OpeScrapers.settings()
@@ -1401,7 +1445,7 @@ elif action.startswith('fenscrapers'):
 
 	if action == 'fenscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).fenscrapersNavigator()
+		Navigator(media = media, kids = kids).fenscrapersNavigator()
 
 	elif action == 'fenscrapersSettings':
 		tools.FenScrapers.settings()
@@ -1421,7 +1465,7 @@ elif action.startswith('oatscrapers'):
 
 	if action == 'oatscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).oatscrapersNavigator()
+		Navigator(media = media, kids = kids).oatscrapersNavigator()
 
 	elif action == 'oatscrapersSettings':
 		tools.OatScrapers.settings()
@@ -1442,7 +1486,7 @@ elif action.startswith('crescrapers'):
 
 	if action == 'crescrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).crescrapersNavigator()
+		Navigator(media = media, kids = kids).crescrapersNavigator()
 
 	elif action == 'crescrapersSettings':
 		tools.CreScrapers.settings()
@@ -1462,7 +1506,7 @@ elif action.startswith('lamscrapers'):
 
 	if action == 'lamscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).lamscrapersNavigator()
+		Navigator(media = media, kids = kids).lamscrapersNavigator()
 
 	elif action == 'lamscrapersSettings':
 		tools.LamScrapers.settings()
@@ -1482,7 +1526,7 @@ elif action.startswith('civscrapers'):
 
 	if action == 'civscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).civscrapersNavigator()
+		Navigator(media = media, kids = kids).civscrapersNavigator()
 
 	elif action == 'civscrapersSettings':
 		tools.CivScrapers.settings()
@@ -1502,7 +1546,7 @@ elif action.startswith('gloscrapers'):
 
 	if action == 'gloscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).gloscrapersNavigator()
+		Navigator(media = media, kids = kids).gloscrapersNavigator()
 
 	elif action == 'gloscrapersSettings':
 		tools.GloScrapers.settings()
@@ -1522,7 +1566,7 @@ elif action.startswith('uniscrapers'):
 
 	if action == 'uniscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).uniscrapersNavigator()
+		Navigator(media = media, kids = kids).uniscrapersNavigator()
 
 	elif action == 'uniscrapersSettings':
 		tools.UniScrapers.settings()
@@ -1542,7 +1586,7 @@ elif action.startswith('nanscrapers'):
 
 	if action == 'nanscrapersNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).nanscrapersNavigator()
+		Navigator(media = media, kids = kids).nanscrapersNavigator()
 
 	elif action == 'nanscrapersSettings':
 		tools.NanScrapers.settings()
@@ -1566,7 +1610,7 @@ elif action.startswith('youtube'):
 
 	elif action == 'youtubeNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).youtubeNavigator()
+		Navigator(media = media, kids = kids).youtubeNavigator()
 
 	elif action == 'youtubeSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1594,7 +1638,7 @@ elif action.startswith('upnext'):
 
 	if action == 'upnextNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).upnextNavigator()
+		Navigator(media = media, kids = kids).upnextNavigator()
 
 	elif action == 'upnextSettings':
 		tools.UpNext.settings()
@@ -1610,7 +1654,7 @@ elif action.startswith('vpnmanager'): # Make sure this is placed BEFORE the 'vpn
 
 	if action == 'vpnmanagerNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).vpnmanagerNavigator()
+		Navigator(media = media, kids = kids).vpnmanagerNavigator()
 
 	elif action == 'vpnmanagerLaunch':
 		tools.VpnManager.launch()
@@ -1650,7 +1694,7 @@ elif action.startswith('speedtest'):
 	if action == 'speedtestNavigator':
 		from lib.indexers.navigator import Navigator
 		from lib.modules import speedtest
-		Navigator(menu = menu).speedtestNavigator()
+		Navigator().speedtestNavigator()
 
 	elif action == 'speedtest':
 		from lib.modules import speedtest
@@ -1740,15 +1784,15 @@ elif action.startswith('history'):
 
 	if action == 'history':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).history()
+		Navigator(media = media, kids = kids).history()
 
 	elif action == 'historyType':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).historyType()
+		Navigator(media = media, kids = kids).historyType()
 
 	elif action == 'historyStream':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).historyStream()
+		Navigator(media = media, kids = kids).historyStream()
 
 ####################################################
 # FANART
@@ -1769,11 +1813,11 @@ elif action.startswith('imdb'):
 
 	if action == 'imdbMovies':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).imdbMovies()
+		Navigator(media = media, kids = kids).imdbMovies()
 
 	elif action == 'imdbTv':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).imdbTv()
+		Navigator(media = media, kids = kids).imdbTv()
 
 	elif action == 'imdbExport':
 		from lib.modules import trakt as Trakt
@@ -1814,19 +1858,19 @@ elif action.startswith('trakt'):
 
 	if action == 'traktMovies':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).traktMovies()
+		Navigator(media = media, kids = kids).traktMovies()
 
 	elif action == 'traktMoviesLists':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).traktMoviesLists()
+		Navigator(media = media, kids = kids).traktMoviesLists()
 
 	elif action == 'traktTv':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).traktTv()
+		Navigator(media = media, kids = kids).traktTv()
 
 	elif action == 'traktTvLists':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).traktTvLists()
+		Navigator(media = media, kids = kids).traktTvLists()
 
 	elif action == 'traktManager':
 		from lib.modules import trakt as Trakt
@@ -1872,7 +1916,7 @@ elif action.startswith('network'):
 
 	if action == 'networkNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).networkNavigator()
+		Navigator(media = media, kids = kids).networkNavigator()
 
 	elif action == 'networkInformation':
 		from lib.modules.network import Geolocator
@@ -1892,7 +1936,7 @@ elif action.startswith('vpn'):
 
 	if action == 'vpnNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).vpnNavigator()
+		Navigator(media = media, kids = kids).vpnNavigator()
 
 	elif action == 'vpnVerify':
 		from lib.modules import vpn
@@ -1938,15 +1982,15 @@ elif action.startswith('extensions'):
 
 	elif action == 'extensionsNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).extensionsNavigator()
+		Navigator(media = media, kids = kids).extensionsNavigator()
 
 	elif action == 'extensionsAvailableNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).extensionsAvailableNavigator()
+		Navigator(media = media, kids = kids).extensionsAvailableNavigator()
 
 	elif action == 'extensionsInstalledNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).extensionsInstalledNavigator()
+		Navigator(media = media, kids = kids).extensionsInstalledNavigator()
 
 ####################################################
 # THEME
@@ -1970,7 +2014,7 @@ elif action.startswith('backup'):
 
 	if action == 'backupNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).backupNavigator()
+		Navigator(media = media, kids = kids).backupNavigator()
 
 	elif action == 'backupAutomatic':
 		tools.Backup.automatic()
@@ -1989,7 +2033,7 @@ elif action.startswith('settings'):
 
 	if action == 'settingsNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).settingsNavigator()
+		Navigator(media = media, kids = kids).settingsNavigator()
 
 	elif action == 'settingsAdvanced':
 		id = parameters.get('id')
@@ -2134,7 +2178,7 @@ elif action.startswith('shortcuts'):
 	elif action == 'shortcutsNavigator':
 		from lib.indexers.navigator import Navigator
 		location = parameters.get('location')
-		Navigator(media = media, kids = kids, menu = menu).shortcutsNavigator(location = location)
+		Navigator(media = media, kids = kids).shortcutsNavigator(location = location)
 
 	elif action == 'shortcutsOpen':
 		from lib.modules import shortcuts
@@ -2150,16 +2194,16 @@ elif action.startswith('library'):
 
 	if action == 'libraryNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).libraryNavigator()
+		Navigator(media = media, kids = kids).libraryNavigator()
 
 	elif action == 'libraryLocalNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).libraryLocalNavigator()
+		Navigator(media = media, kids = kids).libraryLocalNavigator()
 
 	elif action == 'libraryBrowseNavigator':
 		from lib.indexers.navigator import Navigator
 		error = tools.Converter.boolean(parameters.get('error'))
-		Navigator(media = media, kids = kids, menu = menu).libraryBrowseNavigator(error = error)
+		Navigator(media = media, kids = kids).libraryBrowseNavigator(error = error)
 
 	elif action == 'libraryAdd':
 		from lib.modules import library
@@ -2255,7 +2299,7 @@ elif action.startswith('orion'):
 
 	if action == 'orionNavigator':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).orionNavigator()
+		Navigator(media = media, kids = kids).orionNavigator()
 
 	elif action == 'orionInitialize':
 		try:
@@ -2637,15 +2681,15 @@ elif action.startswith('navigator'):
 
 	if action == 'navigatorTools':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).tools()
+		Navigator(media = media, kids = kids).tools()
 
 	elif action == 'navigatorFavourites':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).favourites()
+		Navigator(media = media, kids = kids).favourites()
 
 	elif action == 'navigatorArrivals':
 		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids, menu = menu).arrivals()
+		Navigator(media = media, kids = kids).arrivals()
 
 ####################################################
 # METADATA

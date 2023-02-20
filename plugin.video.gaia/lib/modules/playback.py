@@ -745,10 +745,15 @@ class Playback(Database):
 				if not episode is None and self.settingsRatingEpisode():
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeEpisode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external):
 						rate.append({'media' : Media.TypeEpisode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'refresh' : False})
+
 				if not season is None and self.settingsRatingSeason() and lastEpisode:
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeSeason, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, internal = internal, external = external):
 						rate.append({'media' : Media.TypeSeason, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'internal' : internal, 'external' : external, 'refresh' : False})
-				if self.settingsRatingShow() and lastEpisode and lastSeason:
+
+				# Rate the show after each season, not only after the last season.
+				# User can re-rate show if it rating changes after a new season.
+				#if self.settingsRatingShow() and lastEpisode and lastSeason:
+				if self.settingsRatingShow() and lastEpisode:
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external):
 						rate.append({'media' : Media.TypeShow, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
 

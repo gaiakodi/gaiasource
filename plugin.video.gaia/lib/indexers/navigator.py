@@ -24,10 +24,9 @@ from lib.modules.shortcuts import Shortcuts
 
 class Navigator(object):
 
-	def __init__(self, media = Media.TypeNone, kids = Selection.TypeUndefined, menu = None):
+	def __init__(self, media = Media.TypeNone, kids = Selection.TypeUndefined):
 		self.mMedia = media
 		self.mKids = kids
-		self.mMenu = menu if menu else []
 		self.mContext = Context.enabled()
 
 		# Give a content type, otherwise descriptions/overviews/plots are not show in the interface.
@@ -49,9 +48,10 @@ class Navigator(object):
 	def addDirectoryItem(self, name, query, icon, iconDefault = None, isAction = True, isFolder = True, iconSpecial = Icon.SpecialNone, library = None, description = None):
 		name = Translation.string(name)
 		if description: description = Translation.string(description)
+		description = System.menuDescription(name = name) + (('\n\n' + description) if description else '')
 
 		link = System.command(query = 'action=' + query) if isAction else query
-		link += '&menu=' + Converter.jsonTo(self.mMenu + [name])
+		link += '&' + System.menuParameter(name = name)
 
 		if Tools.isArray(library):
 			media = library[1]
@@ -72,21 +72,21 @@ class Navigator(object):
 
 		from lib.modules.tools import Promotions
 		promotions = Promotions.enabled()
-		if promotions: self.addDirectoryItem(name = 35442, description = 36009, query = 'promotionsNavigator', icon = 'promotion.png', iconDefault = 'DefaultAddonProgram.png')
+		if promotions: self.addDirectoryItem(name = 35442, query = 'promotionsNavigator', icon = 'promotion.png', iconDefault = 'DefaultAddonProgram.png')
 
 		if Settings.getBoolean('navigation.menu.shortcut'): self.shortcutsItems(location = Shortcuts.LocationMain)
 
-		if Settings.getBoolean('navigation.menu.movie'): self.addDirectoryItem(name = 32001, description = 36000, query = self.parameterize('movies', media = Media.TypeMovie), icon = 'movies.png', iconDefault = 'DefaultMovies.png')
-		if Settings.getBoolean('navigation.menu.show'): self.addDirectoryItem(name = 32002, description = 36001, query = self.parameterize('shows', media = Media.TypeShow), icon = 'shows.png', iconDefault = 'DefaultTVShows.png')
-		if Settings.getBoolean('navigation.menu.documentary'): self.addDirectoryItem(name = 33470, description = 36002, query = self.parameterize('documentaries', media = Media.TypeDocumentary), icon = 'documentaries.png', iconDefault = 'DefaultVideo.png')
-		if Settings.getBoolean('navigation.menu.short'): self.addDirectoryItem(name = 33471, description = 36003, query = self.parameterize('shorts', media = Media.TypeShort), icon = 'shorts.png', iconDefault = 'DefaultVideo.png')
-		if Settings.getBoolean('navigation.menu.kid'): self.addDirectoryItem(name = 33429, description = 36004, query = self.parameterize('kids', kids = Selection.TypeInclude), icon = 'kids.png', iconDefault = 'DefaultVideo.png')
+		if Settings.getBoolean('navigation.menu.movie'): self.addDirectoryItem(name = 32001, query = self.parameterize('movies', media = Media.TypeMovie), icon = 'movies.png', iconDefault = 'DefaultMovies.png')
+		if Settings.getBoolean('navigation.menu.show'): self.addDirectoryItem(name = 32002, query = self.parameterize('shows', media = Media.TypeShow), icon = 'shows.png', iconDefault = 'DefaultTVShows.png')
+		if Settings.getBoolean('navigation.menu.documentary'): self.addDirectoryItem(name = 33470, query = self.parameterize('documentaries', media = Media.TypeDocumentary), icon = 'documentaries.png', iconDefault = 'DefaultVideo.png')
+		if Settings.getBoolean('navigation.menu.short'): self.addDirectoryItem(name = 33471, query = self.parameterize('shorts', media = Media.TypeShort), icon = 'shorts.png', iconDefault = 'DefaultVideo.png')
+		if Settings.getBoolean('navigation.menu.kid'): self.addDirectoryItem(name = 33429, query = self.parameterize('kids', kids = Selection.TypeInclude), icon = 'kids.png', iconDefault = 'DefaultVideo.png')
 
-		if Settings.getBoolean('navigation.menu.favourite'): self.addDirectoryItem(name = 33000, description = 36005, query = 'navigatorFavourites', icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
-		if Settings.getBoolean('navigation.menu.arrival'): self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('navigatorArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png')
-		if Settings.getBoolean('navigation.menu.search'): self.addDirectoryItem(name = 32010, description = 36007, query = 'search', icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
+		if Settings.getBoolean('navigation.menu.favourite'): self.addDirectoryItem(name = 33000, query = 'navigatorFavourites', icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
+		if Settings.getBoolean('navigation.menu.arrival'): self.addDirectoryItem(name = 33490, query = self.parameterize('navigatorArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png')
+		if Settings.getBoolean('navigation.menu.search'): self.addDirectoryItem(name = 32010, query = 'search', icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 
-		self.addDirectoryItem(name = 32008, description = 36008, query = 'navigatorTools', icon = 'tools.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 32008, query = 'navigatorTools', icon = 'tools.png', iconDefault = 'DefaultAddonProgram.png')
 
 		# Do not cache to hide the promotions entry or parental locking.
 		self.endDirectory(cache = not promotions and not Kids.enabled())
@@ -97,14 +97,14 @@ class Navigator(object):
 			elif self.mMedia == Media.TypeShort: self.shortcutsItems(location = Shortcuts.LocationShorts)
 			else: self.shortcutsItems(location = Shortcuts.LocationMovies)
 
-		if not self.kidsOnly() and lite == False: self.addDirectoryItem(name = 33000, description = 36005, query = self.parameterize('moviesFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
+		if not self.kidsOnly() and lite == False: self.addDirectoryItem(name = 33000, query = self.parameterize('moviesFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
 
-		self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('moviesArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
-		self.addDirectoryItem(name = 33001, description = 36011, query = self.parameterize('moviesCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
-		self.addDirectoryItem(name = 33002, description = 36012, query = self.parameterize('moviesLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
-		if self.mMedia == Media.TypeMovie: self.addDirectoryItem(name = 33527, description = 33528, query = self.parameterize('sets'), icon = 'sets.png', iconDefault = 'DefaultVideoPlaylists.png')
-		self.addDirectoryItem(name = 32013, description = 36013, query = self.parameterize('moviesPeople'), icon = 'people.png', iconDefault = 'DefaultActor.png')
-		if lite is False: self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('moviesSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
+		self.addDirectoryItem(name = 33490, query = self.parameterize('moviesArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
+		self.addDirectoryItem(name = 33001, query = self.parameterize('moviesCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
+		self.addDirectoryItem(name = 33002, query = self.parameterize('moviesLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
+		if self.mMedia == Media.TypeMovie: self.addDirectoryItem(name = 33527, query = self.parameterize('sets'), icon = 'sets.png', iconDefault = 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(name = 32013, query = self.parameterize('moviesPeople'), icon = 'people.png', iconDefault = 'DefaultActor.png')
+		if lite is False: self.addDirectoryItem(name = 32010, query = self.parameterize('moviesSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
 
 	def moviesFavourites(self, lite = False):
@@ -219,30 +219,30 @@ class Navigator(object):
 
 	def favourites(self):
 		from lib.modules.library import Library
-		self.addDirectoryItem(name = 32001, description = 36005, query = self.parameterize('moviesFavourites', media = Media.TypeMovie), icon = 'moviesfavourites.png', iconDefault = 'DefaultFavourite.png')
-		self.addDirectoryItem(name = 32002, description = 36005, query = self.parameterize('showsFavourites', media = Media.TypeShow), icon = 'showsfavourites.png', iconDefault = 'DefaultFavourite.png')
-		self.addDirectoryItem(name = 33470, description = 36005, query = self.parameterize('moviesFavourites', media = Media.TypeDocumentary), icon = 'documentariesfavourites.png', iconDefault = 'DefaultFavourite.png')
-		self.addDirectoryItem(name = 33471, description = 36005, query = self.parameterize('moviesFavourites', media = Media.TypeShort), icon = 'shortsfavourites.png', iconDefault = 'DefaultFavourite.png')
-		self.addDirectoryItem(name = 32036, description = 36016, query = self.parameterize('history', media = None), icon = 'historyfavourites.png', iconDefault = 'DefaultFavourite.png')
-		if Library.enabled(): self.addDirectoryItem(name = 35170, description = 36017, query = self.parameterize('libraryLocalNavigator', media = None), icon = 'libraryfavourites.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 32001, query = self.parameterize('moviesFavourites', media = Media.TypeMovie), icon = 'moviesfavourites.png', iconDefault = 'DefaultFavourite.png')
+		self.addDirectoryItem(name = 32002, query = self.parameterize('showsFavourites', media = Media.TypeShow), icon = 'showsfavourites.png', iconDefault = 'DefaultFavourite.png')
+		self.addDirectoryItem(name = 33470, query = self.parameterize('moviesFavourites', media = Media.TypeDocumentary), icon = 'documentariesfavourites.png', iconDefault = 'DefaultFavourite.png')
+		self.addDirectoryItem(name = 33471, query = self.parameterize('moviesFavourites', media = Media.TypeShort), icon = 'shortsfavourites.png', iconDefault = 'DefaultFavourite.png')
+		self.addDirectoryItem(name = 32036, query = self.parameterize('history', media = None), icon = 'historyfavourites.png', iconDefault = 'DefaultFavourite.png')
+		if Library.enabled(): self.addDirectoryItem(name = 35170, query = self.parameterize('libraryLocalNavigator', media = None), icon = 'libraryfavourites.png', iconDefault = 'DefaultAddonProgram.png')
 		self.endDirectory()
 
 	def arrivals(self):
-		self.addDirectoryItem(name = 32001, description = 36006, query = self.parameterize('moviesArrivals', media = Media.TypeMovie), icon = 'moviesnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeMovie))
-		self.addDirectoryItem(name = 32002, description = 36006, query = self.parameterize('showsArrivals', media = Media.TypeShow), icon = 'showsnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeShow))
-		self.addDirectoryItem(name = 33470, description = 36006, query = self.parameterize('moviesArrivals', media = Media.TypeDocumentary), icon = 'documentariesnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeDocumentary))
-		self.addDirectoryItem(name = 33471, description = 36006, query = self.parameterize('moviesArrivals', media = Media.TypeShort), icon = 'shortsnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeShort))
+		self.addDirectoryItem(name = 32001, dquery = self.parameterize('moviesArrivals', media = Media.TypeMovie), icon = 'moviesnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeMovie))
+		self.addDirectoryItem(name = 32002, query = self.parameterize('showsArrivals', media = Media.TypeShow), icon = 'showsnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeShow))
+		self.addDirectoryItem(name = 33470, query = self.parameterize('moviesArrivals', media = Media.TypeDocumentary), icon = 'documentariesnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeDocumentary))
+		self.addDirectoryItem(name = 33471, query = self.parameterize('moviesArrivals', media = Media.TypeShort), icon = 'shortsnew.png', iconDefault = 'DefaultAddSource.png', library = ('arrivals', Media.TypeShort))
 		self.endDirectory()
 
 	def search(self):
-		self.addDirectoryItem(name = 32001, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeMovie), icon = 'searchmovies.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 33527, description = 36018, query = self.parameterize('setsSearch', media = Media.TypeSet), icon = 'searchsets.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 32002, description = 36018, query = self.parameterize('showsSearch', media = Media.TypeShow), icon = 'searchshows.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 33470, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeDocumentary), icon = 'searchdocumentaries.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 33471, description = 36018, query = self.parameterize('moviesSearch', media = Media.TypeShort), icon = 'searchshorts.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 32013, description = 36019, query = self.parameterize('moviesPerson'), icon = 'searchpeople.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 32036, description = 36020, query = self.parameterize('searchHistory'), icon = 'searchhistory.png', iconDefault = 'DefaultAddonsSearch.png')
-		self.addDirectoryItem(name = 35157, description = 36021, query = self.parameterize('searchExact'), icon = 'searchexact.png', iconDefault = 'DefaultAddonsSearch.png')
+		self.addDirectoryItem(name = 32001, query = self.parameterize('moviesSearch', media = Media.TypeMovie), icon = 'searchmovies.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 33527, query = self.parameterize('setsSearch', media = Media.TypeSet), icon = 'searchsets.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 32002, query = self.parameterize('showsSearch', media = Media.TypeShow), icon = 'searchshows.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 33470, query = self.parameterize('moviesSearch', media = Media.TypeDocumentary), icon = 'searchdocumentaries.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 33471, query = self.parameterize('moviesSearch', media = Media.TypeShort), icon = 'searchshorts.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 32013, query = self.parameterize('moviesPerson'), icon = 'searchpeople.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 32036, query = self.parameterize('searchHistory'), icon = 'searchhistory.png', iconDefault = 'DefaultAddonsSearch.png')
+		self.addDirectoryItem(name = 35157, query = self.parameterize('searchExact'), icon = 'searchexact.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
 
 	def searchExact(self):
@@ -316,17 +316,17 @@ class Navigator(object):
 	def tools(self):
 		from lib.modules.api import Api
 		if Settings.getBoolean('navigation.menu.shortcut'): self.shortcutsItems(location = Shortcuts.LocationTools)
-		if Api.lotteryValid(): self.addDirectoryItem(name = 33876, description = 36035, query = 'lotteryVoucher', icon = 'tickets.png', iconDefault = 'DefaultAddonProgram.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 33011, description = 36022, query = 'settingsNavigator', icon = 'settings.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 33502, description = 36023, query = 'servicesNavigator', icon = 'services.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 33719, description = 36024, query = 'networkNavigator', icon = 'network.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 32009, description = 36025, query = 'downloads', icon = 'downloads.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 35170, description = 36026, query = 'libraryNavigator', icon = 'library.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 33017, description = 36029, query = 'verificationNavigator', icon = 'verification.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 33720, description = 36030, query = 'extensionsNavigator', icon = 'extensions.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = 33989, description = 36032, query = 'clean', icon = 'clean.png', iconDefault = 'DefaultAddonProgram.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(name = 35330, description = 36033, query = 'utilityNavigator', icon = 'utility.png', iconDefault = 'DefaultAddonProgram.png')
-		self.addDirectoryItem(name = Format.color(33505, 'FFB700'), description = 36034, query = 'donations', icon = 'donations.png', iconDefault = 'DefaultAddonProgram.png', iconSpecial = Icon.SpecialDonations, isAction = True, isFolder = False)
+		if Api.lotteryValid(): self.addDirectoryItem(name = 33876, query = 'lotteryVoucher', icon = 'tickets.png', iconDefault = 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 33011, query = 'settingsNavigator', icon = 'settings.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 33502, query = 'servicesNavigator', icon = 'services.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 33719, query = 'networkNavigator', icon = 'network.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 32009, query = 'downloads', icon = 'downloads.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 35170, query = 'libraryNavigator', icon = 'library.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 33017, query = 'verificationNavigator', icon = 'verification.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 33720, query = 'extensionsNavigator', icon = 'extensions.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = 33989, query = 'clean', icon = 'clean.png', iconDefault = 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+		self.addDirectoryItem(name = 35330, query = 'utilityNavigator', icon = 'utility.png', iconDefault = 'DefaultAddonProgram.png')
+		self.addDirectoryItem(name = Format.color(33505, 'FFB700'), query = 'donations', icon = 'donations.png', iconDefault = 'DefaultAddonProgram.png', iconSpecial = Icon.SpecialDonations, isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def settingsNavigator(self):
@@ -457,13 +457,11 @@ class Navigator(object):
 		self.addDirectoryItem(32011, self.parameterize('moviesGenres'), 'genres.png', 'DefaultGenre.png')
 		self.addDirectoryItem(35526, self.parameterize('moviesYears'), 'calendar.png', 'DefaultYear.png')
 		self.addDirectoryItem(33302, self.parameterize('moviesAwards'), 'awards.png', 'DefaultFile.png')
-		if self.mMedia == Media.TypeMovie and not self.kidsOnly(): self.addDirectoryItem(32016, self.parameterize('channels'), 'networks.png', 'DefaultNetwork.png')
+		self.addDirectoryItem(32016, self.parameterize('moviesNetworks'), 'networks.png', 'DefaultNetwork.png')
 		self.addDirectoryItem(32014, self.parameterize('moviesLanguages'), 'languages.png', 'DefaultCountry.png')
-		self.addDirectoryItem(32013, self.parameterize('moviesPersons'), 'people.png', 'DefaultActor.png')
 		self.addDirectoryItem(32015, self.parameterize('moviesCertificates'), 'certificates.png', 'DefaultFile.png')
 		self.addDirectoryItem(33437, self.parameterize('moviesAge'), 'age.png', 'DefaultYear.png')
-		if self.mMedia == Media.TypeMovie and not self.kidsOnly():
-			self.addDirectoryItem(35368, self.parameterize('moviesDrugs'), 'drugs.png', 'DefaultVideoPlaylists.png')
+		if self.mMedia == Media.TypeMovie and not self.kidsOnly(): self.addDirectoryItem(35368, self.parameterize('moviesDrugs'), 'drugs.png', 'DefaultVideoPlaylists.png')
 		self.endDirectory()
 
 	def moviesLists(self):
@@ -489,6 +487,9 @@ class Navigator(object):
 
 	def moviesPeople(self):
 		self.addDirectoryItem(33003, self.parameterize('moviesPersons'), 'browse.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(35315, self.parameterize('moviesFamous'), 'famous.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(33302, self.parameterize('moviesAwards&type=academyawards&category=people&generic=true'), 'awards.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(35306, self.parameterize('moviesGenders'), 'gender.png', 'DefaultAddonContextItem.png')
 		self.addDirectoryItem(32010, self.parameterize('moviesPerson'), 'search.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
@@ -511,12 +512,12 @@ class Navigator(object):
 
 	def shows(self, lite = False):
 		if Settings.getBoolean('navigation.menu.shortcut'): self.shortcutsItems(location = Shortcuts.LocationShows)
-		if not self.kidsOnly() and lite == False: self.addDirectoryItem(name = 33000, description = 36005, query = self.parameterize('showsFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
-		self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('showsArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
-		self.addDirectoryItem(name = 33001, description = 36011, query = self.parameterize('showsCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
-		self.addDirectoryItem(name = 33002, description = 36012, query = self.parameterize('showsLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
-		self.addDirectoryItem(name = 32013, description = 36013, query = self.parameterize('showsPeople'), icon = 'people.png', iconDefault = 'DefaultTags.png')
-		if lite == False: self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('showsSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
+		if not self.kidsOnly() and lite == False: self.addDirectoryItem(name = 33000, query = self.parameterize('showsFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
+		self.addDirectoryItem(name = 33490, query = self.parameterize('showsArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
+		self.addDirectoryItem(name = 33001, query = self.parameterize('showsCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
+		self.addDirectoryItem(name = 33002, query = self.parameterize('showsLists'), icon = 'lists.png', iconDefault = 'DefaultVideoPlaylists.png')
+		self.addDirectoryItem(name = 32013, query = self.parameterize('showsPeople'), icon = 'people.png', iconDefault = 'DefaultTags.png')
+		if lite == False: self.addDirectoryItem(name = 32010, query = self.parameterize('showsSearches'), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
 
 	def showsFavourites(self, lite = False):
@@ -536,7 +537,6 @@ class Navigator(object):
 		self.addDirectoryItem(33302, self.parameterize('showsAwards'), 'awards.png', 'DefaultFile.png')
 		self.addDirectoryItem(32016, self.parameterize('showsNetworks'), 'networks.png', 'DefaultNetwork.png')
 		self.addDirectoryItem(32014, self.parameterize('showsLanguages'), 'languages.png', 'DefaultCountry.png')
-		self.addDirectoryItem(32013, self.parameterize('showsPersons'), 'people.png', 'DefaultActor.png')
 		self.addDirectoryItem(32015, self.parameterize('showsCertificates'), 'certificates.png', 'DefaultFile.png')
 		self.addDirectoryItem(33437, self.parameterize('showsAge'), 'age.png', 'DefaultYear.png')
 		self.endDirectory()
@@ -556,6 +556,9 @@ class Navigator(object):
 
 	def showsPeople(self):
 		self.addDirectoryItem(33003, self.parameterize('showsPersons'), 'browse.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(35315, self.parameterize('showsFamous'), 'famous.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(33302, self.parameterize('showsAwards&type=academyawards&category=people&generic=true'), 'awards.png', 'DefaultAddonContextItem.png')
+		self.addDirectoryItem(35306, self.parameterize('showsGenders'), 'gender.png', 'DefaultAddonContextItem.png')
 		self.addDirectoryItem(32010, self.parameterize('showsPerson'), 'search.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
@@ -568,8 +571,8 @@ class Navigator(object):
 		self.endDirectory()
 
 	def channels(self):
-		self.addDirectoryItem(33050, self.parameterize('channelsBroadcasters'), 'networks.png', 'DefaultNetwork.png')
-		self.addDirectoryItem(32007, self.parameterize('channelsIndividuals'), 'networks.png', 'DefaultNetwork.png')
+		self.addDirectoryItem(33050, self.parameterize('channelsBroadcasters'), 'aired.png', 'DefaultNetwork.png')
+		self.addDirectoryItem(32007, self.parameterize('channelsIndividuals'), 'aired.png', 'DefaultNetwork.png')
 		self.endDirectory()
 
 	def verificationNavigator(self):
@@ -1015,16 +1018,16 @@ class Navigator(object):
 	def kids(self):
 		kids = Selection.TypeInclude
 
-		if Settings.getBoolean('navigation.menu.movie'): self.addDirectoryItem(name = 32001, description = 36000, query = self.parameterize('movies', media = Media.TypeMovie, kids = kids), icon = 'movies.png', iconDefault = 'DefaultMovies.png')
-		if Settings.getBoolean('navigation.menu.show'): self.addDirectoryItem(name = 32002, description = 36001, query = self.parameterize('shows', media = Media.TypeShow, kids = kids), icon = 'shows.png', iconDefault = 'DefaultTVShows.png')
-		if Settings.getBoolean('navigation.menu.documentary'): self.addDirectoryItem(name = 33470, description = 36002, query = self.parameterize('documentaries', media = Media.TypeDocumentary, kids = kids), icon = 'documentaries.png', iconDefault = 'DefaultVideo.png')
-		if Settings.getBoolean('navigation.menu.short'): self.addDirectoryItem(name = 33471, description = 36003, query = self.parameterize('shorts', media = Media.TypeShort, kids = kids), icon = 'shorts.png', iconDefault = 'DefaultVideo.png')
+		if Settings.getBoolean('navigation.menu.movie'): self.addDirectoryItem(name = 32001, query = self.parameterize('movies', media = Media.TypeMovie, kids = kids), icon = 'movies.png', iconDefault = 'DefaultMovies.png')
+		if Settings.getBoolean('navigation.menu.show'): self.addDirectoryItem(name = 32002, query = self.parameterize('shows', media = Media.TypeShow, kids = kids), icon = 'shows.png', iconDefault = 'DefaultTVShows.png')
+		if Settings.getBoolean('navigation.menu.documentary'): self.addDirectoryItem(name = 33470, query = self.parameterize('documentaries', media = Media.TypeDocumentary, kids = kids), icon = 'documentaries.png', iconDefault = 'DefaultVideo.png')
+		if Settings.getBoolean('navigation.menu.short'): self.addDirectoryItem(name = 33471, query = self.parameterize('shorts', media = Media.TypeShort, kids = kids), icon = 'shorts.png', iconDefault = 'DefaultVideo.png')
 
-		if Settings.getBoolean('navigation.menu.arrival'): self.addDirectoryItem(name = 33490, description = 36006, query = self.parameterize('navigatorArrivals', kids = kids), icon = 'new.png', iconDefault = 'DefaultAddSource.png')
-		if Settings.getBoolean('navigation.menu.search'): self.addDirectoryItem(name = 32010, description = 36007, query = self.parameterize('search', kids = kids), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
+		if Settings.getBoolean('navigation.menu.arrival'): self.addDirectoryItem(name = 33490, query = self.parameterize('navigatorArrivals', kids = kids), icon = 'new.png', iconDefault = 'DefaultAddSource.png')
+		if Settings.getBoolean('navigation.menu.search'): self.addDirectoryItem(name = 32010, query = self.parameterize('search', kids = kids), icon = 'search.png', iconDefault = 'DefaultAddonsSearch.png')
 
-		if Kids.lockable(): self.addDirectoryItem(name = 33442, description = 36014, query = 'kidsLock', icon = 'lock.png', iconDefault = 'DefaultAddonService.png')
-		elif Kids.unlockable(): self.addDirectoryItem(name = 33443, description = 36015, query = 'kidsUnlock', icon = 'unlock.png', iconDefault = 'DefaultAddonService.png')
+		if Kids.lockable(): self.addDirectoryItem(name = 33442, query = 'kidsLock', icon = 'lock.png', iconDefault = 'DefaultAddonService.png')
+		elif Kids.unlockable(): self.addDirectoryItem(name = 33443, query = 'kidsUnlock', icon = 'unlock.png', iconDefault = 'DefaultAddonService.png')
 
 		self.endDirectory()
 
@@ -1039,7 +1042,7 @@ class Navigator(object):
 		if Shortcuts.enabled():
 			values = Shortcuts().retrieve(location = location)
 			if len(values) == 1: self.shortcutsItem(location, values[0][0], values[0][1], values[0][2])
-			elif len(values) > 1: self.addDirectoryItem(name = 35119, description = 36010, query = self.parameterize('shortcutsNavigator&location=%s' % location), icon = 'shortcuts.png', iconDefault = 'DefaultAddonProgram.png')
+			elif len(values) > 1: self.addDirectoryItem(name = 35119, query = self.parameterize('shortcutsNavigator&location=%s' % location), icon = 'shortcuts.png', iconDefault = 'DefaultAddonProgram.png')
 
 	def shortcutsItem(self, location, id, link, name):
 		link = Shortcuts.parameterize(link, location, id)
@@ -1051,4 +1054,4 @@ class Navigator(object):
 		# Kodi 18 has problems with calling Container.Update/RunPlugin from another plugin call.
 		# Instead, show the content directly here without going through shortcutsOpen first.
 		# Shortcuts.process(params) was added to gaia.py top handle the count update with the new way.
-		self.mDirectory.add(label = name, description = 36010, link = link, context = context, icon = 'shortcuts.png', iconDefault = 'DefaultAddonProgram.png', fanart = True, folder = not Shortcuts.direct(link), lock = False)
+		self.mDirectory.add(label = name, link = link, context = context, icon = 'shortcuts.png', iconDefault = 'DefaultAddonProgram.png', fanart = True, folder = not Shortcuts.direct(link), lock = False)

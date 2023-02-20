@@ -88,10 +88,40 @@ class MetaImdb(object):
 		return None
 
 	@classmethod
-	def image(self, link):
+	def image(self, link, size = 780, crop = False):
+		expression = '((?:_SX|_SY|_UX|_UY|_CR|_AL|_V)(?:\d+|_).+?\.)'
+
+		# Keep the cropped coordinates for people images, otherwise there might be differently sized images in the menu.
+		# Eg: https://m.media-amazon.com/images/M/MV5BMzIzMTE4NzcyMl5BMl5BanBnXkFtZTgwODA2NTQyNTM@._V1_UY209_CR87,0,140,209_AL_.jpg
+		# Eg: https://m.media-amazon.com/images/M/MV5BYjQ5MDkyMGEtYmI0OS00MmM2LWE0MmEtZmQ2NjA5MzYyYTFjXkEyXkFqcGdeQXVyNjIwMTQzOTU@._V1_UY209_CR37,0,140,209_AL_.jpg
+		if crop:
+			try:
+				pixel = Regex.extract(data = link, expression = '_CR([\d\,]+)')
+				if pixel:
+					pixel = [int(i) for i in pixel.split(',')]
+					if pixel:
+						ratio = size / float(pixel[3])
+						pixel = [int(i * ratio) for i in pixel]
+
+						# Either scale vertically or horizontally.
+						# Use the same scaling as in the original link (some links contain _UX, some _UY).
+						# Otherwise some images might have top-bottom or left-right white bars.
+						width = pixel[2]
+						height = pixel[3]
+						if Regex.extract(data = link, expression = '((?:_UX)(?:\d+|_).+?\.)'):
+							scaler = '_UX'
+							size = width
+						else:
+							scaler = '_UY'
+							size = height
+
+						pixel = [str(i) for i in pixel]
+						return Regex.replace(data = link, expression = expression, replacement = '%s%d_CR%s.' % (scaler, size, ','.join(pixel)), group = 1)
+			except: Logger.error()
+
 		# Eg: https://m.media-amazon.com/images/M/MV5BNjA3NGExZDktNDlhZC00NjYyLTgwNmUtZWUzMDYwMTZjZWUyXkEyXkFqcGdeQXVyMTU1MDM3NDk0._V1_.jpg
 		# Eg: https://m.media-amazon.com/images/M/MV5BMzA4Njc3ODYtMTYwOS00Y2NiLWFkNmEtOThhZmU0MGQxM2Y5XkEyXkFqcGdeQXVyMTYzMDM0NTU@._V1_QL75_UX190_CR0,0,190,281_.jpg
-		return Regex.replace(data = link, expression = '((?:_SX|_SY|_UX|_UY|_CR|_AL|_V)(?:\d+|_).+?\.)', replacement = '_SX500.', group = 1)
+		return Regex.replace(data = link, expression = expression, replacement = '_SX%d.' % size, group = 1)
 
 	##############################################################################
 	# LOGGING

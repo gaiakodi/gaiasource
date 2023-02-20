@@ -48,6 +48,7 @@ class Shows(object):
 		self.mDeveloper = System.developerVersion()
 		self.mDetail = self.mMetatools.settingsDetail()
 		self.mLimit = self.mMetatools.settingsPageShow()
+		self.mLimitSearch = self.mMetatools.settingsPageSearch()
 
 		self.mMedia = media
 		self.mKids = kids
@@ -73,6 +74,10 @@ class Shows(object):
 		else:
 			self.mCertificates = ''
 
+		self.mCategoryShow = 'tv_series,tv_miniseries'
+		self.mCategoryEpisode = 'tv_episode'
+		self.mCategoryAll = self.mCategoryShow + ',' + self.mCategoryEpisode
+
 		self.mYear = Time.year()
 		self.mLanguage = self.mMetatools.settingsLanguage()
 
@@ -86,29 +91,58 @@ class Shows(object):
 		self.tvmaze_link = 'https://www.tvmaze.com'
 		self.tvmaze_info_link = 'https://api.tvmaze.com/shows/%s'
 
-		self.search_link = 'https://api.trakt.tv/search?type=show&limit=%d&query=' % self.mMetatools.settingsPageSearch()
+		self.search_link = 'https://api.trakt.tv/search?type=show&limit=%d&query=' % self.mLimitSearch
 
-		self.persons_link = 'https://www.imdb.com/search/name?count=100&name='
-		self.personlist_link = 'https://www.imdb.com/search/name?count=100&gender=male,female'
-		self.featured_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[60]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.popular_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&num_votes=100,&release_date=,date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.airing_link = 'https://www.imdb.com/search/title?title_type=tvEpisode&release_date=date[1],date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.active_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=10,&production_status=active&sort=moviemeter,asc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.premiere_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&num_votes=10,&release_date=date[60],date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
+		self.people_link = 'https://www.imdb.com/search/name'
+		self.persons_link = 'https://www.imdb.com/search/name?count=%d&start=1&name=%s' % (self.mLimitSearch, '%s')
+		self.personlist_link = 'https://www.imdb.com/search/name?gender=male,female,non-binary,other&count=%d&start=1' % (self.mLimit)
+		self.featured_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[60]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		self.popular_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&release_date=,date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		self.airing_link = 'https://www.imdb.com/search/title?title_type=%s&release_date=date[1],date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryEpisode, self.mLimit, self.mCertificates)
+		self.active_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=10,&production_status=active&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		self.premiere_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=10,&release_date=date[60],date[0]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
 
-		if self.mKidsOnly: self.rating_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=10000,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		else: self.rating_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=50000,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
+		if self.mKidsOnly: self.rating_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=10000,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		else: self.rating_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=50000,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
 
-		self.views_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=100,&release_date=,date[0]&sort=num_votes,desc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.person_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&release_date=,date[0]&role=%s&sort=year,desc&count=%d&start=1%s' % ('%s', self.mLimit, '%s')
-		self.genre_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&release_date=,date[0]&genres=%s&sort=moviemeter,asc&count=%d&start=1%s' % ('%s', self.mLimit, '%s')
-		self.certification_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&release_date=,date[0]&certificates=%s&sort=moviemeter,asc&count=%d&start=1' % ('%s', self.mLimit) # Does not use certificates, since it has it's own.
+		self.views_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=100,&release_date=,date[0]&sort=num_votes,desc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		self.person_link = 'https://www.imdb.com/search/title?title_type=%s&release_date=,date[0]&role=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategoryShow, '%s', self.mLimit, '%s')
+		self.genre_link = 'https://www.imdb.com/search/title?title_type=%s&release_date=,date[0]&genres=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, '%s', self.mLimit, '%s')
+		self.certification_link = 'https://www.imdb.com/search/title?title_type=%s&release_date=,date[0]&certificates=%s&sort=moviemeter,asc&count=%d&start=1' % (self.mCategoryShow, '%s', self.mLimit) # Does not use certificates, since it has it's own.
 		self.trending_link = 'https://api.trakt.tv/shows/trending?limit=%d' % self.mLimit
 
-		self.year_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&num_votes=100,&production_status=released&year=%s,%s&sort=moviemeter,asc&count=%d&start=1%s' % ('%s', '%s', self.mLimit, '%s')
-		self.language_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&num_votes=100,&production_status=released&languages=%s&sort=moviemeter,asc&count=%d&start=1%s' % ('%s', self.mLimit, '%s')
-		self.emmies_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&production_status=released&groups=emmy_winners&sort=year,desc&count=%d&start=1%s' % (self.mLimit, self.mCertificates)
-		self.award_link = 'https://www.imdb.com/search/title?title_type=tvSeries,tvMiniSeries&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % ('%s', self.mLimit, self.mCertificates)
+		self.year_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&year=%s,%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, '%s', '%s', self.mLimit, '%s')
+		self.language_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=100,&production_status=released&languages=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategoryShow, '%s', self.mLimit, '%s')
+		self.emmies_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=emmy_winners&sort=year,desc&count=%d&start=1%s' % (self.mCategoryShow, self.mLimit, self.mCertificates)
+		self.award_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategoryShow, '%s', self.mLimit, self.mCertificates)
+
+		self.famouscreator_link = 'https://www.imdb.com/list/ls062274560/'
+		self.famousdirector_link = 'https://www.imdb.com/list/ls059167873/'
+		self.famouscinematographer_link = 'imdb.com/list/ls075157401/'
+		self.famouswriter_link = 'https://www.imdb.com/list/ls059167873/'
+		self.famousproducer_link = 'https://www.imdb.com/list/ls098127847/'
+		self.famouscomposer_link = 'https://www.imdb.com/list/ls068448237/'
+		self.famousactor_link = 'https://www.imdb.com/list/ls046978814/'
+		self.famousactress_link = 'https://www.imdb.com/list/ls082848195/'
+
+		# https://mdblist.com/lists/plexmetamanager/
+		self.networknetflix_link = 'https://api.trakt.tv/users/plexmetamanager/lists/netflix-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkamazon_link = 'https://api.trakt.tv/users/plexmetamanager/lists/amazon-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkappletv_link = 'https://api.trakt.tv/users/plexmetamanager/lists/appletv-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkhbo_link = 'https://api.trakt.tv/users/plexmetamanager/lists/hbomax-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkdisney_link = 'https://api.trakt.tv/users/plexmetamanager/lists/disney-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkparamount_link = 'https://api.trakt.tv/users/plexmetamanager/lists/paramount-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkpeacock_link = 'https://api.trakt.tv/users/plexmetamanager/lists/peacock-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkhulu_link = 'https://api.trakt.tv/users/plexmetamanager/lists/hulu-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkshowtime_link = 'https://api.trakt.tv/users/plexmetamanager/lists/showtime-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkbritbox_link = 'https://api.trakt.tv/users/plexmetamanager/lists/britbox-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networknow_link = 'https://api.trakt.tv/users/plexmetamanager/lists/now-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkbet_link = 'https://api.trakt.tv/users/plexmetamanager/lists/bet-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkcrunchyroll_link = 'https://api.trakt.tv/users/plexmetamanager/lists/crunchyroll-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkall4_link = 'https://api.trakt.tv/users/plexmetamanager/lists/all4-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkyoutube_link = 'https://api.trakt.tv/users/plexmetamanager/lists/youtube-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkdiscovery_link = 'https://api.trakt.tv/users/plexmetamanager/lists/discovery-shows/items/show?limit=%d&page=1' % self.mLimit
+		self.networkhayu_link = 'https://api.trakt.tv/users/plexmetamanager/lists/hayu-shows/items/show?limit=%d&page=1' % self.mLimit
 
 		self.random1_link = 'https://www.imdb.com/list/ls067413463/'
 		self.random2_link = 'https://www.imdb.com/list/ls080165495/'
@@ -121,8 +155,8 @@ class Shows(object):
 		self.traktwatchlist_link = 'https://api.trakt.tv/users/me/watchlist?limit=%d&page=1' % self.mLimit
 		self.traktrecommendations_link = 'https://api.trakt.tv/recommendations/shows' # No paging support. Only a limit of up to 100 items.
 
-		self.imdblistname_link = 'https://www.imdb.com/list/%s/?view=detail&sort=alpha,asc&title_type=tvSeries,tvEpisode,tvMiniSeries&start=1'
-		self.imdblistdate_link = 'https://www.imdb.com/list/%s/?view=detail&sort=date_added,desc&title_type=tvSeries,tvEpisode,tvMiniSeries&start=1'
+		self.imdblistname_link = 'https://www.imdb.com/list/%s/?view=detail&sort=alpha,asc&title_type=%s&start=1' % ('%s', self.mCategoryAll)
+		self.imdblistdate_link = 'https://www.imdb.com/list/%s/?view=detail&sort=date_added,desc&title_type=%s&start=1' % ('%s', self.mCategoryAll)
 		self.imdblists_link = 'https://www.imdb.com/user/%s/lists?sort=mdfd&order=desc' % self.mAccountImdb
 		self.imdbcollection_link = 'https://www.imdb.com/user/%s/watchlist?sort=alpha,asc' % self.mAccountImdb
 		self.imdbwatchlist_link = 'https://www.imdb.com/user/%s/watchlist?sort=date_added,desc' % self.mAccountImdb
@@ -134,6 +168,7 @@ class Shows(object):
 
 	def retrieve(self, link, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
 		try:
+			type = link
 			items = []
 
 			try: link = getattr(self, link + '_link')
@@ -143,7 +178,12 @@ class Shows(object):
 
 			if domain == 'trakt':
 
-				if '/users/' in link:
+				if type.startswith('network'):
+					items = self.cache('cacheRefreshMedium', refresh, self.traktList, link = link)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+					items = self.sort(items = items)
+
+				elif '/users/' in link:
 					if self.traktcollection_link in link:
 
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
@@ -169,7 +209,7 @@ class Shows(object):
 
 				elif self.search_link in link:
 					self.mModeSearch = True
-					items = self.cache('cacheShort', refresh, self.traktList,  link = link, user = self.mAccountTrakt)
+					items = self.cache('cacheShort', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 
 					# In case Trakt is down.
 					if not items:
@@ -214,7 +254,7 @@ class Shows(object):
 
 		except: Logger.error()
 
-		kids = not self.persons_link in link and not self.personlist_link in link
+		kids = not self.people_link in link
 		search = self.search_link in link
 		return self.process(items = items, menu = menu, kids = kids, search = search, refresh = refresh)
 
@@ -412,7 +452,39 @@ class Shows(object):
 	# NETWORK
 	##############################################################################
 
-	def networks(self):
+	def networks(self, menu = True):
+		items = [
+			{'name' : Translation.string(35429), 'image' : 'stream.png', 'action' : 'showsStreamers', 'parameters' : {'kids' : self.mKids}},
+			{'name' : Translation.string(35430), 'image' : 'aired.png', 'action' : 'showsBroadcasters', 'parameters' : {'kids' : self.mKids}},
+		]
+		if menu: self.directory(items)
+		return items
+
+	def networksStreamers(self, service = None, country = None, menu = True):
+		items = [
+			{'name' : Translation.string(36000), 'image' : 'netflix.png', 'action' : 'showsRetrieve', 'link' : 'networknetflix'},
+			{'name' : Translation.string(36001), 'image' : 'amazon.png', 'action' : 'showsRetrieve', 'link' : 'networkamazon'},
+			{'name' : Translation.string(36002), 'image' : 'appletv.png', 'action' : 'showsRetrieve', 'link' : 'networkappletv'},
+			{'name' : Translation.string(36003), 'image' : 'hbo.png', 'action' : 'showsRetrieve', 'link' : 'networkhbo'},
+			{'name' : Translation.string(36004), 'image' : 'disney.png', 'action' : 'showsRetrieve', 'link' : 'networkdisney'},
+			{'name' : Translation.string(36005), 'image' : 'paramount.png', 'action' : 'showsRetrieve', 'link' : 'networkparamount'},
+			{'name' : Translation.string(36006), 'image' : 'peacock.png', 'action' : 'showsRetrieve', 'link' : 'networkpeacock'},
+			{'name' : Translation.string(36007), 'image' : 'hulu.png', 'action' : 'showsRetrieve', 'link' : 'networkhulu'},
+			{'name' : Translation.string(36008), 'image' : 'showtime.png', 'action' : 'showsRetrieve', 'link' : 'networkshowtime'},
+			{'name' : Translation.string(36009), 'image' : 'britbox.png', 'action' : 'showsRetrieve', 'link' : 'networkbritbox'},
+			{'name' : Translation.string(36010), 'image' : 'now.png', 'action' : 'showsRetrieve', 'link' : 'networknow'},
+			{'name' : Translation.string(36011), 'image' : 'bet.png', 'action' : 'showsRetrieve', 'link' : 'networkbet'},
+			{'name' : Translation.string(36012), 'image' : 'crunchyroll.png', 'action' : 'showsRetrieve', 'link' : 'networkcrunchyroll'},
+			{'name' : Translation.string(36013), 'image' : 'channel4.png', 'action' : 'showsRetrieve', 'link' : 'networkall4'},
+			{'name' : Translation.string(36014), 'image' : 'discovery.png', 'action' : 'showsRetrieve', 'link' : 'networkdiscovery'},
+			{'name' : Translation.string(36015), 'image' : 'hayu.png', 'action' : 'showsRetrieve', 'link' : 'networkhayu'},
+			{'name' : Translation.string(35296), 'image' : 'youtube.png', 'action' : 'showsRetrieve', 'link' : 'networkyoutube'},
+		]
+		items = Tools.listSort(data = items, key = lambda i : i['name'])
+		if menu: self.directory(items)
+		return items
+
+	def networksBroadcasters(self):
 		networks = []
 
 		if not self.mKidsOnly or self.mRestriction >= 0:
@@ -613,23 +685,54 @@ class Shows(object):
 	# AWARD
 	##############################################################################
 
-	def awards(self, type = None, category = None, menu = True):
+	def awards(self, type = None, category = None, subcategory = None, generic = False, menu = True):
+		icon = 'awards' if generic else type
 		awards = {
+			'academyawards' : {
+				'people' : {
+					'global' : {'winner' : 'oscar_winner', 'nominee' : 'oscar_nominee'},
+					'director' : {'winner' : 'best_director_winner', 'nominee' : 'oscar_best_director_nominees'},
+					'actor' : {'winner' : 'oscar_best_actor_winners', 'nominee' : 'oscar_best_actor_nominees'},
+					'actress' : {'winner' : 'oscar_best_actress_winners', 'nominee' : 'oscar_best_actress_nominees'},
+					'actorsupporting' : {'winner' : 'oscar_best_supporting_actor_winners', 'nominee' : 'oscar_best_supporting_actor_nominees'},
+					'actresssupporting' : {'winner' : 'oscar_best_supporting_actress_winners', 'nominee' : 'oscar_best_supporting_actress_nominees'},
+				},
+			},
+			'goldenglobes' : {'winner' : 'golden_globe_winner', 'nominee' : 'golden_globe_nominee'},
 			'emmyawards' : {'winner' : 'emmy_winner', 'nominee' : 'emmy_nominee'},
 		}
 
 		if type is None:
 			items = [
 				{'name' : Translation.string(33326), 'image' : 'emmyawards.png', 'action' : 'showsAwards', 'parameters' : {'type' : 'emmyawards'}},
+				{'name' : Translation.string(33325), 'image' : 'goldenglobes.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'goldenglobes'}},
+			]
+		elif type == 'academyawards' and category == 'people' and subcategory is None:
+			items = [
+				{'name' : Translation.string(33700), 'image' : '%speople.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'global', 'generic' : generic}},
+				{'name' : Translation.string(35560), 'image' : '%sdirector.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'director', 'generic' : generic}},
+				{'name' : Translation.string(35561), 'image' : '%smale.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'actor', 'generic' : generic}},
+				{'name' : Translation.string(35562), 'image' : '%sfemale.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'actress', 'generic' : generic}},
+				{'name' : Translation.string(35563), 'image' : '%smale.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'actorsupporting', 'generic' : generic}},
+				{'name' : Translation.string(35564), 'image' : '%sfemale.png' % icon, 'action' : 'showsAwards', 'parameters' : {'type' : 'academyawards', 'category' : 'people', 'subcategory' : 'actresssupporting', 'generic' : generic}},
 			]
 		elif type:
 			awards = awards[type]
 			if category: awards = awards[category]
-			items = [
-				{'name' : Translation.string(33029), 'image' : '%sall.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % ','.join([awards['winner'], awards['nominee']])},
-				{'name' : Translation.string(33885), 'image' : '%swinner.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['winner']},
-				{'name' : Translation.string(33886), 'image' : '%snominee.png' % type, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['nominee']},
-			]
+			if subcategory: awards = awards[subcategory]
+			if category == 'people':
+				link = self.personlist_link + '&groups=%s'
+				items = [
+					{'name' : Translation.string(33029), 'image' : '%sall.png' % icon, 'action' : 'showsPersons', 'link' : link % ','.join([awards['winner'], awards['nominee']])},
+					{'name' : Translation.string(33885), 'image' : '%swinner.png' % icon, 'action' : 'showsPersons', 'link' : link % awards['winner']},
+					{'name' : Translation.string(33886), 'image' : '%snominee.png' % icon, 'action' : 'showsPersons', 'link' : link % awards['nominee']},
+				]
+			else:
+				items = [
+					{'name' : Translation.string(33029), 'image' : '%sall.png' % icon, 'action' : 'showsRetrieve', 'link' : self.award_link % ','.join([awards['winner'], awards['nominee']])},
+					{'name' : Translation.string(33885), 'image' : '%swinner.png' % icon, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['winner']},
+					{'name' : Translation.string(33886), 'image' : '%snominee.png' % icon, 'action' : 'showsRetrieve', 'link' : self.award_link % awards['nominee']},
+				]
 
 		if menu: self.directory(items)
 		return items
@@ -638,13 +741,13 @@ class Shows(object):
 	# PEOPLE
 	##############################################################################
 
-	def persons(self, link = None):
+	def persons(self, link = None, menu = True):
 		if link: items = self.mCache.cacheShort(self.imdbListPerson, link)
 		else: items = self.mCache.cacheMedium(self.imdbListPerson, self.personlist_link)
 
 		if items:
 			for i in range(0, len(items)): items[i].update({'action': 'showsRetrieve', 'media' : self.mMedia})
-			self.directory(items)
+			if menu: self.directory(items)
 		else:
 			Loader.hide()
 			Dialog.notification(title = 32010, message = 33049, icon = Dialog.IconInformation)
@@ -665,10 +768,35 @@ class Shows(object):
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
-			link = self.persons_link + Networker.linkQuote(terms, plus = True)
+			link = self.persons_link % Networker.linkQuote(terms, plus = True)
 			System.executeContainer(action = 'showsPersons', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
 			#self.persons(link)
 		except: Logger.error()
+
+	def famous(self, menu = True):
+		items = [
+			{'name' : Translation.string(35376), 'image' : 'famousfilmmaker.png', 'action' : 'showsPersons', 'link' : self.famouscreator_link},
+			{'name' : Translation.string(35340), 'image' : 'famousdirector.png', 'action' : 'showsPersons', 'link' : self.famousdirector_link},
+			{'name' : Translation.string(35457), 'image' : 'famouscinematographer.png', 'action' : 'showsPersons', 'link' : self.famouscinematographer_link},
+			{'name' : Translation.string(35341), 'image' : 'famouswriter.png', 'action' : 'showsPersons', 'link' : self.famouswriter_link},
+			{'name' : Translation.string(35458), 'image' : 'famousproducer.png', 'action' : 'showsPersons', 'link' : self.famousproducer_link},
+			{'name' : Translation.string(35512), 'image' : 'famouscomposer.png', 'action' : 'showsPersons', 'link' : self.famouscomposer_link},
+			{'name' : Translation.string(35342), 'image' : 'famousactor.png', 'action' : 'showsPersons', 'link' : self.famousactor_link},
+			{'name' : Translation.string(35343), 'image' : 'famousactress.png', 'action' : 'showsPersons', 'link' : self.famousactress_link},
+		]
+		if menu: self.directory(items)
+		return items
+
+	def genders(self, menu = True):
+		expression = 'gender=(.*?)(?:$|&)'
+		items = [
+			{'name' : Translation.string(35270), 'image' : 'gendermale.png', 'action' : 'showsPersons', 'link' : Regex.replace(data = self.personlist_link, expression = expression, replacement = 'male', group  = 1)},
+			{'name' : Translation.string(35271), 'image' : 'genderfemale.png', 'action' : 'showsPersons', 'link' : Regex.replace(data = self.personlist_link, expression = expression, replacement = 'female', group  = 1)},
+			{'name' : Translation.string(35272), 'image' : 'gendernonbinary.png', 'action' : 'showsPersons', 'link' : Regex.replace(data = self.personlist_link, expression = expression, replacement = 'non-binary', group  = 1)},
+			{'name' : Translation.string(35149), 'image' : 'genderother.png', 'action' : 'showsPersons', 'link' : Regex.replace(data = self.personlist_link, expression = expression, replacement = 'other', group  = 1)},
+		]
+		if menu: self.directory(items)
+		return items
 
 	##############################################################################
 	# LIST
@@ -726,7 +854,7 @@ class Shows(object):
 	# TRAKT
 	##############################################################################
 
-	def traktList(self, link, user, dulicates = False, next = True):
+	def traktList(self, link, user = None, dulicates = False, next = True):
 		list = []
 		items = []
 		dulicated = []
@@ -1127,10 +1255,33 @@ class Shows(object):
 			items = Raw.parse(data = result, tag = 'div', attributes = {'class': '.+? lister-item'}) + Raw.parse(data = result, tag = 'div', attributes = {'class': 'lister-item .+?'})
 		except: Logger.error()
 
+		try:
+			# HTML syntax error, " directly followed by attribute name. Insert space in between. Raw.parse can otherwise not handle it.
+			result = result.replace('"class="lister-page-next', '" class="lister-page-next')
+			next = Raw.parse(data = result, tag = 'a', extract = 'href', attributes = {'class': '.*?lister-page-next.*?'})
+
+			if not next:
+				next = Raw.parse(data = result, tag = 'div', attributes = {'class': 'pagination'})[0]
+				next = zip(Raw.parse(data = next, tag = 'a', extract = 'href'), Raw.parse(data = next, tag = 'a'))
+				next = [i[0] for i in next if 'Next' in i[1]]
+
+			parameters = Networker.linkParameters(link = next[0])
+			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters)
+			next = Networker.htmlDecode(next)
+		except:
+			next = None
+
 		for item in items:
 			try:
 				name = Raw.parse(data = item, tag = 'a')[1]
 				name = Networker.htmlDecode(name)
+
+				try:
+					# Do not use [-1]  for lists like: https://www.imdb.com/list/ls000005319/
+					bio = Raw.parse(data = item, tag = 'p')[1]
+					description = Parser(bio).text
+				except:
+					description = None
 
 				link = Raw.parse(data = item, tag = 'a', extract = 'href')[1]
 				link = Regex.extract(data = link, expression = '(nm\d+)', group = 1)
@@ -1138,9 +1289,11 @@ class Shows(object):
 				link = Networker.htmlDecode(link)
 
 				image = Raw.parse(data = item, tag = 'img', extract = 'src')[0]
-				image = MetaImdb.image(Networker.htmlDecode(image))
+				image = MetaImdb.image(Networker.htmlDecode(image), crop = True) # Crop to keep the aspect ratio.
 
-				list.append({'name': name, 'link': link, 'image': image})
+				item = {'name' : name, 'description' : description, 'link' : link, 'image' : image, 'person' : True}
+				if next: item['next'] = next
+				list.append(item)
 			except: Logger.error()
 
 		return list

@@ -2427,7 +2427,7 @@ msgid "National Film"
 msgstr ""
 
 msgctxt "#33447"
-msgid "[GAIA-NO-LABEL]"
+msgid "Not Rated Yet"
 msgstr ""
 
 msgctxt "#33448"
@@ -2751,7 +2751,7 @@ msgid "Sets"
 msgstr ""
 
 msgctxt "#33528"
-msgid "Sets that contain multiple related movies."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#33529"
@@ -3435,7 +3435,7 @@ msgid "Best Picture"
 msgstr ""
 
 msgctxt "#33699"
-msgid "Best Director"
+msgid "Best Directing"
 msgstr ""
 
 msgctxt "#33700"
@@ -7947,15 +7947,15 @@ msgid "Optimize"
 msgstr ""
 
 msgctxt "#35270"
-msgid "[GAIA-NO-LABEL]"
+msgid "Male"
 msgstr ""
 
 msgctxt "#35271"
-msgid "[GAIA-NO-LABEL]"
+msgid "Female"
 msgstr ""
 
 msgctxt "#35272"
-msgid "[GAIA-NO-LABEL]"
+msgid "Nonbinary"
 msgstr ""
 
 msgctxt "#35273"
@@ -8091,7 +8091,7 @@ msgid "Maximum Value"
 msgstr ""
 
 msgctxt "#35306"
-msgid "[GAIA-NO-LABEL]"
+msgid "Gender"
 msgstr ""
 
 msgctxt "#35307"
@@ -8127,7 +8127,7 @@ msgid "Frequent Questions"
 msgstr ""
 
 msgctxt "#35315"
-msgid "[GAIA-NO-LABEL]"
+msgid "Famous"
 msgstr ""
 
 msgctxt "#35316"
@@ -8147,7 +8147,7 @@ msgid "Sending Torrent To Elementum Addon"
 msgstr ""
 
 msgctxt "#35320"
-msgid "[GAIA-NO-LABEL]"
+msgid "Too large to calculate"
 msgstr ""
 
 msgctxt "#35321"
@@ -8223,23 +8223,23 @@ msgid "Rate Episodes"
 msgstr ""
 
 msgctxt "#35339"
-msgid "[GAIA-NO-LABEL]"
+msgid "Filmmakers"
 msgstr ""
 
 msgctxt "#35340"
-msgid "[GAIA-NO-LABEL]"
+msgid "Directors"
 msgstr ""
 
 msgctxt "#35341"
-msgid "[GAIA-NO-LABEL]"
+msgid "Writers"
 msgstr ""
 
 msgctxt "#35342"
-msgid "[GAIA-NO-LABEL]"
+msgid "Actors"
 msgstr ""
 
 msgctxt "#35343"
-msgid "[GAIA-NO-LABEL]"
+msgid "Actresses"
 msgstr ""
 
 msgctxt "#35344"
@@ -8371,7 +8371,7 @@ msgid "Random"
 msgstr ""
 
 msgctxt "#35376"
-msgid "[GAIA-NO-LABEL]"
+msgid "Creators"
 msgstr ""
 
 msgctxt "#35377"
@@ -8583,11 +8583,11 @@ msgid "Free Account"
 msgstr ""
 
 msgctxt "#35429"
-msgid "[GAIA-NO-LABEL]"
+msgid "Streaming Services"
 msgstr ""
 
 msgctxt "#35430"
-msgid "[GAIA-NO-LABEL]"
+msgid "Live Broadcasters"
 msgstr ""
 
 msgctxt "#35431"
@@ -8695,15 +8695,15 @@ msgid "A summary of what happened previously in Season %s of %s."
 msgstr ""
 
 msgctxt "#35457"
-msgid "[GAIA-NO-LABEL]"
+msgid "Cinematographers"
 msgstr ""
 
 msgctxt "#35458"
-msgid "[GAIA-NO-LABEL]"
+msgid "Producers"
 msgstr ""
 
 msgctxt "#35459"
-msgid "[GAIA-NO-LABEL]"
+msgid "Editors"
 msgstr ""
 
 msgctxt "#35460"
@@ -8915,7 +8915,7 @@ msgid "%s Unwatched"
 msgstr ""
 
 msgctxt "#35512"
-msgid "[GAIA-NO-LABEL]"
+msgid "Composers"
 msgstr ""
 
 msgctxt "#35513"
@@ -9107,27 +9107,27 @@ msgid "Remote"
 msgstr ""
 
 msgctxt "#35560"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Director"
 msgstr ""
 
 msgctxt "#35561"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Actor"
 msgstr ""
 
 msgctxt "#35562"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Actress"
 msgstr ""
 
 msgctxt "#35563"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Supporting Actor"
 msgstr ""
 
 msgctxt "#35564"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Supporting Actress"
 msgstr ""
 
 msgctxt "#35565"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best People"
 msgstr ""
 
 msgctxt "#35566"
@@ -10394,113 +10394,112 @@ msgstr ""
 
 
 
-
 msgctxt "#36000"
-msgid "Movies and related content."
+msgid "Netflix"
 msgstr ""
 
 msgctxt "#36001"
-msgid "Shows and related content."
+msgid "Amazon"
 msgstr ""
 
 msgctxt "#36002"
-msgid "Documentaries and related content."
+msgid "AppleTV"
 msgstr ""
 
 msgctxt "#36003"
-msgid "Short films and related content."
+msgid "HBO"
 msgstr ""
 
 msgctxt "#36004"
-msgid "Kids section with limited viewing capabilities."
+msgid "Disney"
 msgstr ""
 
 msgctxt "#36005"
-msgid "Favourite lists, watch history, and local library."
+msgid "Paramount"
 msgstr ""
 
 msgctxt "#36006"
-msgid "Latest arrivals and new releases."
+msgid "Peacock"
 msgstr ""
 
 msgctxt "#36007"
-msgid "Search a specific title or person."
+msgid "Hulu"
 msgstr ""
 
 msgctxt "#36008"
-msgid "Settings and tools for managing the addon."
+msgid "Showtime"
 msgstr ""
 
 msgctxt "#36009"
-msgid "Latest promotions from premium services."
+msgid "BritBox"
 msgstr ""
 
 msgctxt "#36010"
-msgid "Custom shortcuts for quick navigation."
+msgid "NOW"
 msgstr ""
 
 msgctxt "#36011"
-msgid "Categories based on distinct attributes."
+msgid "BET"
 msgstr ""
 
 msgctxt "#36012"
-msgid "Lists based on common attributes."
+msgid "Crunchyroll"
 msgstr ""
 
 msgctxt "#36013"
-msgid "People involved in production."
+msgid "All4"
 msgstr ""
 
 msgctxt "#36014"
-msgid "Activate the child lock."
+msgid "Discovery"
 msgstr ""
 
 msgctxt "#36015"
-msgid "Deactivate the child lock."
+msgid "Hayu"
 msgstr ""
 
 msgctxt "#36016"
-msgid "History of watched titles and streams."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36017"
-msgid "Local Kodi library content."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36018"
-msgid "Search a specific title."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36019"
-msgid "Search a specific person."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36020"
-msgid "History of previous searches."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36021"
-msgid "Exact file name scraping."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36022"
-msgid "Addon management and settings."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36023"
-msgid "Premium services and external addons."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36024"
-msgid "Network tools, VPN, and speed tests."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36025"
-msgid "Local download manager."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36026"
-msgid "Local Kodi library."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36027"
@@ -10512,11 +10511,11 @@ msgid "Light"
 msgstr ""
 
 msgctxt "#36029"
-msgid "Account, provider, and Cloudflare verification."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36030"
-msgid "Addon extension installation."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36031"
@@ -10524,19 +10523,19 @@ msgid "Icon Configuration"
 msgstr ""
 
 msgctxt "#36032"
-msgid "Clear caching and local databases."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36033"
-msgid "Additional addon utilities and information."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36034"
-msgid "Donate to keep the project alive."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36035"
-msgid "Lottery vouchers and rewards."
+msgid "[GAIA-NO-LABEL]"
 msgstr ""
 
 msgctxt "#36036"

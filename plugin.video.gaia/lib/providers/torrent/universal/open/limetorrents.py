@@ -23,7 +23,7 @@ from lib.modules.tools import Regex, Time
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://limetorrents.pro', 'https://limetorrents.info', 'https://limetorrents.co', 'https://limetorrents.zone', 'https://limetorrents.asia', 'https://limetor.com', 'https://limetor.pro']
+	_Link					= ['https://limetorrents.lol', 'https://limetorrents.pro', 'https://limetorrents.info', 'https://limetorrents.co', 'https://limetor.com', 'https://limetor.pro']
 	_Mirror					= ['https://limetorrents.online/mirror-proxy-sites-to-unblock-limetorrents-cc']
 	_Unblock				= {ProviderHtml.UnblockFormat1 : 'limetorrents', ProviderHtml.UnblockFormat2 : 'limetorrents', ProviderHtml.UnblockFormat3 : 'limetorrents', ProviderHtml.UnblockFormat4 : 'limetorrents'}
 	_Path					= 'search/%s/%s/seeds/%s/'

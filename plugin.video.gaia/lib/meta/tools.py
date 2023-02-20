@@ -1646,7 +1646,8 @@ class MetaTools(object):
 				else:
 					parameters = {'link' : link, 'media' : media}
 					if not kids is None: parameters['kids'] = kids
-					if media == Media.TypeShow or media == Media.TypeSeason: action = 'showsRetrieve'
+					if 'person' in metadata[0] and metadata[0]['person']: action = 'showsPersons' if Media.typeTelevision(media) else 'moviesPersons'
+					elif media == Media.TypeShow or media == Media.TypeSeason: action = 'showsRetrieve'
 					elif media == Media.TypeEpisode: action = 'episodesRetrieve'
 					elif media == Media.TypeSet: action = 'setsRetrieve'
 					else: action = 'moviesRetrieve'
@@ -1791,13 +1792,19 @@ class MetaTools(object):
 	# DIRECTORY
 	###################################################################
 
-	def directories(self, metadatas, media = None, kids = None):
+	def directories(self, metadatas, media = None, kids = None, next = True):
 		items = []
+
 		for metadata in metadatas:
 			try:
 				item = self.directory(media = media, kids = kids, metadata = metadata)
 				if item: items.append([item['command'], item['item'], True])
 			except: Logger.error()
+
+		if next:
+			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids)
+			if itemNext: items.append(itemNext)
+
 		return items
 
 	def directory(self, metadata = None, media = None, kids = None, link = None, item = None, context = None):
@@ -1809,6 +1816,18 @@ class MetaTools(object):
 			except: pass
 
 			name = metadata['name']
+
+			if metadata:
+				data = {}
+
+				if 'person' in metadata and metadata['person']: data['title'] = name
+
+				if 'plot' in metadata and metadata['plot']: data['plot'] = metadata['plot']
+				elif 'description' in metadata and metadata['description']: data['plot'] = metadata['description']
+				else: data['plot'] = System.menuDescription(name = name)
+
+				if data: self.itemInfo(item = item, metadata = data)
+
 			item.setLabel(name)
 
 			if metadata['image'].startswith('http'): icon = thumb = poster = banner = metadata['image']
@@ -1829,8 +1848,9 @@ class MetaTools(object):
 			try: parameters = metadata['parameters']
 			except: parameters = {}
 			if not 'media' in parameters: parameters['media'] = media
-			if not 'link' in parameters and link: parameters['link']= link
-			if not 'kids' in parameters and not kids is None: parameters['kids']= kids
+			if not 'link' in parameters and link: parameters['link'] = link
+			if not 'kids' in parameters and not kids is None: parameters['kids'] = kids
+			parameters['menu'] = System.menu(name = name)
 			command = System.command(action = metadata['action'], parameters = parameters)
 
 			context = self.itemContext(item = item, context = context, mode = Context.ModeGeneric, media = media, kids = kids, command = command, library = link, shortcutLabel = name, shortcutCreate = True)
@@ -2107,7 +2127,9 @@ class MetaTools(object):
 			if metadata['tvdb']: trailer['tvdb'] = metadata['tvdb']
 		except: pass
 		try: trailer['title'] = metadata['tvshowtitle']
-		except: trailer['title'] = metadata['title']
+		except:
+			try: trailer['title'] = metadata['title']
+			except: pass
 		try: trailer['year'] = metadata['year']
 		except: pass
 		try: trailer['season'] = metadata['season']

@@ -647,6 +647,10 @@ class Handler(object):
 		if not result['success']:
 			if not result['error'] in [Handler.ReturnUnavailable, Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnPack]:
 				if notification and (not 'notification' in result or not result['notification']):
+					try: tools.Logger.log('Resolving or playback failure: ' + tools.Converter.jsonTo(result), type = tools.Logger.TypeError)
+					except:
+						try: tools.Logger.log('Resolving or playback failure: ' + str(result), type = tools.Logger.TypeError)
+						except: pass
 					interface.Dialog.notification(title = 33448, message = 35295, icon = interface.Dialog.IconError)
 				result['error'] = Handler.ReturnUnavailable
 		return result

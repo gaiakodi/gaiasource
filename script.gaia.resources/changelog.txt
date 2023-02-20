@@ -1,4 +1,10 @@
 
+[B]6.1.7 (2023.02.20)[/B]
+- Added more awards icons.
+- Added famous icons.
+- Added gender icons.
+- Added network icons.
+
 [B]6.1.6 (2023.02.13)[/B]
 - Added new awards icons.
 

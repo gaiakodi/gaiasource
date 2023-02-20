@@ -531,9 +531,7 @@ class Networker(object):
 
 		try:
 			if tools.Platform.systemTypeMacintosh():
-				try:
-					tools.Subprocess.open(['open', link], communicate = False)
-					success = True
+				try: success = not tools.Subprocess.open(['open', link], communicate = False) is False
 				except: pass
 			if not success:
 				# This opens http/https links in the browser and magnets in a torrent client.

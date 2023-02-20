@@ -3076,6 +3076,10 @@ class File(object):
 		return name
 
 	@classmethod
+	def separator(self):
+		return os.path.sep
+
+	@classmethod
 	def makeDirectory(self, path, retry = True):
 		xbmcvfs.mkdirs(path)
 		if self.existsDirectory(path):
@@ -3231,13 +3235,15 @@ class File(object):
 		return xbmcvfs.File(path).size()
 
 	@classmethod
-	def sizeDirectory(self, path):
+	def sizeDirectory(self, path, limit = None):
 		total = 0
 		directories, files = self.listDirectory(path, absolute = True)
 		for directory in directories:
 			total += self.sizeDirectory(directory)
+			if limit and total > limit: return -1
 		for file in files:
 			total += self.size(file)
+			if limit and total > limit: return -1
 		return total
 
 	@classmethod
@@ -3431,6 +3437,7 @@ class System(object):
 
 	Monitor = None
 	Arguments = None
+	Menu = []
 
 	@classmethod
 	def arguments(self, index = None):
@@ -3587,7 +3594,21 @@ class System(object):
 		return None
 
 	@classmethod
-	def menu(self, action, menu = None):
+	def menu(self, name = None):
+		if name: return System.Menu + [name]
+		else: return System.Menu
+
+	@classmethod
+	def menuParameter(self, name = None):
+		return 'menu=' + Converter.jsonTo(self.menu(name = name))
+
+	@classmethod
+	def menuDescription(self, name = None):
+		from lib.modules.interface import Format
+		return Format.iconJoin(self.menu(name = name))
+
+	@classmethod
+	def menuResolve(self, action = None, menu = None, initialize = True):
 		# If the context menu is launched, the handle is -1 and pluginPropertySet() does not work.
 		# Attempt to use invalid handle -1
 		handle = self.handle()
@@ -3619,6 +3640,8 @@ class System(object):
 		elif action is None or action == 'home':
 			self.pluginPropertySet(property = 'GaiaMenuCategory', value = 'Gaia')
 			self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = addon.getLocalizedString(33102))
+
+		if initialize: System.Menu = menu
 
 		return menu
 
@@ -6288,8 +6311,12 @@ class Cleanup(object):
 
 	@classmethod
 	def _size(self, size):
-		from lib.modules.convert import ConverterSize
-		return ConverterSize(size).stringOptimal(places = 1)
+		if size is None:
+			from lib.modules.interface import Translation
+			return Translation.string(35320)
+		else:
+			from lib.modules.convert import ConverterSize
+			return ConverterSize(size).stringOptimal(places = 1)
 
 	@classmethod
 	def _clean(self, function, message = None, confirm = None):
@@ -6563,7 +6590,8 @@ class Cleanup(object):
 
 	@classmethod
 	def librarySize(self):
-		return self.libraryDatabaseSize() + self.libraryFileSize()
+		size = self.libraryFileSize()
+		return self.libraryDatabaseSize() + (size if size and size > 0 else 0)
 
 	@classmethod
 	def libraryClean(self):
@@ -6592,7 +6620,8 @@ class Cleanup(object):
 
 	@classmethod
 	def downloadSize(self):
-		return self.downloadDatabaseSize() + self.downloadFileSize()
+		size = self.downloadFileSize()
+		return self.downloadDatabaseSize() + (size if size and size > 0 else 0)
 
 	@classmethod
 	def downloadClean(self):
@@ -7287,6 +7316,20 @@ class Lightpack(object):
 class Subprocess(object):
 
 	@classmethod
+	def _error(self, exception):
+		exception = str(exception)
+
+		# On Apple:
+		#	in output\n    return Converter.unicode(check_output(self.command(command), shell = True))  File "Kodi.app/Frameworks/lib/python3.11/subprocess.py", line 465, in check_output\n    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,  File "Kodi.app/Frameworks/lib/python3.11/subprocess.py", line 546, in run\n    with Popen(*popenargs, **kwargs) as process:, '  File "Kodi.app/Frameworks/lib/python3.11/subprocess.py", line 816, in __init__\n    raise OSError(\n', 'OSError: [Errno 45] darwin does not support processes.\n']
+		# And:
+		#	File "Library/Caches/Kodi/addons/plugin.video.gaia/lib/modules/tools.py", line 7339, in fallback\n    os.system(command + \' > \' + path)\n    ^^^^^^^^^\n', "AttributeError: module 'os' has no attribute 'system'\n"]
+		if 'does not support processes' in exception or 'has no attribute \'system\'' in exception:
+			Logger.log('Your operating system does not support processes and certain features, like hardware optimization, will not work.', type = Logger.TypeError)
+			return False
+
+		return True
+
+	@classmethod
 	def command(self, command):
 		# NB: When using "shell", the command cannot be a list, it must be a string.
 		# https://stackoverflow.com/questions/26417658/subprocess-call-arguments-ignored-when-using-shell-true-w-list
@@ -7304,9 +7347,9 @@ class Subprocess(object):
 			#	subprocess.CalledProcessError: Command 'lscpu' returned non-zero exit status 127.
 			# Do not print the error.
 			pass
-		except:
-			Logger.error()
-			return None
+		except Exception as exception:
+			if self._error(exception = exception): Logger.error()
+			return False
 
 	@classmethod
 	def open(self, command, communicate = True, timeout = None):
@@ -7317,9 +7360,9 @@ class Subprocess(object):
 			if communicate is True: return Converter.unicode(process.communicate(timeout = timeout)[0])
 			elif communicate: return Converter.unicode(process.communicate(input = Converter.bytes(communicate), timeout = timeout)[0])
 			else: return None
-		except:
-			if not timeout: Logger.error()
-			return None
+		except Exception as exception:
+			if not timeout and self._error(exception = exception): Logger.error()
+			return False
 
 	@classmethod
 	def fallback(self, command):
@@ -7328,6 +7371,7 @@ class Subprocess(object):
 		# Try os.system() if the subprocess does not work.
 		# Not sure if os.system uses processes in the background and has the same issue.
 		# os.system also does not return the output, so we have to write it to file.
+		# UPDATE: os.system() is not available on Mac.
 		result = None
 		try:
 			from subprocess import check_output
@@ -7340,8 +7384,9 @@ class Subprocess(object):
 				if File.exists(path):
 					result = Converter.unicode(File.readNow(path))
 					File.delete(path)
-			except:
-				Logger.error()
+			except Exception as exception:
+				if self._error(exception = exception): Logger.error()
+				return False
 		return result
 
 ###################################################################

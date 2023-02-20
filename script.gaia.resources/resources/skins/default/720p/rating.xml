@@ -183,6 +183,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,1)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Weak Sauce)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),1)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),1)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>noop</onleft>
 								<onright>52101</onright>
 								<onup>50100</onup>
@@ -203,7 +207,7 @@
 							<control type="image" id="52004">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),1)</visible>
 							</control>
@@ -222,6 +226,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,2)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Terrible)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !Integer.IsEqual(Window.Property(GaiaPreviousRating),2)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + Integer.IsEqual(Window.Property(GaiaPreviousRating),2)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52001</onleft>
 								<onright>52201</onright>
 								<onup>50100</onup>
@@ -242,7 +250,7 @@
 							<control type="image" id="52104">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),2)</visible>
 							</control>
@@ -261,6 +269,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,3)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Bad)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),3)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),3)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52101</onleft>
 								<onright>52301</onright>
 								<onup>50100</onup>
@@ -281,7 +293,7 @@
 							<control type="image" id="52204">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),3)</visible>
 							</control>
@@ -300,6 +312,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,4)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Poor)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),4)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),4)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52201</onleft>
 								<onright>52401</onright>
 								<onup>50100</onup>
@@ -320,7 +336,7 @@
 							<control type="image" id="52304">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),4)</visible>
 							</control>
@@ -339,6 +355,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,5)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Meh)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),5)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),5)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52301</onleft>
 								<onright>52501</onright>
 								<onup>50100</onup>
@@ -359,7 +379,7 @@
 							<control type="image" id="52404">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),5)</visible>
 							</control>
@@ -378,6 +398,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,6)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Fair)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),6)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),6)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52401</onleft>
 								<onright>52601</onright>
 								<onup>50100</onup>
@@ -398,7 +422,7 @@
 							<control type="image" id="52504">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),6)</visible>
 							</control>
@@ -417,6 +441,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,7)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Good)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),7)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),7)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52501</onleft>
 								<onright>52701</onright>
 								<onup>50100</onup>
@@ -437,7 +465,7 @@
 							<control type="image" id="52604">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),7)</visible>
 							</control>
@@ -456,6 +484,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,8)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Great)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),8)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),8)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52601</onleft>
 								<onright>52801</onright>
 								<onup>50100</onup>
@@ -476,7 +508,7 @@
 							<control type="image" id="52704">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),8)</visible>
 							</control>
@@ -495,6 +527,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,9)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Superb)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),9)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),9)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52701</onleft>
 								<onright>52901</onright>
 								<onup>50100</onup>
@@ -515,7 +551,7 @@
 							<control type="image" id="52804">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),9)</visible>
 							</control>
@@ -534,6 +570,10 @@
 
 								<onfocus>SetProperty(GaiaRatingValue,10)</onfocus>
 								<onfocus>SetProperty(GaiaRatingLabel,Totally Ninja)</onfocus>
+
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),10)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorPrimary)])</onfocus>
+								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),10)">SetProperty(GaiaColorDefault,$INFO[Window.Property(GaiaColorRated)])</onfocus>
+
 								<onleft>52801</onleft>
 								<onright>noop</onright>
 								<onup>50100</onup>
@@ -554,7 +594,7 @@
 							<control type="image" id="52904">
 								<width>52</width>
 								<height>52</height>
-								<texture colordiffuse="$INFO[Window.Property(GaiaColorPrimary)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
+								<texture colordiffuse="$INFO[Window.Property(GaiaColorDefault)]">special://home/addons/script.gaia.resources/resources/media/interface/rating/$INFO[Window.Property(GaiaIcon)]/inner.png</texture>
 								<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="100" reversible="false">VisibleChange</animation>
 								<visible>Integer.IsGreaterOrEqual(Window.Property(GaiaRatingValue),10)</visible>
 							</control>
@@ -576,7 +616,6 @@
 					<aligny>center</aligny>
 					<textcolor>FFFFFFFF</textcolor>
 					<label>[B]$INFO[Window.Property(GaiaRatingValue)].0$INFO[Window.Property(GaiaSeparator)]$INFO[Window.Property(GaiaRatingLabel)][/B]</label>
-					<visible>!String.IsEmpty(Window.Property(GaiaPreviousRating))</visible>
 				</control>
 				<control type="fadelabel" id="51004">
 					<top>460</top>
@@ -589,26 +628,12 @@
         			<pauseatend>2000</pauseatend>
 					<align>right</align>
 					<aligny>center</aligny>
-					<textcolor>FFFFFFFF</textcolor>
+					<textcolor>$INFO[Window.Property(GaiaColorRated)]</textcolor>
 					<label>$INFO[Window.Property(GaiaPreviousLabel)]</label>
 					<label>[B]$INFO[Window.Property(GaiaPreviousRating)].0[/B] ($INFO[Window.Property(GaiaPreviousTime)])</label>
 					<visible>!String.IsEmpty(Window.Property(GaiaPreviousRating))</visible>
 				</control>
 				<control type="label" id="51005">
-					<top>430</top>
-					<right>20</right>
-					<width>200</width>
-					<height>32</height>
-					<font>[GAIAFONTLARGE]</font>
-					<scroll>true</scroll>
-					<scrollspeed>50</scrollspeed>
-					<align>right</align>
-					<aligny>center</aligny>
-					<textcolor>FFFFFFFF</textcolor>
-					<label>[B]$INFO[Window.Property(GaiaRatingValue)].0[/B]</label>
-					<visible>String.IsEmpty(Window.Property(GaiaPreviousRating))</visible>
-				</control>
-				<control type="label" id="51006">
 					<top>460</top>
 					<right>20</right>
 					<width>200</width>
@@ -619,7 +644,7 @@
 					<align>right</align>
 					<aligny>center</aligny>
 					<textcolor>FFFFFFFF</textcolor>
-					<label>[B]$INFO[Window.Property(GaiaRatingLabel)][/B]</label>
+					<label>[B]$INFO[Window.Property(GaiaUnratedLabel)][/B]</label>
 					<visible>String.IsEmpty(Window.Property(GaiaPreviousRating))</visible>
 				</control>
 

@@ -274,6 +274,7 @@ class Episodes(object):
 		try:
 			attribute = None
 			reverse = None
+
 			if type == 'release':
 				force = True
 				attribute = 4
@@ -335,9 +336,9 @@ class Episodes(object):
 								if release:
 									seconds = time - release
 									if seconds > 0:
-										if seconds < 259200: value[0] = min(value[0], seconds) # Place new seasons released the past 3 days at the top, maybe even before the recentley watched.
-										elif seconds < 1209600: value[1] = seconds # Place new seasons released the past 2 weeks second after the recentley watched.
-										elif seconds < 4838400: value[2] = min(value[2], seconds) # Move new seasons released the past 8 weeks closer to the top.
+										if seconds < 604800: value[0] = min(value[0], seconds) # Place new seasons released the past 7 days at the top, maybe even before the recentley watched.
+										elif seconds < 2629800: value[1] = seconds # Place new seasons released the past 4 weeks second after the recentley watched.
+										elif seconds < 7889400: value[2] = min(value[2], seconds) # Move new seasons released the past 3 months closer to the top.
 
 							items[i]['sort'] = value
 							if not 'premiered' in items[i] or not items[i]['premiered']: items[i]['premiered'] = items[i]['aired'] if 'aired' in items[i] else None
@@ -365,6 +366,10 @@ class Episodes(object):
 		elif setting == 3: return self.retrieve(link = self.progress_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
 		elif setting == 4: return self.retrieve(link = self.mycalendar_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
 		else: return self.home(menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
+
+	# Called from trakt.py.
+	def arrivalsRefresh(self):
+		self.retrieve(link = self.progress_link, menu = False)
 
 	def home(self, menu = True, clean = True, limit = None, detailed = True, quick = None, refresh = False):
 		self.mModeRelease = True
@@ -1972,7 +1977,7 @@ class Episodes(object):
 								countContinue = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = i['season'], episode = i['episode'])
 								if countContinue:
 									countContinue = countContinue['count']['total']
-									if not countContinue == countCurrent:
+									if not countContinue is None and not countContinue == countCurrent:
 										counter += countContinue
 										break
 								else:

@@ -542,6 +542,7 @@ class Font(object):
 						upper = tools.Regex.match(data = style, expression = 'upper')
 						lower = tools.Regex.match(data = style, expression = 'lower')
 						capital = tools.Regex.match(data = style, expression = 'capitalize')
+						symbol = tools.Regex.match(data = style, expression = 'symbol')
 
 						Font.FontData.append({
 							'name' : name,
@@ -558,6 +559,7 @@ class Font(object):
 							'upper' : upper,
 							'lower' : lower,
 							'capital' : capital,
+							'symbol' : symbol,
 						})
 
 				# If nothing found, att the default font (seems to be avilable in most skins).
@@ -577,6 +579,7 @@ class Font(object):
 						'upper' : None,
 						'lower' : None,
 						'capital' : None,
+						'symbol' : None,
 					})
 
 				Font.FontData = {'id' : Skin.id(), 'fonts' : Font.FontData}
@@ -589,7 +592,7 @@ class Font(object):
 		return value is None or (value is True and font[key]) or (value is False and not font[key]) or font[key] == value
 
 	@classmethod
-	def _fontFind(self, size = 20, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False):
+	def _fontFind(self, size = 20, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False):
 		fonts = self._fontDetect()['fonts']
 
 		if fonts:
@@ -604,6 +607,7 @@ class Font(object):
 				[upper, 'upper'],
 				[lower, 'lower'],
 				[capital, 'capital'],
+				[symbol, 'symbol'],
 			]
 
 			for font in fonts:
@@ -632,7 +636,7 @@ class Font(object):
 			2. None: Decrease of 50% font size, increase of 25% font size.
 			3. Integer: Increase/decrease deviation (eg: size = 5, deviation = 2 : [5, 4, 6, 3, 7])
 			4. List: Separate decrease (index 0) and increase (index 1) deviations
-		aspect/spacing/bold/italic/light/mono/upper/lower/capital:
+		aspect/spacing/bold/italic/light/mono/upper/lower/capital/symbol:
 			Select a font based on style attributes.
 			1. None: Attribute can have any value or not be present.
 			2. False: Attribute may not be present (eg: bold = False : do not select any bold fonts)
@@ -642,17 +646,17 @@ class Font(object):
 			Return a default value if no font can be found with the given preferences.
 	'''
 	@classmethod
-	def font(self, size = 20, deviation = None, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, default = True, full = False):
+	def font(self, size = 20, deviation = None, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, default = True, full = False):
 		if deviation is None: deviation = [int(size * 0.5), int(size * 0.25)]
 		elif tools.Tools.isInteger(deviation): deviation = [deviation, deviation]
-		key = (size, tuple(deviation), aspect, spacing, bold, italic, light, mono, upper, lower, capital, default)
+		key = (size, tuple(deviation), aspect, spacing, bold, italic, light, mono, upper, lower, capital, symbol, default)
 
 		# Quickly return previously detected fonts.
 		try: return Font.FontSelection[key] if full else Font.FontSelection[key]['name']
 		except: pass
 
 		# Preferred size.
-		font = self._fontFind(size = size, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital)
+		font = self._fontFind(size = size, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol)
 
 		# Deviated size.
 		if not font and deviation:
@@ -665,12 +669,12 @@ class Font(object):
 			while True:
 				allowed = False
 				if sizeDecrease >= sizeMinimum:
-					font = self._fontFind(size = sizeDecrease, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital)
+					font = self._fontFind(size = sizeDecrease, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol)
 					if font: break
 					sizeDecrease -= 1
 					allowed = True
 				if sizeIncrease <= sizeMaximum:
-					font = self._fontFind(size = sizeIncrease, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital)
+					font = self._fontFind(size = sizeIncrease, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol)
 					if font: break
 					sizeIncrease += 1
 					allowed = True
@@ -678,9 +682,9 @@ class Font(object):
 
 		# Any other font
 		if not font and default:
-			font = self.font(size = size, deviation = deviation, aspect = None, spacing = None, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, default = False)
+			font = self.font(size = size, deviation = deviation, aspect = None, spacing = None, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, default = False)
 			if not font:
-				font = self.font(size = size, deviation = deviation, aspect = None, spacing = None, bold = None, italic = None, light = None, mono = None, upper = None, lower = None, capital = None, default = False)
+				font = self.font(size = size, deviation = deviation, aspect = None, spacing = None, bold = None, italic = None, light = None, mono = None, upper = None, lower = None, capital = None, symbol = symbol, default = False)
 				if not font:
 					fonts = self._fontDetect()['fonts']
 					if fonts: font = fonts[0]
@@ -900,7 +904,9 @@ class Icon(object):
 		items = ['Default', 'White']
 		getMore = Format.fontBold(Translation.string(33739))
 		if tools.Extension.installed(id):
-			items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Cerulean (Blue)', 'Sky (Blue)', 'Pine (Green)', 'Lime (Green)', 'Ruby (Red)', 'Candy (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)', 'Amber (Brown)'])
+			# Removed 2 old icon packs, since the ZIP file is becoming too large.
+			#items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Cerulean (Blue)', 'Sky (Blue)', 'Pine (Green)', 'Lime (Green)', 'Ruby (Red)', 'Candy (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)', 'Amber (Brown)'])
+			items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Cerulean (Blue)', 'Sky (Blue)', 'Pine (Green)', 'Lime (Green)', 'Ruby (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)'])
 		else:
 			items.extend([getMore])
 		choice = Dialog.select(title = 33338, items = items)
@@ -2968,7 +2974,14 @@ class Directory(object):
 	ContentArtists = 'artists'
 	ContentActors = 'actors'
 	ContentDirectors = 'directors'
+	ContentStudios = 'studios'
+	ContentCountries = 'countries'
 	ContentGames = 'games'
+	ContentTags = 'tags'
+	ContentYears = 'years'
+	ContentGenres = 'genres'
+	ContentPlaylists = 'playlists'
+	ContentMixed = 'mixed'
 
 	ContentNone = ''
 	ContentSettings = 'settings'

@@ -1104,21 +1104,44 @@ class Downloader(Database):
 		return Database(Downloader.Database, addon = Downloader.AddonId)._size()
 
 	@classmethod
-	def sizeFile(self, type = None):
+	def sizeFile(self, type = None, limit = True):
 		if type is None:
-			return self.sizeFile(type = Downloader.TypeManual) + self.sizeFile(type = Downloader.TypeCache)
+			return self.sizeFile(type = Downloader.TypeManual, limit = limit) + self.sizeFile(type = Downloader.TypeCache, limit = limit)
 		else:
+			# NB: Limit the total size at 5GB after which size calculations terminate.
+			# Otherwise if the user makes the download path point to a HDD with 100s of movies, this function can take a very long time, sinze it will scan the entire HDD.
+			if limit is True: limit = 5368709120
+			elif not limit: limit = None
+
 			from .tools import File
 			downloader = Downloader(type = type)
 			if downloader._setting('location.selection') == '0':
-				return File.sizeDirectory(downloader._settingPath('location.combined'))
+				size = File.sizeDirectory(downloader._settingPath('location.combined'), limit = limit)
+				if size < 0: return None
+				else: return size
 			else:
 				total = 0
-				total += File.sizeDirectory(downloader._locationMovies())
-				total += File.sizeDirectory(downloader._locationShows())
-				total += File.sizeDirectory(downloader._locationDocumentaries())
-				total += File.sizeDirectory(downloader._locationShorts())
-				total += File.sizeDirectory(downloader._locationOther())
+
+				size = File.sizeDirectory(downloader._locationMovies(), limit = limit)
+				if size < 0: return None
+				else: total += size
+
+				size = File.sizeDirectory(downloader._locationShows(), limit = limit)
+				if size < 0: return None
+				else: total += size
+
+				size = File.sizeDirectory(downloader._locationDocumentaries(), limit = limit)
+				if size < 0: return None
+				else: total += size
+
+				size = File.sizeDirectory(downloader._locationShorts(), limit = limit)
+				if size < 0: return None
+				else: total += size
+
+				size = File.sizeDirectory(downloader._locationOther(), limit = limit)
+				if size < 0: return None
+				else: total += size
+
 				return total
 
 	def refresh(self):

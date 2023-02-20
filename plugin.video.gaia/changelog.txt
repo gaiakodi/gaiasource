@@ -1,4 +1,26 @@
 
+[B]6.1.7 (2023.02.20)[/B]
+- Fixed Psutil import.
+- Increased IMDb image sizes.
+- Added cropping for IMDb images.
+- Added biography to people menus.
+- Added paging to people menus.
+- Improved people menus.
+- Added people category to awards.
+- Fixed type for IMDb show lists.
+- Updated icon themes.
+- Updated menu descriptions.
+- Added famous people menus.
+- Added people gender menus.
+- Added streaming networks lists.
+- Improved cleanup tool speed.
+- Auto refresh Trakt progress list.
+- Improved auto audio stream selection.
+- Improved rating dialog.
+- Added show rating after each season.
+- Updated provider domains.
+- Fixed font issue for Kodi skins.
+
 [B]6.1.6 (2023.02.13)[/B]
 - Added awards category.
 - Possible fix for reload on playback failure.

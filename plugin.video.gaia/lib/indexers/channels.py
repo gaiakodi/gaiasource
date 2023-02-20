@@ -149,7 +149,7 @@ class Channels(object):
 		channels = self.mCache.cacheLong(self.skyChannels)
 		if menu and channels:
 			items = sorted(channels, key = lambda i : i['name'].lower())
-			items = [{'action' : 'channelsRetrieve', 'name' : i['name'].upper(), 'link' : i['id'], 'image' : 'networks.png'} for i in items]
+			items = [{'action' : 'channelsRetrieve', 'name' : i['name'].upper(), 'link' : i['id'], 'image' : 'aired.png'} for i in items]
 			self.directory(items)
 		return channels
 
@@ -166,7 +166,7 @@ class Channels(object):
 				for channel in channels:
 					name = self.nameClean(name = channel['name'].lower(), group = group.replace(' ', ''))
 					if name.startswith(group): ids.append(channel['id'])
-				if ids: items.append({'action' : 'channelsRetrieve', 'name' : group.upper(), 'link' : ','.join(ids), 'image' : 'networks.png'})
+				if ids: items.append({'action' : 'channelsRetrieve', 'name' : group.upper(), 'link' : ','.join(ids), 'image' : 'aired.png'})
 			self.directory(items)
 		return channels
 

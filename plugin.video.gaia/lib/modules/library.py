@@ -778,14 +778,15 @@ class Library(object):
 
 	@classmethod
 	def size(self):
-		return self.sizeDatabase() + self.sizeFile()
+		files = self.sizeFile()
+		return self.sizeDatabase() + (files if files > 0 else 0)
 
 	@classmethod
 	def sizeDatabase(self):
 		return Database(name = Library.DatabaseName, connect = False)._size()
 
 	@classmethod
-	def sizeFile(self):
+	def sizeFile(self, limit = True):
 		total = 0
 		checked = []
 		paths = [
@@ -794,10 +795,19 @@ class Library(object):
 			self._location(media = Media.TypeShort, make = False),
 			self._location(media = Media.TypeShow, make = False),
 		]
+
+		# NB: Limit the total size at 5GB after which size calculations terminate.
+		# Otherwise if the user makes the library path point to a HDD with 100s of movies, this function can take a very long time, sinze it will scan the entire HDD.
+		if limit is True: limit = 5368709120
+		elif not limit: limit = None
+
 		for path in paths:
 			if not path in checked:
-				total += File.sizeDirectory(path)
+				size = File.sizeDirectory(path, limit = limit)
+				if size < 0: return None
+				total += size
 				checked.append(path)
+
 		return total
 
 	##############################################################################
