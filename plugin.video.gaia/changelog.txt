@@ -1,4 +1,14 @@
 
+[B]6.1.8 (2023.02.22)[/B]
+- Added chapter support.
+- Added episode intro skipping.
+- Updated binge delay with outro chapter.
+- Possible fix for external module upgrades.
+- Changed release edition color.
+- Improved scraping endpoint.
+- Improved metadata cached.
+- Improved metadata ID lookups.
+
 [B]6.1.7 (2023.02.20)[/B]
 - Fixed Psutil import.
 - Increased IMDb image sizes.

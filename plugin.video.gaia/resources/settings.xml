@@ -3066,6 +3066,30 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## PLAYBACK - SKIP ########## -->
+			<group id="playback.skip" label="33897">
+				<setting id="playback.skip.enabled" type="boolean" label="33462" help="34566">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="playback.skip.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="playback.skip.time.label" type="string" label="32312" help="34567" parent="playback.skip.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=playback.skip.time&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.skip.enabled">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
 			<!-- ########## PLAYBACK - BINGE ########## -->
 			<group id="playback.binge" label="35580">
 				<setting id="playback.binge.enabled" type="boolean" label="35579" help="34407">

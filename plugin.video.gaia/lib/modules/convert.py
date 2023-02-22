@@ -486,6 +486,7 @@ class ConverterDuration(ConverterBase):
 	FormatInitialLong = 'formatinitiallong' # 1Y 2M 105D 23H 45M 12S
 	FormatInitialFixed = 'formatinitialfixed' # Fixed according to unit. Eg: 1523M or 1.6H
 
+	FormatClockMini = 'formatclockmini' # MM:SS - 12:23
 	FormatClockShort = 'formatclockshort' # HH:MM:SS - 256:12:23
 	FormatClockMedium = 'formatclockmedium' # DD:HH:MM:SS - 105:23:45:12
 	FormatClockLong = 'formatclocklong' # YY:MM:DD:HH:MM:SS - 01:11:28:14:20
@@ -730,12 +731,12 @@ class ConverterDuration(ConverterBase):
 	def _stringClock(self, value):
 		return '%02d' % value
 
-	def _stringClocks(self, years, months, days, hours, minutes, seconds):
+	def _stringClocks(self, years, months, days, hours, minutes, seconds, full = True):
 		units = []
 		if years > 0: units.append(self._stringClock(years))
 		if months > 0: units.append(self._stringClock(months))
 		if days > 0: units.append(self._stringClock(days))
-		units.append(self._stringClock(hours))
+		if full or hours > 0: units.append(self._stringClock(hours))
 		units.append(self._stringClock(minutes))
 		units.append(self._stringClock(seconds))
 		result = ':'.join(filter(None, units)) # Join if not empty.
@@ -765,7 +766,9 @@ class ConverterDuration(ConverterBase):
 			places = 0 if (valueYears == 0 or valueYears >= 10 or format == ConverterDuration.FormatInitialOptimal) else 1
 		else:
 			start = ConverterDuration.UnitYear
-			if format in [ConverterDuration.FormatWordShort, ConverterDuration.FormatAbbreviationShort, ConverterDuration.FormatInitialShort, ConverterDuration.FormatClockShort]:
+			if format in [ConverterDuration.FormatClockMini]:
+				start = ConverterDuration.UnitMinute
+			elif format in [ConverterDuration.FormatWordShort, ConverterDuration.FormatAbbreviationShort, ConverterDuration.FormatInitialShort, ConverterDuration.FormatClockShort]:
 				start = ConverterDuration.UnitHour
 			elif format in [ConverterDuration.FormatWordMedium, ConverterDuration.FormatAbbreviationMedium, ConverterDuration.FormatInitialMedium, ConverterDuration.FormatClockMedium]:
 				start = ConverterDuration.UnitDay
@@ -784,8 +787,8 @@ class ConverterDuration(ConverterBase):
 			result = self._stringAbbreviations(valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds, places = places)
 		elif format in [ConverterDuration.FormatInitialOptimal, ConverterDuration.FormatInitialOptimal, ConverterDuration.FormatInitialMinimal, ConverterDuration.FormatInitialShort, ConverterDuration.FormatInitialMedium, ConverterDuration.FormatInitialLong]:
 			result = self._stringInitials(valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds, places = places)
-		elif format in [ConverterDuration.FormatClockShort, ConverterDuration.FormatClockMedium, ConverterDuration.FormatClockLong]:
-			result = self._stringClocks(valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds)
+		elif format in [ConverterDuration.FormatClockMini, ConverterDuration.FormatClockShort, ConverterDuration.FormatClockMedium, ConverterDuration.FormatClockLong]:
+			result = self._stringClocks(valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds, full = not format == ConverterDuration.FormatClockMini)
 		elif format in [ConverterDuration.FormatFixed, ConverterDuration.FormatWordFixed, ConverterDuration.FormatAbbreviationFixed, ConverterDuration.FormatInitialFixed]:
 			result = self._stringFixed(unit, format = format, places = places)
 

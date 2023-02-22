@@ -4493,7 +4493,7 @@ class Stream(Serializer):
 	ReleaseEditionDefinitive	= 'definitive'	# Definitive Edition
 	ReleaseEditionUltimate		= 'ultimate'	# Ultimate Cut
 	ReleaseEditionLimited		= 'limited'		# Limited Edition
-	ReleaseEditionUnrated		= 'unrated'		# Unrated/Uncensored Edition
+	ReleaseEditionUncensored	= 'uncensored'	# Uncensored/Unrated Edition
 	ReleaseEditionAlternative	= 'alternative'	# Alternative Edition
 	ReleaseEditionFan			= 'fan'			# Fan Edit Edition
 	ReleaseEditionTheatrical	= 'theatrical'	# Theatrical Version
@@ -4527,7 +4527,7 @@ class Stream(Serializer):
 			(ReleaseEditionSuper,		u'(super(?:{separator}*duper|fan))'), # Super Duper: Deadpool, Superfan: Avatar
 			(ReleaseEditionUltimate,	u'((?:ultimat(?:e|iv)|ultieme|(?:ú|u)ltim[ao]|definitiv[ao]|última){apostrophe}{item})'),
 			(ReleaseEditionDefinitive,	u'(definitive)'),
-			(ReleaseEditionUnrated,		u'(unrated?|uncensor(?:ed)?)'),
+			(ReleaseEditionUncensored,	u'(unrated?|uncensor(?:ed)?)'),
 			(ReleaseEditionAlternative,	u'(alternat(?:e|ive))'),
 			(ReleaseEditionFestival,	u'(festival)'),
 			(ReleaseEditionRetail,		u'(retail{apostrophe}{item})'),
@@ -4558,7 +4558,7 @@ class Stream(Serializer):
 		ReleaseEditionDefinitive	: { LabelShort : 'DEF',		LabelMedium : 'Definitive',		LabelLong : 'Definitive Edition' },
 		ReleaseEditionUltimate		: { LabelShort : 'ULT',		LabelMedium : 'Ultimate',		LabelLong : 'Ultimate Edition' },
 		ReleaseEditionLimited		: { LabelShort : 'LTD',		LabelMedium : 'Limited',		LabelLong : 'Limited Edition' },
-		ReleaseEditionUnrated		: { LabelShort : 'UNR',		LabelMedium : 'Unrated',		LabelLong : 'Unrated Edition' },
+		ReleaseEditionUncensored	: { LabelShort : 'UNC',		LabelMedium : 'Uncensored',		LabelLong : 'Uncensored Edition' },
 		ReleaseEditionAlternative	: { LabelShort : 'ALT',		LabelMedium : 'Alternative',	LabelLong : 'Alternative Edition' },
 		ReleaseEditionFan			: { LabelShort : 'FAN',		LabelMedium : 'Fan',			LabelLong : 'Fan Edit Edition' },
 		ReleaseEditionTheatrical	: { LabelShort : 'THE',		LabelMedium : 'Theatrical',		LabelLong : 'Theatrical Edition' },
@@ -4579,7 +4579,7 @@ class Stream(Serializer):
 		ReleaseEditionDefinitive	: { OrderInterface : 11,	OrderSorting : 11 },
 		ReleaseEditionUltimate		: { OrderInterface : 6,		OrderSorting : 6 },
 		ReleaseEditionLimited		: { OrderInterface : 7,		OrderSorting : 7 },
-		ReleaseEditionUnrated		: { OrderInterface : 8,		OrderSorting : 8 },
+		ReleaseEditionUncensored	: { OrderInterface : 8,		OrderSorting : 8 },
 		ReleaseEditionAlternative	: { OrderInterface : 10,	OrderSorting : 10 },
 		ReleaseEditionFan			: { OrderInterface : 9,		OrderSorting : 9 },
 		ReleaseEditionTheatrical	: { OrderInterface : 13,	OrderSorting : 13 },
@@ -22961,7 +22961,7 @@ class Stream(Serializer):
 	@classmethod
 	def releaseEditionColor(self):
 		def _releaseEditionColor():
-			return interface.Format.colorLighter(color = interface.Format.colorAlternative(), change = 0.1)
+			return interface.Format.colorLighter(color = interface.Format.colorPoor())
 		return self._cache(_releaseEditionColor)
 
 	'''

@@ -848,6 +848,14 @@ class Window(object):
 		except: pass
 
 	@classmethod
+	def focusHas(self, control = IdListControl):
+		try:
+			if not tools.Tools.isInteger(control): control = control.getId()
+			return self._instance().mWindow.getFocusId() == control
+		except: pass
+		return False
+
+	@classmethod
 	def itemClear(self, control = IdListControl):
 		try: return self._instance().control(control).reset()
 		except: pass
@@ -1048,8 +1056,8 @@ class Window(object):
 		elif width is True: width = Window.SeparatorLineWide
 		return [width, Window.SeparatorLineHeight + Window.SeparatorLinePadding]
 
-	def _dimensionButton(self, text = None, icon = None):
-		return [(len(self._buttonText(text = text, icon = icon)) * 14) if text else self._scaleWidth(250), self._scaleHeight(50)]
+	def _dimensionButton(self, text = None, icon = None, adjust = 1.0):
+		return [int(len(self._buttonText(text = text, icon = icon)) * 14 * adjust) if text else self._scaleWidth(250), self._scaleHeight(50)]
 
 	def _buttonText(self, text, icon = None):
 		text = interface.Translation.string(text)
@@ -1186,7 +1194,7 @@ class Window(object):
 			return self._addImage(path = path, x = 0, y = 0, width = self.mWidth, height = self.mHeight)
 		return None
 
-	def _addButton(self, text = None, x = None, y = None, width = None, height = None, callback = None, icon = None, iconSize = None, select = SelectNone, highlight = None, bold = True, uppercase = True, alignment = AlignmentCenter, size = None, visible = True, type = ButtonMedium):
+	def _addButton(self, text = None, x = None, y = None, width = None, height = None, callback = None, icon = None, iconSize = None, iconOffset = None, select = SelectNone, highlight = None, bold = True, uppercase = True, alignment = AlignmentCenter, size = None, visible = True, type = ButtonMedium, animation = None):
 		dimension = self._dimensionButton(text = text, icon = icon)
 		if width is None: width = dimension[0]
 		if height is None: height = dimension[1]
@@ -1204,22 +1212,23 @@ class Window(object):
 		pathNormal = self._pathImage(['button', type, 'unfocused'])
 		pathFocus = self._pathImage(['button', type, 'focused'])
 
-		control = self._add(xbmcgui.ControlButton(x, y, width, height, interface.Format.font(text, bold = bold, uppercase = uppercase), focusTexture = pathFocus, noFocusTexture = pathNormal, alignment = alignment, textColor = Window._colorDefault(), font = size), visible = visible)
+		control = self._add(xbmcgui.ControlButton(x, y, width, height, interface.Format.font(text, bold = bold, uppercase = uppercase), focusTexture = pathFocus, noFocusTexture = pathNormal, alignment = alignment, textColor = Window._colorDefault(), font = size), visible = visible, animation = animation)
 
 		if not icon is None:
 			sizeIcon = int(height * 0.8 * (iconSize if iconSize else 1))
-			iconX = int(x + (width * 0.1))
+			iconX = int(x + (width * (0.1 if iconOffset is None else iconOffset)))
 			iconY = int(y + ((height - sizeIcon) / 2.0))
-			controlIcon = self._addImage(path = self._pathIcon(icon = icon, quality = interface.Icon.QualityMini), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible)
+			controlIcon = self._addImage(path = self._pathIcon(icon = icon, quality = interface.Icon.QualityMini), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible, animation = animation)
 			components['icon'] = controlIcon
 		else:
 			controlIcon = None
 
 		if highlight:
 			if highlight is True: highlight = self._colorHighlight()
-			controlHighlight = self._addImage(path = self._pathImage(['button', type, 'highlight']), x = x + 2, y = y + 2, width = width - 4, height = height - 4, visible = visible, color = highlight)
+			controlHighlight = self._addImage(path = self._pathImage(['button', type, 'highlight']), x = x + 2, y = y + 2, width = width - 4, height = height - 4, visible = visible, color = highlight, animation = animation)
 			components['highlight'] = controlHighlight
-			components['animation'] = [('Conditional', 'effect=fade start=100 end=0 time=1000 pulse=true tween=linear condition=String.IsEqual(Window.Property(%s),true)' % Window.PropertyAnimation)]
+			if not 'animation' in components: components['animation'] = []
+			components['animation'].append([('Conditional', 'effect=fade start=100 end=0 time=1000 pulse=true tween=linear condition=String.IsEqual(Window.Property(%s),true)' % Window.PropertyAnimation)])
 		else:
 			controlHighlight = None
 
@@ -1227,7 +1236,7 @@ class Window(object):
 			sizeIcon = 32
 			iconX = int(x - (sizeIcon / 3))
 			iconY = int(y - (sizeIcon / 3))
-			controlSelect = self._addImage(path = self._pathImage(['button', 'select', 'selected' if select == Window.SelectYes else 'unselected' if select == Window.SelectNo else '']), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible)
+			controlSelect = self._addImage(path = self._pathImage(['button', 'select', 'selected' if select == Window.SelectYes else 'unselected' if select == Window.SelectNo else '']), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible, animation = animation)
 			components['select'] = controlSelect
 		else:
 			controlSelect = None
@@ -1242,7 +1251,7 @@ class Window(object):
 
 		return [control, controlIcon, controlSelect, controlHighlight]
 
-	def _setButton(self, control, text = None, icon = None, highlight = None, bold = True, uppercase = True, size = None):
+	def _setButton(self, control, text = None, icon = None, highlight = None, bold = True, uppercase = True, size = None, width = None):
 		# From _initializeAnimations().
 		if tools.Tools.isDictionary(control):
 			temp = [None, None, None, None]
@@ -1256,8 +1265,10 @@ class Window(object):
 		if text:
 			if size is None: size = interface.Font.fontLarge()
 			control[0].setLabel(interface.Format.font(self._buttonText(text = text, icon = icon), bold = bold, uppercase = uppercase), font = size)
-			dimension = self._dimensionButton(text = text, icon = icon)
-			control[0].setWidth(dimension[0])
+			if width is None:
+				dimension = self._dimensionButton(text = text, icon = icon)
+				width = dimension[0]
+			if width: control[0].setWidth(width)
 		if icon and control[1]: control[1].setImage(self._pathIcon(icon = icon, quality = interface.Icon.QualityMini))
 		if not highlight is None and control[3]: control[3].setVisible(highlight)
 
@@ -5367,3 +5378,167 @@ class WindowWizard(object):
 	def showFinal(self):
 		WindowWizardOutro.close()
 		self.close()
+
+
+class WindowSkip(Window):
+
+	StateHidden = 0
+	StatePartial = 1
+	StateVisible = 2
+
+	DurationVisible = 7
+	DurationAnimation = 1
+
+	PropertyAnimation = 'GaiaAnimationSkip'
+
+	def __init__(self, **kwargs):
+		super(WindowSkip, self).__init__(**kwargs)
+
+		self.mSkipDummy = None
+		self.mSkipButton = None
+		self.mSkipState = None
+		self.mSkipCanceled = False
+		self.mSkipInteract = False
+		self.mSkipTime = WindowSkip.DurationVisible
+		self.mSkipClock = '00:00'
+		self.mSkipThread = None
+		self.mSkipCallback = None
+
+	def _initializeStart2(self):
+		super(WindowSkip, self)._initializeStart2()
+
+		self._addButtons()
+		self._onAction(WindowBase.ActionMoveLeft, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveRight, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveUp, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveDown, self._actionInteract)
+		self._onAction(WindowBase.ActionSelectItem, self._actionInteract)
+		for action in WindowBase.ActionsCancel: self._onAction(action, self._actionInteract)
+
+	def _initializeEnd1(self):
+		super(WindowSkip, self)._initializeEnd1()
+		self._actionToggle()
+
+	@classmethod
+	def show(self, duration = None, time = None, callback = None, wait = False, initialize = True, close = False):
+		instance = self.instance()
+		if not instance:
+			super(WindowSkip, self)._show(wait = wait, initialize = initialize, close = close)
+			instance = self.instance()
+		if instance:
+			if time: instance.mSkipTime = time
+			instance.mSkipClock = self._clock(duration)
+			instance.mSkipCallback = callback
+			instance.mSkipState = None
+			instance.mSkipCanceled = False
+			instance._setButton(control = instance.mSkipButton, text = '%s (+%s)' % (interface.Translation.string(33897), instance.mSkipClock), icon = 'change', width = False)
+			instance._actionToggle()
+
+	@classmethod
+	def cancel(self):
+		instance = self.instance()
+		if instance: instance._actionClose()
+
+	@classmethod
+	def _clock(self, duration):
+		from lib.modules.convert import ConverterDuration
+		return ConverterDuration(value = duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
+
+	def _addButtons(self):
+		text = '%s (+%s)' % (interface.Translation.string(33897), self.mSkipClock)
+		icon = 'change'
+		duration = int(WindowSkip.DurationAnimation * 1000)
+
+		dimension = self._dimensionButton(text = text, icon = icon, adjust = 0.7)
+		self.mSkipDummy = self._addButton(text = text, x = Window.SizeWidth + 10, y = Window.SizeHeight + 10, icon = icon, iconOffset = 0.05, width = dimension[0])
+		width = self.mSkipDummy[0].getWidth()
+
+		x = Window.SizeWidth + 1
+		y = Window.SizeHeight - 150
+		position = width - 7
+
+		self.propertySet(WindowSkip.PropertyAnimation, '')
+		animation = [
+			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowSkip.PropertyAnimation, WindowSkip.StateHidden)),
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (55, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)),
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowSkip.PropertyAnimation, WindowSkip.StateVisible)),
+		]
+		self.mSkipButton = self._addButton(text = text, x = x, y = y, width = dimension[0], callback = self._actionClick, icon = icon, iconOffset = 0.05, animation = animation)
+
+	def _actionClick(self, control = None):
+		try:
+			self._actionInteract(action = WindowBase.ActionSelectItem)
+		except: tools.Logger.error()
+
+	def _actionInteract(self, action = None):
+		try:
+			self.mSkipInteract = True
+			self._actionToggle(action = action)
+		except: tools.Logger.error()
+
+	def _actionToggle(self, action = None):
+		try:
+			if action in WindowBase.ActionsCancel:
+				self._actionClose()
+			elif action == WindowBase.ActionSelectItem:
+				if self.focusHas(control = self.mSkipButton[0]):
+					if self.mSkipCallback: self.mSkipCallback()
+					self._actionClose()
+				else:
+					self.focus(control = self.mSkipButton[0])
+			else:
+				if self.mSkipState is None:
+					self.focus(self.mSkipButton[0])
+					self.mSkipState = WindowSkip.StateVisible
+					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+					Pool.thread(target = self._threadPartial, start = True)
+				elif self.focusHas(control = self.mSkipButton[0]):
+					if self.mSkipState == WindowSkip.StateHidden:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StatePartial
+					elif self.mSkipState == WindowSkip.StatePartial:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StateVisible
+						elif action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StateHidden
+					elif self.mSkipState == WindowSkip.StateVisible:
+						if action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StatePartial
+
+					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+
+					if self.mSkipState == WindowSkip.StateHidden and (not self.mSkipThread or not self.mSkipThread.alive()):
+						self.mSkipThread = Pool.thread(target = self._threadClose, start = True)
+				else:
+					self.focus(control = self.mSkipButton[0])
+		except: tools.Logger.error()
+
+	def _actionClose(self, sleep = True):
+		try:
+			self.mSkipState = WindowSkip.StateHidden
+			self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+			self.mSkipCanceled = True
+			if sleep: tools.Time.sleep(WindowSkip.DurationAnimation * 0.1)
+			self.close()
+		except: tools.Logger.error()
+
+	def _threadClose(self):
+		try:
+			# Close the window after being hidden for a few seconds.
+			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowSkip.
+			for i in range(max(2, min(5, int(self.mSkipTime / 2.0))) * 2):
+				if self.mSkipCanceled or not self.mSkipState == WindowSkip.StateHidden: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateHidden: self.close()
+		except: tools.Logger.error()
+
+	def _threadPartial(self):
+		try:
+			# Partially hide after a few seconds.
+			for i in range(self.mSkipTime * 2):
+				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StateVisible: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
+
+			# Fully hide after a few seconds.
+			for i in range(self.mSkipTime * 2):
+				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StatePartial: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)
+		except: tools.Logger.error()

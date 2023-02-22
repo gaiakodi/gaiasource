@@ -1461,7 +1461,7 @@ class Movies(object):
 	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None):
 		try:
 			single = False
-			if items or (idImdb or idTmdb) or (title and year):
+			if items or (idImdb or idTmdb or idTvdb or idTrakt) or title:
 				if items:
 					if not Tools.isArray(items):
 						single = True

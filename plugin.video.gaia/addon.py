@@ -2397,6 +2397,91 @@ elif action.startswith('orion'):
 elif action.startswith('scrape'):
 
 	if action == 'scrape':
+		'''
+			#################################################################################################################################################################
+			# FOR 3RD-PARTY DEVELOPERS                                                                                                                                      #
+			#################################################################################################################################################################
+
+			If you want to initiate a Gaia scrape from an external addon or widget, use the following command.
+
+			COMMAND:
+
+				plugin://plugin.video.gaia/?action=...&media=...&imdb=...&tmdb=...&tvdb=...&trakt=...&title=...&year=...&season=...&episode=...
+
+			PYTHON:
+
+				import xbmc
+				xbmc.executebuiltin("RunPlugin(plugin://plugin.video.gaia/?action=scrape&<other parameters here>)")
+
+			PARAMETERS:
+
+				- action (required): scrape
+				- media (required): movie|show
+				- imdb (optional): IMDb ID.
+				- tmdb (optional): TMDb ID.
+				- tvdb (optional): TVDb ID.
+				- trakt (optional): Trakt ID.
+				- title (optional): URL-encoded title. For shows this is the show title, not the episode title.
+				- year (optional): Year of release. For shows this is the year the 1st season/episode was released.
+				- season (optional): The season number. Only required for shows. Specials have 0 as season number.
+				- episode (optional): The episode number. Only required for shows.
+
+				All other parameters used by this endpoint are not required. Gaia will automatically fill in these parameters based
+				on the user's settings and the metadata retrieved from the above parameters.
+
+			LOOKUP:
+
+				- You can scrape by using a single or multiple IDs, by providing a title and year, or both.
+				- Scraping by ID is always better, faster, and more reliable than scraping by title and year.
+				- If IDs are provided, no title or year is required.
+				- If a title is provided, a year is not required. However, a year will substantially improve the chances of picking
+				  the correct title, especially if there are multiple movies/shows with the same title, but released in different years.
+
+			IDS:
+
+				The best way to scrape is by using an ID. You can pass in IDs from multiple providers and let Gaia figure out which
+				one to use. The reliability and accuracy of IDs is as follows (from most reliable to least reliable):
+
+				- Movies: IMDb, TMDb, Trakt, (TVDb)
+				- Shows: IMDb, TVDb, Trakt, (TMDb)
+
+				You should avoid searching movies by TVDb ID and shows by TMDb ID. Although it might work in some cases, most of the time
+				nothing will be found. If you have IDs from multiple providers, just pass all of them in.
+
+			EXAMPLES:
+
+				- Movies:
+					Search by single ID:
+						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190
+						plugin://plugin.video.gaia/?action=scrape&media=movie&tmdb=76341
+						plugin://plugin.video.gaia/?action=scrape&media=movie&trakt=56360
+					- Search by multiple IDs:
+						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360
+					- Search by title and year:
+						plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road&year=2015
+					- Search by title:
+						plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road
+					- Search by anything:
+						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360&title=Mad%20Max%3A%20Fury%20Road&year=2015
+
+				- Shows:
+					Search by single ID:
+						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&season=8&episode=2
+						plugin://plugin.video.gaia/?action=scrape&media=show&tvdb=121361&season=8&episode=2
+						plugin://plugin.video.gaia/?action=scrape&media=show&trakt=1390&season=8&episode=2
+					- Search by multiple IDs:
+						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&season=8&episode=2
+					- Search by title and year:
+						plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&year=2011&season=8&episode=2
+					- Search by title:
+						plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&season=8&episode=2
+					- Search by anything:
+						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&title=Game%20of%20Thrones&year=2011&season=8&episode=2
+
+			#################################################################################################################################################################
+		'''
+
+
 		# Sometimes when using the Kore remote app and clicking on a movie/episode to start a scrape, the user might accidentally click twice, which starts the scraping process twice.
 		# This is not a huge issue for other endpoints, but the scrape endpoint starts many threads and uses many resources, and should be avoided.
 		# This is not a perfect solution, since both processes might call windowPropertyGet() before the other process is able to call windowPropertySet().
@@ -2433,9 +2518,11 @@ elif action.startswith('scrape'):
 				imdb = parameters.get('imdb')
 				tmdb = parameters.get('tmdb')
 				tvdb = parameters.get('tvdb')
+				trakt = parameters.get('trakt')
 
 				title = parameters.get('title')
 				tvshowtitle = parameters.get('tvshowtitle')
+
 				year = parameters.get('year')
 				if year: year = int(year)
 				premiered = parameters.get('premiered')
@@ -2454,7 +2541,7 @@ elif action.startswith('scrape'):
 				except: pack = None
 				items = parameters.get('items')
 
-				core.Core(media = media, kids = kids, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, season = season, episode = episode, premiered = premiered, metadata = metadata, autopack = autopack, autoplay = autoplay, library = library, preset = preset, binge = binge, cache = cache, pack = pack, items = items)
+				core.Core(media = media, kids = kids, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, premiered = premiered, metadata = metadata, autopack = autopack, autoplay = autoplay, library = library, preset = preset, binge = binge, cache = cache, pack = pack, items = items)
 			except: tools.Logger.error()
 			tools.System.windowPropertyClear(property)
 

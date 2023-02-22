@@ -515,6 +515,7 @@ class MetaCache(Database):
 				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? ORDER BY time DESC;' % type
 				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
 				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
+				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? ORDER BY time DESC;' % type
 			elif typeSet:
 				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
 			elif typeShow:
@@ -523,18 +524,21 @@ class MetaCache(Database):
 				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? ORDER BY time DESC;' % type
 				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
 				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? ORDER BY time DESC;' % type
+				querySelect6 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
 			elif typeSeason:
 				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTvdb = ? ORDER BY time DESC;' % type
 				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? ORDER BY time DESC;' % type
 				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? ORDER BY time DESC;' % type
 				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? ORDER BY time DESC;' % type
 				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? ORDER BY time DESC;' % type
+				querySelect6 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? ORDER BY time DESC;' % type
 			elif typeEpisode:
 				querySelect1 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND idTvdb = ? AND season = ? ORDER BY time DESC;' % type
 				querySelect2 = 'SELECT time, complete, settings, data FROM `%s` WHERE idImdb = ? AND season = ? ORDER BY time DESC;' % type
 				querySelect3 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvdb = ? AND season = ? ORDER BY time DESC;' % type
 				querySelect4 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTrakt = ? AND season = ? ORDER BY time DESC;' % type
 				querySelect5 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTvmaze = ? AND season = ? ORDER BY time DESC;' % type
+				querySelect6 = 'SELECT time, complete, settings, data FROM `%s` WHERE idTmdb = ? AND season = ? ORDER BY time DESC;' % type
 
 			for i in range(len(items)):
 				try:
@@ -545,7 +549,7 @@ class MetaCache(Database):
 					parameters = None
 
 					if typeMovie:
-						if idImdb or idTmdb or idTrakt:
+						if idImdb or idTmdb or idTrakt or idTvdb:
 							parameters = []
 							if idImdb and idTmdb:
 								query = querySelect1
@@ -559,6 +563,9 @@ class MetaCache(Database):
 							elif idTrakt:
 								query = querySelect4
 								parameters = [idTrakt]
+							elif idTvdb:
+								query = querySelect5
+								parameters = [idTvdb]
 					elif typeSet:
 						if idTmdb:
 							parameters = []
@@ -566,7 +573,7 @@ class MetaCache(Database):
 								query = querySelect1
 								parameters = [idTmdb]
 					else:
-						if idImdb or idTvdb or idTrakt or idTvmaze:
+						if idImdb or idTvdb or idTrakt or idTvmaze or idTmdb:
 							parameters = []
 							if idImdb and idTvdb:
 								query = querySelect1
@@ -583,6 +590,9 @@ class MetaCache(Database):
 							elif idTvmaze:
 								query = querySelect5
 								parameters = [idTvmaze]
+							elif idTmdb:
+								query = querySelect6
+								parameters = [idTmdb]
 							if typeEpisode:
 								season = self._season(items[i])
 								parameters.append(season)

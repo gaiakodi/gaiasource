@@ -25,7 +25,7 @@ import re
 from lib import debrid
 from lib.debrid.external import External, Orion, Alldebrid, Debridlink
 
-from lib.modules import trakt
+from lib.modules import trakt as traktx
 from lib.modules import network
 from lib.modules import interface
 from lib.modules import window
@@ -510,7 +510,7 @@ class Core(object):
 						return True
 		return False
 
-	def scrape(self, title = None, year = None, imdb = None, tmdb = None, tvdb = None, season = None, episode = None, tvshowtitle = None, premiered = None, metadata = None, autoplay = None, autopack = None, preset = None, pack = None, library = False, exact = False, items = None, process = True, binge = None, cache = True):
+	def scrape(self, title = None, tvshowtitle = None, year = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, premiered = None, metadata = None, autoplay = None, autopack = None, preset = None, pack = None, library = False, exact = False, items = None, process = True, binge = None, cache = True):
 		try:
 			self.propertyStatusSet(Core.StatusInitialize)
 
@@ -553,14 +553,30 @@ class Core(object):
 			if tools.Tools.isString(metadata): metadata = tools.Converter.jsonFrom(metadata)
 
 			# Retrieve metadata if not available.
-			# Applies to links from Kodi's local library. The metadata cannot be saved in the link, since Kodi cuts off the link if too long. Retrieve it here afterwards.
+			# Applies to links from Kodi's local library or when launched from an external addon. The metadata cannot be saved in the link, since Kodi cuts off the link if too long. Retrieve it here afterwards.
 			if not metadata:
 				if tvshowtitle or not season is None:
 					from lib.indexers.episodes import Episodes
-					metadata = Episodes().metadata(idImdb = imdb, idTvdb = tvdb, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode)
+					metadata = Episodes().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, filter = True)
 				else:
 					from lib.indexers.movies import Movies
-					metadata = Movies().metadata(idImdb = imdb, idTmdb = tmdb, title = title, year = year)
+					metadata = Movies().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, title = title, year = year, filter = True)
+
+				if metadata:
+					if not title and 'title' in metadata: title = metadata['title']
+					if not tvshowtitle and 'tvshowtitle' in metadata: tvshowtitle = metadata['tvshowtitle']
+					if not year and 'year' in metadata: year = metadata['year']
+					if not season and 'season' in metadata: season = metadata['season']
+					if not episode and 'episode' in metadata: episode = metadata['episode']
+
+					if not imdb and 'imdb' in metadata: imdb = metadata['imdb']
+					if not tmdb and 'tmdb' in metadata: tmdb = metadata['tmdb']
+					if not tvdb and 'tvdb' in metadata: tvdb = metadata['tvdb']
+					if not trakt and 'trakt' in metadata: trakt = metadata['trakt']
+				else:
+					interface.Dialog.notification(title = 33458, message = 33459, icon = interface.Dialog.IconError)
+					self.progressClose(force = True)
+					return
 
 			if exact: self.scrapeLabel = title if title else tvshowtitle
 			else: self.scrapeLabel = tools.Media.titleUniversal(metadata = metadata, title = title if tvshowtitle is None else tvshowtitle, year = year, season = season, episode = episode)
@@ -970,16 +986,17 @@ class Core(object):
 
 				# If there is an abbreviation in the title, remove it.
 				# Eg: "XMA: Xtreme Martial Arts" -> "Xtreme Martial Arts"
-				abbreviation = tools.Regex.extract(data = processedMain[0], expression = '^([A-Z]{3,})', flags = tools.Regex.FlagNone)
-				if abbreviation:
-					capital = tools.Regex.extract(data = processedMain[0], expression = '\s([A-Z])[a-z\d]', group = None, all = True, flags = tools.Regex.FlagNone)
-					if capital:
-						capital = ''.join(capital)
-						if abbreviation.startswith(capital):
-							capital = tools.Regex.remove(data = processedMain[0], expression = '^(%s.*?\s)' % abbreviation)
-							if capital:
-								titles.append(capital)
-								processedMain.insert(1, capital)
+				if processedMain:
+					abbreviation = tools.Regex.extract(data = processedMain[0], expression = '^([A-Z]{3,})', flags = tools.Regex.FlagNone)
+					if abbreviation:
+						capital = tools.Regex.extract(data = processedMain[0], expression = '\s([A-Z])[a-z\d]', group = None, all = True, flags = tools.Regex.FlagNone)
+						if capital:
+							capital = ''.join(capital)
+							if abbreviation.startswith(capital):
+								capital = tools.Regex.remove(data = processedMain[0], expression = '^(%s.*?\s)' % abbreviation)
+								if capital:
+									titles.append(capital)
+									processedMain.insert(1, capital)
 
 				# Add native and alias titles stripped from the main title.
 				# For instance, the Portuguese title for "Eternals" is "Eternals (Eternos)".
@@ -1351,7 +1368,7 @@ class Core(object):
 			def additionalTrakt(imdb):
 				try:
 					self.additionalLockTrakt.acquire() # Lock, since this function can be called for extracting the year OR the original title, and we only want to make the request once.
-					if imdb: return trakt.SearchMovie(imdb = imdb)
+					if imdb: return traktx.SearchMovie(imdb = imdb)
 				except:
 					tools.Logger.error()
 				finally:
@@ -1632,7 +1649,7 @@ class Core(object):
 							break
 
 					if not found and imdb:
-						items = trakt.getTVShowTranslation if titleShow else trakt.getMovieTranslation
+						items = traktx.getTVShowTranslation if titleShow else traktx.getMovieTranslation
 						items = items(imdb, languages, full = True)
 						if items:
 							for item in items:
@@ -1656,7 +1673,7 @@ class Core(object):
 			def additionalTitleAlias(title, titleShow, imdb, tvdb):
 				self.progressTitleAlias = 25
 				try:
-					aliases = trakt.getTVShowAliases(imdb) if titleShow else trakt.getMovieAliases(imdb)
+					aliases = traktx.getTVShowAliases(imdb) if titleShow else traktx.getMovieAliases(imdb)
 					if not aliases: aliases = []
 
 					titleAliases = {}

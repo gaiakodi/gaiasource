@@ -2471,11 +2471,11 @@ msgid "Disc Box"
 msgstr ""
 
 msgctxt "#33458"
-msgid "[GAIA-NO-LABEL]"
+msgid "Missing Metadata"
 msgstr ""
 
 msgctxt "#33459"
-msgid "[GAIA-NO-LABEL]"
+msgid "No Metadata Found For This Title"
 msgstr ""
 
 msgctxt "#33460"
@@ -2487,7 +2487,7 @@ msgid "Automatic Playback"
 msgstr ""
 
 msgctxt "#33462"
-msgid "[GAIA-NO-LABEL]"
+msgid "Skip Intro"
 msgstr ""
 
 msgctxt "#33463"
@@ -6860,6 +6860,14 @@ msgstr ""
 
 msgctxt "#34565"
 msgid "Hide episodes with playcount discrepancies from the Trakt progress menu. If all episodes of a show were watched N times, except one episode which was watched N+1 times, the show will be listed under the Trakt progress. This setting can be used to hide these shows from the Trakt progress. The [I]Disabled[/I]  option will always list all shows, even those with discrepancies. The [I]Lenient[/I]  option will only hide shows with major discrepancies.  The [I]Strict[/I] option will hide shows with minor or major discrepancies."
+msgstr ""
+
+msgctxt "#34566"
+msgid "Show a button during episode playback that allows skipping the intro or recap and directly go to the start of the episode. This only works if the video being played has chapters. Also note that sometimes the timestamps of chapters are inaccurate."
+msgstr ""
+
+msgctxt "#34567"
+msgid "Specify how long the skip button is shown before being hidden automatically. The button is first shown fully for this period of time, then partially hidden for the same amount of time, before being fully hidden."
 msgstr ""
 
 

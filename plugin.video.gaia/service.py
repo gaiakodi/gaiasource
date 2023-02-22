@@ -18,6 +18,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+# Reset possible old modules after the addon was updated.
+# Otherwise after upgrade, Gaia throws errors about copied modules under the __gaia__ directory.
+from lib.modules.external import Importer, Loader
+Importer.reset()
+Loader.reset()
+
 # Reload here if the invoker settings changed after upgrading Gaia.
 # This will cause Kodi to freeze for a bit.
 # Once reloaded, Kodi will restart all services, so this script will be called again.

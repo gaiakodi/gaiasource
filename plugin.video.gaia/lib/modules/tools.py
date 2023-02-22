@@ -5270,6 +5270,20 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
+		'playback.skip.time' : {
+			'type' : CustomDuration,
+			'title' : 32312,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 7,
+				'minimum' : 1,
+				'maximum' : 180,
+			},
+			'special' : {
+				'zero' : SpecialDefault,
+				'none' : SpecialDefault,
+			},
+		},
 		'playback.buffer.monitor.delay' : {
 			'type' : CustomDuration,
 			'title' : 33020,
@@ -12245,7 +12259,7 @@ class Donations(object):
 					self.show(wait = wait)
 					interface.Loader.hide()
 					return True
-		interface.Loader.hide()
+				interface.Loader.hide()
 		return False
 
 ###################################################################

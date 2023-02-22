@@ -671,7 +671,14 @@ class Player(xbmc.Player):
 
 	def _bingeDelay(self):
 		if self.bingeDelay is None:
-			self.bingeDelay = tools.Binge.delay()
+			# If an outro chapter is available, sync the binge window accordingly.
+			try:
+				outro = Chapter.chapterOutro(single = True)
+				if outro: self.bingeDelay = int(self.getTotalTime() - outro['time']['start'] + 1)
+			except: tools.Logger.error()
+
+			if not self.bingeDelay: self.bingeDelay = tools.Binge.delay()
+
 			if self.bingeDelay == 0:
 				try: self.bingeDelay = self.getTotalTime()
 				except:
@@ -1382,6 +1389,7 @@ class Player(xbmc.Player):
 	def streamSelect(self):
 		Audio.select() # Must be before subtitles, since the subtitles might need the current audio stream/language.
 		Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
+		if self.mediaTelevision: Chapter.select()
 
 	def streamSubtitle(self):
 		Subtitle.internal(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
@@ -2143,3 +2151,154 @@ class Subtitle(Streamer):
 		Subtitle.InternalInitial = True
 
 		return status
+
+
+class Chapter(Streamer):
+
+	TypePromo = 'promo'
+	TypeIntro = 'intro'
+	TypeRecap = 'recap'
+	TypeStory = 'story'
+	TypeOutro = 'outro'
+	TypeEnd = 'end' # Often there is an extra chapter to indicate the end of the chapter.
+	TypeDefault = TypeStory
+	TypesSkip = [TypePromo, TypeIntro, TypeRecap]
+	TypesExpression = {
+		TypePromo : '(promo)',
+		TypeIntro : '(intro|start|theme|trailer)',
+		TypeOutro : '(outro|credit|finish)',
+		TypeRecap : '(recap|refresh)',
+	}
+
+	Chapters = []
+
+	@classmethod
+	def settingsEnabled(self):
+		return tools.Settings.getBoolean('playback.skip.enabled')
+
+	@classmethod
+	def settingsTime(self):
+		return tools.Settings.getCustom('playback.skip.time')
+
+	@classmethod
+	def chapterSkip(self):
+		return {chapter['percent']['start'] : chapter for chapter in Chapter.Chapters if chapter['skip'] and chapter['time']['duration'] > 10}
+
+	@classmethod
+	def chapterOutro(self, single = True):
+		result = [chapter for chapter in Chapter.Chapters if chapter['type'] == Chapter.TypeOutro and chapter['time']['duration'] > 5]
+		if result: return result[-1] if single else result
+		return None
+
+	@classmethod
+	def select(self, wait = False):
+		if self.settingsEnabled():
+			thread = Pool.thread(target = self._select, start = True)
+			if wait: Player.join(thread)
+
+	@classmethod
+	def _select(self):
+		# There is currently no way to get the chapter names, not from the RPC, not from the info labels, and not from Python.
+		# Often chapters are labeled as "Intro" or "Recap", which could be used to better determine which chapter is the intro.
+		# We could do:
+		#	tools.System.execute('ActivateWindow(videobookmarks)')
+		#	list = xbmcgui.Window(xbmcgui.getCurrentWindowId()).getControl(11)
+		#	item = list.getListItem(0).getLabel()
+		# However, getListItem() always returns None for lists populated from the skin (C++).
+
+		Chapter.Chapters = []
+
+		try:
+			from lib.modules.convert import ConverterDuration
+			chapters = tools.System.infoLabel('Player.Chapters')
+			if chapters:
+				chapters = [float(i) for i in chapters.split(',')]
+				if chapters:
+					time = tools.Math.roundUp(self.player().getTotalTime() or 0)
+					chapters.append(100.0)
+					last = len(chapters) - 1
+					for i in range(last):
+						next = i + 1
+						name = 'Chapter %d' % (i + 1)
+
+						start = chapters[i] / 100.0
+						end = chapters[next] / 100.0
+						startTime = int(start * time)
+						endTime = int(end * time)
+						if not startTime == endTime and i < next: endTime -= 1
+						startFormat = ConverterDuration(value = startTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
+						endFormat = ConverterDuration(value = endTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
+
+						# In the future if we can get the chapter names, matching with regex will be better.
+						type = None
+						if start == end: type = Chapter.TypeEnd
+						if not type:
+							for t, e in Chapter.TypesExpression.items():
+								if tools.Regex.match(data = name, expression = e):
+									type = t
+									break
+							if not type:
+								percent = end - start
+								if percent < 0.001 and start < 0.1: type = Chapter.TypePromo
+								elif percent < 0.05 and start < 0.25: type = Chapter.TypeIntro # House of Dragons: 2.7%.
+								elif percent < 0.05 and end >= 0.99: type = Chapter.TypeOutro # House of Dragons: 2.4%.
+								else: type = Chapter.TypeDefault
+
+						Chapter.Chapters.append({
+							'name' : name,
+							'label' : '%s: %s (%s - %s)' % (name, type.title(), startFormat, endFormat),
+							'type' : type,
+							'skip' : type in Chapter.TypesSkip,
+							'percent' : {
+								'start' : start,
+								'end' : end,
+								'duration' : end - start,
+							},
+							'time' : {
+								'start' : startTime,
+								'end' : endTime,
+								'duration' : endTime - startTime,
+							},
+						})
+					self.log('Available chapters: ' + (' | '.join([i['label'] for i in Chapter.Chapters])))
+		except: tools.Logger.error()
+
+		self._update()
+		return Chapter.Chapters
+
+	@classmethod
+	def _update(self):
+		if Chapter.Chapters:
+			chapters = self.chapterSkip()
+			chapter = None
+			player = self.player()
+			timeTotal = float(player.getTotalTime())
+			progressPrevious = 0
+			second = 1 / timeTotal
+			offset = 3
+
+			while True:
+				if not player.isPlayingVideo() or tools.System.aborted():
+					window.WindowSkip.cancel()
+					return
+
+				timeCurrent = player.getTime()
+				progress = timeCurrent / timeTotal
+
+				if progress < progressPrevious: chapters = self.chapterSkip()
+				if chapter and (timeCurrent < chapter['time']['start'] - 1 or timeCurrent > chapter['time']['end'] + 1): window.WindowSkip.cancel()
+				progressPrevious = progress
+
+				for percent in chapters.keys():
+					if progress >= percent and progress <= percent + (5 * second):
+						chapter = chapters[percent]
+						del chapters[percent]
+
+						seekTime = chapter['time']['end'] - offset
+						seekDuration = chapter['time']['duration'] - offset
+						window.WindowSkip.show(duration = seekDuration, time = self.settingsTime(), callback = lambda : player.seekTime(seekTime))
+						break
+
+				# Use longer sleeping time if the progress is closer to the end, in order to reduce processing.
+				# Still keep monitoring, in case the user is at the end of the progress and seeks to the start of the video.
+				tools.Time.sleep(0.5 if progress < 0.1 else 1 if progress < 0.2 else 1.5 if progress < 0.3 else 2 if progress < 0.5 else 5)

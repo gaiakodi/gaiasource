@@ -225,7 +225,16 @@ def _limit(url = None, data = None, wait = False):
 		tools.Logger.log('     Response: %s' % tools.Converter.jsonTo(limit))
 
 		tools.Time.sleep(seconds)
-		return max(0, limit - 1) if tools.Tools.isInteger(limit) else True
+		result = max(0, limit - 1) if tools.Tools.isInteger(limit) else True
+
+		if result:
+			tools.Logger.log('Retrying after Trakt rate limit reached.')
+			tools.Logger.log('     Link: %s' % str(url))
+		else:
+			tools.Logger.log('Not retrying after Trakt rate limit reached.')
+			tools.Logger.log('     Link: %s' % str(url))
+
+		return result
 	else:
 		tools.Logger.log('Trakt rate limit reached. Aborting request without retrying.')
 		tools.Logger.log('     Link: %s' % str(url))

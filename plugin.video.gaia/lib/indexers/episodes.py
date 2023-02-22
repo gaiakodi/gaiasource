@@ -1177,7 +1177,7 @@ class Episodes(object):
 			pickMultiple = False
 			pickNext = False
 
-			if items or (idImdb or idTvdb) or (title and year):
+			if items or (idImdb or idTmdb or idTvdb or idTrakt) or title:
 				if items:
 					pickNext = self.metadataIncrementing(items = items)
 					if Tools.isArray(items):
@@ -1340,6 +1340,8 @@ class Episodes(object):
 					for item in items:
 						if not item['season'] == 0:
 							item['episodes'] = [i for i in item['episodes'] if 'tvdb' in i and 'id' in i and 'episode' in i['id'] and (('tvdb' in i['id']['episode'] and i['id']['episode']['tvdb']) or ('trakt' in i['id']['episode'] and i['id']['episode']['trakt']))]
+
+			if not items: items = []
 
 			# Remove temporary, useless, or already aggregatd data, to keep the size of the data passed arround small.
 			if clean:
