@@ -6416,13 +6416,10 @@ class Cleanup(object):
 		subitems.append({'title' : 33898, 'size' : self.folderQrSize, 'clean' : self.folderQrClean, 'message' : 33973})
 		items.append({'title' : 33895, 'items' : subitems})
 
-		from lib.modules.interface import Translation#gaiaremove
 		for i in range(len(items)):
 			if 'items' in items[i]:
 				for j in range(len(items[i]['items'])):
-					t = Time(start = True)#gaiaremove
 					items[i]['items'][j]['value'] = self._size(items[i]['items'][j]['size']())
-					Logger.log("Cleanup (%s - %s): %d" % (Translation.string(items[i]['title']), Translation.string(items[i]['items'][j]['title']), t.elapsed(True)))#gaiaremove
 					if not 'message' in items[i]['items'][j]: items[i]['items'][j]['message'] = None
 					if not 'confirm' in items[i]['items'][j]: items[i]['items'][j]['confirm'] = None
 					# NB: Pass values in as lambda parameters and not in the call of self.clean(...) itself, otherwise the function will always execute with the last values set in this for-loop (aka QR code values).

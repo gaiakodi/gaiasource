@@ -2479,7 +2479,7 @@ msgid "No Metadata Found For This Title"
 msgstr ""
 
 msgctxt "#33460"
-msgid "[GAIA-NO-LABEL]"
+msgid "Rated"
 msgstr ""
 
 msgctxt "#33461"
@@ -3571,11 +3571,11 @@ msgid "The addon resolves links from hosters and other streaming websites. The a
 msgstr ""
 
 msgctxt "#33733"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best Rated"
 msgstr ""
 
 msgctxt "#33734"
-msgid "[GAIA-NO-LABEL]"
+msgid "Worst Rated"
 msgstr ""
 
 msgctxt "#33735"

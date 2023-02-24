@@ -26,25 +26,51 @@ from lib.modules.concurrency import Lock
 
 class MetaTmdb(object):
 
-	LinkMovie		= 'https://themoviedb.org/movie/%s'
-	LinkShow		= 'https://themoviedb.org/tv/%s'
-	LinkSeason		= 'https://themoviedb.org/tv/%s/season/%d'
-	LinkEpisode		= 'https://themoviedb.org/tv/%s/season/%d/episode/%d'
+	LinkMovie			= 'https://themoviedb.org/movie/%s'
+	LinkShow			= 'https://themoviedb.org/tv/%s'
+	LinkSeason			= 'https://themoviedb.org/tv/%s/season/%d'
+	LinkEpisode			= 'https://themoviedb.org/tv/%s/season/%d/episode/%d'
 
-	LinkSearchMovie	= 'https://api.themoviedb.org/3/search/movie'
-	LinkSearchSet	= 'https://api.themoviedb.org/3/search/collection'
-	LinkSearchShow	= 'https://api.themoviedb.org/3/search/tv'
+	LinkList			= 'https://api.themoviedb.org/3/list/%s'
 
-	LinkId			= 'https://api.themoviedb.org/3/find/%s'
+	LinkSearchMovie		= 'https://api.themoviedb.org/3/search/movie'
+	LinkSearchSet		= 'https://api.themoviedb.org/3/search/collection'
+	LinkSearchShow		= 'https://api.themoviedb.org/3/search/tv'
 
-	LinkSetIds		= 'https://files.tmdb.org/p/exports/collection_ids_%s.json.gz'
-	LinkSetDetails	= 'https://api.themoviedb.org/3/collection/%s'
-	LinkSetImages	= 'https://api.themoviedb.org/3/collection/%s/images'
+	LinkDiscoverMovie	= 'https://api.themoviedb.org/3/discover/movie'
+	LinkDiscoverShow	= 'https://api.themoviedb.org/3/discover/tv'
 
-	LinkGenreMovie	= 'https://api.themoviedb.org/3/genre/movie/list'
-	LinkGenreShow	= 'https://api.themoviedb.org/3/genre/tv/list'
+	LinkRatedMovie		= 'https://api.themoviedb.org/3/movie/top_rated'
+	LinkRatedShow		= 'https://api.themoviedb.org/3/tv/top_rated'
 
-	Lock			= Lock()
+	LinkId				= 'https://api.themoviedb.org/3/find/%s'
+
+	LinkSetIds			= 'https://files.tmdb.org/p/exports/collection_ids_%s.json.gz'
+	LinkSetDetails		= 'https://api.themoviedb.org/3/collection/%s'
+	LinkSetImages		= 'https://api.themoviedb.org/3/collection/%s/images'
+
+	LinkGenreMovie		= 'https://api.themoviedb.org/3/genre/movie/list'
+	LinkGenreShow		= 'https://api.themoviedb.org/3/genre/tv/list'
+
+	SortRelease			= 'release_date'
+	SortTitle			= 'original_title'
+	SortPopularity		= 'popularity'
+	SortRating			= 'vote_average'
+	SortVotes			= 'vote_count'
+	SortRevenue			= 'revenue'
+
+	OrderAscending		= 'asc'
+	OrderDescending		= 'desc'
+	OrderDefault		= {
+		SortRelease		: OrderDescending,
+		SortTitle		: OrderAscending,
+		SortPopularity	: OrderDescending,
+		SortRating		: OrderDescending,
+		SortVotes		: OrderDescending,
+		SortRevenue		: OrderDescending,
+	}
+
+	Lock				= Lock()
 
 	##############################################################################
 	# GENERAL
@@ -70,9 +96,54 @@ class MetaTmdb(object):
 
 		return None
 
+	@classmethod
+	def linkEncode(self, link, query = None, page = None, data = None, increment = True):
+		parameters = Networker.linkParameters(link = link)
+		link = Networker.linkClean(link = link, parametersStrip = True, headersStrip = True)
+
+		if (page is None or page == 1) and 'page' in parameters and parameters['page']: page = int(parameters['page'])
+		if not page is None and increment: page += 1
+		if data and 'total_pages' in data and data['total_pages'] < page: return None
+
+		if not query is None: parameters['query'] = query
+		if not page is None: parameters['page'] = page
+
+		return Networker.linkCreate(link = link, parameters = parameters, duplicates = False)
+
+	@classmethod
+	def linkDencode(self, link):
+		if link: return Networker.linkParameters(link = link)
+		else: return None
+
+	@classmethod
+	def linkData(self, link = None, query = None, page = None, language = None):
+		if link: data = self.linkDencode(link = link)
+		else: data = {}
+
+		if not query is None and not 'query' in data: data['query'] = query
+		if not page is None and not 'page' in data: data['page'] = page
+		if not language is None and not 'language' in data: data['language'] = language
+		if not 'include_adult' in data: data['include_adult'] = False
+
+		return data
+
 	##############################################################################
 	# REQUEST
 	##############################################################################
+
+	@classmethod
+	def retrieve(self, link, linkExtra = None, query = None, page = 1, language = None, data = None, next = None):
+		results = None
+		try:
+			if not linkExtra: linkExtra = link
+			parameters = self.linkData(link = linkExtra, query = query, page = page, language = language)
+			if data:
+				if not parameters: parameters = {}
+				parameters.update(data)
+			data = self.request(method = Networker.MethodGet, link = link, data = parameters)
+			if data: results = self.items(data = data, link = linkExtra, query = query, page = page, next = next)
+		except: Logger.error()
+		return results
 
 	@classmethod
 	def request(self, link, data = None, method = None, cache = None, lock = False):
@@ -89,6 +160,64 @@ class MetaTmdb(object):
 		data['api_key'] = Tmdb().key()
 		if method is None: method = Networker.MethodGet
 		return Networker().requestJson(method = method, link = link, data = data)
+
+	##############################################################################
+	# ITEM
+	##############################################################################
+
+	@classmethod
+	def item(self, item, next = None):
+		if not item: return None
+		result = {}
+
+		ids = {}
+		idTmdb = item.get('id')
+		if idTmdb: result['tmdb'] = ids['tmdb'] = str(idTmdb)
+		if ids: result['id'] = ids
+
+		title = item.get('title')
+		if not title: title = item.get('name')
+		if title: result['title'] = Networker.htmlDecode(title)
+
+		originaltitle = item.get('original_title')
+		if not originaltitle: originaltitle = item.get('original_name')
+		if originaltitle: result['originaltitle'] = Networker.htmlDecode(originaltitle)
+
+		plot = item.get('overview')
+		if plot: result['plot'] = Networker.htmlDecode(plot)
+
+		premiered = item.get('release_date')
+		if not premiered: premiered = item.get('first_air_date')
+		if premiered:
+			premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+			if premiered:
+				result['premiered'] = premiered
+				year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
+				if year: result['year'] = int(year)
+
+		if next: result['next'] = next
+
+		return result
+
+	@classmethod
+	def items(self, items = None, next = None, data = None, link = None, query = None, page = None, increment = True):
+		if items is None and data:
+			for i in ['results', 'items', 'movie_results', 'tv_results', 'tv_season_results', 'tv_episode_results']:
+				if i in data:
+					items = data[i]
+					break
+		if not items: return None
+
+		if next is None and not page is None: next = self.linkEncode(link = link, query = query, page = page, data = data, increment = increment)
+
+		result = []
+		for item in items:
+			try:
+				item = self.item(item = item, next = next)
+				if item: result.append(item)
+			except: Logger.error()
+
+		return result
 
 	##############################################################################
 	# ID
@@ -136,182 +265,143 @@ class MetaTmdb(object):
 		return self.id(media = Media.TypeEpisode, idImdb = idImdb, idTvdb = idTvdb)
 
 	##############################################################################
+	# LIST
+	##############################################################################
+
+	@classmethod
+	def list(self, id = None, language = None, link = None):
+		if not link: link = MetaTmdb.LinkList % id
+		return self.retrieve(link = link, linkExtra = link, language = language, next = False)
+
+	##############################################################################
 	# SEARCH
 	##############################################################################
 
 	@classmethod
-	def searchMovie(self, query = None, page = 1, link = None, language = None):
-		results = None
-		try:
-			if link:
-				parts = Networker.linkParts(link = link)
-				try:
-					query = Networker.linkUnquote(parts[-2])
-					page = int(parts[-1])
-				except:
-					Logger.error()
-					return results
-
-			data = {'query' : query, 'page' : page}
-			if language: data['language'] = language
-
-			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchMovie, data = data)
-			if data:
-				page += 1
-				next = None
-				if 'total_pages' in data and data['total_pages'] >= page:
-					next = '%s/%s/%s' % (MetaTmdb.LinkSearchMovie, Networker.linkQuote(query), page)
-
-				results = []
-				for item in data['results']:
-					try:
-						result = {}
-
-						ids = {}
-						idTmdb = item.get('id')
-						if idTmdb: result['tmdb'] = ids['tmdb'] = str(idTmdb)
-						if ids: result['id'] = ids
-
-						title = item.get('title')
-						if title: result['title'] = Networker.htmlDecode(title)
-
-						originaltitle = item.get('original_title')
-						if originaltitle: result['originaltitle'] = Networker.htmlDecode(originaltitle)
-
-						plot = item.get('overview')
-						if plot: result['plot'] = Networker.htmlDecode(plot)
-
-						premiered = item.get('release_date')
-						if premiered:
-							premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
-							if premiered:
-								result['premiered'] = premiered
-								year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
-								if year: result['year'] = int(year)
-
-						if next: result['next'] = next
-
-						if result: results.append(result)
-					except: Logger.error()
-		except: Logger.error()
-
-		return results
+	def searchMovie(self, query = None, page = 1, language = None, link = None):
+		return self.retrieve(link = MetaTmdb.LinkSearchMovie, linkExtra = link, query = query, page = page, language = language)
 
 	@classmethod
-	def searchSet(self, query = None, page = 1, link = None, language = None):
-		results = None
-		try:
-			if link:
-				parts = Networker.linkParts(link = link)
-				try:
-					query = Networker.linkUnquote(parts[-2])
-					page = int(parts[-1])
-				except:
-					Logger.error()
-					return results
-
-			data = {'query' : query, 'page' : page}
-			if language: data['language'] = language
-
-			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchSet, data = data)
-			if data:
-				page += 1
-				next = None
-				if 'total_pages' in data and data['total_pages'] >= page:
-					next = '%s/%s/%s' % (MetaTmdb.LinkSearchSet, Networker.linkQuote(query), page)
-
-				results = []
-				for item in data['results']:
-					try:
-						result = {}
-
-						ids = {}
-						idTmdb = item.get('id')
-						if idTmdb: result['tmdb'] = ids['tmdb'] = str(idTmdb)
-						if ids: result['id'] = ids
-
-						title = item.get('name')
-						if title: result['title'] = Networker.htmlDecode(title)
-
-						originaltitle = item.get('original_name')
-						if originaltitle: result['originaltitle'] = Networker.htmlDecode(originaltitle)
-
-						plot = item.get('overview')
-						if plot: result['plot'] = Networker.htmlDecode(plot)
-
-						premiered = item.get('release_date')
-						if premiered:
-							premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
-							if premiered:
-								result['premiered'] = premiered
-								year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
-								if year: result['year'] = int(year)
-
-						if next: result['next'] = next
-
-						if result: results.append(result)
-					except: Logger.error()
-		except: Logger.error()
-
-		return results
+	def searchSet(self, query = None, page = 1, language = None, link = None):
+		return self.retrieve(link = MetaTmdb.LinkSearchSet, linkExtra = link, query = query, page = page, language = language)
 
 	@classmethod
-	def searchShow(self, query = None, page = 1, link = None, language = None):
-		results = None
-		try:
-			if link:
-				parts = Networker.linkParts(link = link)
-				try:
-					query = Networker.linkUnquote(parts[-2])
-					page = int(parts[-1])
-				except:
-					Logger.error()
-					return results
+	def searchShow(self, query = None, page = 1, language = None, link = None):
+		return self.retrieve(link = MetaTmdb.LinkSearchShow, linkExtra = link, query = query, page = page, language = language)
 
-			data = {'query' : query, 'page' : page}
-			if language: data['language'] = language
+	##############################################################################
+	# DISCOVER
+	##############################################################################
 
-			data = self.request(method = Networker.MethodGet, link = MetaTmdb.LinkSearchShow, data = data)
+	# year: integer = single year
+	# release: integer = single minimum timestamp | tuple = range of timestamps (from and to) | tuple = if one value is None, ignore that and only use upper or lower date.
+	# rating: integer = single minimum rating | tuple = range of rating (from and to) | tuple = if one value is None, ignore that and only use upper or lower rating.
+	# votes: integer = single minimum vote | tuple = range of votes (from and to) | tuple = if one value is None, ignore that and only use upper or lower votes.
+	@classmethod
+	def discover(self, media, page = 1, language = None, sort = None, order = None, year = None, release = None, rating = None, votes = None, link = None):
+		if link:
+			data = self.linkDencode(link = link)
 			if data:
-				page += 1
-				next = None
-				if 'total_pages' in data and data['total_pages'] >= page:
-					next = '%s/%s/%s' % (MetaTmdb.LinkSearchShow, Networker.linkQuote(query), page)
+				if 'page' in data:
+					page = int(data['page'])
+					del data['page']
+				if 'language' in data:
+					language = data['language']
+					del data['language']
+				if 'sort' in data:
+					sort = data['sort']
+					del data['sort']
+				if 'order' in data:
+					order = data['order']
+					del data['order']
+				if 'year' in data:
+					year = int(data['year'])
+					del data['year']
+				if 'release' in data:
+					release = data['release']
+					if ',' in release: release = [int(i) if Tools.isNumeric(i) else i for i in release.split(',')]
+					elif Tools.isNumeric(release): release = int(release)
+					del data['release']
+				if 'rating' in data:
+					rating = data['rating']
+					if ',' in rating: rating = [float(i) for i in rating.split(',')]
+					else: rating = float(rating)
+					del data['rating']
+				if 'votes' in data:
+					votes = data['votes']
+					if ',' in votes: votes = [int(i) for i in votes.split(',')]
+					else: votes = int(votes)
+					del data['votes']
 
-				results = []
-				for item in data['results']:
-					try:
-						result = {}
+		if not data: data = {}
 
-						ids = {}
-						idTmdb = item.get('id')
-						if idTmdb: result['tmdb'] = ids['tmdb'] = str(idTmdb)
-						if ids: result['id'] = ids
+		if sort:
+			if not order: order = MetaTmdb.OrderDefault[sort]
+			data['sort_by'] = sort + '.' + order
 
-						title = item.get('name')
-						if title: result['title'] = Networker.htmlDecode(title)
+		if release:
+			releaseStart = None
+			releaseEnd = None
+			if Tools.isArray(release):
+				releaseStart = release[0]
+				releaseEnd = release[1]
+			else:
+				releaseStart = release
+			if releaseStart:
+				if Tools.isInteger(releaseStart): releaseStart = Time.format(releaseStart, format = Time.FormatDate)
+				data['release_date.gte'] = releaseStart
+			if releaseEnd:
+				if Tools.isInteger(releaseEnd): releaseEnd = Time.format(releaseEnd, format = Time.FormatDate)
+				data['release_date.lte'] = releaseEnd
 
-						originaltitle = item.get('original_name')
-						if originaltitle: result['originaltitle'] = Networker.htmlDecode(originaltitle)
+		if year: data['year'] = year
 
-						plot = item.get('overview')
-						if plot: result['plot'] = Networker.htmlDecode(plot)
+		if not rating is None:
+			ratingStart = None
+			ratingEnd = None
+			if Tools.isArray(rating):
+				ratingStart = rating[0]
+				ratingEnd = rating[1]
+			else:
+				ratingStart = rating
+			if ratingStart: data['vote_average.gte'] = ratingStart
+			if ratingEnd: data['vote_average.lte'] = ratingEnd
 
-						premiered = item.get('first_air_date')
-						if premiered:
-							premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
-							if premiered:
-								result['premiered'] = premiered
-								year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
-								if year: result['year'] = int(year)
+		if not votes is None:
+			votesStart = None
+			votesEnd = None
+			if Tools.isArray(votes):
+				votesStart = votes[0]
+				votesEnd = votes[1]
+			else:
+				votesStart = votes
+			if votesStart: data['vote_count.gte'] = votesStart
+			if votesEnd: data['vote_count.lte'] = votesEnd
 
-						if next: result['next'] = next
+		link = Networker.linkClean(link = link, parametersStrip = True, headersStrip = True)
+		link = Networker.linkCreate(link = link, parameters = data, duplicates = False)
 
-						if result: results.append(result)
-					except: Logger.error()
-		except: Logger.error()
+		return self.retrieve(link = MetaTmdb.LinkDiscoverShow if Media.typeTelevision(media) else MetaTmdb.LinkDiscoverMovie, linkExtra = link, page = page, language = language, data = data)
 
-		return results
+	@classmethod
+	def discoverMovie(self, page = 1, language = None, sort = None, order = None, release = None, year = None, rating = None, votes = None, link = None):
+		return self.discover(media = Media.TypeMovie, page = page, language = language, sort = sort, order = order, release = release, year = year, rating = rating, votes = votes, link = link)
+
+	@classmethod
+	def discoverShow(self, page = 1, language = None, sort = None, order = None, release = None, year = None, rating = None, votes = None, link = None):
+		return self.discover(media = Media.TypeShow, page = page, language = language, sort = sort, order = order, release = release, year = year, rating = rating, votes = votes, link = link)
+
+	##############################################################################
+	# RATED
+	##############################################################################
+
+	@classmethod
+	def ratedMovie(self, page = 1, language = None, link = None):
+		return self.retrieve(link = MetaTmdb.LinkRatedMovie, linkExtra = link, page = page, language = language)
+
+	@classmethod
+	def ratedShow(self, page = 1, language = None, link = None):
+		return self.retrieve(link = MetaTmdb.LinkRatedShow, linkExtra = link, page = page, language = language)
 
 	##############################################################################
 	# SET

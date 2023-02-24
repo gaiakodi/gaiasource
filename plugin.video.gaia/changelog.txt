@@ -1,4 +1,8 @@
 
+[B]6.1.9 (2023.02.24)[/B]
+- Added rated category menus.
+- Added new TMDb features.
+
 [B]6.1.8 (2023.02.22)[/B]
 - Added chapter support.
 - Added episode intro skipping.

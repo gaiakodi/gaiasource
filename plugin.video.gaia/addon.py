@@ -156,6 +156,11 @@ elif action.startswith('movies'):
 		generic = tools.Converter.boolean(parameters.get('generic'))
 		Movies(media = media, kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
 
+	elif action == 'moviesRated':
+		from lib.indexers.movies import Movies
+		type = parameters.get('type')
+		Movies(media = media, kids = kids).rated(type = type)
+
 	elif action == 'moviesNetworks':
 		from lib.indexers.movies import Movies
 		Movies(media = media, kids = kids).networks()
@@ -333,11 +338,11 @@ elif action.startswith('shows'):
 
 	elif action == 'showsFamous':
 		from lib.indexers.shows import Shows
-		Shows(media = media, kids = kids).famous()
+		Shows(kids = kids).famous()
 
 	elif action == 'showsGenders':
 		from lib.indexers.shows import Shows
-		Shows(media = media, kids = kids).genders()
+		Shows(kids = kids).genders()
 
 	elif action == 'showsYears':
 		from lib.indexers.shows import Shows
@@ -349,7 +354,12 @@ elif action.startswith('shows'):
 		category = parameters.get('category')
 		subcategory = parameters.get('subcategory')
 		generic = tools.Converter.boolean(parameters.get('generic'))
-		Shows(media = media, kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
+		Shows(kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
+
+	elif action == 'showsRated':
+		from lib.indexers.shows import Shows
+		type = parameters.get('type')
+		Shows(kids = kids).rated(type = type)
 
 	elif action == 'showsLanguages':
 		from lib.indexers.shows import Shows
@@ -2451,7 +2461,7 @@ elif action.startswith('scrape'):
 			EXAMPLES:
 
 				- Movies:
-					Search by single ID:
+					- Search by single ID:
 						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190
 						plugin://plugin.video.gaia/?action=scrape&media=movie&tmdb=76341
 						plugin://plugin.video.gaia/?action=scrape&media=movie&trakt=56360
@@ -2465,7 +2475,7 @@ elif action.startswith('scrape'):
 						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360&title=Mad%20Max%3A%20Fury%20Road&year=2015
 
 				- Shows:
-					Search by single ID:
+					- Search by single ID:
 						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&season=8&episode=2
 						plugin://plugin.video.gaia/?action=scrape&media=show&tvdb=121361&season=8&episode=2
 						plugin://plugin.video.gaia/?action=scrape&media=show&trakt=1390&season=8&episode=2

@@ -100,31 +100,38 @@ class Movies(object):
 		self.mAccountTrakt = Trakt().dataUsername()
 
 		self.search_link = 'https://api.trakt.tv/search?type=movie&limit=%d&query=' % self.mLimitSearch
-		self.people_link = 'https://www.imdb.com/search/name'
-		self.persons_link = 'https://www.imdb.com/search/name?count=%d&start=1&name=%s' % (self.mLimitSearch, '%s')
-		self.personlist_link = 'https://www.imdb.com/search/name?gender=male,female,non-binary,other&count=%d&start=1' % (self.mLimit)
-		self.views_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&sort=num_votes,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-		self.featured_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&release_date=date[365],date[60]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-		self.person_link = 'https://www.imdb.com/search/title?title_type=%s&production_status=released&role=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
-		self.genre_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&release_date=,date[0]&genres=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
-		self.language_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=100,&production_status=released&languages=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
-		self.certification_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&certificates=%s&sort=moviemeter,asc&count=%d&start=1' % (self.mCategory, '%s', self.mLimit) # Does not use certificates, since it has it's own.
-		self.year_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&year=%s,%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', '%s', self.mLimit, '%s')
-		self.boxoffice_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&sort=boxoffice_gross_us,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-		self.oscars_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, self.mAwards, self.mLimit, self.mCertificates)
-		self.theaters_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&release_date=date[365],date[0]&sort=release_date_us,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mLimit, self.mCertificates)
-		self.rating_link = 'https://www.imdb.com/search/title?title_type=%s&num_votes=%d,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mVotes, self.mLimit, self.mCertificates)
-		self.award_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, self.mCertificates)
+		self.people_link = 'https://imdb.com/search/name'
+		self.persons_link = 'https://imdb.com/search/name?count=%d&start=1&name=%s' % (self.mLimitSearch, '%s')
+		self.personlist_link = 'https://imdb.com/search/name?gender=male,female,non-binary,other&count=%d&start=1' % (self.mLimit)
+		self.views_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&sort=num_votes,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+		self.featured_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&release_date=date[365],date[60]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+		self.person_link = 'https://imdb.com/search/title?title_type=%s&production_status=released&role=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
+		self.genre_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&release_date=,date[0]&genres=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
+		self.language_link = 'https://imdb.com/search/title?title_type=%s&num_votes=100,&production_status=released&languages=%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, '%s')
+		self.certification_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&certificates=%s&sort=moviemeter,asc&count=%d&start=1' % (self.mCategory, '%s', self.mLimit) # Does not use certificates, since it has it's own.
+		self.year_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&year=%s,%s&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, '%s', '%s', self.mLimit, '%s')
+		self.boxoffice_link = 'https://imdb.com/search/title?title_type=%s&languages=en&production_status=released&sort=boxoffice_gross_us,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+		self.oscars_link = 'https://imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, self.mAwards, self.mLimit, self.mCertificates)
+		self.theaters_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&release_date=date[365],date[0]&sort=release_date_us,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mLimit, self.mCertificates)
+		self.rating_link = 'https://imdb.com/search/title?title_type=%s&num_votes=%d,&release_date=,date[0]&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategoryTheatre, self.mVotes, self.mLimit, self.mCertificates)
+		self.award_link = 'https://imdb.com/search/title?title_type=%s&languages=en&production_status=released&groups=%s&sort=year,desc&count=%d&start=1%s' % (self.mCategory, '%s', self.mLimit, self.mCertificates)
 
-		self.famousfilmmaker_link = 'https://www.imdb.com/list/ls026411399/'
-		self.famousdirector_link = 'https://www.imdb.com/list/ls000005319/'
-		self.famouscinematographer_link = 'https://www.imdb.com/list/ls000045131/'
-		self.famouswriter_link = 'https://www.imdb.com/list/ls026034645/'
-		self.famousproducer_link = 'https://www.imdb.com/list/ls009401127/'
-		self.famouseditor_link = 'https://www.imdb.com/list/ls020798362/'
-		self.famouscomposer_link = 'https://www.imdb.com/list/ls026034696/'
-		self.famousactor_link = 'https://www.imdb.com/list/ls000005354/'
-		self.famousactress_link = 'https://www.imdb.com/list/ls000005315/'
+		self.famousfilmmaker_link = 'https://imdb.com/list/ls026411399/'
+		self.famousdirector_link = 'https://imdb.com/list/ls000005319/'
+		self.famouscinematographer_link = 'https://imdb.com/list/ls000045131/'
+		self.famouswriter_link = 'https://imdb.com/list/ls026034645/'
+		self.famousproducer_link = 'https://imdb.com/list/ls009401127/'
+		self.famouseditor_link = 'https://imdb.com/list/ls020798362/'
+		self.famouscomposer_link = 'https://imdb.com/list/ls026034696/'
+		self.famousactor_link = 'https://imdb.com/list/ls000005354/'
+		self.famousactress_link = 'https://imdb.com/list/ls000005315/'
+
+		self.ratedimdbbest_link = 'https://imdb.com/search/title/?title_type=%s&groups=top_1000&sort=user_rating&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+		self.ratedimdbworst_link = 'https://imdb.com/search/title/?title_type=%s&groups=bottom_1000&sort=user_rating,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+		self.ratedtmdbbest_link = '%s?sort=%s&order=%s&votes=1000' % (MetaTmdb.LinkDiscoverMovie, MetaTmdb.SortRating, MetaTmdb.OrderDescending)
+		self.ratedtmdbworst_link = '%s?sort=%s&order=%s&votes=100' % (MetaTmdb.LinkDiscoverMovie, MetaTmdb.SortRating, MetaTmdb.OrderAscending)
+		self.ratedtraktbest_link = 'https://api.trakt.tv/movies/popular?limit=%d&page=1' % self.mLimit
+		self.ratedtraktworst_link = 'https://api.trakt.tv/users/mogodon/lists/worst-movies/items/movie?limit=%d&page=1' % self.mLimit
 
 		# https://mdblist.com/lists/plexmetamanager/
 		self.networknetflix_link = 'https://api.trakt.tv/users/plexmetamanager/lists/netflix-movies/items/movie?limit=%d&page=1' % self.mLimit
@@ -145,32 +152,32 @@ class Movies(object):
 		#self.networkdiscovery_link = 'https://api.trakt.tv/users/plexmetamanager/lists/discovery-movies/items/movie?limit=%d&page=1' % self.mLimit  # No movie list.
 		#self.networkhayu_link = 'https://api.trakt.tv/users/plexmetamanager/lists/hayu-movies/items/movie?limit=%d&page=1' % self.mLimit  # No movie list.
 
-		self.drugsgeneral_link = 'https://www.imdb.com/list/ls052149893/'
-		self.drugsalcohol_link = 'https://www.imdb.com/list/ls000527140/'
-		self.drugsmarijuana_link = 'https://www.imdb.com/list/ls036810850/'
-		self.drugspsychedelics_link = 'https://www.imdb.com/list/ls054725090/'
+		self.drugsgeneral_link = 'https://imdb.com/list/ls052149893/'
+		self.drugsalcohol_link = 'https://imdb.com/list/ls000527140/'
+		self.drugsmarijuana_link = 'https://imdb.com/list/ls036810850/'
+		self.drugspsychedelics_link = 'https://imdb.com/list/ls054725090/'
 
-		self.random1_link = 'https://www.imdb.com/list/ls091294718/'
-		self.random2_link = 'https://www.imdb.com/list/ls080799519/'
-		self.random3_link = 'https://www.imdb.com/list/ls071457904/'
+		self.random1_link = 'https://imdb.com/list/ls091294718/'
+		self.random2_link = 'https://imdb.com/list/ls080799519/'
+		self.random3_link = 'https://imdb.com/list/ls071457904/'
 
 		self.mHomeBase = 'online_availability'
 		if self.mMedia == Media.TypeDocumentary or self.mMedia == Media.TypeShort:
 			# Documentaries and Shorts do not have a TOP list. Simply use a list sorted by ratings.
-			self.popular_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&production_status=released&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-			self.new_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-			self.home_link = 'https://www.imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid,DE/today/Amazon/subs,DE/today/Amazon/paid&title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[730],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.popular_link = 'https://imdb.com/search/title?title_type=%s&languages=en&production_status=released&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.new_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.home_link = 'https://imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid,DE/today/Amazon/subs,DE/today/Amazon/paid&title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[730],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 			self.disc_link = None
 			self.trending_link = self.featured_link
 		else:
-			self.popular_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&groups=top_1000&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-			self.new_link = 'https://www.imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[%d],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, 180 if self.mKidsOnly else 90, self.mLimit, self.mCertificates)
-			self.home_link = 'https://www.imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid&title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.popular_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&groups=top_1000&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.new_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[%d],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, 180 if self.mKidsOnly else 90, self.mLimit, self.mCertificates)
+			self.home_link = 'https://imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid&title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 
 			# This redirects to an Amazon shop page.
-			# Another alternative might be (not managed by IMDb admins): https://www.imdb.com/list/ls093173574/
-			#self.disc_link = None if self.mLimit <= 20 else ('https://www.imdb.com/list/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
-			self.disc_link = None if self.mLimit <= 20 else ('https://www.imdb.com/imdbpicks/new-to-vod-dvd-blu-ray/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
+			# Another alternative might be (not managed by IMDb admins): https://imdb.com/list/ls093173574/
+			#self.disc_link = None if self.mLimit <= 20 else ('https://imdb.com/list/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
+			self.disc_link = None if self.mLimit <= 20 else ('https://imdb.com/imdbpicks/new-to-vod-dvd-blu-ray/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
 
 			self.trending_link = 'https://api.trakt.tv/movies/trending?limit=%d&page=1' % self.mLimit
 
@@ -183,12 +190,12 @@ class Movies(object):
 		self.trakthistory_link = 'https://api.trakt.tv/users/me/history/movies?limit=%d&page=1' % self.mLimit
 		self.traktunfinished_link = 'https://api.trakt.tv/sync/playback/movies'
 
-		self.imdblistname_link = 'https://www.imdb.com/list/%s/?view=detail&sort=alpha,asc&title_type=%s&start=1' % ('%s', self.mCategory)
-		self.imdblistdate_link = 'https://www.imdb.com/list/%s/?view=detail&sort=date_added,desc&title_type=%s&start=1' % ('%s', self.mCategory)
-		self.imdblists_link = 'https://www.imdb.com/user/%s/lists?sort=mdfd&order=desc' % self.mAccountImdb
-		self.imdbcollection_link = 'https://www.imdb.com/user/%s/watchlist?sort=alpha,asc&title_type=%s' % (self.mAccountImdb, self.mCategory)
-		self.imdbwatchlist_link = 'https://www.imdb.com/user/%s/watchlist?sort=date_added,desc&title_type=%s' % (self.mAccountImdb, self.mCategory)
-		self.imdbratings_link = 'https://www.imdb.com/user/%s/ratings?sort=your_rating,desc&mode=detail&title_type=%s' % (self.mAccountImdb, self.mCategory) # Does not use the title_type parameter. Still add it to avoid caching between different types.
+		self.imdblistname_link = 'https://imdb.com/list/%s/?view=detail&sort=alpha,asc&title_type=%s&start=1' % ('%s', self.mCategory)
+		self.imdblistdate_link = 'https://imdb.com/list/%s/?view=detail&sort=date_added,desc&title_type=%s&start=1' % ('%s', self.mCategory)
+		self.imdblists_link = 'https://imdb.com/user/%s/lists?sort=mdfd&order=desc' % self.mAccountImdb
+		self.imdbcollection_link = 'https://imdb.com/user/%s/watchlist?sort=alpha,asc&title_type=%s' % (self.mAccountImdb, self.mCategory)
+		self.imdbwatchlist_link = 'https://imdb.com/user/%s/watchlist?sort=date_added,desc&title_type=%s' % (self.mAccountImdb, self.mCategory)
+		self.imdbratings_link = 'https://imdb.com/user/%s/ratings?sort=your_rating,desc&mode=detail&title_type=%s' % (self.mAccountImdb, self.mCategory) # Does not use the title_type parameter. Still add it to avoid caching between different types.
 
 	##############################################################################
 	# RETRIEVE
@@ -196,7 +203,6 @@ class Movies(object):
 
 	def retrieve(self, link = None, items = None, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
 		try:
-			type = link
 			self.mModeRelease = link in ['new', 'home', 'disc']
 			if items is None: items = []
 
@@ -207,19 +213,19 @@ class Movies(object):
 
 			if domain == 'trakt':
 
-				if type.startswith('network'):
-					items = self.cache('cacheRefreshMedium', refresh, self.traktList, link = link)
-					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
-					items = self.sort(items = items)
-
-				elif '/users/' in link:
+				if '/users/' in link:
 					if self.traktcollection_link in link:
 						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
 						items = self.page(link = link, items = items)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
-					else:
+					elif '/me/' in link:
 						items = self.cache('cacheRefreshMini', refresh, self.traktList, link = link, user = self.mAccountTrakt)
+						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+						items = self.sort(items = items)
+
+					else: # Eg: Networks and Rated categories.
+						items = self.cache('cacheRefreshMedium', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items)
 
@@ -260,6 +266,7 @@ class Movies(object):
 				else:
 					items = self.cache('cacheMedium', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+					if Networker.linkClean(link = self.ratedtraktbest_link, parametersStrip = True) in link: items = self.sort(items = items, type = 'best')
 
 			elif domain == 'imdb':
 
@@ -301,9 +308,23 @@ class Movies(object):
 					items = self.cache('cacheMedium', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
-			elif domain == 'themoviedb':
+			elif domain == 'themoviedb' or domain == 'themdb' or domain == 'tmdb':
 
-				if MetaTmdb.LinkSearchMovie in link:
+				if '/list/' in link:
+					items = self.cache('cacheMedium', refresh, MetaTmdb.list, link = link, language = self.mLanguage)
+					items = self.page(link = link, items = items)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+					items = self.sort(items = items, type = 'best' if 'sort=best' in link else 'worst' if 'sort=worst' in link else None)
+
+				elif MetaTmdb.LinkRatedMovie in link:
+					items = self.cache('cacheLong', refresh, MetaTmdb.ratedMovie, link = link, language = self.mLanguage)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
+				elif MetaTmdb.LinkDiscoverMovie in link:
+					items = self.cache('cacheLong', refresh, MetaTmdb.discoverMovie, link = link, language = self.mLanguage)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+
+				elif MetaTmdb.LinkSearchMovie in link:
 					self.mModeSearch = True
 					items = self.cache('cacheMedium', refresh, MetaTmdb.searchMovie, link = link, language = self.mLanguage)
 
@@ -401,13 +422,25 @@ class Movies(object):
 	# SORT
 	##############################################################################
 
-	def sort(self, items):
+	def sort(self, items, type = None, force = False):
 		try:
-			if Settings.getBoolean('navigation.sort.favourite'):
+			attribute = None
+			reverse = None
+
+			if type == 'best':
+				force = True
+				attribute = 2
+				reverse = True
+			elif type == 'worst':
+				force = True
+				attribute = 2
+				reverse = False
+
+			if force or Settings.getBoolean('navigation.sort.favourite'):
 				dummyString = 'zzzzzzzzzz'
 
-				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % self.mMedia)
-				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % self.mMedia) == 1
+				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % self.mMedia) if attribute is None else attribute
+				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % self.mMedia) == 1 if reverse is None else reverse
 
 				if attribute > 0:
 					if attribute == 1:
@@ -655,7 +688,7 @@ class Movies(object):
 		return self.retrieve(self.year_link % (str(year), str(year), self.mCertificates), menu = menu, refresh = refresh)
 
 	##############################################################################
-	# AWARD
+	# AWARDS
 	##############################################################################
 
 	def awards(self, type = None, category = None, subcategory = None, generic = False, menu = True):
@@ -724,6 +757,25 @@ class Movies(object):
 		return items
 
 	##############################################################################
+	# RATED
+	##############################################################################
+
+	def rated(self, type = None, menu = True):
+		if type is None:
+			items = [
+				{'name' : Translation.string(32034), 'image' : 'imdb.png', 'action' : 'moviesRated', 'parameters' : {'type' : 'imdb'}},
+				{'name' : Translation.string(33508), 'image' : 'tmdb.png', 'action' : 'moviesRated', 'parameters' : {'type' : 'tmdb'}},
+				{'name' : Translation.string(32315), 'image' : 'trakt.png', 'action' : 'moviesRated', 'parameters' : {'type' : 'trakt'}},
+			]
+		elif type:
+			items = [
+				{'name' : Translation.string(33733), 'image' : '%sbest.png' % type, 'action' : 'moviesRetrieve', 'link' : 'rated%sbest' % type},
+				{'name' : Translation.string(33734), 'image' : '%sworst.png' % type, 'action' : 'moviesRetrieve', 'link' : 'rated%sworst' % type},
+			]
+		if menu: self.directory(items)
+		return items
+
+	##############################################################################
 	# NETWORKS
 	##############################################################################
 
@@ -768,8 +820,12 @@ class Movies(object):
 	##############################################################################
 
 	def persons(self, link = None, menu = True):
-		if link: items = self.mCache.cacheShort(self.imdbListPerson, link)
-		else: items = self.mCache.cacheMedium(self.imdbListPerson, self.personlist_link)
+		if link:
+			try: link = getattr(self, link + '_link')
+			except: pass
+			items = self.mCache.cacheShort(self.imdbListPerson, link)
+		else:
+			items = self.mCache.cacheMedium(self.imdbListPerson, self.personlist_link)
 
 		if items:
 			for i in range(0, len(items)): items[i].update({'action': 'moviesRetrieve', 'media' : self.mMedia})
@@ -801,15 +857,15 @@ class Movies(object):
 
 	def famous(self, menu = True):
 		items = [
-			{'name' : Translation.string(35339), 'image' : 'famousfilmmaker.png', 'action' : 'moviesPersons', 'link' : self.famousfilmmaker_link},
-			{'name' : Translation.string(35340), 'image' : 'famousdirector.png', 'action' : 'moviesPersons', 'link' : self.famousdirector_link},
-			{'name' : Translation.string(35457), 'image' : 'famouscinematographer.png', 'action' : 'moviesPersons', 'link' : self.famouscinematographer_link},
-			{'name' : Translation.string(35341), 'image' : 'famouswriter.png', 'action' : 'moviesPersons', 'link' : self.famouswriter_link},
-			{'name' : Translation.string(35458), 'image' : 'famousproducer.png', 'action' : 'moviesPersons', 'link' : self.famousproducer_link},
-			{'name' : Translation.string(35459), 'image' : 'famouseditor.png', 'action' : 'moviesPersons', 'link' : self.famouseditor_link},
-			{'name' : Translation.string(35512), 'image' : 'famouscomposer.png', 'action' : 'moviesPersons', 'link' : self.famouscomposer_link},
-			{'name' : Translation.string(35342), 'image' : 'famousactor.png', 'action' : 'moviesPersons', 'link' : self.famousactor_link},
-			{'name' : Translation.string(35343), 'image' : 'famousactress.png', 'action' : 'moviesPersons', 'link' : self.famousactress_link},
+			{'name' : Translation.string(35339), 'image' : 'famousfilmmaker.png', 'action' : 'moviesPersons', 'link' : 'famousfilmmaker'},
+			{'name' : Translation.string(35340), 'image' : 'famousdirector.png', 'action' : 'moviesPersons', 'link' : 'famousdirector'},
+			{'name' : Translation.string(35457), 'image' : 'famouscinematographer.png', 'action' : 'moviesPersons', 'link' : 'famouscinematographer'},
+			{'name' : Translation.string(35341), 'image' : 'famouswriter.png', 'action' : 'moviesPersons', 'link' : 'famouswriter'},
+			{'name' : Translation.string(35458), 'image' : 'famousproducer.png', 'action' : 'moviesPersons', 'link' : 'famousproducer'},
+			{'name' : Translation.string(35459), 'image' : 'famouseditor.png', 'action' : 'moviesPersons', 'link' : 'famouseditor'},
+			{'name' : Translation.string(35512), 'image' : 'famouscomposer.png', 'action' : 'moviesPersons', 'link' : 'famouscomposer'},
+			{'name' : Translation.string(35342), 'image' : 'famousactor.png', 'action' : 'moviesPersons', 'link' : 'famousactor'},
+			{'name' : Translation.string(35343), 'image' : 'famousactress.png', 'action' : 'moviesPersons', 'link' : 'famousactress'},
 		]
 		if menu: self.directory(items)
 		return items
@@ -1337,7 +1393,7 @@ class Movies(object):
 				name = Networker.htmlDecode(name)
 
 				try:
-					# Do not use [-1]  for lists like: https://www.imdb.com/list/ls000005319/
+					# Do not use [-1]  for lists like: https://imdb.com/list/ls000005319/
 					bio = Raw.parse(data = item, tag = 'p')[1]
 					description = Parser(bio).text
 				except:

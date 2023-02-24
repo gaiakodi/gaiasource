@@ -1,4 +1,7 @@
 
+[B]6.1.9 (2023.02.24)[/B]
+- Added more service icons.
+
 [B]6.1.7 (2023.02.20)[/B]
 - Added more awards icons.
 - Added famous icons.
