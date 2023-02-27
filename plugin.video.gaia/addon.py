@@ -19,7 +19,7 @@
 '''
 
 import xbmcaddon
-developer = xbmcaddon.Addon().getAddonInfo('version') == '9.9.9'
+developer = xbmcaddon.Addon().getAddonInfo('version') == '999.999.999'
 if developer:
 	import time as timer
 	timeStart = timer.time()

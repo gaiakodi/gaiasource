@@ -5426,7 +5426,7 @@ class WindowSkip(Window):
 			super(WindowSkip, self)._show(wait = wait, initialize = initialize, close = close)
 			instance = self.instance()
 		if instance:
-			if time: instance.mSkipTime = time
+			if time: instance.mSkipTime = min(time, int(duration / 3.0)) if duration else time # Divide by 3, since we show the full button for 1/3 of the time and the partial button for 2/3 of the time.
 			instance.mSkipClock = self._clock(duration)
 			instance.mSkipCallback = callback
 			instance.mSkipState = None
@@ -5460,7 +5460,7 @@ class WindowSkip(Window):
 		self.propertySet(WindowSkip.PropertyAnimation, '')
 		animation = [
 			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowSkip.PropertyAnimation, WindowSkip.StateHidden)),
-			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (55, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)),
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (53, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)), # 55 still shows the label pixels on a TV.
 			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowSkip.PropertyAnimation, WindowSkip.StateVisible)),
 		]
 		self.mSkipButton = self._addButton(text = text, x = x, y = y, width = dimension[0], callback = self._actionClick, icon = icon, iconOffset = 0.05, animation = animation)
@@ -5522,7 +5522,7 @@ class WindowSkip(Window):
 		try:
 			# Close the window after being hidden for a few seconds.
 			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowSkip.
-			for i in range(max(2, min(5, int(self.mSkipTime / 2.0))) * 2):
+			for i in range(max(3, min(6, int(self.mSkipTime / 2.0))) * 2):
 				if self.mSkipCanceled or not self.mSkipState == WindowSkip.StateHidden: return
 				tools.Time.sleep(0.5)
 			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateHidden: self.close()
@@ -5537,7 +5537,7 @@ class WindowSkip(Window):
 			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
 
 			# Fully hide after a few seconds.
-			for i in range(self.mSkipTime * 2):
+			for i in range(self.mSkipTime * 4): # Twice as long as the full visibility.
 				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StatePartial: return
 				tools.Time.sleep(0.5)
 			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)

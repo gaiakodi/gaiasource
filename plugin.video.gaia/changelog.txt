@@ -1,4 +1,11 @@
 
+[B]6.1.10 (2023.02.27)[/B]
+- Improved intro skip button.
+- Fixed multiple rating dialogs.
+- Improved stream language detection.
+- Improved announcements.
+- Changed version numbering.
+
 [B]6.1.9 (2023.02.24)[/B]
 - Added rated category menus.
 - Added new TMDb features.

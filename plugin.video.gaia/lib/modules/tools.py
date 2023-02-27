@@ -2791,7 +2791,7 @@ class Logger(object):
 				name = prefix
 
 		if name:
-			nameValue = System.name().upper() + ' ' + System.version()
+			nameValue = System.name().upper() + ' ' + ('DEV' if System.versionDeveloper() else System.version())
 			if not name is True: nameValue += ' (' + name + ')'
 			if parameters:
 				nameValue += ' ['
@@ -3913,21 +3913,44 @@ class System(object):
 	def version(self, id = GaiaAddon):
 		return self.addon(id = id).getAddonInfo('version')
 
+	# Version Number:
+	#	Format: AAABBBCCCR.XXX
+	#		AAA: Major version
+	#		BBB: Minor version
+	#		CCC: Patch version
+	#		R: Release version (1 = alpha, 2 = beta, 9 = stable)
+	#		XXX: Alpha/beta version
+	# EG: 6.54.32 -> 6054329.0
+	# EG: 6.54.32~alpha -> 6054321.0
+	# EG: 6.54.32~beta98 -> 6054322.098
 	@classmethod
 	def versionNumber(self, id = GaiaAddon, version = None):
 		try:
 			if version is None: version = self.version(id = id)
-			version = version.replace('.', '')
+
+			try: subversion = version.split('~')[1]
+			except: subversion = None
+
 			try:
-				version = version.split('~')
-				try:
-					subversion = version[1].replace('alpha', '').replace('beta', '')
-					if not subversion: subversion = '1'
-					if 'alpha' in version[1]: subversion = '0' + subversion
-				except: subversion = '0'
-				version = version[0] + '.' + str(subversion)
+				try: version = version.split('~')[0]
+				except: pass
+				version = version.split('.')
 			except: pass
-			version = float(version)
+
+			result = ['%03d' % int(i) for i in version]
+			result = ''.join(result)
+
+			if subversion:
+				try: subresult = int(subversion.replace('alpha', '').replace('beta', ''))
+				except: subresult = 0
+				if 'alpha' in subversion: result += '1.'
+				elif 'beta' in subversion: result += '2.'
+				else: result += '3.'
+				result += ('%03d' % subresult)
+			else:
+				result += '9.0'
+
+			version = float(result)
 		except: version = None
 		return version if version else 0
 
@@ -3963,7 +3986,7 @@ class System(object):
 
 	@classmethod
 	def versionDeveloper(self, id = GaiaAddon):
-		return self.version(id = id) == '9.9.9'
+		return self.version(id = id) == '999.999.999'
 
 	@classmethod
 	def versionInfo(self, update = False):
@@ -4428,82 +4451,9 @@ class System(object):
 			except: Logger.error()
 
 		# Do not do this if Gaia was installed from scratch without having and old version.
-		if version['old']['number'] and version['old']['number'] >= 500:
-			# gaiaremove - Can be removed in later versions.
-			if version['old']['number'] < 600 and version['new']['number'] >= 600:
-				try: Settings.clear()
-				except: Logger.error()
-
-				try: Backup.automaticClear()
-				except: Logger.error()
-
-				try:
-					from lib.modules.cache import Cache
-					Cache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.meta.cache import MetaCache
-					MetaCache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.modules.history import History
-					History()._deleteFile()
-				except: Logger.error()
-			if version['old']['prerelease'] and version['new']['prerelease']:
-				if version['old']['number'] < 600.2 and version['new']['number'] >= 600.2: # Beta 2
-					Settings.set('network.vpn.detection', 0)
-
-					try:
-						from lib.modules.cache import Cache
-						Cache.instance()._deleteFile()
-					except: Logger.error()
-
-					try:
-						from lib.meta.cache import MetaCache
-						MetaCache.instance()._deleteFile()
-					except: Logger.error()
-
-				if version['old']['number'] < 600.6 and version['new']['number'] >= 600.6:
-					try:
-						from lib.modules.playback import Playback
-						Playback.clear()
-					except: Logger.error()
-			if version['old']['prerelease'] and version['old']['number'] < 601 and not version['new']['prerelease'] and version['new']['number'] >= 600: # From beta to stable 6.0.0.
-				try: Settings.clear()
-				except: Logger.error()
-
-				try: Backup.automaticClear()
-				except: Logger.error()
-
-				try:
-					from lib.modules.cache import Cache
-					Cache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.meta.cache import MetaCache
-					MetaCache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.modules.playback import Playback
-					Playback._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.modules.history import History
-					History()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.providers.core.manager import Manager
-					Manager.streamsDatabaseClear()
-				except: Logger.error()
-
+		if version['old']['number'] and version['old']['number'] >= 50000009.0:
 			#gaiaremove - since pack and episode numbering changed.
-			if version['old']['number'] < 610 and version['new']['number'] >= 610:
+			if version['old']['number'] < 60010009.0 and version['new']['number'] >= 60010009.0:
 				try:
 					from lib.modules.cache import Cache
 					Cache.instance()._deleteFile()
@@ -4523,12 +4473,12 @@ class System(object):
 				WindowMetaExternal.show()
 
 			#gaiaremove
-			if version['old']['number'] == 610 and version['new']['number'] > 610:
+			if version['old']['number'] == 60010009.0 and version['new']['number'] > 60010009.0:
 				from lib.modules.window import WindowMetaExternal
 				WindowMetaExternal.show()
 
 			#gaiaremove
-			if version['old']['number'] <= 611 and version['new']['number'] > 611:
+			if version['old']['number'] <= 60010019.0 and version['new']['number'] > 60010019.0:
 				Settings.default(id = 'navigation.page.episode')
 				Settings.default(id = 'general.cache.expression')
 
@@ -10747,8 +10697,7 @@ class Extension(object):
 			data = network.Networker().requestText(link)
 			if data:
 				match = re.search('id\s*=\s*[\'"]' + id + '[\'"].*?version\s*=\s*[\'"](.*?)[\'"]', data, flags = re.IGNORECASE)
-				if match:
-					return match.group(1)
+				if match: return match.group(1)
 		return None
 
 	@classmethod
@@ -12569,18 +12518,30 @@ class Announcements(object):
 		try:
 			from lib.modules import api
 			from lib.modules import interface
-			if sleep: Time.sleep(2) # Wait a bit so that everything has been loaded.
-			last = Settings.getInteger('internal.announcement')
+
+			if sleep: Time.sleep(1.5) # Wait a bit so that everything has been loaded.
+
 			if force:
 				interface.Loader.show()
-				result = api.Api.announcement(version = System.version())
+				last = Time.past(days = 365)
+				result = api.Api.announcement(last = last, version = System.version(), count = 5)
 			else:
+				last = Settings.getInteger('internal.announcement')
 				if not last: last = Time.past(days = 14) # Make sure Gaia 6 does not retrieve old Gaia 5 announcements. Also limits old announcements if the user newley installs Gaia.
-				result = api.Api.announcement(last = last, version = System.version())
+				result = api.Api.announcement(last = last, version = System.version(), count = 5)
+
 			if result:
-				mode = result['mode']
-				text = result['message']['format']
-				if not force: Settings.set('internal.announcement', result['time']['added'])
+				if Tools.isDictionary(result): result = [result]
+				single = len(result) == 1
+
+				mode = result[0]['mode'] if single else 'page'
+
+				newline = interface.Format.newline() * 2
+				text = [interface.Format.font(Time.format(i['time']['added'], format = Time.FormatDate), bold = True, color = interface.Format.colorSecondary()) + newline + i['message']['format'] for i in result]
+				text = newline.join(text)
+
+				if not force: Settings.set('internal.announcement', max(i['time']['added'] for i in result))
+
 				if mode == 'dialog': interface.Dialog.confirm(title = 33962, message = text)
 				elif mode == 'splash': interface.Splash.popupMessage(message = text)
 				elif mode == 'page': interface.Dialog.text(title = 33962, message = text)

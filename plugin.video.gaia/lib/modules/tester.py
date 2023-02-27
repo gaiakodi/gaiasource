@@ -17402,6 +17402,8 @@ class Tester(object):
 			{'result' : {'audio' : [], 'subtitle' : ['pt']},								'data' : 'Português (FIXA) subtitle',											'native' : 'pt'},
 			{'result' : {'audio' : ['pt'], 'subtitle' : []},								'data' : 'Português audio',														'native' : 'pt'},
 			{'result' : {'audio' : ['pt'], 'subtitle' : ['un']},							'data' : 'Português audio (FIXA)',												'native' : 'pt'},
+
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'The Last of Us.S01E02.Infected.MULTi.1080p.HMAX.WEB-DL.DDP5.1.x264-Ralf - PSOTNIK HT.mkv'},
 		)
 
 		timer = tools.Time(start = True)

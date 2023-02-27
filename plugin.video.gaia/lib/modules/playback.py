@@ -193,8 +193,14 @@ class Playback(Database):
 		if trakt: query.append('idTrakt = "%s"' % str(trakt))
 		query = ['(%s)' % ' OR '.join(query)]
 
-		if not season is None: query.append('numberSeason = %s' % int(season))
-		if not episode is None: query.append('numberEpisode = %s' % int(episode))
+		# Specifically select where values are NULL.
+		# Otherwise if selecting a show (with season = None), if will not pass in the season, and then return the season data instead of the show data.
+		#if not season is None: query.append('numberSeason = %s' % int(season))
+		#if not episode is None: query.append('numberEpisode = %s' % int(episode))
+		if season is None: query.append('(numberSeason IS NULL OR numberSeason = "")')
+		else: query.append('numberSeason = %s' % int(season))
+		if episode is None: query.append('(numberEpisode IS NULL OR numberEpisode = "")')
+		else: query.append('numberEpisode = %s' % int(episode))
 
 		return ' WHERE ' + (' AND '.join(query))
 

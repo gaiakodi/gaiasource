@@ -2931,7 +2931,7 @@ class Manager(object):
 	def streamsRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, time = None):
 		from lib.modules.stream import Stream
 
-		if provider.typeLocal(): return None # always rescrape local providers.
+		if provider.typeLocal(): return None # Always rescrape local providers.
 
 		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
 

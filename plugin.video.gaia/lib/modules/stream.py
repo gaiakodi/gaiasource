@@ -20507,6 +20507,9 @@ class Stream(Serializer):
 				elif codePrimary == 'be':
 					# Eg: Avatar 2009 FRENCH TS xvid MD ac3 SUBFORCED (condom be)
 					keyword = __languageKeywordReplace(keyword = keyword, value = 'be', replacement = 'be' + endingExclude)
+				elif codePrimary == 'ht':
+					# Eg: The Last of Us.S01E02.Infected.MULTi.1080p.HMAX.WEB-DL.DDP5.1.x264-Ralf - PSOTNIK HT.mkv
+					keyword = __languageKeywordReplace(keyword = keyword, value = 'ht', replacement = 'ht' + endingExclude)
 				elif codePrimary == 'sq':
 					# SHQ = Super High Quality
 					# Eg: Avatar(2009)TS SHQ 720p-[Spanish+Sub)-[ESPADESCARGAS]
