@@ -3650,7 +3650,8 @@ class ProviderBase(object):
 		return self.mParameters
 
 	def parametersSet(self, query = None, media = None, titles = None, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = None, silent = None):
-		self.mParameters = {'query' : query, 'media' : media, 'titles' : titles, 'years' : years, 'date' : date, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
+		# Copy the years, since the dictionary gets edited.
+		self.mParameters = {'query' : query, 'media' : media, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'date' : date, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
 
 	def parametersImport(self, data):
 		if Tools.isString(data): data = Converter.jsonFrom(data)

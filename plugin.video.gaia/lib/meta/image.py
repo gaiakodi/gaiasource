@@ -19,6 +19,7 @@
 '''
 
 from lib.modules.tools import Media, Regex, Tools, Settings, Language, Logger
+from lib.modules.network import Networker
 from lib.modules.theme import Theme
 from lib.modules.concurrency import Lock
 
@@ -55,12 +56,12 @@ class MetaImage(object):
 	MediaShow						= Media.TypeShow
 	MediaSeason						= Media.TypeSeason
 	MediaEpisode					= Media.TypeEpisode
-	MediaMixed						= Media.TypeMixed
+	MediaMultiple					= Media.TypeMultiple
 	MediaSpecialSeason				= Media.TypeSpecialSeason
 	MediaSpecialEpisode				= Media.TypeSpecialEpisode
 	MediaSpecialRecap				= Media.TypeSpecialRecap
 	MediaSpecialExtra				= Media.TypeSpecialExtra
-	Medias							= {ModeStyle : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode], ModeSelection : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode, MediaSpecialSeason, MediaSpecialEpisode, MediaSpecialRecap, MediaSpecialExtra, MediaMixed]}
+	Medias							= {ModeStyle : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode], ModeSelection : [MediaMovie, MediaSet, MediaShow, MediaSeason, MediaEpisode, MediaSpecialSeason, MediaSpecialEpisode, MediaSpecialRecap, MediaSpecialExtra, MediaMultiple]}
 
 	TypePoster						= 'poster'
 	TypeThumb						= 'thumb'
@@ -75,9 +76,32 @@ class MetaImage(object):
 	TypeIcon						= 'icon' # Not listed under Kodi artwork wiki, but listed under the Python ListItem docs.
 	Types							= [TypePoster, TypeThumb, TypeFanart, TypeLandscape, TypeBanner, TypeClearlogo, TypeClearart, TypeDiscart, TypeKeyart]
 	TypesAlternative				= {TypePoster : TypeThumb, TypeThumb : TypeFanart, TypeFanart : TypeLandscape, TypeLandscape : TypeFanart, TypeBanner : TypeFanart, TypeClearlogo : TypeClearart, TypeClearart : TypeClearlogo, TypeDiscart : TypeKeyart, TypeKeyart : TypeDiscart}
-	TypesPreference					= {MediaSeason : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaEpisode : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaSpecialSeason : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaSpecialEpisode : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaSpecialRecap : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaSpecialExtra : {TypeFanart : MediaShow, TypeLandscape : MediaShow}, MediaMixed : {TypePoster : MediaShow, TypeThumb : MediaShow, TypeFanart : MediaShow, TypeLandscape : MediaShow, TypeBanner : MediaShow, TypeClearlogo : MediaShow, TypeClearart : MediaShow, TypeDiscart : MediaShow, TypeKeyart : MediaShow}}
-	TypesFallback					= {MediaSpecialEpisode : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypePoster}}, MediaSpecialRecap : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypePoster}}, MediaSpecialExtra : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypePoster}}}
-	TypesRecover					= {TypePoster : [TypeKeyart, TypeThumb, TypeLandscape, TypeFanart, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart], TypeThumb : [TypeKeyart, TypeThumb, TypeLandscape, TypeFanart, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart], TypeFanart : [TypeLandscape, TypeThumb, TypeKeyart, TypePoster, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart], TypeLandscape : [TypeFanart, TypeThumb, TypeKeyart, TypePoster, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart], TypeBanner : [TypeFanart, TypeLandscape, TypeKeyart, TypePoster, TypeThumb, TypeClearart, TypeClearlogo, TypeDiscart], TypeClearlogo : [TypeClearart], TypeClearart : [TypeClearlogo], TypeKeyart : [TypePoster, TypeThumb, TypeFanart, TypeLandscape, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart]}
+	TypesPreference					= {
+										MediaSeason : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaEpisode : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaSpecialSeason : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaSpecialEpisode : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaSpecialRecap : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaSpecialExtra : {TypeFanart : MediaShow, TypeLandscape : MediaShow},
+										MediaMultiple : {TypePoster : MediaShow, TypeThumb : MediaShow, TypeFanart : MediaShow, TypeLandscape : MediaShow, TypeBanner : MediaShow, TypeClearlogo : MediaShow, TypeClearart : MediaShow, TypeDiscart : MediaShow, TypeKeyart : MediaShow},
+									}
+	TypesFallback					= {
+										MediaSeason : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}},
+										MediaSpecialSeason : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}},
+										MediaSpecialEpisode : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+										MediaSpecialRecap : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+										MediaSpecialExtra : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+									}
+	TypesRecover					= {
+										TypePoster : [TypeKeyart, TypeThumb, TypeLandscape, TypeFanart, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
+										TypeThumb : [TypeKeyart, TypeThumb, TypeLandscape, TypeFanart, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
+										TypeFanart : [TypeLandscape, TypeThumb, TypeKeyart, TypePoster, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
+										TypeLandscape : [TypeFanart, TypeThumb, TypeKeyart, TypePoster, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
+										TypeBanner : [TypeFanart, TypeLandscape, TypeKeyart, TypePoster, TypeThumb, TypeClearart, TypeClearlogo, TypeDiscart],
+										TypeClearlogo : [TypeClearart],
+										TypeClearart : [TypeClearlogo],
+										TypeKeyart : [TypePoster, TypeThumb, TypeFanart, TypeLandscape, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
+									}
 
 	ProviderImdb					= 'imdb'
 	ProviderTmdb					= 'tmdb'
@@ -175,12 +199,12 @@ class MetaImage(object):
 	SettingsSelectionShow			= 'image.selection.show'
 	SettingsSelectionSeason			= 'image.selection.season'
 	SettingsSelectionEpisode		= 'image.selection.episode'
-	SettingsSelectionMixed			= 'image.selection.mixed'
+	SettingsSelectionMultiple		= 'image.selection.multiple'
 	SettingsSpecialSeason			= 'image.special.season'
 	SettingsSpecialEpisode			= 'image.special.episode'
 	SettingsSpecialRecap			= 'image.special.recap'
 	SettingsSpecialExtra			= 'image.special.extra'
-	SettingsSelection				= {MediaMovie : SettingsSelectionMovie, MediaSet : SettingsSelectionSet, MediaShow : SettingsSelectionShow, MediaSeason : SettingsSelectionSeason, MediaEpisode : SettingsSelectionEpisode, MediaMixed : SettingsSelectionMixed, MediaSpecialSeason : SettingsSpecialSeason, MediaSpecialEpisode : SettingsSpecialEpisode, MediaSpecialRecap : SettingsSpecialRecap, MediaSpecialExtra : SettingsSpecialExtra}
+	SettingsSelection				= {MediaMovie : SettingsSelectionMovie, MediaSet : SettingsSelectionSet, MediaShow : SettingsSelectionShow, MediaSeason : SettingsSelectionSeason, MediaEpisode : SettingsSelectionEpisode, MediaMultiple : SettingsSelectionMultiple, MediaSpecialSeason : SettingsSpecialSeason, MediaSpecialEpisode : SettingsSpecialEpisode, MediaSpecialRecap : SettingsSpecialRecap, MediaSpecialExtra : SettingsSpecialExtra}
 
 	SettingsData					= {}
 	SettingsDefault					= {}
@@ -274,7 +298,7 @@ class MetaImage(object):
 	def settingsFallback(self, media, fallback):
 		if media == MetaImage.MediaSeason: id = MetaImage.SettingsSelectionSeason
 		elif media == MetaImage.MediaEpisode: id = MetaImage.SettingsSelectionEpisode
-		elif media == MetaImage.MediaMixed: id = MetaImage.SettingsSelectionMixed
+		elif media == MetaImage.MediaMultiple: id = MetaImage.SettingsSelectionMultiple
 		elif media == MetaImage.MediaSpecialSeason: id = MetaImage.SettingsSpecialSeason
 		elif media == MetaImage.MediaSpecialEpisode: id = MetaImage.SettingsSpecialEpisode
 		else: return False
@@ -303,7 +327,7 @@ class MetaImage(object):
 								elif m == MetaImage.MediaSpecialEpisode: m = MetaImage.MediaEpisode
 								elif m == MetaImage.MediaSpecialRecap: m = MetaImage.MediaSeason
 								elif m == MetaImage.MediaSpecialExtra: m = MetaImage.MediaSeason
-								elif m == MetaImage.MediaMixed: m = MetaImage.MediaEpisode
+								elif m == MetaImage.MediaMultiple: m = MetaImage.MediaEpisode
 
 								try: index = MetaImage.IndexesDefault[i]
 								except: index = MetaImage.IndexDefault
@@ -376,7 +400,7 @@ class MetaImage(object):
 		elif media == MetaImage.MediaShow: self.mTitle = 35595 if mode == MetaImage.ModeStyle else 35589
 		elif media == MetaImage.MediaSeason: self.mTitle = 35596 if mode == MetaImage.ModeStyle else 35590
 		elif media == MetaImage.MediaEpisode: self.mTitle = 35597 if mode == MetaImage.ModeStyle else 35591
-		elif media == MetaImage.MediaMixed: self.mTitle = None if mode == MetaImage.ModeStyle else 35598
+		elif media == MetaImage.MediaMultiple: self.mTitle = None if mode == MetaImage.ModeStyle else 35598
 		elif media == MetaImage.MediaSpecialSeason: self.mTitle = None if mode == MetaImage.ModeStyle else 35590
 		elif media == MetaImage.MediaSpecialEpisode: self.mTitle = None if mode == MetaImage.ModeStyle else 35591
 		elif media == MetaImage.MediaSpecialRecap: self.mTitle = None if mode == MetaImage.ModeStyle else 35592
@@ -658,7 +682,7 @@ class MetaImage(object):
 		def _settingsSupport(mode, type, option, selection = None):
 			support							= {
 				MetaImage.ModeSelection			: {
-					MetaImage.OptionMedia		: {MetaImage.OptionMedia : (MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMixed)},
+					MetaImage.OptionMedia		: {MetaImage.OptionMedia : (MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMultiple)},
 					MetaImage.OptionIndex		: {MetaImage.OptionMedia : (MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra)},
 					MetaImage.OptionType		: None,
 					MetaImage.OptionChoice		: None,
@@ -713,11 +737,11 @@ class MetaImage(object):
 					else: values.extend([MetaImage.ProviderTmdb, MetaImage.ProviderFanart])
 				elif option == MetaImage.OptionMedia:
 					values = []
-					if self.mMedia in [MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMixed]:
+					if self.mMedia in [MetaImage.MediaShow, MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMultiple]:
 						values.append(MetaImage.MediaShow)
-					if self.mMedia in [MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMixed]:
+					if self.mMedia in [MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra, MetaImage.MediaMultiple]:
 						values.append(MetaImage.MediaSeason)
-					if self.mMedia in [MetaImage.MediaEpisode, MetaImage.MediaSpecialEpisode, MetaImage.MediaMixed]:
+					if self.mMedia in [MetaImage.MediaEpisode, MetaImage.MediaSpecialEpisode, MetaImage.MediaMultiple]:
 						values.append(MetaImage.MediaEpisode)
 
 				subitems = []
@@ -840,6 +864,11 @@ class MetaImage(object):
 	def replaceThumbnail(self, images, all = True, force = False):
 		# Some skins (eg: Aeon Nox Silvo) are not intelligent enough to pick the poster if no thumb is available.
 		return self.replace(images = images, missing = MetaImage.TypeThumb, replacement = MetaImage.TypePoster, all = all, force = force)
+
+	@classmethod
+	def replacePoster(self, images, all = True, force = False):
+		# Some skins (eg: Estaury) always display a poster (if available) in episode lists, even if thumbnails are available.
+		return self.replace(images = images, missing = MetaImage.TypePoster, replacement = MetaImage.TypeThumb, all = all, force = force)
 
 	@classmethod
 	def replaceSeason(self, images):
@@ -1035,7 +1064,7 @@ class MetaImage(object):
 					if 'set' in data and data['set'] and 'tmdb' in data and data['tmdb'] and not('imdb' in data and data['tmdb']) and not('trakt' in data and data['trakt']): media = MetaImage.MediaSet
 					else: media = MetaImage.MediaMovie
 
-			television = Media.typeTelevision(media) or media == MetaImage.MediaMixed
+			television = Media.typeTelevision(media) or media == MetaImage.MediaMultiple
 
 			images = {}
 			if MetaImage.Attribute in data:
@@ -1071,11 +1100,39 @@ class MetaImage(object):
 								if self.valid(image):
 									images[level + type + MetaImage.Numbers[i]] = image
 
-			if preference: images = self.extractSelection(selection = MetaImage.SelectionPreference, media = media, images = images)
+			if preference: images = self.extractSelection(selection = MetaImage.SelectionPreference, media = media, images = images, fallback = False)
 			if fallback: images = self.extractSelection(selection = MetaImage.SelectionFallback, media = media, images = images)
+
+			# Add show.xxx and season.xxx images.
+			# Only do here, after preference/fallback, since we might not want to use these images as replacements.
+			if MetaImage.Attribute in data and television:
+				levels = []
+				if media in [MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaMultiple, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra]: levels.append((MetaImage.MediaShow, MetaImage.PrefixShow))
+				if media in [MetaImage.MediaEpisode, MetaImage.MediaMultiple, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra]: levels.append((MetaImage.MediaSeason, MetaImage.PrefixSeason))
+
+				if levels:
+					values = data[MetaImage.Attribute]
+					for level in levels:
+						if level:
+							if not level[0] in values: continue
+							values1 = values[level[0]]
+							level = level[1]
+						else:
+							values1 = values
+
+						for type in MetaImage.Types:
+							if type in values1:
+								values2 = values1[type]
+								for i in range(len(values2)):
+									image = values2[i]
+									if self.valid(image):
+										id = level + type + MetaImage.Numbers[i]
+										if not id in images or not images[id]: images[id] = image
+
 			if recover: images = self.extractRecover(images = images)
 			if limit: images = self.extractLimit(media = media, images = images)
 			if default: images = self.extractDefault(images = images)
+			images = self.extractClean(images = images)
 
 			return images
 		except:
@@ -1131,7 +1188,7 @@ class MetaImage(object):
 		return None
 
 	@classmethod
-	def extractSelection(self, selection, media, images):
+	def extractSelection(self, selection, media, images, fallback = True):
 		default = self.settingsDefault(mode = MetaImage.ModeSelection)
 		for type in MetaImage.Types:
 			if selection == MetaImage.SelectionPreference or not type in images:
@@ -1142,7 +1199,7 @@ class MetaImage(object):
 					for key, value in data.items():
 						if value is None: data[key] = default[media][type][key]
 				if data:
-					image = self.extractChoice(images = images, media = data[MetaImage.OptionMedia], index = data[MetaImage.OptionIndex], type = data[MetaImage.OptionType], choice = data[MetaImage.OptionChoice], fallback = True)
+					image = self.extractChoice(images = images, media = data[MetaImage.OptionMedia], index = data[MetaImage.OptionIndex], type = data[MetaImage.OptionType], choice = data[MetaImage.OptionChoice], fallback = fallback)
 					if image: images[type] = image
 		return images
 
@@ -1218,6 +1275,14 @@ class MetaImage(object):
 			except: pass
 			try: del images[MetaImage.TypeLandscape]
 			except: pass
+		return images
+
+	@classmethod
+	def extractClean(self, images):
+		# Sometimes URLs contain a space and then do not show:
+		#	error <general>: CCurlFile::Stat - <http://assets.fanart.tv/fanart/tv/75299/seasonthumb/Sopranos (3).jpg> Failed: URL using bad/illegal format or missing URL(3)
+		for type, link in images.items():
+			if ' ' in link: images[type] = link.replace(' ', '%20')
 		return images
 
 	###################################################################
@@ -1321,20 +1386,22 @@ class MetaImage(object):
 		if season is None: season = self.settingsFallback(media = media, fallback = MetaImage.MediaSeason)
 
 		images = self.extract(media = media, data = data, default = False, show = show, season = season, episode = episode, previous = previous, next = next)
+
 		images = self.replaceThumbnail(images = images)
-		if media == MetaImage.MediaMixed: images = self.replaceSeason(images = images)
+		if media == MetaImage.MediaSpecialRecap or media == MetaImage.MediaSpecialExtra: images = self.replacePoster(images = images, force = True)
+		if media == MetaImage.MediaMultiple: images = self.replaceSeason(images = images)
 		if function: function(images)
 
 		if item: self.set(images = images, item = item, default = default)
 		return images
 
 	@classmethod
-	def setMedia(self, media, data, item = None, default = True, mixed = False, show = None, season = None, episode = True, previous = True, next = True):
+	def setMedia(self, media, data, item = None, default = True, multiple = False, show = None, season = None, episode = True, previous = True, next = True):
 		if Media.typeMovie(media): return self.setMovie(data = data, item = item, default = default)
 		elif media == MetaImage.MediaSet: return self.setSet(data = data, item = item, default = default)
 		elif media == MetaImage.MediaShow: return self.setShow(data = data, item = item, default = default)
 		elif media == MetaImage.MediaSeason: return self.setSeason(data = data, item = item, default = default, show = show)
-		elif media == MetaImage.MediaEpisode: return self.setEpisode(data = data, item = item, default = default, mixed = mixed, show = show, season = season, episode = episode, previous = previous, next = next)
+		elif media == MetaImage.MediaEpisode: return self.setEpisode(data = data, item = item, default = default, multiple = multiple, show = show, season = season, episode = episode, previous = previous, next = next)
 		elif media == MetaImage.MediaSpecialRecap: return self.setRecap(data = data, item = item, default = default)
 		elif media == MetaImage.MediaSpecialExtra: return self.setExtra(data = data, item = item, default = default)
 
@@ -1356,8 +1423,8 @@ class MetaImage(object):
 		return self._set(media = media, data = data, item = item, default = default, show = show)
 
 	@classmethod
-	def setEpisode(self, data, item = None, default = True, mixed = False, show = None, season = None, episode = True, previous = True, next = True):
-		media = MetaImage.MediaMixed if mixed else MetaImage.MediaSpecialEpisode if int(data['season']) == 0 else MetaImage.MediaEpisode
+	def setEpisode(self, data, item = None, default = True, multiple = False, show = None, season = None, episode = True, previous = True, next = True):
+		media = MetaImage.MediaMultiple if multiple else MetaImage.MediaSpecialEpisode if int(data['season']) == 0 else MetaImage.MediaEpisode
 		return self._set(media = media, data = data, item = item, default = default, show = show, season = season, episode = episode, previous = previous, next = next)
 
 	@classmethod

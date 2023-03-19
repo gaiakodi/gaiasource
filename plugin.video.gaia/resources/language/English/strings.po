@@ -2491,7 +2491,7 @@ msgid "Skip Intro"
 msgstr ""
 
 msgctxt "#33463"
-msgid "[GAIA-NO-LABEL]"
+msgid "Notifications"
 msgstr ""
 
 msgctxt "#33464"
@@ -2751,7 +2751,7 @@ msgid "Sets"
 msgstr ""
 
 msgctxt "#33528"
-msgid "[GAIA-NO-LABEL]"
+msgid "Version Announcements"
 msgstr ""
 
 msgctxt "#33529"
@@ -3231,7 +3231,7 @@ msgid "An IMDb account is required for this feature. Do you want to authenticate
 msgstr ""
 
 msgctxt "#33648"
-msgid "[GAIA-NO-LABEL]"
+msgid "Shuffle"
 msgstr ""
 
 msgctxt "#33649"
@@ -3279,7 +3279,7 @@ msgid "This action requires the Trakt addon to be installed."
 msgstr ""
 
 msgctxt "#33660"
-msgid "[GAIA-NO-LABEL]"
+msgid "Binge Timeout"
 msgstr ""
 
 msgctxt "#33661"
@@ -3803,15 +3803,15 @@ msgid "In addition not the main episodes, do you also want to mark [B]all[/B] sp
 msgstr ""
 
 msgctxt "#33791"
-msgid "[GAIA-NO-LABEL]"
+msgid "Show End"
 msgstr ""
 
 msgctxt "#33792"
-msgid "[GAIA-NO-LABEL]"
+msgid "Season End"
 msgstr ""
 
 msgctxt "#33793"
-msgid "[GAIA-NO-LABEL]"
+msgid "Episode End"
 msgstr ""
 
 msgctxt "#33794"
@@ -3819,11 +3819,11 @@ msgid "EasyNews"
 msgstr ""
 
 msgctxt "#33795"
-msgid "[GAIA-NO-LABEL]"
+msgid "Movie End"
 msgstr ""
 
 msgctxt "#33796"
-msgid "[GAIA-NO-LABEL]"
+msgid "Airing End"
 msgstr ""
 
 msgctxt "#33797"
@@ -4411,7 +4411,7 @@ msgid "The Gaia library path does not appear in the Kodi file sources and automa
 msgstr ""
 
 msgctxt "#33943"
-msgid "Settings related to navigation, paging, menus, and views."
+msgid "Settings related to navigation, paging, and sorting."
 msgstr ""
 
 msgctxt "#33944"
@@ -4443,7 +4443,7 @@ msgid "Please Restart Kodi"
 msgstr ""
 
 msgctxt "#33951"
-msgid "[GAIA-NO-LABEL]"
+msgid "Settings related to menus, quick and arrival sections."
 msgstr ""
 
 msgctxt "#33952"
@@ -4695,7 +4695,7 @@ msgid "Mark movies and episodes as watched when their playback has finished. The
 msgstr ""
 
 msgctxt "#34014"
-msgid "Resume playback of streams that were previously started but not finished. Playback can be resumed automatically or manually through user interaction. Alternatively if no choice was made within a certain period of time, the playback is resumed automatically."
+msgid "Resume playback of unfinished streams from the previous position. The [I]Disabled[/I]  option will not resume playback and always restart from beginning. The [I]Automatic[/I]  option will always resume playback automatically. The [I]Manual[/I]  option will show a dialog asking wether to resume or restart playback. The [I]Timeout[/I]  option will show a dialog asking wether to resume or restart playback, and automatically resume playback if no choice was made within a certain period. The [I]35233[/I]  option will automatically restart playback if the progress is in the first or last 2%, show a dialog with a timeout if the progress is in the first or last 10%, and otherwise resume playback automatically."
 msgstr ""
 
 msgctxt "#34015"
@@ -5727,19 +5727,19 @@ msgid "Show a notification when preemptive termination is triggered."
 msgstr ""
 
 msgctxt "#34272"
-msgid "Sort the Trakt and IMDb movie lists according to a specific attribute."
+msgid "Sort movie lists according to a specific attribute."
 msgstr ""
 
 msgctxt "#34273"
-msgid "Sort the Trakt and IMDb show lists according to a specific attribute."
+msgid "Sort show lists according to a specific attribute."
 msgstr ""
 
 msgctxt "#34274"
-msgid "Sort the Trakt and IMDb documentary lists according to a specific attribute."
+msgid "Sort documentary lists according to a specific attribute."
 msgstr ""
 
 msgctxt "#34275"
-msgid "Sort the Trakt and IMDb short film lists according to a specific attribute."
+msgid "Sort short film lists according to a specific attribute."
 msgstr ""
 
 msgctxt "#34276"
@@ -5783,7 +5783,7 @@ msgid "Specify the server location for instant streaming. Changing to a fixed se
 msgstr ""
 
 msgctxt "#34286"
-msgid "Sort the favourite lists, such as Trakt and IMDb calendars, progress and user lists."
+msgid "Sort supported lists, such as Trakt and IMDb calendars, progress and user lists."
 msgstr ""
 
 msgctxt "#34287"
@@ -5971,7 +5971,7 @@ msgid "Use variations of titles that have special or language-specific character
 msgstr ""
 
 msgctxt "#34333"
-msgid "Adjust the maximum number of episodes to list per page for mixed show menus before having to navigate to the next page. The more episodes are listed, the more metadata has to be retrieved and the longer it takes to load menus. This page limit is used for episode menus when direct scraping is disabled."
+msgid "Adjust the maximum number of episodes to list per page for menus containing episodes from multiple shows, before having to navigate to the next page. The more episodes are listed, the more metadata has to be retrieved and the longer it takes to load menus. This page limit is used for episode menus when direct scraping is disabled."
 msgstr ""
 
 msgctxt "#34334"
@@ -6127,7 +6127,7 @@ msgid "Install the ResolveUrl addon for torrent, hoster, and direct streaming."
 msgstr ""
 
 msgctxt "#34372"
-msgid "Playback will start automatically in a few seconds."
+msgid "Playback will automatically resume in a few seconds."
 msgstr ""
 
 msgctxt "#34373"
@@ -6283,7 +6283,7 @@ msgid "Change the limit, preferred and fallback selections for different special
 msgstr ""
 
 msgctxt "#34421"
-msgid "Change the limit, preferred and fallback selections for different mixed image types. Certain menus, such as arrivals or new releases, contain episodes from different shows. These multi-episode menus might look better with show images instead of season or episode images. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
+msgid "Change the limit, preferred and fallback selections for different multiple image types. Certain menus, such as arrivals or new releases, contain episodes from different shows. These multi-episode menus might look better with show images instead of season or episode images. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
 msgstr ""
 
 msgctxt "#34422"
@@ -6479,15 +6479,15 @@ msgid "Optimize the number of providers based on your device's hardware and inte
 msgstr ""
 
 msgctxt "#34470"
-msgid "Occasionally show important notifications."
+msgid "Occasionally show important announcements from the developers."
 msgstr ""
 
 msgctxt "#34471"
-msgid "Show public notifications, such as news, events, and release announcements."
+msgid "Show public announcements, such as news, events, and release notifications."
 msgstr ""
 
 msgctxt "#34472"
-msgid "Show private notifications, such as problems with your device or running out of storage space."
+msgid "Show private announcements, such as problems with your device or running out of storage space."
 msgstr ""
 
 msgctxt "#34473"
@@ -6539,7 +6539,7 @@ msgid "Settings related to developer features and advanced options."
 msgstr ""
 
 msgctxt "#34485"
-msgid "The settings in this category are experimental and should only be used by developers. These features will [B]substantially[/B] increase scraping time, consume a lot of your internet bandwidth, and put a heavy load on servers. Only enabled these features if you know what you are doing."
+msgid "The settings under this section are experimental and should only be used by developers. These features will [B]substantially[/B] increase scraping time, consume a lot of your internet bandwidth, and put a heavy load on servers. Only enabled these features if you know what you are doing."
 msgstr ""
 
 msgctxt "#34486"
@@ -6707,7 +6707,7 @@ msgid "Authenticate a RealDebrid account with an external resolver addon. Only c
 msgstr ""
 
 msgctxt "#34527"
-msgid "Change the view of mixed menus that contain episodes from different shows. The [I]Default[/I]  option uses the view that was manually selected through the Kodi sidebar in the addon menus. Each submenu has to be set separately and changes through the Kodi sidebar will be persistent if the menu is reloaded. The [I]Fixed[/I]  option uses the hardcoded view as specified by Gaia. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded. The [I]Custom[/I]  option uses a custom view specified by you. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded."
+msgid "Change the view of mixed menus that contain episodes from different shows or a mixture of movies and shows. The [I]Default[/I]  option uses the view that was manually selected through the Kodi sidebar in the addon menus. Each submenu has to be set separately and changes through the Kodi sidebar will be persistent if the menu is reloaded. The [I]Fixed[/I]  option uses the hardcoded view as specified by Gaia. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded. The [I]Custom[/I]  option uses a custom view specified by you. Views are applied to all submenus and changes through the Kodi sidebar will reset if the menu is reloaded."
 msgstr ""
 
 msgctxt "#34528"
@@ -6779,19 +6779,19 @@ msgid "Rate items after playback has finished. Items can be rated on Trakt for s
 msgstr ""
 
 msgctxt "#34545"
-msgid "Rate movies after playback has finished."
+msgid "Rate movies after playback has finished.  The [B]Disabled[/B]  option will not show a dialog at all. The [B]Movie End[/B]  option will show a dialog after the movie has finished."
 msgstr ""
 
 msgctxt "#34546"
-msgid "Rate shows after playback has finished. Once all episodes of a show have been watched, display an additional rating dialog for the show. Note that this might pop up multiple rating dialogs at the end of the show, one for the last episode, one for the last season, and one for the show."
+msgid "Rate shows after playback has finished. The [B]Disabled[/B]  option will not show a dialog at all. The [B]Show End[/B]  option will show a dialog after the entire show has finished. The [B]Season End[/B]  option will show a dialog after each season. The [B]Episode End[/B]  option will show a dialog after each episode. The [B]Airing End[/B]  option will show a dialog after each season if the season is the last one or the next season has not been released yet. Note that this might pop up multiple rating dialogs at the end of the show, one for the episode, one for the season, and one for the show."
 msgstr ""
 
 msgctxt "#34547"
-msgid "Rate seasons after playback has finished. Once all episodes of a season have been watched, display an additional rating dialog for the season. Note that this might pop up multiple rating dialogs at the end of the season, one for the last episode and one for the season."
+msgid "Rate seasons after playback has finished. The [B]Disabled[/B]  option will not show a dialog at all. The [B]Season End[/B]  option will show a dialog after the season has finished. The [B]Episode End[/B]  option will show a dialog after each episode. Note that this might pop up multiple rating dialogs at the end of the show, one for the episode, and one for the season."
 msgstr ""
 
 msgctxt "#34548"
-msgid "Rate episodes after playback has finished."
+msgid "Rate episodes after playback has finished. The [B]Disabled[/B]  option will not show a dialog at all. The [B]Episode End[/B]  option will show a dialog after the episode has finished."
 msgstr ""
 
 msgctxt "#34549"
@@ -6869,6 +6869,75 @@ msgstr ""
 msgctxt "#34567"
 msgid "Specify how long the skip button is shown before being hidden automatically. The button is first shown fully for this period of time, then partially hidden for the same amount of time, before being fully hidden."
 msgstr ""
+
+msgctxt "#34568"
+msgid "Show a quick menu that contains a combination of items allowing easy access to items most likely desired."
+msgstr ""
+
+msgctxt "#34569"
+msgid "Specify the number of items to add to the quick menu that are unfinished or in progress on Trakt. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34570"
+msgid "Specify the number of items to add to the quick menu that were recently watched on Trakt. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34571"
+msgid "Specify the number of items to add to the quick menu that are on your Trakt watchlist. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34572"
+msgid "Specify the number of items to add to the quick menu that were recommended by the Trakt algorithm. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34573"
+msgid "Specify the number of items to add to the quick menu that were recently released. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34574"
+msgid "Specify the number of items to add to the quick menu that are most popular among the audience. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34575"
+msgid "Specify the number of items to add to the quick menu that are currently trending among the audience. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34576"
+msgid "Specify the number of items to add to the quick menu that are currently featured releases. A value of [I]0[/I]  will not add these types of items."
+msgstr ""
+
+msgctxt "#34577"
+msgid "Adjust the maximum number of items to list per page for quick menus and menus containing a mixture of movies and shows, before having to navigate to the next page. The more items are listed, the more metadata has to be retrieved and the longer it takes to load menus."
+msgstr ""
+
+msgctxt "#34578"
+msgid "Immediately start scraping an episode from the quick menu instead of showing a list of all unwatched episodes first."
+msgstr ""
+
+msgctxt "#34579"
+msgid "Integrate quick access of recent and recommnded movies and shows in the main menu."
+msgstr ""
+
+msgctxt "#34580"
+msgid "Sort movie set lists according to a specific attribute."
+msgstr ""
+
+msgctxt "#34581"
+msgid "Sort quick access lists according to a specific attribute. The [I]Interest[/I]  option combines your last watched activity and item origin in order to list items you are most likely to watch first."
+msgstr ""
+
+msgctxt "#34582"
+msgid "Display a default thumbnail if the movie or show artwork is not available."
+msgstr ""
+
+msgctxt "#34583"
+msgid "Automatically close the rating dialog during binge watching if no rating was cast for a certain time period. This helps with continues playback if you do not want to use a remote to cast the rating before the next episode is binged. The dialog will not automatically close if you interact with it. A value of [I]0[/I]  will never close the dialog automatically and always wait for a rating. An [I]empty[/I]  value will reset to default."
+msgstr ""
+
+msgctxt "#34584"
+msgid "Show the changelog with bug fixes and alterations to the addon if a new version was released."
+msgstr ""
+
 
 
 # [/GAIACODE]
@@ -7103,7 +7172,7 @@ msgid "Use Settings"
 msgstr ""
 
 msgctxt "#35057"
-msgid "[GAIA-NO-LABEL]"
+msgid "Auto resuming binge in %s."
 msgstr ""
 
 msgctxt "#35058"
@@ -7687,7 +7756,7 @@ msgid "Style"
 msgstr ""
 
 msgctxt "#35203"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set Sorting"
 msgstr ""
 
 msgctxt "#35204"
@@ -7855,7 +7924,7 @@ msgid "Bad"
 msgstr ""
 
 msgctxt "#35245"
-msgid "[GAIA-NO-LABEL]"
+msgid "Quick Sorting"
 msgstr ""
 
 msgctxt "#35246"
@@ -8199,7 +8268,7 @@ msgid "Utilities"
 msgstr ""
 
 msgctxt "#35331"
-msgid "[GAIA-NO-LABEL]"
+msgid "Version Changes"
 msgstr ""
 
 msgctxt "#35332"
@@ -8415,7 +8484,7 @@ msgid "Episode Paging"
 msgstr ""
 
 msgctxt "#35385"
-msgid "Mixed Paging"
+msgid "Multiple Paging"
 msgstr ""
 
 msgctxt "#35386"
@@ -8927,7 +8996,7 @@ msgid "Composers"
 msgstr ""
 
 msgctxt "#35513"
-msgid "[GAIA-NO-LABEL]"
+msgid "Mixed Paging"
 msgstr ""
 
 msgctxt "#35514"
@@ -9175,15 +9244,15 @@ msgid "Do you want to enabled SSL/TLS encryption for the server? Most local serv
 msgstr ""
 
 msgctxt "#35575"
-msgid "[GAIA-NO-LABEL]"
+msgid "Quick Access"
 msgstr ""
 
 msgctxt "#35576"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Rating Unchanged At [B]%.1f[/B]"
 msgstr ""
 
 msgctxt "#35577"
-msgid "[GAIA-NO-LABEL]"
+msgid "%s Rating Unchanged At [B]%.1f[/B] On Trakt"
 msgstr ""
 
 msgctxt "#35578"
@@ -9223,7 +9292,7 @@ msgid "Binge Scrape"
 msgstr ""
 
 msgctxt "#35587"
-msgid "No New Episode Available For Binge Watching"
+msgid "No New Episode For Bingeing"
 msgstr ""
 
 msgctxt "#35588"
@@ -9267,7 +9336,7 @@ msgid "Episode Style"
 msgstr ""
 
 msgctxt "#35598"
-msgid "Mixed Images"
+msgid "Multiple Images"
 msgstr ""
 
 msgctxt "#35599"
@@ -10211,7 +10280,7 @@ msgid "Video Retrieval"
 msgstr ""
 
 msgctxt "#35834"
-msgid "[GAIA-NO-LABEL]"
+msgid "Thumbnail Fallback"
 msgstr ""
 
 msgctxt "#35835"
@@ -10239,7 +10308,7 @@ msgid "Context Informer"
 msgstr ""
 
 msgctxt "#35841"
-msgid "Favourites Sorting"
+msgid "List Sorting"
 msgstr ""
 
 msgctxt "#35842"
@@ -10467,35 +10536,35 @@ msgid "Hayu"
 msgstr ""
 
 msgctxt "#36016"
-msgid "[GAIA-NO-LABEL]"
+msgid "Progress Items"
 msgstr ""
 
 msgctxt "#36017"
-msgid "[GAIA-NO-LABEL]"
+msgid "Watched Items"
 msgstr ""
 
 msgctxt "#36018"
-msgid "[GAIA-NO-LABEL]"
+msgid "Watchlist Items"
 msgstr ""
 
 msgctxt "#36019"
-msgid "[GAIA-NO-LABEL]"
+msgid "Recommended Items"
 msgstr ""
 
 msgctxt "#36020"
-msgid "[GAIA-NO-LABEL]"
+msgid "Arrived Items"
 msgstr ""
 
 msgctxt "#36021"
-msgid "[GAIA-NO-LABEL]"
+msgid "Popular Items"
 msgstr ""
 
 msgctxt "#36022"
-msgid "[GAIA-NO-LABEL]"
+msgid "Trending Items"
 msgstr ""
 
 msgctxt "#36023"
-msgid "[GAIA-NO-LABEL]"
+msgid "Featured Items"
 msgstr ""
 
 msgctxt "#36024"

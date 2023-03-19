@@ -146,7 +146,7 @@ class Channels(object):
 	##############################################################################
 
 	def channels(self, menu = True):
-		channels = self.mCache.cacheLong(self.skyChannels)
+		channels = self.mCache.cacheExtended(self.skyChannels)
 		if menu and channels:
 			items = sorted(channels, key = lambda i : i['name'].lower())
 			items = [{'action' : 'channelsRetrieve', 'name' : i['name'].upper(), 'link' : i['id'], 'image' : 'aired.png'} for i in items]

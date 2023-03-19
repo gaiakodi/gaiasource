@@ -24,6 +24,7 @@ from lib.modules.tools import Logger, Media, Kids, Selection, Settings, Tools, S
 from lib.modules.interface import Dialog, Loader, Translation, Format, Directory
 from lib.modules.network import Networker
 from lib.modules.convert import ConverterDuration, ConverterTime
+from lib.modules.playback import Playback
 from lib.modules.account import Trakt, Imdb, Tmdb
 from lib.modules.parser import Parser, Raw
 from lib.modules.clean import Genre, Title
@@ -94,6 +95,7 @@ class Movies(object):
 
 		self.mModeRelease = False
 		self.mModeSearch = False
+		self.mModeMixed = False
 
 		self.mAccountImdb = Imdb().dataId()
 		self.mAccountTmdb = Tmdb().key()
@@ -201,7 +203,7 @@ class Movies(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link = None, items = None, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
+	def retrieve(self, link = None, items = None, detailed = True, menu = True, full = False, clean = True, quick = None, limit = None, refresh = False, next = True):
 		try:
 			self.mModeRelease = link in ['new', 'home', 'disc']
 			if items is None: items = []
@@ -211,21 +213,28 @@ class Movies(object):
 
 			domain = Networker.linkDomain(link, subdomain = False, topdomain = False, ip = False, scheme = False, port = False)
 
-			if domain == 'trakt':
+			if link == 'quick':
+
+				self.mModeMixed = True # Hides 0-1% and 99-100% progress labels.
+				items = self.quick(limit = limit)
+				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+				items = self.sort(items = items, type = 'quick')
+
+			elif domain == 'trakt':
 
 				if '/users/' in link:
 					if self.traktcollection_link in link:
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
+						items = self.cache('cacheRefreshLong', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
 						items = self.page(link = link, items = items)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					elif '/me/' in link:
-						items = self.cache('cacheRefreshMini', refresh, self.traktList, link = link, user = self.mAccountTrakt)
+						items = self.cache('cacheRefreshLong', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items)
 
 					else: # Eg: Networks and Rated categories.
-						items = self.cache('cacheRefreshMedium', refresh, self.traktList, link = link, user = self.mAccountTrakt)
+						items = self.cache('cacheRefreshExtended', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items)
 
@@ -254,12 +263,12 @@ class Movies(object):
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif self.traktrecommendations_link in link:
-					items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktrecommendations_link + '?limit=100', user = self.mAccountTrakt, next = False)
+					items = self.cache('cacheRefreshExtended', refresh, self.traktList, link = self.traktrecommendations_link + '?limit=100', user = self.mAccountTrakt, next = False)
 					items = self.page(link = link, items = items, maximum = 100)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif self.traktunfinished_link in link:
-					items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktunfinished_link, user = self.mAccountTrakt)
+					items = self.cache('cacheRefreshLong', refresh, self.traktList, link = self.traktunfinished_link, user = self.mAccountTrakt)
 					items = self.page(link = link, items = items)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -271,12 +280,12 @@ class Movies(object):
 			elif domain == 'imdb':
 
 				if '/list/' in link:
-					items = self.cache('cacheLong', refresh, self.imdbList, link = link, full = full)
+					items = self.cache('cacheExtended', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 					items = self.sort(items = items)
 
 				elif '/user/' in link:
-					items = self.cache('cacheRefreshShort', refresh, self.imdbList, link = link, full = full)
+					items = self.cache('cacheRefreshLong', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 					items = self.sort(items = items)
 
@@ -317,11 +326,11 @@ class Movies(object):
 					items = self.sort(items = items, type = 'best' if 'sort=best' in link else 'worst' if 'sort=worst' in link else None)
 
 				elif MetaTmdb.LinkRatedMovie in link:
-					items = self.cache('cacheLong', refresh, MetaTmdb.ratedMovie, link = link, language = self.mLanguage)
+					items = self.cache('cacheExtended', refresh, MetaTmdb.ratedMovie, link = link, language = self.mLanguage)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif MetaTmdb.LinkDiscoverMovie in link:
-					items = self.cache('cacheLong', refresh, MetaTmdb.discoverMovie, link = link, language = self.mLanguage)
+					items = self.cache('cacheExtended', refresh, MetaTmdb.discoverMovie, link = link, language = self.mLanguage)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif MetaTmdb.LinkSearchMovie in link:
@@ -340,7 +349,7 @@ class Movies(object):
 		except: Logger.error()
 
 		if link:
-			genre = self.search_link in link and not self.people_link in link
+			genre = (self.search_link in link and not self.people_link in link) or link == 'quick'
 			kids = not self.people_link in link
 			search = self.search_link in link
 		else:
@@ -348,7 +357,7 @@ class Movies(object):
 			kids = False
 			search = False
 
-		return self.process(items = items, menu = menu, genre = genre, kids = kids, search = search, refresh = refresh)
+		return self.process(items = items, menu = menu, genre = genre, kids = kids, search = search, refresh = refresh, limit = limit, next = next)
 
 	# genre: Filter by genre depending on wether the items are movies, docus, or shorts.
 	# kids: Filter by age restriction.
@@ -356,7 +365,7 @@ class Movies(object):
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before today. If date-string,return items before the date. If integer, return items older than the given number of days.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, genre = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False):
+	def process(self, items, menu = True, genre = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -381,15 +390,15 @@ class Movies(object):
 					Loader.hide()
 					Directory.refresh()
 				else:
-					self.menu(items)
+					self.menu(items, next = next)
 
 		if not items:
 			Loader.hide()
 			if menu: Dialog.notification(title = 32010 if search else 32001, message = 33049, icon = Dialog.IconInformation)
 		return items
 
-	def cache(self, cache, refresh, *args, **kwargs):
-		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh else cache, *args, **kwargs)
+	def cache(self, cache_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
 
 	##############################################################################
 	# PAGE
@@ -428,36 +437,60 @@ class Movies(object):
 			reverse = None
 
 			if type == 'best':
+				type = None
 				force = True
-				attribute = 2
+				attribute = 3
 				reverse = True
 			elif type == 'worst':
+				type = None
 				force = True
-				attribute = 2
+				attribute = 3
 				reverse = False
+			elif type == 'release':
+				type = None
+				force = True
+				attribute = 5
+				reverse = True
+			elif type == 'internal':
+				type = None
+				force = True
+				attribute = 999
+				reverse = True
 
-			if force or Settings.getBoolean('navigation.sort.favourite'):
+			if force or Settings.getBoolean('navigation.sort'):
 				dummyString = 'zzzzzzzzzz'
 
-				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % self.mMedia) if attribute is None else attribute
-				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % self.mMedia) == 1 if reverse is None else reverse
-
-				if attribute > 0:
+				attribute = Settings.getInteger('navigation.sort.%s.type' % (type if type else self.mMedia)) if attribute is None else attribute
+				reverse = Settings.getInteger('navigation.sort.%s.order' % (type if type else self.mMedia)) == 1 if (reverse is None and not attribute == 1) else reverse
+				if type == 'quick':
 					if attribute == 1:
-						if Settings.getBoolean('navigation.sort.favourite.article'):
+						attribute = 999
+						reverse = True
+					elif attribute == 8:
+						reverse = True
+
+				if attribute == 0:
+					items = Tools.listShuffle(items)
+				elif attribute > 1:
+					if attribute == 2:
+						if Settings.getBoolean('navigation.sort.article'):
 							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
 							items = sorted(items, key = lambda k : (k.get('title') or '').lower() or dummyString, reverse = reverse)
-					elif attribute == 2:
-						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 4:
-						items = sorted(items, key = lambda k : k.get('premiered') or dummyString, reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 					elif attribute == 5:
-						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('premiered') or dummyString, reverse = reverse)
 					elif attribute == 6:
+						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+					elif attribute == 7:
 						items = sorted(items, key = lambda k : k.get('timeWatched') or 0, reverse = reverse)
+					elif attribute == 8:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
+					elif attribute == 999:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
 
@@ -468,7 +501,7 @@ class Movies(object):
 	# RANDOM
 	##############################################################################
 
-	def random(self, menu = True, release = True, limit = True, quick = None):
+	def random(self, menu = True, release = True, limit = True, quick = None, next = True):
 		if limit is True: limit = self.mLimit
 		elif not limit: limit = 50
 
@@ -529,26 +562,140 @@ class Movies(object):
 		for item in items: item['next'] = System.command(action = 'moviesRandom')
 		items = Tools.listShuffle(items)
 
-		return self.process(items = items, menu = menu, release = 30 if release is True else release, limit = limit)
+		return self.process(items = items, menu = menu, release = 30 if release is True else release, limit = limit, next = next)
+
+	##############################################################################
+	# QUICK
+	##############################################################################
+
+	def quick(self, limit = None):
+		# NB: Pass in the media, otherwise Movies/Docus/Shorts will all use the same cached results.
+		return self.cache('cacheRefresh', False, self._quick, limit = limit, media = self.mMedia)
+
+	def _quick(self, limit = None, media = None):
+		def update(items, category, data):
+			result = Movies(media = self.mMedia, kids = self.mKids).retrieve(link = data['link'], quick = True, detailed = False, menu = False)
+			if result: items.append({'items' : result, 'category' : category, 'limit' : data['limit'], 'sort' : data['sort']})
+
+		progress = Math.roundUp(Settings.getInteger('menu.quick.progress') / 2.0)
+		categories = {
+			'unfinished' : {'link' : 'traktunfinished', 'limit' : [progress, progress], 'sort' : [11, 10]}, # Corresponds with shows.py - to interleave movie-show mixed menus.
+			'watchlist' : {'link' : 'traktwatchlist', 'limit' : Settings.getInteger('menu.quick.watchlist'), 'sort' : 8},
+			'history' : {'link' : 'trakthistory', 'limit' : Settings.getInteger('menu.quick.history'), 'sort' : 7},
+			'recommended' : {'link' : 'traktrecommendations', 'limit' : Settings.getInteger('menu.quick.recommended'), 'sort' : 3},
+			'arrivals' : {'link' : 'home', 'limit' : Settings.getInteger('menu.quick.arrivals'), 'sort' : 2},
+			'popular' : {'link' : 'popular', 'limit' : Settings.getInteger('menu.quick.popular'), 'sort' : 1},
+			'trending' : {'link' : 'trending', 'limit' : Settings.getInteger('menu.quick.trending'), 'sort' : 1},
+			'featured' : {'link' : 'featured', 'limit' : Settings.getInteger('menu.quick.featured'), 'sort' : 1},
+		}
+
+		if limit:
+			total = 0
+			for value in categories.values():
+				limited = value['limit']
+				if Tools.isArray(limited): total += sum(limited)
+				else: total += limited
+			ratio = limit / float(total)
+			for key in categories.keys():
+				limited = categories[key]['limit']
+				if Tools.isArray(limited): categories[key]['limit'] = [Math.roundUp(ratio * i) for i in limited]
+				else: categories[key]['limit'] = Math.roundUp(ratio * limited)
+
+		items = []
+		threads = []
+		for key, value in categories.items():
+			if (Tools.isArray(value['limit']) and max(value['limit'])) or value['limit']:
+				threads.append(Pool.thread(target = update, kwargs = {'items' : items, 'category' : key, 'data' : value}, start = True))
+		[thread.join() for thread in threads]
+
+		# Sort items by the 'sort' rank of the category.
+		# Otherwise, since threads can finish at different times, they add items in random order to the results.
+		# Otherwise, self.mMetatools.filterContains() below might move down items that appear in multiple lists.
+		# Eg: X appear in Unfinished and Arrivals. It should be shown at the top, since Unfinished is ranked higher.
+		# However, if Arrivals finishes first, it will be added to the results before we get to the Unfinished list, which will not add the item due to filterContains().
+		items = Tools.listSort(data = items, key = lambda i : max(i['sort']) if Tools.isArray(i['sort']) else i['sort'], reverse = True)
+
+		result = []
+		for item in items:
+			values = self.mMetatools.filterDuplicate(items = item['items'])
+			if self.mMedia == Media.TypeDocumentary or self.mMedia == Media.TypeShort: values = self.mMetatools.filterGenre(items = item['items'], genre = self.mMedia)
+
+			category = item['category']
+			try: limited = item['limit']
+			except: limited = 5
+			try: sort = item['sort']
+			except: sort = 0
+
+			if category == 'unfinished':
+				if limited[0]:
+					value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+					value = Tools.listSort(data = value, key = lambda i : i['timeWatched'] if 'timeWatched' in i and i['timeWatched'] else 0, reverse = True)
+					value = value[:limited[0]]
+					for i in value: i['sort'] = sort[0]
+					result.extend(value)
+
+				if limited[1]:
+					value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+					value = Tools.listShuffle(value)
+					value = value[:limited[1]]
+					for i in value: i['sort'] = sort[1]
+					result.extend(value)
+			elif limited:
+				value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+				if category == 'history': value = Tools.listSort(data = value, key = lambda i : i['timeWatched'] if 'timeWatched' in i and i['timeWatched'] else 0, reverse = True)
+				else: value = Tools.listShuffle(value)
+				value = value[:limited]
+				for i in value: i['sort'] = sort
+				result.extend(value)
+
+		# Docus/shorts that have too few items.
+		if len(result) < (self.mMetatools.settingsPageMixed() / 2.0):
+			for item in items:
+				values = self.mMetatools.filterDuplicate(items = item['items'])
+				if self.mMedia == Media.TypeDocumentary or self.mMedia == Media.TypeShort: values = self.mMetatools.filterGenre(items = item['items'], genre = self.mMedia)
+				value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+				value = Tools.listShuffle(value)
+				for i in value: i['sort'] = 0
+				result.extend(value)
+
+		result = Tools.listUnique(result)
+		result = self.sort(items = result, type = 'internal')
+		result = result[:limit if limit else self.mMetatools.settingsPageMixed()]
+
+		# Retrieve the detailed metadata here.
+		# Otherwise if the quick menu was previously cached and contains an item that does not have detailed metadata in the local database, the menu will take longer to load while this new metadata is retrieved.
+		# Already retrieve here when this function cache is refreshed, so that the next time the quick menu is shown, it can be loaded quickly because the detailed metadata is already available.
+		self.metadata(items = result)
+
+		for i in result:
+			try: del i['next']
+			except: pass
+
+		return result
 
 	##############################################################################
 	# ARRIVALS
 	##############################################################################
 
-	def arrivals(self, menu = True, quick = None, refresh = False):
+	def home(self, menu = True, quick = None, refresh = False, next = True):
 		self.mModeRelease = True
-		setting = Settings.getInteger('navigation.arrival.' + self.mMedia)
+		return self.retrieve(self.home_link, menu = menu, quick = quick, refresh = refresh, next = next)
 
-		if setting == 0: return self.retrieve(self.new_link, menu = menu, quick = quick, refresh = refresh)
-		elif setting == 1: return self.home(menu = menu, quick = quick, refresh = refresh)
-		elif setting == 2: return self.retrieve(self.popular_link, menu = menu, quick = quick, refresh = refresh)
-		elif setting == 3: return self.retrieve(self.theaters_link, menu = menu, quick = quick, refresh = refresh)
-		elif setting == 4: return self.retrieve(self.trending_link, menu = menu, quick = quick, refresh = refresh)
-		else: return self.home(menu = menu, quick = quick, refresh = refresh)
-
-	def home(self, menu = True, quick = None, refresh = False):
+	def arrivals(self, menu = True, quick = None, refresh = False, next = True):
 		self.mModeRelease = True
-		return self.retrieve(self.home_link, menu = menu, quick = quick, refresh = refresh)
+		setting = Settings.getInteger('menu.arrival.' + self.mMedia)
+
+		if setting == 0: return self.retrieve(self.new_link, menu = menu, quick = quick, refresh = refresh, next = next)
+		elif setting == 1: return self.home(menu = menu, quick = quick, refresh = refresh, next = next)
+		elif setting == 2: return self.retrieve(self.popular_link, menu = menu, quick = quick, refresh = refresh, next = next)
+		elif setting == 3: return self.retrieve(self.theaters_link, menu = menu, quick = quick, refresh = refresh, next = next)
+		elif setting == 4: return self.retrieve(self.trending_link, menu = menu, quick = quick, refresh = refresh, next = next)
+		else: return self.home(menu = menu, quick = quick, refresh = refresh, next = next)
+
+	# Called from trakt.py.
+	def arrivalsRefresh(self):
+		self.retrieve(link = self.traktunfinished_link, menu = False)
+		self.retrieve(link = self.trakthistory_link, menu = False)
 
 	##############################################################################
 	# SEARCH
@@ -942,20 +1089,18 @@ class Movies(object):
 		items = []
 		dulicates = []
 
+		if self.traktunfinished_link in link:
+			unstarted = Playback.percentStart(media = self.mMedia)
+			unfinished = Playback.percentEnd(media = self.mMedia)
+		else:
+			unstarted = None
+			unfinished = None
+
 		try:
 			parameters = Networker.linkParameters(link = link)
 			parameters['extended'] = 'full'
 			linkNew = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
-			result = trakt.getTraktAsJson(linkNew)
-
-			for i in result:
-				try:
-					movie = i['movie']
-					try: movie['progress'] = max(0, min(1, i['progress'] / 100.0))
-					except: pass
-					items.append(movie)
-				except: pass
-			if not items: items = result
+			items = trakt.getTraktAsJson(linkNew)
 		except:
 			Logger.error()
 			return list
@@ -973,6 +1118,15 @@ class Movies(object):
 
 		for item in items:
 			try:
+				try: progress = max(0, min(1, item['progress'] / 100.0))
+				except: progress = None
+
+				# Do not list movies that have a higher progress than the progress considered the end of the video.
+				if progress and ((unstarted and progress < unstarted) or (unfinished and progress > unfinished)): continue
+
+				try: item = item['movie']
+				except: pass
+
 				title = item['title']
 				title = Networker.htmlDecode(title)
 				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
@@ -981,9 +1135,6 @@ class Movies(object):
 					year = item['year']
 					if year > self.mYear: continue
 				except: year = None
-
-				try: progress = item['progress']
-				except: progress = None
 
 				try:
 					idImdb = item['ids']['imdb']
@@ -1126,6 +1277,8 @@ class Movies(object):
 		except: return None
 
 	def imdbList(self, link, full = False):
+		if not link: return None # Some lists for documentaries/shorts might be missing.
+
 		list = []
 		items = []
 		isRating = '/ratings' in link
@@ -1145,10 +1298,10 @@ class Movies(object):
 				id = None
 
 				if link == self.imdbcollection_link:
-					id = self.mCache.cacheLong(self.imdbListId, link)
+					id = self.mCache.cacheExtended(self.imdbListId, link)
 					if id: link = self.imdblistname_link % id
 				elif link == self.imdbwatchlist_link:
-					id = self.mCache.cacheLong(self.imdbListId, link)
+					id = self.mCache.cacheExtended(self.imdbListId, link)
 					if id: link = self.imdblistdate_link % id
 
 				if isOwn and not isRating and (not id or id.startswith('ur')):
@@ -1571,6 +1724,8 @@ class Movies(object):
 								semaphore.acquire()
 								if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
 								else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
+							elif background and not self.mMetatools.busyStart(media = self.mMedia, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
 								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
@@ -2261,7 +2416,7 @@ class Movies(object):
 		metadatas = self.check(metadatas = metadatas)
 		if metadatas:
 			directory = Directory(content = Directory.ContentSettings, media = Media.TypeMovie, cache = True, lock = False)
-			directory.addItems(items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, next = next, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, contextPlaylist = True, contextShortcutCreate = True))
+			directory.addItems(items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, next = next, mixed = self.mModeMixed, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, contextPlaylist = True, contextShortcutCreate = True))
 			directory.finish(loader = self.mModeSearch) # The loader initiated from search() ios not automatically hidden by Kodi once the menu has loaded. Probably because searching starts a new sub-process and does not load the directory like other menus.
 
 	def directory(self, metadatas):

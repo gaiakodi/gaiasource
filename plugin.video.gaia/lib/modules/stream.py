@@ -15493,6 +15493,7 @@ class Stream(Serializer):
 			if cache and not id is None: self._cacheId(id, self.data())
 			self.unlock(lock)
 			self.statisticsUpdate(type = Stream.StatisticExtracted, timer = timer)
+
 			return True
 		except:
 			tools.Logger.error()
@@ -19629,8 +19630,10 @@ class Stream(Serializer):
 				if exclude:
 					if encode: exclude = self.cleanEncode(exclude)
 					if not tools.Tools.isArray(exclude): exclude = [exclude]
+					titleReplace = 'GAIATITLEREPLACEGAIAs'
 					for ex in exclude:
-						ex = self._cacheId('languageExtract14', re.compile, Stream.ExpressionSymbol + '+', flags = Stream.ExpressionFlags).sub('.?', ex)
+						ex = self._cacheId('languageExtract14', re.compile, Stream.ExpressionSymbol + '+', flags = Stream.ExpressionFlags).sub(titleReplace, ex)
+						ex = ex.replace(titleReplace, '\s*.?\s*') # Allow additional spaces instead of a single character. Eg: "Operation Fortune: Ruse de guerre"
 						data = self._cacheIdInternal('languageExtract15' + ex, re.compile, '(%s)' % ex, flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace separators.

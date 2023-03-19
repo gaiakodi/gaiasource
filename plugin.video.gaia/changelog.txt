@@ -1,4 +1,42 @@
 
+[B]6.2.0 (2023.03.19)[/B]
+- Support for Kodi 20.1.
+- Major fixes for slow Trakt progress lists.
+- Added quick access menus.
+- Improved binge watching.
+- Rounded poster in binge window.
+- Improved Trakt unfinished lists.
+- Improved labels for new seasons and episodes.
+- Improved episode menu automatic selection.
+- Various metadata and list improvements.
+- Improved file name matching for stream.
+- Improved language detection for stream.
+- Fixed time conversion with daylight savings.
+- Fixed history streams notification.
+- Changed all sorting options.
+- Added shuffle sorting options.
+- Added quick access sorting.
+- Moved some navigation settings to menus.
+- Added features for future Gaia skin.
+- Improved initial launch window.
+- Improved menu auto selection.
+- Improved Bluetooth detection.
+- Moved developers settings to the general category.
+- Better plot filtering.
+- Updated episode list images.
+- Fixed multiple episode paging.
+- Updated non-changing rating behavior.
+- Fixed context refocusing in the stream window.
+- Removed sets from docus and shorts.
+- Improved episode menus.
+- Fixed spaces in artwork links.
+- Added changelog announcements.
+- Fixed wizard window animations.
+- Improved TVDb alias title selection.
+- Added more options for playback rating.
+- Added a more advanced resume playback option.
+- Improved episode submenu ordering.
+
 [B]6.1.10 (2023.02.27)[/B]
 - Improved intro skip button.
 - Fixed multiple rating dialogs.

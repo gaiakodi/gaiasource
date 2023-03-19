@@ -76,10 +76,10 @@ class Sets(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link = None, idTmdb = None, title = None, year = None, character = None, detailed = True, menu = True, clean = True, quick = None, refresh = False):
+	def retrieve(self, link = None, idTmdb = None, title = None, year = None, character = None, detailed = True, menu = True, clean = True, quick = None, refresh = False, next = True):
 		try:
 			if idTmdb:
-				items = self.cache('cacheLong', refresh, self.tmdbList, id = idTmdb)
+				items = self.cache('cacheExtended', refresh, self.tmdbList, id = idTmdb)
 				return Movies(kids = self.mKids).retrieve(items = items, detailed = detailed, menu = menu, clean = clean, quick = quick, refresh = refresh)
 			else:
 				if link:
@@ -101,7 +101,7 @@ class Sets(object):
 					self.mModeSearch = True
 					items = self.cache('cacheMedium', refresh, self.tmdbSearch, terms = parameters.get('terms'), link = parameters.get('link'))
 				else:
-					items = self.cache('cacheLong', refresh, self.tmdbList)
+					items = self.cache('cacheExtended', refresh, self.tmdbList)
 
 				sort = None
 				reverse = False
@@ -122,7 +122,7 @@ class Sets(object):
 
 				items = self.page(link = link, items = items, strict = strict)
 				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
-				return self.process(items = items, menu = menu, refresh = refresh)
+				return self.process(items = items, menu = menu, refresh = refresh, next = next)
 		except: Logger.error()
 
 	# kids: Filter by age restriction.
@@ -130,7 +130,7 @@ class Sets(object):
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before today. If date-string,return items before the date. If integer, return items older than the given number of days.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -151,15 +151,15 @@ class Sets(object):
 					Loader.hide()
 					Directory.refresh()
 				else:
-					self.menu(items)
+					self.menu(items, next = next)
 
 		if not items:
 			Loader.hide()
 			if menu: Dialog.notification(title = 32010 if search else 32001, message = 33049, icon = Dialog.IconInformation)
 		return items
 
-	def cache(self, cache, refresh, *args, **kwargs):
-		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh else cache, *args, **kwargs)
+	def cache(self, cache_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
 
 	##############################################################################
 	# PAGE
@@ -233,30 +233,66 @@ class Sets(object):
 	# SORT
 	##############################################################################
 
-	def sort(self, items):
+	def sort(self, items, type = None, force = False):
 		try:
-			if Settings.getBoolean('navigation.sort.favourite'):
+			attribute = None
+			reverse = None
+
+			if type == 'best':
+				type = None
+				force = True
+				attribute = 3
+				reverse = True
+			elif type == 'worst':
+				type = None
+				force = True
+				attribute = 3
+				reverse = False
+			elif type == 'release':
+				type = None
+				force = True
+				attribute = 5
+				reverse = True
+			elif type == 'internal':
+				type = None
+				force = True
+				attribute = 999
+				reverse = True
+
+			if force or Settings.getBoolean('navigation.sort'):
 				dummyString = 'zzzzzzzzzz'
 
-				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % self.mMedia)
-				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % self.mMedia) == 1
-
-				if attribute > 0:
+				attribute = Settings.getInteger('navigation.sort.%s.type' % (type if type else Media.TypeSet)) if attribute is None else attribute
+				reverse = Settings.getInteger('navigation.sort.%s.order' % (type if type else Media.TypeSet)) == 1 if (reverse is None and not attribute == 1) else reverse
+				if type == 'quick':
 					if attribute == 1:
-						if Settings.getBoolean('navigation.sort.favourite.article'):
+						attribute = 999
+						reverse = True
+					elif attribute == 8:
+						reverse = True
+
+				if attribute == 0:
+					items = Tools.listShuffle(items)
+				elif attribute > 1:
+					if attribute == 2:
+						if Settings.getBoolean('navigation.sort.article'):
 							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
 							items = sorted(items, key = lambda k : (k.get('title') or '').lower() or dummyString, reverse = reverse)
-					elif attribute == 2:
-						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 4:
-						items = sorted(items, key = lambda k : k.get('premiered') or dummyString, reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 					elif attribute == 5:
-						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('premiered') or dummyString, reverse = reverse)
 					elif attribute == 6:
+						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+					elif attribute == 7:
 						items = sorted(items, key = lambda k : k.get('timeWatched') or 0, reverse = reverse)
+					elif attribute == 8:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
+					elif attribute == 999:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
 
@@ -419,6 +455,8 @@ class Sets(object):
 								semaphore.acquire()
 								if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
 								else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
+							elif background and not self.mMetatools.busyStart(media = self.mMedia, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
 								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})

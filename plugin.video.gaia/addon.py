@@ -96,10 +96,10 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesRetrieve':
 		from lib.indexers.movies import Movies
-
 		link = parameters.get('link')
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = media, kids = kids).retrieve(link, refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Movies(media = media, kids = kids).retrieve(link = link, refresh = refresh, next = next)
 
 	elif action == 'moviesSearch':
 		from lib.indexers.movies import Movies
@@ -118,15 +118,25 @@ elif action.startswith('movies'):
 		link = parameters.get('link')
 		Movies(media = media, kids = kids).persons(link)
 
+	elif action == 'moviesQuick':
+		from lib.indexers.movies import Movies
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Movies(media = media, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh, next = next)
+
 	elif action == 'moviesHome':
 		from lib.indexers.movies import Movies
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = media, kids = kids).home(refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Movies(media = media, kids = kids).home(refresh = refresh, next = next)
 
 	elif action == 'moviesArrivals':
 		from lib.indexers.movies import Movies
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = media, kids = kids).arrivals(refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Movies(media = media, kids = kids).arrivals(refresh = refresh, next = next)
 
 	elif action == 'moviesGenres':
 		from lib.indexers.movies import Movies
@@ -187,7 +197,8 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesRandom':
 		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).random()
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Movies(media = media, kids = kids).random(next = next)
 
 	elif action == 'moviesCategories':
 		from lib.indexers.navigator import Navigator
@@ -225,7 +236,8 @@ elif action.startswith('sets'):
 		tmdb = parameters.get('tmdb')
 		character = parameters.get('character')
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Sets(kids = kids).retrieve(link = link, idTmdb = tmdb, character = character, refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Sets(kids = kids).retrieve(link = link, idTmdb = tmdb, character = character, refresh = refresh, next = next)
 
 	elif action == 'setsAlphabetic':
 		from lib.indexers.sets import Sets
@@ -255,7 +267,8 @@ elif action.startswith('shows'):
 		from lib.indexers.shows import Shows
 		link = parameters.get('link')
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Shows(kids = kids).retrieve(link, refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Shows(kids = kids).retrieve(link, refresh = refresh, next = next)
 
 	elif action == 'showsSearch':
 		from lib.indexers.shows import Shows
@@ -308,17 +321,28 @@ elif action.startswith('shows'):
 
 	elif action == 'showsRandom':
 		from lib.indexers.shows import Shows
-		Shows(kids = kids).random()
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Shows(kids = kids).random(next = next)
+
+	elif action == 'showsQuick':
+		from lib.indexers.episodes import Episodes
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Episodes(kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh, next = next)
 
 	elif action == 'showsHome':
 		from lib.indexers.episodes import Episodes
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Episodes(kids = kids).home(refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Episodes(kids = kids).home(refresh = refresh, next = next)
 
 	elif action == 'showsArrivals':
 		from lib.indexers.episodes import Episodes
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Episodes(kids = kids).arrivals(refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Episodes(kids = kids).arrivals(refresh = refresh, next = next)
 
 	elif action == 'showsCalendars':
 		from lib.indexers.episodes import Episodes
@@ -393,7 +417,8 @@ elif action.startswith('seasons'):
 		year = parameters.get('year')
 		if year: year = int(year)
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Seasons(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Seasons(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, refresh = refresh, next = next)
 
 	elif action == 'seasonsUserlists':
 		from lib.indexers.seasons import Seasons
@@ -428,13 +453,55 @@ elif action.startswith('episodes'):
 		if not limit is None: limit = int(limit)
 		reduce = tools.Converter.boolean(parameters.get('reduce'))
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh)
+		next = tools.Converter.boolean(parameters.get('next', True))
+		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
 
 	elif action == 'episodesUserlists':
 		from lib.indexers.episodes import Episodes
 		mode = parameters.get('mode')
 		watchlist = tools.Converter.boolean(parameters.get('watchlist'))
 		Episodes(kids = kids).listUser(mode = mode, watchlist = watchlist)
+
+####################################################
+# QUICK
+####################################################
+
+elif action.startswith('quick'):
+
+	if action == 'quick':
+		from lib.indexers.navigator import Navigator
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Navigator(media = media, kids = kids).quick(limit = limit, refresh = refresh)
+
+	elif action == 'quickMovies':
+		from lib.indexers.movies import Movies
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Movies(media = media, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
+
+	elif action == 'quickShows':
+		from lib.indexers.episodes import Episodes
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Episodes(kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
+
+	elif action == 'quickDocus':
+		from lib.indexers.movies import Movies
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Movies(media = tools.Media.TypeDocumentary, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
+
+	elif action == 'quickShorts':
+		from lib.indexers.movies import Movies
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		Movies(media = tools.Media.TypeShort, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
 
 ####################################################
 # REFRESH
@@ -562,8 +629,7 @@ elif action.startswith('information'):
 		Navigator(media = media, kids = kids).informationPremium()
 
 	elif action == 'informationChangelog':
-		from lib.modules import interface
-		interface.Changelog.show()
+		tools.Changelog.show()
 
 	elif action == 'informationDisclaimer':
 		tools.Disclaimer.show(exit = True)

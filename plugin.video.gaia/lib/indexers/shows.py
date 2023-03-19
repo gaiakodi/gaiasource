@@ -173,7 +173,7 @@ class Shows(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link, detailed = True, menu = True, full = False, clean = True, quick = None, refresh = False):
+	def retrieve(self, link, detailed = True, menu = True, full = False, clean = True, quick = None, limit = None, refresh = False, next = True):
 		try:
 			items = []
 
@@ -187,7 +187,7 @@ class Shows(object):
 				if '/users/' in link:
 					if self.traktcollection_link in link:
 
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
+						items = self.cache('cacheRefreshExtended', refresh, self.traktList, link = self.traktcollection_link, user = self.mAccountTrakt)
 						items = self.page(link = link, items = items)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -202,7 +202,7 @@ class Shows(object):
 							links.append(link)
 
 						for i in links:
-							result = self.cache('cacheRefreshMini' if '/me/' in i else 'cacheRefreshMedium', refresh, self.traktList, link = i, user = self.mAccountTrakt)
+							result = self.cache('cacheRefreshLong' if '/me/' in i else 'cacheRefreshExtended', refresh, self.traktList, link = i, user = self.mAccountTrakt)
 							if result: items += result
 
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
@@ -222,7 +222,7 @@ class Shows(object):
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif self.traktrecommendations_link in link:
-					items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktrecommendations_link + '?limit=100', user = self.mAccountTrakt, next = False)
+					items = self.cache('cacheRefreshExtended', refresh, self.traktList, link = self.traktrecommendations_link + '?limit=100', user = self.mAccountTrakt, next = False)
 					items = self.page(link = link, items = items, maximum = 100)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
@@ -232,8 +232,13 @@ class Shows(object):
 
 			elif domain == 'imdb':
 
-				if '/user/' in link or '/list/' in link:
-					items = self.cache('cacheRefreshShort', refresh, self.imdbList, link = link, full = full)
+				if '/list/' in link:
+					items = self.cache('cacheExtended', refresh, self.imdbList, link = link, full = full)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+					items = self.sort(items = items)
+
+				elif '/user/' in link:
+					items = self.cache('cacheRefreshExtended', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 					items = self.sort(items = items)
 
@@ -250,11 +255,11 @@ class Shows(object):
 					items = self.sort(items = items, type = 'best' if 'sort=best' in link else 'worst' if 'sort=worst' in link else None)
 
 				elif MetaTmdb.LinkRatedShow in link:
-					items = self.cache('cacheLong', refresh, MetaTmdb.ratedShow, link = link, language = self.mLanguage)
+					items = self.cache('cacheExtended', refresh, MetaTmdb.ratedShow, link = link, language = self.mLanguage)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif MetaTmdb.LinkDiscoverShow in link:
-					items = self.cache('cacheLong', refresh, MetaTmdb.discoverShow, link = link, language = self.mLanguage)
+					items = self.cache('cacheExtended', refresh, MetaTmdb.discoverShow, link = link, language = self.mLanguage)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif MetaTmdb.LinkSearchShow in link:
@@ -264,21 +269,21 @@ class Shows(object):
 
 			elif domain == 'tvmaze':
 
-				items = self.cache('cacheLong', refresh, self.tvmazeList, link = link)
+				items = self.cache('cacheExtended', refresh, self.tvmazeList, link = link)
 				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 		except: Logger.error()
 
 		kids = not self.people_link in link
 		search = self.search_link in link
-		return self.process(items = items, menu = menu, kids = kids, search = search, refresh = refresh)
+		return self.process(items = items, menu = menu, kids = kids, search = search, refresh = refresh, limit = limit, next = next)
 
 	# kids: Filter by age restriction.
 	# search: Wether or not the items are from search results.
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -299,15 +304,15 @@ class Shows(object):
 					Loader.hide()
 					Directory.refresh()
 				else:
-					self.menu(items)
+					self.menu(items, next = next)
 
 		if not items:
 			Loader.hide()
 			if menu: Dialog.notification(title = 32010 if search else 32002, message = 33049, icon = Dialog.IconInformation)
 		return items
 
-	def cache(self, cache, refresh, *args, **kwargs):
-		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh else cache, *args, **kwargs)
+	def cache(self, cache_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
 
 	##############################################################################
 	# PAGE
@@ -340,30 +345,66 @@ class Shows(object):
 	# SORT
 	##############################################################################
 
-	def sort(self, items):
+	def sort(self, items, type = None, force = False):
 		try:
-			if Settings.getBoolean('navigation.sort.favourite'):
+			attribute = None
+			reverse = None
+
+			if type == 'best':
+				type = None
+				force = True
+				attribute = 3
+				reverse = True
+			elif type == 'worst':
+				type = None
+				force = True
+				attribute = 3
+				reverse = False
+			elif type == 'release':
+				type = None
+				force = True
+				attribute = 5
+				reverse = True
+			elif type == 'internal':
+				type = None
+				force = True
+				attribute = 999
+				reverse = True
+
+			if force or Settings.getBoolean('navigation.sort'):
 				dummyString = 'zzzzzzzzzz'
 
-				attribute = Settings.getInteger('navigation.sort.favourite.show.type')
-				reverse = Settings.getInteger('navigation.sort.favourite.show.order') == 1
-
-				if attribute > 0:
+				attribute = Settings.getInteger('navigation.sort.%s.type' % (type if type else Media.TypeShow)) if attribute is None else attribute
+				reverse = Settings.getInteger('navigation.sort.%s.order' % (type if type else Media.TypeShow)) == 1 if (reverse is None and not attribute == 1) else reverse
+				if type == 'quick':
 					if attribute == 1:
-						if Settings.getBoolean('navigation.sort.favourite.article'):
+						attribute = 999
+						reverse = True
+					elif attribute == 8:
+						reverse = True
+
+				if attribute == 0:
+					items = Tools.listShuffle(items)
+				elif attribute > 1:
+					if attribute == 2:
+						if Settings.getBoolean('navigation.sort.article'):
 							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('tvshowtitle') or k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
 							items = sorted(items, key = lambda k : (k.get('tvshowtitle') or k.get('title') or '').lower() or dummyString, reverse = reverse)
-					elif attribute == 2:
-						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
-						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 4:
-						items = sorted(items, key = lambda k : k.get('premiered') or k.get('aired') or dummyString, reverse = reverse)
+						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 					elif attribute == 5:
-						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+						items = sorted(items, key = lambda k : k.get('premiered') or k.get('aired') or dummyString, reverse = reverse)
 					elif attribute == 6:
+						items = sorted(items, key = lambda k : k.get('timeAdded') or 0, reverse = reverse)
+					elif attribute == 7:
 						items = sorted(items, key = lambda k : k.get('timeWatched') or 0, reverse = reverse)
+					elif attribute == 8:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
+					elif attribute == 999:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
 
@@ -374,7 +415,7 @@ class Shows(object):
 	# RANDOM
 	##############################################################################
 
-	def random(self, menu = True, release = True, limit = True, quick = None):
+	def random(self, menu = True, release = True, limit = True, quick = None, next = True):
 		if limit is True: limit = self.mLimit
 		elif not limit: limit = 50
 
@@ -434,7 +475,7 @@ class Shows(object):
 		for item in items: item['next'] = System.command(action = 'showsRandom')
 		items = Tools.listShuffle(items)
 
-		return self.process(items = items, menu = menu, release = 24 if release is True else release, limit = limit)
+		return self.process(items = items, menu = menu, release = 24 if release is True else release, limit = limit, next = next)
 
 	##############################################################################
 	# SEARCH
@@ -1608,6 +1649,8 @@ class Shows(object):
 								semaphore.acquire()
 								if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
 								else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
+							elif background and not self.mMetatools.busyStart(media = self.mMedia, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
 								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
@@ -1780,6 +1823,8 @@ class Shows(object):
 			if idTvrage: data['tvrage'] = idTvrage
 			if idTrakt: data['trakt'] = idTrakt
 			if idSlug: data['slug'] = idSlug
+
+			if not 'tvshowtitle' in data and 'title' in data: data['tvshowtitle'] = data['title']
 
 			if images: MetaImage.update(media = MetaImage.MediaShow, images = images, data = data)
 

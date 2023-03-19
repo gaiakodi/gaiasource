@@ -368,7 +368,7 @@ class Core(object):
 			self.loaderHide()
 			interface.Dialog.notification(title = 33448, message = 32401 if single else 32402, icon = interface.Dialog.IconError)
 
-	def progressNotification(self, loader = False, force = False):
+	def progressNotification(self, loader = False, force = False, mixed = False):
 		# Check if the dialog was already shown.
 		# Otherwise the notification might be shown twice if:
 		#    1. Streams are shown in the directory structure.
@@ -377,9 +377,9 @@ class Core(object):
 		if not self.silent:
 			if not self.propertyNotification() or force:
 				self.progressClose(force = True, loader = loader)
-				if not self.filter or self.filter['initial'] == 0:
+				if (not self.filter or self.filter['initial'] == 0) and not mixed:
 					interface.Dialog.notification(title = 33448, message = 35372, icon = interface.Dialog.IconError)
-				else:
+				elif self.filter:
 					counts = []
 					counts.append((33497, self.filter['initial'] if self.filter['initial'] else 0))
 					counts.append((35453, self.filter['exclusion'] if self.filter['exclusion'] else 0))
@@ -1382,7 +1382,7 @@ class Core(object):
 					if imdb:
 						from lib.modules.account import Tmdb
 						key = Tmdb().key()
-						if key: return cachex.Cache.instance().cacheLong(network.Networker().requestJson, 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id' % (imdb, key))
+						if key: return cachex.Cache.instance().cacheExtended(network.Networker().requestJson, 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id' % (imdb, key))
 				except:
 					tools.Logger.error()
 				finally:
@@ -1399,7 +1399,7 @@ class Core(object):
 							# Otherwise IMDb might use the public IP address (eg: VPN) to return the page in another language.
 							# Otherwise the title prefix ("Original title: ...") will be in another language, making the extraction fail (or at least more complicated, since multiple Regexs are needed).
 							return network.Networker().requestText(link = 'https://imdb.com/title/%s' % imdb, headers = network.Networker.headersAcceptLanguage(language = tools.Language.EnglishCode))
-						result = cachex.Cache.instance().cacheLong(_additionalImdb, imdb)
+						result = cachex.Cache.instance().cacheExtended(_additionalImdb, imdb)
 						if result: return Parser(result)
 				except:
 					tools.Logger.error()
@@ -1700,7 +1700,7 @@ class Core(object):
 					if key:
 						self.tmdbDetails = {}
 						def tmdbDetails(id, key):
-							self.tmdbDetails[id] = cachex.Cache.instance().cacheLong(network.Networker().requestJson, 'https://api.themoviedb.org/3/movie/%s?api_key=%s' % (str(id), key))
+							self.tmdbDetails[id] = cachex.Cache.instance().cacheExtended(network.Networker().requestJson, 'https://api.themoviedb.org/3/movie/%s?api_key=%s' % (str(id), key))
 							return self.tmdbDetails[id]
 						result = tmdbDetails(id = imdb, key = key)
 						self.progressTitleCollection = 50
@@ -1709,7 +1709,7 @@ class Core(object):
 						try: id = result['belongs_to_collection']['id']
 						except: id = None
 						if id:
-							result = cachex.Cache.instance().cacheLong(network.Networker().requestJson, 'https://api.themoviedb.org/3/collection/%d?api_key=%s' % (id, key))
+							result = cachex.Cache.instance().cacheExtended(network.Networker().requestJson, 'https://api.themoviedb.org/3/collection/%d?api_key=%s' % (id, key))
 							titleCollection = result['name']
 							# Many collections on TMDb contain sequels that have not been released.
 							# This means movie packs are scraped, although only 1 movie in the collection was released.
@@ -1891,15 +1891,15 @@ class Core(object):
 			self.enabledCollection = ProviderBase.settingsGlobalPackMovie()
 			self.enabledFailures = manager.Manager.failureEnabled()
 
-			self.preloadEnabled = self.enabledDeveloper and tools.Settings.getBoolean('developer.preload.container')
-			self.preloadEnabledTorrent = self.preloadEnabled and tools.Settings.getBoolean('developer.preload.container.torrent')
-			self.preloadEnabledUsenet = self.preloadEnabled and tools.Settings.getBoolean('developer.preload.container.usenet')
+			self.preloadEnabled = self.enabledDeveloper and tools.Settings.getBoolean('general.developer.preload.container')
+			self.preloadEnabledTorrent = self.preloadEnabled and tools.Settings.getBoolean('general.developer.preload.container.torrent')
+			self.preloadEnabledUsenet = self.preloadEnabled and tools.Settings.getBoolean('general.developer.preload.container.usenet')
 
-			self.precheckLink = self.enabledDeveloper and tools.Settings.getBoolean('developer.precheck.link')
-			self.precheckLinkTime = tools.Settings.getCustom('developer.precheck.link.time')
+			self.precheckLink = self.enabledDeveloper and tools.Settings.getBoolean('general.developer.precheck.link')
+			self.precheckLinkTime = tools.Settings.getCustom('general.developer.precheck.link.time')
 			if not self.precheckLinkTime: self.precheckLinkTime = 30
-			self.precheckMetadata = self.enabledDeveloper and tools.Settings.getBoolean('developer.precheck.metadata')
-			self.precheckMetadataTime = tools.Settings.getCustom('developer.precheck.metadata.time')
+			self.precheckMetadata = self.enabledDeveloper and tools.Settings.getBoolean('general.developer.precheck.metadata')
+			self.precheckMetadataTime = tools.Settings.getCustom('general.developer.precheck.metadata.time')
 			if not self.precheckMetadataTime: self.precheckMetadataTime = 30
 
 			self.cacheCount = 0
@@ -2892,6 +2892,18 @@ class Core(object):
 			interface.Loader.show()
 			self.showStreams()
 
+	def mixedStreams(self, items):
+		try:
+			if items and 'metadata' in items[0]:
+				different = False
+				previous = None
+				for item in items:
+					current = item['metadata']
+					if previous and current and not previous == current: return True
+					previous = current
+		except: tools.Logger.error()
+		return False
+
 	def showStreams(self, items = None, extras = None, metadata = None, direct = False, filter = True, autoplay = False, clear = False, library = False, initial = False, new = True, add = False, process = True, binge = None):
 		try:
 			if clear: self._showClear()
@@ -2918,7 +2930,7 @@ class Core(object):
 
 			if (items is None or len(items) == 0) and (extras is None or len(extras) == 0):
 				if new:
-					self.progressNotification(loader = True)
+					self.progressNotification(loader = True, mixed = self.mixedStreams(items = items))
 					self.scrapeStatistics()
 				self.loaderHide()
 				return False
@@ -2934,7 +2946,7 @@ class Core(object):
 					if process: itemsFiltered = self.sourcesFilter(items = items, metadata = metadata, autoplay = autoplay)
 					else: itemsFiltered = items
 					if len(itemsFiltered) == 0:
-						if not new or self.progressNotification():
+						if not new or self.progressNotification(mixed = self.mixedStreams(items = itemsFiltered)):
 							return self.showStreams(items = items, extras = extras, metadata = metadata, direct = False if autoplay else True, library = library, filter = False, autoplay = False, clear = True, new = new, add = add, binge = binge)
 						else:
 							self.progressClose(force = True, loader = self.navigationStreamsSpecial and new and not autoplay)
@@ -2953,12 +2965,13 @@ class Core(object):
 
 			if autoplay: return self._autoplay(items = itemsFiltered, metadata = metadata, extras = extras, library = library, new = new, add = add, binge = binge, execute = True)
 
+			mixed = self.mixedStreams(items = itemsFiltered) # Determine here, since the 'metadata' attribute is removed from the items in _showStreams().
 			if self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain:
 				self.loaderShow()
-				if new: self.progressNotification()
+				if new: self.progressNotification(mixed = mixed)
 			result = self._showStreams(items = itemsFiltered, metadata = metadata, initial = initial, library = library, add = add, binge = binge)
 			if not(self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain):
-				if new: self.progressNotification()
+				if new: self.progressNotification(mixed = mixed)
 
 			self.progressClose(force = True, loader = self.navigationStreamsSpecial and new)
 			return result
@@ -3007,20 +3020,7 @@ class Core(object):
 		addonFanart = Theme.fanart()
 
 		total = len(items)
-
-		multi = False
-		try:
-			if 'metadata' in items[0]:
-				different = False
-				previous = None
-				for item in items:
-					current = item['metadata']
-					if previous and current and not previous == current:
-						different = True
-						break
-					previous = current
-				multi = different
-		except: pass
+		mixed = self.mixedStreams(items = items)
 
 		try: title = metadata['tvshowtitle']
 		except:
@@ -3042,7 +3042,7 @@ class Core(object):
 		except: tmdb = None
 		try: tvdb = metadata['tvdb']
 		except: tvdb = None
-		id = '' if multi else tools.Hash.sha1((imdb if imdb else tmdb if tmdb else tvdb if tvdb else tools.Converter.jsonTo(metadata)) + '_' + str(season) + '_' + str(episode) + '_' + str(total))
+		id = '' if mixed else tools.Hash.sha1((imdb if imdb else tmdb if tmdb else tvdb if tvdb else tools.Converter.jsonTo(metadata)) + '_' + str(season) + '_' + str(episode) + '_' + str(total))
 
 		images = MetaImage.extract(data = metadata)
 		if not hasFanart or not MetaImage.TypeFanart in images: images[MetaImage.TypeFanart] = addonFanart
@@ -3064,7 +3064,7 @@ class Core(object):
 			if self.navigationCinema and not self.navigationCinemaInerrupt:
 				self.navigationCinemaTrailer.cinemaStop()
 
-			window.WindowStreams.show(background = None if multi else fanart, status = 'Loading Streams', metadata = metadata, items = items, close = not initial)
+			window.WindowStreams.show(background = None if mixed else fanart, status = 'Loading Streams', metadata = metadata, items = items, close = not initial)
 
 			window.Window.propertyGlobalSet('GaiaIndexId', id) # Used in WindowStreams.
 			window.Window.propertyGlobalSet('GaiaPosterStatic', tools.Settings.getInteger('interface.stream.interface.poster') == 0)
@@ -3137,7 +3137,7 @@ class Core(object):
 
 				# Set from history where each item is from a differnt movie/show.
 				try:
-					if multi:
+					if mixed:
 						metadata = itemJson['metadata']
 						encoded = tools.System.commandEncode({'metadata' : metadata})
 						if self.navigationStreamsDirectory: metadataKodi = metatools.clean(metadata = metadata, exclude = True)
@@ -3185,7 +3185,7 @@ class Core(object):
 				parameters = {
 					'handleMode' : handler.Handler.ModeDefault,
 					'binge' : bool(binge),
-					'reload' : not multi,
+					'reload' : not mixed,
 					'source' : {'stream' : itemJson['stream']}, # itemJson can contain other attributes as well, including a full copy of the metadata. Remove all attributes, except the stream.
 					#'metadata' : metadata, # Adding this here requires the metadata to be encoded for each item, adding 4+ seconds to loading time. Only encode the metadata once.
 				}
@@ -3212,7 +3212,7 @@ class Core(object):
 					try: label = label.replace('[GAIAEXTRA]', extra)
 					except: pass
 
-					if multi:
+					if mixed:
 						try: images[MetaImage.TypeIcon] = images[MetaImage.TypeThumb]
 						except: pass
 					else:
@@ -3397,7 +3397,7 @@ class Core(object):
 			window.WindowStreams.itemAdd(item = controls, context = contexts)
 			window.WindowStreams.update(progress = 100, finished = True)
 			window.WindowStreams.focus()
-			if not multi: window.WindowStreams.itemReselect() # Go to previously selected position if window is reopened.
+			if not mixed: window.WindowStreams.itemReselect() # Go to previously selected position if window is reopened.
 			#if not self.silent: tools.Donations.popup() # Do not show here, since users might just want to play. Show the donation dialog on Gaia launch.
 			self.loaderHide() # When window is reloaded during paused playback and the reloaded window is closed.
 		elif self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain:

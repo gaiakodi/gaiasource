@@ -66,7 +66,7 @@ class Seasons(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, menu = True, clean = True, quick = None, refresh = False):
+	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, menu = True, clean = True, quick = None, refresh = False, next = True):
 		try:
 			items = []
 			if link:
@@ -79,14 +79,14 @@ class Seasons(object):
 					if show: items.insert(0, show)
 		except: Logger.error()
 
-		return self.process(items = items, menu = menu, refresh = refresh)
+		return self.process(items = items, menu = menu, refresh = refresh, next = next)
 
 	# kids: Filter by age restriction.
 	# search: Wether or not the items are from search results.
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -107,15 +107,15 @@ class Seasons(object):
 					Loader.hide()
 					Directory.refresh()
 				else:
-					self.menu(items)
+					self.menu(items, next = next)
 
 		if not items:
 			Loader.hide()
 			if menu: Dialog.notification(title = 32010 if search else 32054, message = 33049, icon = Dialog.IconInformation)
 		return items
 
-	def cache(self, cache, refresh, *args, **kwargs):
-		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh else cache, *args, **kwargs)
+	def cache(self, cache_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
 
 	##############################################################################
 	# LIST
@@ -231,6 +231,8 @@ class Seasons(object):
 								semaphore.acquire()
 								if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
 								else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
+							elif background and not self.mMetatools.busyStart(media = self.mMedia, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 						elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 							if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
 								threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})

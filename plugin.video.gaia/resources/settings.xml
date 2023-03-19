@@ -266,6 +266,14 @@ The label is then added to the action element:
 						<dependency type="visible" setting="general.announcement.enabled">true</dependency>
 					</dependencies>
 				</setting>
+				<setting id="general.announcement.changelog" type="boolean" label="33528" help="34584" parent="general.announcement.enabled">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="general.announcement.enabled">true</dependency>
+					</dependencies>
+				</setting>
 			</group>
 
 			<!-- ########## GENERAL - SETTINGS ########## -->
@@ -424,6 +432,128 @@ The label is then added to the action element:
 							<option label="36092">3</option>
 						</options>
 					</constraints>
+				</setting>
+			</group>
+
+			<!-- ########## GENERAl - DEVELOPER ########## -->
+			<!--
+				NB: Just like there is a 100 item limit per setting's tab, Kodi seems to also have an implicit limit on the total number of settings tabs/categories.
+				NB: If there are more than 20 tabs in the addon settings (aka 21+), and within the tab we try to scroll from the first item upwards, or from the last item downwards, the navigation does not wrap back to the first/last item in the tab.
+				NB: Instead, when scrolling from the first item upwards (we would expect it to wrap around the list and now select/focus the last item in the list), Kodi instead selects the last tab from the tab list.
+				NB: This might be caused by Kodi using a fixed ID "20" for the "level change button". Maybe Kodi gets confused on tab 21 and when going upwards, Kodi navigates away from the tab.
+				NB:		https://kodi.wiki/view/List_of_Built_In_Controls#DialogAddonSettings.xml
+				NB: The only solution seems to be to have a MAXIMUM of 20 settings tabs.
+				NB: Hence, the Developers tab was moved to the General tab to reduce the number of tabs/categories..
+				NB: If futher tabs have to be reduced in the future, maybe combine Bluetooth and Ambilight into a single "Utilities" tab.
+			-->
+			<group id="general.developer" label="36041">
+				<setting id="general.developer.help" type="string" label="" help="34485">
+					<control type="button" format="action"></control>
+					<default>[B]$ADDON[plugin.video.gaia 33310][/B]</default>
+					<level>3</level>
+				</setting>
+				<setting id="general.developer.code" type="string" label="33414" help="34106">
+					<control type="edit" format="string">
+						<heading>33414</heading>
+						<hidden>true</hidden>
+					</control>
+					<default/>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+
+				<setting id="general.developer.preload.container" type="boolean" label="36095" help="34486">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="general.developer.code">opensesame</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.developer.preload.container.torrent" type="boolean" label="33672" help="34174" parent="general.developer.preload.container">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.developer.preload.container">true</condition>
+								<condition setting="general.developer.code">opensesame</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.developer.preload.container.usenet" type="boolean" label="33673" help="34175" parent="general.developer.preload.container">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.developer.preload.container">true</condition>
+								<condition setting="general.developer.code">opensesame</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+
+				<setting id="general.developer.precheck.link" type="boolean" label="33259" help="34043">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="general.developer.code">opensesame</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.developer.precheck.link.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.developer.precheck.link.time.label" type="string" label="32312" help="34040" parent="general.developer.precheck.link">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.developer.precheck.link.time&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.developer.precheck.link">true</condition>
+								<condition setting="general.developer.code">opensesame</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.developer.precheck.metadata" type="boolean" label="33260" help="34044">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="general.developer.code">opensesame</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.developer.precheck.metadata.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.developer.precheck.metadata.time.label" type="string" label="32312" help="34045" parent="general.developer.precheck.metadata">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.developer.precheck.metadata.time&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.developer.precheck.metadata">true</condition>
+								<condition setting="general.developer.code">opensesame</condition>
+							</and>
+						</dependency>
+					</dependencies>
 				</setting>
 			</group>
 
@@ -3749,7 +3879,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="activity.history.resume" type="integer" label="32344" help="34014" parent="activity.history.enabled">
 					<control type="spinner" format="string"/>
-					<default>3</default>
+					<default>4</default>
 					<level>2</level>
 					<constraints>
 						<options>
@@ -3757,6 +3887,7 @@ The label is then added to the action element:
 							<option label="33800">1</option>
 							<option label="33110">2</option>
 							<option label="33273">3</option>
+							<option label="35233">4</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -3863,11 +3994,26 @@ The label is then added to the action element:
 						</dependency>
 						<dependency type="enable">
 							<or>
-								<condition setting="activity.rating.show">true</condition>
-								<condition setting="activity.rating.season">true</condition>
-								<condition setting="activity.rating.episode">true</condition>
+								<condition setting="activity.rating.show" operator="gt">0</condition>
+								<condition setting="activity.rating.season" operator="gt">0</condition>
+								<condition setting="activity.rating.episode" operator="gt">0</condition>
 							</or>
 						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.timeout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.rating.timeout.label" type="string" label="33660" help="34583" parent="activity.rating.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.timeout&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
 				<setting id="activity.rating.rerate" type="boolean" label="35046" help="34549" parent="activity.rating.enabled">
@@ -3878,34 +4024,62 @@ The label is then added to the action element:
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.movie" type="boolean" label="35335" help="34545" parent="activity.rating.enabled">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+				<setting id="activity.rating.movie" type="integer" label="35335" help="34545" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="33795">1</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.show" type="boolean" label="35336" help="34546" parent="activity.rating.enabled">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+				<setting id="activity.rating.show" type="integer" label="35336" help="34546" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>4</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="33791">1</option>
+							<option label="33792">2</option>
+							<option label="33793">3</option>
+							<option label="33796">4</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.season" type="boolean" label="35337" help="34547" parent="activity.rating.enabled">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+				<setting id="activity.rating.season" type="integer" label="35337" help="34547" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="33792">1</option>
+							<option label="33793">2</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.episode" type="boolean" label="35338" help="34548" parent="activity.rating.enabled">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+				<setting id="activity.rating.episode" type="integer" label="35338" help="34548" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="33793">1</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
@@ -4943,10 +5117,10 @@ The label is then added to the action element:
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="image.selection.mixed" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
-				<setting id="image.selection.mixed.label" type="string" label="35598" help="34421">
+				<setting id="image.selection.multiple" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.selection.multiple.label" type="string" label="35598" help="34421">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=mixed&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=multiple&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -4955,12 +5129,12 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="image.selection.mixed.show" type="boolean" label="35686" help="34291" parent="image.selection.mixed.label">
+				<setting id="image.selection.multiple.show" type="boolean" label="35686" help="34291" parent="image.selection.multiple.label">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 				</setting>
-				<setting id="image.selection.mixed.season" type="boolean" label="35687" help="34292" parent="image.selection.mixed.label">
+				<setting id="image.selection.multiple.season" type="boolean" label="35687" help="34292" parent="image.selection.multiple.label">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
@@ -5037,167 +5211,62 @@ The label is then added to the action element:
 		</category>
 
 
-		<!-- ########## NAVIGATION ########## -->
-		<category id="navigation" label="33232" help="33943">
+		<!-- ########## MENU ########## -->
+		<category id="menu" label="32319" help="33951">
 
-			<!-- ########## NAVIGATION - GENERAL ########## -->
-			<group id="navigation.general" label="32310">
-				<setting id="navigation.general.shortcut" type="boolean" label="36192" help="34514">
+			<!-- ########## MENU - MAIN ########## -->
+			<group id="menu.main" label="35397">
+				<setting id="menu.main.movie" type="boolean" label="32001" help="34125">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.show" type="boolean" label="32002" help="34126">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.documentary" type="boolean" label="33470" help="34127">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.short" type="boolean" label="33471" help="34128">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.kid" type="boolean" label="33429" help="34113">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.quick" type="boolean" label="35550" help="34579">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.main.arrival" type="boolean" label="33490" help="34118">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="navigation.general.hide" type="integer" label="35672" help="34439">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="35164">1</option>
-							<option label="33029">2</option>
-						</options>
-					</constraints>
-				</setting>
-			</group>
-
-			<!-- ########## NAVIGATION - PAGE ########## -->
-			<group id="navigation.page" label="33666">
-				<setting id="navigation.page.movie" type="integer" label="35382" help="34155">
-					<control type="slider" format="integer">
-						<heading>35382</heading>
-						<popup>true</popup>
-					</control>
-					<default>50</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-				</setting>
-				<setting id="navigation.page.show" type="integer" label="35383" help="34156">
-					<control type="slider" format="integer">
-						<heading>35383</heading>
-						<popup>true</popup>
-					</control>
-					<default>50</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-				</setting>
-				<setting id="navigation.page.episode" type="integer" label="35384" help="34134" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35384</heading>
-						<popup>true</popup>
-					</control>
-					<default>30</default> <!-- 50 is too much and makes menu loading slow. -->
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-				</setting>
-				<setting id="navigation.page.flatten" type="integer" label="35388" help="34353" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35388</heading>
-						<popup>true</popup>
-					</control>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="enable" setting="navigation.show.flatten">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.page.mixed" type="integer" label="35385" help="34333" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35385</heading>
-						<popup>true</popup>
-					</control>
-					<default>10</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="enable" setting="navigation.show.direct">false</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.page.search" type="integer" label="35437" help="34423">
-					<control type="slider" format="integer">
-						<heading>35437</heading>
-						<popup>true</popup>
-					</control>
-					<default>20</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-
-				</setting>
-			</group>
-
-			<!-- ########## NAVIGATION - MENU ########## -->
-			<group id="navigation.menu" label="32319">
-				<setting id="navigation.menu.movie" type="boolean" label="32001" help="34125">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.menu.show" type="boolean" label="32002" help="34126">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.menu.documentary" type="boolean" label="33470" help="34127">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.menu.short" type="boolean" label="33471" help="34128">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.menu.kid" type="boolean" label="33429" help="34113">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.menu.favourite" type="boolean" label="33000" help="34007">
+				<setting id="menu.main.favourite" type="boolean" label="33000" help="34007">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="navigation.menu.arrival" type="boolean" label="33490" help="34118">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="navigation.menu.search" type="boolean" label="32010" help="34119">
+				<setting id="menu.main.search" type="boolean" label="32010" help="34119">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 				</setting>
-				<setting id="navigation.menu.promotion" type="boolean" label="35442" help="34361">
+				<setting id="menu.main.promotion" type="boolean" label="35442" help="34361">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 				</setting>
-				<setting id="navigation.menu.shortcut" type="boolean" label="35119" help="34243">
+				<setting id="menu.main.shortcut" type="boolean" label="35119" help="34243">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
@@ -5207,9 +5276,178 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## NAVIGATION - ARRIVAL ########## -->
-			<group id="navigation.arrival" label="33490">
-				<setting id="navigation.arrival.movie" type="integer" label="32320" help="34005">
+			<!-- ########## MENU - QUICK ########## -->
+			<group id="menu.quick" label="35550">
+				<setting id="menu.quick.enabled" type="boolean" label="35575" help="34568">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.quick.direct" type="boolean" label="35492" help="34578" parent="menu.quick.enabled">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.progress" type="integer" label="36016" help="34569" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36016</heading>
+						<popup>true</popup>
+					</control>
+					<default>8</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.history" type="integer" label="36017" help="34570" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36017</heading>
+						<popup>true</popup>
+					</control>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.watchlist" type="integer" label="36018" help="34571" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36018</heading>
+						<popup>true</popup>
+					</control>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.recommended" type="integer" label="36019" help="34572" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36019</heading>
+						<popup>true</popup>
+					</control>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.arrivals" type="integer" label="36020" help="34573" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36020</heading>
+						<popup>true</popup>
+					</control>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.popular" type="integer" label="36021" help="34574" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36021</heading>
+						<popup>true</popup>
+					</control>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.trending" type="integer" label="36022" help="34575" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36022</heading>
+						<popup>true</popup>
+					</control>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.quick.featured" type="integer" label="36023" help="34576" parent="menu.quick.enabled">
+					<control type="slider" format="integer">
+						<heading>36023</heading>
+						<popup>true</popup>
+					</control>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## MENU - ARRIVAL ########## -->
+			<group id="menu.arrival" label="33490">
+				<setting id="menu.arrival.movie" type="integer" label="32320" help="34005">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>1</level>
@@ -5223,7 +5461,7 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
-				<setting id="navigation.arrival.show" type="integer" label="32325" help="34006">
+				<setting id="menu.arrival.show" type="integer" label="32325" help="34006">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>1</level>
@@ -5243,7 +5481,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.arrival.show.trakt" type="integer" label="32325" help="34006">
+				<setting id="menu.arrival.show.trakt" type="integer" label="32325" help="34006">
 					<control type="spinner" format="string"/>
 					<default>3</default>
 					<level>1</level>
@@ -5265,7 +5503,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.arrival.documentary" type="integer" label="33572" help="34157">
+				<setting id="menu.arrival.documentary" type="integer" label="33572" help="34157">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>1</level>
@@ -5279,7 +5517,7 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
-				<setting id="navigation.arrival.short" type="integer" label="33573" help="34158">
+				<setting id="menu.arrival.short" type="integer" label="33573" help="34158">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>1</level>
@@ -5290,6 +5528,33 @@ The label is then added to the action element:
 							<option label="32323">2</option>
 							<option label="33006">3</option>
 							<option label="33007">4</option>
+						</options>
+					</constraints>
+				</setting>
+			</group>
+
+		</category>
+
+
+		<!-- ########## NAVIGATION ########## -->
+		<category id="navigation" label="33232" help="33943">
+
+			<!-- ########## NAVIGATION - GENERAL ########## -->
+			<group id="navigation.general" label="32310">
+				<setting id="navigation.general.shortcut" type="boolean" label="36192" help="34514">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="navigation.general.hide" type="integer" label="35672" help="34439">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35164">1</option>
+							<option label="33029">2</option>
 						</options>
 					</constraints>
 				</setting>
@@ -5485,74 +5750,143 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## NAVIGATION - PAGE ########## -->
+			<group id="navigation.page" label="33666">
+				<setting id="navigation.page.movie" type="integer" label="35382" help="34155">
+					<control type="slider" format="integer">
+						<heading>35382</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+				</setting>
+				<setting id="navigation.page.show" type="integer" label="35383" help="34156">
+					<control type="slider" format="integer">
+						<heading>35383</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+				</setting>
+				<setting id="navigation.page.episode" type="integer" label="35384" help="34134" parent="navigation.page.show">
+					<control type="slider" format="integer">
+						<heading>35384</heading>
+						<popup>true</popup>
+					</control>
+					<default>30</default> <!-- 50 is too much and makes menu loading slow. -->
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+				</setting>
+				<setting id="navigation.page.flatten" type="integer" label="35388" help="34353" parent="navigation.page.show">
+					<control type="slider" format="integer">
+						<heading>35388</heading>
+						<popup>true</popup>
+					</control>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" setting="navigation.show.flatten">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.page.multiple" type="integer" label="35385" help="34333" parent="navigation.page.show">
+					<control type="slider" format="integer">
+						<heading>35385</heading>
+						<popup>true</popup>
+					</control>
+					<default>15</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" setting="navigation.show.direct">false</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.page.search" type="integer" label="35437" help="34423">
+					<control type="slider" format="integer">
+						<heading>35437</heading>
+						<popup>true</popup>
+					</control>
+					<default>20</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+				</setting>
+				<setting id="navigation.page.mixed" type="integer" label="35513" help="34577">
+					<control type="slider" format="integer">
+						<heading>35513</heading>
+						<popup>true</popup>
+					</control>
+					<default>30</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>200</maximum>
+					</constraints>
+				</setting>
+			</group>
+
 			<!-- ########## NAVIGATION - SORT ########## -->
 			<group id="navigation.sort" label="35189">
-				<setting id="navigation.sort.favourite" type="boolean" label="35841" help="34286">
+				<setting id="navigation.sort" type="boolean" label="35841" help="34286">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="navigation.sort.favourite.article" type="boolean" label="35195" help="34277" parent="navigation.sort.favourite">
+				<setting id="navigation.sort.article" type="boolean" label="35195" help="34277" parent="navigation.sort">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.movie.type" type="integer" label="35190" help="34272">
+				<setting id="navigation.sort.movie.type" type="integer" label="35190" help="34272">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>1</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.movie.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.movie.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.documentary.type" type="integer" label="35192" help="34274">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.documentary.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.documentary.type">
+				<setting id="navigation.sort.movie.order" type="integer" label="33679" help="34276" parent="navigation.sort.movie.type">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -5563,62 +5897,35 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.movie.type" operator="gt">0</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.short.type" type="integer" label="35193" help="34275">
+				<setting id="navigation.sort.documentary.type" type="integer" label="35192" help="34274">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>1</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.short.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.short.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.show.type" type="integer" label="35191" help="34273">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.show.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.show.type">
+				<setting id="navigation.sort.documentary.order" type="integer" label="33679" help="34276" parent="navigation.sort.documentary.type">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -5629,64 +5936,35 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.documentary.type" operator="gt">0</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.progress.type" type="integer" label="35572" help="34169">
+				<setting id="navigation.sort.short.type" type="integer" label="35193" help="34275">
 					<control type="spinner" format="string"/>
-					<default>7</default>
+					<default>1</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
-							<option label="35463">7</option>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.favourite.progress.order" type="integer" label="33679" help="34276" parent="navigation.sort.favourite.progress.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.calendar.type" type="integer" label="35573" help="34563">
-					<control type="spinner" format="string"/>
-					<default>4</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="33039">1</option>
-							<option label="35187">2</option>
-							<option label="35188">3</option>
-							<option label="35391">4</option>
-							<option label="35392">5</option>
-							<option label="35393">6</option>
-							<option label="35463">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.favourite.calendar.order" type="integer" label="33679" help="34413" parent="navigation.sort.favourite.calendar.type">
+				<setting id="navigation.sort.short.order" type="integer" label="33679" help="34276" parent="navigation.sort.short.type">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -5697,7 +5975,204 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort.favourite">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.short.type" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.set.type" type="integer" label="35203" help="34580">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.set.order" type="integer" label="33679" help="34276" parent="navigation.sort.set.type">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33649">0</option>
+							<option label="33650">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.set.type" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.show.type" type="integer" label="35191" help="34273">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.show.order" type="integer" label="33679" help="34276" parent="navigation.sort.show.type">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33649">0</option>
+							<option label="33650">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.show.type" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.progress.type" type="integer" label="35572" help="34169">
+					<control type="spinner" format="string"/>
+					<default>8</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
+							<option label="35463">8</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.progress.order" type="integer" label="33679" help="34276" parent="navigation.sort.progress.type">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33649">0</option>
+							<option label="33650">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.progress.type" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.calendar.type" type="integer" label="35573" help="34563">
+					<control type="spinner" format="string"/>
+					<default>5</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="33039">2</option>
+							<option label="35187">3</option>
+							<option label="35188">4</option>
+							<option label="35391">5</option>
+							<option label="35392">6</option>
+							<option label="35393">7</option>
+							<option label="35463">8</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.calendar.order" type="integer" label="33679" help="34413" parent="navigation.sort.calendar.type">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33649">0</option>
+							<option label="33650">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.calendar.type" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.quick.type" type="integer" label="35245" help="34581">
+					<control type="spinner" format="string"/>
+					<default>8</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33648">0</option>
+							<option label="33564">1</option>
+							<option label="35463">8</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="navigation.sort">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.sort.quick.order" type="integer" label="33679" help="34276" parent="navigation.sort.quick.type">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33649">0</option>
+							<option label="33650">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="navigation.sort">true</condition>
+								<condition setting="navigation.sort.quick.type" operator="gt">0</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -6375,6 +6850,19 @@ The label is then added to the action element:
 					<default>true</default>
 				</setting>
 				<setting id="theme.image.poster" type="integer" label="35827" help="34120">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="33455">1</option>
+							<option label="33233">2</option>
+							<option label="33457">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="theme.image.thumbnail" type="integer" label="35834" help="34582">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>2</level>
@@ -8321,130 +8809,6 @@ The label is then added to the action element:
 							<and>
 								<condition setting="ambilight.lightpack.enabled">true</condition>
 								<condition setting="ambilight.lightpack.connection">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-		</category>
-
-
-		<!-- ########## DEVELOPER ########## -->
-		<category id="developer" label="36041" help="34484">
-
-			<!-- ########## DEVELOPER - ACCESS ########## -->
-			<group id="developer.access" label="36093">
-				<setting id="developer.access.help" type="string" label="" help="34485">
-					<control type="button" format="action"></control>
-					<default>[B]$ADDON[plugin.video.gaia 33310][/B]</default>
-					<level>3</level>
-				</setting>
-				<setting id="developer.access.code" type="string" label="33414" help="34106">
-					<control type="edit" format="string">
-						<heading>33414</heading>
-						<hidden>true</hidden>
-					</control>
-					<default/>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-			</group>
-
-			<!-- ########## DEVELOPER - PRECHECK ########## -->
-			<group id="developer.preload" label="36094">
-				<setting id="developer.preload.container" type="boolean" label="36095" help="34486">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="developer.access.code">opensesame</dependency>
-					</dependencies>
-				</setting>
-				<setting id="developer.preload.container.torrent" type="boolean" label="33672" help="34174" parent="developer.preload.container">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="developer.preload.container">true</condition>
-								<condition setting="developer.access.code">opensesame</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="developer.preload.container.usenet" type="boolean" label="33673" help="34175" parent="developer.preload.container">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="developer.preload.container">true</condition>
-								<condition setting="developer.access.code">opensesame</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## DEVELOPER - PRECHECK ########## -->
-			<group id="developer.precheck" label="35831">
-				<setting id="developer.precheck.link" type="boolean" label="33259" help="34043">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="developer.access.code">opensesame</dependency>
-					</dependencies>
-				</setting>
-				<setting id="developer.precheck.link.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="developer.precheck.link.time.label" type="string" label="32312" help="34040" parent="developer.precheck.link">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=developer.precheck.link.time&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="developer.precheck.link">true</condition>
-								<condition setting="developer.access.code">opensesame</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="developer.precheck.metadata" type="boolean" label="33260" help="34044">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="developer.access.code">opensesame</dependency>
-					</dependencies>
-				</setting>
-				<setting id="developer.precheck.metadata.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="developer.precheck.metadata.time.label" type="string" label="32312" help="34045" parent="developer.precheck.metadata">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=developer.precheck.metadata.time&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="developer.precheck.metadata">true</condition>
-								<condition setting="developer.access.code">opensesame</condition>
 							</and>
 						</dependency>
 					</dependencies>

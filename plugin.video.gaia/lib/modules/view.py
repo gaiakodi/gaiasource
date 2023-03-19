@@ -176,9 +176,14 @@ class View(object):
 			interval = 0.05
 
 			if id:
-				command = 'Container.ListItemAbsolute(1).Property(%s)' % Directory.PropertyId
+				# NB: When the Back entry (..) is hidden, the 1st item has an index of 0 instead of 1.
+				# Gaia Eminence hides the back button on first install.
+				# Check 1st and 2nd item.
+				command1 = 'Container.ListItemAbsolute(0).Property(%s)' % Directory.PropertyId
+				command2 = 'Container.ListItemAbsolute(1).Property(%s)' % Directory.PropertyId
 				for i in range(0, interations):
-					if id == System.infoLabel(command, wait = False): return True
+					if id == System.infoLabel(command1, wait = False): return True
+					if id == System.infoLabel(command2, wait = False): return True
 					if System.aborted(): return False
 					try: Time.sleep(interval)
 					except: return False # Read Update 2 above.
@@ -259,7 +264,6 @@ class View(object):
 	@classmethod
 	def _setSelection(self, index = None):
 		try:
-
 			selection = self.settingsSelection(episode = False)
 			if not index is None:
 				selectionEpisode = self.settingsSelection(episode = True)
@@ -274,7 +278,9 @@ class View(object):
 				# This can be tested by opening a movie menu, make sure a specific movie is selected, then hit the Backspace key, and then reload the same menu.
 				# In contrast to opening a movie menu, selecting some movie, then going to the top/first entry (which is the back ".." item), and then reloading the same menu.
 				current = None if selection == View.SelectionAlways else System.infoLabel('Container.CurrentItem')
-				if selection == View.SelectionAlways or (not current is None and int(current) == 0):
+				try: currentValue = int(current) # ValueError: invalid literal for int() with base 10
+				except: currentValue = -1
+				if selection == View.SelectionAlways or (not current is None and currentValue == 0):
 					import xbmcgui
 					try: id = int(System.infoLabel('System.CurrentControlID')) # Sometimes this returns nothing.
 					except: id = None

@@ -89,6 +89,11 @@
 						<onright>50102</onright>
 						<onup>51100</onup>
 						<ondown>51100</ondown>
+
+						<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+						<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+						<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+						<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 					</control>
 					<control type="button" id="50102">
 						<visible>!String.IsEmpty(Window.Property(GaiaLink))</visible>
@@ -106,6 +111,11 @@
 						<onright>50101</onright>
 						<onup>51100</onup>
 						<ondown>51100</ondown>
+
+						<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+						<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+						<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+						<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 					</control>
 				</control>
 
@@ -191,6 +201,11 @@
 								<onright>52101</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52002">
 								<width>52</width>
@@ -234,6 +249,11 @@
 								<onright>52201</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52102">
 								<width>52</width>
@@ -277,6 +297,11 @@
 								<onright>52301</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52202">
 								<width>52</width>
@@ -320,6 +345,11 @@
 								<onright>52401</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52302">
 								<width>52</width>
@@ -363,6 +393,11 @@
 								<onright>52501</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52402">
 								<width>52</width>
@@ -406,6 +441,11 @@
 								<onright>52601</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52502">
 								<width>52</width>
@@ -449,6 +489,11 @@
 								<onright>52701</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52602">
 								<width>52</width>
@@ -492,6 +537,11 @@
 								<onright>52801</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52702">
 								<width>52</width>
@@ -535,6 +585,11 @@
 								<onright>52901</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52802">
 								<width>52</width>
@@ -578,6 +633,11 @@
 								<onright>noop</onright>
 								<onup>50100</onup>
 								<ondown>50100</ondown>
+
+								<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+								<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+								<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+								<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 							</control>
 							<control type="image" id="52902">
 								<width>52</width>

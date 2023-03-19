@@ -66,6 +66,7 @@ class Playback(Database):
 	AdjustSettings		= 'settings'
 
 	# Other
+	Autoclosed			= 'autoclosed'
 	Instance			= None
 	Lock				= Lock()
 
@@ -86,6 +87,7 @@ class Playback(Database):
 		self.mSettingsRatingEnabled = self.settingsRatingEnabled()
 		self.mSettingsRatingMode = self.settingsRatingMode()
 		self.mSettingsRatingBinge = self.settingsRatingBinge()
+		self.mSettingsRatingTimeout = self.settingsRatingTimeout()
 		self.mSettingsRatingRerate = self.settingsRatingRerate()
 		self.mSettingsRatingDialog = self.settingsRatingDialog()
 
@@ -284,6 +286,18 @@ class Playback(Database):
 		return result[0] if result and single else result
 
 	##############################################################################
+	# GENERAL
+	##############################################################################
+
+	@classmethod
+	def percentStart(self, media = None):
+		return Playback.ProgressStart
+
+	@classmethod
+	def percentEnd(self, media = None):
+		return Playback.ProgressEndShow if Media.typeTelevision(media) else Playback.ProgressEndMovie
+
+	##############################################################################
 	# SETTINGS
 	##############################################################################
 
@@ -292,7 +306,7 @@ class Playback(Database):
 		return Settings.getBoolean('activity.history.enabled')
 
 	@classmethod
-	def settingsHistoryEnd(self):
+	def settingsHistoryEnd(self, percent = False):
 		return Settings.getInteger('activity.history.end')
 
 	@classmethod
@@ -324,24 +338,28 @@ class Playback(Database):
 		return Settings.getInteger('activity.rating.binge')
 
 	@classmethod
+	def settingsRatingTimeout(self):
+		return Settings.getCustom('activity.rating.timeout')
+
+	@classmethod
 	def settingsRatingRerate(self):
 		return Settings.getBoolean('activity.rating.rerate')
 
 	@classmethod
 	def settingsRatingMovie(self):
-		return Settings.getBoolean('activity.rating.movie')
+		return Settings.getInteger('activity.rating.movie')
 
 	@classmethod
 	def settingsRatingShow(self):
-		return Settings.getBoolean('activity.rating.show')
+		return Settings.getInteger('activity.rating.show')
 
 	@classmethod
 	def settingsRatingSeason(self):
-		return Settings.getBoolean('activity.rating.season')
+		return Settings.getInteger('activity.rating.season')
 
 	@classmethod
 	def settingsRatingEpisode(self):
-		return Settings.getBoolean('activity.rating.episode')
+		return Settings.getInteger('activity.rating.episode')
 
 	@classmethod
 	def settingsRatingDialog(self):
@@ -510,6 +528,10 @@ class Playback(Database):
 
 		return last
 
+	def next(self, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None):
+		from lib.indexers.episodes import Episodes
+		return Episodes().metadataNext(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, season = season, episode = episode)
+
 	##############################################################################
 	# DIALOG
 	##############################################################################
@@ -676,7 +698,7 @@ class Playback(Database):
 
 		return result
 
-	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, animation = False, refresh = True):
+	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, animation = False, refresh = True, timeout = None):
 		Loader.show()
 
 		result = None
@@ -687,13 +709,20 @@ class Playback(Database):
 		rating = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, full = True)
 		metadata = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
+		if timeout:
+			from lib.modules.convert import ConverterDuration
+			duration = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordFixed, unit = ConverterDuration.UnitSecond, years = False, months = False, days = False, hours = False, minutes = False, seconds = True)
+			Dialog.notification(title = 35579, message = Translation.string(35057) % duration, icon = Dialog.IconInformation)
+
+		autoclosed = False
 		if self.mSettingsRatingDialog == 1:
-			rating = Dialog.input(type = Dialog.InputNumeric, title = title, default = rating['rating'] if rating else None)
+			rating = Dialog.input(type = Dialog.InputNumeric, title = title, default = rating['rating'] if rating else None, timeout = timeout)
 		else:
 			from lib.modules.window import WindowRating
-			rating = WindowRating.show(metadata = metadata, rating = rating, animation = animation, wait = True)
+			rating = WindowRating.show(metadata = metadata, rating = rating, animation = animation, timeout = timeout, wait = True)
+			autoclosed = WindowRating.closedTimeout()
 
-		if rating is None: return result
+		if rating is None: return Playback.Autoclosed if autoclosed else result
 		else: rating = max(1, min(10, int(rating)))
 
 		Loader.show()
@@ -703,10 +732,12 @@ class Playback(Database):
 		if result:
 			Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, rating), icon = Dialog.IconSuccess)
 			if refresh: Directory.refresh()
+		elif result is None:
+			Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation)
 		else:
 			Dialog.notification(title = title, message = Translation.string(35347 if alternative else 35044) % label, icon = Dialog.IconWarning)
 
-		return result
+		return Playback.Autoclosed if autoclosed else result
 
 	def dialogUnrate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, refresh = True):
 		Loader.show()
@@ -737,7 +768,7 @@ class Playback(Database):
 		if self.mSettingsRatingEnabled:
 			rate = []
 			if Media.typeMovie(media):
-				if self.settingsRatingMovie():
+				if self.settingsRatingMovie() == 1:
 					if self.mSettingsRatingRerate or not self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external):
 						rate.append({'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
 			elif Media.typeTelevision(media):
@@ -748,26 +779,43 @@ class Playback(Database):
 				lastEpisode = self.last(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 				lastSeason = self.last(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season)
 
-				if not episode is None and self.settingsRatingEpisode():
+				rateEpisode = self.settingsRatingEpisode()
+				if rateEpisode == 1: rateEpisode = True
+				else: rateEpisode = False
+
+				rateSeason = self.settingsRatingSeason()
+				if rateSeason == 1: rateSeason = lastEpisode
+				elif rateSeason == 2: rateSeason = True
+				else: rateSeason = False
+
+				rateShow = self.settingsRatingShow()
+				if rateShow == 1: rateShow = lastEpisode and lastSeason
+				elif rateShow == 2: rateShow = lastEpisode
+				elif rateShow == 3: rateShow = True
+				elif rateShow == 4: rateShow = lastEpisode and (lastSeason or not self.next(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode))
+				else: rateShow = False
+
+				if not episode is None and rateEpisode:
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeEpisode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external):
 						rate.append({'media' : Media.TypeEpisode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'refresh' : False})
 
-				if not season is None and self.settingsRatingSeason() and lastEpisode:
+				if not season is None and rateSeason:
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeSeason, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, internal = internal, external = external):
 						rate.append({'media' : Media.TypeSeason, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'internal' : internal, 'external' : external, 'refresh' : False})
 
-				# Rate the show after each season, not only after the last season.
-				# User can re-rate show if it rating changes after a new season.
-				#if self.settingsRatingShow() and lastEpisode and lastSeason:
-				if self.settingsRatingShow() and lastEpisode:
+				if rateShow:
 					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external):
 						rate.append({'media' : Media.TypeShow, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
 
 			multiple = len(rate) > 1
-			if multiple:
-				for i in rate: i['animation'] = True
+			for i in rate:
+				if multiple: i['animation'] = True
+				if binge and self.mSettingsRatingTimeout: i['timeout'] = self.mSettingsRatingTimeout
 
-			for i in rate: self.dialogRate(**i)
+			for i in rate:
+				# If one dialog timed out and auto closed, do not show the remainder of the dialogs.
+				if self.dialogRate(**i) == Playback.Autoclosed: break
+
 			if refresh: Directory.refresh()
 			return True
 
@@ -1364,6 +1412,7 @@ class Playback(Database):
 		return rating
 
 	def ratingUpdate(self, rating, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, wait = False):
+		result = False
 		try:
 			time = Time.timestamp() # Before the lock to get the time of the action, not the time the lock was released.
 			self._lock() # This function can be called from player.py concurrently.
@@ -1372,21 +1421,23 @@ class Playback(Database):
 			if external is None: external = True
 
 			if internal or external:
-				if wait: self._ratingUpdate(time = time, rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
+				result = True
+				if wait: result = self._ratingUpdate(time = time, rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
 				else: Pool.thread(target = self._ratingUpdate, kwargs = {'time' : time, 'rating' : rating, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True)
 			else:
 				self._unlock()
-			return True
 		except:
 			Logger.error()
 			self._unlock()
-		return False
+		return result
 
 	def _ratingUpdate(self, rating, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = True, external = True, time = None):
+		result = False
 		try:
 			if time is None: time = Time.timestamp()
 
 			if internal:
+				result = True
 				ratings = None
 				data = self._retrieve(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, single = True)
 				if data: ratings = data['rating']
@@ -1401,10 +1452,11 @@ class Playback(Database):
 					%s;''' % (Playback.Table, self._query(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)), [time, Converter.jsonTo(ratings)])
 
 			if external and self.mSettingsTraktRating:
-				Trakt.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, time = time)
+				result = Trakt.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, time = time)
 
 		except: Logger.error()
 		self._unlock()
+		return result
 
 	def ratingRemove(self, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, wait = False):
 		try:

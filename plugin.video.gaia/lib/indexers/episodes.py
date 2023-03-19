@@ -28,6 +28,7 @@ from lib.modules.interface import Directory, Dialog, Loader, Translation
 from lib.modules.cache import Cache, Memory
 from lib.modules.account import Trakt, Tmdb
 from lib.modules.network import Networker
+from lib.modules.playback import Playback
 from lib.modules.concurrency import Pool, Lock, Semaphore
 
 from lib.meta.data import MetaData
@@ -59,6 +60,8 @@ class Episodes(object):
 		self.mModeSearch = False
 		self.mModeWatched = False
 		self.mModeHierarchical = False
+		self.mModeMultiple = False
+		self.mModeMixed = False
 
 		self.mAccountTrakt = Trakt().dataUsername()
 		self.mAccountTmdb = Tmdb().key()
@@ -82,10 +85,9 @@ class Episodes(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, season = None, episode = None, detailed = True, menu = True, single = False, clean = True, quick = None, limit = None, reduce = None, refresh = False):
+	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, season = None, episode = None, detailed = True, menu = True, single = False, clean = True, quick = None, limit = None, reduce = None, refresh = False, next = True):
 		try:
 			items = []
-			mixed = None
 
 			if link:
 				self.mModeRelease = True
@@ -95,53 +97,80 @@ class Episodes(object):
 
 				domain = Networker.linkDomain(link, subdomain = False, topdomain = False, ip = False, scheme = False, port = False)
 
-				if domain == 'trakt':
+				if link == 'quick':
+
+					self.mModeHierarchical = True
+					self.mModeMixed = True # Hides 0-1% and 99-100% progress labels.
+					self.mModeMultiple = True
+					items = self.quick(limit = limit)
+					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
+					items = self.sort(items = items, type = 'internal')
+
+				elif domain == 'trakt':
 
 					if self.progress_link in link:
+						if limit is None: limit = self.mMetatools.settingsPageMultiple()
 						self.mModeHierarchical = True
-						mixed = True
-						items = self.cache('cacheRefreshShort', refresh, self.traktListProgress, link = self.progress_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
-						items = self.page(link = link, items = items, sort = 'progress')
-						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh, next = False) # 'next' was already done in self.page(). Do  not do it again, otherwise the 2nd-next episode is listed.
+						self.mModeMultiple = True
+						# Use original link, since the link passed in here can contain the limit/page.
+						# Use cacheRefreshExtended to make Arrivals load faster. This is in any case refreshed from trakt.py, once the Trakt history is updated.
+						items = items2 = self.cache('cacheRefreshExtended', refresh, self.traktListProgress, link = self.progress_link, user = self.mAccountTrakt)
+						items = self.page(link = link, items = items, limit = limit, sort = 'progress')
+						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh, next = False) # 'next' was already done in self.page(). Do not do it again, otherwise the 2nd-next episode is listed.
 						items = self.sort(items = items, type = 'progress') # Sort again, since sorting in self.page() might not have all the metadata yet, like the rating.
 
+						# NB: Trakt progress lists that are very large (100+ items) will only pick the first N items from the list in page().
+						# This means that if a show at the end of the list gets a new season, it will never be moved to the front with sort(type = 'progress').
+						# In page() we use "quick = False" to only retrieve items directly from cache.
+						# We do not use "quick = True" in page(), since large progress lists will then end up retriving 100+ full show metadata in background threads.
+						# Firstly, this slows down the foreground metadata retrieval for the first N items.
+						# Secondly, this can cause ARM devices to run out of new threads (after 350+ threads).
+						# Instead, we only use sort() in page() with cached metadata (eg: from script.gaia.metadata) to make the progress list load faster.
+						# This means that the first few times the progress list is loaded, it might not necessarily have the best shows at the top (eg those with a new season).
+						# Here we retrieve the metadata in the background for 10 random items from the list. This is done AFTER we fully retrieved the metadata in foreground threads above, in order not to impact the loading time of the Arrivals menu.
+						# So every time the progress list is loaded, it will retrieve a few random items from the end of the list in the background.
+						# Eventually after the progress list has been loaded a number of times, the metadata of all shows in the list should have been retrieved and cached, and the correct shows should be pulled to the top of the list.
+						Pool.thread(target = self.metadataRandom, kwargs = {'items' : items2, 'exclude' : items, 'limit' : 10, 'delay' : 10}, start = True)
+
 					elif self.mycalendar_link in link:
+						if limit is None: limit = self.mMetatools.settingsPageMultiple()
 						self.mModeHierarchical = True
-						mixed = True
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.mycalendar_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
-						items = self.page(link = link, items = items, sort = 'calendar')
+						self.mModeMultiple = True
+						items = self.cache('cacheRefreshMedium', refresh, self.traktList, link = self.mycalendar_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
+						items = self.page(link = link, items = items, limit = limit, sort = 'calendar')
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items, type = 'calendar') # Sort again, since sorting in self.page() might not have all the metadata yet, like the rating.
 
 					elif link and '/users/' in link:
+						if limit is None: limit = self.mMetatools.settingsPageMultiple()
 						self.mModeHierarchical = True
-						mixed = True # The history page can have all episodes from the same show, and then it is not automatically detected as mixed.
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = link, user = self.mAccountTrakt)
+						self.mModeMultiple = True # The history page can have all episodes from the same show, and then it is not automatically detected as multiple.
+						items = self.cache('cacheRefreshLong' if '/me/' in link else 'cacheRefreshExtended', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					elif self.traktunfinished_link in link:
 						self.mModeHierarchical = True
 						#self.mModeWatched = True # Do not hide watched items, in case of a rewatch.
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = self.traktunfinished_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
+						items = self.cache('cacheRefreshLong', refresh, self.traktList, link = self.traktunfinished_link, user = self.mAccountTrakt) # Use original link, since the link passed in here can contain the limit/page.
 						items = self.page(link = link, items = items)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					else:
 						self.mModeHierarchical = True
-						items = self.cache('cacheRefreshShort', refresh, self.traktList, link = link, user = self.mAccountTrakt)
+						items = self.cache('cacheRefreshLong', refresh, self.traktList, link = link, user = self.mAccountTrakt)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 				elif domain == 'tvmaze':
 
 					if link == self.added_link:
 						self.mModeHierarchical = True
-						items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule)
+						items = self.cache('cacheRefreshMedium', refresh, self.tvmazeSchedule)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 						items = self.sort(items = items, type = 'release')
 
 					else:
 						self.mModeHierarchical = True
-						items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule, link = link)
+						items = self.cache('cacheRefreshMedium', refresh, self.tvmazeSchedule, link = link)
 						if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 					items = self.mMetatools.filterRelease(items = items) # Must be after detailed metadata retrieval, since TVmaze has the incorrect aired date.
@@ -155,19 +184,19 @@ class Episodes(object):
 
 			# Limit the number of episodes shown for indirect or flattened episode menus (eg Trakt Progress list).
 			# Otherwise menus with many episodes per season take too long to load and the user probably does not access the last episodes in the list anyway.
-			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMixed()
+			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMultiple()
 
 			items = self.mMetatools.filterNumber(items = items, season = season, episode = episode, single = single)
 		except: Logger.error()
 
-		return self.process(items = items, menu = menu, limit = limit, mixed = mixed, refresh = refresh)
+		return self.process(items = items, menu = menu, limit = limit, refresh = refresh, next = next)
 
 	# kids: Filter by age restriction.
 	# search: Wether or not the items are from search results.
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, mixed = None, refresh = False):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -188,15 +217,15 @@ class Episodes(object):
 					Loader.hide()
 					Directory.refresh()
 				else:
-					self.menu(items, mixed = mixed)
+					self.menu(items, next = next)
 
 		if not items:
 			Loader.hide()
 			if menu: Dialog.notification(title = 32010 if search else 32326, message = 33049, icon = Dialog.IconInformation)
 		return items
 
-	def cache(self, cache, refresh, *args, **kwargs):
-		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh else cache, *args, **kwargs)
+	def cache(self, cache_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
 
 	##############################################################################
 	# PAGE
@@ -207,6 +236,7 @@ class Episodes(object):
 		# If the user has many watched shows, these list can get very long, making menu loading slow while extended metadata is retrieved.
 		# Manually handle paging.
 
+		stopped = False
 		page = 1
 		if limit is None: limit = self.mLimit
 		parameters = Networker.linkParameters(link = link)
@@ -231,12 +261,15 @@ class Episodes(object):
 			# Do preliminary sorting here to try to pull those episodes to the top.
 			# Only retrieve cached metadata (quick = True) in order not to increase menu loading times.
 			# This means the pulled-up episodes will not show the 1st time the menu is opened, but only later once the metadata is cached.
+			# NB: Do not use "quick = True". if the Trakt progress list has 100+ items and the Arrivals menu is loaded for the 1st time, it will retrieve 100+ metadata in the background.
+			# This will firstly slow down the foreground threads, since the background threads occupy the processor and network.
+			# And secondly, it will cause ARM devices to run out of new threads (after abour 350+ threads created), sometimes leading Kodi to crash and restart.
+			# We later retrieve background metadata for the remainder of the list in retrieve() -> metadataRandom().
 			if sort:
-				self.metadata(items = items, clean = False, quick = True) # Do not "items = self.metadata()", since the returned list can contain only a subset of the items.
+				self.metadata(items = items, clean = False, quick = False) # Do not "items = self.metadata()", since the returned list can contain only a subset of the items.
 				items = self.sort(items = items, type = sort)
 
 			itemsDone = []
-			stopped = False
 			for i in range(5):
 				step = (i * limit)
 				try: itemsChunk = items[i * limit : (i + 1) * limit]
@@ -270,45 +303,69 @@ class Episodes(object):
 	# SORT
 	##############################################################################
 
-	def sort(self, items, type = 'show', force = False):
+	def sort(self, items, type = None, force = False):
 		try:
 			attribute = None
 			reverse = None
 
-			if type == 'release':
+			if type == 'best':
+				type = None
 				force = True
-				attribute = 4
+				attribute = 3
+				reverse = True
+			elif type == 'worst':
+				type = None
+				force = True
+				attribute = 3
+				reverse = False
+			elif type == 'release':
+				type = None
+				force = True
+				attribute = 5
+				reverse = True
+			elif type == 'internal':
+				type = None
+				force = True
+				attribute = 999
 				reverse = True
 
-			if force or Settings.getBoolean('navigation.sort.favourite'):
+			if force or Settings.getBoolean('navigation.sort'):
 				dummyString = 'zzzzzzzzzz'
 				dummyNumber = 9999999999
 
-				attribute = Settings.getInteger('navigation.sort.favourite.%s.type' % type) if attribute is None else attribute
-				reverse = Settings.getInteger('navigation.sort.favourite.%s.order' % type) == 1 if reverse is None else reverse
-
-				if attribute > 0:
+				attribute = Settings.getInteger('navigation.sort.%s.type' % (type if type else Media.TypeShow)) if attribute is None else attribute
+				reverse = Settings.getInteger('navigation.sort.%s.order' % (type if type else Media.TypeShow)) == 1 if (reverse is None and not attribute == 1) else reverse
+				if type == 'quick':
 					if attribute == 1:
-						if Settings.getBoolean('navigation.sort.favourite.article'):
+						attribute = 999
+						reverse = True
+					elif attribute == 8:
+						reverse = True
+
+				if attribute == 0:
+					items = Tools.listShuffle(items)
+				elif attribute > 1:
+					if attribute == 2:
+						if Settings.getBoolean('navigation.sort.article'):
 							items = sorted(items, key = lambda k : Regex.remove(data = (k.get('tvshowtitle') or k.get('title') or '').lower(), expression = '(^the\s|^an?\s)', group = 1) or dummyString, reverse = reverse)
 						else:
 							items = sorted(items, key = lambda k : (k.get('tvshowtitle') or k.get('title') or '').lower() or dummyString, reverse = reverse)
-					elif attribute == 2:
-						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
 					elif attribute == 3:
+						items = sorted(items, key = lambda k : float(k.get('rating') or 0.0), reverse = reverse)
+					elif attribute == 4:
 						items = sorted(items, key = lambda k : int(k.get('votes') or 0), reverse = reverse)
 
 					# Add he season and episode numbers.
 					# This is especially important for "premiered" sorting of Trakt calendars.
 					# All episodes of a show might be released on the same day and then they are listed in random order.
 					# Adding the season/episode numbers first sorts by date, and then makes sure episodes from the same show are listed sequentially.
-					elif attribute == 4:
-						items = sorted(items, key = lambda k : (k.get('premiered') or k.get('aired') or dummyString, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
 					elif attribute == 5:
-						items = sorted(items, key = lambda k : (k.get('timeAdded') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
+						items = sorted(items, key = lambda k : (k.get('premiered') or k.get('aired') or dummyString, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
 					elif attribute == 6:
-						items = sorted(items, key = lambda k : (k.get('timeWatched') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
+						items = sorted(items, key = lambda k : (k.get('timeAdded') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
 					elif attribute == 7:
+						items = sorted(items, key = lambda k : (k.get('timeWatched') or 0, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber), reverse = reverse)
+					elif attribute == 8:
 						time = Time.timestamp()
 						for i in range(len(items)):
 							value = [315569520, 315569520, 315569520]
@@ -327,7 +384,7 @@ class Episodes(object):
 							except: idTvdb = None
 							try: idTrakt = items[i]['trakt']
 							except: idTrakt = None
-							show = Shows(kids = self.mKids).metadata(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, quick = True) # Only quick - do not hold up the process.
+							show = Shows(kids = self.mKids).metadata(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, quick = False) # Only quick (False) - do not hold up the process.
 							if show and 'pack' in show and show['pack']:
 								release = 0
 								for season in show['pack']['seasons']:
@@ -344,6 +401,8 @@ class Episodes(object):
 							if not 'premiered' in items[i] or not items[i]['premiered']: items[i]['premiered'] = items[i]['aired'] if 'aired' in items[i] else None
 
 						items = sorted(items, key = lambda k : tuple(k.get('sort', []) + [k.get('premiered') or dummyString, k.get('tvshowtitle') or dummyString, k.get('season') or dummyNumber, k.get('episode') or dummyNumber]), reverse = reverse)
+					elif attribute == 999:
+						items = sorted(items, key = lambda k : k.get('sort') or 0, reverse = reverse)
 				elif reverse:
 					items.reverse()
 
@@ -351,38 +410,162 @@ class Episodes(object):
 		return items
 
 	##############################################################################
+	# QUICK
+	##############################################################################
+
+	def quick(self, limit = None):
+		return self.cache('cacheRefresh', False, self._quick, limit = limit)
+
+	def _quick(self, limit = None):
+		def update(items, category, data):
+			result = data['class'](kids = self.mKids).retrieve(link = data['link'], quick = True, detailed = False, menu = False)
+			if result: items.append({'items' : result, 'category' : category, 'limit' : data['limit'], 'sort' : data['sort']})
+
+		progress = Math.roundUp(Settings.getInteger('menu.quick.progress') / 2.0)
+		unfinished = max(1 if progress else 0, Math.roundUp(progress / 1.5))
+
+		categories = {
+			'progress' : {'class' : Episodes, 'link' : 'progress', 'limit' : [progress, progress], 'sort' : [11, 10]},
+			'unfinished' : {'class' : Episodes, 'link' : 'traktunfinished', 'limit' : unfinished, 'sort' : 9},
+			'watchlist' : {'class' : Shows, 'link' : 'traktwatchlist', 'limit' : Settings.getInteger('menu.quick.watchlist'), 'sort' : 8},
+			'history' : {'class' : Episodes, 'link' : 'trakthistory', 'limit' : Settings.getInteger('menu.quick.history'), 'sort' : 7},
+			'recommended' : {'class' : Shows, 'link' : 'traktrecommendations', 'limit' : Settings.getInteger('menu.quick.recommended'), 'sort' : 3},
+			'arrivals' : {'class' : Shows, 'link' : 'airing', 'limit' : Settings.getInteger('menu.quick.arrivals'), 'sort' : 2},
+			'popular' : {'class' : Shows, 'link' : 'popular', 'limit' : Settings.getInteger('menu.quick.popular'), 'sort' : 1},
+			'trending' : {'class' : Shows, 'link' : 'trending', 'limit' : Settings.getInteger('menu.quick.trending'), 'sort' : 1},
+			'featured' : {'class' : Shows, 'link' : 'featured', 'limit' : Settings.getInteger('menu.quick.featured'), 'sort' : 1},
+		}
+
+		if limit:
+			total = 0
+			for value in categories.values():
+				limited = value['limit']
+				if Tools.isArray(limited): total += sum(limited)
+				else: total += limited
+			ratio = limit / float(total)
+			for key in categories.keys():
+				limited = categories[key]['limit']
+				if Tools.isArray(limited): categories[key]['limit'] = [Math.roundUp(ratio * i) for i in limited]
+				else: categories[key]['limit'] = Math.roundUp(ratio * limited)
+
+		items = []
+		threads = []
+		for key, value in categories.items():
+			if (Tools.isArray(value['limit']) and max(value['limit'])) or value['limit']:
+				threads.append(Pool.thread(target = update, kwargs = {'items' : items, 'category' : key, 'data' : value}, start = True))
+		[thread.join() for thread in threads]
+
+		# Sort items by the 'sort' rank of the category.
+		# Otherwise, since threads can finish at different times, they add items in random order to the results.
+		# Otherwise, self.mMetatools.filterContains() below might move down items that appear in multiple lists.
+		# Eg: X appear in Unfinished and Arrivals. It should be shown at the top, since Unfinished is ranked higher.
+		# However, if Arrivals finishes first, it will be added to the results before we get to the Unfinished list, which will not add the item due to filterContains().
+		items = Tools.listSort(data = items, key = lambda i : max(i['sort']) if Tools.isArray(i['sort']) else i['sort'], reverse = True)
+
+		# If a show is part of a non-progress list, it does not have the last watched episodes data.
+		# If a non-progress list contains a show that the user partially watched, but the show is not picked (using the limit) from the progress list.
+		# That means at the end of this function, we set the last episode and the show will be listed as S01E01.
+		# Manually check the progress to make sure all shows have the correctly listed last episode, even if it comes from a non-progress list.
+		# Should still be cached from the threads above.
+		progress = self.cache('cacheLong', False, self.traktListProgress, link = self.progress_link, user = self.mAccountTrakt)
+
+		result = []
+		for item in items:
+			values = self.mMetatools.filterDuplicate(items = item['items']) # Unfinished list might contain multiple episodes for the same show.
+
+			# Add the last episode watched and last time watched data to the items.
+			for value in values:
+				current = self.mMetatools.filterContains(items = progress, item = value, result = True)
+				if current:
+					value.update(current)
+					value['sort'] = 10 # Move it to the top.
+
+			category = item['category']
+			try: limited = item['limit']
+			except: limited = 5
+			try: sort = item['sort']
+			except: sort = 0
+
+			if category == 'progress':
+				if limited[0]:
+					value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+					#value = Tools.listSort(data = value, key = lambda i : i['timeWatched'] if 'timeWatched' in i and i['timeWatched'] else 0, reverse = True) # Keep the progress order.
+					value = value[:limited[0]]
+					for i in value: i['sort'] = sort[0]
+					result.extend(value)
+
+				if limited[1]:
+					value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+					value = Tools.listShuffle(value)
+					value = value[:limited[1]]
+					for i in value: i['sort'] = sort[1]
+					result.extend(value)
+			elif limited:
+				value = [i for i in values if not self.mMetatools.filterContains(items = result, item = i)]
+				if category == 'history': value = Tools.listSort(data = value, key = lambda i : i['timeWatched'] if 'timeWatched' in i and i['timeWatched'] else 0, reverse = True)
+				elif not category == 'progress': value = Tools.listShuffle(value)
+				value = value[:limited]
+				for i in value: i['sort'] = sort
+				result.extend(value)
+
+		result = Tools.listUnique(result)
+		result = self.sort(items = result, type = 'internal')
+		result = result[:limit if limit else self.mMetatools.settingsPageMixed()]
+
+		# Retrieve the detailed metadata here.
+		# Otherwise if the quick menu was previously cached and contains an item that does not have detailed metadata in the local database, the menu will take longer to load while this new metadata is retrieved.
+		# Already retrieve here when this function cache is refreshed, so that the next time the quick menu is shown, it can be loaded quickly because the detailed metadata is already available.
+		for i in result:
+			if not 'seasonLast' in i:
+				i['seasonLast'] = 1
+				i['episodeLast'] = 0
+		Episodes().metadata(items = result)
+
+		# Retrieving detailed metadata and then saving it to cache can take 900MB+ disk space.
+		# Delete some values to reduce the cache size.
+		for i in result:
+			for j in ['next', 'episodes', 'pack', 'seasonCurrent', 'seasonPrevious', 'seasonNext']:
+				try: del i[j]
+				except: pass
+
+		return result
+
+	##############################################################################
 	# ARRIVALS
 	##############################################################################
 
-	def arrivals(self, menu = True, clean = True, detailed = True, quick = None, refresh = False):
-		self.mModeRelease = True
-
-		if self.mAccountTrakt: setting = Settings.getInteger('navigation.arrival.show.trakt')
-		else: setting = Settings.getInteger('navigation.arrival.show')
-
-		if setting == 0: return self.retrieve(link = self.added_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-		elif setting == 1: return self.home(menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-		elif setting == 2: return Shows(kids = self.mKids).retrieve(link = 'airing', menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-		elif setting == 3: return self.retrieve(link = self.progress_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-		elif setting == 4: return self.retrieve(link = self.mycalendar_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-		else: return self.home(menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh)
-
-	# Called from trakt.py.
-	def arrivalsRefresh(self):
-		self.retrieve(link = self.progress_link, menu = False)
-
-	def home(self, menu = True, clean = True, limit = None, detailed = True, quick = None, refresh = False):
+	def home(self, menu = True, clean = True, limit = None, detailed = True, quick = None, refresh = False, next = True):
 		self.mModeRelease = True
 		self.mModeHierarchical = True
+		self.mModeMultiple = True
 
-		items = self.cache('cacheRefreshShort', refresh, self.tvmazeSchedule, offset = 1)
+		items = self.cache('cacheRefreshMedium', refresh, self.tvmazeSchedule, offset = 1)
 		if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 		items = self.sort(items = items, type = 'release')
 
 		if limit is None: limit = self.mLimit
 
 		# Filter by release date must be after detailed metadata retrieval, since TVmaze has the incorrect aired date.
-		return self.process(items = items, menu = menu, duplicate = True, release = True, limit = limit, refresh = refresh, mixed = True)
+		return self.process(items = items, menu = menu, duplicate = True, release = True, limit = limit, refresh = refresh, next = next)
+
+	def arrivals(self, menu = True, clean = True, detailed = True, quick = None, refresh = False, next = True):
+		self.mModeRelease = True
+
+		if self.mAccountTrakt: setting = Settings.getInteger('menu.arrival.show.trakt')
+		else: setting = Settings.getInteger('menu.arrival.show')
+
+		if setting == 0: return self.retrieve(link = self.added_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+		elif setting == 1: return self.home(menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+		elif setting == 2: return Shows(kids = self.mKids).retrieve(link = 'airing', menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+		elif setting == 3: return self.retrieve(link = self.progress_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+		elif setting == 4: return self.retrieve(link = self.mycalendar_link, menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+		else: return self.home(menu = menu, clean = clean, detailed = detailed, quick = quick, refresh = refresh, next = next)
+
+	# Called from trakt.py.
+	def arrivalsRefresh(self):
+		self.retrieve(link = self.progress_link, menu = False)
+		self.retrieve(link = self.traktunfinished_link, menu = False)
+		self.retrieve(link = self.trakthistory_link, menu = False)
 
 	##############################################################################
 	# CALENDAR
@@ -419,7 +602,6 @@ class Episodes(object):
 	##############################################################################
 
 	def binge(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, season = None, episode = None, notification = True, scrape = True):
-		from lib.modules.playback import Playback
 		last = Playback.instance().historyLast(imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode)
 		if last and 'episode' in last and not last['episode'] is None:
 			season = last['season']
@@ -509,6 +691,13 @@ class Episodes(object):
 		items = []
 		dulicated = []
 
+		if self.traktunfinished_link in link:
+			unstarted = Playback.percentStart(media = self.mMedia)
+			unfinished = Playback.percentEnd(media = self.mMedia)
+		else:
+			unstarted = None
+			unfinished = None
+
 		try:
 			for i in Regex.extract(data = link, expression = 'date\[(\d+)\]', group = None, all = True):
 				link = link.replace('date[%s]' % i, Time.past(days = int(i), format = Time.FormatDate))
@@ -516,7 +705,6 @@ class Episodes(object):
 			parameters = Networker.linkParameters(link = link)
 			parameters['extended'] = 'full'
 			link = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
-
 			items = trakt.getTraktAsJson(link)
 		except:
 			Logger.error()
@@ -532,6 +720,12 @@ class Episodes(object):
 
 		for item in items:
 			try:
+				try: progress = max(0, min(1, item['progress'] / 100.0))
+				except: progress = None
+
+				# Do not list shows that have a higher progress than the progress considered the end of the video.
+				if progress and ((unstarted and progress < unstarted) or (unfinished and progress > unfinished)): continue
+
 				if not 'show' in item or not 'episode' in item: continue
 
 				tvshowtitle = item['show']['title']
@@ -613,9 +807,6 @@ class Episodes(object):
 
 				try: mpaa = item['show']['certification']
 				except: mpaa = None
-
-				try: progress = max(0, min(1, item['progress'] / 100.0))
-				except: progress = None
 
 				list.append({
 					'imdb' : idImdb,
@@ -1002,7 +1193,7 @@ class Episodes(object):
 	##############################################################################
 
 	def pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True, threaded = True):
-		if cache: return self.mCache.cacheLong(self._pack, idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = threaded)
+		if cache: return self.mCache.cacheExtended(self._pack, idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = threaded)
 		else: return self._pack(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, threaded = threaded)
 
 	def _pack(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, threaded = True):
@@ -1130,7 +1321,7 @@ class Episodes(object):
 							result.append(item)
 
 						# For specials between seasons, determine if the special is closer to the current or the previous/next season.
-						# Check for "time >= timePrevious"  and "time <= timeNext" for Trakt mixed submenus that are not devided strictly according to seasons.
+						# Check for "time >= timePrevious"  and "time <= timeNext" for Trakt multiple submenus that are not devided strictly according to seasons.
 						elif (timeStart is None or time < timeStart) and timePrevious and time >= timePrevious:
 							differenceCurrent = abs(timeStart - time)
 							differencePrevious = abs(timePrevious - time)
@@ -1170,7 +1361,7 @@ class Episodes(object):
 	# quick = Quickly retrieve items from cache without holding up the process of retrieving detailed metadata in the foreground. This is useful if only a few random items are needed from the list and not all of them.
 	# quick = positive integer (retrieve the given number of items in the foreground and the rest in the background), negative integer (retrieve the given number of items in the foreground and do not retrieve the rest at all), True (retrieve whatever is in the cache and the rest in the background - could return no items at all), False (retrieve whatever is in the cache and the rest not at all - could return no items at all).
 	# threaded = If sub-function calls should use threads or not. None: threaded for single item, non-threaded for multiple items. True: threaded. False: non-threaded.
-	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, detailed = True, refresh = False, cache = False, threaded = None):
+	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, detailed = True, refresh = False, cache = False, threaded = None, discrepancy = None):
 		try:
 			pickSingle = False
 			pickSingles = False
@@ -1189,7 +1380,7 @@ class Episodes(object):
 				# Negative values mean the season offset for flattened show menus. "-0.0" means offset from the Special season.
 				# Make sure this is not executed if +0.0 is passed in, meaning retrieve all episodes the Special season.
 				elif not season is None and Math.negative(season):
-					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMixed()
+					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMultiple()
 
 					pickMultiple = True
 					seasonStart = abs(int(-1 if season == -0.0  else season))
@@ -1243,18 +1434,24 @@ class Episodes(object):
 				semaphore = Semaphore(self.mMetatools.concurrency(media = self.mMedia, hierarchical = self.mModeHierarchical))
 				metacache = MetaCache.instance()
 
-				if next and pickNext:
+				# NB: Only execute this if-statement if we are not in quick mode.
+				# Not sure if this is correct, or if there are some calls that actually require this part during quick?
+				# Without checking quick here, if the Trakt progress list contains 100+ items, the Arrivals menu loads very slowly, since all items' metadata is retrieved here.
+				# This also causes Kodi to crash often, once the threads run out and no new ones can be created.
+				# This happens from page() -> if sort: self.metadata(...)
+				# UPDATE: Only do this if quick is not False, not if quick is True/integer. Otherwise, below where we retrieve the full metadata, the foreground/background threads fail in metadataUpdate(), since there is no season number in the items, only seasonLast which has not been converted to the actual season yet.
+				if next and pickNext and not quick is False:
 					threadsNext = []
 					itemsNext = self.metadataIncrementing(items = items, filter = True)
 					if itemsNext:
 						if len(itemsNext) == 1:
 							semaphore.acquire()
 							item = itemsNext[0]
-							self.metadataIncrement(item = item, lock = lock, locks = locks, semaphore = semaphore, cache = cache, threaded = threaded)
+							self.metadataIncrement(item = item, lock = lock, locks = locks, semaphore = semaphore, cache = cache, threaded = threaded, discrepancy = discrepancy)
 						else:
 							for item in itemsNext:
 								semaphore.acquire()
-								threadsNext.append(Pool.thread(target = self.metadataIncrement, kwargs = {'item' : item, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache, 'threaded' : threaded}, start = True))
+								threadsNext.append(Pool.thread(target = self.metadataIncrement, kwargs = {'item' : item, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache, 'threaded' : threaded, 'discrepancy' : discrepancy}, start = True))
 							[thread.join() for thread in threadsNext]
 					items = [i for i in items if not 'invalid' in i or not i['invalid']] # No more episodes available.
 					items = [i for i in items if 'episode' in i and not i['episode'] is None] # metadataIncrement() can return without adding the 'invalid' attribute. Filter out all items without a valid episode number.
@@ -1298,6 +1495,8 @@ class Episodes(object):
 									semaphore.acquire()
 									if threadsSingle: self.metadataUpdate(item = item, result = metadataForeground, lock = lock, locks = locks, semaphore = semaphore, filter = filter, cache = cache, threaded = threaded, mode = 'foreground')
 									else: threadsForeground.append(Pool.thread(target = self.metadataUpdate, kwargs = {'item' : item, 'result' : metadataForeground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'foreground'}, start = True))
+								elif background and not self.mMetatools.busyStart(media = self.mMedia, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
 							elif refreshing == MetaCache.RefreshBackground or (counter is None or len(lookup) >= counter):
 								if background and not self.mMetatools.busyStart(media = self.mMedia, item = item):
 									threadsBackground.append({'item' : item, 'result' : metadataBackground, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'filter' : filter, 'cache' : cache, 'threaded' : threaded, 'mode' : 'background'})
@@ -1684,7 +1883,7 @@ class Episodes(object):
 						except: idImdb = None
 						try: idTvdb = item['tvdb']
 						except: idTvdb = None
-						tvshowtitle = item['tvshowtitle']
+						tvshowtitle = item['tvshowtitle'] if 'tvshowtitle' in item else item['title']
 						number = item['season']
 
 						for season in seasons:
@@ -1712,6 +1911,13 @@ class Episodes(object):
 									break
 					except: Logger.error()
 		except: Logger.error()
+
+	def metadataRandom(self, items, exclude = None, limit = 10, delay = None):
+		if delay: Time.sleep(delay)
+		items = Tools.listShuffle(items)
+		if exclude: items = [i for i in items if not self.mMetatools.filterContains(items = exclude, item = i)]
+		if limit: items = items[:limit]
+		self.metadata(items = items)
 
 	def metadataDeveloper(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, item = None):
 		if self.mDeveloper:
@@ -1793,7 +1999,13 @@ class Episodes(object):
 	def metadataNext(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, released = True):
 		try:
 			item = {'imdb' : idImdb, 'tmdb' : idTmdb, 'tvdb' : idTvdb, 'trakt' : idTrakt, 'title' : title, 'year' : year, 'seasonLast' : season, 'episodeLast' : episode}
-			item = self.metadata(items = item)
+
+			# NB: discrepancy = False
+			# If an entire season was previously watched. Then the 1st three episodes are watched a second time.
+			# The next day, the user wants to watch E02 (and E03) again, since they fell asleep after E01.
+			# Otherwise when checking discrepancies, Gaia will throw an error during playback, saying no more episodes available for binge watching.
+			item = self.metadata(items = item, discrepancy = False)
+
 			if item:
 				premiered = None
 				if not premiered and 'premiered' in item: premiered = item['premiered']
@@ -1823,7 +2035,7 @@ class Episodes(object):
 		except: Logger.error()
 		return result if filter else False
 
-	def metadataIncrement(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, item = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None):
+	def metadataIncrement(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, item = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, discrepancy = None):
 		try:
 			if idImdb is None: idImdb = str(item['imdb']) if item and 'imdb' in item and item['imdb'] else None
 			if idTmdb is None: idTmdb = str(item['tmdb']) if item and 'tmdb' in item and item['tmdb'] else None
@@ -1907,11 +2119,10 @@ class Episodes(object):
 						break
 
 			# If all episodes in a show are watched 1 time, the show is hidden from the Arrivals menu.
-			# If a single episode in the show was watched 2 times while the rest werre only watched 1 time (maybe by accident or rewatched after a long time), it shows up again in the Arrivals menu.
+			# If a single episode in the show was watched 2 times while the rest were only watched 1 time (maybe by accident or rewatched after a long time), it shows up again in the Arrivals menu.
 			# Hide these shows where the previous N episodes have a lower playcount than the current/last-watched episode.
-			discrepancy = self.mMetatools.settingsShowDiscrepancy()
+			if discrepancy is None: discrepancy = self.mMetatools.settingsShowDiscrepancy()
 			if discrepancy and found and seasonSelect and episodeSelect:
-				from lib.modules.playback import Playback
 				playback = Playback.instance()
 
 				countCurrent = playback.history(media = self.mMedia, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode)
@@ -1922,7 +2133,7 @@ class Episodes(object):
 						countCurrent = countCurrent['count']['total']
 
 						# Previous episodes have a lower count.
-						if countCurrent > 1:
+						if countCurrent and countCurrent > 1:
 							lookups = []
 							seasonCounter = season
 							episodeCounter = episode
@@ -2465,12 +2676,12 @@ class Episodes(object):
 		try:
 			if item and 'episodes' in item:
 				for episode in item['episodes']:
-					# Do not include special episodes from IMDb.
-					# Eg: Sherlock has a S01E00 on IMDb which is the unaired pilot.
-					# This episodes is listed under the Specials S00 on TVDb/Trakt.
-					# Some specials are listed on IMDb (eg: Sherlock S03E00) that do not form part of TVDb/Trakt special season (Update: this episode is listed on Trakt, but for some reason is missing on TVDb).
-					if episode and not episode['episode'] == 0:
-						if 'season' in episode and 'episode' in episode:
+					if episode and 'season' in episode and 'episode' in episode:
+						# Do not include special episodes from IMDb.
+						# Eg: Sherlock has a S01E00 on IMDb which is the unaired pilot.
+						# This episodes is listed under the Specials S00 on TVDb/Trakt.
+						# Some specials are listed on IMDb (eg: Sherlock S03E00) that do not form part of TVDb/Trakt special season (Update: this episode is listed on Trakt, but for some reason is missing on TVDb).
+						if not episode['episode'] == 0:
 							resultEpisode = Tools.copy(episode)
 							try: del resultEpisode['temp']
 							except: pass
@@ -2557,14 +2768,14 @@ class Episodes(object):
 			return None
 		return metadatas
 
-	def menu(self, metadatas, mixed = None, submenu = None, next = True, recap = True, extra = True):
+	def menu(self, metadatas, submenu = None, next = True, recap = True, extra = True):
 		metadatas = self.check(metadatas = metadatas)
 		if metadatas:
-			mixed = self.mMetatools.mixed(metadatas) if mixed is None else mixed
-			items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, mixed = mixed, submenu = submenu, next = next, recap = recap, extra = extra, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, hideWatched = self.mModeWatched, contextPlaylist = True, contextShortcutCreate = True)
-			directory = Directory(content = Directory.ContentSettings, media = Media.TypeMixed if mixed else Media.TypeEpisode, cache = True, lock = False)
+			multiple = self.mModeMultiple if self.mModeMultiple else self.mMetatools.multiple(metadatas)
+			items = self.mMetatools.items(metadatas = metadatas, media = self.mMedia, kids = self.mKids, multiple = multiple, mixed = self.mModeMixed, submenu = submenu, next = next, recap = recap, extra = extra, hide = True, hideSearch = self.mModeSearch, hideRelease = self.mModeRelease, hideWatched = self.mModeWatched, contextPlaylist = True, contextShortcutCreate = True)
+			directory = Directory(content = Directory.ContentSettings, media = Media.TypeMixed if multiple else Media.TypeEpisode, cache = True, lock = False)
 			directory.addItems(items = items)
-			directory.finish(select = None if mixed else self.mMetatools.select(items = items))
+			directory.finish(select = None if multiple else self.mMetatools.select(items = items, adjust = True))
 
 	def directory(self, metadatas):
 		metadatas = self.check(metadatas = metadatas)

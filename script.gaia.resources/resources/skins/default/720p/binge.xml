@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+	<views>50</views>
+	<zorder>0</zorder>
+	<coordinates>
+		<left>0</left>
+		<top>0</top>
+	</coordinates>
+	<defaultcontrol always="true">52401</defaultcontrol>
+
+	<controls>
+		<control type="group" id="50000">
+			<visible>Integer.IsEqual(Window.Property(GaiaInitialized),1)</visible>
+			<animation effect="fade" easing="inout" tween="cubic" start="0" end="100" time="500" reversible="false">VisibleChange</animation>
+
+			<!-- POSTER -->
+			<control type="image">
+				<top>10</top>
+				<left>10</left>
+				<width>61</width>
+				<height>90</height>
+				<texture diffuse="special://home/addons/script.gaia.resources/resources/media/interface/posterrounded.png">$INFO[Window.Property(GaiaPoster)]</texture>
+			</control>
+
+		</control>
+
+	</controls>
+</window>

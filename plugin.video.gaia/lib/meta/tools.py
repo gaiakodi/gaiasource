@@ -261,8 +261,9 @@ class MetaTools(object):
 		self.mPageShow = Settings.getInteger('navigation.page.show')
 		self.mPageEpisode = Settings.getInteger('navigation.page.episode')
 		self.mPageFlatten = Settings.getInteger('navigation.page.flatten')
-		self.mPageMixed = Settings.getInteger('navigation.page.mixed')
+		self.mPageMultiple = Settings.getInteger('navigation.page.multiple')
 		self.mPageSearch = Settings.getInteger('navigation.page.search')
+		self.mPageMixed = Settings.getInteger('navigation.page.mixed')
 
 		self.mShowDirect = Settings.getBoolean('navigation.show.direct')
 		self.mShowExtra = Settings.getBoolean('navigation.show.extra')
@@ -324,6 +325,7 @@ class MetaTools(object):
 		self.mThemeThumb = Theme.thumbnail()
 		self.mThemeNextBanner = Theme.nextBanner()
 		self.mThemeNextPoster = Theme.nextPoster()
+		self.mThemeNextThumb = Theme.nextThumbnail()
 
 		ratingsUser = [False, None, True]
 		ratingsMovie = [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTrakt, MetaTools.RatingMetacritic, MetaTools.RatingAverage, MetaTools.RatingAverageWeighted, MetaTools.RatingAverageLimited]
@@ -405,11 +407,14 @@ class MetaTools(object):
 	def settingsPageFlatten(self):
 		return self.mPageFlatten
 
-	def settingsPageMixed(self):
-		return self.mPageMixed
+	def settingsPageMultiple(self):
+		return self.mPageMultiple
 
 	def settingsPageSearch(self):
 		return self.mPageSearch
+
+	def settingsPageMixed(self):
+		return self.mPageMixed
 
 	def settingsShowFlatten(self):
 		return self.mShowFlatten
@@ -529,18 +534,18 @@ class MetaTools(object):
 	# COMMAND
 	###################################################################
 
-	def command(self, metadata, media = None, action = None, video = None, mixed = None, submenu = None, reduce = None, increment = False):
+	def command(self, metadata, media = None, action = None, video = None, multiple = None, submenu = None, reduce = None, increment = False):
 		force = False
 		if media == Media.TypeSeason and not 'season' in metadata: # Series menu.
 			media = Media.TypeShow
 			submenu = True
 			force = True
 
-		if submenu is None: submenu = self.submenu(media = media, mixed = mixed, force = force)
+		if submenu is None: submenu = self.submenu(media = media, multiple = multiple, force = force)
 
 		if not action:
 			if not video is None: action = 'streamsVideo'
-			elif submenu: action = 'episodesRetrieve'
+			elif Media.typeTelevision(media) and submenu: action = 'episodesRetrieve'
 			elif media == Media.TypeSpecialExtra: action = 'seasonsExtras'
 			elif media == Media.TypeShow: action = 'seasonsRetrieve'
 			elif media == Media.TypeSeason: action = 'episodesRetrieve'
@@ -553,7 +558,7 @@ class MetaTools(object):
 		# Almost halfs the time to load menus.
 		if action == 'scrape' or action == 'seasonsExtras': parameters['metadata'] = self.reduce(metadata)
 
-		if mixed and submenu: parameters['limit'] = self.mPageMixed
+		if Media.typeTelevision(media) and multiple and submenu: parameters['limit'] = self.mPageMultiple
 
 		for attribute in ['imdb', 'tmdb', 'tvdb', 'title', 'tvshowtitle', 'year', 'premiered', 'season', 'episode']:
 			try: parameters[attribute] = metadata[attribute]
@@ -562,12 +567,12 @@ class MetaTools(object):
 		# Season offset for "Next Page" of flattened show menus.
 		# NB: Make the season/episode number floats, since Python allows -0.0, but a negative zero is not possible for integers.
 		# -0.0 is used to indicate the offset for the Specials season.
-		if submenu or force:
+		if Media.typeTelevision(media) and (submenu or force):
 			if self.submenuFlatten(media = media, force = force) and self.mPageFlatten == 0: # Flattened show menus.
 				parameters['season'] = -1 * float((metadata['season'] if 'season' in metadata else 0) + int(increment))
 				try: del parameters['episode']
 				except: pass
-			else: # Submenus for mixed episode menus.
+			else: # Submenus for multiple episode menus.
 				# Include the last 3 watched episodes, in case the user wants to rewatch them (aka fell asleep yesterday while watching).
 				season = metadata['season'] if 'season' in metadata else 1
 				episode = metadata['episode'] + int(increment)
@@ -594,10 +599,10 @@ class MetaTools(object):
 		return System.command(action = action, parameters = parameters)
 
 	###################################################################
-	# MIXED
+	# MULTIPLE
 	###################################################################
 
-	def mixed(self, metadata):
+	def multiple(self, metadata):
 		if not Tools.isArray(metadata): metadata = [metadata]
 		titles = [meta['tvshowtitle'] for meta in metadata if 'tvshowtitle' in meta and meta['tvshowtitle']]
 		titles = Tools.listUnique(titles)
@@ -619,20 +624,20 @@ class MetaTools(object):
 	# SUBMENU
 	###################################################################
 
-	def submenu(self, media, mixed, force = False):
-		return self.submenuFlatten(media = media, force = force) or self.submenuDirect(media = media, mixed = mixed)
+	def submenu(self, media, multiple, force = False):
+		return self.submenuFlatten(media = media, force = force) or self.submenuDirect(media = media, multiple = multiple)
 
 	def submenuFlatten(self, media, force = False):
 		return media == Media.TypeShow and (force or self.mShowFlatten)
 
-	def submenuDirect(self, media, mixed):
-		return media == Media.TypeEpisode and mixed and not self.mShowDirect
+	def submenuDirect(self, media, multiple):
+		return media == Media.TypeEpisode and multiple and not self.mShowDirect
 
 	###################################################################
 	# LABEl
 	###################################################################
 
-	def label(self, metadata, media = None, future = None, mixed = False, extend = True):
+	def label(self, metadata, media = None, future = None, multiple = False, extend = True):
 		if not media: media = self.media(metadata = metadata)
 
 		if media == Media.TypeSeason:
@@ -643,7 +648,7 @@ class MetaTools(object):
 			try: season = metadata['season']
 			except: season = None
 			series = season is None and not 'season' in metadata
-			label = Media.title(type = media, title = None if mixed else title, year = year, season = season, series = series, special = True)
+			label = Media.title(type = media, title = None if multiple else title, year = year, season = season, series = series, special = True)
 		elif media == Media.TypeEpisode:
 			try: title = metadata['title']
 			except: title = None
@@ -653,7 +658,7 @@ class MetaTools(object):
 			except: season = None
 			try: episode = metadata['episode']
 			except: episode = None
-			label = Media.title(type = media, title = None if mixed else title, year = year, season = season, episode = episode)
+			label = Media.title(type = media, title = None if multiple else title, year = year, season = season, episode = episode)
 		else:
 			try: year = metadata['year']
 			except: year = None
@@ -667,7 +672,7 @@ class MetaTools(object):
 			label = Media.title(type = media, title = title, year = year)
 			if not label: label = title
 
-		if mixed and (media == Media.TypeSeason or media == Media.TypeEpisode):
+		if multiple and (media == Media.TypeSeason or media == Media.TypeEpisode):
 			try: title = metadata['tvshowtitle']
 			except: title = None
 
@@ -688,7 +693,7 @@ class MetaTools(object):
 		if media == Media.TypeEpisode and season == 0:
 			if not 'story' in metadata or not metadata['story']: label = Format.fontItalic(label)
 
-		# Mark new episodes/seasons in mixed menus as bold.
+		# Mark new episodes/seasons in multiple menus as bold.
 		if media == Media.TypeEpisode and (not future or future < 0):
 			new = False
 			time = Time.timestamp()
@@ -705,12 +710,23 @@ class MetaTools(object):
 			# New Season.
 			if not new and 'pack' in metadata and metadata['pack']:
 				date = 0
-				for season in metadata['pack']['seasons']:
-					if season['time']['start'] and season['time']['start'] < time:
-						date = max(date, season['time']['start'])
-				if date:
+				season = None
+				for i in metadata['pack']['seasons']:
+					if i['time']['start'] and i['time']['start'] < time and i['time']['start'] >= date:
+						date = i['time']['start']
+						season = i['number']['official']
+
+				# Only do this for the season that is newley released.
+				# Otherwise a new season might cause all unwatched episodes in older seasons to also be marked in bold.
+				# Or mark as bold if multiple, so that shows in the Arrivals menu are highlighted if a new season comes out, even if the user still watches an older season.
+				if date and (metadata['season'] == season or multiple):
 					date = time - date
-					if date > 0 and date < 2419200: new = True # 4 weeks.
+					if date > 0 and date < 2419200: # 4 weeks.
+						# NB: Only do this if at least 1 episode in the show was previously watched.
+						# Otherwise shows without any watched episodes also show in bold (Quick menu - recommendations/featured/trending/arrivals).
+						history = self.mItemPlayback.history(media = media, imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'))
+						if history and history['count']['total']:
+							new = True
 
 			if new: label = Format.fontBold(label)
 
@@ -720,11 +736,23 @@ class MetaTools(object):
 	# SELECT
 	###################################################################
 
-	def select(self, items, next = True):
+	def select(self, items, next = True, adjust = False):
 		index = None
-		for i in range(len(items)):
+		size = len(items)
+		for i in range(size):
 			if items[i][1].getProperty(MetaTools.PropertySelect):
 				index = i
+
+				# Skip specials, recaps, and extras.
+				try:
+					while index < (size - 1):
+						info = items[index + 1][1].getVideoInfoTag()
+						season = info.getSeason()
+						episode = info.getEpisode()
+						if (season and season > 0) and (episode and episode > 0): break
+						index += 1
+				except: Logger.error()
+
 				break
 		if next and not index is None and (index + 1) < len(items): index += 1
 		return index
@@ -790,6 +818,7 @@ class MetaTools(object):
 		stream = None,
 		properties = None,
 		playable = None,
+		multiple = None,
 		mixed = None,
 		submenu = None,
 		next = None,
@@ -815,95 +844,107 @@ class MetaTools(object):
 		images = True,
 	):
 		if media is None: media = self.media(metadata = metadatas)
-		if mixed is None: mixed = self.mixed(metadata = metadatas) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
-		if submenu is None: submenu = self.submenu(media = media, mixed = mixed)
-		folder = submenu or (media == Media.TypeSet or media == Media.TypeShow or media == Media.TypeSeason)
+		if multiple is None: multiple = self.multiple(metadata = metadatas) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
+		if mixed is None: mixed = media == Media.TypeMixed
+		if submenu is None: submenu = self.submenu(media = media, multiple = multiple)
 
-		seasons = []
 		items = []
-		itemsMore = []
+		if not mixed and media == Media.TypeEpisode and sum(Tools.listUnique([i['season'] for i in metadatas if 'season' in i and not i['season'] == 0])) > 1:
+			# NB: when there are submenus in the Arrivals menu that contain episodes from multiple seasons (eg: last episodes of S02 and first episodes of S03).
+			# The season extras, recap, and the occasional special episodes between seasons, are all mixed up (eg: S03 recap is listed before S02 extras).
+			# This is because adding the recap/extras item cannot deal with mutiple seasons, always moving the recap before the extras while assuming it is the same season.
+			# Instead, break the episodes into chuncks, one for each season.
+			# Process each subset separately, each with their own recap/extras, and then combine them into one linear list.
 
-		for metadata in metadatas:
-			try:
-				item = self.item(
-					metadata = metadata,
+			index = -1
+			season = -1
+			chunks = []
+			for i in range(len(metadatas)):
+				metadata = metadatas[i]
 
-					media = media,
-					kids = kids,
+				# Determine for special episodes between seasons, if they belong to the previous or next season (closest release date).
+				if metadata['season'] == 0:
+					timePrevious = 0
+					for j in range(i, 0, -1):
+						if metadatas[j]['season'] > 0:
+							time = None
+							try: time = item['aired']
+							except: pass
+							if not time:
+								try: time = item['premiered']
+								except: pass
+							if time:
+								timePrevious = Time.integer(time)
+								break
 
-					stream = stream,
-					properties = properties,
-					playable = playable,
-					mixed = mixed,
-					submenu = submenu,
+					timeNext = 0
+					for j in range(i, len(metadatas)):
+						if metadatas[j]['season'] > 0:
+							time = None
+							try: time = item['aired']
+							except: pass
+							if not time:
+								try: time = item['premiered']
+								except: pass
+							if time:
+								timeNext = Time.integer(time)
+								break
 
-					context = context,
-					contextAdd = contextAdd,
-					contextMode = contextMode,
-					contextLibrary = contextLibrary,
-					contextPlaylist = contextPlaylist,
-					contextShortcutCreate = contextShortcutCreate,
-					contextShortcutDelete = contextShortcutDelete,
+					if timeNext > timePrevious:
+						chunks.append([])
+						index += 1
 
-					hide = hide,
-					hideSearch = hideSearch,
-					hideRelease = hideRelease,
-					hideWatched = hideWatched,
+				if index < 0 or (metadata['season'] > 0 and not metadata['season'] == season):
+					chunks.append([])
+					index += 1
+					if metadata['season'] > 0: season = metadata['season']
+				if season < 0 or metadata['season'] > 0: season = metadata['season']
+				chunks[index].append(metadata)
+		else:
+			chunks = [metadatas]
 
-					label = label,
-					command = command,
-					clean = clean,
-					images = images
-				)
-				if item:
-					if 'season' in metadata: seasons.append(metadata['season'])
-					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], folder]})
+		for chunk in chunks:
+			items.append(self._items(
+				metadatas = chunk,
 
-					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
-					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
-					# There can be multiple recaps/extras for mixed submenus (if the number of episodes listed is less than the navigation.page.mixed).
-					if recap or extra:
-						cleaned = Tools.update(self.copy(metadata), item['metadata'])
-						if recap:
-							item = self.itemRecap(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialRecap, 'item' : {'data' : item}})
-						if extra:
-							item = self.itemExtra(metadata = cleaned, media = media, kids = kids, mixed = mixed)
-							if item: itemsMore.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialExtra, 'item' : {'data' : item}})
-			except: Logger.error()
+				media = media,
+				kids = kids,
 
-		if itemsMore:
-			offset = 0
-			for itemMore in itemsMore:
-				index = 0
-				itemIndex = itemMore['index']
-				itemSeason = itemMore['season']
-				itemMedia = itemMore['media']
-				if itemMedia == Media.TypeSpecialRecap:
-					for i in range(itemIndex, -1, -1): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
-						if seasons[i] == 0: index -= 1
-						elif seasons[i] < itemSeason: break
-					for i in range(itemIndex, len(seasons)):
-						if seasons[i] > 0 and seasons[i] >= itemSeason:
-							index += i
-							break
-				elif itemMedia == Media.TypeSpecialExtra:
-					for i in range(itemIndex, len(seasons)): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
-						if seasons[i] == 0: index += 1
-						elif seasons[i] > itemSeason: break
-					for i in range(itemIndex, -1, -1):
-						if seasons[i] > 0 and seasons[i] <= itemSeason:
-							index += i + 1
-							break
+				item = item,
+				stream = stream,
+				properties = properties,
+				playable = playable,
+				multiple = multiple,
+				mixed = mixed,
+				submenu = submenu,
+				recap = recap,
+				extra = extra,
 
-				items.insert(index + offset, itemMore['item'])
-				offset += 1
+				context = context,
+				contextAdd = contextAdd,
+				contextMode = contextMode,
+				contextLibrary = contextLibrary,
+				contextPlaylist = contextPlaylist,
+				contextShortcutCreate = contextShortcutCreate,
+				contextShortcutDelete = contextShortcutDelete,
+
+				hide = hide,
+				hideSearch = hideSearch,
+				hideRelease = hideRelease,
+				hideWatched = hideWatched,
+
+				label = label,
+				command = command,
+				clean = clean,
+				images = images,
+			))
+		items = Tools.listFlatten(data = items, recursive = False)
 
 		if next:
-			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids)
+			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids, multiple = multiple)
 			if itemNext: items.append({'data' : itemNext})
 
-		# Specify the last watched item to  auto-select from view.py.
+		# Specify the last watched item to auto-select from view.py.
 		if media == Media.TypeEpisode:
 			plays = []
 			for i in range(len(items)):
@@ -933,6 +974,138 @@ class MetaTools(object):
 			if playItem: playItem.setProperty(MetaTools.PropertySelect, '1')
 
 		return [item['data'] for item in items]
+
+	def _items(self,
+		metadatas,
+
+		media = None,
+		kids = None,
+
+		item = None,
+		stream = None,
+		properties = None,
+		playable = None,
+		multiple = None,
+		mixed = None,
+		submenu = None,
+		recap = None,
+		extra = None,
+
+		context = None,
+		contextAdd = None,
+		contextMode = None,
+		contextLibrary = None,
+		contextPlaylist = None,
+		contextShortcutCreate = None,
+		contextShortcutDelete = None,
+
+		hide = False,
+		hideSearch = False,
+		hideRelease = False,
+		hideWatched = False,
+
+		label = True,
+		command = True,
+		clean = True,
+		images = True,
+	):
+		folder = submenu or (media == Media.TypeSet or media == Media.TypeShow or media == Media.TypeSeason)
+
+		seasons = []
+		items = []
+		itemsRecap = []
+		itemsExtra = []
+
+		for metadata in metadatas:
+			try:
+				item = self.item(
+					metadata = metadata,
+
+					media = self.media(metadata = metadata) if mixed else media,
+					kids = kids,
+
+					stream = stream,
+					properties = properties,
+					playable = playable,
+					multiple = multiple,
+					mixed = mixed,
+					submenu = submenu,
+
+					context = context,
+					contextAdd = contextAdd,
+					contextMode = contextMode,
+					contextLibrary = contextLibrary,
+					contextPlaylist = contextPlaylist,
+					contextShortcutCreate = contextShortcutCreate,
+					contextShortcutDelete = contextShortcutDelete,
+
+					hide = hide,
+					hideSearch = hideSearch,
+					hideRelease = hideRelease,
+					hideWatched = hideWatched,
+
+					label = label,
+					command = command,
+					clean = clean,
+					images = images
+				)
+				if item:
+					if 'season' in metadata: seasons.append(metadata['season'])
+					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], folder]})
+
+					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
+					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
+					# There can be multiple recaps/extras for multiple submenus (if the number of episodes listed is less than the navigation.page.multiple).
+					if recap or extra:
+						cleaned = Tools.update(self.copy(metadata), item['metadata'])
+						if recap:
+							item = self.itemRecap(metadata = cleaned, media = media, kids = kids, multiple = multiple)
+							if item: itemsRecap.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialRecap, 'item' : {'data' : item}})
+						if extra:
+							item = self.itemExtra(metadata = cleaned, media = media, kids = kids, multiple = multiple)
+							if item: itemsExtra.append({'index' : len(items) - 1, 'season' : cleaned['season'], 'media' : Media.TypeSpecialExtra, 'item' : {'data' : item}})
+			except: Logger.error()
+
+		offset = 0
+		if itemsRecap:
+			for itemMore in itemsRecap: # Iterate from front to back.
+				index = 0
+				itemIndex = itemMore['index']
+				itemSeason = itemMore['season']
+				for i in range(itemIndex, -1, -1): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
+					if seasons[i] == 0: index -= 1
+					elif seasons[i] < itemSeason: break
+				for i in range(itemIndex, len(seasons)):
+					if seasons[i] > 0 and seasons[i] >= itemSeason:
+						index += i
+						break
+				items.insert(index + offset, itemMore['item'])
+				offset += 1
+
+		if itemsExtra:
+			found = {}
+			for itemMore in reversed(itemsExtra): # Iterate from back to front.
+				index = 0
+				itemIndex = itemMore['index']
+				itemSeason = itemMore['season']
+				for i in range(itemIndex, len(seasons)): # If special episodes are interleaved, make sure the recap/extra is placed before/after all interleaved specials.
+					if seasons[i] == 0: index += 1
+					elif seasons[i] > itemSeason: break
+				for i in range(itemIndex, -1, -1):
+					if seasons[i] > 0 and seasons[i] <= itemSeason:
+						index += i + 1
+						break
+
+				# Sometimes Trakt has more episodes in the season than TVDb.
+				# The pack data will therefore have 1 less episode than the actual episode list.
+				# Eg: Shark Tank India S01 has 35 episodes on TVDb and 36 episodes on Trakt (last episode is online special).
+				# This will add 2 Season Extras menus, one after E35 and one after E36.
+				# Start from the back and only add
+				if not itemSeason in found:
+					found[itemSeason] = True
+					items.insert(index + offset, itemMore['item'])
+
+		return items
 
 	def itemsExtra(self,
 		metadata,
@@ -989,8 +1162,10 @@ class MetaTools(object):
 			dictionary created by stream().
 		properties:
 			dictionary with custom properties.
-		mixed:
+		multiple:
 			Whether or not the seasons/episodes are from different shows.
+		mixed:
+			Whether or not the items are a mixture of movies and shows.
 		extend:
 			Add extra info to the label or plot.
 			Should mostly be used with items in a menu, but not items in the player.
@@ -1014,6 +1189,7 @@ class MetaTools(object):
 		properties = None,
 		playable = None,
 		video = None,
+		multiple = False,
 		mixed = False,
 		submenu = False,
 
@@ -1081,7 +1257,7 @@ class MetaTools(object):
 
 			# Must be before setInfo() and itemPlot().
 			# Must be after itemPlayback().
-			self.itemDetail(media = media, item = item, metadata = metadata)
+			self.itemDetail(media = media, item = item, metadata = metadata, mixed = mixed)
 
 			# Must be before setInfo().
 			self.itemDate(media = media, item = item, metadata = metadata)
@@ -1098,7 +1274,7 @@ class MetaTools(object):
 						if hideWatched and (not 'progress' in metadata or not metadata['progress']): return None # Skip episodes marked as watched for the unfinished list.
 
 		# Must be done before the title/label is changed below.
-		if command is True: command = self.command(media = media, metadata = metadata, video = video, mixed = mixed, submenu = submenu)
+		if command is True: command = self.command(media = media, metadata = metadata, video = video, multiple = multiple, submenu = submenu)
 		elif not command: command = None
 		elif command: item.setPath(command)
 
@@ -1112,7 +1288,7 @@ class MetaTools(object):
 		# The only way to use a custom title seems to be to replace the title attribute.
 		# Note that this will propagate to all places where the ListItem is used. Eg: The Kodi info dialog will show the custom label instead of the title and might eg have 2 years in the label.
 		if label:
-			if label is True: label = self.label(metadata = metadata, media = mediaOriginal, future = future, mixed = mixed, extend = extendLabel)
+			if label is True: label = self.label(metadata = metadata, media = mediaOriginal, future = future, multiple = multiple, extend = extendLabel)
 
 			# Use original, since we can pass docu/short in.
 			# Always force for seasons, since a few seasons have their own title and we do not want to have naming inconsistencies.
@@ -1133,7 +1309,7 @@ class MetaTools(object):
 		self.itemStream(item = item, tag = tag, stream = stream)
 		self.itemProperty(item = item, properties = properties, playable = playable)
 
-		images = self.itemImage(item = item, media = media, metadata = metadata, images = images, video = video)
+		images = self.itemImage(item = item, media = media, metadata = metadata, images = images, video = video, multiple = multiple)
 
 		if context is False:
 			context = None
@@ -1169,7 +1345,7 @@ class MetaTools(object):
 			stream = stream,
 			properties = properties,
 			playable = True,
-			mixed = False,
+			multiple = False,
 
 			context = False,
 
@@ -1204,7 +1380,7 @@ class MetaTools(object):
 		elif media == Media.TypeSpecialExtra or media == Media.TypeSpecialRecap:
 			item.setProperty('GaiaShowExtra', '1')
 
-	def itemDetail(self, media, metadata, item):
+	def itemDetail(self, media, metadata, item, mixed = False):
 		if self.mLabelDetailEnabled:
 			details = False
 			if self.mLabelDetailLevel == 0: details = Media.typeMovie(media) or media == Media.TypeEpisode
@@ -1226,7 +1402,9 @@ class MetaTools(object):
 					if playcount >= self.mLabelPlayThreshold:
 						values.append((32006, Font.IconWatched, Format.colorExcellent() if color is True else color, str(playcount)))
 
-				if self.mLabelProgressEnabled and 'progress' in metadata and not metadata['progress'] is None:
+				# For mixed menus, do not add the progress if it is <= 1% or >= 99%.
+				# Still show the progress for unfinished lists.
+				if self.mLabelProgressEnabled and 'progress' in metadata and not metadata['progress'] is None and (not mixed or (metadata['progress'] > 0.01 and metadata['progress'] < 0.99)):
 					values.append((32037, Font.IconProgress, Format.colorPoor() if color is True else color, '%.0f%%' % (metadata['progress'] * 100.0)))
 
 				if self.mLabelRatingEnabled and 'userrating' in metadata and not metadata['userrating'] is None:
@@ -1356,6 +1534,17 @@ class MetaTools(object):
 					try: episodes = metadata['airs']['episodes']
 					except: episodes = None
 					if not episodes: return MetaTools.TimeFuture
+				elif 'pack' in metadata:
+					# Slow Horses has a year for S03, although not aired yet.
+					try:
+						season = metadata['season']
+						found = False
+						for i in metadata['pack']['seasons']:
+							if i['number']['official'] == season:
+								found = True
+								break
+						if not found: return MetaTools.TimeFuture
+					except: pass
 			if media == Media.TypeSeason or media == Media.TypeEpisode:
 				if (not 'rating' in metadata or not metadata['rating']) and (not 'votes' in metadata or not metadata['votes']):
 					# If no rating, votes or images.
@@ -1388,13 +1577,13 @@ class MetaTools(object):
 							except: item.setRating(i, rating, votes, False) # Kodi 19
 		except: Logger.error()
 
-	def itemImage(self, media, metadata, item, images = True, video = None):
+	def itemImage(self, media, metadata, item, images = True, video = None, multiple = False):
 		if Tools.isDictionary(images):
 			return MetaImage.set(item = item, images = images)
 		elif images:
 			if media == Media.TypeSeason and not 'season' in metadata: media = Media.TypeShow # Series menu.
 
-			if video is None: return MetaImage.setMedia(media = media, data = metadata, item = item)
+			if video is None: return MetaImage.setMedia(media = media, data = metadata, item = item, multiple = multiple)
 			elif video == Recap.Id: return MetaImage.setRecap(data = metadata, item = item)
 			else: return MetaImage.setExtra(data = metadata, item = item)
 		return None
@@ -1599,7 +1788,7 @@ class MetaTools(object):
 		if menu and (add or add is None): item.addContextMenuItems(menu.menu(full = True))
 		return menu
 
-	def itemNext(self, metadata = None, media = None, kids = None, link = None, item = None):
+	def itemNext(self, metadata = None, media = None, kids = None, multiple = False, link = None, item = None):
 		try:
 			if link is None:
 				if not Tools.isArray(metadata): metadata = [metadata]
@@ -1628,15 +1817,16 @@ class MetaTools(object):
 				self.itemInfo(item = item, tag = tag, metadata = {'title' : title, 'tagline' : Translation.string(35317), 'plot' : Translation.string(35318)})
 
 				icon = Icon.pathIcon(icon = 'next.png', default = 'DefaultFolder.png')
+				image = self.mThemeNextThumb if media == Media.TypeEpisode and not multiple else self.mThemeNextPoster
 				images = {
-					MetaImage.TypePoster : self.mThemeNextPoster,
+					MetaImage.TypePoster : image,
 					MetaImage.TypeThumb : icon,
 					MetaImage.TypeFanart : self.mThemeFanart,
 					MetaImage.TypeLandscape : self.mThemeFanart,
 					MetaImage.TypeBanner : self.mThemeNextBanner,
 					MetaImage.TypeClearlogo : icon,
 					MetaImage.TypeClearart : icon,
-					MetaImage.TypeDiscart : self.mThemeNextPoster,
+					MetaImage.TypeDiscart : image,
 					MetaImage.TypeIcon : icon,
 				}
 				MetaImage.set(item = item, images = images)
@@ -1657,12 +1847,12 @@ class MetaTools(object):
 		except: Logger.error()
 		return None
 
-	def itemRecap(self, metadata, media = None, kids = None, mixed = None):
+	def itemRecap(self, metadata, media = None, kids = None, multiple = None):
 		try:
 			if media is None: media = self.media(metadata = metadata)
-			if mixed is None: mixed = self.mixed(metadata = metadata) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
+			if multiple is None: multiple = self.multiple(metadata = metadata) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
 
-			if media == Media.TypeEpisode and not mixed:
+			if media == Media.TypeEpisode and not multiple:
 				if self.mShowExtra and Recap.enabled():
 					if Tools.isArray(metadata): metadata = metadata[0]
 					season = metadata['season'] - 1
@@ -1679,7 +1869,9 @@ class MetaTools(object):
 						if not metadata: return None
 
 						# Copy images, otherwise if there is an Extras from the previous season and a Recap from the next seasons (eg: Trakt progress submenu), the image dictionary is changed, causing exceptions.
-						if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+						if metadataCurrent and MetaImage.Attribute in metadataCurrent:
+							MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+							MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, category = MetaImage.MediaSeason, copy = True)
 						if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow, copy = True)
 						if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious, copy = True)
 						if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext, copy = True)
@@ -1713,12 +1905,12 @@ class MetaTools(object):
 		except: Logger.error()
 		return None
 
-	def itemExtra(self, metadata, media = None, kids = None, mixed = None):
+	def itemExtra(self, metadata, media = None, kids = None, multiple = None):
 		try:
 			if media is None: media = self.media(metadata = metadata)
-			if mixed is None: mixed = self.mixed(metadata = metadata) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
+			if multiple is None: multiple = self.multiple(metadata = metadata) if (media == Media.TypeSeason or media == Media.TypeEpisode) else False
 
-			if media == Media.TypeEpisode and not mixed:
+			if media == Media.TypeEpisode and not multiple:
 				if self.mShowExtra and Recap.enabled():
 					if Tools.isArray(metadata): metadata = metadata[-1]
 					season = metadata['season']
@@ -1759,7 +1951,9 @@ class MetaTools(object):
 							if not metadata: return None
 
 							# Copy images, otherwise if there is an Extras from the previous season and a Recap from the next seasons (eg: Trakt progress submenu), the image dictionary is changed, causing exceptions.
-							if metadataCurrent and MetaImage.Attribute in metadataCurrent: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+							if metadataCurrent and MetaImage.Attribute in metadataCurrent:
+								MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, copy = True)
+								MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute], data = metadata, category = MetaImage.MediaSeason, copy = True)
 							if metadataCurrent and MetaImage.Attribute in metadataCurrent and MetaImage.MediaShow in metadataCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaSeason, images = metadataCurrent[MetaImage.Attribute][MetaImage.MediaShow], data = metadata, category = MetaImage.MediaShow, copy = True)
 							if metadataPrevious and MetaImage.Attribute in metadataPrevious: MetaImage.update(media = MetaImage.MediaSeason, images = metadataPrevious[MetaImage.Attribute], data = metadata, category = MetaImage.IndexPrevious, copy = True)
 							if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext, copy = True)
@@ -1830,8 +2024,12 @@ class MetaTools(object):
 
 			item.setLabel(name)
 
-			if metadata['image'].startswith('http'): icon = thumb = poster = banner = metadata['image']
-			else: icon, thumb, poster, banner = Icon.pathAll(icon = metadata['image'], default = self.mThemeThumb)
+			if metadata['image'].startswith('http'):
+				icon = thumb = poster = banner = metadata['image']
+			else:
+				icon, thumb, poster, banner = Icon.pathAll(icon = metadata['image'], default = self.mThemeThumb)
+				Directory.decorate(item = item, icon = metadata['image']) # For Gaia Eminence.
+
 			images = {
 				MetaImage.TypePoster : poster,
 				MetaImage.TypeThumb : thumb,
@@ -2022,16 +2220,24 @@ class MetaTools(object):
 			if 'plot' in metadata:
 				plot = original = metadata['plot']
 				if plot:
-					# Some plots end with a URL.
-					plot = Regex.remove(data = plot, expression = '.{10,}\.(\s*(?:[a-z\d\s\-\,\;\:\\\']*)(?:https?:\/\/|www\.).*?$)', group = 1)
+					# Some have no plot, just showing "Add a Plot<a ...".
+					if Regex.match(data = plot, expression = '(add\s*a\s*plot)'): plot = None
 
-					# Some plots end with "see full summary".
-					plot = Regex.remove(data = plot, expression = '.{10,}(see\s*full\s*summary.*$)', group = 1).strip()
+					if plot:
+						# Some plots end with a URL.
+						plot = Regex.remove(data = plot, expression = '.{10,}\.(\s*(?:[a-z\d\s\-\,\;\:\\\']*)(?:https?:\/\/|www\.).*?$)', group = 1)
 
-					# Some plots are cut off and do not end with a full stop.
-					if Regex.match(data = plot, expression = '[a-z\d]$'): plot += ' ...'
+						# Some plots end with "see full summary".
+						plot = Regex.remove(data = plot, expression = '.{10,}(see\s*full\s*summary.*$)', group = 1).strip()
 
-					metadata['plot'] = plot
+						# Some plots start with "Short synopsis (50 words)".
+						# https://www.imdb.com/title/tt20158938/
+						plot = Regex.remove(data = plot, expression = '(short\s*synopsis\s*(?:[\[\(]\d+\s*words?[\]\)]\s*)?(?:docu(?:mentary)?|short|movie|film|(?:tv\s*)?show|series?)?,?\s*)', group = 1)
+
+						# Some plots are cut off and do not end with a full stop.
+						if Regex.match(data = plot, expression = '[a-z\d]$'): plot += ' ...'
+
+					if plot: metadata['plot'] = plot.strip()
 		except: Logger.error()
 
 	def cleanCountry(self, metadata):
@@ -2297,17 +2503,52 @@ class MetaTools(object):
 
 		return result
 
-	def filterDuplicate(self, items):
+	def filterDuplicate(self, items, number = False):
 		duplicates = {'imdb' : [], 'tmdb' : [], 'tvdb' : [], 'trakt' : []}
 		result = []
 		for item in items:
 			found = False
 			for id in duplicates.keys():
 				if id in item and item[id]:
-					if item[id] in duplicates[id]: found = True
-					else: duplicates[id].append(item[id])
+					i = item[id]
+					if number:
+						try: season = str(item['season'])
+						except: season = 'z'
+						try: episode = str(item['episode'])
+						except: episode = 'z'
+						i = '%s_%s_%s' % (i, season, episode)
+					if i in duplicates[id]: found = True
+					else: duplicates[id].append(i)
 			if not found: result.append(item)
 		return result
+
+	def filterContains(self, items, item, number = False, result = False):
+		duplicates = {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None}
+
+		for id in duplicates.keys():
+			if id in item and item[id]:
+				i = item[id]
+				if number:
+					try: season = str(item['season'])
+					except: season = 'z'
+					try: episode = str(item['episode'])
+					except: episode = 'z'
+					i = '%s_%s_%s' % (i, season, episode)
+				duplicates[id] = i
+
+		for item in items:
+			for id in duplicates.keys():
+				if id in item and item[id] and duplicates[id]:
+					i = item[id]
+					if number:
+						try: season = str(item['season'])
+						except: season = 'z'
+						try: episode = str(item['episode'])
+						except: episode = 'z'
+						i = '%s_%s_%s' % (i, season, episode)
+					if i == duplicates[id]: return item if result else True
+
+		return None if result else False
 
 	def filterLimit(self, items, limit = True):
 		if limit: return items[:50 if limit is True else limit]
@@ -2330,6 +2571,10 @@ class MetaTools(object):
 					else: items = [y for x, y in enumerate(items) if x >= number]
 
 		return items
+
+	def filterGenre(self, items, genre):
+		genre = genre.lower()
+		return [item for item in items if 'genre' in item and genre in [j.lower() for j in item['genre']]]
 
 	###################################################################
 	# PACK

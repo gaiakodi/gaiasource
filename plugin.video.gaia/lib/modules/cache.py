@@ -98,7 +98,8 @@ class Cache(Database):
 	TimeoutMini = TimeoutMinute10  # 10 Minutes.
 	TimeoutShort = TimeoutHour1 # 1 Hour.
 	TimeoutMedium = TimeoutHour6 # 6 Hours.
-	TimeoutLong = TimeoutDay3 # 3 Days.
+	TimeoutLong = TimeoutDay1 # 1 Day.
+	TimeoutExtended = TimeoutDay3 # 3 Days.
 
 	Instance = None
 	Id = None
@@ -436,6 +437,11 @@ class Cache(Database):
 	def cacheRefreshLong(self, function, *args, **kwargs):
 		return self.cache(None, Cache.TimeoutRefresh, Cache.TimeoutLong, function, *args, **kwargs)
 
+	# Force refresh the data, but still return the current cached data (ModeAsynchronous).
+	# Will wait to force refresh if the cached data is older than TimeoutExtended (ModeSynchronous).
+	def cacheRefreshExtended(self, function, *args, **kwargs):
+		return self.cache(None, Cache.TimeoutRefresh, Cache.TimeoutExtended, function, *args, **kwargs)
+
 	def cacheSynchronousSeconds(self, timeout, function, *args, **kwargs):
 		return self.cache(Cache.ModeSynchronous, timeout, None, function, *args, **kwargs)
 
@@ -460,6 +466,9 @@ class Cache(Database):
 	def cacheSynchronousLong(self, function, *args, **kwargs):
 		return self.cache(Cache.ModeSynchronous, Cache.TimeoutLong, None, function, *args, **kwargs)
 
+	def cacheSynchronousExtended(self, function, *args, **kwargs):
+		return self.cache(Cache.ModeSynchronous, Cache.TimeoutExtended, None, function, *args, **kwargs)
+
 	def cacheSeconds(self, timeout, function, *args, **kwargs):
 		return self.cache(None, timeout, None, function, *args, **kwargs)
 
@@ -483,6 +492,9 @@ class Cache(Database):
 
 	def cacheLong(self, function, *args, **kwargs):
 		return self.cache(None, Cache.TimeoutLong, None, function, *args, **kwargs)
+
+	def cacheExtended(self, function, *args, **kwargs):
+		return self.cache(None, Cache.TimeoutExtended, None, function, *args, **kwargs)
 
 	##############################################################################
 	# CLEAR

@@ -1,4 +1,8 @@
 
+[B]6.2.0 (2023.03.19)[/B]
+- Renamed skin directories.
+- Added next page thumbnail.
+
 [B]6.1.0 (2023.01.18)[/B]
 - Updated addon icon.
 - Removed module library.

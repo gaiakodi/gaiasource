@@ -875,6 +875,7 @@ class ConverterTime(ConverterBase):
 		self.mDatetime = None
 		self.mTimestamp = None
 
+		offsetHas = False
 		offsetInvert = True
 		if self._isString(offset):
 			offset = self.offset(offset, local = False)
@@ -894,7 +895,6 @@ class ConverterTime(ConverterBase):
 					value = re.sub(other, english, value, flags = re.IGNORECASE | re.UNICODE) # Must be UNICODE, otherwise unicode characters do not work with IGNORECASE.
 					if not value == before: break
 
-			offsetHas = False
 			if format is None:
 				offsetHas = True
 				format = ConverterTime.Formats
@@ -929,7 +929,7 @@ class ConverterTime(ConverterBase):
 				#	Wed, 27 Jan 2021 08:09:14
 				#	Wed, 27 Jan 2021 08:09:14  +2000
 				#	Wed, 27 Jan 2021 08:09:14  -0030 - None
-				# The first time it works and the date is correctly parsed. When executing it the second+ time, it does not work.
+				# The first time it works and the date is correctly parsed. When executing it the 2nd+ time, it does not work.
 				# Kodi/Python probably caches something internally after the first call.
 				# It probably is the "Wed" part.
 				try:
@@ -969,6 +969,9 @@ class ConverterTime(ConverterBase):
 				epoch = datetime.datetime(1970, 1, 1)
 				difference = self.mDatetime - epoch
 				self.mTimestamp = (difference.days * 86400) + difference.seconds
+
+			if offsetHas and self.daylight(timestamp = self.mTimestamp, date = self.mDatetime, timezone = ConverterTime.OffsetUtc):
+				self.mTimestamp += 3600
 
 	@classmethod
 	def offset(self, offset, local = True):

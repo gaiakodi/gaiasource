@@ -263,10 +263,13 @@ class Window(object):
 	SelectNo = False
 	SelectHide = 'hide'
 
+	CloseTimeout = {}
+
 	def __init__(self, backgroundType = None, backgroundPath = None, xml = None, xmlType = TypeDefault, xmlOffset = None, xmlReplacements = None, width = None, height = None):
 		self.mId = 0
 		self.mLock = Lock()
 		self.mClose = False
+		self.mCloseTimeout = True
 
 		self.mEnd = False
 		self.mControls = []
@@ -394,6 +397,17 @@ class Window(object):
 		except: pass
 
 	@classmethod
+	def _instanceType(self, instance = None):
+		if instance:
+			try: return instance.__class__.__name__
+			except:
+				try: return instance.__name__
+				except: pass
+		try: return self.__name__
+		except: pass
+		return None
+
+	@classmethod
 	def _replace(self, data, category, allow = None, forbid = None, single = None, custom = None):
 		flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagAllLines
 		category = 'GAIA%s%%s' % category.upper()
@@ -519,6 +533,11 @@ class Window(object):
 	@classmethod
 	def _initialize1(self, **arguments):
 		try:
+			timeout = arguments['timeout']
+			del arguments['timeout']
+		except: timeout = None
+
+		try:
 			window = self._instance(self(**arguments))
 		except:
 			try:
@@ -533,8 +552,16 @@ class Window(object):
 		window._initializeStart2()
 		window._initializeControls(labels = False) # Initialize controls needed from the start (important for WindowStreams).
 		window._initializeStart3()
+
+		# Automatically close the dialog if a timeout was specified.
+		thread = None
+		if timeout: thread = Pool.thread(target = self.closeTimeout, kwargs = {'timeout' : timeout, 'instance' : window}, start = True)
+
 		window.mWindow.doModal()
 		window.close()
+
+		# Important to wait here, otherwise the next rating dialog (season/show ratings after episode rating) might already be launched before the previous dialog is fully closed.
+		if thread: thread.join(timeout = 3)
 
 	@classmethod
 	def _initialize2(self):
@@ -586,7 +613,8 @@ class Window(object):
 
 		# Add animations.
 		for control in animations:
-			control[0].setAnimations(control[1])
+			try: control[0].setAnimations(control[1])
+			except: tools.Logger.error()
 
 		# Initialize the label text.
 		if labels:
@@ -635,10 +663,8 @@ class Window(object):
 			del arguments['initialize']
 		except:
 			initialize = True
-		thread1 = Pool.thread(target = self._initialize1, kwargs = arguments)
-		thread1.start()
-		thread2 = Pool.thread(target = self._initialize2)
-		thread2.start()
+		thread1 = Pool.thread(target = self._initialize1, kwargs = arguments, start = True)
+		thread2 = Pool.thread(target = self._initialize2, start = True)
 		if wait:
 			thread1.join()
 		elif initialize: # Wait until launched.
@@ -656,12 +682,13 @@ class Window(object):
 		tools.File.deleteDirectory(self._pathWindow())
 
 	@classmethod
-	def close(self, id = None, loader = False):
+	def close(self, id = None, instance = None, loader = False, delay = None):
 		try:
+			if delay: tools.Time.sleep(delay)
 			# Instance might be lost if accessed in a subsequent execution (eg: applying filters).
-			if id is None and not self._instanceHas(): id = self._idProperty()
+			if id is None and not instance and not self._instanceHas(): id = self._idProperty()
 			if id is None:
-				instance = self._instance()
+				if instance is None: instance = self._instance()
 				if not instance.mClose: # In case this function is called multiple times.
 					instance.mClose = True
 					# Close the window BEFORE calling _remove().
@@ -682,6 +709,37 @@ class Window(object):
 		except:
 			self._idPropertyClear()
 			return False
+
+	@classmethod
+	def closeTimeout(self, timeout, instance = None):
+		if instance is None: instance = self._instance()
+
+		type = self._instanceType(instance = instance)
+		Window.CloseTimeout[type] = False
+
+		for i in range(timeout * 2):
+			tools.Time.sleep(0.5)
+			if tools.System.aborted(): return
+			elif instance:
+				if instance.mClose: return
+				elif not instance.mCloseTimeout: return
+				elif not instance._closedTimeout(): return
+
+		Window.CloseTimeout[type] = True
+		instance._closeTimeout()
+
+	@classmethod
+	def closedTimeout(self):
+		try: return Window.CloseTimeout[self._instanceType()]
+		except: return False
+
+	# Virtual function, overwritten by subclasses.
+	def _closeTimeout(self):
+		self.close()
+
+	# Virtual function, overwritten by subclasses.
+	def _closedTimeout(self):
+		return True
 
 	@classmethod
 	def show(self, id):
@@ -1228,7 +1286,7 @@ class Window(object):
 			controlHighlight = self._addImage(path = self._pathImage(['button', type, 'highlight']), x = x + 2, y = y + 2, width = width - 4, height = height - 4, visible = visible, color = highlight, animation = animation)
 			components['highlight'] = controlHighlight
 			if not 'animation' in components: components['animation'] = []
-			components['animation'].append([('Conditional', 'effect=fade start=100 end=0 time=1000 pulse=true tween=linear condition=String.IsEqual(Window.Property(%s),true)' % Window.PropertyAnimation)])
+			components['animation'].append(('Conditional', 'effect=fade start=100 end=0 time=1000 pulse=true tween=linear condition=String.IsEqual(Window.Property(%s),true)' % Window.PropertyAnimation))
 		else:
 			controlHighlight = None
 
@@ -1815,13 +1873,14 @@ class WindowRating(Window):
 		self.mRating = rating
 		self.mIcon = icon
 		self.mAnimation = animation
+		self.mInteracted = False
 
 		self.mLabel = self._label()
 		self.mHighlight = self._label(partial = True)
 		self.mLink = self._link()
 
 	@classmethod
-	def show(self, metadata, rating = None, icon = None, animation = False, wait = True, initialize = True, close = False):
+	def show(self, metadata, rating = None, icon = None, animation = False, wait = True, initialize = True, timeout = None, close = False):
 		interface.Loader.show()
 
 		from lib.meta.image import MetaImage
@@ -1832,7 +1891,7 @@ class WindowRating(Window):
 		if not icon: icon = WindowRating.IconSettings[tools.Settings.getInteger('interface.rating.interface.icon')]
 
 		WindowRating.Rating = None
-		super(WindowRating, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, animation = animation, wait = wait, initialize = initialize, close = close)
+		super(WindowRating, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, animation = animation, wait = wait, initialize = initialize, timeout = timeout, close = close)
 		return WindowRating.Rating
 
 	def _initializeEnd1(self):
@@ -1909,10 +1968,10 @@ class WindowRating(Window):
 			else: offset = dialogLeft + offset
 			control.setPosition(offset, control.getY())
 
-		self._onClick(WindowRating.IdButtonClose, self._cancel)
-		self._onClick(WindowRating.IdButtonQr, self._qr)
+		self._onClick(WindowRating.IdButtonClose, lambda : self._onInteraction(self._cancel))
+		self._onClick(WindowRating.IdButtonQr, lambda : self._onInteraction(self._qr))
 		for button in WindowRating.IdButtons:
-			self._onClick(button, self._rate)
+			self._onClick(button, lambda : self._onInteraction(self._rate))
 
 		rated = self.mRating and 'rating' in self.mRating and self.mRating['rating']
 		colorPrimary = interface.Format.colorPrimary()
@@ -1967,6 +2026,19 @@ class WindowRating(Window):
 	def _initializeEnd2(self):
 		super(WindowRating, self)._initializeEnd2()
 		interface.Loader.hide()
+
+	def _onInteraction(self, callback):
+		self.mInteracted = True
+		callback()
+
+	def _closeTimeout(self):
+		self._cancel()
+
+	def _closedTimeout(self):
+		# Called from parent class.
+		# Do not automatically close the dialog if the user interacts with the dialog.
+		if self.mInteracted or bool(self.property('GaiaRatingInteract')): return False
+		else: return True
 
 	def _label(self, partial = False):
 		label = []
@@ -2893,6 +2965,8 @@ class WindowPlayback(WindowProgress):
 
 class WindowStreams(WindowProgress):
 
+	IdDummy = 50000
+
 	ProgressThread = None
 	ProgressData = {}
 
@@ -3007,8 +3081,15 @@ class WindowStreams(WindowProgress):
 	def _actionContext(self):
 		index = self.control(Window.IdListControl).getSelectedPosition()
 		if index >= 0:
-			self.focus(50000)
-			self.mContexts[index].show()
+			# Focus on the dummy control to open the context menu in the center of the screen.
+			self.focus(WindowStreams.IdDummy)
+
+			self.mContexts[index].show(wait = True)
+
+			# NB: Wait until the context menu closes and then refocus the list.
+			# Otherwise, after the context closes, the user has to hit a key (eg: Enter/Select) to refocus on the item in the list.
+			# Eg: Open the context and do a speed test. Once done, you want to play a link. However, clicking Enter the 1st time does not do anything (except selecting/focusing the list control). Only clicking Enter the 2nd time initiates playback.
+			self.focus(Window.IdListControl)
 
 	def _actionList(self):
 		try:
@@ -3219,13 +3300,14 @@ class WindowBingeOverlay(WindowBinge):
 	LogoIconWidth = 48
 	LogoIconHeight = 48
 
+	# Change this in XML.
 	PosterWidth = 61
 	PosterHeight = 90
 
 	Padding = 10
 
 	def __init__(self, backgroundType, backgroundPath, poster, logo, status):
-		super(WindowBingeOverlay, self).__init__(mode = WindowBinge.ModeOverlay, backgroundType = backgroundType, backgroundPath = backgroundPath, poster = poster, logo = logo, status = status, height = WindowBingeOverlay.SizeHeight, inverse = True)
+		super(WindowBingeOverlay, self).__init__(xml = 'binge', mode = WindowBinge.ModeOverlay, backgroundType = backgroundType, backgroundPath = backgroundPath, poster = poster, logo = logo, status = status, height = WindowBingeOverlay.SizeHeight, inverse = True)
 
 	def _initializeStart1(self):
 		super(WindowBingeOverlay, self)._initializeStart1()
@@ -3237,6 +3319,7 @@ class WindowBingeOverlay(WindowBinge):
 		self._addPoster()
 		self._addDetails()
 		self._addControls()
+		self.propertySet('GaiaInitialized', 1)
 
 	def _dimensionSpace(self):
 		return [0, 0]
@@ -3262,9 +3345,12 @@ class WindowBingeOverlay(WindowBinge):
 		return self._addImage(self._pathImage('separator'), x = -5, y = self.mHeight, width = self.mWidth + 10, height = Window.SeparatorLineHeight)
 
 	def _addPoster(self):
+		# Use XML for poster, since it allows rounded corners.
+		#if self.mPoster:
+		#	dimension = self._dimensionPoster()
+		#	self._addImage(path = self.mPoster, x = WindowBingeOverlay.Padding, y = WindowBingeOverlay.Padding, width = dimension[0], height = dimension[1])
 		if self.mPoster:
-			dimension = self._dimensionPoster()
-			self._addImage(path = self.mPoster, x = WindowBingeOverlay.Padding, y = WindowBingeOverlay.Padding, width = dimension[0], height = dimension[1])
+			self.propertySet('GaiaPoster', self.mPoster)
 
 	def _addDetails(self):
 		x = (self._dimensionPoster()[0] + (2 * WindowBingeOverlay.Padding)) if self.mPoster else WindowBingeOverlay.Padding

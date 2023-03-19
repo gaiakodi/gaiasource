@@ -606,7 +606,7 @@ def getTranslation(url, lang = None, full = False, cache = True, failsafe = Fals
 
 		if single: url += '/%s' % lang
 
-		if cache: item = getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: item = getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: item = getTraktAsJson(url = url)
 
 		item = processTitles(item)
@@ -625,7 +625,7 @@ def getMovieSummary(id, full = True, cache = True, failsafe = False):
 	try:
 		url = '/movies/%s' % id
 		if full: url += '?extended=full'
-		if cache: return getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: return getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: return getTraktAsJson(url = url)
 	except: tools.Logger.error()
 	return None
@@ -634,7 +634,7 @@ def getTVShowSummary(id, full = True, cache = True, failsafe = False):
 	try:
 		url = '/shows/%s' % id
 		if full: url += '?extended=full'
-		if cache: return getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: return getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: return getTraktAsJson(url = url)
 	except: tools.Logger.error()
 	return None
@@ -645,7 +645,7 @@ def getTVSeasonSummary(id, season = None, lang = None, full = True, cache = True
 		if not season is None: url += '/%d' % season
 		if full: url += '?extended=full'
 		if lang: url += '%stranslations=%s' % ('&' if full else '?', lang)
-		if cache: return getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: return getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: return getTraktAsJson(url = url)
 	except: tools.Logger.error()
 	return None
@@ -724,18 +724,18 @@ def processTitles(data):
 	return data
 
 def getMovieAliases(id):
-	try: return processTitles(Cache.instance().cacheLong(getTraktAsJson, '/movies/%s/aliases' % id))
+	try: return processTitles(Cache.instance().cacheExtended(getTraktAsJson, '/movies/%s/aliases' % id))
 	except: return []
 
 def getTVShowAliases(id):
-	try: return processTitles(Cache.instance().cacheLong(getTraktAsJson, '/shows/%s/aliases' % id))
+	try: return processTitles(Cache.instance().cacheExtended(getTraktAsJson, '/shows/%s/aliases' % id))
 	except: return []
 
 def getPeopleMovie(id, full = True, cache = True, failsafe = False):
 	try:
 		url = '/movies/%s/people' % id
 		if full: url += '?extended=full'
-		if cache: return getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: return getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: return getTraktAsJson(url = url)
 	except:
 		tools.Logger.error()
@@ -747,7 +747,7 @@ def getPeopleShow(id, season = None, episode = None, full = True, cache = True, 
 		elif episode is None: url = '/shows/%s/seasons/%s/people' % (id, str(season))
 		else: url = '/shows/%s/seasons/%s/episodes/%s/people' % (id, str(season), str(episode))
 		if full: url += '?extended=full'
-		if cache: return getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: return getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: return getTraktAsJson(url = url)
 	except:
 		tools.Logger.error()
@@ -777,7 +777,7 @@ def SearchMovie(title = None, year = None, imdb = None, tmdb = None, tvdb = None
 		else: return None
 		if full: url += ('&' if '?' in url else '?') + 'extended=full'
 
-		if cache: result = getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: result = getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: result = getTraktAsJson(url = url)
 
 		if result is False: return result
@@ -799,7 +799,7 @@ def SearchTVShow(title = None, year = None, imdb = None, tmdb = None, tvdb = Non
 		else: return None
 		if full: url += ('&' if '?' in url else '?') + 'extended=full'
 
-		if cache: result = getTraktCache(function = Cache.instance().cacheLong, url = url, failsafe = failsafe)
+		if cache: result = getTraktCache(function = Cache.instance().cacheExtended, url = url, failsafe = failsafe)
 		else: result = getTraktAsJson(url = url)
 
 		if result is False: return result
@@ -814,7 +814,7 @@ def SearchTVShow(title = None, year = None, imdb = None, tmdb = None, tvdb = Non
 def getGenre(content, type, type_id):
 	try:
 		r = '/search/%s/%s?type=%s&extended=full' % (type, type_id, content)
-		r = Cache.instance().cacheLong(getTraktAsJson, r)
+		r = Cache.instance().cacheExtended(getTraktAsJson, r)
 		r = r[0].get(content, {}).get('genres', [])
 		return r
 	except:
@@ -834,16 +834,16 @@ def timeFormat(timestamp):
 # REFRESH
 ##############################################################################
 
-def refresh(media = None, wait = True, reload = False):
+def refresh(media = None, wait = True, reload = True):
 	threads = []
 	if not media or tools.Media.typeMovie(media):
-		threads.append(Pool.thread(target = historyRefreshMovie, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = progressRefreshMovie, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = ratingRefreshMovie, kwargs = {'wait' : True}, start = True))
+		threads.append(Pool.thread(target = historyRefreshMovie, kwargs = {'wait' : True, 'reload' : reload}, start = True))
 	if not media or tools.Media.typeTelevision(media):
-		threads.append(Pool.thread(target = historyRefreshShow, kwargs = {'wait' : True, 'reload' : reload}, start = True))
 		threads.append(Pool.thread(target = progressRefreshShow, kwargs = {'wait' : True}, start = True))
 		threads.append(Pool.thread(target = ratingRefreshShow, kwargs = {'wait' : True}, start = True))
+		threads.append(Pool.thread(target = historyRefreshShow, kwargs = {'wait' : True, 'reload' : reload}, start = True))
 	if wait: [thread.join() for thread in threads]
 
 ##############################################################################
@@ -899,19 +899,27 @@ def historyRefresh(media = None, wait = True, reload = True):
 		historyClear(media = media, wait = True)
 		historyRetrieve(media = media)
 
-		# When we watch an episode and afterwards load the Trakt progress menu, the previously watched show is not listed.
-		# This is probably because Gaia thinks there are no new episodes, since the last episode it knows of, has just been watched.
-		# If the progress menu is reloaded manually (navigate back and load menu again), the show is listed again.
-		# Auto reload here if the history changed, so that the user does not have to manually reload the list.
-		if reload and tools.Media.typeTelevision(media):
-			from lib.indexers.episodes import Episodes
-			Episodes().arrivalsRefresh()
+		if reload:
+
+			# When we watch an episode and afterwards load the Trakt progress menu, the previously watched show is not listed.
+			# This is probably because Gaia thinks there are no new episodes, since the last episode it knows of, has just been watched.
+			# If the progress menu is reloaded manually (navigate back and load menu again), the show is listed again.
+			# Auto reload here if the history changed, so that the user does not have to manually reload the list.
+			if tools.Media.typeTelevision(media):
+				from lib.indexers.episodes import Episodes
+				Episodes().arrivalsRefresh()
+			elif tools.Media.typeMovie(media):
+				from lib.indexers.movies import Movies
+				Movies().arrivalsRefresh()
+
+			# Reload the list content in the widget of the Quick view.
+			tools.Eminence.widgetReload(media = media)
 
 	if wait: _historyRefresh(media = media, reload = reload)
 	else: Pool.thread(target = _historyRefresh, kwargs = {'media' : media, 'reload' : reload}, start = True)
 
-def historyRefreshMovie(wait = True):
-	historyRefresh(media = tools.Media.TypeMovie, wait = wait)
+def historyRefreshMovie(wait = True, reload = True):
+	historyRefresh(media = tools.Media.TypeMovie, wait = wait, reload = reload)
 
 def historyRefreshShow(wait = True, reload = True):
 	historyRefresh(media = tools.Media.TypeShow, wait = wait, reload = reload)
@@ -1443,7 +1451,7 @@ def progressUpdate(action, media = None, imdb = None, tmdb = None, tvdb = None, 
 				if tools.Media.typeTelevision(media):
 					slug = item['show']['ids']['slug']
 					link = '/shows/%s/seasons/%d/episodes/%d' % (slug, season, episode)
-					item = Cache.instance().cacheLong(getTraktAsJson, link)
+					item = Cache.instance().cacheExtended(getTraktAsJson, link)
 				else:
 					item = item['movie']
 
@@ -1627,9 +1635,14 @@ def ratingUpdateTime(items = None, time = None):
 	return items
 
 # rating = integer in [1, 10]
-def ratingUpdate(rating, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, time = None, items = None, wait = False):
+def ratingUpdate(rating, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, time = None, items = None, force = False, wait = False):
 	result = False
 	try:
+		# Do not update the rating if it did not change, in order to keep the old/original rating date.
+		if not force:
+			current = ratingRetrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
+			if current == rating: return None
+
 		media, type = ratingType(media = media, season = season, episode = episode, general = True)
 		items = request(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, rating = rating, items = items)
 		items = ratingUpdateTime(items = items, time = time)
@@ -1638,11 +1651,11 @@ def ratingUpdate(rating, media = None, imdb = None, tmdb = None, tvdb = None, tr
 	except: tools.Logger.error()
 	return result
 
-def ratingUpdateMovie(rating, imdb = None, tmdb = None, tvdb = None, trakt = None, time = None, items = None, wait = False):
-	return ratingUpdate(rating = rating, media = tools.Media.TypeMovie, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, time = time, items = items, wait = wait)
+def ratingUpdateMovie(rating, imdb = None, tmdb = None, tvdb = None, trakt = None, time = None, items = None, force = False, wait = False):
+	return ratingUpdate(rating = rating, media = tools.Media.TypeMovie, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, time = time, items = items, force = force, wait = wait)
 
-def ratingUpdateShow(rating, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, time = None, items = None, wait = False):
-	return ratingUpdate(rating = rating, media = tools.Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, time = time, items = items, wait = wait)
+def ratingUpdateShow(rating, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, time = None, items = None, force = False, wait = False):
+	return ratingUpdate(rating = rating, media = tools.Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, time = time, items = items, force = force, wait = wait)
 
 ##############################################################################
 # RATING - REMOVE

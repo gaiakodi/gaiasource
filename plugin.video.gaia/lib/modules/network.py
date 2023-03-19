@@ -590,9 +590,15 @@ class Networker(object):
 	@classmethod
 	def htmlDecode(self, data):
 		try:
-			try: from HTMLParser import HTMLParser
-			except: from html.parser import HTMLParser
-			data = HTMLParser().unescape(data)
+			# In the new Python 3, HTMLParser does not behave as expected (sometimes not removing the trailing ; and not detecting hex like &#039;).
+			# The html lib seems to do a better job.
+			try:
+				import html
+				data = html.unescape(data)
+			except:
+				try: from HTMLParser import HTMLParser
+				except: from html.parser import HTMLParser
+				data = HTMLParser().unescape(data)
 		except: pass
 		return data
 
@@ -3540,7 +3546,7 @@ class Tracker(object):
 			elif udp: type = 'udp'
 
 			from lib.modules.cache import Cache
-			result = Cache.instance().cacheLong(Networker().requestText, link = 'https://newtrackon.com/api/' + type)
+			result = Cache.instance().cacheExtended(Networker().requestText, link = 'https://newtrackon.com/api/' + type)
 			if result and not result == 'None':
 				result = result.split('\n')
 				result = [i.strip() for i in result]

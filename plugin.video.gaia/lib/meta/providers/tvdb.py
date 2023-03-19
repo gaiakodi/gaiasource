@@ -376,7 +376,7 @@ class MetaTvdb(MetaProvider):
 
 		if language is None: language = self._extractLanguage(data = data, language = MetaData.LanguageOriginal, single = True)
 
-		original = [[], []]
+		original = [[], [], []]
 		try: original[0].append(data[type])
 		except: pass
 		result[MetaData.LanguageUniversal] = original
@@ -393,8 +393,8 @@ class MetaTvdb(MetaProvider):
 				if not code:
 					if unknown: code = MetaData.LanguageUniversal
 					else: continue
-				if not code in result: result[code] = [[], []]
-				result[code][1].append(i)
+				if not code in result: result[code] = [[], [], []]
+				result[code][2].append(i)
 		except: pass
 
 		try:
@@ -404,28 +404,38 @@ class MetaTvdb(MetaProvider):
 					value = i[type]
 					primary = self._extract(data = i, type = ['isPrimary', 'IsPrimary'])
 					alias = self._extract(data = i, type = ['isAlias', 'IsAlias'])
+					aliasAssumed = False
 
 					# Some languages have multiple names, where the first name is the same as the original name.
 					# Prefer the non-original name, except if it is the original language.
 					# Example:
 					#	French = ["Game of Thrones", "Le Trône de fer"]
 					#	English = ["Game of Thrones", "GOT"]
+					# Some are also not marked as IsPrimary, but still contains IsAlias titles.
+					# Example (we rather want to pick Liaison above Bonding):
+					#	{"name": "Liaison", "language": "fra", "isPrimary": true}
+					#	{"name": "Liaison", "language": "eng"}
+					#	{"name": "Bonding", "isAlias": true, "language": "eng"}
 					if not alias:
-						if value in original[0] or value in original[1]:
-							if not code == language: alias = True
+						if value in original[0] or value in original[1] or value in original[2]:
+							if not code == language:
+								if code == Language.CodeEnglish and not primary: aliasAssumed = True
+								else: alias = True
 
-					if not code in result: result[code] = [[], []]
-					if primary or not alias: result[code][0].append(value)
-					elif alias: result[code][1].append(value)
+					if not code in result: result[code] = [[], [], []]
+					if primary: result[code][0].append(value)
+					elif aliasAssumed and not alias: result[code][1].append(value)
+					elif alias: result[code][2].append(value)
+					else: result[code][1].append(value)
 					try:
 						value = i[aliases]
 						if Tools.isDictionary(value):
 							try:
 								code = Language.code(value['language'])
-								if not code in result: result[code] = [[], []]
+								if not code in result: result[code] = [[], [], []]
 							except: pass
 							value = value['name']
-						result[code][1].extend(value)
+						result[code][2].extend(value)
 					except: pass
 		except: pass
 
@@ -434,19 +444,20 @@ class MetaTvdb(MetaProvider):
 			for key, value in self._extract(data = data, type = [extra]).items():
 				code = Language.code(key)
 				if code:
-					if not code in result: result[code] = [[], []]
-					try: result[code][1].append(value)
+					if not code in result: result[code] = [[], [], []]
+					try: result[code][2].append(value)
 					except: pass
 		except: pass
 
 		if result:
 			if language:
-				if not language in result: result[language] = [[], []]
+				if not language in result: result[language] = [[], [], []]
 				result[language][0].extend(original[0])
 				result[language][1].extend(original[1])
+				result[language][2].extend(original[2])
 
 			for key, value in result.items():
-				value = value[0] + value[1]
+				value = value[0] + value[1] + value[2]
 				value = [i for i in value if i]
 				value = Tools.listUnique(value)
 				result[key] = value

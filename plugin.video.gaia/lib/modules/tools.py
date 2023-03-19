@@ -566,6 +566,16 @@ class Tools(object):
 		return data
 
 	@classmethod
+	def listInterleave(self, data1, data2):
+	    result = []
+	    length1 = len(data1)
+	    length2 = len(data2)
+	    for i in range(max(length1, length2)):
+	        if i < length1: result.append(data1[i])
+	        if i < length2: result.append(data2[i])
+	    return result
+
+	@classmethod
 	def listConsecutive(self, data):
 		if not data: return None
 		return data == list(range(min(data), max(data) + 1))
@@ -3481,7 +3491,7 @@ class System(object):
 
 	@classmethod
 	def developerCode(self):
-		return Settings.getString('developer.access.code')
+		return Settings.getString('general.developer.code')
 
 	@classmethod
 	def developerVersion(self):
@@ -3632,7 +3642,7 @@ class System(object):
 			menu = [addon.getLocalizedString(menu)]
 
 		if menu:
-			if Tools.isString(menu): menu = Converter.jsonFrom(menu)
+			if menu and Tools.isString(menu): menu = Converter.jsonFrom(menu)
 			if len(menu) > 1 and menu[0] == addon.getLocalizedString(35639): menu.pop(0)
 			self.pluginPropertySet(property = 'GaiaMenuCategory', value = menu[0])
 			submenu = menu[1:]
@@ -3640,6 +3650,16 @@ class System(object):
 		elif action is None or action == 'home':
 			self.pluginPropertySet(property = 'GaiaMenuCategory', value = 'Gaia')
 			self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = addon.getLocalizedString(33102))
+
+		if menu and self.originGaia():
+			media = ''
+			menuType = menu[0]
+			if menuType:
+				if menuType == addon.getLocalizedString(32001): media = Media.TypeMovie
+				elif menuType == addon.getLocalizedString(32002): media = Media.TypeShow
+				elif menuType == addon.getLocalizedString(33470): media = Media.TypeDocumentary
+				elif menuType == addon.getLocalizedString(33471): media = Media.TypeShort
+			self.windowPropertySet(property = 'GaiaMenuType', value = media)
 
 		if initialize: System.Menu = menu
 
@@ -4244,7 +4264,8 @@ class System(object):
 
 	@classmethod
 	def launched(self):
-		return Converter.boolean(self.windowPropertyGet(System.PropertyInitial))
+		try: return int(self.windowPropertyGet(System.PropertyInitial))
+		except: return None
 
 	@classmethod
 	def launch(self, hidden = None):
@@ -4268,6 +4289,8 @@ class System(object):
 
 	@classmethod
 	def _launch(self, hidden = False, observe = False):
+		if not hidden: self.windowPropertySet(System.PropertyInitial, '1')
+
 		# Sequential non-threaded and parallel threaded execution seems to take more or less the same time.
 		# Sometimes sequential execution is actually faster.
 		# Keep sequential execution for now, since it is probably more robust with less mututal exclusion problems.
@@ -4337,7 +4360,7 @@ class System(object):
 			Settings.set('internal.initial.launch', True)
 			try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
 			except: pass
-			if not hidden: self.windowPropertySet(System.PropertyInitial, True)
+			if not hidden: self.windowPropertySet(System.PropertyInitial, '2')
 
 			Loader.enable()
 
@@ -4370,7 +4393,7 @@ class System(object):
 				# Announcement
 				def _launchAnnouncement():
 					Time.sleep(0.5)
-					Announcements.show(wait = True)
+					Announcements.show(wait = True, version = version['old']['number'] if (version['old']['number'] and not version['old']['number'] == version['new']['number']) else None)
 					Announcements.storage(wait = True)
 				Pool.thread(target = _launchAnnouncement).start()
 
@@ -4481,6 +4504,14 @@ class System(object):
 			if version['old']['number'] <= 60010019.0 and version['new']['number'] > 60010019.0:
 				Settings.default(id = 'navigation.page.episode')
 				Settings.default(id = 'general.cache.expression')
+
+			#gaiaremove
+			if version['old']['number'] <= self.versionNumber(version = '6.1.10') and version['new']['number'] > self.versionNumber(version = '6.1.10'):
+				Settings.default(id = 'activity.history.resume')
+				Settings.default(id = 'activity.rating.movie')
+				Settings.default(id = 'activity.rating.show')
+				Settings.default(id = 'activity.rating.season')
+				Settings.default(id = 'activity.rating.episode')
 
 		_launchProgress(4) # 25%
 
@@ -4777,6 +4808,33 @@ class System(object):
 		elif choice == 1: self.reload(loader = True)
 		elif choice == 2: self.execute('RestartApp')
 		elif choice == 3: self.execute('Reboot')
+
+class Eminence(object):
+
+	PropertyWidget = 'GaiaWidgetReload'
+	PropertyWidgetMovie = 'GaiaWidgetReloadMovie'
+	PropertyWidgetDocu = 'GaiaWidgetReloadDocu'
+	PropertyWidgetShort = 'GaiaWidgetReloadShort'
+	PropertyWidgetShow = 'GaiaWidgetReloadShow'
+
+	@classmethod
+	def widgetReload(self, media = None):
+		# For Gaia Eminence skin.
+		# Forces the widget in the Quick view to reload the list content.
+		# Call this if the content in the list has changed (eg: item watched).
+
+		time = str(Time.timestamp())
+		properties = [Eminence.PropertyWidget]
+
+		# From trakt.py, there is no docu/short refresh.
+		'''if media is None or media == Media.TypeMovie: properties.append(Eminence.PropertyWidgetMovie)
+		if media is None or media == Media.TypeDocumentary: properties.append(Eminence.PropertyWidgetDocu)
+		if media is None or media == Media.TypeShort: properties.append(Eminence.PropertyWidgetShort)
+		if media is None or Media.typeTelevision(media): properties.append(Eminence.PropertyWidgetShow)'''
+		if media is None or Media.typeMovie(media): properties.extend([Eminence.PropertyWidgetMovie, Eminence.PropertyWidgetDocu, Eminence.PropertyWidgetShort])
+		if media is None or Media.typeTelevision(media): properties.append(Eminence.PropertyWidgetShow)
+
+		for property in properties: System.windowPropertySet(property, time)
 
 class Screen(object):
 
@@ -5206,6 +5264,20 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
+		'activity.rating.timeout' : {
+			'type' : CustomDuration,
+			'title' : 33660,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 30,
+				'minimum' : 5,
+				'maximum' : 600,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
 		'playback.time.wait' : {
 			'type' : CustomDuration,
 			'title' : 35289,
@@ -5304,7 +5376,7 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'developer.precheck.link.time' : {
+		'general.developer.precheck.link.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
 			'value' : {
@@ -5318,7 +5390,7 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'developer.precheck.metadata.time' : {
+		'general.developer.precheck.metadata.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
 			'value' : {
@@ -6662,7 +6734,8 @@ class Media(object):
 	TypeSeason = 'season'
 	TypeEpisode = 'episode'
 	TypePerson = 'person'
-	TypeMixed = 'mixed'
+	TypeMultiple = 'multiple' # List containing episodes from different shows.
+	TypeMixed = 'mixed' # List containing a mixture of movies and shows.
 	TypeSpecialSeason = 'specialseason'
 	TypeSpecialEpisode = 'specialepisode'
 	TypeSpecialRecap = 'specialrecap'
@@ -6975,11 +7048,11 @@ class Media(object):
 
 	@classmethod
 	def typeMovie(self, type):
-		return type in [Media.TypeMovie, Media.TypeDocumentary, Media.TypeShort]
+		return type == Media.TypeMovie or type == Media.TypeDocumentary or type == Media.TypeShort
 
 	@classmethod
 	def typeTelevision(self, type):
-		return type in [Media.TypeShow, Media.TypeSeason, Media.TypeEpisode, Media.TypeSpecialSeason, Media.TypeSpecialEpisode, Media.TypeSpecialRecap, Media.TypeSpecialExtra]
+		return type == Media.TypeShow or type == Media.TypeSeason or type == Media.TypeEpisode or type == Media.TypeSpecialSeason or type == Media.TypeSpecialEpisode or type == Media.TypeSpecialRecap or type == Media.TypeSpecialExtra
 
 ###################################################################
 # LIGHTPACK
@@ -7316,11 +7389,26 @@ class Subprocess(object):
 	def open(self, command, communicate = True, timeout = None):
 		try:
 			# Use "shell", otherwise Windows will show a CMD window popup.
-			from subprocess import Popen, PIPE
+			from subprocess import Popen, PIPE, TimeoutExpired
 			process = Popen(self.command(command), stdout = PIPE, stderr = PIPE, stdin = PIPE, shell = True)
 			if communicate is True: return Converter.unicode(process.communicate(timeout = timeout)[0])
 			elif communicate: return Converter.unicode(process.communicate(input = Converter.bytes(communicate), timeout = timeout)[0])
 			else: return None
+		except TimeoutExpired:
+			# NB: The timeout only waits for the process output for a number of seconds.
+			# However, it does not terminate the child process.
+			# When calling "bluetoothctl" and there is no Bluetooth dongle, the command hangs with: Waiting to connect to bluetoothd...
+			# Simply timing out keeps the subprocess running in the task manager (eg Linux: 'sh' in the system monitor).
+			# Manually terminate the subprocess
+			try:
+				# NB: It is very important to sleep after calling kill().
+				# If not, for some reason the process remains active.
+				process.kill()
+				Time.sleep(0.1)
+				return None
+			except:
+				Logger.error()
+				return False
 		except Exception as exception:
 			if not timeout and self._error(exception = exception): Logger.error()
 			return False
@@ -12508,46 +12596,62 @@ class Announcements(object):
 		return self.enabled() and Settings.getBoolean('general.announcement.private')
 
 	@classmethod
-	def show(self, force = False, wait = False, sleep = False):
-		if force or self.enabledPublic():
-			thread = Pool.thread(target = self._show, args = (force, sleep), start = True)
+	def enabledChangelog(self):
+		return self.enabled() and Settings.getBoolean('general.announcement.changelog')
+
+	@classmethod
+	def show(self, force = False, version = None, wait = False, sleep = False):
+		if force or self.enabledPublic() or (version and self.enabledChangelog()):
+			thread = Pool.thread(target = self._show, kwargs = {'force' : force, 'version' : version, 'sleep' : sleep}, start = True)
 			if wait: thread.join()
 
 	@classmethod
-	def _show(self, force = False, sleep = False):
+	def _show(self, force = False, version = None, sleep = False):
 		try:
 			from lib.modules import api
 			from lib.modules import interface
 
 			if sleep: Time.sleep(1.5) # Wait a bit so that everything has been loaded.
 
+			message = []
+			result = None
+			newline = interface.Format.newline() * 2
+
 			if force:
 				interface.Loader.show()
 				last = Time.past(days = 365)
 				result = api.Api.announcement(last = last, version = System.version(), count = 5)
-			else:
+			elif self.enabledPublic():
 				last = Settings.getInteger('internal.announcement')
 				if not last: last = Time.past(days = 14) # Make sure Gaia 6 does not retrieve old Gaia 5 announcements. Also limits old announcements if the user newley installs Gaia.
 				result = api.Api.announcement(last = last, version = System.version(), count = 5)
 
 			if result:
 				if Tools.isDictionary(result): result = [result]
-				single = len(result) == 1
-
-				mode = result[0]['mode'] if single else 'page'
-
-				newline = interface.Format.newline() * 2
-				text = [interface.Format.font(Time.format(i['time']['added'], format = Time.FormatDate), bold = True, color = interface.Format.colorSecondary()) + newline + i['message']['format'] for i in result]
-				text = newline.join(text)
-
 				if not force: Settings.set('internal.announcement', max(i['time']['added'] for i in result))
 
+				title = interface.Translation.string(33962)
+				color = interface.Format.colorSecondary()
+				text = [interface.Format.font('%s (%s)' % (title, Time.format(i['time']['added'], format = Time.FormatDate)), bold = True, color = color) + newline + i['message']['format'] for i in result]
+				text = interface.Format.font(35277, bold = True, color = interface.Format.colorPrimary(), uppercase = True) + newline + newline.join(text)
+
+				'''single = len(result) == 1
+				mode = result[0]['mode'] if single else 'page'
 				if mode == 'dialog': interface.Dialog.confirm(title = 33962, message = text)
 				elif mode == 'splash': interface.Splash.popupMessage(message = text)
-				elif mode == 'page': interface.Dialog.text(title = 33962, message = text)
-			elif force:
-				interface.Dialog.notification(title = 33962, message = 33992, icon = interface.Dialog.IconInformation)
-			if force: interface.Loader.hide()
+				elif mode == 'page': interface.Dialog.text(title = 33962, message = text)'''
+
+				message.append(text)
+
+			if version and self.enabledChangelog():
+				changelog = Changelog.extract(limit = 5, version = version, format = True)
+				if changelog: message.append(interface.Format.font(35331, bold = True, color = interface.Format.colorPrimary(), uppercase = True) + newline + changelog)
+
+			if message: interface.Dialog.text(title = 35201, message = (interface.Format.newline() * 3).join(message))
+
+			if force:
+				if not message: interface.Dialog.notification(title = 35201, message = 33992, icon = interface.Dialog.IconInformation)
+				interface.Loader.hide()
 		except: Logger.error()
 
 	@classmethod
@@ -12571,6 +12675,44 @@ class Announcements(object):
 			if not Dummy().test():
 				from lib.modules.interface import Dialog
 				Dialog.confirm(title = 36044, message = 36045)
+
+###################################################################
+# CHANGELOG
+###################################################################
+
+class Changelog(object):
+
+	@classmethod
+	def extract(self, limit = None, version = None, format = False):
+		from lib.modules.interface import Translation, Format
+
+		result = []
+		if version and Tools.isString(version): version = System.versionNumber(version = version)
+
+		data = File.readNow(File.joinPath(System.path(), 'changelog.txt'))
+		if data:
+			releases = Regex.extract(data = data, expression = '\[B\](\d+\.\d+\.\d+).*?\((.*?)\)\s*\[\/B]\s*(.*?)\s*\n{2,}', all = True, group = None, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
+			if releases:
+				for release in releases:
+					if not version or System.versionNumber(version = release[0]) > version:
+						result.append({'version' : release[0], 'date' : release[1], 'data' : release[2]})
+				if limit: result = result[:limit]
+
+		if format:
+			newline = Format.newline()
+			color = Format.colorSecondary()
+			title = Translation.string(33359)
+			text = []
+			for release in result:
+				text.append(Format.font('%s %s (%s)' % (title, release['version'], release['date']), bold = True, color = color) + newline + release['data'])
+			result = (newline * 2).join(text)
+
+		return result
+
+	@classmethod
+	def show(self, limit = None, version = None, format = True):
+		from lib.modules.interface import Dialog
+		Dialog.text(title = 33503, message = self.extract(limit = limit, version = version, format = format))
 
 ###################################################################
 # PROMOTIONS
@@ -12637,7 +12779,7 @@ class Promotions(object):
 	def enabled(self):
 		try:
 			from lib.modules import orionoid
-			if not Settings.getBoolean('navigation.menu.promotion'): return False
+			if not Settings.getBoolean('menu.root.promotion'): return False
 			elif orionoid.Orionoid().accountPromotionEnabled(): return True
 			current = Time.timestamp()
 			for i in self._cache():

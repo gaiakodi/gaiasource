@@ -1672,16 +1672,16 @@ class HandleTorrenter(Handle):
 					key = Tmdb().key()
 					if key:
 						if media == 'episode' and tvdb: # Shows - IMDb ID for episodes does not work on TMDb.
-							result = cache.Cache.instance().cacheLong(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=tvdb_id' % (tvdb, key))
+							result = cache.Cache.instance().cacheExtended(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=tvdb_id' % (tvdb, key))
 							result = result['tv_results']
 							if tools.Tools.isArray(result): result = result[0]
 							if result and 'id' in result and result['id']:
 								data.append({'name' : 'show', 'data' : str(result['id'])})
 								if not season is None and not episode is None:
-									result = cache.Cache.instance().cacheLong(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/tv/%s/season/%s/episode/%s?api_key=%s' % (result['id'], season, episode, key))
+									result = cache.Cache.instance().cacheExtended(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/tv/%s/season/%s/episode/%s?api_key=%s' % (result['id'], season, episode, key))
 									if result and 'id' in result: data.append({'name' : 'tmdb', 'data' : str(result['id'])})
 						elif media == 'movie' and imdb:
-							result = cache.Cache.instance().cacheLong(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id' % (imdb, key))
+							result = cache.Cache.instance().cacheExtended(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id' % (imdb, key))
 							result = result['movie_results']
 							if tools.Tools.isArray(result): result = result[0]
 							if result and 'id' in result and result['id']: data.append({'name' : 'tmdb', 'data' : str(result['id'])})

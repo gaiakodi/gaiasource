@@ -782,7 +782,7 @@ class Player(xbmc.Player):
 
 	def _bingeShow(self):
 		try:
-			if self.binge and not self.bingeFinishedShow:
+			if self.binge and self.bingeMetadata and not self.bingeFinishedShow:
 				self.bingeFinishedShow = True
 				if not self.bingeDialogUpNext:
 					self.bingeContinue = True
@@ -1172,7 +1172,16 @@ class Player(xbmc.Player):
 					if seconds > 0:
 						if self.playback.settingsHistoryEnabled():
 							resume = self.playback.settingsHistoryResume()
-							if resume == 2 or resume == 3:
+							if resume == 4:
+								if self.progress <= 0.02 or self.progress >= 0.98:
+									resume = -1
+									seconds = 0
+								elif self.progress <= 0.1 or self.progress >= 0.9:
+									resume = 3
+								else:
+									resume = -1
+
+							if resume >= 2:
 								paused = True
 								self.pause()
 								timeMinutes, timeSeconds = divmod(float(seconds), 60)
@@ -1180,7 +1189,7 @@ class Player(xbmc.Player):
 								label = '%02d:%02d:%02d' % (timeHours, timeMinutes, timeSeconds)
 								label = interface.Translation.string(32502) % label
 								if resume == 3: label += ' ' + interface.Translation.string(34372)
-								choice = interface.Dialog.option(title = 32344, message = label, labelConfirm = 32501, labelDeny = 32503, timeout = 10000 if resume == 3 else None)
+								choice = interface.Dialog.option(title = 32344, message = label, labelConfirm = 32501, labelDeny = 32503, timeout = 10000 if resume >= 3 else None)
 								if choice: seconds = 0
 
 					if seconds > 0: self.resume(seconds, offset = True)
@@ -1436,10 +1445,8 @@ class Player(xbmc.Player):
 				self._showStreams()
 
 				if self.binge:
-					if self.bingePlay:
-						self._bingePlay()
-					elif self.bingeDialogNone or self.bingeDialogFull:
-						self._bingeShow()
+					if self.bingePlay: self._bingePlay()
+					elif self.bingeDialogNone or self.bingeDialogFull: self._bingeShow()
 
 	def onPlayBackStarted(self):
 		tools.Logger.log('Playback Started')

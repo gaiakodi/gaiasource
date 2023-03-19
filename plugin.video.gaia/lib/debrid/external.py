@@ -151,7 +151,7 @@ class External(object):
 
 	@classmethod
 	def services(self):
-		return Cache.instance().cacheLong(self._services)
+		return Cache.instance().cacheExtended(self._services)
 
 	@classmethod
 	def _services(self):

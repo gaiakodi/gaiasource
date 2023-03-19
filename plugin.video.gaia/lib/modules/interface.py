@@ -1425,15 +1425,6 @@ class Format(object):
 		label = tools.Regex.remove(data = label, expression = '(\[\/.*?\])')
 		return label
 
-class Changelog(object):
-
-	@classmethod
-	def show(self):
-		path = tools.File.joinPath(tools.System.path(), 'changelog.txt')
-		file = open(path)
-		text = file.read()
-		file.close()
-		Dialog.text(title = 33503, message = text)
 
 class Core(object):
 
@@ -2080,7 +2071,7 @@ class Dialog(object):
 	# hidden: Hides alphabetic input.
 	# default: Default set input.
 	@classmethod
-	def input(self, type = InputAlphabetic, verify = False, confirm = False, hidden = False, default = None, title = None):
+	def input(self, type = InputAlphabetic, verify = False, confirm = False, hidden = False, default = None, timeout = None, title = None):
 		default = '' if default == None else default
 		if verify:
 			option = xbmcgui.PASSWORD_VERIFY
@@ -2092,9 +2083,12 @@ class Dialog(object):
 			option = xbmcgui.ALPHANUM_HIDE_INPUT
 		else:
 			option = None
-		# NB: Although the default parameter is given in the docs, it seems that the parameter is not actually called "default". Hence, pass it in as an unmaed parameter.
-		if option == None: result = xbmcgui.Dialog().input(self.title(title), str(default), type = type)
-		else: result = xbmcgui.Dialog().input(self.title(title), str(default), type = type, option = option)
+
+		timeout = (timeout * 1000) if timeout else 0 # Milliseconds.
+
+		# NB: Although the default parameter is given in the docs, it seems that the parameter is not actually called "default". Hence, pass it in as an unnamed parameter.
+		if option is None: result = xbmcgui.Dialog().input(self.title(title), str(default), type = type, autoclose = timeout)
+		else: result = xbmcgui.Dialog().input(self.title(title), str(default), type = type, autoclose = timeout, option = option)
 
 		# When moving between day/month/year, Kodi can insert a space (eg: "1/ 1/2012").
 		if type == Dialog.InputDate and result: result = result.replace(' ', '')
@@ -3010,6 +3004,13 @@ class Directory(object):
 		# Disable descriptions for Aeon Nox (and  maybe other skins in the future).
 		self.mDescription = not Skin.isAeon()
 
+	@classmethod
+	def decorate(self, item, icon = None, iconDefault = None, iconSpecial = None):
+		# For Gaia Eminence.
+		item.setProperty('GaiaIconLarge', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualityLarge, default = iconDefault, special = iconSpecial))
+		item.setProperty('GaiaIconSmall', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualitySmall, default = iconDefault, special = iconSpecial))
+		item.setProperty('GaiaIconMini', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualityMini, default = iconDefault, special = iconSpecial))
+
 	# context = [{'label', 'action', 'parameters'}]
 	# info = (type, label-dict)
 	# Optional 'command' parameter to specify a custom command instead of construction one from action and parameters.
@@ -3034,17 +3035,13 @@ class Directory(object):
 
 		iconIcon, iconThumb, iconPoster, iconBanner = Icon.pathAll(icon = icon, default = iconDefault, special = iconSpecial)
 		item.setArt({'icon': iconIcon, 'thumb': iconThumb, 'poster': iconPoster, 'banner': iconBanner})
+		self.decorate(item = item, icon = icon, iconDefault = iconDefault, iconSpecial = iconSpecial)
 
 		if not fanart is False:
 			if fanart is True:
 				from lib.modules.theme import Theme
 				fanart = Theme.fanart()
 			item.setProperty('Fanart_Image', fanart)
-
-		# For Gaia Eminence.
-		item.setProperty('GaiaIconLarge', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualityLarge, default = iconDefault, special = iconSpecial))
-		item.setProperty('GaiaIconSmall', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualitySmall, default = iconDefault, special = iconSpecial))
-		item.setProperty('GaiaIconMini', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualityMini, default = iconDefault, special = iconSpecial))
 
 		infoType = 'video'
 		infoLabels = {}
