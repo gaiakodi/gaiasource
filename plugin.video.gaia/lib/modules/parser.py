@@ -67,7 +67,7 @@ class Parser(BeautifulSoup):
 		try: data = data.decode('utf-8') # Important, otherwise some &nbsp; end up being \xa0.
 		except: pass
 		try:
-			data = data.replace('&nbsp;', ' ').replace(unichr(160), ' ').replace('\\xa0', ' ').replace('<br>', ' ').replace('<br/>', ' ').replace('<br />', ' ')
+			data = data.replace('&nbsp;', ' ').replace(chr(160), ' ').replace('\\xa0', ' ').replace('<br>', ' ').replace('<br/>', ' ').replace('<br />', ' ')
 			if full:
 				# https://beautiful-soup-4.readthedocs.io/en/latest/#output-formatters
 				# BeautifulSoup does not replace &amp; &lt; &gt;, because this can invalidate the HTML during processing.

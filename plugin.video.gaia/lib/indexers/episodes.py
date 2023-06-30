@@ -297,6 +297,9 @@ class Episodes(object):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
 			for item in items: item['next'] = next
 
+		for item in items:
+			if 'nextFixed' in item: item['next'] = item['nextFixed']
+
 		return items
 
 	##############################################################################
@@ -731,7 +734,7 @@ class Episodes(object):
 				tvshowtitle = item['show']['title']
 				if not tvshowtitle: continue
 				tvshowtitle = Networker.htmlDecode(tvshowtitle)
-				tvshowtitle = Regex.remove(data = tvshowtitle, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
+				tvshowtitle = Regex.remove(data = tvshowtitle, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$', all = True)
 
 				title = item['episode']['title']
 				title = Networker.htmlDecode(title)
@@ -875,7 +878,7 @@ class Episodes(object):
 					title = item['show']['title']
 					if not title: continue
 					title = Networker.htmlDecode(title)
-					title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
+					title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$', all = True)
 
 					try:
 						year = item['show']['year']
@@ -1286,10 +1289,10 @@ class Episodes(object):
 			else: timeStart = timeLimit
 
 		if timeStart or timeEnd or offset:
-			supplementary = self.mMetatools.settingsShowInterleaveSupplementary()
-			unofficial = self.mMetatools.settingsShowInterleaveUnofficial()
-			duration = self.mMetatools.settingsShowInterleaveDuration()
-			if Tools.isArray(duration): duration = duration[1 if reduce else 0]
+			submenu = bool(reduce) # Make sure it is boolean and not None.
+			unofficial = self.mMetatools.settingsShowInterleaveUnofficial(submenu = submenu)
+			extra = self.mMetatools.settingsShowInterleaveExtra(submenu = submenu)
+			duration = self.mMetatools.settingsShowInterleaveDuration(submenu = submenu)
 
 			average = None
 			if pack:
@@ -1304,7 +1307,17 @@ class Episodes(object):
 					elif item['season'] == 0 and item['episode'] < episode: continue
 
 				if item['season'] == 0:
-					if supplementary and (not 'story' in item or not item['story']): continue
+					if not extra is None:
+						specialStory = None
+						specialExtra = None
+						if 'special' in item:
+							special = item['special']
+							if special:
+								if 'story' in special: specialStory = special['story']
+								if 'extra' in special: specialExtra = special['extra']
+						if extra is True and not specialStory: continue
+						elif extra is False and not specialStory and specialExtra: continue
+
 					if unofficial and (not 'episode' in item['id'] or not 'tvdb' in item['id']['episode'] or not item['id']['episode']['tvdb']): continue
 					if duration and average and (not 'duration' in item or not item['duration'] or item['duration'] < average): continue
 
@@ -1314,7 +1327,6 @@ class Episodes(object):
 					if not time:
 						try: time = item['premiered']
 						except: pass
-
 					if time:
 						time = Time.integer(time)
 						if (timeStart is None or time >= timeStart) and (timeEnd is None or time <= timeEnd):
@@ -1463,6 +1475,8 @@ class Episodes(object):
 					threadsBackground = []
 
 					items = metacache.select(type = MetaCache.TypeEpisode, items = items)
+					if items: self.metadataLegacy(items = items)
+
 					threadsSingle = len(items) == 1
 
 					if quick is None:
@@ -1593,7 +1607,7 @@ class Episodes(object):
 				for item in result:
 					# Add an 'empty' command to force itemNext() in MetaTools to stop scanning previous episodes.
 					if (not seasonLast is None and item['season'] >= seasonLast) and (not episodeLast is None and item['episode'] >= episodeLast): command = None
-					else: command = self.mMetatools.command(metadata = item, media = Media.TypeShow if episode is None else Media.TypeEpisode, submenu = True, reduce = reduce, increment = True)
+					else: command = self.mMetatools.command(metadata = item, media = Media.TypeShow if episode is None else Media.TypeEpisode, submenu = True, reduce = reduce, increment = True, next = True)
 					item['next'] = command
 
 				if self.mInterleave: result = self.interleave(items = result, reduce = reduce, season = season, episode = episode)
@@ -1876,6 +1890,9 @@ class Episodes(object):
 			seasons = Tools.listUnique(seasons)
 			seasons = Seasons().metadata(items = seasons, threaded = threaded) if seasons else None
 
+			castShow = {}
+			castSeason = {}
+
 			if seasons:
 				for item in items:
 					try:
@@ -1883,6 +1900,10 @@ class Episodes(object):
 						except: idImdb = None
 						try: idTvdb = item['tvdb']
 						except: idTvdb = None
+						try: idTmdb = item['tmdb']
+						except: idTmdb = None
+						try: idTrakt = item['trakt']
+						except: idTrakt = None
 						tvshowtitle = item['tvshowtitle'] if 'tvshowtitle' in item else item['title']
 						number = item['season']
 
@@ -1908,8 +1929,63 @@ class Episodes(object):
 											MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(seasonCurrent[MetaImage.Attribute]), data = episode, category = MetaImage.MediaSeason) # Add season images.
 											if MetaImage.MediaShow in seasonCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(seasonCurrent[MetaImage.Attribute][MetaImage.MediaShow]), data = episode, category = MetaImage.MediaShow) # Add show images.
 
+										# Some episodes only have a few cast members.
+										# Either no one has added the cast to the APIs, or it only lists the guest stars for that episode.
+										# In such a case, add the season/show cast as well.
+										# Only do this for <= 3. Some shows might just have few cast per episode (eg: 5-6).
+										try:
+											if not 'cast' in episode or not episode['cast'] or len(episode['cast']) <= 3:
+												id = '%s_%s' % (str(idImdb), str(idTvdb))
+
+												if not id in castSeason:
+													try: castSeason[id] = season['cast']
+													except: castSeason[id] = None
+												if (not castSeason[id] or len(castSeason[id]) <= 3) and not id in castShow:
+													show = Shows().metadata(idImdb = idImdb, idTvdb = idTvdb, idTmdb = idTmdb, idTrakt = idTrakt)
+													if show:
+														try: castShow[id] = show['cast']
+														except: castShow[id] = None
+													else:
+														castShow[id] = None
+
+												try: cast = episode['cast']
+												except: cast = None
+												if not cast: cast = []
+												if len(cast) <= 3 and castSeason[id]: cast = Tools.listUnique(cast + castSeason[id], attribute = 'name')
+												if len(cast) <= 3 and castShow[id]: cast = Tools.listUnique(cast + castShow[id], attribute = 'name')
+												episode['cast'] = cast
+										except: Logger.error()
 									break
 					except: Logger.error()
+		except: Logger.error()
+
+	def metadataLegacy(self, items):
+		# In the old legacy structure, 'story' and 'special' were their own attributes.
+		# In the new structure, this is a dictionary:
+		#	'special' : {'type' : [], 'story' : True/False, 'extra' : True/False}
+		# Adjust the special structure for old metadata here.
+		try:
+			for item in items:
+				if 'episodes' in item:
+					for episode in item['episodes']:
+						if ('special' in episode and not Tools.isDictionary(episode['special'])) or ('story' in episode):
+							type = None
+							if 'special' in episode:
+								type = episode['special']
+								del episode['special']
+
+							story = None
+							if 'story' in episode:
+								story = episode['story']
+								del episode['story']
+
+							extra = MetaData.specialExtraLegacy(special = type, title = episode['title'] if 'title' in episode else None, exclude = episode['tvshowtitle'] if 'tvshowtitle' in episode else None)
+
+							episode['special'] = {
+								'type' : type,
+								'story' : story,
+								'extra' : extra,
+							}
 		except: Logger.error()
 
 	def metadataRandom(self, items, exclude = None, limit = 10, delay = None):
@@ -2530,10 +2606,12 @@ class Episodes(object):
 											if not writer: writer = seasonWriter
 											if writer: resultEpisode['writer'] = writer
 
-											special = episode.special()
-											if special: resultEpisode['special'] = special
-											story = episode.specialStory()
-											if not story is None: resultEpisode['story'] = story
+											if resultEpisode['season'] == 0 or resultEpisode['episode'] == 0:
+												resultEpisode['special'] = {
+													'type' : episode.special(),
+													'story' : episode.specialStory(),
+													'extra' : episode.specialExtra(),
+												}
 
 											image = {
 												MetaImage.TypePoster : episode.imageKodiPoster(language = MetaData.LanguageSpecific, selection = MetaData.SelectionList, fallback = MetaData.FallbackPrimary, sort = MetaData.SortSettings),

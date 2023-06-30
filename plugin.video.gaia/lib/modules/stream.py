@@ -202,6 +202,7 @@ class Stream(Serializer):
 	ParameterSourceHoster				= 'sourceHoster'
 
 	ParameterAccessType					= 'accessType'
+	ParameterAccessOffline				= 'accessOffline'
 	ParameterAccessDirect				= 'accessDirect'
 	ParameterAccessMember				= 'accessMember'
 	ParameterAccessOpen					= 'accessOpen'
@@ -213,10 +214,11 @@ class Stream(Serializer):
 	# EXACT
 	##############################################################################
 
-	ExactYes	= True	# The value is an exact value.
-	ExactNo		= False	# The value is an inexact/estimated/generated value.
-	ExactRaw	= 'raw'	# The raw, unprocessssed value.
-	ExactAuto	= None	# Try the exact value, and if it does not exist, use the inexact value.
+	ExactYes	= True		# The value is an exact value.
+	ExactNo		= False		# The value is an inexact/estimated/generated value.
+	ExactRaw	= 'raw'		# The raw, unprocessssed value.
+	ExactTime	= 'time'	# The time the value was added.
+	ExactAuto	= None		# Try the exact value, and if it does not exist, use the inexact value.
 
 	##############################################################################
 	# VALIDATE
@@ -381,7 +383,7 @@ class Stream(Serializer):
 	NumberPack				= -1	# Season/episode number used to indicate an entire pack.
 	NumberSpecial			= 0		# Episode number used to indicate special episodes.
 
-	ExpressionNumberRange	= '{symbol_start}(?:(%s){separator}?[\-\/]{separator}?(%s))(?!{separator}+\d{separator}){symbol_end}'
+	ExpressionNumberRange	= '{symbol_start}(?:(%s){separator}?[\-\–\/]{separator}?(%s))(?!{separator}+\d{separator}){symbol_end}'
 	ExpressionNumberList	= '{symbol_start}(?:(%s){separator}+)(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}*)?{symbol_end}'
 
 	##############################################################################
@@ -394,12 +396,12 @@ class Stream(Serializer):
 
 	ExpressionGroups			= 100 # The maximum number of named groups allowed in Python's re module.
 
-	ExpressionSymbol			= u'[\s\-\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
-	ExpressionSymbolAlternative	= u'[\s\-\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]' # Without ! and ?.
+	ExpressionSymbol			= u'[\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
+	ExpressionSymbolAlternative	= u'[\s\-\–\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]' # Without ! and ?.
 	ExpressionSymbolStart		= u'(?:^|' + ExpressionSymbol + '+)'
 	ExpressionSymbolEnd			= u'(?:$|' + ExpressionSymbol + '+)'
-	ExpressionSeparator			= u'[\s\-\_\+\.\,\\\/\|\:\&]'
-	ExpressionSeparatorExtra	= u'[\s\-\_\+\.\,\\\/\|\:\&\(\[\{]'
+	ExpressionSeparator			= u'[\s\-\–\_\+\.\,\\\/\|\:\&]'
+	ExpressionSeparatorExtra	= u'[\s\-\–\_\+\.\,\\\/\|\:\&\(\[\{]'
 	ExpressionBrackets			= u'[\(\[\{\)\]\}]'
 	ExpressionBracketsStart		= u'[\(\[\{]'
 	ExpressionBracketsEnd		= u'[\)\]\}]'
@@ -497,7 +499,7 @@ class Stream(Serializer):
 		'language' : (
 			('english', {
 				'season'		: u'(?:s(?:e|easons?|eries?)?)',
-				'episode'		: u'(?:e(?:p|pisodes?)?|(?<!\d{3})p(?:art(?!\d+(?:[\s\.\,\-\_]rar|$)))?)',
+				'episode'		: u'(?:e(?:p|pisodes?)?|(?<!\d{3})p(?:art(?!\d+(?:[\s\.\,\-\–\_]rar|$)))?)',
 				'full'			: u'(?:(?:all\s*(?:of\s*)?(?:the\s*)?|full|total)?(?:seasons?|series?|episodes?|parts?|batch(?:es)?))',
 				'pack'			: u'(?:(?:all\s*(?:of\s*)?(?:the\s*)?|full|total)?(?:seasons|series|episodes|parts|batches))',
 				'range'			: u'(?:to|till|until)',
@@ -506,7 +508,7 @@ class Stream(Serializer):
 			}),
 			('french', {
 				'season'		: u'(?:s(?:a|aisons?)?|box)',
-				'episode'		: u'(?:(?:e|é|e\?)(?:p|pisode)?|(?<!\d{3})p(?:art(?!\d+(?:[\s\.\,\-\_]rar|$))|artie)?)',
+				'episode'		: u'(?:(?:e|é|e\?)(?:p|pisode)?|(?<!\d{3})p(?:art(?!\d+(?:[\s\.\,\-\–\_]rar|$))|artie)?)',
 				'full'			: u'(?:(?:toutes\s*(?:les\s*)?)?(?:saisons?|box|(?:e|é|e\?)pisodes?|part(?:ie)?s?))',
 				'pack'			: u'(?:(?:toutes\s*(?:les\s*)?)?(?:saisons|box|(?:e|é|e\?)pisodes|part(?:ie)?s))',
 				'range'			: u'(?:a|à|a\?|pour|de|vers|en|avant(?:\s*de)?|jusqu\'?(?:a|à|a\?)?)',
@@ -672,10 +674,10 @@ class Stream(Serializer):
 		u'\d+[h:]\d+[m:](?:\d+[s])?', # Duration
 	)
 
-	ExpressionUsenetNumber		= u'[\[\(\{](?:(?!\d\-\d|' + ExpressionYear + u'[\-\/\\\]' + ExpressionYear + u')\d+[\_\-\.\/\\\]\d+|\d{{2,3}}|\d{{5,}})[\]\)\}]' # Ecludes year, year ranges, and collection number ranges.
+	ExpressionUsenetNumber		= u'[\[\(\{](?:(?!\d\-\–\d|' + ExpressionYear + u'[\-\–\/\\\]' + ExpressionYear + u')\d+[\_\-\–\.\/\\\]\d+|\d{{2,3}}|\d{{5,}})[\]\)\}]' # Ecludes year, year ranges, and collection number ranges.
 	ExpressionUsenetSize		= u'\d+(?:[\.\,]\d+)?\s*(?:bytes?|[kmgt]b(?!ps))' # Exclude kbps.
-	ExpressionUsenetSeparator	= u'[\.\-\_\s]'
-	ExpressionUsenetSeparator2	= u'[\-\_\s]'
+	ExpressionUsenetSeparator	= u'[\.\-\–\_\s]'
+	ExpressionUsenetSeparator2	= u'[\-\–\_\s]'
 	ExpressionUsenetQuotes		= u'"(.+?)"'
 	ExpressionUsenetYenc		= ExpressionUsenetSeparator + u'yenc(?:$|' + ExpressionUsenetSeparator + u')'
 	ExpressionUsenetNfo			= u'\.nfo'
@@ -718,7 +720,7 @@ class Stream(Serializer):
 		'keyword' : {},
 		'special' : ['soundtrack', 'trailer', 'sample', 'fan', 'game', 'porn'], # Allow certain keywords for specials (eg: S08 Extras).
 		'expression' : [ # Use array, ssince these ccan be edited.
-			(ProhibitionSound,		u'{precede}(ost|music|albums?|scores?|sound{separator}*tracks?|themes?{separator}*(?:music|songs?|tacks?)|theme{separator}*songs?)'), # Do not include "mp3", since this removes valid links (eg: Kim.Possible.Intégrale.VF.PDTV.XviD.MP3-splanck-BaLLanTeAm).
+			(ProhibitionSound,		u'{precede}(ost|music|albums?|scores?|(?:un)?sound{separator}*tracks?|themes?{separator}*(?:music|songs?|tacks?)|theme{separator}*songs?)'), # Do not include "mp3", since this removes valid links (eg: Kim.Possible.Intégrale.VF.PDTV.XviD.MP3-splanck-BaLLanTeAm).
 			(ProhibitionTrailer,	u'{precede}(trailers?|teasers?)'),
 			(ProhibitionExtra,		u'{precede}(e?xtras?|bloopers?|deleted{separator}*scenes?|featurett?es?|animatics?)'),
 			(ProhibitionSpoiler,	u'{precede}(spoilers?|funny|funniest|(?:best|great(?:est)?){separator}*moments?|easter{separator}*eggs?)'),
@@ -729,7 +731,7 @@ class Stream(Serializer):
 			(ProhibitionFan,		u'{precede}(fan{separator}*(?:made|content|film|movie))'),
 			(ProhibitionGame,		u'(game(?:{separator}*play)?|(?:the{separator}*)?(?:video|pc|console|xbox|ps\d|playstation|nintendo|nds|ios|android|windows)?game|walkthrough)'), # Do not include "RPG", since it is also a release group.
 			(ProhibitionBook,		u'((?:(?:e|audio){separator}?)?books?|e{separator}?pub|m4b|h(?:oe?|ö)r(?:spiele?|buch)|l(?:y|ju)dbok|kindle|(?:read{separator}by|reader){separator}[a-z]{{2,}}{separator}[a-z]{{2,}}|pdf|azw3|(?<=\.)(?:djvu|mobi)(?=$))'),
-			(ProhibitionPorn,		u'(porn|sex(?:y|ual|art)?|xxx|fuck(?:ing|ed)?|hentai|lesbian|gay|anal|gangbang|orgy|creampie|cum|facial|oral|milf|pussy|vigina|cunt|penis|tits?|boobs?|bdsm|threesome|squirt(?:ing)?|masturbat(?:e|ing)?|blowjob|fetish|ebony|hardcore|brazzers|nubiles)'),
+			(ProhibitionPorn,		u'(p[o\*]rn|s[e\*]x(?:y|ual|art)?|xxx|fuck(?:ing|ed)?|f[x\*]+(?:ing|c?k(?:ed)?)|hentai|lesbian|gay|anal|gangbang|orgy|creampie|cum|facial|oral|milf|nudes?|pussy|vigina|cunt|penis|tits?|boobs?|bdsm|threesome|squirt(?:ing)?|masturbat(?:e|ing)?|blowjob|fetish|ebony|hardcore|brazzers|nubiles)'),
 		],
 	}
 
@@ -756,7 +758,7 @@ class Stream(Serializer):
 		ProhibitionFan		: { LabelShort : 'FAN',	LabelMedium : 'FAN',		LabelLong : 'Fanmade' },
 		ProhibitionGame		: { LabelShort : 'GAM',	LabelMedium : 'GAME',		LabelLong : 'Game' },
 		ProhibitionBook		: { LabelShort : 'BOK',	LabelMedium : 'BOOK',		LabelLong : 'Book' },
-		ProhibitionPorn		: { LabelShort : 'PRN',	LabelMedium : 'PORN',		LabelLong : 'Pornographie' },
+		ProhibitionPorn		: { LabelShort : 'PRN',	LabelMedium : 'PORN',		LabelLong : 'Pornography' },
 	}
 
 	##############################################################################
@@ -1031,6 +1033,7 @@ class Stream(Serializer):
 
 	AccessTypeDebrid	= 'debrid'
 	AccessTypeCache		= 'cache'
+	AccessTypeOffline	= 'offline'
 	AccessTypeDirect	= 'direct'
 	AccessTypeMember	= 'member'
 	AccessTypeOpen		= 'open'
@@ -1051,6 +1054,7 @@ class Stream(Serializer):
 
 		AccessTypeDebrid	: { LabelShort : 'DB',	LabelMedium : 'DEB',	LabelLong : 'Debrid' },
 		AccessTypeCache		: { LabelShort : 'CH',	LabelMedium : 'CHD',	LabelLong : 'Cached' },
+		AccessTypeOffline	: { LabelShort : 'OF',	LabelMedium : 'OFF',	LabelLong : 'Offline' },
 		AccessTypeDirect	: { LabelShort : 'DI',	LabelMedium : 'DIR',	LabelLong : 'Direct' },
 		AccessTypeMember	: { LabelShort : 'ME',	LabelMedium : 'MEM',	LabelLong : 'Member' },
 		AccessTypeOpen		: { LabelShort : 'OP',	LabelMedium : 'OPE',	LabelLong : 'Open' },
@@ -1063,6 +1067,7 @@ class Stream(Serializer):
 		AccessTypeDirect	: { OrderInterface : 3,		OrderSorting : 2 },
 		AccessTypeMember	: { OrderInterface : 4,		OrderSorting : 4 },
 		AccessTypeOpen		: { OrderInterface : 5,		OrderSorting : 5 },
+		AccessTypeOffline	: { OrderInterface : 6,		OrderSorting : 6 },
 		AccessTypeOrion		: { OrderInterface : None,	OrderSorting : None },
 	}
 
@@ -1114,6 +1119,8 @@ class Stream(Serializer):
 	##############################################################################
 	# ACCESS CACHE
 	##############################################################################
+
+	AccessCacheExpired		= 'expired'
 
 	# Only used for filtering.
 	OrderAccessCache = {
@@ -1942,6 +1949,7 @@ class Stream(Serializer):
 	VideoRangeHdrVpx2020	= 'hdrvpx2020'	# High Dynamic Range Dolby Vision Plus X (VisionPlus HDR-X) ITU Radiocommunication Sector Recommendation 2020 (BT.2020) - https://tekno3d.com
 
 	VideoRangeNone			= None
+	VideoRangeDolby			= {VideoRangeHdrDv : True, VideoRangeHdrDvi : True}
 
 	ExpressionVideoRange	= {
 		'keyword' : {
@@ -2055,18 +2063,18 @@ class Stream(Serializer):
 		VideoRangeSdr1886	: { OrderInterface : 18,	OrderSorting : 18 },
 		VideoRangeSdrSrgb	: { OrderInterface : 21,	OrderSorting : 21 },
 		VideoRangeHdr		: { OrderInterface : 1,		OrderSorting : 17 },
-		VideoRangeHdr10		: { OrderInterface : 2,		OrderSorting : 2 },
-		VideoRangeHdr10p	: { OrderInterface : 3,		OrderSorting : 1 },
-		VideoRangeHdr2020	: { OrderInterface : 6,		OrderSorting : 5 },
-		VideoRangeHdr2100	: { OrderInterface : 5,		OrderSorting : 4 },
-		VideoRangeHdr2390	: { OrderInterface : 4,		OrderSorting : 3 },
-		VideoRangeHdrDcip3	: { OrderInterface : 7,		OrderSorting : 6 },
-		VideoRangeHdrD		: { OrderInterface : 11,	OrderSorting : 11 },
-		VideoRangeHdrPq		: { OrderInterface : 8,		OrderSorting : 10 },
-		VideoRangeHdrSl		: { OrderInterface : 10,	OrderSorting : 9 },
+		VideoRangeHdr10		: { OrderInterface : 4,		OrderSorting : 4 },
+		VideoRangeHdr10p	: { OrderInterface : 5,		OrderSorting : 3 },
+		VideoRangeHdr2020	: { OrderInterface : 8,		OrderSorting : 7 },
+		VideoRangeHdr2100	: { OrderInterface : 7,		OrderSorting : 6 },
+		VideoRangeHdr2390	: { OrderInterface : 6,		OrderSorting : 5 },
+		VideoRangeHdrDcip3	: { OrderInterface : 9,		OrderSorting : 8 },
+		VideoRangeHdrD		: { OrderInterface : 13,	OrderSorting : 11 },
+		VideoRangeHdrPq		: { OrderInterface : 10,	OrderSorting : 10 },
+		VideoRangeHdrSl		: { OrderInterface : 12,	OrderSorting : 9 },
 		VideoRangeHdrHlg	: { OrderInterface : 9,		OrderSorting : 12 },
-		VideoRangeHdrDv		: { OrderInterface : 12,	OrderSorting : 8 },
-		VideoRangeHdrDvi	: { OrderInterface : 13,	OrderSorting : 7 },
+		VideoRangeHdrDv		: { OrderInterface : 2,		OrderSorting : 2 },
+		VideoRangeHdrDvi	: { OrderInterface : 3,		OrderSorting : 1 },
 		VideoRangeHdrRx		: { OrderInterface : 14,	OrderSorting : 13 },
 		VideoRangeHdrVp		: { OrderInterface : 15,	OrderSorting : 16 },
 		VideoRangeHdrVp2020	: { OrderInterface : 16,	OrderSorting : 15 },
@@ -2259,7 +2267,7 @@ class Stream(Serializer):
 	#	VOS = Original audio (not dubbed) + subtitles (don't have to be Spanish, but probably are Spanish, but can also be French)
 	#	VOSE = Original audio (not dubbed) + Spanish subtitles
 
-	ExpressionAudio				= u'(?:(?<!discovery[\s\-\_\+\.])(?<!history[\s\-\_\+\.])ch(?:annels?)?|audios?|sound|surround|spoken|gesproken?|original)' # Original for: "Dub + Original Eng + Sub Rus, Eng"
+	ExpressionAudio				= u'(?:(?<!discovery[\s\-\–\_\+\.])(?<!history[\s\-\–\_\+\.])ch(?:annels?)?|audios?|sound|surround|spoken|gesproken?|original)' # Original for: "Dub + Original Eng + Sub Rus, Eng"
 	ExpressionAudioDual			= u'{symbol_start}(dual(?:{separator}*audio)?|multi(?:ple)?{separator}*(?:audio|lang(?:uages?)?)){symbol_end}'
 	ExpressionAudioEnglish		= [u'engelsk?', 'engl']
 	ExpressionAudioFrench		= [u'vfstfr', u'vfstf', u'vfst', u'vf', u'vof', u'vofr', u'vff', u'vfq', u'vfb', u'truefrench', u'fq', u'pfd', u'vfi']
@@ -14062,6 +14070,7 @@ class Stream(Serializer):
 				'type' : {
 					Stream.AccessTypeDebrid : None,
 					Stream.AccessTypeCache : None,
+					Stream.AccessTypeOffline : None,
 					Stream.AccessTypeDirect : None,
 					Stream.AccessTypeMember : None,
 					Stream.AccessTypeOpen : None,
@@ -14083,42 +14092,52 @@ class Stream(Serializer):
 					Stream.AccessDebridPremiumize : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridOffcloud : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridRealdebrid : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridDebridlink : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridAlldebrid : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridLinksnappy : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridMegadebrid : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridRapidpremium : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridSimplydebrid : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 					Stream.AccessDebridSmoozed : {
 						'exact' : None,
 						'inexact' : None,
+						'time' : None,
 					},
 				},
 			},
@@ -14444,6 +14463,7 @@ class Stream(Serializer):
 		sourceHoster = None,
 
 		accessType = None,
+		accessOffline = None,
 		accessDirect = None,
 		accessMember = None,
 		accessOpen = None,
@@ -14644,6 +14664,11 @@ class Stream(Serializer):
 			except: metaTitleCollection = None
 			try: metaTitleEpisode = metaTitle[Stream.TitleEpisode]
 			except: metaTitleEpisode = None
+
+			metaTitleCombined = []
+			if metaTitleMain: metaTitleCombined.append(metaTitleMain)
+			if metaTitleCollection: metaTitleCombined.extend(metaTitleCollection)
+			if metaTitleEpisode: metaTitleCombined.extend(metaTitleEpisode)
 
 			# Always set these values, even if the validation fails, since they are used in other functions (eg: titleValid).
 			if not metaMedia is None: self.metaMediaSet(metaMedia)
@@ -14876,6 +14901,7 @@ class Stream(Serializer):
 					if not sourceHoster is None: self.sourceHosterSet(sourceHoster)
 
 					if not accessType is None: self.accessTypeSet(accessType)
+					if accessOffline: self.accessTypeSet(type = Stream.AccessTypeOffline)
 					if accessDirect: self.accessTypeSet(type = Stream.AccessTypeDirect)
 					if accessMember: self.accessTypeSet(type = Stream.AccessTypeMember)
 					if accessOpen: self.accessTypeSet(type = Stream.AccessTypeOpen)
@@ -15289,11 +15315,13 @@ class Stream(Serializer):
 				releaseEdition = self.releaseEditionSet(releaseEdition)
 			if releaseEdition is None and extract:
 				processed['release']['edition'] = True
-				# Use metaTitleMain instead of metaTitleAll.
+				# Use metaTitleCombined instead of metaTitleAll.
 				# Otherwise aliases containing edition keywords will make the edition go undetected.
 				# Eg: Avatar - Collector's Extended Edition
 				# Eg: Avatar: An IMAX 3D Experience
-				releaseEdition = self.releaseEditionExtract(data = fileNameExtra, exclude = metaTitleMain, encode = False, clean = False)
+				# Still include the episode title.
+				# Eg: Abbott.Elementary.S02E19.Festival.1080p.AMZN.WEBRip.DDP5.1.x264-NTb[rartv]
+				releaseEdition = self.releaseEditionExtract(data = fileNameExtra, exclude = metaTitleCombined, encode = False, clean = False)
 
 			# Release Network
 			if not releaseNetwork is None:
@@ -15413,6 +15441,7 @@ class Stream(Serializer):
 			if not sourceHoster is None: self.sourceHosterSet(sourceHoster)
 
 			if not accessType is None: self.accessTypeSet(accessType)
+			if accessOffline: self.accessTypeSet(type = Stream.AccessTypeOffline)
 			if accessDirect: self.accessTypeSet(type = Stream.AccessTypeDirect)
 			if accessMember: self.accessTypeSet(type = Stream.AccessTypeMember)
 			if accessOpen: self.accessTypeSet(type = Stream.AccessTypeOpen)
@@ -15542,38 +15571,58 @@ class Stream(Serializer):
 	@classmethod
 	def exact(self, exact, data, sub = None):
 		if exact is Stream.ExactAuto:
-			value = data['exact']
-			if value is None or (sub and value[sub] is None): value = data['inexact']
-		elif exact is Stream.ExactNo: value = data['inexact']
-		elif exact == Stream.ExactRaw: value = data['raw']
+			try: value = data['exact']
+			except: value = None
+			if value is None or (sub and value[sub] is None):
+				try: value = data['inexact']
+				except: value = None
+		elif exact is Stream.ExactNo:
+			try: value = data['inexact']
+			except: value = None
+		elif exact == Stream.ExactRaw:
+			try: value = data['raw']
+			except: value = None
+		elif exact == Stream.ExactTime:
+			try: value = data['time']
+			except: value = None
 		else: value = data['exact']
 		return value
 
 	@classmethod
 	def exactSet(self, exact, data, value):
-		data['raw' if exact == Stream.ExactRaw else 'inexact' if exact is Stream.ExactNo else 'exact'] = value
+		data['raw' if exact == Stream.ExactRaw else 'time' if exact == Stream.ExactTime else 'inexact' if exact is Stream.ExactNo else 'exact'] = value
 
 	@classmethod
 	def exactUpdate(self, exact, data, value):
-		data['raw' if exact == Stream.ExactRaw else 'inexact' if exact is Stream.ExactNo else 'exact'].update(value)
+		data['raw' if exact == Stream.ExactRaw else 'time' if exact == Stream.ExactTime else 'inexact' if exact is Stream.ExactNo else 'exact'].update(value)
 
 	@classmethod
 	def exactSub(self, exact, data, sub):
 		if exact is Stream.ExactAuto:
-			value = data['exact'][sub]
-			if value is None: value = data['inexact'][sub]
-		elif exact is Stream.ExactNo: value = data['inexact'][sub]
-		elif exact == Stream.ExactRaw: value = data['raw'][sub]
+			try: value = data['exact'][sub]
+			except: value = None
+			if value is None:
+				try: value = data['inexact'][sub]
+				except: value = None
+		elif exact is Stream.ExactNo:
+			try: value = data['inexact'][sub]
+			except: value = None
+		elif exact == Stream.ExactRaw:
+			try: value = data['raw'][sub]
+			except: value = None
+		elif exact == Stream.ExactTime:
+			try: value = data['time'][sub]
+			except: value = None
 		else: value = data['exact'][sub]
 		return value
 
 	@classmethod
 	def exactSubSet(self, exact, data, value, sub):
-		data['raw' if exact == Stream.ExactRaw else 'inexact' if exact is Stream.ExactNo else 'exact'][sub] = value
+		data['raw' if exact == Stream.ExactRaw else 'time' if exact == Stream.ExactTime else 'inexact' if exact is Stream.ExactNo else 'exact'][sub] = value
 
 	@classmethod
 	def exactSubUpdate(self, exact, data, value, sub):
-		data['raw' if exact == Stream.ExactRaw else 'inexact' if exact is Stream.ExactNo else 'exact'][sub].update(value)
+		data['raw' if exact == Stream.ExactRaw else 'time' if exact == Stream.ExactTime else 'inexact' if exact is Stream.ExactNo else 'exact'][sub].update(value)
 
 	##############################################################################
 	# DEBUG
@@ -15959,6 +16008,7 @@ class Stream(Serializer):
 			items.append({
 				'title' : 35739,
 				'items' : [
+					{'title' : 36356, 'value' : yes if self.accessTypeOffline() else no},
 					{'title' : 35740, 'value' : yes if self.accessTypeDirect() else no},
 					{'title' : 35707, 'value' : yes if self.accessTypeMember() else no},
 					{'title' : 35741, 'value' : yes if self.accessTypeOpen(account = True) else no},
@@ -16714,7 +16764,7 @@ class Stream(Serializer):
 			if parameters[type]:
 				if type == Stream.IdExtraLink:
 					if not(hash or local or universal or collection or item):
-						link = tools.Regex.remove(data = link, expression = '^((?:ht|f)tps?:\/\/)')
+						link = tools.Regex.remove(data = link, expression = '^((?:ht|f)tps?:\/\/)', all = True)
 						try: parts.append(tools.Converter.unicode(link))
 						except: pass
 				else:
@@ -17857,22 +17907,57 @@ class Stream(Serializer):
 							if obfuscated:
 								ratio = tools.Matcher.levenshtein(title, name)
 								if length < 5: ratio *= 1.1 # Short titles, eg: "Dune" vs "Du00ne".
-							else: ratio = tools.Matcher.jaccard(title, name)
-							if ratio >= thresholdBase: return True
+							else:
+								ratio = tools.Matcher.jaccard(title, name)
+
+							if ratio >= thresholdBase:
+								allow = obfuscated or ratio >= (thresholdBase * 1.3)
+								if not allow:
+									if length < 20:
+										# For titles that are very similar, but the words are in a differrent order.
+										# Eg [valid]: "george orwell 1984" vs "1984 george orwell"
+										# Do not make too lenient, for close matches.
+										# Eg [invalid]: "love and death" vs "love death and robots"
+										titleSorted = sorted(title.split(' '))
+										nameSorted = sorted(name.split(' '))
+										common = set(titleSorted) & set(nameSorted)
+										titleBasic = ' '.join(list(common) + list(set(titleSorted) - set(common)))
+										nameBasic = ' '.join(list(common) + list(set(nameSorted) - set(common)))
+										allow = tools.Matcher.levenshtein(titleBasic, nameBasic) > (thresholdBase * 1.1)
+									else:
+										# Long titles.
+										# Eg: "xma xtreme martial arts" vs "xma xtreme martial arts docdvdrip"
+										allow = True
+
+								if allow: return True
 
 							# Combine the original title with a foreign title (eg: Il cacciatore e la regina di ghiaccio - The Huntsman Winter's War).
 							# Important to "titles[0].startswith(title)" instead of "titles[0] == title".
 							# This ensures that collection titles are not used, eg: do not concatenate "The Lord of the Rings" and "The Lord of the Rings: The Two Towers".
-							elif not titles[0].startswith(title) and not titles[0].endswith(title) and ratio >= thresholdShortDouble:
-								titleConcatenated = __titleConcatenate(titles[0], title)
-								if titleConcatenated:
-									ratio = tools.Matcher.levenshtein(titleConcatenated, name)
-									if ratio >= thresholdLongConcatenated: return True
+							# Also check the Levenshtein distance for unicode titles.
+							# Eg (Łowca i Królowa Lodu): owca-i-krolowa-lodu-the-huntsman-winter039s-war-2016-extended-pldub-720p-bluray-x264-dts-kit-mkv-mp4
+							elif not titles[0].startswith(title) and not titles[0].endswith(title):
+								allow = ratio >= thresholdShortDouble
 
-								titleConcatenated = __titleConcatenate(title, titles[0])
-								if titleConcatenated:
-									ratio = tools.Matcher.levenshtein(titleConcatenated, name)
-									if ratio >= thresholdLongConcatenated: return True
+								# Eg: owca-i-krolowa-lodu-the-huntsman-winter039s-war-2016-extended-pldub-720p-bluray-x264-dts-kit-mkv-mp4
+								if not allow:
+									nameStripped = name.replace(titles[0], '')
+									try: nameStripped = nameStripped.replace(titles[1], '')
+									except: pass
+									if nameStripped and ' ' in nameStripped: allow = tools.Matcher.levenshtein(title, nameStripped) >= (thresholdShortDouble * 1.3)
+
+								if allow:
+									titleConcatenated = __titleConcatenate(titles[0], title)
+									if titleConcatenated:
+										ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+										# Eg (Love & Death): Love.Death.and.Robots.S01.1080p.WEBRip.x265-RARBM
+										if ratio >= thresholdLongConcatenated:
+											return True
+
+									titleConcatenated = __titleConcatenate(title, titles[0])
+									if titleConcatenated:
+										ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+										if ratio >= thresholdLongConcatenated: return True
 			except:
 				tools.Logger.error()
 			return False
@@ -17994,24 +18079,40 @@ class Stream(Serializer):
 				if collection and number:
 					# Extract the pack number range.
 					# Eg: Taken.1-3.2008-2014.HDRip.Isl.Texti
-					# If the number is not in range, return Fale, else remove the range from the name
-					ranged = self._cacheId('_titleValid_range', re.compile, '%s(?:(\d)(?:%s?-%s?(\d))+|(?:(\d)%s){2,})(?!%s+\d%s)%s' % (Stream.ExpressionSymbolStart, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSymbolEnd), flags = Stream.ExpressionFlags).search(data)
+					# If the number is not in range, return False, else remove the range from the name
+					ranged = self._cacheId('_titleValid_range1', re.compile, '%s(?:(\d)(?:%s?-%s?(\d))+|(?:(\d)%s){2,})(?!%s+\d%s)%s' % (Stream.ExpressionSymbolStart, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSeparator, Stream.ExpressionSymbolEnd), flags = Stream.ExpressionFlags).search(data)
 					if ranged:
 						ranged = [int(i) for i in ranged.groups() if i]
 						if len(ranged) == 2: ranged = list(range(ranged[0], ranged[1] + 1))
 						if int(number) in ranged:
+							nameCollection = nameStripped
+							replaceCollection = 'GAIACOLLECTIONUMBER'
 							for i in ranged:
-								nameStripped = nameStripped.replace(' ' + str(i), '')
+								# Make sure to only replace standalone digits.
+								# Otherwise the "1"  might be rermoved from a year "1995".
+								#nameStripped = nameStripped.replace(' ' + str(i), '')
+								nameStripped = self._cacheId('_titleValid_range2_' + str(i), re.compile, '\s(%s)(?:$|\s)' % i, flags = Stream.ExpressionFlags).sub(' ', nameStripped)
+								nameCollection = self._cacheId('_titleValid_range3_' + str(i), re.compile, '\s(%s)(?:$|\s)' % i, flags = Stream.ExpressionFlags).sub(' %s ' % replaceCollection, nameCollection)
+
+							# Allow collections to be matched, evenn if no collection title was passsed.
+							# Eg (Toy Story 3): Toy.Story.1-3.1995-2010.1080p.BluRay.x264.DTS.AC3.3Audio-HDWinG
+							nameCollection = self._cacheId('_titleValid_range4', re.compile, '((?:\s%s)+)' % replaceCollection, flags = Stream.ExpressionFlags).sub(' %s' % number, nameCollection)
+							if nameCollection and not nameCollection == nameStripped:
+								indexYear = self.yearIndex(nameCollection)
+								if indexYear: nameCollection = nameCollection[:indexYear]
+								if nameCollection and not nameCollection == nameStripped:
+									found = __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameCollection, number = number, adjust = adjust)
+									if found: return found
 						else:
-							# If the title iss not the collection title, ignore the range.
+							# If the title is not the collection title, ignore the range.
 							# Eg: Star.Wars.The.Last.Jedi.2017.1-3.HDCAM.Rip.x264.AC3-DTOne-Exclusive.mkv
-							if titlesCleaned[0] == titlesCollection or not __titleMatch(threshold = threshold, titles = titlesCleaned[0], name = nameStripped, number = number, adjust = adjust):
-								return False
+							if titlesCleaned[0] == titlesCollection or not __titleMatch(threshold = threshold, titles = titlesCleaned[0], name = nameStripped, number = number, adjust = adjust): return False
 
 					# Number that is part of the collection keywords.
 					# Eg: Terminator 5-Film Collection (1984-2015) ~ TombDoc
 					match = self._cacheId('_titleValid_single', re.compile, '%s(\d)%s(?:films?|movies?)%s' % (Stream.ExpressionSymbolStart, Stream.ExpressionSeparator, Stream.ExpressionSymbolEnd), flags = Stream.ExpressionFlags).search(data)
 					if match: nameStripped = nameStripped.replace(' ' + str(match.group(1)), '')
+
 				elif not collection:
 					if not nameStripped.replace(' ', '').isdigit():
 						if number:
@@ -18025,23 +18126,24 @@ class Stream(Serializer):
 								# Eg: Toy Story 2010 TS XviD PrisM
 								# This should be valid for "Toy Story 3". The number was not added to the file name, but the year is correct.
 								elif not number == '1' and year and not str(year) in nameOriginal:
-									if self._expressionMatch(id = '_titleValid_number3_' + number, data = titlesCleaned[0], expression = '(?:^|\s)(0*' + number + ')(?:$|\s)', internal = True) and __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameStripped, number = number, adjust = adjust):
-										if not self._expressionMatch(id = '_titleValid_number4', data = nameStripped, expression = 'i+'): return False
+									if self._expressionMatch(id = '_titleValid_number3_' + number, data = titlesCleaned[0], expression = '(?:^|\s)(0*' + number + ')(?:$|\s)', internal = True) and not self._expressionMatch(id = '_titleValid_number4_' + number, data = nameStripped, expression = '[^1-9](0*' + number + ')(?:$|\s)', internal = True):
+										if __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameStripped, number = number, adjust = adjust):
+											if not self._expressionMatch(id = '_titleValid_number5', data = nameStripped, expression = 'i+'): return False
 
-							nameStripped = self._expressionReplace(id = '_titleValid_number5_' + number, data = nameStripped, expression = '(0+' + number + ')', replace = number, internal = True) # Replace number with leading 0s (03 -> 3).
-							nameStripped = self._expressionReplace(id = '_titleValid_number6_' + number, data = nameStripped, expression = '(?!' + number + ')(\d+)', exclude = titlesCleaned, internal = True) # Remove other standalone numbers, except the detected number. Important to exclude, otherwise titles with numbers are removed (eg: "1917").
+							nameStripped = self._expressionReplace(id = '_titleValid_number6_' + number, data = nameStripped, expression = '(0+' + number + ')', replace = number, internal = True) # Replace number with leading 0s (03 -> 3).
+							nameStripped = self._expressionReplace(id = '_titleValid_number7_' + number, data = nameStripped, expression = '(?!' + number + ')(\d+)', exclude = titlesCleaned, internal = True) # Remove other standalone numbers, except the detected number. Important to exclude, otherwise titles with numbers are removed (eg: "1917").
 
 							expressionPack = self._filePackExpression(collection = True)
-							if ((guidance and guidance['file']['pack'])) or (not guidance and self._expressionMatch(id = '_titleValid_number7', data = data, expression = expressionPack)):
+							if ((guidance and guidance['file']['pack'])) or (not guidance and self._expressionMatch(id = '_titleValid_number8', data = data, expression = expressionPack)):
 								try:
 									if not nameStripped.endswith(number):
-										nameStripped = self._expressionReplace(id = '_titleValid_number8', data = nameStripped, expression = expressionPack) + ' ' + number
+										nameStripped = self._expressionReplace(id = '_titleValid_number9', data = nameStripped, expression = expressionPack) + ' ' + number
 								except: pass
 							elif titles['suffix']:
 								# Strip everything after the number, but only if the title ends in the number (suffix) and does not appear somewhere in between.
 								# Use the last occurance of the number:
 								#	Eg: 3.Toy.Story.3.2010.BD1080P.X264.AC3.Mandarin&English.CHS-ENG.Adans
-								nameStripped = self._expressionReplace(id = '_titleValid_number9_' + number, data = nameStripped, expression = '.*%s+%s(%s+.*$)' % (Stream.ExpressionSymbol, number, Stream.ExpressionSymbol), internal = True)
+								nameStripped = self._expressionReplace(id = '_titleValid_number10_' + number, data = nameStripped, expression = '.*%s+%s(%s+.*$)' % (Stream.ExpressionSymbol, number, Stream.ExpressionSymbol), internal = True)
 
 						elif number is None:
 							# If the title does not contain a number while the file name contains a number.
@@ -18060,7 +18162,7 @@ class Stream(Serializer):
 									found = False
 									expression = Stream.ExpressionSymbolStart + '(' + extract + ')' + Stream.ExpressionSymbolEnd
 									for title in titlesCleaned:
-										if self._expressionMatch(id = '_titleValid_number10_' + extract, data = title, expression = expression, internal = True):
+										if self._expressionMatch(id = '_titleValid_number11_' + extract, data = title, expression = expression, internal = True):
 											found = True
 											break
 									if not found: temp.append(extract)
@@ -18072,10 +18174,10 @@ class Stream(Serializer):
 									# Do not return False for movie packs.
 									#	Eg: Harry Potter [8] eight Movies Collection [Dual Audio-ENG-HINDI]2
 									if not(len(temp) == 1 and temp[0] == '1'):
-										if ((guidance and not guidance['file']['pack'])) or (not guidance and not self._expressionMatch(id = '_titleValid_number11', data = data, expression = self._filePackExpression(collection = True))):
+										if ((guidance and not guidance['file']['pack'])) or (not guidance and not self._expressionMatch(id = '_titleValid_number12', data = data, expression = self._filePackExpression(collection = True))):
 											return False
 
-									nameStripped = self._expressionReplace(id = '_titleValid_number12_' + str(temp), data = nameStripped, expression = ['(' + i + ')' for i in temp], internal = True)
+									nameStripped = self._expressionReplace(id = '_titleValid_number13_' + str(temp), data = nameStripped, expression = ['(' + i + ')' for i in temp], internal = True)
 
 			# Remove duplicate show numbers.
 			# Only do this for shows, not movies.
@@ -18104,6 +18206,14 @@ class Stream(Serializer):
 			# Try for the first time.
 			found = __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameStripped, number = number, adjust = adjust, obfuscated = obfuscated)
 			if found: return found
+
+			# Try rermoving the network name.
+			# Eg [Discovery]: HDTV.Discovery.Xtreme.Martial.Arts.x264.720p.AC3.mkv
+			if guidance and guidance['release']['network']:
+				nameNetwork = self.releaseNetworkClean(nameStripped, guidance = guidance['release']['network'], split = Stream.SplitLeft, exclude = titlesCleaned)
+				if not nameNetwork == nameStripped:
+					found = __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameNetwork, number = number, adjust = adjust, obfuscated = obfuscated)
+					if found: return found
 
 			# In case the year appears twice, try removing up to the first one (second year was removed the first time).
 			indexYear = self.yearIndex(nameStripped)
@@ -18284,6 +18394,12 @@ class Stream(Serializer):
 						return True
 
 			if reevaluate:
+				# If there is a single slash, try everything before it.
+				# Eg: den-of-thieves/openload
+				if '/' in data:
+					dataNew = data.split('/')[0]
+					if dataNew and not dataNew == data:
+						if self.__titleValid(data = dataNew, media = media, title = title, titleCollection = titleCollection, year = year, none = none, quick = quick, guidance = guidance, adjust = adjust, reevaluate = False): return True
 
 				# For names with quote parts in them, especially for usenet file names.
 				# Eg: DVDRips "Avatar.2009.DVDRip.x264-DJ.par2" yEnc (1/1)]
@@ -18497,7 +18613,7 @@ class Stream(Serializer):
 				number = None
 				suffix = False
 				for i in title:
-					extract = self._expressionExtractMultiple(data = i, expression = '(?:^|\s|\:|\-)(\d)(?:$|[^a-z\d])', internal = True)
+					extract = self._expressionExtractMultiple(data = i, expression = '(?:^|\s|\:|\-\–)(\d)(?:$|[^a-z\d])', internal = True)
 					if extract:
 						if len(extract) == 1:
 							number = extract[0] # Do not use the number if multiple ones are detected (eg: 9-1-1).
@@ -18814,7 +18930,7 @@ class Stream(Serializer):
 				# Year range (eg: "2005-2010").
 				if not result:
 					try:
-						value = self._cacheId('numberCollectionExtract8', re.compile, lambda : self._expressionFormatCommon('{symbol_start}(?<!%s[\-\s\_\.\,])(?<!%s[\-\s\_\.\,][\-\s\_\.\,])(%s){separator}*(?:[\-\s\_\.]|to){separator}*(%s)(?![\-\s\_\.\,]+%s){symbol_end}' % tuple([Stream.ExpressionYear] * 5)), flags = Stream.ExpressionFlags).search(data)
+						value = self._cacheId('numberCollectionExtract8', re.compile, lambda : self._expressionFormatCommon('{symbol_start}(?<!%s[\-\–\s\_\.\,])(?<!%s[\-\–\s\_\.\,][\-\–\s\_\.\,])(%s){separator}*(?:[\-\–\s\_\.]|to){separator}*(%s)(?![\-\–\s\_\.\,]+%s){symbol_end}' % tuple([Stream.ExpressionYear] * 5)), flags = Stream.ExpressionFlags).search(data)
 						if value:
 							value = [int(i) for i in value.groups() if i]
 							if pack: result = _numberCollectionYears(value = value, pack = pack, ranged = True)
@@ -19583,7 +19699,7 @@ class Stream(Serializer):
 
 				# Ignore the Spanish word "el", sinec it will be detected as Greek.
 				# Eg: Avatar (2009) V.Extendida 4K UHDRip 2160p El_Ranero
-				data = self._cacheId('languageExtract4', re.compile, lambda : self._expressionFormatCommon('{separator}(el)(\'|[\-\_\.][a-z]+$)'), flags = Stream.ExpressionFlags).sub(r' \2', data)
+				data = self._cacheId('languageExtract4', re.compile, lambda : self._expressionFormatCommon('{separator}(el)(\'|[\-\–\_\.][a-z]+$)'), flags = Stream.ExpressionFlags).sub(r' \2', data)
 
 				# Remove upload names.
 				# Eg: AVATAR 2009 DVD9 Rip By Antony_GR
@@ -19630,10 +19746,31 @@ class Stream(Serializer):
 				if exclude:
 					if encode: exclude = self.cleanEncode(exclude)
 					if not tools.Tools.isArray(exclude): exclude = [exclude]
-					titleReplace = 'GAIATITLEREPLACEGAIAs'
+
+					titleReplace = 'GAIATITLEREPLACEGAIA'
+					titleAny = 'GAIATITLEANYGAIA'
+
+					# Replace "and" and "&".
+					# Eg: Movie is called "Peter Pan & Wendy", but file names mostly use "Peter Pan and Wendy".
+					temp = []
+					for ex in exclude:
+						if ' and ' in ex.lower():
+							temp.append(ex.replace(' and ', ' & ').replace(' And ', ' & ').replace(' AND ', ' & '))
+						if ' & ' in ex:
+							# The & is often replaced with another character (eg: i, a, E, etc).
+							# Match any single character.
+							temp.append(ex.replace(' & ', ' and '))
+							temp.append(ex.replace(' & ', ' %s ' % titleAny))
+					if temp:
+						# NB: Do not extend the passed-by-reference list here.
+						# Otherwise scrape can get stuck in _releaseTypeExclude(), since the list has changed.
+						#exclude.extend(temp)
+						exclude = tools.Tools.listUnique(exclude + temp)
+
 					for ex in exclude:
 						ex = self._cacheId('languageExtract14', re.compile, Stream.ExpressionSymbol + '+', flags = Stream.ExpressionFlags).sub(titleReplace, ex)
 						ex = ex.replace(titleReplace, '\s*.?\s*') # Allow additional spaces instead of a single character. Eg: "Operation Fortune: Ruse de guerre"
+						ex = ex.replace(titleAny, '.') # Allow additional spaces instead of a single character. Eg: "Operation Fortune: Ruse de guerre"
 						data = self._cacheIdInternal('languageExtract15' + ex, re.compile, '(%s)' % ex, flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace separators.
@@ -19977,7 +20114,6 @@ class Stream(Serializer):
 						temp.append(labels[i])
 				labels = temp
 
-
 				if len(labels) > 0 and labels[0]['type'] == 'other': del labels[0]
 				if len(labels) > 0 and labels[-1]['type'] == 'other': del labels[-1]
 
@@ -20155,7 +20291,7 @@ class Stream(Serializer):
 							for i in range(subtitleLast, audioLast):
 								if labels[i]['language']: labels[i]['type'] = 'subtitle'
 						else:
-							for i in range(subtitleLast, audioLast):
+							for i in range(subtitleLast + 1, audioLast):
 								if labels[i]['language']: labels[i]['type'] = 'audio'
 				elif audioHas:
 					labels = [{'type' : 'audio', 'language' : i['language']} for i in labels if i['language']]
@@ -20383,10 +20519,10 @@ class Stream(Serializer):
 			if common: languages = [i for i in languages if i[tools.Language.Frequency] >= tools.Language.FrequencyOccasional]
 			else: languages = [i for i in languages if i[tools.Language.Frequency] == tools.Language.FrequencyUncommon]
 			languages = sorted(languages, key = lambda i : i[tools.Language.Frequency], reverse = True)
-			exp = self._cacheId('_languageKeyword1', re.compile, '[^a-z\-\s]+', flags = Stream.ExpressionFlags)
+			exp = self._cacheId('_languageKeyword1', re.compile, '[^a-z\-\–\s]+', flags = Stream.ExpressionFlags)
 
 			endingName = '(?:$|' + Stream.ExpressionBracketsEnd + '$|' + Stream.ExpressionFileSeparator + ')'
-			endingExtension = '(?:' + endingName + '|[\.\-\_\s](?:mkv|webm|avi|mp(?:4|e?g)|mov|iso|rar|zip)' + endingName + ')'
+			endingExtension = '(?:' + endingName + '|[\.\-\–\_\s](?:mkv|webm|avi|mp(?:4|e?g)|mov|iso|rar|zip)' + endingName + ')'
 			endingExclude = '(?!' + endingExtension + ')'
 			endingGroup = '(?!' + Stream.ExpressionSeparator + '[a-z0-9]+' + endingExtension + ')' + endingExclude
 
@@ -20436,6 +20572,7 @@ class Stream(Serializer):
 				country = language[tools.Language.Country]
 				codePrimary = language[tools.Language.Code][tools.Language.CodePrimary]
 				if codePrimary == 'en':
+					keyword.append('ing') # Spanish abbreviation.
 					keyword.extend([i + 'e' for i in Stream.ExpressionSubtitleFrench])
 					keyword.extend([i + 'a' for i in Stream.ExpressionSubtitleFrench])
 					keyword.extend([i + 'an' for i in Stream.ExpressionSubtitleFrench])
@@ -20496,7 +20633,8 @@ class Stream(Serializer):
 				elif codePrimary == 'bn':
 					# "BEN" is also a release group.
 					# Eg: Nineteen.Eighty-Four.1984.BDRip-AVC.BEN-BEN.mkv
-					keyword = __languageKeywordReplace(keyword = keyword, value = 'ben', replacement = 'ben' + endingGroup)
+					# Eg: Maggie.Moores.2023.2160p.Multi.Sub.DD5.1.HDR.x265.MP4-BEN.THE.MEN
+					keyword = __languageKeywordReplace(keyword = keyword, value = 'ben', replacement = 'ben(?!.the.men)' + endingGroup)
 				elif codePrimary == 'te':
 					# Eg: The.Terminator.1984.BDRip-AVC.Sem-te.mkv
 					keyword = __languageKeywordReplace(keyword = keyword, value = 'te', replacement = '(?<!sem.)te')
@@ -21753,6 +21891,16 @@ class Stream(Serializer):
 		value = self.videoRangeExtract(data = value, clean = False) if extract else value
 		self.mData['video']['range'] = value
 		return value
+
+	'''
+		FUNCTION:
+			Determines if the video range is Dolby Vision.
+		RETURNS:
+			If the video range is Dolby Vision (boolean).
+	'''
+	def videoRangeDolby(self):
+		range = self.videoRange()
+		return range and range in Stream.VideoRangeDolby
 
 	'''
 		FUNCTION:
@@ -24715,7 +24863,7 @@ class Stream(Serializer):
 
 	'''
 		FUNCTION:
-			Extracts the  source time from a string.
+			Extracts the source time from a string.
 			The time can be a timestamp, time string, duration string, or the number of days.
 		PARAMETERS:
 			data (string): The string.
@@ -25349,6 +25497,7 @@ class Stream(Serializer):
 			value = self.mData['access']['type']
 			if derive:
 				value = tools.Tools.copy(value)
+				if value[Stream.AccessTypeOffline] is None and self.accessTypeOffline(): value[Stream.AccessTypeOffline] = True
 				if value[Stream.AccessTypeDirect] is None and self.accessTypeDirect(derive = derive): value[Stream.AccessTypeDirect] = True
 				if value[Stream.AccessTypeCache] is None and self.accessTypeCache(derive = derive, account = account): value[Stream.AccessTypeCache] = True
 				if value[Stream.AccessTypeDebrid] is None and self.accessTypeDebrid(derive = derive, account = account): value[Stream.AccessTypeDebrid] = True
@@ -25377,6 +25526,11 @@ class Stream(Serializer):
 			if self.accessTypeOpen(derive = derive, account = account):
 				value = self._label(value = Stream.AccessTypeOpen, values = Stream.LabelAccessType, format = format, label = label)
 				value = self._decorate(value = value, format = format, bold = True, uppercase = True, color = self.accessTypeOpenColor)
+				result.append(value)
+				if exclusive: return result[0]
+			if self.accessTypeOffline():
+				value = self._label(value = Stream.AccessTypeOffline, values = Stream.LabelAccessType, format = format, label = label)
+				value = self._decorate(value = value, format = format, bold = True, uppercase = True, color = self.accessTypeOfflineColor)
 				result.append(value)
 				if exclusive: return result[0]
 			result = [i for i in result if i]
@@ -25507,6 +25661,24 @@ class Stream(Serializer):
 
 	'''
 		FUNCTION:
+			Checks if the access type is offline (stream comes from an offline provider).
+		RETURNS:
+			If it is an offline access type (boolean).
+	'''
+	def accessTypeOffline(self):
+		return self.mData['access']['type'][Stream.AccessTypeOffline]
+
+	'''
+		FUNCTION:
+			Sets the access offline type.
+		PARAMETERS:
+			value (boolean/dictionary): The access offlines type.
+	'''
+	def accessTypeOfflineSet(self, value = True):
+		self.accessTypeSet(type = Stream.AccessTypeOffline, value = value)
+
+	'''
+		FUNCTION:
 			Checks if the access type is from Orion.
 		RETURNS:
 			If it is an Orion access type (boolean).
@@ -25564,6 +25736,19 @@ class Stream(Serializer):
 		def _accessTypeOpenColor():
 			return interface.Format.colorLighter(color = interface.Format.colorSpecial(), change = 0.2)
 		return self._cacheId('accessTypeOpenColor', _accessTypeOpenColor)
+
+
+	'''
+		FUNCTION:
+			Retrieve the color for offline access.
+		RETURNS:
+			The offline color (string).
+	'''
+	@classmethod
+	def accessTypeOfflineColor(self):
+		def _accessTypeOfflineColor():
+			return interface.Format.colorLighter(color = interface.Format.colorSpecial(), change = 0.6)
+		return self._cacheId('accessTypeOfflineColor', _accessTypeOfflineColor)
 
 	##############################################################################
 	# ACCESS DEBRID
@@ -25801,6 +25986,7 @@ class Stream(Serializer):
 			If the status is None, the status was not yet looked up.
 		PARAMETERS:
 			id (None/string/boolean): The debrid service ID. If None, returns all services.
+			time (None/integer): The duration in seconds from now, or the timestamp, after which the cache status is considered to be outdated and nothing will be returned.
 			format (string): The format of the returned value.
 			label (string): The type or unit label to use.
 			exact (enumeration): Wether or not to return the latests or outdated cache status.
@@ -25809,13 +25995,24 @@ class Stream(Serializer):
 		RETURNS:
 			The access cache statuses (dictionary/string).
 	'''
-	def accessCache(self, id = None, format = FormatNone, label = LabelNone, exact = ExactAuto, account = False, default = None):
+	def accessCache(self, id = None, time = None, format = FormatNone, label = LabelNone, exact = ExactAuto, account = False, default = None):
+		if time and time < 1000000000: time = tools.Time.timestamp() - time
+
 		if id:
-			try: value = self.exact(exact = exact, data = self.mData['access']['cache'][id])
+			try:
+				if time:
+					checked = self.exact(exact = Stream.ExactTime, data = self.mData['access']['cache'][id])
+					if checked and checked < time: return default
+				value = self.exact(exact = exact, data = self.mData['access']['cache'][id])
 			except: return default
 		else:
 			temp = {}
 			for key in self.mData['access']['cache'].keys():
+				if time:
+					checked = self.exact(exact = Stream.ExactTime, data = self.mData['access']['cache'][key])
+					if checked and checked < time:
+						temp[key] = None
+						continue
 				temp[key] = self.exact(exact = exact, data = self.mData['access']['cache'][key])
 			value = temp
 
@@ -25846,41 +26043,73 @@ class Stream(Serializer):
 		PARAMETERS:
 			value (boolean/dictionary): The cached statuses of all services. If the ID is set, it is the cached status (boolean) instead.
 			id (None/string): The debrid service ID. If not set, the value is assumed to be a dicitionary containing multiple services.
+			time (None/True/integer): The time the debrid cache status was last checked. if True, use the current timestamp.
 			exact (enumeration): Wether or not the stauts is the latests or outdated.
 			force (boolean): Force the update of the value. If True, the value is updated irrespective of it being True or False. If False, the value is only updated if it is True.
 	'''
-	def accessCacheSet(self, value = True, id = None, exact = ExactYes, force = True):
+	def accessCacheSet(self, value = True, id = None, time = None, exact = ExactYes, force = True):
+		if time is True: time = tools.Time.timestamp()
 		if tools.Tools.isArray(id):
 			if force or value:
 				for i in id:
-					self.accessCacheSet(value = value, id = i, exact = exact)
+					self.accessCacheSet(value = value, id = i, time = time, exact = exact)
 		elif tools.Tools.isDictionary(value):
 			if force:
 				for k, v in value.items():
 					self.exactSet(exact = exact, data = self.mData['access']['cache'][k], value = v)
+					if time: self.exactSet(exact = Stream.ExactTime, data = self.mData['access']['cache'][k], value = time)
 			else:
 				for k, v in value.items():
-					if v: self.exactSet(exact = exact, data = self.mData['access']['cache'][k], value = v)
+					if v:
+						self.exactSet(exact = exact, data = self.mData['access']['cache'][k], value = v)
+						if time: self.exactSet(exact = Stream.ExactTime, data = self.mData['access']['cache'][k], value = time)
 		elif id:
-			if force or value: self.exactSet(exact = exact, data = self.mData['access']['cache'][id], value = value)
+			if force or value:
+				self.exactSet(exact = exact, data = self.mData['access']['cache'][id], value = value)
+				if time: self.exactSet(exact = Stream.ExactTime, data = self.mData['access']['cache'][id], value = time)
 
 	'''
 		FUNCTION:
 			Checks if the cache status has already been looked up for a debrid service.
 		PARAMETERS:
 			id (string/list): The debrid service ID.
+			time (None/integer): The duration in seconds from now, or the timestamp, after which the cache status is considered to be outdated.
 			exact (enumeration): Wether or not the stauts is the latests or outdated.
 		RETURNS:
 			If cache status has been looked up (boolean).
 	'''
-	def accessCacheHas(self, id, exact = ExactAuto):
+	def accessCacheHas(self, id, time = None, exact = ExactAuto):
+		if time and time < 1000000000: time = tools.Time.timestamp() - time
+
 		if tools.Tools.isArray(id):
 			for i in id:
+				if time:
+					checked = self.exact(exact = Stream.ExactTime, data = self.mData['access']['cache'][i])
+					if checked and checked < time: return False
 				if self.exact(exact = exact, data = self.mData['access']['cache'][i]) is None:
 					return False
 			return True
 		else:
+			if time:
+				checked = self.exact(exact = Stream.ExactTime, data = self.mData['access']['cache'][id])
+				if checked and checked < time: return False
 			return not self.exact(exact = exact, data = self.mData['access']['cache'][id]) is None
+
+	'''
+		FUNCTION:
+			Checks if the cache status has expired, that is, looked up too long ago.
+		PARAMETERS:
+			id (string/list): The debrid service ID.
+			time (integer): The duration in seconds from now, or the timestamp, after which the cache status is considered to be outdated.
+			none (boolean): Consider time values of None to be expired, that is, not time was previously set.
+		RETURNS:
+			If cache status has expired.
+	'''
+	def accessCacheExpired(self, id, time, none = True):
+		if time < 1000000000: time = tools.Time.timestamp() - time
+		checked = self.exact(exact = Stream.ExactTime, data = self.mData['access']['cache'][id])
+		if (none and checked is None) or (checked and checked < time): return True
+		return False
 
 	'''
 		FUNCTION:
@@ -27792,17 +28021,21 @@ class Stream(Serializer):
 	'''
 		FUNCTION:
 			Retrieves if the stream was retrieved from cache or was scraped.
+		PARAMETERS:
+			expired (boolean): If True, return the raw value. If False, return None if the cache expired, else the raw value.
 		RETURNS:
-			The query (string).
+			The query (boolean/string).
 	'''
-	def infoCache(self):
-		return self.mData['info']['cache']
+	def infoCache(self, expired = True):
+		value = self.mData['info']['cache']
+		if expired: return value
+		return None if value == Stream.AccessCacheExpired else value
 
 	'''
 		FUNCTION:
 			Sets if the stream was retrieved from cache or was scraped.
 		PARAMETERS:
-			value (string): The cache.
+			value (boolean/string): The cache.
 	'''
 	def infoCacheSet(self, value = True):
 		self.mData['info']['cache'] = value
@@ -27815,6 +28048,22 @@ class Stream(Serializer):
 	'''
 	def infoCacheHas(self):
 		return not self.mData['info']['cache'] is None
+
+	'''
+		FUNCTION:
+			Marks the cache status as expired.
+	'''
+	def infoCacheExpire(self):
+		self.infoCacheSet(value = Stream.AccessCacheExpired)
+
+	'''
+		FUNCTION:
+			Checks whether or not the cache has expired.
+		RETURNS:
+			If the cache has expired (boolean).
+	'''
+	def infoCacheExpired(self):
+		return self.mData['info']['cache'] == Stream.AccessCacheExpired
 
 	##############################################################################
 	# CLEAN
@@ -27865,11 +28114,19 @@ class Stream(Serializer):
 		try: data = data.rstrip('⭐')
 		except: pass
 
-		# Clean and decode HTML
-		# Eg: "Am&eacute;lie (2001) BDRip 1080p DTS multi HighCode-PHD" -> "Amélie (2001) BDRip 1080p DTS multi HighCode-PHD"
-		# Sometimes the ; is missing, remove it manually.
-		# Eg: [Extended Collector&quots Cut]
-		if html: data = network.Networker.htmlDecode(data).replace('&quot', '\'')
+		if html:
+			# Clean and decode HTML
+			# Eg: "Am&eacute;lie (2001) BDRip 1080p DTS multi HighCode-PHD" -> "Amélie (2001) BDRip 1080p DTS multi HighCode-PHD"
+			# Sometimes the ; is missing, remove it manually.
+			# Eg: [Extended Collector&quots Cut]
+			data = network.Networker.htmlDecode(data).replace('&quot', '\'')
+
+			# Incorrectly formated apostrophe HTML entity.
+			# Eg: owca-i-krolowa-lodu-the-huntsman-winter039s-war-2016-extended-pldub-720p-bluray-x264-dts-kit-mkv-mp4
+			# Eg: the huntsman: winter&#039;s war (2016) hc - 1080p hdtc - 1 85gb - shaa...
+			# Eg: the-huntsman-winter039s-war-2016-plsubbed-720p-web-dl-xvid-ac3-mx-avi-mp4
+			# the huntsman winter 039 s war 2016 720p hdcam [mic audio] zi t ctrc  » movies
+			data = self._cacheId('cleanBasic3', re.compile, u'([^\d])(?:0|&amp;|&?#)39[\s\;]?s', flags = Stream.ExpressionFlags).sub(r'\1\'s', data)
 
 		# Clean usenet keywords.
 		if not usenet is False: data = self.cleanUsenet(data = data, force = usenet is True)
@@ -27879,10 +28136,10 @@ class Stream(Serializer):
 		# Eg: (Star Wars. The last Jedi.2017- French)
 		# Ignore if only internal brackets:
 		# Eg: [LostYears] Demon Slayer: Kimetsu no Yaiba - S01 (BD 1080p Hi10P AAC) [Dual Audio]
-		match = self._cacheId('cleanBasic3', re.compile, '^\(([^\(\)]*?)\)$', flags = Stream.ExpressionFlags).search(data)
+		match = self._cacheId('cleanBasic4', re.compile, '^\(([^\(\)]*?)\)$', flags = Stream.ExpressionFlags).search(data)
 		if not match:
-			match = self._cacheId('cleanBasic4', re.compile, '^\[([^\[\]]*?)\]$', flags = Stream.ExpressionFlags).search(data)
-			if not match: match = self._cacheId('cleanBasic5', re.compile, '^\{([^\{\}]*?)\}$', flags = Stream.ExpressionFlags).search(data)
+			match = self._cacheId('cleanBasic5', re.compile, '^\[([^\[\]]*?)\]$', flags = Stream.ExpressionFlags).search(data)
+			if not match: match = self._cacheId('cleanBasic6', re.compile, '^\{([^\{\}]*?)\}$', flags = Stream.ExpressionFlags).search(data)
 		if match:
 			try:
 				match = match.group(1)
@@ -27890,7 +28147,7 @@ class Stream(Serializer):
 			except: pass
 
 		# Duplicate spaces.
-		data = self._cacheId('cleanBasic6', re.compile, '\s+', flags = Stream.ExpressionFlags).sub(' ', data).strip()
+		data = self._cacheId('cleanBasic7', re.compile, '\s+', flags = Stream.ExpressionFlags).sub(' ', data).strip()
 
 		# Custom process function.
 		if process: data = process(data)
@@ -28084,7 +28341,7 @@ class Stream(Serializer):
 	def cleanOther(self, data, ignore = None, file = True, titles = None):
 		# Remove special trailing word.
 		# Eg: toy-story-3/movdivx
-		match = self._cacheId('cleanOther0', re.compile, '(?:[a-z\d]+[\-\_\.])+(?:[a-z\d])?(\/[a-z\d]+$)', flags = Stream.ExpressionFlags).search(data)
+		match = self._cacheId('cleanOther0', re.compile, '(?:[a-z\d]+[\-\–\_\.])+(?:[a-z\d])?(\/[a-z\d]+$)', flags = Stream.ExpressionFlags).search(data)
 		if match: data = data.replace(match.groups(1)[0], '')
 
 		# Apostrophes gone wrong.
@@ -28100,20 +28357,20 @@ class Stream(Serializer):
 		if file:
 			# Remove leading domain names.
 			prefix = '^' + Stream.ExpressionSymbol + '*(?:access|acesse)?' + Stream.ExpressionSymbol + '*'
-			data = self._cacheId('cleanOther3', re.compile, prefix + '([\[\(\{]\s*([a-z0-9\-]+\.){1,2}[a-z0-9]{2,5}\s*[\]\)\}]' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) # (ilmiotorrent.netsons.org).Avatar.2009.iTALiAN.MD.DVDRip.XViD-TH
-			data = self._cacheId('cleanOther4', re.compile, prefix + '(w{2}[w\d]\.([a-z0-9\-]+\.){1,2}[a-z0-9]{2,5}' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) #  www.Scenetime.com - Star Trek Picard S01E02 iNTERNAL 1080p HEVC x265-MeGusta
-			data = self._cacheId('cleanOther5', re.compile, prefix + '(w{2}[w\d]\s([a-z0-9\-]+\s)[a-z0-9]{2,3}' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) # www Scenetime com - Star Trek Picard S01E02 iNTERNAL 1080p HEVC x265-MeGusta
-			data = self._cacheId('cleanOther6', re.compile, prefix + '(([a-z0-9]+(?:\-[a-z0-9]+)?\.)(com|net|org|xyz|eu|us|cc|co|to|co\.uk|nl|de|pl|pe|es|jp)' + Stream.ExpressionSymbol + '*@?)(?:@|' + Stream.ExpressionSymbol + ')', flags = Stream.ExpressionFlags).sub('', data) # (only do this for common TLD): TamilRockers.com - The Huntsman Winters War (2016) English 720p HDRip x264 ESubs 850MB
-			data = self._cacheId('cleanOther7', re.compile, prefix + '([a-z0-9]+[\.\-\_\s](com|net|org|co\.uk)' + Stream.ExpressionSymbol + '*@?)(?:@|' + Stream.ExpressionSymbol + ')', flags = Stream.ExpressionFlags).sub('', data) # (only do this for common TLD): TamilRockers.com - The Huntsman Winters War (2016) English 720p HDRip x264 ESubs 850MB
+			data = self._cacheId('cleanOther3', re.compile, prefix + '([\[\(\{]\s*([a-z0-9\-\–]+\.){1,2}[a-z0-9]{2,5}\s*[\]\)\}]' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) # (ilmiotorrent.netsons.org).Avatar.2009.iTALiAN.MD.DVDRip.XViD-TH
+			data = self._cacheId('cleanOther4', re.compile, prefix + '(w{2}[w\d]\.([a-z0-9\-\–]+\.){1,2}[a-z0-9]{2,5}' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) #  www.Scenetime.com - Star Trek Picard S01E02 iNTERNAL 1080p HEVC x265-MeGusta
+			data = self._cacheId('cleanOther5', re.compile, prefix + '(w{2}[w\d]\s([a-z0-9\-\–]+\s)[a-z0-9]{2,3}' + Stream.ExpressionSymbol + '*@?)', flags = Stream.ExpressionFlags).sub('', data) # www Scenetime com - Star Trek Picard S01E02 iNTERNAL 1080p HEVC x265-MeGusta
+			data = self._cacheId('cleanOther6', re.compile, prefix + '(([a-z0-9]+(?:\-\–[a-z0-9]+)?\.)(com|net|org|xyz|eu|us|cc|co|to|co\.uk|nl|de|pl|pe|es|jp)' + Stream.ExpressionSymbol + '*@?)(?:@|' + Stream.ExpressionSymbol + ')', flags = Stream.ExpressionFlags).sub('', data) # (only do this for common TLD): TamilRockers.com - The Huntsman Winters War (2016) English 720p HDRip x264 ESubs 850MB
+			data = self._cacheId('cleanOther7', re.compile, prefix + '([a-z0-9]+[\.\-\–\_\s](com|net|org|co\.uk)' + Stream.ExpressionSymbol + '*@?)(?:@|' + Stream.ExpressionSymbol + ')', flags = Stream.ExpressionFlags).sub('', data) # (only do this for common TLD): TamilRockers.com - The Huntsman Winters War (2016) English 720p HDRip x264 ESubs 850MB
 
 			# Remove long leading numbers and timestamps.
 			# Eg: 152369_-1623594926-Dune--BDremux
-			data = self._cacheId('cleanOther8', re.compile, '^(\d{6,}[\s\-\_\.\,]+)+', flags = Stream.ExpressionFlags).sub('', data)
+			data = self._cacheId('cleanOther8', re.compile, '^(\d{6,}[\s\-\–\_\.\,]+)+', flags = Stream.ExpressionFlags).sub('', data)
 
 			# Remove any uploader names. Do after domains, since uploader can also appear in the domain (eg: tamilrockers.lu).
 			# Eg: TwoDDL_Wonder.2017.1080.WEB-DL.DD5.1.H264-CMRG.mkv
 			# Eg: [SSR Movies - Avatar (2009) EXTENDED Dual Audio [Hindi 2 0 - English 2 0] 720p BluRay x264 1.4GB ESubs]
-			data = self._cacheId('cleanOther9', re.compile, '(twoddl|(?:twoddl[\-\_\.]*)?veto|tamilrockers|hdfree4u|downloadhub|extramovies(?:\.click)?|ssr[\-\_\.\s]*movies?)', flags = Stream.ExpressionFlags).sub('', data)
+			data = self._cacheId('cleanOther9', re.compile, '(twoddl|(?:twoddl[\-\–\_\.]*)?veto|tamilrockers|hdfree4u|downloadhub|extramovies(?:\.click)?|ssr[\-\–\_\.\s]*movies?)', flags = Stream.ExpressionFlags).sub('', data)
 
 			# Remove leading keywords or numbers.
 			# Eg: cocain-candyman.2021.bdrip.x264.mkv
@@ -28131,7 +28388,7 @@ class Stream(Serializer):
 
 		# Remove leading bracket words.
 		# [Hakata Ramen] Star Trek Picard S01E02 CBS Web-Dl 1080p x265~GodZilla
-		data = self._cacheId('cleanOther11', re.compile, '^([\[\(\{][\s\.\-\_a-z0-9]+[\]\)\}])', flags = Stream.ExpressionFlags).sub('', data)
+		data = self._cacheId('cleanOther11', re.compile, '^([\[\(\{][\s\.\-\–\_a-z0-9]+[\]\)\}])', flags = Stream.ExpressionFlags).sub('', data)
 
 		if file:
 			# Remove weird leading bracket words, mostly used in Chinese names.
@@ -29392,6 +29649,11 @@ class Manager(object):
 	##############################################################################
 
 	@classmethod
+	def _formatTime(self, value, label = False, inverse = False):
+		if label: return '%d %s' % (value, interface.Translation.string(35028 if value == 1 else 33347))
+		else: return value
+
+	@classmethod
 	def _formatFileSize(self, value, label = False, inverse = False):
 		from lib.modules.convert import ConverterSize, ConverterSpeed
 		if label: return ConverterSize(value).stringOptimal()
@@ -29401,11 +29663,6 @@ class Manager(object):
 	@classmethod
 	def _formatSourcePeers(self, value, label = False, inverse = False):
 		if label: return '%d %s' % (value, interface.Translation.string(33190 if value == 1 else 33191))
-		else: return value
-
-	@classmethod
-	def _formatSourceTime(self, value, label = False, inverse = False):
-		if label: return '%d %s' % (value, interface.Translation.string(35028 if value == 1 else 33347))
 		else: return value
 
 	@classmethod
@@ -30349,7 +30606,7 @@ class Manager(object):
 							'filter' : {
 								'enabled'	: True,
 								'type'		: Manager.OptionRange,
-								'function'	: Manager._formatSourceTime,
+								'function'	: Manager._formatTime,
 							},
 							'sort' : {
 								'enabled'	: True,
@@ -30603,10 +30860,18 @@ class Manager(object):
 
 		return Manager.Options
 
-	def _optionOrder(self, category, attribute, order = Stream.OrderSorting, reverse = False):
+	def _optionOrder(self, category, attribute, order = Stream.OrderSorting, limit = None, reverse = False):
 		result = self._option(category, attribute, 'order')
 		result = [{'id' : key, 'order' : value[order]} for key, value in result.items() if not value[order] is None]
-		return [value['id'] for value in sorted(result, key = lambda i : i['order'], reverse = reverse)]
+		result = [value['id'] for value in sorted(result, key = lambda i : i['order'], reverse = reverse)]
+		if not limit is None:
+			if not tools.Tools.isArray(limit): limit = [limit]
+			temp = []
+			for value in result:
+				if value in limit: break
+				temp.append(value)
+			result = temp
+		return result
 
 	def _optionDefault(self, category, attribute, default = True):
 		result = None
@@ -30619,55 +30884,92 @@ class Manager(object):
 
 			if type == Manager.OptionSort:
 				result = [
+					# Firstly group by video quality. Move 4K links to the top.
 					{
 						'category'	: Manager.CategoryVideo,
 						'attribute'	: Manager.AttributeQuality,
 						'order'		: self._optionOrder(category = Manager.CategoryVideo, attribute = Manager.AttributeQuality),
 					},
+					# Within the video quality grouping, move local and premium sources to the top.
 					{
 						'category'	: Manager.CategorySource,
 						'attribute'	: Manager.AttributeType,
 						'order'		: [Stream.SourceTypeLocal, Stream.SourceTypePremium],
 					},
+					# Move cached and direct links to the top.
 					{
 						'category'	: Manager.CategoryAccess,
 						'attribute'	: Manager.AttributeType,
 						'order'		: [Stream.AccessTypeCache, Stream.AccessTypeDirect],
 					},
+					# Move better video codecs to the top.
 					{
 						'category'	: Manager.CategoryVideo,
 						'attribute'	: Manager.AttributeCodec,
 						'order'		: self._optionOrder(category = Manager.CategoryVideo, attribute = Manager.AttributeCodec),
 					},
-					{
-						'category'	: Manager.CategoryAudio,
-						'attribute'	: Manager.AttributeChannels,
-						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeChannels),
-					},
-					{
-						'category'	: Manager.CategoryAudio,
-						'attribute'	: Manager.AttributeSystem,
-						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeSystem),
-					},
+					# Move HDR links to the top.
 					{
 						'category'	: Manager.CategoryVideo,
 						'attribute'	: Manager.AttributeRange,
 						'order'		: self._optionOrder(category = Manager.CategoryVideo, attribute = Manager.AttributeRange),
 					},
+					# Move surround sound to the top.
+					{
+						'category'	: Manager.CategoryAudio,
+						'attribute'	: Manager.AttributeChannels,
+						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeChannels, limit = Stream.AudioChannels5),
+					},
+					# Move Dolby and DTS links to the top.
+					# NB: Do not do this, since it will put all Dolby content before DTS content.
+					# Rather use the audio codec to make Atmos and DTS:X links appear at the top.
+					#{
+					#	'category'	: Manager.CategoryAudio,
+					#	'attribute'	: Manager.AttributeSystem,
+					#	'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeSystem),
+					#},
+					# Move better audio codecs to the top.
+					# Only sort by Dolby and DTS, so that AAC 8CH are moved down.
+					{
+						'category'	: Manager.CategoryAudio,
+						'attribute'	: Manager.AttributeCodec,
+						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeCodec, limit = [Stream.AudioCodecAac, Stream.AudioCodecHeaac, Stream.AudioCodecLcaac]),
+					},
+					# Move more audio channels to the top.
+					{
+						'category'	: Manager.CategoryAudio,
+						'attribute'	: Manager.AttributeChannels,
+						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeChannels),
+					},
+					# Move higher video depth to the top.
 					{
 						'category'	: Manager.CategoryVideo,
 						'attribute'	: Manager.AttributeDepth,
 						'order'		: self._optionOrder(category = Manager.CategoryVideo, attribute = Manager.AttributeDepth),
 					},
+					# Move larger file sizes to the top.
+					{
+						'category'	: Manager.CategoryFile,
+						'attribute'	: Manager.AttributeSize,
+						'order'		: [Manager.SortStart, Manager.SortEnd],
+					},
+					# Move packs to the top, since they are better for binge.
+					{
+						'category'	: Manager.CategoryFile,
+						'attribute'	: Manager.AttributePack,
+						'order'		: self._optionOrder(category = Manager.CategoryFile, attribute = Manager.AttributePack),
+					},
+					# Sort remaining audio codecs.
+					{
+						'category'	: Manager.CategoryAudio,
+						'attribute'	: Manager.AttributeCodec,
+						'order'		: self._optionOrder(category = Manager.CategoryAudio, attribute = Manager.AttributeCodec),
+					},
+					# Finally, put debrid in front of member in front of open links.
 					{
 						'category'	: Manager.CategoryAccess,
 						'attribute'	: Manager.AttributeType,
 						'order'		: [Stream.AccessTypeDebrid, Stream.AccessTypeMember, Stream.AccessTypeOpen],
-					},
-					{
-						'category'	: Manager.CategoryFile,
-						'attribute'	: Manager.AttributeSize,
-						'order'		: [Manager.SortEnd, Manager.SortStart],
 					},
 				]
 			else:
@@ -31677,11 +31979,13 @@ class Manager(object):
 			try:
 				cacheExact = None
 				cacheInexact = None
+				cacheTime = None
 
 				for item in streams:
 					stream = item['stream']
 					exact = stream.accessCache(exact = Stream.ExactYes)
 					inexact = stream.accessCache(exact = Stream.ExactNo)
+					time = stream.accessCache(exact = Stream.ExactTime)
 
 					if exact:
 						if cacheExact is None:
@@ -31695,9 +31999,16 @@ class Manager(object):
 						else:
 							for k, v in cacheInexact.items():
 								if v is None: cacheInexact[k] = inexact[k]
+					if time:
+						if cacheTime is None:
+							cacheTime = tools.Tools.copy(time)
+						else:
+							for k, v in cacheTime.items():
+								if v is None: cacheTime[k] = time[k]
 
 				if cacheExact: cacheExact = {k : v for k, v in cacheExact.items() if not v is None}
 				if cacheInexact: cacheInexact = {k : v for k, v in cacheInexact.items() if not v is None}
+				if cacheTime: cacheTime = {k : v for k, v in cacheTime.items() if not v is None}
 
 				if cacheExact:
 					for item in streams:
@@ -31705,6 +32016,10 @@ class Manager(object):
 				elif cacheInexact:
 					for item in streams:
 						item['stream'].accessCacheSet(value = cacheInexact, exact = Stream.ExactNo)
+
+				if cacheTime:
+					for item in streams:
+						item['stream'].accessCacheSet(value = cacheTime, exact = Stream.ExactTime)
 			except: tools.Logger.error()
 
 		def _excludeDuplicatePopularity(streams):
@@ -31946,6 +32261,11 @@ class Settings(Manager):
 	@classmethod
 	def settingsFilter(self):
 		return self.settingsId(Manager.ModeAutomatic if tools.Settings.getBoolean(Settings.SettingAutoplayEnabled) and tools.Settings.getInteger(Settings.SettingAutoplayFilter) == 1 else Manager.ModeManual)
+
+	@classmethod
+	def settingsFilterDefault(self):
+		settings = self.settingsFilter()
+		return tools.Settings.defaultIs(settings) or tools.Settings.getDataLabel(settings) == interface.Translation.string(33564)
 
 
 class Filters(Manager):

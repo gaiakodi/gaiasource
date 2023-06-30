@@ -79,8 +79,8 @@ class ProviderWeb(ProviderBase):
 	TermAuthenticationKey			= TermAuthentications % ProviderBase.AccountTypeKey
 	TermAuthenticationOther			= TermAuthentications % ProviderBase.AccountTypeOther
 
-	TermCustom						= '{custom_%s}'			# Parameters for custom settings. The first %s is the custom setting ID.
-	TermCustomized					= '{custom_%s_%s}'		# Parameters for custom settings. The first %s is a custom label. The second %s is the custom setting ID.
+	TermCustom						= '{custom_%s}'				# Parameters for custom settings. The first %s is the custom setting ID.
+	TermCustomized					= '{custom_%s_%s}'			# Parameters for custom settings. The first %s is a custom label. The second %s is the custom setting ID.
 
 	# Query - Type
 	QueryTypeMovie					= 'movie'
@@ -470,13 +470,6 @@ class ProviderWeb(ProviderBase):
 					**kwargs
 				)
 
-			queryMovie = self.queryInitialize(type = ProviderWeb.QueryTypeMovieYear if queryYear else ProviderWeb.QueryTypeMovie, default = queryMovie, extra = queryExtraMovie)
-			queryCollection = self.queryInitialize(type = ProviderWeb.QueryTypeCollection, default = queryCollection, extra = queryExtraCollection)
-			queryShow = self.queryInitialize(type = ProviderWeb.QueryTypeShow, default = queryShow, extra = queryExtraShow)
-			querySeason = self.queryInitialize(type = ProviderWeb.QueryTypeSeason, default = querySeason, extra = queryExtraSeason)
-			queryEpisode = self.queryInitialize(type = ProviderWeb.QueryTypeEpisode, default = queryEpisode, extra = queryExtraEpisode)
-			querySpecial = self.queryInitialize(type = ProviderWeb.QueryTypeSpecial, default = querySpecial, extra = queryExtraSpecial)
-
 			if searchQuery is None: searchQuery = []
 			if not Tools.isArray(searchQuery): searchQuery = [searchQuery]
 
@@ -520,12 +513,12 @@ class ProviderWeb(ProviderBase):
 				'replacements' : replacements,
 
 				'query' : {
-					'movie' : queryMovie,
-					'collection' : queryCollection,
-					'show' : queryShow,
-					'season' : querySeason,
-					'episode' : queryEpisode,
-					'special' : querySpecial,
+					'movie' : {'data' : [], 'template' : {'custom' : queryMovie, 'extra' : queryExtraMovie, 'year' : queryYear}},
+					'collection' : {'data' : [], 'template' : {'custom' : queryCollection, 'extra' : queryExtraCollection}},
+					'show' : {'data' : [], 'template' : {'custom' : queryShow, 'extra' : queryExtraShow}},
+					'season' : {'data' : [], 'template' : {'custom' : querySeason, 'extra' : queryExtraSeason}},
+					'episode' : {'data' : [], 'template' : {'custom' : queryEpisode, 'extra' : queryExtraEpisode}},
+					'special' : {'data' : [], 'template' : {'custom' : querySpecial, 'extra' : queryExtraSpecial}},
 				},
 
 				'format' : {
@@ -1105,10 +1098,8 @@ class ProviderWeb(ProviderBase):
 	def replace(self, data, replacements, nested = False):
 		if data:
 			for key, value in replacements.items():
-				if value is None:
-					replacements[key] = ''
-				elif Tools.isBoolean(value):
-					replacements[key] = int(value)
+				if value is None: replacements[key] = ''
+				elif Tools.isBoolean(value): replacements[key] = int(value)
 
 			if Tools.isDictionary(data):
 				# Convert bool to integer. If this is ever changed, make sure to update EasyNews.
@@ -1216,39 +1207,65 @@ class ProviderWeb(ProviderBase):
 	##############################################################################
 
 	def queryMovie(self):
-		return self.mData['query']['movie']
+		return self.mData['query']['movie']['data']
 
 	def queryCollection(self):
-		return self.mData['query']['collection']
+		return self.mData['query']['collection']['data']
 
 	def queryShow(self):
-		return self.mData['query']['show']
+		return self.mData['query']['show']['data']
 
 	def querySeason(self):
-		return self.mData['query']['season']
+		return self.mData['query']['season']['data']
 
 	def queryEpisode(self):
-		return self.mData['query']['episode']
+		return self.mData['query']['episode']['data']
 
 	def querySpecial(self):
-		return self.mData['query']['special']
+		return self.mData['query']['special']['data']
 
-	def queryInitialize(self, type, default, extra = None):
+	def queryInitialize(self, language = None):
+		try:
+			if not self.mData['query']['movie']['data']:
+				self.lock() # Lock, since this function can be called multiple times for each subquery.
+				if not self.mData['query']['movie']['data']:
+					data = self.mData['query']
+					self.mData['query']['movie']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeMovieYear if data['movie']['template']['year'] else ProviderWeb.QueryTypeMovie, default = data['movie']['template']['custom'], extra = data['movie']['template']['extra'], language = language)
+					self.mData['query']['collection']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeCollection, default = data['collection']['template']['custom'], extra = data['collection']['template']['extra'], language = language)
+					self.mData['query']['show']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeShow, default = data['show']['template']['custom'], extra = data['show']['template']['extra'], language = language)
+					self.mData['query']['season']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSeason, default = data['season']['template']['custom'], extra = data['season']['template']['extra'], language = language)
+					self.mData['query']['episode']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeEpisode, default = data['episode']['template']['custom'], extra = data['episode']['template']['extra'], language = language)
+					self.mData['query']['special']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSpecial, default = data['special']['template']['custom'], extra = data['special']['template']['extra'], language = language)
+				self.unlock()
+		except: self.logError()
+
+	def _queryInitialize(self, type, default, extra = None, language = None):
 		result = []
 
-		def _add(language, mode):
-			try: result.extend(ProviderWeb.Queries[language][type][mode])
-			except:
-				try: result.extend(ProviderWeb.Queries[language][type][ProviderWeb.QueryModeFull])
-				except: pass
+		def _add(language = None, mode = None, universal = False, original = False, queries = None):
+			if queries is None:
+				try: queries = ProviderWeb.Queries[language][type][mode]
+				except:
+					try:
+						mode = ProviderWeb.QueryModeFull
+						queries = ProviderWeb.Queries[language][type][mode]
+					except: pass
+			else:
+				if not Tools.isArray(queries): queries = [queries]
+
+			if queries:
+				for query in queries:
+					result.append({'template' : query, 'language' : language, 'mode' : mode, 'universal' : universal, 'original' : original})
 
 		if default is None:
 			# Always include Universal queries.
-			_add(language = Language.UniversalCode, mode = ProviderWeb.QueryModeFull)
+			_add(language = Language.UniversalCode, mode = ProviderWeb.QueryModeFull, universal = True)
 
 			if self.settingsGlobalKeywordEnabled():
 				settingsEnglish = self.settingsGlobalKeywordEnglish()
 				settingsEnglish = ProviderWeb.QueryModeQuick if settingsEnglish == ProviderBase.KeywordQuick else ProviderWeb.QueryModeFull if settingsEnglish == ProviderBase.KeywordFull else None
+				settingsOriginal = self.settingsGlobalKeywordOriginal()
+				settingsOriginal = ProviderWeb.QueryModeQuick if settingsOriginal == ProviderBase.KeywordQuick else ProviderWeb.QueryModeFull if settingsOriginal == ProviderBase.KeywordFull else None
 				settingsNative = self.settingsGlobalKeywordNative()
 				settingsNative = ProviderWeb.QueryModeQuick if settingsNative == ProviderBase.KeywordQuick else ProviderWeb.QueryModeFull if settingsNative == ProviderBase.KeywordFull else None
 				settingsCustom = self.settingsGlobalKeywordCustom()
@@ -1257,33 +1274,41 @@ class ProviderWeb(ProviderBase):
 				# Include English queries.
 				if settingsEnglish: _add(language = Language.EnglishCode, mode = settingsEnglish)
 
+				# Include the language the title was originally released in.
+				if settingsOriginal and language:
+					_add(language = language, mode = settingsOriginal, original = True)
+
 				# Include languages specified by the provider.
 				if settingsNative:
-					for language in self.languages():
-						if not language == Language.UniversalCode and (not language == Language.EnglishCode or not settingsEnglish):
-							_add(language = language, mode = settingsNative)
+					for lang in self.languages():
+						if not lang == Language.UniversalCode and (not lang == Language.EnglishCode or not settingsEnglish):
+							_add(language = lang, mode = settingsNative)
 
 				# Include custom language specified by the user in the settings.
 				if settingsCustom:
-					language = self.settingsGlobalKeywordLanguage()
-					if not language == Language.UniversalCode and (not language == Language.EnglishCode or not settingsEnglish):
-						_add(language = language, mode = settingsCustom)
-		else:
-			if Tools.isArray(default): result.extend(default)
-			else: result.append(default)
+					lang = self.settingsGlobalKeywordLanguage()
+					if not lang == Language.UniversalCode and (not lang == Language.EnglishCode or not settingsEnglish):
+						_add(language = lang, mode = settingsCustom)
+		else: _add(queries = default)
 
-		if extra:
-			if Tools.isArray(extra): result.extend(extra)
-			else: result.append(extra)
+		if extra: _add(queries = extra)
 
-		seen = set()
-		result = [i for i in result if not(i in seen or seen.add(i))]
+		result = Tools.listUnique(result)
 		return result
 
-	def queryGenerate(self, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, exact):
+	def queryGenerate(self, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, exact):
 		queries = []
 		queryTitles = []
 		try:
+			self.queryInitialize(language = language)
+
+			try: mainProcessed = titles['processed']['main']
+			except: mainProcessed = []
+			try: originalProcessed = titles['processed']['original']
+			except: originalProcessed = []
+			try: originalSearch = titles['search']['original']
+			except: originalSearch = []
+
 			yearDefault = None
 			if years:
 				for i in ['common', 'original', 'mean']:
@@ -1291,33 +1316,243 @@ class ProviderWeb(ProviderBase):
 						yearDefault = years[i]
 						break
 
-			def _queryGenerate(search, title = None, year = None, pack = None, priority = None):
-				# NB: This structure should be the same as base.py -> parameterQueryXYZ().
-				# Also check stream.py -> infoQuery().
-				queries.append({
-					# Use a priority to execute queries first that are assumed to return more links.
-					# For instance, any query with a the main title should be placed before queries with aliases or other titles.
-					'priority' : (1000000000 + len(queries)) if priority is None else priority,
+			def _queryGenerate(search = None, query = None, format = None, title = None, year = None, pack = None, priority = None, universal = None, original = None, indexTitle = 0, indexQuery = 0):
+				try:
+					'''
+						We try to push the queries that are likley to return better results before those who are less likley to return good results.
+						Due to hardware and time contraints, there is a limit on the number of queries that will actually be executed.
+						All queries beyond this limit will be cut off and not executed.
+						We therefore need the best queries to be within this limit.
+						This is mostly not an issue, since the limit is not exceeded in many cases.
+						However, titles with aliases or foreign titles, might cause this limit to be reached quickly.
 
-					'search' : search,
-					'raw' : search,
-					'pack' : bool(pack),
-					'special' : bool((not numberSeason is None) and numberSeason == 0 and numberEpisode),
-					'year' : None if pack else year if year else yearDefault,
-					'date' : None if pack else date,
-					'id' : {
-						'imdb' : None if pack == 'movie' else idImdb,
-						'tmdb' : None if pack == 'movie' else idTmdb,
-						'tvdb' : None if pack == 'movie' else idTvdb,
-					},
-					'title' : title,
-					'number' : {
-						'season' : None if pack == 'show' else numberSeason,
-						'episode' : None if (pack == 'show' or pack == 'season') else numberEpisode,
-					},
-				})
+						We generally want the priority as follows:
+							1. Episode numbers first (S01E01), including those of original title and variations.
+							2. Generic season numbers (S01), including those of original title and variations.
+							3. All other language-specific pack keywords.
+
+						Eg: German show on Amazon:
+							German title: "Luden: Könige Der Reeperbahn"
+							English title: "The Pimp - No F***Ing Fairytale"
+							Streams found:
+								The.Pimp.No.Fucking.Fairytale.S01E01.MULTi.1080p.WEB.H264-AMB3R[eztv.re].mkv
+								Luden.Konige.Der.Reeperbahn.S01.1080p.Ultradox
+								Luden.Konige.Der.Reeperbahn.S01.720p.Ultradox
+								Luden.Konige.Der.Reeperbahn.S01.400p.Ultradox
+
+						Not only do we have German and English titles whhich both erturn results, but we also have variations:
+							English:
+								The Pimp - No F***Ing Fairytale
+								The Pimp - No F Ing Fairytale
+								The Pimp - No Fucking Fairytale (the censored *** part is filled in by modules -> core.py).
+							German:
+								Luden: Könige Der Reeperbahn
+								Luden: Konige Der Reeperbahn
+								Luden: Koenige Der Reeperbahn
+
+						EXAMPLES:
+
+						Amélie (2001):
+							[
+							  "Am%C3%A9lie 2001",
+							  "Amelie 2001",
+							  "Le Fabuleux Destin d Am%C3%A9lie Poulain 2001",
+							  "Le Fabuleux Destin dAm%C3%A9lie Poulain 2001",
+							  "Le Fabuleux Destin d Amelie Poulain 2001",
+							  "Amlie 2001",
+							  "Le Fabuleux Destin d Poulain 2001"
+							]
+
+						Harry Potter and the Sorcerer's Stone (2001):
+							[
+							  "Harry Potter and the Sorcerers Stone 2001",
+							  "Harry Potter and the Sorcerer Stone 2001",
+							  "Harry Potter and the Philosophers Stone 2001",
+							  "Harry Potter and the Philosopher Stone 2001",
+							  "Harry Potter collection",
+							  "Harry Potter complete",
+							  "Harry Potter pack",
+							  "and the Philosophers Stone 2001",
+							  "and the Philosopher Stone 2001",
+							  "Harry Potter trilogy"
+							]
+
+						The Lord of the Rings: The Two Towers (2002):
+							[
+							  "The Lord of the Rings The Two Towers 2002",
+							  "The Two Towers 2002",
+							  "The Lord of the Rings collection",
+							  "The Lord of the Rings complete",
+							  "The Lord of the Rings pack",
+							  "The Lord of the Rings trilogy"
+							]
+
+						The Pimp No fucking Fairytale (2023) S01E01:
+							[
+							  "The Pimp No fucking Fairytale S01E01",
+							  "Luden K%C3%B6nige der Reeperbahn S01E01",
+							  "Luden Konige der Reeperbahn S01E01",
+							  "Luden Koenige der Reeperbahn S01E01",
+							  "The Pimp No fucking Fairytale S01",
+							  "Luden K%C3%B6nige der Reeperbahn S01",
+							  "Luden Konige der Reeperbahn S01",
+							  "Luden Koenige der Reeperbahn S01",
+							  "The Pimp No F ing Fairytale S01E01",
+							  ---------------------------------------------- (9 query limit cut off for high-performance devices)
+							  "The Pimp No fucking Fairytale complete",
+							  "Luden K%C3%B6nige der Reeperbahn Staffel 1",
+							  "The Pimp No fucking Fairytale season 1",
+							  "Luden Konige der Reeperbahn Staffel 1",
+							  "The Pimp No fucking Fairytale collection",
+							  "Luden K%C3%B6nige der Reeperbahn Staffeln",
+							  "Luden Konige der Reeperbahn Staffeln",
+							  "The Pimp No F ing Fairytale S01",
+							  "Luden K%C3%B6nige der Reeperbahn Sammlung",
+							  "Luden Konige der Reeperbahn Sammlung",
+							  "The Pimp No fucking Fairytale pack",
+							  "Luden Koenige der Reeperbahn Staffel 1",
+							  "Luden Koenige der Reeperbahn Staffeln",
+							  "The Pimp No fucking Fairytale series",
+							  "Luden Koenige der Reeperbahn Sammlung",
+							  "The Pimp No F ing Fairytale complete",
+							  "The Pimp No F ing Fairytale season 1",
+							  "The Pimp No F ing Fairytale collection",
+							  "The Pimp No F ing Fairytale pack",
+							  "The Pimp No F ing Fairytale series"
+							]
+
+						Game of Thrones (2011) S08E01:
+							[
+							  "Game of Thrones S08E01",
+							  "Game of Thrones S08",
+							  "Game of Thrones season 8",
+							  "Game of Thrones complete",
+							  "Game of Thrones collection",
+							  "Game of Thrones pack",
+							  "Game of Thrones series"
+							]
+
+						Dark (2017) S02E02:
+							[
+							  "Dark S02E02",
+							  "Dark S02",
+							  "Dark season 2",
+							  "Dark Staffel 2",
+							  "Dark complete",
+							  "Dark collection",
+							  "Dark pack",
+							  "Dark series",
+							  "Dark Staffeln",
+							  "Dark Sammlung"
+							]
+					'''
+
+					if query:
+						if format: format = Tools.copy(format) # Changed in replace().
+						if search is None: search = self.replace(data = query['template'], replacements = format)
+						if universal is None: universal = query['universal']
+						if original is None: original = query['original']
+
+					originalIs = False
+					originalRank = 0
+					originalIndex = -1
+					orignalSame = False
+
+					if originalProcessed and title:
+						titleQuery = title['query']
+						for i in range(len(originalProcessed)):
+							if originalProcessed[i] in titleQuery:
+								originalIs = True
+								originalRank = i + 1
+								orignalSame = mainProcessed and (mainProcessed[0] in originalProcessed[i] or originalProcessed[i] in mainProcessed[0])
+								break
+
+					if originalSearch and search:
+						for i in range(len(originalSearch)):
+							if originalSearch[i] in search:
+								originalIndex = i
+								break
+
+					# Only add original keywords to original titles/queries.
+					# Also do not add English keywords to non-English titles/queries.
+					# Eg: Do not add French keywords to the English titles. Only add French keywords to French titles.
+					# NB: Check orignalSame, since we do not want to do this if the original title is the sasme as the other alias titles. Eg: the sshow "Dark".
+					if universal is False and not orignalSame:
+						if original is True and not originalIs: return
+						elif original is False and originalIs: return
+
+					priorities = priority
+					if Tools.isArray(priority): priority = (priority[0] if indexTitle == 0 else (priority[0] + originalRank) if originalRank else (priority[1] + (priority[2] * indexTitle))) + indexQuery
+					priority = (1000000000 + len(queries)) if priority is None else priority
+
+					# Try to pull original pack queries above alias pack queries.
+					if not orignalSame: priority *= ((0.8 if original else 2.0) * (1.0 if universal else 1.5) * (indexQuery + 1))
+
+					# If there are non-ASCII characters in title, there can be a few variations of the title.
+					# 1. The original UTF characters, or 2. The UTF characters mapped to ASCII characters, or 3. The UTF characters removed.
+					# Only prioritize the first variations  of the original title, otherwise the season pack queries might not be used, since there are to many episode queries with title variations.
+					if originalIndex >= 0: priority *= min(2.0, 1.05 + (0.05 * originalIndex * max(1, originalIndex - 1)))
+
+					# Move higher-changed original title variations further down the list.
+					if originalIndex > 1: priority *= 1.3 + (0.1 * originalIndex * max(1, originalIndex - 1))
+
+					# Movie queries with universal numbering (S01 or S01E01) before local-language numbering (season 1 or saison 1").
+					if not orignalSame and not language == Language.EnglishCode and Regex.match(data = search, expression = '\s\d+(?:e\d+|$|\s)'):
+						if universal is True: multiplier = 0.4 if originalIndex >= 0 else 0.5
+						elif universal is False: multiplier = (3.0 if pack else 1.6) if originalIndex >= 0 else (2.5 if pack else 1.5)
+						else: multiplier = 1.0
+
+						if originalIndex >= 0: priority *= multiplier * min(1.0, 0.6 + (0.1 * originalIndex * max(1, originalIndex - 1)))
+						else: priority *= multiplier * 0.5
+
+					if priorities:
+						# Try to pull very short alias titles forward, since they probably will return more results.
+						# Instead of: ["Am%C3%A9lie 2001","Le Fabuleux Destin d Am%C3%A9lie Poulain 2001","Le Fabuleux Destin dAm%C3%A9lie Poulain 2001","Le Fabuleux Destin d Amelie Poulain 2001","Amelie 2001","Amlie 2001","Le Fabuleux Destin d Poulain 2001"]
+						# Rather we want: ["Am%C3%A9lie 2001","Amelie 2001","Le Fabuleux Destin d Am%C3%A9lie Poulain 2001","Le Fabuleux Destin dAm%C3%A9lie Poulain 2001","Le Fabuleux Destin d Amelie Poulain 2001","Amlie 2001","Le Fabuleux Destin d Poulain 2001"]
+						if title and originalSearch and not original and universal:
+							lengthCurrent = len(title['query'])
+							lengthOriginal = len(originalSearch[0])
+							if lengthCurrent < lengthOriginal * 0.8:
+								priority = max(1, priority - max(priorities[1], priority * lengthCurrent / float(lengthOriginal)))
+
+						# Move cut-off titles lower.
+						# Eg: and the Philosophers Stone 2001
+						expression = '^[a-z]{2,}\s'
+						if Regex.match(data = search, expression = expression, flags = Regex.FlagNone) and (not originalSearch or not Regex.match(data = originalSearch[0], expression = expression, flags = Regex.FlagNone)):
+							priority += (priorities[1] * 7.0)
+
+					priority = max(0, priority)
+
+					# NB: This structure should be the same as base.py -> parameterQueryXYZ().
+					# Also check stream.py -> infoQuery().
+					queries.append({
+						# Use a priority to execute queries first that are assumed to return more links.
+						# For instance, any query with a the main title should be placed before queries with aliases or other titles.
+						'priority' : priority,
+
+						'search' : search,
+						'raw' : search,
+						'pack' : bool(pack),
+						'special' : bool((not numberSeason is None) and numberSeason == 0 and numberEpisode),
+						'universal' : universal,
+						'original' : original,
+						'year' : None if pack else year if year else yearDefault,
+						'date' : None if pack else date,
+						'id' : {
+							'imdb' : None if pack == 'movie' else idImdb,
+							'tmdb' : None if pack == 'movie' else idTmdb,
+							'tvdb' : None if pack == 'movie' else idTvdb,
+						},
+						'title' : title,
+						'number' : {
+							'season' : None if pack == 'show' else numberSeason,
+							'episode' : None if (pack == 'show' or pack == 'season') else numberEpisode,
+						},
+					})
+				except: self.logError()
 
 			def _queryEncode(value, caseLower, caseUpper, set, encodeQuote, encodePlus, encodeMinus, includeBasic, includeEncode, includeHas, formatTitles, formatExpression1, formatExpression2):
+				if not value: return None
 				value = self._queryClean(value)
 
 				# If FormatIncludeBasic or FormatIncludeEncode, unicode characters are removed from the string.
@@ -1326,14 +1561,14 @@ class ProviderWeb(ProviderBase):
 					valueLower = value.lower()
 					for title in formatTitles:
 						if title in valueLower:
-							title = Regex.remove(data = title, expression = formatExpression1)
+							title = Regex.remove(data = title, expression = formatExpression1, all = True)
 							if not title: return None
 
 				if caseLower: value = value.lower()
 				elif caseUpper: value = value.upper()
 
 				# Must be before the encoding, otherwise the unicode characters are replaced with % url.
-				if includeHas: value = Regex.remove(data = value, expression = formatExpression2)
+				if includeHas: value = Regex.remove(data = value, expression = formatExpression2, all = True)
 
 				if encodeQuote or encodePlus or encodeMinus:
 					value = Networker.linkQuote(data = value, plus = (encodePlus or encodeMinus))
@@ -1344,10 +1579,10 @@ class ProviderWeb(ProviderBase):
 			if self.typeExternal():
 				if Media.typeTelevision(media):
 					if self.supportShow() and (self.supportSpecial() or not(numberSeason is None and numberEpisode is None)):
-						title
+						title = titles['search']['main'][0]
 						format = {
-							'title' : titles['search']['main'][0],
-							'title_show' : titles['search']['main'][0],
+							'title' : title,
+							'title_show' : title,
 							'year' : yearDefault,
 							'season' : numberSeason,
 							'season_zero' : None if numberSeason is None else ('%02d' % numberSeason),
@@ -1356,34 +1591,35 @@ class ProviderWeb(ProviderBase):
 						}
 						try: format['title_episode'] = titles['search']['episode'][0]
 						except: format['title_episode'] = None
-						_queryGenerate(search = self.replace(data = self.queryEpisode()[0], replacements = format), title = {'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
+						_queryGenerate(query = self.queryEpisode()[0], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
 						queryTitles.extend([format['title'], format['title_episode']])
 				else:
 					if self.supportMovie():
+						title = titles['search']['main'][0]
 						format = {
-							'title' : titles['search']['main'][0],
-							'title_movie' : titles['search']['main'][0],
+							'title' : title,
+							'title_movie' : title,
 						}
 						try: format['title_collection'] = titles['search']['collection'][0]
 						except: format['title_collection'] = None
 						if years and 'all' in years and years['all']:
 							for year in years['all']:
 								format['year'] = year
-								_queryGenerate(search = self.replace(data = self.queryMovie()[0], replacements = format), title = {'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, year = year)
+								_queryGenerate(query = self.queryMovie()[0], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, year = year)
 						else:
 							format['year'] = yearDefault
-							_queryGenerate(search = self.replace(data = self.queryMovie()[0], replacements = format), title = {'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']})
+							_queryGenerate(query = self.queryMovie()[0], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']})
 						queryTitles.extend([format['title'], format['title_collection']])
 			else:
 				if exact:
 					for title in titles['search']['exact']:
-						_queryGenerate(search = title, title = {'exact' : title})
+						_queryGenerate(search = title, title = {'query' : title, 'exact' : title})
 					queryTitles.extend(titles['search']['exact'])
 				else:
 					titlesSearch = Tools.copy(titles['search']['main']) # Copy, since we add to it below.
-					for language in self.languages():
-						if language in titles['search']['native']:
-							titlesSearch.extend(titles['search']['native'][language])
+					for lang in self.languages():
+						if lang in titles['search']['native']:
+							titlesSearch.extend(titles['search']['native'][lang])
 					titlesSearch = Tools.listUnique(titlesSearch)
 
 					if Media.typeTelevision(media):
@@ -1406,7 +1642,7 @@ class ProviderWeb(ProviderBase):
 									format['title_show'] = title
 									queryEpisode = self.queryEpisode()
 									for j in range(len(queryEpisode)):
-										try: _queryGenerate(priority = (0 if i == 0 else (3000 + (1001 * i))) + j, search = self.replace(data = queryEpisode[j], replacements = format), title = {'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
+										try: _queryGenerate(priority = [0, 3000, 1001], query = queryEpisode[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 										except: pass
 								except: pass
 
@@ -1415,11 +1651,12 @@ class ProviderWeb(ProviderBase):
 								try:
 									format['title'] = titlesSearch[0]
 									format['title_show'] = titlesSearch[0]
-									for title in titles['search']['episode']:
+									for i in range(len(titles['search']['episode'])):
+										title = titles['search']['episode'][i]
 										format['title_episode'] = title
 										querySpecial = self.querySpecial()
 										for j in range(len(querySpecial)):
-											try: _queryGenerate(priority = (1000 if i == 0 else (6000 + (1002 * i))) + j, search = self.replace(data = querySpecial[j], replacements = format), title = {'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
+											try: _queryGenerate(priority = [1000, 6000, 1002], query = querySpecial[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1432,7 +1669,7 @@ class ProviderWeb(ProviderBase):
 										format['title_show'] = title
 										querySeason = self.querySeason()
 										for j in range(len(querySeason)):
-											try: _queryGenerate(priority = (2000 if i == 0 else (9000 + (1003 * i))) + j, search = self.replace(data = querySeason[j], replacements = format), pack = 'season', title = {'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
+											try: _queryGenerate(priority = [2000, 9000, 1003], query = querySeason[j], format = format, pack = 'season', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1445,7 +1682,7 @@ class ProviderWeb(ProviderBase):
 										format['title_show'] = title
 										queryShow = self.queryShow()
 										for j in range(len(queryShow)):
-											try: _queryGenerate(priority = (3000 if i == 0 else (12000 + (1004 * i))) + j, search = self.replace(data = queryShow[j], replacements = format), pack = 'show', title = {'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']})
+											try: _queryGenerate(priority = [3000, 12000, 1004], query = queryShow[j], format = format, pack = 'show', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1468,7 +1705,7 @@ class ProviderWeb(ProviderBase):
 											format['year'] = year
 											queryMovie = self.queryMovie()
 											for j in range(len(queryMovie)):
-												try: _queryGenerate(priority = (0 if i == 0 else (1000 + (1001 * i))) + j, search = self.replace(data = queryMovie[j], replacements = format), title = {'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, year = year)
+												try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, year = year, indexTitle = i, indexQuery = j)
 												except: pass
 										except: pass
 							else:
@@ -1480,7 +1717,7 @@ class ProviderWeb(ProviderBase):
 										format['title_movie'] = title
 										queryMovie = self.queryMovie()
 										for j in range(len(queryMovie)):
-											try: _queryGenerate(priority = (0 if i == 0 else (1000 + (1001 * i))) + j, search = self.replace(data = queryMovie[j], replacements = format), title = {'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']})
+											try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
 											except: pass
 									except: pass
 
@@ -1495,7 +1732,7 @@ class ProviderWeb(ProviderBase):
 										format['title_collection'] = title
 										queryCollection = self.queryCollection()
 										for j in range(len(queryCollection)):
-											try: _queryGenerate(priority = (1000 if i == 0 else (4000 + (1002 * i))) + j, search = self.replace(data = queryCollection[j], replacements = format), pack = 'movie', title = {'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']})
+											try: _queryGenerate(priority = [1000, 4000, 1002], query = queryCollection[j], format = format, pack = 'movie', title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1547,7 +1784,7 @@ class ProviderWeb(ProviderBase):
 					if not value is None: query['title'][key] = value
 
 				result.append(query)
-			queries = result
+			queries = Tools.listUnique(result, attribute = 'search')
 		except: self.logError()
 
 		return queries
@@ -1614,9 +1851,9 @@ class ProviderWeb(ProviderBase):
 		return replacements
 
 	def _queryClean(self, query):
-		query = Regex.remove(data = query, expression = '[\'\`]')
-		query = Regex.replace(data = query, expression = '[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]', replacement = ' ')
-		query = Regex.replace(data = query, expression = '\s{2,}', replacement = ' ').strip()
+		query = Regex.remove(data = query, expression = '[\'\`]', all = True)
+		query = Regex.replace(data = query, expression = '[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]', replacement = ' ', all = True)
+		query = Regex.replace(data = query, expression = '\s{2,}', replacement = ' ', all = True).strip()
 		return query
 
 	##############################################################################
@@ -2554,7 +2791,7 @@ class ProviderWeb(ProviderBase):
 
 			validate = not exact
 			searches = self.searchQuery()
-			queries = self.queryGenerate(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, exact = exact)
+			queries = self.queryGenerate(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, exact = exact)
 			replacements = self.replacements()
 
 			if Media.typeMovie(media): categories = self.searchCategoryMovie()

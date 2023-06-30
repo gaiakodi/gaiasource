@@ -214,8 +214,11 @@ class Window(object):
 	TypeWizardScroll = 'scroll'
 	TypeWizardStatic = 'static'
 	TypeWizardQr = 'qr'
+	TypeOracleChat = 'chat'
+	TypeOracleResults = 'results'
 	TypeDefault = TypeNone
-	Types = [TypeStreamPlain, TypeStreamBasic, TypeStreamIcons, TypeWizardSmall, TypeWizardLarge, TypeWizardScroll, TypeWizardStatic, TypeWizardQr]
+	Types = [TypeStreamPlain, TypeStreamBasic, TypeStreamIcons, TypeWizardSmall, TypeWizardLarge, TypeWizardScroll, TypeWizardStatic, TypeWizardQr, TypeOracleChat, TypeOracleResults]
+	TypesOracle = [TypeOracleChat, TypeOracleResults]
 
 	# Background
 	BackgroundColorOpaque = 'FFFFFFFF'
@@ -305,9 +308,10 @@ class Window(object):
 					data = data.replace(key, value)
 
 				types = tools.Tools.copy(Window.Types) # Copy, since we remove below.
-				for type in xmlType:
-					try: types.remove(type)
-					except: pass
+				if xmlType:
+					for type in xmlType:
+						try: types.remove(type)
+						except: pass
 
 				flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagAllLines
 
@@ -363,6 +367,7 @@ class Window(object):
 			WindowStreams.reset(settings = settings)
 			WindowOptimization.reset(settings = settings)
 			WindowWizard.reset(settings = settings)
+			WindowOracle.reset(settings = settings)
 
 	##############################################################################
 	# GENERAL
@@ -919,18 +924,24 @@ class Window(object):
 		except: pass
 
 	@classmethod
-	def itemAdd(self, item, context = None, control = IdListControl):
+	def itemAdd(self, item, context = None, control = IdListControl, select = None):
 		try:
 			instance = self._instance()
 			if instance and item:
 				if tools.Tools.isArray(item):
 					if context: instance.mContexts.extend(context)
 					instance.mItems.extend(item)
-					return instance.control(control).addItems([i['item'] for i in item] if tools.Tools.isDictionary(item[0]) else item)
+					control = instance.control(control)
+					result = control.addItems([i['item'] for i in item] if tools.Tools.isDictionary(item[0]) else item)
+					if not select is None: control.selectItem(select if select >= 0 else control.size() + select)
+					return result
 				else:
 					if context: instance.mContexts.append(context)
 					instance.mItems.append(item)
-					return instance.control(control).addItem(item['item'] if tools.Tools.isDictionary(item) else item)
+					control = instance.control(control)
+					result = control.addItem(item['item'] if tools.Tools.isDictionary(item) else item)
+					if not select is None: control.selectItem(select if select >= 0 else control.size() + select)
+					return result
 		except: tools.Logger.error()
 
 	@classmethod
@@ -1902,6 +1913,8 @@ class WindowRating(Window):
 		from lib.meta.image import MetaImage
 		from lib.modules.playback import Playback
 
+		playback = Playback.instance()
+
 	 	# Resize for  wide screens.
 		controls = [
 			WindowRating.IdImageBorder,
@@ -2017,8 +2030,14 @@ class WindowRating(Window):
 		else:
 			self.propertySet('GaiaUnratedLabel', interface.Translation.string(33447))
 
-		default = int(tools.Math.roundClosest(value = default, base = 1))
-		self.propertySet('GaiaRatingDefault', default)
+		setting = playback.settingsRatingDefault()
+		if setting == 0: default = tools.Math.roundDown(value = default)
+		elif setting == 1: default = tools.Math.roundUp(value = default)
+		elif setting == 2: default = tools.Math.roundClosest(value = default, base = 1)
+		elif setting == 3: default = 10
+		elif setting == 4: default = 1
+		elif setting == 5: default = 5
+		self.propertySet('GaiaRatingDefault', int(default))
 		self.focus(WindowRating.IdButtons[default - 1])
 
 		self.propertySet('GaiaInitialized', 1)
@@ -2191,9 +2210,18 @@ class WindowProgress(Window):
 			self._dimensionUpdate(self._addStatus())
 			self._dimensionUpdate(self._dimensionSpace())
 
+		# Update the progress bar here already.
+		# Otherwise the thread that updates the progress for the 1st time takes too long.
+		# Then you see a short period where the progress goes back to 0 before being updated again in the Wizard/Oracle window stepper.
+		try:
+			if self.mProgress: self._progressUpdate(progressNew = self.mProgress, progressCurrent = self.mProgress, controlFill = self.mProgressFill, controlIcon = self.mProgressInner, force = True)
+		except: tools.Logger.error()
+
 	def _initializeEnd1(self):
 		super(WindowProgress, self)._initializeEnd1()
-		if self.mProgress: self.update(progress = self.mProgress, status = self.mStatus) # Do not do this if the status has a value, like in _initializeEnd2(), otherwise WindowStreams gets messed up.
+		if self.mProgress:
+			self.update(progress = self.mProgress, status = self.mStatus) # Do not do this if the status has a value, like in _initializeEnd2(), otherwise WindowStreams gets messed up.
+			self._progressUpdate(progressNew = self.mProgress, progressCurrent = self.mProgress, controlFill = self.mProgressFill, controlIcon = self.mProgressInner, force = True)
 
 	def _initializeEnd2(self):
 		super(WindowProgress, self)._initializeEnd2()
@@ -2898,7 +2926,7 @@ class WindowPlayback(WindowProgress):
 
 			interface.Loader.show()
 			instance.close(loader = False, stop = True)
-			self.show(background = background, status = True, retry = True)
+			self.show(background = background, status = status, retry = True)
 
 			instance = super(WindowPlayback, self).update(progress = progress, finished = finished, status = status)
 			interface.Loader.hide()
@@ -3115,6 +3143,7 @@ class WindowBinge(WindowProgress):
 		self.mControlContinue = None
 
 		self.mPoster = poster
+		self.mUpdate = True
 		self.mTime = None
 		self.mFocus = None
 		self.mAction = tools.Binge.actionNone()
@@ -3125,7 +3154,7 @@ class WindowBinge(WindowProgress):
 			self._onAction(action, self._actionFocus)
 
 	@classmethod
-	def show(self, background = None, poster = None, wait = False, initialize = True, close = False, title = None, season = None, episode = None, duration = None, delay = None):
+	def show(self, background = None, poster = None, wait = False, initialize = True, close = False, title = None, season = None, episode = None, duration = None, delay = None, automatic = None):
 		next = False
 		result = super(WindowBinge, self)._show(backgroundType = tools.Settings.getInteger('interface.playback.interface.background'), backgroundPath = background, poster = poster, logo = WindowProgress.LogoIcon, status = interface.Translation.string(35582), wait = wait, initialize = initialize, close = close)
 		if result:
@@ -3152,14 +3181,30 @@ class WindowBinge(WindowProgress):
 			instance._setLabel(control = instance.mControlTime, text = duration, size = instance.mFontSize, bold = True, uppercase = True)
 
 			if delay:
+				if automatic: automatic *= 1000
+				else: instance._actionAutomatic()
+
 				delay = (delay * 1000) - 1000 # Subtract a little bit, since the window takes some time to show.
 				self.update(progress = 0, time = int(delay / 1000.0))
-				timer = tools.Time()
-				timer.start()
+				timer = tools.Time(start = True)
 				elapsed = 0
+
 				while (delay - elapsed) > 1000 and instance.visible() and not tools.System.aborted():
 					elapsed = timer.elapsed(milliseconds = True)
-					self.update(progress = int((elapsed + 1000) / float(delay) * 100), time = int((delay - elapsed) / 1000.0))
+
+					# Only start updating the progress bar once the overlay dialog is shown.
+					# This ensures that the progress starts at 0% once the automatic popup is triggered.
+					# Otherwise if the dialog pops up automatically, the progress might already be at 50%+.
+					if automatic and elapsed > automatic and not instance.mUpdate:
+						instance._actionAutomatic()
+
+						delay -= automatic
+						timer = tools.Time(start = True)
+						elapsed = timer.elapsed(milliseconds = True)
+
+						automatic = None # Do not call again.
+
+					if instance.mUpdate: self.update(progress = int((elapsed + 1000) / float(delay) * 100), time = int((delay - elapsed) / 1000.0))
 					tools.Time.sleep(0.2)
 				self.update(progress = 100, time = 0, finished = True)
 				next = instance.mContinue
@@ -3189,6 +3234,9 @@ class WindowBinge(WindowProgress):
 	def cancel(self):
 		try: self._instance()._actionCancel()
 		except: pass
+
+	def _actionAutomatic(self):
+		pass
 
 	def _actionFocus(self):
 		if self.mMode == WindowBinge.ModeOverlay:
@@ -3304,10 +3352,14 @@ class WindowBingeOverlay(WindowBinge):
 	PosterWidth = 61
 	PosterHeight = 90
 
+	PropertyVisible = 'GaiaBingeVisible'
+	AnimationSpeed = 1000
+
 	Padding = 10
 
 	def __init__(self, backgroundType, backgroundPath, poster, logo, status):
 		super(WindowBingeOverlay, self).__init__(xml = 'binge', mode = WindowBinge.ModeOverlay, backgroundType = backgroundType, backgroundPath = backgroundPath, poster = poster, logo = logo, status = status, height = WindowBingeOverlay.SizeHeight, inverse = True)
+		self.mUpdate = False
 
 	def _initializeStart1(self):
 		super(WindowBingeOverlay, self)._initializeStart1()
@@ -3319,7 +3371,52 @@ class WindowBingeOverlay(WindowBinge):
 		self._addPoster()
 		self._addDetails()
 		self._addControls()
+
+		self.propertySet('GaiaInitialized', 0)
+		offset = WindowBingeOverlay.SizeHeight + 5
+		self.mAnimations = [
+			('Conditional', 'effect=slide start=0,-%d end=0,-%d time=0 condition=Integer.IsEqual(Window.Property(GaiaInitialized),0)' % (offset, offset)),
+			('Conditional', 'effect=slide start=0,0 end=0,%d time=%d tween=cubic easing=inout condition=Integer.IsEqual(Window.Property(%s),1)' % (offset, WindowBingeOverlay.AnimationSpeed, WindowBingeOverlay.PropertyVisible)),
+			('Conditional', 'effect=slide start=0,0 end=0,-%d time=%d tween=cubic easing=inout condition=Integer.IsEqual(Window.Property(%s),-1)' % (offset, WindowBingeOverlay.AnimationSpeed, WindowBingeOverlay.PropertyVisible)),
+		]
+		for control in self.mControls:
+			if not 'animation' in control or not control['animation']: control['animation'] = []
+			control['animation'].extend(self.mAnimations)
+
+	def _initializeEnd1(self):
+		# Must be BEFORE we call the parent function below.
+		# Otherwise there is a sporadic problem where the first 2 labels on the right sometimes do not show.
+		self.control(50000).setAnimations(self.mAnimations)
+		tools.Time.sleep(0.1) # Wait for the animation to move the poster to the top before making it visible. Otherwise sometimes the poster pops up for some ms before being hidden.
 		self.propertySet('GaiaInitialized', 1)
+
+		super(WindowBingeOverlay, self)._initializeEnd1()
+
+	def _actionAutomatic(self):
+		self.mUpdate = True
+		self.propertySet(WindowBingeOverlay.PropertyVisible, 1)
+		self._actionFocusContinue()
+
+	def _actionFocus(self, action = None):
+		if tools.Converter.boolean(self.property(WindowBingeOverlay.PropertyVisible)):
+			if self.mFocus is True:
+				if action == WindowBase.ActionMoveUp and self.focusHas(self.mControlContinue[0]):
+					self.propertySet(WindowBingeOverlay.PropertyVisible, -1)
+					self._actionFocusDummy(wait = True)
+				else: self._actionFocusCancel()
+			else: self._actionFocusContinue()
+		elif action:
+			self._actionAutomatic()
+
+	def _actionCancel(self):
+		# Only execute the action if the dialog is visible. Otherwise the action is used to show the hidden dialog.
+		if tools.Converter.boolean(self.property(WindowBingeOverlay.PropertyVisible)):
+			super(WindowBingeOverlay, self)._actionCancel()
+
+	def _actionContinue(self):
+		# Only execute the action if the dialog is visible. Otherwise the action is used to show the hidden dialog.
+		if tools.Converter.boolean(self.property(WindowBingeOverlay.PropertyVisible)):
+			super(WindowBingeOverlay, self)._actionContinue()
 
 	def _dimensionSpace(self):
 		return [0, 0]
@@ -3384,22 +3481,29 @@ class WindowStep(WindowProgress):
 	ActionBacked = None
 	ActionClosed = None
 
-	def __init__(self, backgroundType, backgroundPath, logo, stepper = True, helper = False, title = None, description = None, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, xml = False, xmlType = None, xmlOffset = None, **kwargs):
-		super(WindowStep, self).__init__(backgroundType = backgroundType, backgroundPath = backgroundPath, logo = logo, xml = 'wizard' if xml is True else xml, xmlType = xmlType, xmlOffset = xmlOffset, **kwargs)
+	OrientationHorizontal = 'horizontal'
+	OrientationVertical = 'vertical'
+	OrientationDefault = OrientationHorizontal
+
+	def __init__(self, backgroundType, backgroundPath, logo, stepper = True, helper = False, refocus = False, title = None, description = None, orientation = OrientationDefault, navigationRow = None, navigationIndex = None, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, xml = False, xmlType = None, xmlOffset = None, **kwargs):
+		if xml is True: xml = 'oracle' if any(i in xmlType for i in WindowStep.TypesOracle) else 'wizard'
+		super(WindowStep, self).__init__(backgroundType = backgroundType, backgroundPath = backgroundPath, logo = logo, xml = xml, xmlType = xmlType, xmlOffset = xmlOffset, **kwargs)
 
 		if xml: self.mDirectory = interface.Directory(content = interface.Directory.ContentFiles, view = False, cache = True, lock = False)
 
 		self.mStepper = stepper
 		self.mHelper = helper
+		self.mRefocus = refocus
 		self.mTitle = title
 		self.mDescription = description
+		self.mOrientation = orientation
 
 		self.mSeparator1 = None
 		self.mSeparator2 = None
 
 		self.mNavigation = None
-		self.mNavigationIndex = None
-		self.mNavigationRow = None
+		self.mNavigationIndex = navigationIndex
+		self.mNavigationRow = navigationRow
 		self.mNavigationCount = None
 
 		self.mNavigationCancel = navigationCancel
@@ -3440,12 +3544,11 @@ class WindowStep(WindowProgress):
 	def _initializeStart2(self, retry = False):
 		super(WindowStep, self)._initializeStart2(progress = self.mStepper, status = self.mStepper)
 		self._dimensionUpdate(self._addSeparator1())
-		self._dimensionUpdate(self._addContent())
+		content = self._addContent()
+		if content: self._dimensionUpdate(content)
 		self._dimensionUpdate(self._addSeparator2())
 		self._dimensionUpdate(self._addNavigation())
-
-		if self.mTitle: self.propertySet(property = 'GaiaTitle', value = interface.Format.font(self.mTitle, color = interface.Format.colorSecondary(), bold = True, uppercase = True))
-		if self.mDescription: self.propertySet(property = 'GaiaDescription%d' % (1 if len(interface.Translation.string(self.mDescription)) < 100 else 2), value = interface.Format.font(self.mDescription, bold = True))
+		self._updateLabel(title = self.mTitle, description = self.mDescription)
 
 	def _initializeEnd1(self):
 		super(WindowStep, self)._initializeEnd1()
@@ -3459,6 +3562,17 @@ class WindowStep(WindowProgress):
 	def show(self, stepper = True, helper = False, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, **kwargs):
 		return super(WindowStep, self).show(backgroundType = tools.Settings.getInteger('interface.playback.interface.background'), logo = WindowProgress.LogoIcon, stepper = stepper, helper = helper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
 
+	@classmethod
+	def _updateLabel(self, title = None, description = None):
+		if title:
+			self.propertySet(property = 'GaiaTitle', value = interface.Format.font(title, color = interface.Format.colorSecondary(), bold = True, uppercase = True))
+		if description:
+			if tools.Tools.isArray(description):
+				for i in range(len(description)):
+					self.propertySet(property = 'GaiaDescription%d' % (i + 1), value = interface.Format.font(description[i], bold = True))
+			else:
+				self.propertySet(property = 'GaiaDescription%d' % (1 if len(interface.Translation.string(description)) < 100 else 2), value = interface.Format.font(description, bold = True))
+
 	def _actionDefault(self, focus = True):
 		self.mNavigation = []
 		if self.mNavigationCancel: self.mNavigation.append(self.mNavigationCancel)
@@ -3470,10 +3584,17 @@ class WindowStep(WindowProgress):
 	def _actionFocus(self, action = None, multiple = False):
 		if self._actionFocusBack(): return
 
+		actionOrientation = action
+		if self.mOrientation == WindowStep.OrientationVertical and self.mNavigationRow == 0:
+			if action == WindowBase.ActionMoveLeft: actionOrientation = WindowBase.ActionMoveUp
+			elif action == WindowBase.ActionMoveRight: actionOrientation = WindowBase.ActionMoveDown
+			elif action == WindowBase.ActionMoveUp: actionOrientation = WindowBase.ActionMoveLeft
+			elif action == WindowBase.ActionMoveDown: actionOrientation = WindowBase.ActionMoveRight
+
 		if self.mXml:
 			if self.mNavigationRow is None: self.mNavigationRow = 0
-			elif action == WindowBase.ActionMoveUp: self.mNavigationRow -= 1
-			elif action == WindowBase.ActionMoveDown: self.mNavigationRow += 1
+			elif actionOrientation == WindowBase.ActionMoveUp: self.mNavigationRow -= 1
+			elif actionOrientation == WindowBase.ActionMoveDown: self.mNavigationRow += 1
 
 			if self.mNavigationRow < 0: self.mNavigationRow = 1
 			elif self.mNavigationRow > 1: self.mNavigationRow = 0
@@ -3520,9 +3641,13 @@ class WindowStep(WindowProgress):
 			if backed: WindowStep.ActionBacked = None
 			else: WindowStep.ActionBacked = True
 
-			if self.mNavigationBack:
+			if self.mRefocus:
+				self.mNavigationRow = 0
+				self.mNavigationIndex = None
+				self._actionRefocus()
+			elif self.mNavigationBack:
 				self.mNavigationRow = 1
-				try: self.mNavigationIndex = len([i for i in self.mNavigation if self._visible(i)]) - 2
+				try: self.mNavigationIndex = len([i for i in self.mNavigation if self._visible(i)]) - (2 if self.mNavigationNext else 1)
 				except: pass
 				self.focus(self.mNavigationBack[0])
 				return True
@@ -3646,7 +3771,7 @@ class WindowStep(WindowProgress):
 			elif tools.Tools.isInteger(self.mNavigationBack):
 				label = self.mNavigationBack
 			dimensionBack = self._dimensionButton(text = label, icon = icon)
-			self.mNavigationBack = self._addButton(text = label, x = window - offset - 20 - dimensionNext[0] - dimensionBack[0], y = y, callback = self.actionBack, icon = icon)
+			self.mNavigationBack = self._addButton(text = label, x = window - offset - dimensionNext[0] - dimensionBack[0] - (20 if self.mNavigationNext else 0), y = y, callback = self.actionBack, icon = icon)
 		else:
 			self.mNavigationBack = None
 
@@ -3654,7 +3779,7 @@ class WindowStep(WindowProgress):
 
 	def _addItem(self, label = None, label1 = None, label2 = None, label3 = None, label4 = None, icon = None, selected = None, offset = None, callback = None):
 		label = interface.Translation.string(label)
-		item = self.mDirectory.item(label = label, label2 = label) if label else None
+		item = self.mDirectory.item(label = label, label2 = label) if not label is None else None
 		item.setProperties({
 			'GaiaIcon' : self._pathIcon(icon = icon, quality = interface.Icon.QualityLarge, special = interface.Icon.SpecialServices) if icon and not '.' in icon else icon,
 			'GaiaSelected' : '' if selected is None else int(selected),
@@ -3927,6 +4052,170 @@ class WindowDonation(WindowStepQr):
 			{'type' : 'text', 'value' : 'You can leave your crypto on the exchange\'s wallet, especially small amounts. However, exchanges sometimes get hacked and it is better to transfer your crypto out of the exchange into a personal wallet. [B]Exodus[/B] is an easy-to-use wallet, available on most operating systems, and supports hundreds of different coins.', 'break' : 2},
 			{'type' : 'link', 'value' : 'https://exodus.com', 'break' : 1},
 		])
+
+
+class WindowSkip(Window):
+
+	StateHidden = 0
+	StatePartial = 1
+	StateVisible = 2
+
+	DurationVisible = 7
+	DurationAnimation = 1
+
+	PropertyAnimation = 'GaiaAnimationSkip'
+
+	def __init__(self, **kwargs):
+		super(WindowSkip, self).__init__(**kwargs)
+
+		self.mSkipDummy = None
+		self.mSkipButton = None
+		self.mSkipState = None
+		self.mSkipCanceled = False
+		self.mSkipInteract = False
+		self.mSkipTime = WindowSkip.DurationVisible
+		self.mSkipClock = '00:00'
+		self.mSkipThread = None
+		self.mSkipCallback = None
+
+	def _initializeStart2(self):
+		super(WindowSkip, self)._initializeStart2()
+
+		self._addButtons()
+		self._onAction(WindowBase.ActionMoveLeft, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveRight, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveUp, self._actionInteract)
+		self._onAction(WindowBase.ActionMoveDown, self._actionInteract)
+		self._onAction(WindowBase.ActionSelectItem, self._actionInteract)
+		for action in WindowBase.ActionsCancel: self._onAction(action, self._actionInteract)
+
+	def _initializeEnd1(self):
+		super(WindowSkip, self)._initializeEnd1()
+		self._actionToggle()
+
+	@classmethod
+	def show(self, duration = None, time = None, callback = None, wait = False, initialize = True, close = False):
+		instance = self.instance()
+		if not instance:
+			super(WindowSkip, self)._show(wait = wait, initialize = initialize, close = close)
+			instance = self.instance()
+		if instance:
+			if time: instance.mSkipTime = min(time, int(duration / 3.0)) if duration else time # Divide by 3, since we show the full button for 1/3 of the time and the partial button for 2/3 of the time.
+			instance.mSkipClock = self._clock(duration)
+			instance.mSkipCallback = callback
+			instance.mSkipState = None
+			instance.mSkipCanceled = False
+			instance._setButton(control = instance.mSkipButton, text = '%s (+%s)' % (interface.Translation.string(33897), instance.mSkipClock), icon = 'change', width = False)
+			instance._actionToggle()
+
+	@classmethod
+	def cancel(self):
+		instance = self.instance()
+		if instance: instance._actionClose()
+
+	@classmethod
+	def _clock(self, duration):
+		from lib.modules.convert import ConverterDuration
+		return ConverterDuration(value = duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
+
+	def _addButtons(self):
+		text = '%s (+%s)' % (interface.Translation.string(33897), self.mSkipClock)
+		icon = 'change'
+		duration = int(WindowSkip.DurationAnimation * 1000)
+
+		dimension = self._dimensionButton(text = text, icon = icon, adjust = 0.7)
+		self.mSkipDummy = self._addButton(text = text, x = Window.SizeWidth + 10, y = Window.SizeHeight + 10, icon = icon, iconOffset = 0.05, width = dimension[0])
+		width = self.mSkipDummy[0].getWidth()
+
+		x = Window.SizeWidth + 1
+		y = Window.SizeHeight - 150
+		position = width - 7
+
+		self.propertySet(WindowSkip.PropertyAnimation, '')
+		animation = [
+			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowSkip.PropertyAnimation, WindowSkip.StateHidden)),
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (53, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)), # 55 still shows the label pixels on a TV.
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowSkip.PropertyAnimation, WindowSkip.StateVisible)),
+		]
+		self.mSkipButton = self._addButton(text = text, x = x, y = y, width = dimension[0], callback = self._actionClick, icon = icon, iconOffset = 0.05, animation = animation)
+
+	def _actionClick(self, control = None):
+		try:
+			self._actionInteract(action = WindowBase.ActionSelectItem)
+		except: tools.Logger.error()
+
+	def _actionInteract(self, action = None):
+		try:
+			self.mSkipInteract = True
+			self._actionToggle(action = action)
+		except: tools.Logger.error()
+
+	def _actionToggle(self, action = None):
+		try:
+			if action in WindowBase.ActionsCancel:
+				self._actionClose()
+			elif action == WindowBase.ActionSelectItem:
+				if self.focusHas(control = self.mSkipButton[0]):
+					if self.mSkipCallback: self.mSkipCallback()
+					self._actionClose()
+				else:
+					self.focus(control = self.mSkipButton[0])
+			else:
+				if self.mSkipState is None:
+					self.focus(self.mSkipButton[0])
+					self.mSkipState = WindowSkip.StateVisible
+					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+					Pool.thread(target = self._threadPartial, start = True)
+				elif self.focusHas(control = self.mSkipButton[0]):
+					if self.mSkipState == WindowSkip.StateHidden:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StatePartial
+					elif self.mSkipState == WindowSkip.StatePartial:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StateVisible
+						elif action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StateHidden
+					elif self.mSkipState == WindowSkip.StateVisible:
+						if action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StatePartial
+
+					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+
+					if self.mSkipState == WindowSkip.StateHidden and (not self.mSkipThread or not self.mSkipThread.alive()):
+						self.mSkipThread = Pool.thread(target = self._threadClose, start = True)
+				else:
+					self.focus(control = self.mSkipButton[0])
+		except: tools.Logger.error()
+
+	def _actionClose(self, sleep = True):
+		try:
+			self.mSkipState = WindowSkip.StateHidden
+			self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
+			self.mSkipCanceled = True
+			if sleep: tools.Time.sleep(WindowSkip.DurationAnimation * 0.1)
+			self.close()
+		except: tools.Logger.error()
+
+	def _threadClose(self):
+		try:
+			# Close the window after being hidden for a few seconds.
+			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowSkip.
+			for i in range(max(3, min(6, int(self.mSkipTime / 2.0))) * 2):
+				if self.mSkipCanceled or not self.mSkipState == WindowSkip.StateHidden: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateHidden: self.close()
+		except: tools.Logger.error()
+
+	def _threadPartial(self):
+		try:
+			# Partially hide after a few seconds.
+			for i in range(self.mSkipTime * 2):
+				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StateVisible: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
+
+			# Fully hide after a few seconds.
+			for i in range(self.mSkipTime * 4): # Twice as long as the full visibility.
+				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StatePartial: return
+				tools.Time.sleep(0.5)
+			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)
+		except: tools.Logger.error()
 
 
 class WindowOptimization(WindowStep):
@@ -5466,165 +5755,542 @@ class WindowWizard(object):
 		self.close()
 
 
-class WindowSkip(Window):
+class WindowOracle(object):
 
-	StateHidden = 0
-	StatePartial = 1
-	StateVisible = 2
+	Window = None
+	ActionClosed = None
+	ProgressChat = [40, 90]
 
-	DurationVisible = 7
-	DurationAnimation = 1
+	ChoiceService = None
+	ChoiceMedia = None
+	ChoiceMode = None
+	ChoiceInput = None
+	ChoiceConversation = None
+	ChoicePreloaded = None
+	ChoiceHistory = None
 
-	PropertyAnimation = 'GaiaAnimationSkip'
+	Steps = None
+	StepIntro = None
+	StepService = None
+	StepMode = None
+	StepBusy = None
+	StepResults = None
 
-	def __init__(self, **kwargs):
-		super(WindowSkip, self).__init__(**kwargs)
-
-		self.mSkipDummy = None
-		self.mSkipButton = None
-		self.mSkipState = None
-		self.mSkipCanceled = False
-		self.mSkipInteract = False
-		self.mSkipTime = WindowSkip.DurationVisible
-		self.mSkipClock = '00:00'
-		self.mSkipThread = None
-		self.mSkipCallback = None
-
-	def _initializeStart2(self):
-		super(WindowSkip, self)._initializeStart2()
-
-		self._addButtons()
-		self._onAction(WindowBase.ActionMoveLeft, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveRight, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveUp, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveDown, self._actionInteract)
-		self._onAction(WindowBase.ActionSelectItem, self._actionInteract)
-		for action in WindowBase.ActionsCancel: self._onAction(action, self._actionInteract)
-
-	def _initializeEnd1(self):
-		super(WindowSkip, self)._initializeEnd1()
-		self._actionToggle()
+	##############################################################################
+	# RESET
+	##############################################################################
 
 	@classmethod
-	def show(self, duration = None, time = None, callback = None, wait = False, initialize = True, close = False):
-		instance = self.instance()
-		if not instance:
-			super(WindowSkip, self)._show(wait = wait, initialize = initialize, close = close)
-			instance = self.instance()
-		if instance:
-			if time: instance.mSkipTime = min(time, int(duration / 3.0)) if duration else time # Divide by 3, since we show the full button for 1/3 of the time and the partial button for 2/3 of the time.
-			instance.mSkipClock = self._clock(duration)
-			instance.mSkipCallback = callback
-			instance.mSkipState = None
-			instance.mSkipCanceled = False
-			instance._setButton(control = instance.mSkipButton, text = '%s (+%s)' % (interface.Translation.string(33897), instance.mSkipClock), icon = 'change', width = False)
-			instance._actionToggle()
+	def reset(self, settings = True):
+		WindowOracle.ActionClosed = None
+		WindowOracle.Window = None
+
+	##############################################################################
+	# GENERAL
+	##############################################################################
+
+	@classmethod
+	def help(self):
+		from lib.oracle import Oracle
+		Oracle.instance().helpFull()
+
+	@classmethod
+	def visible(self):
+		# This is called from view.py to automatically selet the 1st item in the list returned by the Oracle.
+		# Do not use the standard funtions: visible(), instance(), currentDialog().
+		# These functions will not work, since they rely on the global() variables.
+		# However, the menu is loaded in a separate process whichh will not have the global() variables anymore.
+		# Hence, use a window property to determine if the Oracle windows are still showing.
+		try: return 'WindowOracle' in Window.currentType()
+		except: return False
+
+	@classmethod
+	def close(self):
+		WindowOracle.ActionClosed = True
+		return True
+
+	@classmethod
+	def closeAll(self, exception = None):
+		if not exception == WindowOracleIntro: WindowOracleIntro.close()
+		if not exception == WindowOracleService: WindowOracleService.close()
+		if not exception == WindowOracleMode: WindowOracleMode.close()
+		if not exception == WindowOracleBusy: WindowOracleBusy.close()
+		if not exception == WindowOracleResults: WindowOracleResults.close()
+
+	@classmethod
+	def show(self, media = None, full = False, history = None):
+		from lib.oracle import Oracle
+		oracle = Oracle.instance()
+
+		WindowOracle.ChoiceMedia = media if media else tools.Media.TypeMixed
+
+		WindowOracle.Steps = {
+			'intro' : {
+				'next' : self.showService,
+				'back' : None,
+			},
+			'service' : {
+				'next' : self.showMode,
+				'back' : self.showIntro,
+			},
+			'mode' : {
+				'next' : self.showBusy,
+				'back' : self.showService,
+			},
+			'busy' : {
+				'next' : self.showResults,
+				'back' : None,
+			},
+			'results' : {
+				'next' : self.close,
+				'back' : None,
+			},
+		}
+		WindowOracle.StepIntro = oracle.settingsInterfaceIntro()
+		WindowOracle.StepService = oracle.settingsInterfaceService()
+		WindowOracle.StepMode = oracle.settingsInterfaceMode()
+		WindowOracle.StepBusy = oracle.settingsInterfaceBusy()
+		WindowOracle.StepResults = oracle.settingsInterfaceResults()
+
+		if history:
+			WindowOracle.ChoiceHistory = history
+			try: WindowOracle.ChoiceService = Oracle.instance(history['service'])
+			except: pass
+			try: WindowOracle.ChoiceInput = history['query']
+			except: pass
+			try: WindowOracle.ChoiceMode = history['mode']
+			except: pass
+			try: WindowOracle.ChoiceMedia = history['media']
+			except: pass
+			self.showBusy()
+		elif full:
+			self.showIntro()
+		else:
+			if WindowOracle.StepService and not WindowOracle.StepService is True: WindowOracle.ChoiceService = WindowOracle.StepService
+			if WindowOracle.StepMode and not WindowOracle.StepMode is True: WindowOracle.ChoiceMode = WindowOracle.StepMode
+
+			WindowOracle.Steps['intro']['next'] = self.showService if WindowOracle.StepService is True else self.showMode if WindowOracle.StepMode is True else self.showBusy
+			WindowOracle.Steps['service']['next'] = self.showMode if WindowOracle.StepMode is True else self.showBusy
+			WindowOracle.Steps['mode']['next'] = self.showBusy
+
+			if WindowOracle.StepIntro: self.showIntro()
+			else: WindowOracle.Steps['intro']['next']()
+
+	@classmethod
+	def showIntro(self):
+		WindowOracle.Window = WindowOracleIntro
+		WindowOracleIntro.show(progress = 10, stepper = True, callbackHelp = self.help, callbackClose = self.close, callbackCancel = self.close, callbackNext = WindowOracle.Steps['intro']['next'])
+		self.closeAll(WindowOracleIntro)
+
+	@classmethod
+	def showService(self, service = None):
+		WindowOracle.ChoiceService = service
+		WindowOracle.ChoiceConversation = None
+		WindowOracle.Window = WindowOracleService
+		WindowOracleService.show(progress = 20, stepper = True, callbackHelp = self.help, callbackClose = self.close, callbackCancel = self.close, callbackBack = WindowOracle.Steps['service']['back'], navigationNext = False)
+		self.closeAll(WindowOracleService)
+
+	@classmethod
+	def showMode(self, mode = None):
+		WindowOracle.ChoiceMode = mode
+		WindowOracle.ChoiceInput = None
+		WindowOracle.Window = WindowOracleMode
+		WindowOracleMode.show(progress = 30, stepper = True, callbackHelp = self.help, callbackClose = self.close, callbackCancel = self.close, callbackBack = WindowOracle.Steps['mode']['back'], navigationNext = False)
+		self.closeAll(WindowOracleMode)
+
+	@classmethod
+	def showBusy(self):
+		WindowOracle.Window = WindowOracleBusy
+		if WindowOracle.StepBusy: WindowOracleBusy.show(progress = WindowOracle.ProgressChat[0], stepper = True, callbackHelp = self.help, callbackClose = self.close, callbackCancel = self.close, navigationBack = False, navigationNext = False)
+		else: WindowOracleBusy.chat(loader = True)
+		self.closeAll(WindowOracleBusy)
+
+	@classmethod
+	def showResults(self):
+		from lib.oracle import Oracle
+		valid = Oracle.detailsValid(conversation = WindowOracle.ChoiceConversation)
+		WindowWizard.Window = WindowOracleResults
+		if WindowOracle.StepResults or not valid: WindowOracleResults.show(progress = 100, stepper = True, callbackHelp = self.help, callbackClose = self.close, callbackCancel = WindowOracleResults.cancel)
+		elif valid:
+			interface.Loader.show()
+			WindowOracleResults.preload()
+		self.closeAll(WindowOracleResults)
+		if valid: Oracle.tutorialUpdate(service = WindowOracle.ChoiceService, mode = WindowOracle.ChoiceMode)
+
+
+class WindowOracleIntro(WindowStep):
+
+	def __init__(self, **kwargs):
+		super(WindowOracleIntro, self).__init__(**kwargs)
+
+	@classmethod
+	def show(self, **kwargs):
+		return super(WindowOracleIntro, self).show(navigationBack = False, **kwargs)
+
+	def _addContent(self):
+		dimension = super(WindowOracleIntro, self)._addContent()
+		height = 360
+		x, y = self._center()
+		self._addLabel(text = '%s %s' % (tools.System.name(), interface.Translation.string(33675)), x = x, y = y - 260, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontHuge(), bold = True, uppercase = True, color = self._colorHighlight())
+		self._addLabel(text = interface.Translation.string(33975), x = x, y = y - 130, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), bold = True)
+		return dimension
+
+
+class WindowOracleService(WindowStepScroll):
+
+	def __init__(self, **kwargs):
+		super(WindowOracleService, self).__init__(title = 36310, refocus = True, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
+
+	@classmethod
+	def show(self, **kwargs):
+		return super(WindowOracleService, self).show(**kwargs)
+
+	def _addItems(self):
+		try:
+			from lib.oracle import Oracle
+			items = []
+			for service in Oracle.Services:
+				service = Oracle.instance(service)
+				if service and service.settingsEnabled():
+					items.append(self._addEntry(service))
+			self.itemAdd(item = items)
+		except: tools.Logger.error()
+
+	def _addEntry(self, service):
+		try:
+			label = service.name()
+			label1 = service.rating(label = True, format = True)
+			label2 = service.type(label = True)
+			label3 = service.intelligence(label = True, format = True)
+			label4 = service.subscription(label = True, format = True)
+
+			icon = self._pathIcon(icon = service.id(), quality = interface.Icon.QualityLarge, special = interface.Icon.SpecialOracle)
+
+			return self._addItem(label = label, label1 = label1, label2 = label2, label3 = label3, label4 = label4, icon = icon, callback = lambda: self._selectEntry(service = service))
+		except: tools.Logger.error()
+
+	def _selectEntry(self, service):
+		try: authenticated = service.accountAuthenticated(free = True)
+		except:
+			try: authenticated = service.accountAuthenticated()
+			except: authenticated = True # Does not have this function. Assuming it is free.
+		if not authenticated:
+			service.accountAuthentication()
+			try: authenticated = service.accountAuthenticated(free = True)
+			except:
+				try: authenticated = service.accountAuthenticated()
+				except: authenticated = True
+		if authenticated:
+			WindowOracle.ChoiceService = service
+			if WindowOracleMode.support(): WindowOracle.Steps['service']['next']()
+			else: WindowOracleMode.input()
+
+
+class WindowOracleMode(WindowStepScroll):
+
+	def __init__(self, **kwargs):
+		super(WindowOracleMode, self).__init__(title = 36311, refocus = True, xml = True, xmlType = Window.TypeWizardSmall, **kwargs)
+
+	@classmethod
+	def show(self, **kwargs):
+		return super(WindowOracleMode, self).show(**kwargs)
+
+	def _addItems(self):
+		try:
+			from lib.oracle import Oracle
+
+			service = WindowOracle.ChoiceService
+			support = service.querySupport(media = WindowOracle.ChoiceMedia)
+
+			items = []
+			if support[Oracle.ModeList]: items.append(self._addEntry(service = service, mode = Oracle.ModeList, title = 36032, description = [36033, 36320]))
+			if support[Oracle.ModeSingle]: items.append(self._addEntry(service = service, mode = Oracle.ModeSingle, title = 36034, description = [36035, 36320]))
+			if support[Oracle.ModePlain]: items.append(self._addEntry(service = service, mode = Oracle.ModePlain, title = 36029, description = [36030, 36321]))
+			self.itemAdd(item = items)
+		except: tools.Logger.error()
+
+	def _addEntry(self, service, mode, title, description):
+		try:
+			label = title
+			label1 = description[0]
+			label2 = description[1]
+
+			icon = self._pathIcon(icon = service.id() + mode, quality = interface.Icon.QualityLarge, special = interface.Icon.SpecialOracle)
+
+			return self._addItem(label = label, label1 = label1, label2 = label2, icon = icon, callback = lambda: self.input(mode = mode))
+		except: tools.Logger.error()
+
+	@classmethod
+	def input(self, mode = None, navigate = True):
+		from lib.oracle import Oracle
+		input = interface.Dialog.input(title = Oracle._showTitle(35026))
+		if input:
+			WindowOracle.ChoiceMode = mode or Oracle.ModePlain
+			WindowOracle.ChoiceInput = input
+			if navigate: WindowOracle.Steps['mode']['next']()
+		return input
+
+	@classmethod
+	def support(self):
+		from lib.oracle import Oracle
+		support = WindowOracle.ChoiceService.querySupport(media = WindowOracle.ChoiceMedia)
+		return sum([int(support[Oracle.ModeList]), int(support[Oracle.ModeSingle]), int(support[Oracle.ModePlain])]) > 1
+
+
+class WindowOracleBusy(WindowStep):
+
+	IconSize				= 300
+
+	AnimationSteps			= 7		# How many steps/components need to be animated.
+	AnimationDuration		= 1000	# The standard duration for each step.
+	AnimationOverlap		= 0.5	# The percentage of the duration to start the next step animation while the previous step is still busy. Allows multiple components to be animated at the same time, to ensure a smoother transition from one step to the next.
+
+	PropertyAnimationStep	= 'GaiaAnimationStep%d'
+
+	def __init__(self, **kwargs):
+		super(WindowOracleBusy, self).__init__(title = 36322, xml = True, xmlType = Window.TypeOracleChat, xmlOffset = None, navigationRow = 1, navigationIndex = 0, **kwargs)
+		self.mAnimationImages = []
+		self.mAnimationThread = None
+
+	def _initializeEnd2(self):
+		super(WindowOracleBusy, self)._initializeEnd2()
+		self.animate()
+		self.chat()
+
+	@classmethod
+	def show(self, **kwargs):
+		return super(WindowOracleBusy, self).show(**kwargs)
+
+	@classmethod
+	def chat(self, loader = False):
+		# Not sure if this helps, but sometimes when cached chats are used, the busy window gets stuck on "Finalizing conversation".
+		# Probably because the animation thread is going into its loop AFTER the chat thread has already completed.
+		# Update: Seems to solve the issue.
+		# Update: this is also important when using the Loader instead of WindowOracleBusy.
+		tools.Time.sleep(0.1)
+
+		if loader: interface.Loader.show()
+		Pool.thread(target = self._chat, kwargs = {'loader' : loader}, start = True)
+
+	@classmethod
+	def _chat(self, loader = False):
+		# Non-tutorial launches WindowOracleBusy before the input is available.
+		if WindowOracle.ChoiceInput is None:
+			self._chatProgress(progress = 0, status = 36339)
+			input = WindowOracleMode.input(mode = WindowOracle.ChoiceMode, navigate = False)
+			if not input: WindowOracleBusy.close()
+			if loader: interface.Loader.show()
+
+		if WindowOracle.ChoiceInput:
+			conversation = None
+			refine = False
+			if WindowOracle.ChoiceConversation:
+				conversation = WindowOracle.ChoiceConversation
+				refine = True
+
+			WindowOracle.ChoiceConversation = WindowOracle.ChoiceService.chatHistory(query = WindowOracle.ChoiceInput, media = WindowOracle.ChoiceMedia, mode = WindowOracle.ChoiceMode, history = WindowOracle.ChoiceHistory, conversation = conversation, refine = refine, menu = False, progress = self._chatProgress)
+			if WindowOracle.ChoiceConversation:
+				if (not loader and WindowOracleBusy.visible()) or (loader and interface.Loader.visible()):
+					if loader: interface.Loader.hide()
+					WindowOracle.Steps['busy']['next']()
+
+	@classmethod
+	def _chatProgress(self, progress, status):
+		progress = progress[1] if tools.Tools.isArray(progress) else progress
+		progress = tools.Math.scale(progress, fromMinimum = 0, fromMaximum = 1, toMinimum = WindowOracle.ProgressChat[0], toMaximum = WindowOracle.ProgressChat[1])
+		self.update(progress = progress)
+		self._updateLabel(description = status)
+
+	def _addItems(self):
+		offset = self._centerY(height = WindowOracleBusy.IconSize) + self._scaleHeight(75)
+		dimension = [self._scaleWidth(WindowOracleBusy.IconSize), self._scaleHeight(WindowOracleBusy.IconSize)]
+		duration = int(WindowOracleBusy.AnimationDuration * (1 + WindowOracleBusy.AnimationOverlap))
+
+		colorEmpty = interface.Format.colorSecondary()
+		colorFull = interface.Format.colorPrimary()
+
+		# We need to use a thread to handle the animation.
+		# Using pure Kodi animation parameters does not work.
+		# We can set a delay BEFORE the animation, but no delay AFTER the animation (during pulse/loop).
+		# Hence, after the first iteration, the individual components' animations become out of sync.
+		for i in range(WindowOracleBusy.AnimationSteps):
+			step = WindowOracleBusy.PropertyAnimationStep % i
+
+			# First animation is to reset the color at the start.
+			animation = [
+				('Conditional', 'effect=fade start=100 end=0 time=0 loop=false pulse=false tween=linear easing=inout condition=String.IsEmpty(Window.Property(%s))' % (step)),
+				('Conditional', 'effect=fade start=0 end=100 time=%d loop=false pulse=true tween=linear easing=inout condition=String.IsEqual(Window.Property(%s),1)' % (duration, step)),
+			]
+
+			self._addImage(path = self._pathImage(['oracle', 'oracle%d' % (i + 1)]), x = self._centerX(dimension[0]), y = offset, width = dimension[0], height = dimension[1], color = colorEmpty)
+			image = self._addImage(path = self._pathImage(['oracle', 'oracle%d' % (i + 1)]), x = -1000, y = -1000, width = dimension[0], height = dimension[1], color = colorFull, animation = animation)
+
+			# When the window opens, sometimes for a split second the enitre brain shows up in green, since the intial animation has not be completed.
+			# Setting the visibility does not work, since it seems that the animation only starts once the control becomes visible.
+			# Hence, position the filled parts off screen, and move them into view in the animation thread.
+			self.mAnimationImages.append({'control' : image, 'x' : self._centerX(dimension[0]), 'y' : offset})
+
+		self._addImage(path = self._pathImage(['oracle', 'oracle']), x = self._centerX(dimension[0]), y = offset, width = dimension[0], height = dimension[1])
+
+	def animate(self):
+		if not self.mAnimationThread: self.mAnimationThread = Pool.thread(target = self._animate, start = True)
+
+	def _animate(self):
+		for image in self.mAnimationImages:
+			image['control'].setPosition(image['x'], image['y'])
+
+		stepCurrent = 0
+		stepNext = 0
+		stepTime = {}
+
+		duration = WindowOracleBusy.AnimationDuration
+		overlap = int(duration * (1 + WindowOracleBusy.AnimationOverlap))
+		timePrevious = tools.Time.timestamp(milliseconds = True)
+
+		while True:
+			if tools.System.aborted() or WindowOracle.ActionClosed or WindowStep.ActionClosed or not WindowOracleBusy.visible(): break
+			timeCurrent = tools.Time.timestamp(milliseconds = True)
+
+			if timeCurrent - timePrevious >= duration:
+				self.propertySet(WindowOracleBusy.PropertyAnimationStep % stepCurrent, '1')
+				timePrevious = timeCurrent
+				stepTime[stepCurrent] = timePrevious
+				stepCurrent += 1
+				if stepCurrent > WindowOracleBusy.AnimationSteps - 1: stepCurrent = 0
+
+			if stepNext in stepTime and (timeCurrent - stepTime[stepNext]) > overlap:
+				stepNext = stepCurrent
+				index = stepNext - 2
+				for j in range(2):
+					step = index - j
+					if step < 0: step += WindowOracleBusy.AnimationSteps
+					if self.property(WindowOracleBusy.PropertyAnimationStep % step) == '1':
+						self.propertySet(WindowOracleBusy.PropertyAnimationStep % step, '0')
+
+			tools.Time.sleep(0.25)
+
+
+class WindowOracleResults(WindowStep):
+
+	def __init__(self, **kwargs):
+		super(WindowOracleResults, self).__init__(title = 36330, xml = True, xmlType = Window.TypeOracleResults, xmlOffset = None, orientation = WindowStep.OrientationVertical, navigationRow = 1, **kwargs)
+
+	def _initializeEnd1(self):
+		super(WindowOracleResults, self)._initializeEnd1()
+		self._addDetails()
+
+	@classmethod
+	def show(self, **kwargs):
+		from lib.oracle import Oracle
+		if Oracle.detailsValid(conversation = WindowOracle.ChoiceConversation):
+			navigationNext = {'label' : 33832, 'icon' : 'check'}
+			callbackNext = self.finish
+		else:
+			navigationNext = {'label' : 35678, 'icon' : 'return'}
+			callbackNext = self.retry
+		return super(WindowOracleResults, self).show(navigationBack = {'label' : 35102, 'icon' : 'categories'}, callbackBack = self.options, navigationNext = navigationNext, callbackNext = callbackNext, **kwargs)
+
+	def _addDetails(self):
+		try:
+			from lib.oracle import Oracle
+			from lib.modules.convert import ConverterDuration
+
+			conversation = WindowOracle.ChoiceConversation
+			service = Oracle.instance(conversation['chatbot']['service'])
+
+			valid = service.detailsValid(conversation = conversation)
+			self._updateLabel(description = ['', service.details(conversation = conversation, label = Oracle.LabelColor, name = True, description = True)])
+
+			preloaded = service.settingsPreload() and valid
+			if preloaded: self.preload(force = True)
+			WindowOracle.ChoicePreloaded = valid and preloaded
+
+			if conversation:
+				report = service.settingsReportAutomatic()
+				if (report == 1) or (report == 2 and valid) or (report == 3 and not valid): service.report(conversation = conversation)
+		except: tools.Logger.error()
+
+	def _addItems(self):
+		try:
+			from lib.oracle import Oracle
+			if WindowOracle.ChoiceConversation['chat']['history']:
+				items = []
+				history = WindowOracle.ChoiceConversation['chat']['history']
+				count = len(history)
+				for i in range(count):
+					items.append(self._addEntry(chat = history[i], last = i == count - 1))
+				self.itemAdd(item = items, select = -1)
+		except: tools.Logger.error()
+
+	def _addEntry(self, chat, last = False):
+		try:
+			from lib.oracle import Oracle
+
+			agent = chat['agent']
+			service = chat['chatbot']['service']
+			if agent == Oracle.AgentSystem:
+				name = 33712
+				color = interface.Format.colorDisabled()
+				icon = tools.File.joinPath(self._pathLogo(size = interface.Icon.QualitySmall), 'iconcolor.png')
+			elif agent == Oracle.AgentUser:
+				name = 32303
+				color = interface.Format.colorPrimary()
+				icon = tools.File.joinPath(self._pathLogo(size = interface.Icon.QualitySmall), 'iconcolor.png')
+			elif agent == Oracle.AgentChatbot:
+				name = Oracle.instance(service).name()
+				color = interface.Format.colorSecondary()
+				icon = self._pathIcon(icon = service, quality = interface.Icon.QualitySmall, special = interface.Icon.SpecialOracle)
+
+			message = Oracle.reportFormat(chat, prettify = True, reduce = True)
+			item = self._addItem(label = message, callback = lambda : Oracle.instance().report(WindowOracle.ChoiceConversation))
+			item['item'].setProperties({
+				'GaiaName' : interface.Translation.string(name),
+				'GaiaLast' : int(last),
+				'GaiaAgent' : agent,
+				'GaiaIcon' : icon,
+				'GaiaColorBorder' : color,
+				'GaiaColorFill' : interface.Format.colorAlpha(color, alpha = '55'),
+			})
+			return item
+		except: tools.Logger.error()
+
+	@classmethod
+	def options(self):
+		from lib.oracle import Oracle
+		conversation = WindowOracle.ChoiceConversation
+		instance = Oracle.instance()
+		option = instance._showOptions(cancel = True, help = True, list = Oracle.detailsCountAddon(conversation = conversation) > 0, refine = conversation and conversation['chat']['refine'], retry = True, report = True, save = True)
+		if not option: self.cancel()
+		elif option == Oracle.ActionList: self.finish()
+		elif option == Oracle.ActionRetry: self.retry()
+		elif option == Oracle.ActionRefine: self.refine()
+		elif option == Oracle.ActionReport: instance.report(conversation = conversation)
+		elif option == Oracle.ActionSave: instance.reportSave(conversation = conversation)
 
 	@classmethod
 	def cancel(self):
-		instance = self.instance()
-		if instance: instance._actionClose()
+		self.close()
+		if WindowOracle.ChoicePreloaded: interface.Directory.back() # Must be AFTER close().
 
 	@classmethod
-	def _clock(self, duration):
-		from lib.modules.convert import ConverterDuration
-		return ConverterDuration(value = duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
+	def finish(self):
+		self.preload()
+		self.close()
 
-	def _addButtons(self):
-		text = '%s (+%s)' % (interface.Translation.string(33897), self.mSkipClock)
-		icon = 'change'
-		duration = int(WindowSkip.DurationAnimation * 1000)
+	@classmethod
+	def retry(self):
+		WindowOracle.Steps['intro']['next']()
+		self.close()
 
-		dimension = self._dimensionButton(text = text, icon = icon, adjust = 0.7)
-		self.mSkipDummy = self._addButton(text = text, x = Window.SizeWidth + 10, y = Window.SizeHeight + 10, icon = icon, iconOffset = 0.05, width = dimension[0])
-		width = self.mSkipDummy[0].getWidth()
+	@classmethod
+	def refine(self):
+		from lib.oracle import Oracle
+		WindowOracleMode.input(mode = Oracle.ModePlain)
 
-		x = Window.SizeWidth + 1
-		y = Window.SizeHeight - 150
-		position = width - 7
-
-		self.propertySet(WindowSkip.PropertyAnimation, '')
-		animation = [
-			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowSkip.PropertyAnimation, WindowSkip.StateHidden)),
-			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (53, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)), # 55 still shows the label pixels on a TV.
-			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowSkip.PropertyAnimation, WindowSkip.StateVisible)),
-		]
-		self.mSkipButton = self._addButton(text = text, x = x, y = y, width = dimension[0], callback = self._actionClick, icon = icon, iconOffset = 0.05, animation = animation)
-
-	def _actionClick(self, control = None):
-		try:
-			self._actionInteract(action = WindowBase.ActionSelectItem)
-		except: tools.Logger.error()
-
-	def _actionInteract(self, action = None):
-		try:
-			self.mSkipInteract = True
-			self._actionToggle(action = action)
-		except: tools.Logger.error()
-
-	def _actionToggle(self, action = None):
-		try:
-			if action in WindowBase.ActionsCancel:
-				self._actionClose()
-			elif action == WindowBase.ActionSelectItem:
-				if self.focusHas(control = self.mSkipButton[0]):
-					if self.mSkipCallback: self.mSkipCallback()
-					self._actionClose()
-				else:
-					self.focus(control = self.mSkipButton[0])
-			else:
-				if self.mSkipState is None:
-					self.focus(self.mSkipButton[0])
-					self.mSkipState = WindowSkip.StateVisible
-					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-					Pool.thread(target = self._threadPartial, start = True)
-				elif self.focusHas(control = self.mSkipButton[0]):
-					if self.mSkipState == WindowSkip.StateHidden:
-						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StatePartial
-					elif self.mSkipState == WindowSkip.StatePartial:
-						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StateVisible
-						elif action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StateHidden
-					elif self.mSkipState == WindowSkip.StateVisible:
-						if action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StatePartial
-
-					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-
-					if self.mSkipState == WindowSkip.StateHidden and (not self.mSkipThread or not self.mSkipThread.alive()):
-						self.mSkipThread = Pool.thread(target = self._threadClose, start = True)
-				else:
-					self.focus(control = self.mSkipButton[0])
-		except: tools.Logger.error()
-
-	def _actionClose(self, sleep = True):
-		try:
-			self.mSkipState = WindowSkip.StateHidden
-			self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-			self.mSkipCanceled = True
-			if sleep: tools.Time.sleep(WindowSkip.DurationAnimation * 0.1)
-			self.close()
-		except: tools.Logger.error()
-
-	def _threadClose(self):
-		try:
-			# Close the window after being hidden for a few seconds.
-			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowSkip.
-			for i in range(max(3, min(6, int(self.mSkipTime / 2.0))) * 2):
-				if self.mSkipCanceled or not self.mSkipState == WindowSkip.StateHidden: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateHidden: self.close()
-		except: tools.Logger.error()
-
-	def _threadPartial(self):
-		try:
-			# Partially hide after a few seconds.
-			for i in range(self.mSkipTime * 2):
-				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StateVisible: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
-
-			# Fully hide after a few seconds.
-			for i in range(self.mSkipTime * 4): # Twice as long as the full visibility.
-				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StatePartial: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)
-		except: tools.Logger.error()
+	@classmethod
+	def preload(self, force = False):
+		from lib.oracle import Oracle
+		if (not WindowOracle.ChoicePreloaded and Oracle.detailsValid(conversation = WindowOracle.ChoiceConversation)) or force:
+			loader = not force
+			if loader: interface.Loader.show()
+			Oracle.instance().menu(data = WindowOracle.ChoiceConversation, external = True, background = True, loader = loader)

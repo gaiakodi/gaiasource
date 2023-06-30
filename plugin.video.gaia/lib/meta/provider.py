@@ -512,7 +512,7 @@ class MetaProvider(object):
 					season = result.idSeason(provider = provider)
 
 				if season:
-					season = self.season(id = season, level = level, cache = cache, threaded = threaded)
+					season = self.season(id = season, show = result, level = level, cache = cache, threaded = threaded)
 					if season: result.seasonSet(value = season, unique = provider)
 
 		# TVDb uses the year as season number for some daytime shows.
@@ -531,32 +531,32 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None, threaded = None):
+	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, show = None, level = None, cache = None, threaded = None):
 		numberSeason, _ = self._defaultNumber(media = MetaData.MediaSeason, number = number, numberSeason = numberSeason)
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSeason, function = self.__season, media = MetaData.MediaSeason, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, level = level)
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSeason, function = self.__season, media = MetaData.MediaSeason, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, show = show, level = level)
 
 	@classmethod
-	def __season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, level = None, cache = None, threaded = None):
-		result = self._season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, level = level)
+	def __season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, show = None, level = None, cache = None, threaded = None):
+		result = self._season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, show = show, level = level)
 		if result:
 			if level >= MetaProvider.Level6:
 				provider = self.provider()
 
 				episode = result.idEpisode(provider = provider)
 				if episode:
-					episode = self.episode(id = episode, level = MetaProvider.Level6, cache = cache, threaded = threaded)
+					episode = self.episode(id = episode, show = show, season = result, level = MetaProvider.Level6, cache = cache, threaded = threaded)
 					if episode: result.episodeSet(value = episode, unique = provider)
 
 				if level >= MetaProvider.Level7:
-					show = result.idShow(provider = provider)
-					if show:
-						show = self.show(id = show, level = MetaProvider.Level3, cache = cache, threaded = threaded)
-						if show: result.showSet(value = show, unique = provider)
+					resultShow = result.idShow(provider = provider)
+					if resultShow:
+						resultShow = self.show(id = resultShow, level = MetaProvider.Level3, cache = cache, threaded = threaded)
+						if resultShow: result.showSet(value = resultShow, unique = provider)
 		return result
 
 	# Virtual
 	@classmethod
-	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, level = None):
+	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, show = None, level = None):
 		pass
 
 	###################################################################
@@ -564,33 +564,33 @@ class MetaProvider(object):
 	###################################################################
 
 	@classmethod
-	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, level = None, cache = None, threaded = None):
+	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, threaded = None):
 		numberSeason, numberEpisode = self._defaultNumber(media = MetaData.MediaEpisode, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheEpisode, function = self.__episode, media = MetaData.MediaEpisode, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level)
+		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheEpisode, function = self.__episode, media = MetaData.MediaEpisode, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level)
 
 	@classmethod
-	def __episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, level = None, cache = None, threaded = None):
-		result = self._episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level)
+	def __episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, threaded = None):
+		result = self._episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level)
 		if result:
 			if level >= MetaProvider.Level7:
 				provider = self.provider()
-				season = result.idSeason(provider = provider)
+				resultSeason = result.idSeason(provider = provider)
 
-				if season:
-					season = self.season(id = season, level = MetaProvider.Level4, threaded = threaded)
-					if season:
-						show = result.idShow(provider = provider)
-						if show:
-							show = self.show(id = show, level = MetaProvider.Level4, threaded = threaded)
-							if show:
-								season.showSet(value = show, unique = provider)
-								result.showSet(value = show, unique = provider) # Set for the episode as well.
-						result.seasonSet(value = season, unique = provider)
+				if resultSeason:
+					resultSeason = self.season(id = resultSeason, show = show, level = MetaProvider.Level4, threaded = threaded)
+					if resultSeason:
+						resultShow = result.idShow(provider = provider)
+						if resultShow:
+							resultShow = self.show(id = resultShow, level = MetaProvider.Level4, threaded = threaded)
+							if resultShow:
+								resultSeason.showSet(value = resultShow, unique = provider)
+								result.showSet(value = resultShow, unique = provider) # Set for the episode as well.
+						result.seasonSet(value = resultSeason, unique = provider)
 		return result
 
 	# Virtual
 	@classmethod
-	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, level = None):
+	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None):
 		return None
 
 	###################################################################

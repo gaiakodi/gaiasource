@@ -101,27 +101,27 @@ def getTrakt(url, post = None, headers = None, cache = True, check = True, times
 		if code is None:
 			try: code = result['status']['code']
 			except: code = None
+		code = code if tools.Tools.isNumber(code) else 0
 		data = network.Networker.dataText(result['data'])
 
 		# Sometimes Trakt returns an HTML page containing something like: <title>api.trakt.tv | 502: Bad gateway</title>
 		# This is typically a temporay problem, sometimes only lasting a few seconds/minutes.
 		# Might be a Cloudflare redirection issue, or maybe a Trakt server restart.
-		if code == 429:
+		if code == 429: # Rate limit reached.
 			limit = _limit(url = url, data = result, wait = limit)
 			if limit:
 				return getTrakt(url = url, post = post, cache = cache, check = check, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
 			else:
 				if extended: return None, result['headers'], result['error']
 				else: return None
-		elif (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
+		elif (not data and code >= 300 and not(code == 404 or code == 401 or code == 405)) or (code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data): # Server errors.
 			_error(url = url, post = post, timestamp = timestamp, message = 33676)
 			if extended: return None, result['headers'], result['error']
 			else: return None
-		elif data and not (code == 401 or code == 405):
-			#if check: cacheUpdate() # Now checked at the end of the script execution.
+		elif data and not(code == 401 or code == 405): # Returned valid data without failing authorization.
 			if extended: return data, result['headers'], result['error']
 			else: return data
-		elif code == 404:
+		elif code == 404: # Movie/show cannot be found.
 			#_error(url = url, post = post, timestamp = timestamp, message = 33786) # Do not show notifications if some movie data cannot be found.
 			if extended: return None, result['headers'], result['error']
 			else: return None
@@ -135,24 +135,25 @@ def getTrakt(url, post = None, headers = None, cache = True, check = True, times
 		if code is None:
 			try: code = result['status']['code']
 			except: code = None
+		code = code if tools.Tools.isNumber(code) else 0
 		data = network.Networker.dataText(result['data'])
 
-		if code == 429:
+		if code == 429: # Rate limit reached.
 			limit = _limit(url = url, data = result, wait = limit)
 			if limit:
 				return getTrakt(url = url, post = post, cache = cache, check = check, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
 			else:
 				if extended: return None, result['headers'], result['error']
 				else: return None
-		elif (not data and not code == 404 and code >= 300) or (tools.Tools.isNumber(code) and code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data):
+		elif (not data and code >= 300 and not(code == 404 or code == 401 or code == 405)) or (code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data): # Server errors.
 			_error(url = url, post = post, timestamp = timestamp, message = 33676)
 			if extended: return None, result['headers'], result['error']
 			else: return None
-		elif data and (code == 401 or code == 405):
+		elif code == 401 or code == 405 or (code == 400 and data and tools.Tools.isString(data) and 'invalid_grant' in data): # Oauth token failed.
 			_error(url = url, post = post, timestamp = timestamp, message = 33677)
 			if extended: return None, result['headers'], result['error']
 			else: return None
-		elif code == 404:
+		elif code == 404: # Movie/show cannot be found.
 			#_error(url = url, post = post, timestamp = timestamp, message = 33786) # Do not show notifications if some movie data cannot be found.
 			if extended: return None, result['headers'], result['error']
 			else: return None
@@ -188,7 +189,8 @@ def cacheUpdate(wait = False):
 	else: Pool.thread(target = _cacheProcess, start = True)
 
 def _cache(url, post = None, timestamp = None):
-	return Cache.instance().traktCache(link = url, data = post, timestamp = timestamp)
+	if not 'scrobble' in url:
+		return Cache.instance().traktCache(link = url, data = post, timestamp = timestamp)
 
 def _cacheProcess():
 	while True:
@@ -773,7 +775,11 @@ def SearchMovie(title = None, year = None, imdb = None, tmdb = None, tvdb = None
 		elif tvdb: url = '/search/tvdb/%s?type=movie' % str(tvdb)
 		elif title:
 			url = '/search/movie?query=%s' % network.Networker.linkQuote(title, plus = True)
-			if year: url += '&years=%s' % str(year)
+			if year:
+				if tools.Tools.isArray(year):
+					if len(year) == 1: year = year[0]
+					else: year = '%d-%d' % (year[0], year[1])
+				url += '&years=%s' % str(year)
 		else: return None
 		if full: url += ('&' if '?' in url else '?') + 'extended=full'
 
@@ -795,7 +801,11 @@ def SearchTVShow(title = None, year = None, imdb = None, tmdb = None, tvdb = Non
 		elif tmdb: url = '/search/tmdb/%s?type=show' % str(tmdb)
 		elif title:
 			url = '/search/show?query=%s' % network.Networker.linkQuote(title, plus = True)
-			if year: url += '&years=%s' % str(year)
+			if year:
+				if tools.Tools.isArray(year):
+					if len(year) == 1: year = year[0]
+					else: year = '%d-%d' % (year[0], year[1])
+				url += '&years=%s' % str(year)
 		else: return None
 		if full: url += ('&' if '?' in url else '?') + 'extended=full'
 

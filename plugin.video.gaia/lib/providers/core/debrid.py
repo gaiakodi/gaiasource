@@ -267,7 +267,8 @@ class ProviderDebrid(ProviderPremium):
 								else: self.searchAdd(id = id, stream = stream)
 						except: self.logError()
 
-				if not self.stopped(): self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
+				# Use at least 5 threads, since Premiumize can be a bit slow, since it retrieves additional metadata in searchAdd().
+				if not self.stopped(): self.threadExecute(threads, limit = self.concurrencyTasks(level = 2, minimum = 5))
 		except: self.logError()
 
 	# Can be overwritten by subsclasses if additional metadata has to be retrieved.

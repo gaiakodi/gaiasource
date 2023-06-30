@@ -46,6 +46,7 @@ from lib.modules.external import Importer
 
 class Json(object):
 
+	Indent			= '\t'
 	Separators		= (',', ':')	# Otherwise unnecessary spaces are added between the key and the value, increasing the JSON string size.
 	Ujson			= None
 
@@ -75,9 +76,26 @@ class Json(object):
 		return self.nativeDecode(data = data, default = default)
 
 	@classmethod
-	def encode(self, data, default = None):
-		try: return self._ujsonEncode(data = data)
-		except AttributeError: return self.nativeEncode(data = data, default = default)
+	def encode(self, data, ascii = True, default = None):
+		try: return self._ujsonEncode(data = data, ascii = ascii)
+		except AttributeError: return self.nativeEncode(data = data, ascii = ascii, default = default)
+		except: return default
+
+	@classmethod
+	def prettify(self, data, ascii = True, default = None, indent = True):
+		# Ujson does not have an indent parameter.
+		try: return self.nativePrettify(data = data, ascii = ascii, default = default, indent = indent)
+		except: return default
+
+	@classmethod
+	def extract(self, data, default = None, multiple = True, text = False, uncomment = False, bounds = None):
+		if uncomment: data = self.uncomment(data = data, default = default)
+		try: return self.nativeExtract(data = data, multiple = multiple, text = text, bounds = bounds)
+		except: return default
+
+	@classmethod
+	def uncomment(self, data, default = None):
+		try: return self.nativeUncomment(data = data)
 		except: return default
 
 	##############################################################################
@@ -90,10 +108,52 @@ class Json(object):
 		except: return default
 
 	@classmethod
-	def nativeEncode(self, data, default = None):
+	def nativeEncode(self, data, ascii = True, default = None):
 		# 'default' must return a non-encoded object that can be JSON encoded.
-		try: return json.dumps(data, default = self._serializeObject, separators = Json.Separators)
+		try: return json.dumps(data, ensure_ascii = ascii, default = self._serializeObject, separators = Json.Separators)
 		except: return default
+
+	@classmethod
+	def nativePrettify(self, data, ascii = True, default = None, indent = True):
+		# Leave out Json.Separators.
+		try: return json.dumps(data, ensure_ascii = ascii, default = self._serializeObject, indent = Json.Indent if indent is True else indent if indent else None)
+		except: return default
+
+	@classmethod
+	def nativeExtract(self, data, multiple = True, text = False, bounds = None):
+		# https://stackoverflow.com/questions/64919264/how-to-pull-out-json-blobs-from-large-random-string-which-contains-plain-text-an
+		result1 = []
+		result2 = []
+		index = 0
+
+		while index < len(data):
+			end = None
+			if data[index] == '{': end = '}'
+			elif data[index] == '[': end = ']'
+			if end:
+				if not bounds is None: bounds.append(data[:index])
+
+				for i in range(len(data) - 1, index, -1):
+					if data[i] == end:
+						try:
+							value = data[index : i + 1]
+							result1.append(json.loads(value))
+							result2.append(value)
+							index = i
+							if not bounds is None: bounds.append(data[index + 1:])
+							break
+						except json.JSONDecodeError: pass
+			index += 1
+			if result1 and not multiple: break
+
+		if text: return ''.join(result2) if multiple else result2[0] if result2 else None
+		else: return result1 if multiple else result1[0] if result1 else None
+
+	@classmethod
+	def nativeUncomment(self, data):
+		# https://stackoverflow.com/questions/69021815/how-to-read-json-file-with-comments
+		import re
+		return re.sub(r'\/\*(\*(?!\/)|[^*])*\*\/|\/\/.*', '', data)
 
 	##############################################################################
 	# UJSON
@@ -104,11 +164,11 @@ class Json(object):
 		return self.ujson().loads(data)
 
 	@classmethod
-	def _ujsonEncode(self, data):
+	def _ujsonEncode(self, data, ascii = True):
 		# Does not have a 'separators' parameter.
 		# Ujson first tries to call __json__() on the object. If the returned value is not a string, an exception is thrown.
 		# 'default' must return an already encoded string.
-		return self.ujson().dumps(data, default = self._serializeString)
+		return self.ujson().dumps(data, ensure_ascii = ascii, default = self._serializeString)
 
 	@classmethod
 	def ujsonDecode(self, data, default = None):
@@ -116,8 +176,8 @@ class Json(object):
 		except: return default
 
 	@classmethod
-	def ujsonEncode(self, data, default = None):
-		try: return self._ujsonEncode(data = data)
+	def ujsonEncode(self, data, ascii = True, default = None):
+		try: return self._ujsonEncode(data = data, ascii = ascii)
 		except: return default
 
 	@classmethod

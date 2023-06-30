@@ -751,6 +751,7 @@ class Icon(object):
 	SpecialAddons = 'addons'
 	SpecialServices = 'services'
 	SpecialHandlers = 'handlers'
+	SpecialOracle = 'oracle'
 
 	ThemeData = {}
 
@@ -781,7 +782,7 @@ class Icon(object):
 					index = theme.find('(')
 					if index >= 0: theme = theme[:index]
 
-				addon = tools.System.pathResources() if theme in ['white', Icon.SpecialQuality, Icon.SpecialDonations, Icon.SpecialNotifications, Icon.SpecialCountries, Icon.SpecialLanguages, Icon.SpecialAddons, Icon.SpecialServices, Icon.SpecialHandlers] else tools.System.pathIcons()
+				addon = tools.System.pathResources() if theme in ['white', Icon.SpecialQuality, Icon.SpecialDonations, Icon.SpecialNotifications, Icon.SpecialCountries, Icon.SpecialLanguages, Icon.SpecialAddons, Icon.SpecialServices, Icon.SpecialHandlers, Icon.SpecialOracle] else tools.System.pathIcons()
 				themePath = tools.File.joinPath(addon, 'resources', 'media', 'icons', theme)
 				quality = tools.Settings.getInteger('theme.general.icon.quality')
 				if quality == 0:
@@ -1421,8 +1422,8 @@ class Format(object):
 
 	@classmethod
 	def clean(self, label):
-		label = tools.Regex.remove(data = label, expression = '(\[.*?\])')
-		label = tools.Regex.remove(data = label, expression = '(\[\/.*?\])')
+		label = tools.Regex.remove(data = label, expression = '(\[.*?\])', all = True)
+		label = tools.Regex.remove(data = label, expression = '(\[\/.*?\])', all = True)
 		return label
 
 
@@ -1896,7 +1897,7 @@ class Dialog(object):
 	#	Add a formatted and indented link.
 	#		{'type' : 'link', 'value' : 'xyz', 'break' : False <True if not provided>, 'identation' : False <True if not provided>}
 	#	Add a list of items, with a bold and colored heading, and text without formatting.
-	#		{'type' : 'list', 'value' : [{'title' : 'List item heading', 'value' : 'Some text'}], 'break' : False <True if not provided>, 'number' : True <False if not provided, shows either bullet points or numbering>}
+	#		{'type' : 'list', 'value' : [{'title' : 'List item heading', 'value' : 'Some text', 'link' : '<optional>'}], 'break' : False <True if not provided>, 'number' : True <False if not provided, shows either bullet points or numbering>}
 	#	Each item can have {'color' : True/False} or {'bold' : True/False} to disable color/bold formatting. By default both are True.
 	@classmethod
 	def details(self, items, mono = False, title = None, text = True):
@@ -1937,6 +1938,12 @@ class Dialog(object):
 						except: identation = True
 						message += self.link(item['value'], color = colorSecondary if color else None, italic = True, bold = False, identation = identation)
 					elif item['type'] == 'list':
+						for entry in item['value']:
+							if 'link' in entry:
+								value = self.link(entry['link'], color = colorSecondary if color else None, italic = True, bold = False, identation = False)
+								if 'value' in entry and entry['value']: value = '%s (%s )' % (entry['value'], value)
+								entry['value'] = value
+
 						try: number = item['number']
 						except: number = False
 						if number: message += Format.FontNewline.join([Format.fontColor(' %d. ' % (i + 1), color = colorSecondary if color else None) + (Format.font(Translation.string(item['value'][i]['title']) + colon, color = colorTitle if color else None) if 'title' in item['value'][i] else ' ') + Translation.string(item['value'][i]['value']) for i in range(len(item['value']))])
@@ -1972,18 +1979,41 @@ class Dialog(object):
 			except: return xbmcgui.Dialog().select(self.title(title), items, useDetails = details)
 
 	@classmethod
-	def option(self, message, labelConfirm = None, labelDeny = None, timeout = None, title = None):
+	def option(self, message, labelConfirm = None, labelDeny = None, default = None, timeout = None, title = None):
 		if not labelConfirm is None: labelConfirm = self.__translate(labelConfirm)
 		if not labelDeny is None: labelDeny = self.__translate(labelDeny)
-		if timeout: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout)
+
+		# Only supported since Kodi 20.
+		if not default is None:
+			if tools.System.versionKodiMinimum(20.0):
+				if default == Dialog.ChoiceYes: default = xbmcgui.DLG_YESNO_YES_BTN
+				elif default == Dialog.ChoiceNo: default = xbmcgui.DLG_YESNO_NO_BTN
+				else: default = None
+			else: default = None
+
+		if not default is None and not timeout is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout, defaultbutton = default)
+		elif not default is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, defaultbutton = default)
+		elif not timeout is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout)
 		else: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny)
 
 	@classmethod
-	def options(self, message, labelConfirm = None, labelDeny = None, labelCustom = None, timeout = None, title = None):
+	def options(self, message, labelConfirm = None, labelDeny = None, labelCustom = None, default = None, timeout = None, title = None):
 		if not labelConfirm is None: labelConfirm = self.__translate(labelConfirm)
 		if not labelDeny is None: labelDeny = self.__translate(labelDeny)
 		if not labelCustom is None: labelCustom = self.__translate(labelCustom)
-		if timeout: return xbmcgui.Dialog().yesnocustom(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, customlabel = labelCustom, autoclose = timeout)
+
+		# Only supported since Kodi 20.
+		if not default is None:
+			if tools.System.versionKodiMinimum(20.0):
+				if default == Dialog.ChoiceYes: default = xbmcgui.DLG_YESNO_YES_BTN
+				elif default == Dialog.ChoiceNo: default = xbmcgui.DLG_YESNO_NO_BTN
+				elif default == Dialog.ChoiceCustom: default = xbmcgui.DLG_YESNO_CUSTOM_BTN
+				else: default = None
+			else: default = None
+
+		if not default is None and not timeout is None: return xbmcgui.Dialog().yesnocustom(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, customlabel = labelCustom, autoclose = timeout, defaultbutton = default)
+		elif not default is None: return xbmcgui.Dialog().yesnocustom(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, customlabel = labelCustom, defaultbutton = default)
+		elif not timeout is None: return xbmcgui.Dialog().yesnocustom(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, customlabel = labelCustom, autoclose = timeout)
 		else: return xbmcgui.Dialog().yesnocustom(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, customlabel = labelCustom)
 
 	# icon: icon or path to image file.
@@ -2133,6 +2163,10 @@ class Dialog(object):
 	#		{'title' : 'Category 1', 'items' : [{'title' : 'Name 1', 'value' : 'Value 1', 'link' : True, 'action' : function, 'parameters' : {}, 'close' : True, 'return' : 'return value', 'back' : <True/False wether or not it is a back button - used for reselection>}, {'title' : 'Name 2', 'value' : 'Value 2', 'action' : function, 'close' : True}]},
 	#		{'title' : 'Category 2', 'items' : [{'title' : 'Name 3', 'value' : 'Value 3', 'link' : False, 'action' : function, 'close' : True, 'return' : 'return value'}, {'title' : 'Name 4', 'value' : 'Value 4', 'action' : function, 'close' : True}]},
 	#	]
+	# Pick the item with a 'selection' attribute (if no 'selection' parameter was provided to the function):
+	#	[
+	#		{'title' : 'Category 1', 'items' : [{'title' : 'Name 1', 'value' : 'Value 1', 'selection' : True}]},
+	#	]
 	@classmethod
 	def information(self, items = None, title = None, refresh = None, reselect = ReselectNo, selection = None, offset = None, details = False, id = None, copy = False):
 		if items is None or len(items) == 0:
@@ -2166,14 +2200,16 @@ class Dialog(object):
 			return label
 
 		def create(items):
-			if not items: return  None, None, None, None, None, None
+			if not items: return None, None, None, None, None, None, None
 			labels = []
 			copies = []
 			actions = []
 			parameters = []
 			closes = []
 			returns = []
+			selection = None
 
+			index = -1
 			total = len(items)
 			end = total - 1
 
@@ -2182,35 +2218,44 @@ class Dialog(object):
 				if not item is None and not(item == Dialog.EmptyLine and i == end): # Exclude empty separator if it is the last element
 					if 'items' in item:
 						if not len(labels) == 0:
+							index += 1
 							labels.append('')
 							copies.append(None)
 							actions.append(None)
 							parameters.append(None)
 							closes.append(None)
 							returns.append(None)
+
+						index += 1
 						labels.append(decorate(item))
 						copies.append(undecorate(item['value']) if 'value' in item else None)
 						actions.append(item['action'] if 'action' in item else None)
 						parameters.append(item['parameters'] if 'parameters' in item else None)
 						closes.append(item['close'] if 'close' in item else False)
 						returns.append(item['return'] if 'return' in item else None)
+						if 'selection' in item and item['selection'] and selection is None: selection = index
+
 						for it in item['items']:
 							if not it is None:
+								index += 1
 								labels.append(decorate(it))
 								copies.append(undecorate(it['value']) if 'value' in it else None)
 								actions.append(it['action'] if 'action' in it else None)
 								parameters.append(it['parameters'] if 'parameters' in it else None)
 								closes.append(it['close'] if 'close' in it else False)
 								returns.append(it['return'] if 'return' in it else None)
+								if 'selection' in it and it['selection'] and selection is None: selection = index
 					else:
+						index += 1
 						labels.append(decorate(item))
 						copies.append(undecorate(item['value']) if 'value' in item else None)
 						actions.append(item['action'] if 'action' in item else None)
 						parameters.append(item['parameters'] if 'parameters' in item else None)
 						closes.append(item['close'] if 'close' in item else False)
 						returns.append(item['return'] if 'return' in item else None)
+						if 'selection' in item and item['selection'] and selection is None: selection = index
 
-			return labels, copies, actions, parameters, closes, returns
+			return labels, copies, actions, parameters, closes, returns, selection
 
 		def menuId(items, generate = True):
 			# Create the id only with the title attributes, since the value attributes might get a different value.
@@ -2225,7 +2270,8 @@ class Dialog(object):
 			if generate: return tools.Hash.hash(tools.Converter.jsonTo(result))
 			else: return result
 
-		labels, copies, actions, parameters, closes, returns = create(items)
+		labels, copies, actions, parameters, closes, returns, selected = create(items)
+		if selection is None: selection = selected
 
 		choiceId = None
 		choices = {}
@@ -2273,7 +2319,7 @@ class Dialog(object):
 					if closes[choice]: return returns[choice]
 					elif refresh:
 						items = refresh()
-						labels, copies, actions, parameters, closes, returns = create(items)
+						labels, copies, actions, parameters, closes, returns, selected = create(items)
 			elif any(i for i in returns):
 				choice = self.select(labels, title = title, selection = selection, details = details)
 				if copy:
@@ -3005,6 +3051,10 @@ class Directory(object):
 		self.mDescription = not Skin.isAeon()
 
 	@classmethod
+	def back(self):
+		tools.System.execute('Action(Back)')
+
+	@classmethod
 	def decorate(self, item, icon = None, iconDefault = None, iconSpecial = None):
 		# For Gaia Eminence.
 		item.setProperty('GaiaIconLarge', Icon.path(icon = icon, type = Icon.TypeIcon, quality = Icon.QualityLarge, default = iconDefault, special = iconSpecial))
@@ -3518,6 +3568,7 @@ class Context(object):
 	EnabledManagerCache = None
 	EnabledVpnManager = None
 	EnabledBluetooth = None
+	EnabledOracle = None
 
 	SettingsInformer = False
 	SettingsEnabled = False
@@ -3720,6 +3771,7 @@ class Context(object):
 
 			Context.EnabledVpnManager = data['enabled']['vpn']['manager']
 			Context.EnabledBluetooth = data['enabled']['bluetooth']
+			Context.EnabledOracle = data['enabled']['oracle']
 
 			Context.SettingsInformer = data['settings']['informer']
 			Context.SettingsEnabled = data['settings']['enabled']['global']
@@ -3743,6 +3795,7 @@ class Context(object):
 		from lib.modules.bluetooth import Bluetooth
 		from lib.modules import trakt as Trakt
 		from lib.modules import video
+		from lib.oracle import Oracle
 
 		label = self._labelIcon(tools.System.name(), icon = Font.IconGaia, color = True)
 
@@ -3800,6 +3853,7 @@ class Context(object):
 				},
 
 				'bluetooth' : Bluetooth.supported(),
+				'oracle' : Oracle.instance().settingsEnabled(),
 			},
 
 			'label' : {
@@ -4342,6 +4396,24 @@ class Context(object):
 	def commandLogExport(self):
 		return self._commandPlugin(action = 'supportReport')
 
+	def commandOracleGeneric(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : None, 'full' : True}) # Always show the full window process when launched from the context menu. So if the user has disabled certain steps in the settings, the full mode & search mode can still be launched from the context.
+
+	def commandOracleMovie(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeMovie, 'full' : True})
+
+	def commandOracleShow(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeShow, 'full' : True})
+
+	def commandOracleDocu(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeDocumentary, 'full' : True})
+
+	def commandOracleShort(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeShort, 'full' : True})
+
+	def commandOracleSet(self):
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeSet, 'full' : True})
+
 	def add(self, label, icon = None, action = None, command = None, parameters = None, condition = None, dynamic = None, close = None, loader = None, items = None):
 		try:
 			item = {'label' : self._translate(label)}
@@ -4410,7 +4482,20 @@ class Context(object):
 
 	def addVideo(self):
 		try:
-			self.addVideoMenu()
+			self.addSelection()
+			self.addInformation()
+			self.addVideos()
+			self.addBrowse()
+			self.addBinge()
+			self.addScrape()
+			self.addLink()
+			self.addActivity()
+			self.addTrakt()
+			self.addLibrary()
+			self.addPlaylist()
+			self.addShortcut()
+			self.addDownloads()
+			self.addRefresh()
 			self.addTools()
 		except: tools.Logger.error()
 
@@ -4518,9 +4603,11 @@ class Context(object):
 			{'label' : Translation.string(video.Reaction.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Reaction.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReaction else None,
 		])
 
-	def addVideoMenu(self):
-		self.add(label = 35646, icon = Font.IconVideo, command = 'commandVideoManual', close = True, loader = True)
-		self.add(label = 35647, icon = Font.IconVideo, command = 'commandVideoAutomatic', close = True, loader = True)
+	def addSelection(self):
+		self.add(label = 35143, icon = Font.IconVideo, items = [
+			{'label' : 35646, 'command' : 'commandVideoManual', 'close' : True, 'loader' : True},
+			{'label' : 35647, 'command' : 'commandVideoAutomatic', 'close' : True, 'loader' : True},
+		])
 
 	def addRefresh(self):
 		items = [{'label' : 33060, 'command' : 'commandRefreshMenu', 'loader' : True}]
@@ -4659,6 +4746,14 @@ class Context(object):
 				{'label' : 32063, 'icon' : Font.IconSettings, 'command' : 'commandLogScrape'},
 				{'label' : 32064, 'icon' : Font.IconSettings, 'command' : 'commandLogKodi'},
 				{'label' : 33151, 'icon' : Font.IconSettings, 'command' : 'commandLogExport'},
+			]},
+			{'label' : 33675, 'icon' : Font.IconSettings, 'items' : [
+				{'label' : 36331, 'icon' : Font.IconSettings, 'command' : 'commandOracleGeneric'},
+				{'label' : 36332, 'icon' : Font.IconSettings, 'command' : 'commandOracleMovie'},
+				{'label' : 36333, 'icon' : Font.IconSettings, 'command' : 'commandOracleShow'},
+				{'label' : 36334, 'icon' : Font.IconSettings, 'command' : 'commandOracleDocu'},
+				{'label' : 36335, 'icon' : Font.IconSettings, 'command' : 'commandOracleShort'},
+				{'label' : 36336, 'icon' : Font.IconSettings, 'command' : 'commandOracleSet'},
 			]},
 		])
 

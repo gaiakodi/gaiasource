@@ -1075,7 +1075,7 @@ class HandleResolver(Handle):
 
 	def serviceClean(self, service, lower = True):
 		service = tools.Regex.remove(data = service, expression = '.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
-		service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol) # Remove symbols. Eg: Real-Debrid
+		service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol, all = True) # Remove symbols. Eg: Real-Debrid
 		if service.lower() == 'rpnet': service = 'RapidPremium'
 		if lower: service = service.lower()
 		return service
@@ -1143,7 +1143,7 @@ class HandleGaia(Handle):
 		self.mServiceName = None
 		if service:
 			service = tools.Regex.remove(data = service, expression = '.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
-			service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol) # Remove symbols. Eg: Real-Debrid
+			service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol, all = True) # Remove symbols. Eg: Real-Debrid
 			self.mServiceName = service
 
 		if self.mServiceName:

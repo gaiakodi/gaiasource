@@ -81,15 +81,26 @@ class Playback(Database):
 		self.mSettingsHistoryEnabled = self.settingsHistoryEnabled()
 		self.mSettingsHistoryEnd = (self.settingsHistoryEnd() if self.mSettingsHistoryEnabled else Playback.HistoryEndDefault) / 100.0
 		self.mSettingsHistoryCount = self.settingsHistoryCount()
+		self.mSettingsHistoryCountRewatch = self.settingsHistoryCountRewatch()
 		self.mSettingsHistoryProgress = self.settingsHistoryProgress()
-		self.mSettingsHistoryRewatch = self.settingsHistoryRewatch()
+		self.mSettingsHistoryProgressResume = self.settingsHistoryProgressResume()
 
 		self.mSettingsRatingEnabled = self.settingsRatingEnabled()
 		self.mSettingsRatingMode = self.settingsRatingMode()
-		self.mSettingsRatingBinge = self.settingsRatingBinge()
-		self.mSettingsRatingTimeout = self.settingsRatingTimeout()
-		self.mSettingsRatingRerate = self.settingsRatingRerate()
 		self.mSettingsRatingDialog = self.settingsRatingDialog()
+		self.mSettingsRatingBinge = self.settingsRatingBinge()
+		self.mSettingsRatingBingeTimeout = self.settingsRatingBingeTimeout()
+		self.mSettingsRatingRate = self.settingsRatingRate()
+		self.mSettingsRatingRateMovie = self.settingsRatingRateMovie() if self.mSettingsRatingRate else 0
+		self.mSettingsRatingRateShow = self.settingsRatingRateShow() if self.mSettingsRatingRate else 0
+		self.mSettingsRatingRateSeason = self.settingsRatingRateSeason() if self.mSettingsRatingRate else 0
+		self.mSettingsRatingRateEpisode = self.settingsRatingRateEpisode() if self.mSettingsRatingRate else 0
+
+		self.mSettingsRatingRerate = self.settingsRatingRerate()
+		self.mSettingsRatingRerateMovie = self.settingsRatingRerateMovie() if self.mSettingsRatingRerate else False
+		self.mSettingsRatingRerateShow = self.settingsRatingRerateShow() if self.mSettingsRatingRerate else False
+		self.mSettingsRatingRerateSeason = self.settingsRatingRerateSeason() if self.mSettingsRatingRerate else False
+		self.mSettingsRatingRerateEpisode = self.settingsRatingRerateEpisode() if self.mSettingsRatingRerate else False
 
 		self.mSettingsTrakt = self._traktEnabled() and self.mSettingsHistoryEnabled
 		self.mSettingsTraktStatus = self.mSettingsTrakt and self.mSettingsHistoryCount == 1
@@ -200,9 +211,9 @@ class Playback(Database):
 		#if not season is None: query.append('numberSeason = %s' % int(season))
 		#if not episode is None: query.append('numberEpisode = %s' % int(episode))
 		if season is None: query.append('(numberSeason IS NULL OR numberSeason = "")')
-		else: query.append('numberSeason = %s' % int(season))
+		elif not season is True: query.append('numberSeason = %s' % int(season))
 		if episode is None: query.append('(numberEpisode IS NULL OR numberEpisode = "")')
-		else: query.append('numberEpisode = %s' % int(episode))
+		elif not episode is True: query.append('numberEpisode = %s' % int(episode))
 
 		return ' WHERE ' + (' AND '.join(query))
 
@@ -310,20 +321,20 @@ class Playback(Database):
 		return Settings.getInteger('activity.history.end')
 
 	@classmethod
-	def settingsHistoryResume(self):
-		return Settings.getInteger('activity.history.resume')
-
-	@classmethod
 	def settingsHistoryCount(self):
 		return Settings.getInteger('activity.history.count' + ('.alternative' if self._traktEnabled() else ''))
+
+	@classmethod
+	def settingsHistoryCountRewatch(self):
+		return Settings.getCustom('activity.history.count.rewatch')
 
 	@classmethod
 	def settingsHistoryProgress(self):
 		return Settings.getInteger('activity.history.progress' + ('.alternative' if self._traktEnabled() else ''))
 
 	@classmethod
-	def settingsHistoryRewatch(self):
-		return Settings.getCustom('activity.history.rewatch')
+	def settingsHistoryProgressResume(self):
+		return Settings.getInteger('activity.history.progress.resume')
 
 	@classmethod
 	def settingsRatingEnabled(self):
@@ -334,36 +345,60 @@ class Playback(Database):
 		return Settings.getInteger('activity.rating.mode' + ('.alternative' if self._traktEnabled() else ''))
 
 	@classmethod
+	def settingsRatingDefault(self):
+		return Settings.getInteger('activity.rating.default')
+
+	@classmethod
+	def settingsRatingDialog(self):
+		return Settings.getBoolean('interface.rating.interface')
+
+	@classmethod
 	def settingsRatingBinge(self):
 		return Settings.getInteger('activity.rating.binge')
 
 	@classmethod
-	def settingsRatingTimeout(self):
-		return Settings.getCustom('activity.rating.timeout')
+	def settingsRatingBingeTimeout(self):
+		return Settings.getCustom('activity.rating.binge.timeout')
+
+	@classmethod
+	def settingsRatingRate(self):
+		return Settings.getBoolean('activity.rating.rate')
+
+	@classmethod
+	def settingsRatingRateMovie(self):
+		return Settings.getInteger('activity.rating.rate.movie')
+
+	@classmethod
+	def settingsRatingRateShow(self):
+		return Settings.getInteger('activity.rating.rate.show')
+
+	@classmethod
+	def settingsRatingRateSeason(self):
+		return Settings.getInteger('activity.rating.rate.season')
+
+	@classmethod
+	def settingsRatingRateEpisode(self):
+		return Settings.getInteger('activity.rating.rate.episode')
 
 	@classmethod
 	def settingsRatingRerate(self):
 		return Settings.getBoolean('activity.rating.rerate')
 
 	@classmethod
-	def settingsRatingMovie(self):
-		return Settings.getInteger('activity.rating.movie')
+	def settingsRatingRerateMovie(self):
+		return Settings.getCustom('activity.rating.rerate.movie')
 
 	@classmethod
-	def settingsRatingShow(self):
-		return Settings.getInteger('activity.rating.show')
+	def settingsRatingRerateShow(self):
+		return Settings.getCustom('activity.rating.rerate.show')
 
 	@classmethod
-	def settingsRatingSeason(self):
-		return Settings.getInteger('activity.rating.season')
+	def settingsRatingRerateSeason(self):
+		return Settings.getCustom('activity.rating.rerate.season')
 
 	@classmethod
-	def settingsRatingEpisode(self):
-		return Settings.getInteger('activity.rating.episode')
-
-	@classmethod
-	def settingsRatingDialog(self):
-		return Settings.getBoolean('interface.rating.interface')
+	def settingsRatingRerateEpisode(self):
+		return Settings.getCustom('activity.rating.rerate.episode')
 
 	##############################################################################
 	# METADATA
@@ -768,8 +803,8 @@ class Playback(Database):
 		if self.mSettingsRatingEnabled:
 			rate = []
 			if Media.typeMovie(media):
-				if self.settingsRatingMovie() == 1:
-					if self.mSettingsRatingRerate or not self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external):
+				if self.mSettingsRatingRateMovie == 1:
+					if self._ratingRerate(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external):
 						rate.append({'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
 			elif Media.typeTelevision(media):
 				if binge:
@@ -778,39 +813,48 @@ class Playback(Database):
 
 				lastEpisode = self.last(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 				lastSeason = self.last(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season)
+				lastAired = not self.next(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
-				rateEpisode = self.settingsRatingEpisode()
+				forceEpisode = False
+				rateEpisode = self.mSettingsRatingRateEpisode
 				if rateEpisode == 1: rateEpisode = True
 				else: rateEpisode = False
 
-				rateSeason = self.settingsRatingSeason()
+				forceSeason = False
+				rateSeason = self.mSettingsRatingRateSeason
 				if rateSeason == 1: rateSeason = lastEpisode
 				elif rateSeason == 2: rateSeason = True
 				else: rateSeason = False
 
-				rateShow = self.settingsRatingShow()
+				forceShow = False
+				rateShow = self.mSettingsRatingRateShow
+				ratedShow = self.rating(media = Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external, full = True)
 				if rateShow == 1: rateShow = lastEpisode and lastSeason
 				elif rateShow == 2: rateShow = lastEpisode
 				elif rateShow == 3: rateShow = True
-				elif rateShow == 4: rateShow = lastEpisode and (lastSeason or not self.next(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode))
+				elif rateShow == 4: rateShow = lastEpisode and (lastSeason or lastAired)
+				elif rateShow == 5: rateShow = lastEpisode and (not binge or lastSeason or lastAired)
+				elif rateShow == 6:
+					forceShow = True
+					rateShow = lastEpisode and (not ratedShow or lastSeason)
+				elif rateShow == 7:
+					forceShow = True
+					rateShow = lastEpisode and (not ratedShow or lastSeason or lastAired)
 				else: rateShow = False
 
-				if not episode is None and rateEpisode:
-					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeEpisode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external):
-						rate.append({'media' : Media.TypeEpisode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'refresh' : False})
+				if rateEpisode and not episode is None and self._ratingRerate(media = Media.TypeEpisode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, force = forceEpisode):
+					rate.append({'media' : Media.TypeEpisode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'refresh' : False})
 
-				if not season is None and rateSeason:
-					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeSeason, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, internal = internal, external = external):
-						rate.append({'media' : Media.TypeSeason, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'internal' : internal, 'external' : external, 'refresh' : False})
+				if rateSeason and not season is None and self._ratingRerate(media = Media.TypeSeason, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, internal = internal, external = external, force = forceSeason):
+					rate.append({'media' : Media.TypeSeason, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'internal' : internal, 'external' : external, 'refresh' : False})
 
-				if rateShow:
-					if self.mSettingsRatingRerate or not self.rating(media = Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external):
-						rate.append({'media' : Media.TypeShow, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
+				if rateShow and self._ratingRerate(media = Media.TypeShow, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external, force = forceShow):
+					rate.append({'media' : Media.TypeShow, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
 
 			multiple = len(rate) > 1
 			for i in rate:
 				if multiple: i['animation'] = True
-				if binge and self.mSettingsRatingTimeout: i['timeout'] = self.mSettingsRatingTimeout
+				if binge and self.mSettingsRatingBingeTimeout: i['timeout'] = self.mSettingsRatingBingeTimeout
 
 			for i in rate:
 				# If one dialog timed out and auto closed, do not show the remainder of the dialogs.
@@ -850,28 +894,32 @@ class Playback(Database):
 	def retrieve(self, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, adjust = False, internal = None, external = None):
 		result = {}
 
-		# Is actually faster without threads.
-		# With threads (50 movies): 1.4 - 1.5 secs
-		# Without threads (50 movies): 1.1 - 1.2 secs
-		'''
-		def _retrieve(result, type, function, **kwargs):
-			result[type] = function(**kwargs)
-		threads = []
-		threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'history', 'function' : self.history, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True))
-		threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'progress', 'function' : self.progress, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'adjust' : adjust}, start = True))
-		threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'rating', 'function' : self.rating, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True))
-		[thread.join() for thread in threads]
-		'''
+		# Exact searches do not have metadata.
+		if not imdb is None or not tmdb is None or not tvdb is None or not trakt is None:
+			# Is actually faster without threads.
+			# With threads (50 movies): 1.4 - 1.5 secs
+			# Without threads (50 movies): 1.1 - 1.2 secs
+			'''
+			def _retrieve(result, type, function, **kwargs):
+				result[type] = function(**kwargs)
+			threads = []
+			threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'history', 'function' : self.history, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True))
+			threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'progress', 'function' : self.progress, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external, 'adjust' : adjust}, start = True))
+			threads.append(Pool.thread(target = _retrieve, kwargs = {'result' : result, 'type' : 'rating', 'function' : self.rating, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True))
+			[thread.join() for thread in threads]
+			'''
 
-		result['history'] = self.history(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
-		result['progress'] = self.progress(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, adjust = adjust)
-		result['rating'] = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
+			result['history'] = self.history(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
+			result['progress'] = self.progress(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, adjust = adjust)
+			result['rating'] = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
 
 		return result
 
 	def update(self, action, duration, current, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, specials = SpecialsNone, force = False, internal = None, external = None, wait = False):
-		self.progressUpdate(action = action, duration = duration, current = current, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, force = force, internal = internal, external = external, wait = wait)
-		self.historyUpdate(duration = duration, current = current, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, specials = specials, force = force, internal = internal, external = external, wait = wait)
+		# Exact searches do not have metadata.
+		if not imdb is None or not tmdb is None or not tvdb is None or not trakt is None:
+			self.progressUpdate(action = action, duration = duration, current = current, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, force = force, internal = internal, external = external, wait = wait)
+			self.historyUpdate(duration = duration, current = current, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, specials = specials, force = force, internal = internal, external = external, wait = wait)
 
 	##############################################################################
 	# PROGRESS
@@ -1043,11 +1091,18 @@ class Playback(Database):
 					if 'seasons' in history: result['seasons'] = history['seasons']
 					if 'episodes' in history: result['episodes'] = history['episodes']
 
-			if internal and not history:
+			# NB: If all episodes of a season are marked as watched, except one which is marked locally, but not on Trakt.
+			# In such a case, the episode will have a checkmark icon under the episode menu (since the local history is also used).
+			# However, the season will have a progress icon.
+			# Only use the local history if the user hass no Trakt account or changed the setting to only use local history.
+			#if internal and not history:
+			if internal and not history and not self.mSettingsTraktStatus:
 				items = self._historyItems(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 				seasons = Tools.listUnique([i[0] for i in items if not i[0] is None])
 				episodes = Tools.listUnique([i[1] for i in items if not i[1] is None])
-				items = self._retrieve(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = seasons[0] if len(seasons) == 1 else None, episode = episodes[0] if len(episodes) == 1 else None)
+
+				# Make sure season/episode is True (and not None) if we want to retrieve multiple values, such as all episode from a season to determine if the season was fully watched.
+				items = self._retrieve(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = seasons[0] if len(seasons) == 1 else True if len(seasons) > 1 else None, episode = episodes[0] if len(episodes) == 1 else True if len(episodes) > 1 else None)
 
 				if items:
 					if media == Media.TypeShow or media == Media.TypeSeason:
@@ -1188,8 +1243,12 @@ class Playback(Database):
 
 				# Do not mark specials as watched if the entire show is marked.
 				if watch and season is None and episode is None and (s == 0 or e == 0):
-					if (specials == Playback.SpecialsNone) or (specials == Playback.SpecialsStory and (not 'story' in metadata or not metadata['story'])):
+					if specials == Playback.SpecialsNone:
 						watch = False
+					elif specials == Playback.SpecialsStory:
+						# Legacy: 'story' was its own attribute before. Now it is part of a dictionary.
+						if (not 'story' in metadata or not metadata['story']) and (not 'special' in metadata or not metadata['special'] or not Tools.isDictionary(metadata['special']) or not 'story' in metadata['special'] or not metadata['special']['story']):
+							watch = False
 
 				# Episode not part of the remaining episodes to be marked as watched.
 				if selection:
@@ -1226,9 +1285,9 @@ class Playback(Database):
 					# Rewatched within a short period of time.
 					# 0: Always mark rewatch playbacks as watched.
 					watch = True
-					if not force and self.mSettingsHistoryRewatch > 0:
+					if not force and self.mSettingsHistoryCountRewatch > 0:
 						last = max(history) if history else None
-						if last and (time - last) < self.mSettingsHistoryRewatch: watch = False
+						if last and (time - last) < self.mSettingsHistoryCountRewatch: watch = False
 
 					if watch:
 						history.append(time)
@@ -1251,13 +1310,13 @@ class Playback(Database):
 					# Rewatched within a short period of time.
 					# 0: Always mark rewatch playbacks as watched.
 					watch = True
-					if not force and not self.mSettingsTraktPlaysLast and self.mSettingsHistoryRewatch > 0:
+					if not force and not self.mSettingsTraktPlaysLast and self.mSettingsHistoryCountRewatch > 0:
 						data = Trakt.historyRetrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = s, episode = e)
 						if data and 'time' in data:
 							last = data['time']
 							if last:
 								last = last['last']
-								if last and (time - last) < self.mSettingsHistoryRewatch: watch = False
+								if last and (time - last) < self.mSettingsHistoryCountRewatch: watch = False
 
 					if watch: updates.append(item)
 
@@ -1385,7 +1444,7 @@ class Playback(Database):
 		if history and history['count']['total'] and history['time']['last']:
 			current = Time.timestamp()
 			last = history['time']['last']
-			if (current - last) < self.mSettingsHistoryRewatch: return True, last
+			if (current - last) < self.mSettingsHistoryCountRewatch: return True, last
 		return False, last
 
 	##############################################################################
@@ -1492,3 +1551,26 @@ class Playback(Database):
 
 		except: Logger.error()
 		self._unlock()
+
+	def _ratingRerate(self, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = True, external = True, force = False):
+		try:
+			if force: return True
+
+			allow = False
+			current = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, full = True)
+
+			if media == Media.TypeShow: rerate = self.mSettingsRatingRerateShow
+			elif media == Media.TypeSeason: rerate = self.mSettingsRatingRerateSeason
+			elif media == Media.TypeEpisode: rerate = self.mSettingsRatingRerateEpisode
+			else: rerate = self.mSettingsRatingRerateMovie
+
+			if current: # Already rated.
+				if Tools.isInteger(rerate):
+					if rerate == 0: allow = True # Always rerate.
+					elif rerate > 0 and (Time.timestamp() - current['time'] > rerate): allow = True # Rerate old.
+			else: allow = True # Not rated yet.
+
+			return allow
+		except:
+			Logger.error()
+			return True

@@ -60,6 +60,7 @@ class Manager(object):
 	# Providers
 	ProvidersData				= None
 	ProvidersCache				= None
+	ProvidersReinitialized		= None
 
 	# Other
 	Thread						= None
@@ -78,6 +79,7 @@ class Manager(object):
 		Manager.Create = {}
 		Manager.ProvidersData = None
 		Manager.ProvidersCache = None
+		Manager.ProvidersReinitialized = None
 
 		ProviderBase.reset(settings = settings)
 		ProviderWeb.reset(settings = settings)
@@ -89,14 +91,14 @@ class Manager(object):
 	##############################################################################
 
 	@classmethod
-	def check(self, progress = True, wait = False):
-		def _check(progress = True):
+	def check(self, progress = True, load = False, wait = False):
+		def _check(progress = True, load = False):
 			self.providersInitialize(full = False, progress = progress)
 			self.settingsLabel()
 			self.presetsLabel()
+			if load: self.providers()
 
-		Manager.Thread = Pool.thread(target = _check, args = (progress,))
-		Manager.Thread.start()
+		Manager.Thread = Pool.thread(target = _check, kwargs = {'progress' : progress, 'load' : load}, start = True)
 		if wait: Manager.Thread.join()
 
 	@classmethod
@@ -435,6 +437,18 @@ class Manager(object):
 		return Manager.ProvidersData
 
 	@classmethod
+	def _providersReinitialize(self, notification = True):
+		if not Manager.ProvidersReinitialized:
+			Manager.ProvidersReinitialized = True
+			if notification:
+				from lib.modules.interface import Dialog
+				Dialog.notification(title = 32345, message = 33708, icon = Dialog.IconWarning)
+			self.databaseClear()
+			self._providersClear()
+			return True
+		return False
+
+	@classmethod
 	def _providersUpdate(self, providers):
 		# Update the settings with links in case the provider code was updated with new domains.
 		# Maintain the old custom domains the user added before the update.
@@ -565,9 +579,14 @@ class Manager(object):
 		return message
 
 	@classmethod
-	def help(self, description = None, mirrors = None, settings = None, settingsGeneral = None, settingsScrape = None, settingsCustom = None, settingsProvider = None):
+	def help(self, description = None, status = None, rank = None, performance = None, mirrors = None, settings = None, settingsGeneral = None, settingsScrape = None, settingsCustom = None, settingsProvider = None):
 		message = ''
-		if description: message += self._help(label = 33040, description = description)
+		if description or status or rank:
+			items = []
+			if status: items.append({'label' : 33389, 'description' : status})
+			if rank: items.append({'label' : 35187, 'description' : rank})
+			if performance: items.append({'label' : 33116, 'description' : performance})
+			message += self._help(label = 33040, description = description, items = items)
 		if mirrors: message += self._help(label = 33422, description = 35788, items = mirrors)
 		if settings: message += self._help(label = 33011, items = settings)
 		if settingsGeneral: message += self._help(label = 35751, items = settingsGeneral)
@@ -1246,6 +1265,9 @@ class Manager(object):
 		def _settingsHelp(provider = None):
 			description = Translation.string(34347) % (ProviderBase.rankIcon(), bulletBad.strip(), bulletMedium.strip(), bulletGood.strip())
 			mirrors = None
+			status = None
+			rank = None
+			performance = None
 
 			settingsGeneral = [{'label' : 33564, 'description' : 34340}, {'label' : 33183, 'description' : 34341}, {'label' : 33219, 'description' : 34346}, {'label' : 35269, 'description' : 34469}]
 			settingsScrape = []
@@ -1255,6 +1277,9 @@ class Manager(object):
 			if provider:
 				description = provider.description()
 				mirrors = provider.mirrors()
+				status = provider.statusLabel()
+				rank = provider.rankLabel()
+				performance = provider.performanceLabel()
 				settingsScrape = provider.scrapeAttributes()
 				settingsCustom = provider.customAttributes()
 				if provider.accountHas(): settingsProvider.append({'label' : 33339, 'description' : 34342})
@@ -1262,7 +1287,7 @@ class Manager(object):
 			else:
 				settingsScrape = ProviderBase.scrapeAttributesAll()
 
-			message = self.help(description = description, mirrors = mirrors, settingsGeneral = settingsGeneral, settingsScrape = settingsScrape, settingsProvider = settingsProvider, settingsCustom = settingsCustom)
+			message = self.help(description = description, status = status, rank = rank, performance = performance, mirrors = mirrors, settingsGeneral = settingsGeneral, settingsScrape = settingsScrape, settingsProvider = settingsProvider, settingsCustom = settingsCustom)
 			Dialog.text(title = 33681, message = message)
 
 		def _settingsDefault(providers = None, attributes = None, type = None, mode = None, access = None, addon = None, navigate = False):
@@ -1523,13 +1548,24 @@ class Manager(object):
 				installed = addon['object'].addonInstalled(scraper = True, parent = False)
 				prefix = bulletGood if enabled else bulletMedium if installed else bulletPoor
 				count = self.settingsCount(label = True, type = type, mode = mode, access = access, addon = addon['id'])
+
 				if not installed: value = installedless
 				elif not enabled: value = enabledless
 				elif not count: # Some errors in executing the external addon code (eg: import errors).
 					instances = addon['object'].instances(full = True)
-					if all([not i['valid'] for i in instances]): value = codeless # All providers failed, assuming there is some major problem in the external addon code (eg: unresolved import).
-					else: value = count
+					if all([not i['valid'] for i in instances]):
+						value = codeless # All providers failed, assuming there is some major problem in the external addon code (eg: unresolved import).
+					else:
+						# When a user manually installs an external scraper addon, and then opens the Gaia provider settings.
+						# The external scrapers will not show, since the provider database still contains the old data without the newly installed scrapers.
+						# This will only change if Gaia is updated (the database is reinitialized if Gaia's version changes), or if the user manually clears the provider database.
+						# Instead, automatically reinitialize the database if the user opens the settings, navigates to the external category, and no providers can be detected.
+						self._providersReinitialize(notification = True)
+
+						count = self.settingsCount(label = True, type = type, mode = mode, access = access, addon = addon['id']) # fetch the new count after the database reinitialization.
+						value = count
 				else: value = count
+
 				items.append({'title' : '%s (%s)' % (addon['object'].addonName(), addon['object'].addonRank(label = True)), 'prefix' : prefix, 'color' : False, 'value' : value, 'action' : _settingsNavigate, 'parameters' : {'addon' : addon['id']}})
 			return items
 
@@ -2208,13 +2244,13 @@ class Manager(object):
 				count = 1
 
 				if ProviderBase.settingsGlobalKeywordEnabled():
-					values = [ProviderBase.settingsGlobalKeywordEnglish(), ProviderBase.settingsGlobalKeywordNative(), ProviderBase.settingsGlobalKeywordCustom()]
+					values = [ProviderBase.settingsGlobalKeywordEnglish(), ProviderBase.settingsGlobalKeywordOriginal(), ProviderBase.settingsGlobalKeywordNative(), ProviderBase.settingsGlobalKeywordCustom()]
 					for value in values:
 						if value == ProviderBase.KeywordQuick: count += 2
 						elif value == ProviderBase.KeywordFull: count += 4
 
-					if count >= 10: label = 35002
-					elif count >= 5: label = 35001
+					if count >= 12: label = 35002
+					elif count >= 7: label = 35001
 					elif count >= 0: label = 35000
 				else:
 					label = 33564
@@ -2380,15 +2416,18 @@ class Manager(object):
 		keywordEnglish = ProviderBase.KeywordNone
 		if rating >= ProviderBase.Performance5 or (languageEnglish and rating >= ProviderBase.Performance4): keywordEnglish = ProviderBase.KeywordFull
 		elif rating >= ProviderBase.Performance2 or (languageEnglish and rating >= ProviderBase.Performance1): keywordEnglish = ProviderBase.KeywordQuick
+		keywordOriginal = ProviderBase.KeywordNone
+		if rating >= ProviderBase.Performance4: keywordOriginal = ProviderBase.KeywordFull
+		elif rating >= ProviderBase.Performance1: keywordOriginal = ProviderBase.KeywordQuick
 		keywordNative = ProviderBase.KeywordNone
 		if rating >= ProviderBase.Performance8 or (languageForeign and rating >= ProviderBase.Performance7): keywordNative = ProviderBase.KeywordFull
 		elif rating >= ProviderBase.Performance2 or (languageForeign and rating >= ProviderBase.Performance1): keywordNative = ProviderBase.KeywordQuick
 		keywordCustom = ProviderBase.KeywordNone
 		if languageForeign and rating >= ProviderBase.Performance9: keywordCustom = ProviderBase.KeywordFull
 		elif languageForeign and rating >= ProviderBase.Performance8: keywordCustom = ProviderBase.KeywordQuick
-		keywordCount = (2 if keywordEnglish == ProviderBase.KeywordFull else 1 if keywordEnglish == ProviderBase.KeywordQuick else 0) + (2 if keywordNative == ProviderBase.KeywordFull else 1 if keywordNative == ProviderBase.KeywordQuick else 0) + (2 if keywordCustom == ProviderBase.KeywordFull else 1 if keywordCustom == ProviderBase.KeywordQuick else 0)
+		keywordCount = (2 if keywordEnglish == ProviderBase.KeywordFull else 1 if keywordEnglish == ProviderBase.KeywordQuick else 0) + (2 if keywordOriginal == ProviderBase.KeywordFull else 1 if keywordOriginal == ProviderBase.KeywordQuick else 0) + (2 if keywordNative == ProviderBase.KeywordFull else 1 if keywordNative == ProviderBase.KeywordQuick else 0) + (2 if keywordCustom == ProviderBase.KeywordFull else 1 if keywordCustom == ProviderBase.KeywordQuick else 0)
 		keywordEnabled = keywordCount > 0
-		keywordLabel = labelMany if keywordCount >= 5 else labelSeveral if keywordCount >= 3 else labelFew if keywordCount >= 1 else labelDisabled
+		keywordLabel = labelMany if keywordCount >= 10 else labelSeveral if keywordCount >= 5 else labelFew if keywordCount >= 1 else labelDisabled
 
 		# Year
 
@@ -2469,6 +2508,7 @@ class Manager(object):
 				'keyword' : {
 					'enabled' : keywordEnabled,
 					'english' : keywordEnglish,
+					'original' : keywordOriginal,
 					'native' : keywordNative,
 					'custom' : keywordCustom,
 				},
@@ -2617,6 +2657,7 @@ class Manager(object):
 
 				ProviderBase.settingsGlobalKeywordEnabledSet(data['keyword']['enabled'])
 				ProviderBase.settingsGlobalKeywordEnglishSet(data['keyword']['english'])
+				ProviderBase.settingsGlobalKeywordOriginalSet(data['keyword']['original'])
 				ProviderBase.settingsGlobalKeywordNativeSet(data['keyword']['native'])
 				ProviderBase.settingsGlobalKeywordCustomSet(data['keyword']['custom'])
 
@@ -2859,7 +2900,7 @@ class Manager(object):
 
 	@classmethod
 	def linksTime(self, time = False):
-		result = ProviderBase.TimeCache
+		result = ProviderBase.settingsGlobalSaveStream()
 		if time: result = Time.timestamp() - result
 		return result
 
@@ -2906,7 +2947,7 @@ class Manager(object):
 
 	@classmethod
 	def streamsTime(self, time = False):
-		result = ProviderBase.TimeCache
+		result = ProviderBase.settingsGlobalSaveStream()
 		if time: result = Time.timestamp() - result
 		return result
 

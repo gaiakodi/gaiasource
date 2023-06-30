@@ -1,4 +1,8 @@
 
+[B]6.3.0 (2023.06.30)[/B]
+- Added Oracle icons.
+- Added Oracle interface.
+
 [B]6.2.0 (2023.03.19)[/B]
 - Added quick icons.
 

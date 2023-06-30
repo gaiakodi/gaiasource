@@ -92,10 +92,8 @@ class Concurrency(object):
 		value = self._globalGet()
 		if value is None:
 			try:
-				def execute(data):
-					data['result'] = True
 				data = self.data()
-				instance = self.base()(target = execute, kwargs = {'data' : data}) # Do not use the Gaia classes, otherwise it will call the Pool functions.
+				instance = self.base()(target = self._support, kwargs = {'data' : data}) # Do not use the Gaia classes, otherwise it will call the Pool functions.
 				instance.start()
 				instance.join()
 				result = data['result']
@@ -104,6 +102,15 @@ class Concurrency(object):
 		else:
 			result = value
 		return result
+
+	@classmethod
+	def _support(self, data = None):
+		# This must be a classmethod iinstead of a local function inside support().
+		# This is important for Processes, otherwise when setting this:
+		#	multiprocessing.set_start_method('spawn')
+		# the following error is thrown:
+		#	AttributeError: Can't pickle local object 'Concurrency.support.<locals>.execute
+		data['result'] = True
 
 	@classmethod
 	def _name(self):
@@ -290,7 +297,27 @@ class Thread(Concurrency, PyThread):
 
 try:
 
-	from multiprocessing import Process as PyProcess, Manager as PyProcessManager, current_process as PyProcessCurrent, Lock as PyProcessLockBase, Semaphore as PyProcessSemaphore, Event as PyProcessEvent
+	'''
+		It seems that multiprocessing does not work in the new Kodi or Python.
+		This always did seem to work (Python 3.6 and 3.8), but doesn't seem to work in Python 3.10 anymore.
+		Whenever we start a new process (just a nomal multiprocessing.Process, not even the custom class below), the following happens:
+			1. The process begins with process.start() and Kodi creates a new LanguageInvoker process.
+			2. When calling process.join(), the code seems to hang. The actual process function coded is never executed.
+			3. The LanguageInvoker stays in memory. If manually killed, Kodi continues executing the code after the process.join() statement.
+			4. At no time is any of the code in the process target function executed. It seems that Kodi struggles to actuually start the target code.
+			5. A similar thing also happens when we call manager.dict(). The manager internally calls manager.start(), which causes the same things as above.
+			6. Every time we start a new process, Kodi pprints this to log: "info <general>: AddOnLog: peripheral.joystick: Disabling joystick interface "linux"".
+			7. So maybe Kodi uses multiprocessing for its own purposes, maybe having overwritten some of its coded. And that is why we cannot start manual processes anymore.
+
+		For now, we leave multiprocessing disabled.
+		We raise an exception here, otherwise if Process-support is checked during service.py, or later on in tools.Hardware, a LanguageInvoker is left in memory, due to a process being created in support().
+	'''
+	raise Exception()
+
+	# The synchronize "classes" in "multiprocessing" are not actually classes, but functions, and can therefore not be inherited from. At least not in newer Python versions
+	#from multiprocessing import Process as PyProcess, Manager as PyProcessManager, current_process as PyProcessCurrent, Lock as PyProcessLockBase, Semaphore as PyProcessSemaphore, Event as PyProcessEvent
+	from multiprocessing import Process as PyProcess, Manager as PyProcessManager, current_process as PyProcessCurrent
+	from multiprocessing.synchronize import Lock as PyProcessLockBase, Semaphore as PyProcessSemaphore, Event as PyProcessEven
 
 	class PyProcessLock(PyProcessLockBase):
 
@@ -305,6 +332,7 @@ try:
 	class Process(Concurrency, PyProcess):
 
 		#Manager = None
+		Shared = 0
 
 		@classmethod
 		def initialize(self):
@@ -322,12 +350,37 @@ try:
 			return PyProcess
 
 		@classmethod
-		def data(self):
+		def data(self, size = 8388608): # 8MB
 			# NB: Do not use a global var for the manager.
 			# Otherwise the process (Python LanguageInvoker) that uses it stays in memory forever and Kodi hangs when being closed.
 			#if Process.Manager is None: Process.Manager = PyProcessManager()
 			#return Process.Manager.dict()
+
+			# NB: This does not work in the new Kodi/Python anymore.
+			# Inside the multiprocessing.Manager function, there is a call "manager.start()" which causes the script to stop.
+			# So maybe Kodi has overwritten/disabled some multiprocessing stuff.
+			# https://github.com/python/cpython/blob/main/Lib/multiprocessing/context.py
+			# Update: This is the same error as above. A bunch of Python LanguageInvoker are left in memory when calling this function.
 			return PyProcessManager().dict()
+
+			# Update: With the new Kodi/Python this does not seem to work at all anymore.
+			# Whenever this function is called (either manually or automatically by the serrvice when calling "Pool.processSupport()"), the Python Invoker freezes without finishing or returning results.
+			# The invoker is then left in memory until Kodi exits.
+			# Every time this function is called, an new invoker is created and left in memory.
+			# Every time this function is called, Kodi shows an error in the log:
+			#	info <general>: AddOnLog: peripheral.joystick: Disabling joystick interface "linux"
+			# This happens when we create a new multiprocessing.Manager() instance. The issue seems to be in the Manager function in the multiprocessing module, when "manager.start()" iss called.
+			# Maybe Kodi does something weird or overwrites some multiprocessing stuff.
+			# Or maybe the manager does not work, because Kodi uses its own manager and Python only allows a single manager instance.
+			# Or maybe we can just not create a manager in the single-invoker context of Kodi addons.
+			# So we currently use a custom module to handle the shared dict. Not sure about cross-platform compatibility or performance implications.
+			# Also note that we have to set a size of the shared memory for this module. Make sure enough memory is allocated for the given task.
+			# Generally, users should use Threads over Processes from the addon settings. This should only be used by the dev in providers->core->offline.py.
+			# Update: This does not solve the problem, so the shared memory module was removed. There seems to be a wider problem with multiprocessing. More info at the start of the class.
+			'''from lib.modules.external import Importer
+			Process.Shared += 1
+			memory = Importer.moduleSharedMemoryDict()
+			return memory(name = 'GaiaProcessShared%d' % Process.Shared, size = size)'''
 
 except:
 

@@ -260,8 +260,9 @@ class MetaTools(object):
 		self.mPageMovie = Settings.getInteger('navigation.page.movie')
 		self.mPageShow = Settings.getInteger('navigation.page.show')
 		self.mPageEpisode = Settings.getInteger('navigation.page.episode')
-		self.mPageFlatten = Settings.getInteger('navigation.page.flatten')
 		self.mPageMultiple = Settings.getInteger('navigation.page.multiple')
+		self.mPageSubmenu = Settings.getInteger('navigation.page.submenu')
+		self.mPageFlatten = Settings.getInteger('navigation.page.flatten')
 		self.mPageSearch = Settings.getInteger('navigation.page.search')
 		self.mPageMixed = Settings.getInteger('navigation.page.mixed')
 
@@ -272,12 +273,21 @@ class MetaTools(object):
 		self.mShowSeries = not self.mShowFlatten and Settings.getBoolean('navigation.show.series')
 
 		self.mShowInterleave = Settings.getBoolean('navigation.show.interleave')
-		self.mShowInterleaveSupplementary = Settings.getBoolean('navigation.show.interleave.supplementary')
-		self.mShowInterleaveUnofficial = Settings.getBoolean('navigation.show.interleave.unofficial')
-		self.mShowInterleaveDuration = Settings.getInteger('navigation.show.interleave.duration')
-		if self.mShowInterleaveDuration == 1: self.mShowInterleaveDuration = [0.0, 0.5] # 0.0 for series menus, 0.5 for other interleaved submenus (eg Trakt progress list).
-		elif self.mShowInterleaveDuration == 2: self.mShowInterleaveDuration = 0.25
-		elif self.mShowInterleaveDuration == 3: self.mShowInterleaveDuration = 0.5
+		self.mShowInterleaveUnofficial = {
+			None : Settings.getInteger('navigation.show.interleave.unofficial'),
+			True : {0 : None, 1 : True, 2 : True}, # Arrivals submenus.
+			False : {0 : None, 1 : None, 2 : True}, # Series menus.
+		}
+		self.mShowInterleaveExtra = {
+			None : Settings.getInteger('navigation.show.interleave.extra'),
+			True : {0 : None, 1 : False, 2 : False, 3 : True}, # Arrivals submenus.
+			False : {0 : None, 1 : None, 2 : False, 3 : True}, # Series menus.
+		}
+		self.mShowInterleaveDuration = {
+			None : Settings.getInteger('navigation.show.interleave.duration'),  # Automatic: 0.0 for series menus, 0.5 for other interleaved submenus (eg Trakt progress list).
+			True : {0 : 0.0, 1 : 0.5, 2 : 0.25, 3 : 0.5}, # Arrivals submenus.
+			False : {0 : 0.0, 1 : 0.0, 2 : 0.25, 3 : 0.5}, # Series menus.
+		}
 
 		self.mShowSpecial = Settings.getBoolean('navigation.show.special')
 		self.mShowSpecialSeason = Settings.getBoolean('navigation.show.special.season') if self.mShowSpecial else False
@@ -404,11 +414,14 @@ class MetaTools(object):
 	def settingsPageEpisode(self):
 		return self.mPageEpisode
 
-	def settingsPageFlatten(self):
-		return self.mPageFlatten
-
 	def settingsPageMultiple(self):
 		return self.mPageMultiple
+
+	def settingsPageSubmenu(self):
+		return self.mPageSubmenu
+
+	def settingsPageFlatten(self):
+		return self.mPageFlatten
 
 	def settingsPageSearch(self):
 		return self.mPageSearch
@@ -425,14 +438,19 @@ class MetaTools(object):
 	def settingsShowInterleave(self):
 		return self.mShowInterleave
 
-	def settingsShowInterleaveSupplementary(self):
-		return self.mShowInterleaveSupplementary
+	# If submenu = True/False, then return: True = strict, None = disabled.
+	def settingsShowInterleaveUnofficial(self, submenu = None):
+		interleave = self.mShowInterleaveUnofficial[None]
+		return self.mShowInterleaveUnofficial[submenu][interleave]
 
-	def settingsShowInterleaveUnofficial(self):
-		return self.mShowInterleaveUnofficial
+	# If submenu = True/False, then return: True = strict, False = lenient, None = disabled.
+	def settingsShowInterleaveExtra(self, submenu = None):
+		interleave = self.mShowInterleaveExtra[None]
+		return self.mShowInterleaveExtra[submenu][interleave]
 
-	def settingsShowInterleaveDuration(self):
-		return self.mShowInterleaveDuration
+	def settingsShowInterleaveDuration(self, submenu = None):
+		interleave = self.mShowInterleaveDuration[None]
+		return self.mShowInterleaveDuration[submenu][interleave]
 
 	def settingsShowSpecial(self):
 		return self.mShowSpecial
@@ -524,7 +542,8 @@ class MetaTools(object):
 	def media(self, metadata):
 		if Tools.isArray(metadata): metadata = metadata[0]
 		if metadata:
-			if 'episode' in metadata: return Media.TypeEpisode
+			if 'media' in metadata and metadata['media']: return metadata['media']
+			elif 'episode' in metadata: return Media.TypeEpisode
 			elif 'season' in metadata: return Media.TypeSeason
 			elif 'tvshowtitle' in metadata: return Media.TypeShow
 			else: return Media.TypeMovie
@@ -534,7 +553,7 @@ class MetaTools(object):
 	# COMMAND
 	###################################################################
 
-	def command(self, metadata, media = None, action = None, video = None, multiple = None, submenu = None, reduce = None, increment = False):
+	def command(self, metadata, media = None, action = None, video = None, multiple = None, submenu = None, reduce = None, increment = False, next = False):
 		force = False
 		if media == Media.TypeSeason and not 'season' in metadata: # Series menu.
 			media = Media.TypeShow
@@ -543,22 +562,23 @@ class MetaTools(object):
 
 		if submenu is None: submenu = self.submenu(media = media, multiple = multiple, force = force)
 
+		parameters = {}
 		if not action:
 			if not video is None: action = 'streamsVideo'
-			elif Media.typeTelevision(media) and submenu: action = 'episodesRetrieve'
+			elif Media.typeTelevision(media) and submenu:
+				action = 'episodesRetrieve'
+				parameters['submenu'] = 'next' if next else True # Check addon.py -> episodesRetrieve for more info. # Do it differently for the "Next Page" in submenus.
 			elif media == Media.TypeSpecialExtra: action = 'seasonsExtras'
 			elif media == Media.TypeShow: action = 'seasonsRetrieve'
 			elif media == Media.TypeSeason: action = 'episodesRetrieve'
 			elif media == Media.TypeSet: action = 'setsRetrieve'
 			if not action: action = 'scrape'
 
-		parameters = {}
-
 		# Removes the current/next/previous season data to reduce time to encode/decode the metadata.
 		# Almost halfs the time to load menus.
 		if action == 'scrape' or action == 'seasonsExtras': parameters['metadata'] = self.reduce(metadata)
 
-		if Media.typeTelevision(media) and multiple and submenu: parameters['limit'] = self.mPageMultiple
+		if Media.typeTelevision(media) and multiple and submenu: parameters['limit'] = self.mPageSubmenu
 
 		for attribute in ['imdb', 'tmdb', 'tvdb', 'title', 'tvshowtitle', 'year', 'premiered', 'season', 'episode']:
 			try: parameters[attribute] = metadata[attribute]
@@ -572,7 +592,7 @@ class MetaTools(object):
 				parameters['season'] = -1 * float((metadata['season'] if 'season' in metadata else 0) + int(increment))
 				try: del parameters['episode']
 				except: pass
-			else: # Submenus for multiple episode menus.
+			elif 'episode' in metadata: # Submenus for multiple episode menus.
 				# Include the last 3 watched episodes, in case the user wants to rewatch them (aka fell asleep yesterday while watching).
 				season = metadata['season'] if 'season' in metadata else 1
 				episode = metadata['episode'] + int(increment)
@@ -590,7 +610,7 @@ class MetaTools(object):
 				parameters['episode'] = -1 * float(max(1, episode))
 
 		# Season recaps and extras.
-		if 'query' in metadata: parameters['title'] = parameters['tvshowtitle'] = metadata['query']
+		if metadata and 'query' in metadata: parameters['title'] = parameters['tvshowtitle'] = metadata['query']
 		if not video is None: parameters['video'] = video
 		parameters['media'] = Media.TypeEpisode if media == Media.TypeSpecialRecap or media == Media.TypeSpecialExtra else media
 
@@ -681,17 +701,12 @@ class MetaTools(object):
 			#if title and not title in label and not label in title: label = '%s - %s' % (title, label)
 			if title: label = '%s - %s' % (title, label)
 
-		if extend:
-			# Show airing details.
-			if 'labelBefore' in metadata and metadata['labelBefore']: label = metadata['labelBefore'] + ' ' + label
-			if 'labelAfter' in metadata and metadata['labelAfter']: label = label + ' ' + metadata['labelAfter']
-
 		if not future is None and not future is True:
 			if future > -MetaTools.TimeUnreleased: label = Format.fontItalic(label)
 			if future >= MetaTools.TimeFuture: label = Format.fontLight(label)
 
 		if media == Media.TypeEpisode and season == 0:
-			if not 'story' in metadata or not metadata['story']: label = Format.fontItalic(label)
+			if not 'special' in metadata or not metadata['special'] or not 'story' in metadata['special'] or not metadata['special']['story']: label = Format.fontItalic(label)
 
 		# Mark new episodes/seasons in multiple menus as bold.
 		if media == Media.TypeEpisode and (not future or future < 0):
@@ -730,6 +745,15 @@ class MetaTools(object):
 
 			if new: label = Format.fontBold(label)
 
+		# Do this last, after Format.fontBold(label).
+		# Otherwise the labelBefore/labelAfter, which might have its own bold formatting, is formatted a second time.
+		# There could then be 2 nested bold tags, and then the title in the label is not actually bold and ends with "[/B]".
+		# Make sure there is no nested formatting.
+		if extend:
+			# Show user, progress, or airing details.
+			if 'labelBefore' in metadata and metadata['labelBefore']: label = metadata['labelBefore'] + ' ' + label
+			if 'labelAfter' in metadata and metadata['labelAfter']: label = label + ' ' + metadata['labelAfter']
+
 		return label
 
 	###################################################################
@@ -754,7 +778,17 @@ class MetaTools(object):
 				except: Logger.error()
 
 				break
+
 		if next and not index is None and (index + 1) < len(items): index += 1
+
+		# If all episodes in the show were watched (the same number of times), the index will be on the 'Next Page' item.
+		# Therefore, opening an Arrivals submenu of a fully watched show will always auto-select the last item on the page, which is the 'Next Page' item.
+		# In such a case (eg: user wants to rewatch the show), set the index to None in order to select the first item in the list.
+		try:
+			episode = items[index][1].getVideoInfoTag().getEpisode()
+			if episode is None or episode < 0: index = None
+		except: pass
+
 		return index
 
 	###################################################################
@@ -1009,7 +1043,7 @@ class MetaTools(object):
 		clean = True,
 		images = True,
 	):
-		folder = submenu or (media == Media.TypeSet or media == Media.TypeShow or media == Media.TypeSeason)
+		folder = None if media == Media.TypeMixed else (submenu or (media == Media.TypeSet or media == Media.TypeShow or media == Media.TypeSeason))
 
 		seasons = []
 		items = []
@@ -1050,8 +1084,13 @@ class MetaTools(object):
 					images = images
 				)
 				if item:
+					if folder is None:
+						itemMedia = self.media(metadata)
+						itemFolder = submenu or (itemMedia == Media.TypeSet or itemMedia == Media.TypeShow or itemMedia == Media.TypeSeason)
+					else: itemFolder = folder
+
 					if 'season' in metadata: seasons.append(metadata['season'])
-					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], folder]})
+					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], itemFolder]})
 
 					# Add here instead of after the loop, since recaps/extras have to be inserted between episodes for flattened menus.
 					# Insert AFTER the episode item() above was created, since we want to use the cleaned metadata with the watched status.
@@ -1368,20 +1407,35 @@ class MetaTools(object):
 		return False
 
 	def itemShow(self, media, metadata, item):
-		if media == Media.TypeShow or media == Media.TypeSeason:
-			if not 'tvshowtitle' in metadata and 'title' in metadata: metadata['tvshowtitle'] = metadata['title']
-			if not 'tvshowyear' in metadata and 'year' in metadata: metadata['tvshowyear'] = metadata['year']
+		if metadata:
+			if media == Media.TypeShow or media == Media.TypeSeason:
+				if not 'tvshowtitle' in metadata and 'title' in metadata: metadata['tvshowtitle'] = metadata['title']
+				if not 'tvshowyear' in metadata and 'year' in metadata: metadata['tvshowyear'] = metadata['year']
 
-		# For Gaia Eminence.
-		if media == Media.TypeEpisode:
-			item.setProperty('GaiaShowNumber', Media.number(metadata = metadata))
-			item.setProperty('GaiaShowStory', str(int(metadata['season'] > 0 or ('story' in metadata and metadata['story']))))
-			if 'special' in metadata and metadata['special']: item.setProperty('GaiaShowSpecial', '-'.join(metadata['special']))
-		elif media == Media.TypeSpecialExtra or media == Media.TypeSpecialRecap:
-			item.setProperty('GaiaShowExtra', '1')
+			# For Gaia Eminence.
+			if media == Media.TypeEpisode:
+				item.setProperty('GaiaShowNumber', Media.number(metadata = metadata))
+
+				try: special = metadata['special']
+				except: special = None
+
+				specialType = None
+				if special and 'type' in special: specialType = special['type']
+				item.setProperty('GaiaShowSpecial', '-'.join(specialType) if specialType else '')
+
+				specialStory = metadata['season'] > 0
+				if not specialStory and special and 'story' in special: specialStory = special['story']
+				item.setProperty('GaiaShowStory', str(int(False if specialStory is None else specialStory)))
+
+				specialExtra = metadata['season'] == 0 or metadata['episode'] == 0
+				if special and 'extra' in special: specialExtra = special['extra']
+				item.setProperty('GaiaShowExtra', str(int(False if specialExtra is None else specialExtra)))
+
+			elif media == Media.TypeSpecialExtra or media == Media.TypeSpecialRecap:
+				item.setProperty('GaiaShowExtra', '1')
 
 	def itemDetail(self, media, metadata, item, mixed = False):
-		if self.mLabelDetailEnabled:
+		if metadata and self.mLabelDetailEnabled:
 			details = False
 			if self.mLabelDetailLevel == 0: details = Media.typeMovie(media) or media == Media.TypeEpisode
 			elif self.mLabelDetailLevel == 1: details = Media.typeMovie(media) or media == Media.TypeSeason or media == Media.TypeEpisode
@@ -1464,26 +1518,27 @@ class MetaTools(object):
 					metadata[attribute] = values
 
 	def itemDate(self, media, metadata, item):
-		# For Gaia Eminence.
-		# These are needed to use sorting in the menus.
-		# date/SORT_METHOD_DATE seems to be broken and does not return the correct order.
-		# dateadded/SORT_METHOD_DATEADDED can correctly sort by date.
-		if 'premiered' in metadata and metadata['premiered']: date = metadata['premiered']
-		elif 'aired' in metadata and metadata['aired']: date = metadata['aired']
-		else: date = None
+		if metadata:
+			# For Gaia Eminence.
+			# These are needed to use sorting in the menus.
+			# date/SORT_METHOD_DATE seems to be broken and does not return the correct order.
+			# dateadded/SORT_METHOD_DATEADDED can correctly sort by date.
+			if 'premiered' in metadata and metadata['premiered']: date = metadata['premiered']
+			elif 'aired' in metadata and metadata['aired']: date = metadata['aired']
+			else: date = None
 
-		if date:
-			# Needs to be set in a specific format.
-			dated = ConverterTime(date, format = '%Y-%m-%d')
-			metadata['date'] = dated.string(format = '%d.%m.%Y')
-			metadata['dateadded'] = dated.string(format = '%Y-%m-%d %H:%M:%S')
+			if date:
+				# Needs to be set in a specific format.
+				dated = ConverterTime(date, format = '%Y-%m-%d')
+				metadata['date'] = dated.string(format = '%d.%m.%Y')
+				metadata['dateadded'] = dated.string(format = '%Y-%m-%d %H:%M:%S')
 
-			if media == Media.TypeSeason or media == Media.TypeEpisode:
-				year = Regex.extract(data = date, expression = '(\d{4})')
-				if year: metadata['year'] = int(year)
+				if media == Media.TypeSeason or media == Media.TypeEpisode:
+					year = Regex.extract(data = date, expression = '(\d{4})')
+					if year: metadata['year'] = int(year)
 
 	def itemPlot(self, media, metadata, item, extend = True):
-		if extend:
+		if metadata and extend:
 			if 'plotBefore' in metadata and metadata['plotBefore']:
 				if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = metadata['plotBefore']
 				else: metadata['plot'] = metadata['plotBefore'] + '\n\n' + metadata['plot']
@@ -1493,21 +1548,22 @@ class MetaTools(object):
 
 	def itemId(self, metadata, item, tag = None):
 		try:
-			if tag is None: tag = self.itemTag(item = item)
-			ids = {}
-			imdb = None
-			for id in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
-				if id and id in metadata and metadata[id]:
-					ids[id] = str(metadata[id])
-					if id == MetaTools.RatingImdb: imdb = metadata[id]
-			try: tag.setUniqueIDs(ids, 'imdb') # Kodi 20+
-			except: item.setUniqueIDs(ids, 'imdb') # Kodi 19
-			if imdb: metadata['imdbnumber'] = imdb
+			if metadata:
+				if tag is None: tag = self.itemTag(item = item)
+				ids = {}
+				imdb = None
+				for id in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
+					if id and id in metadata and metadata[id]:
+						ids[id] = str(metadata[id])
+						if id == MetaTools.RatingImdb: imdb = metadata[id]
+				try: tag.setUniqueIDs(ids, 'imdb') # Kodi 20+
+				except: item.setUniqueIDs(ids, 'imdb') # Kodi 19
+				if imdb: metadata['imdbnumber'] = imdb
 		except: Logger.error()
 
 	def itemInfo(self, metadata, item, tag = None, type = None):
 		if tag is None: tag = self.itemTag(item = item)
-		if tag: # Kodi 20+
+		if tag and metadata: # Kodi 20+
 			for key, value in metadata.items():
 				try:
 					if not value is None:
@@ -1518,70 +1574,78 @@ class MetaTools(object):
 			item.setInfo(type = type if type else 'video', infoLabels = metadata)
 
 	def itemFuture(self, metadata, media = None):
-		if 'status' in metadata and MetaData.statusExtract(metadata['status']) == MetaData.StatusEnded: return True
+		if metadata:
+			if 'status' in metadata and MetaData.statusExtract(metadata['status']) == MetaData.StatusEnded: return True
 
-		time = None
-		if not time and 'aired' in metadata: time = metadata['aired']
-		if not time and 'premiered' in metadata: time = metadata['premiered']
+			time = None
+			if not time and 'aired' in metadata: time = metadata['aired']
+			if not time and 'premiered' in metadata: time = metadata['premiered']
 
-		if not time:
-			# Trakt sometimes returns new/unaired seasons that or not yet on TVDb, and also sometimes vice versa.
-			# These seasons seem to not have a premiered/aired date, year, or even the number of episodes aired.
-			# Make them italic to inidcate that they are unaired.
-			# Update: Sometimes the year and airs attributes are available.
-			if media == Media.TypeSeason:
-				if not 'year' in metadata:
-					try: episodes = metadata['airs']['episodes']
-					except: episodes = None
-					if not episodes: return MetaTools.TimeFuture
-				elif 'pack' in metadata:
-					# Slow Horses has a year for S03, although not aired yet.
-					try:
-						season = metadata['season']
-						found = False
-						for i in metadata['pack']['seasons']:
-							if i['number']['official'] == season:
-								found = True
-								break
-						if not found: return MetaTools.TimeFuture
-					except: pass
-			if media == Media.TypeSeason or media == Media.TypeEpisode:
-				if (not 'rating' in metadata or not metadata['rating']) and (not 'votes' in metadata or not metadata['votes']):
-					# If no rating, votes or images.
-					images = False
-					if MetaImage.Attribute in metadata and metadata[MetaImage.Attribute]:
-						for k, v in metadata[MetaImage.Attribute].items():
-							if not Tools.isDictionary(v) and v:
-								images = True
-								break
-					if not images: return MetaTools.TimeFuture
+			if not time:
+				# Trakt sometimes returns new/unaired seasons that or not yet on TVDb, and also sometimes vice versa.
+				# These seasons seem to not have a premiered/aired date, year, or even the number of episodes aired.
+				# Make them italic to inidcate that they are unaired.
+				# Update: Sometimes the year and airs attributes are available.
+				if media == Media.TypeSeason:
+					if not 'year' in metadata:
+						try: episodes = metadata['airs']['episodes']
+						except: episodes = None
+						if not episodes: return MetaTools.TimeFuture
+					elif 'pack' in metadata:
+						# Slow Horses has a year for S03, although not aired yet.
+						try:
+							season = metadata['season']
+							found = False
+							for i in metadata['pack']['seasons']:
+								if i['number']['official'] == season:
+									found = True
+									break
+							if not found: return MetaTools.TimeFuture
+						except: pass
+				if media == Media.TypeSeason or media == Media.TypeEpisode:
+					if metadata and (not 'rating' in metadata or not metadata['rating']) and (not 'votes' in metadata or not metadata['votes']):
+						# If no rating, votes or images.
+						images = False
+						if MetaImage.Attribute in metadata and metadata[MetaImage.Attribute]:
+							for k, v in metadata[MetaImage.Attribute].items():
+								if not Tools.isDictionary(v) and v:
+									images = True
+									break
+						if not images: return MetaTools.TimeFuture
 
-			return None
+				return None
 
-		time = Time.timestamp(fixedTime = time + ' ' + self.mTimeClock, format = Time.FormatDateTime)
-		if not time: return None
+			time = Time.timestamp(fixedTime = time + ' ' + self.mTimeClock, format = Time.FormatDateTime)
+			if not time: return None
 
-		return time - self.mTimeCurrent
+			return time - self.mTimeCurrent
+		return None
 
 	def itemVoting(self, metadata, item, tag = None):
 		try:
-			if 'voting' in metadata:
+			if metadata and 'voting' in metadata:
 				if tag is None: tag = self.itemTag(item = item)
 				for i in [MetaTools.RatingImdb, MetaTools.RatingTmdb, MetaTools.RatingTvdb, MetaTools.RatingTrakt if tag else None]:
-					if i  and i in metadata['voting']['rating']:
-						rating = metadata['voting']['rating'][i]
-						if not rating is None and i in metadata['voting']['votes']:
-							votes = metadata['voting']['votes'][i]
-							if votes is None: votes = 0
-							try: tag.setRating(rating, votes, i, False) # Kodi 20+
-							except: item.setRating(i, rating, votes, False) # Kodi 19
+					if i:
+						if i in metadata['voting']['rating']:
+							rating = metadata['voting']['rating'][i]
+							if not rating is None and i in metadata['voting']['votes']:
+								votes = metadata['voting']['votes'][i]
+								if votes is None: votes = 0
+								try: tag.setRating(rating, votes, i, False) # Kodi 20+
+								except: item.setRating(i, rating, votes, False) # Kodi 19
+						if i in metadata['voting']['user']:
+							rating = metadata['voting']['user'][i]
+							if not rating is None:
+								try: tag.setUserRating(rating) # Kodi 20+
+								except: pass
 		except: Logger.error()
 
 	def itemImage(self, media, metadata, item, images = True, video = None, multiple = False):
 		if Tools.isDictionary(images):
 			return MetaImage.set(item = item, images = images)
 		elif images:
-			if media == Media.TypeSeason and not 'season' in metadata: media = Media.TypeShow # Series menu.
+			if media == Media.TypeSeason and metadata and not 'season' in metadata: media = Media.TypeShow # Series menu.
 
 			if video is None: return MetaImage.setMedia(media = media, data = metadata, item = item, multiple = multiple)
 			elif video == Recap.Id: return MetaImage.setRecap(data = metadata, item = item)
@@ -1609,7 +1673,7 @@ class MetaTools(object):
 		# Maybe this will be fixed in Kodi 20 with the new functions/classes:
 		#	self.item.setCast([xbmc.Actor('vvv', 'role', order=1, thumbnail='https://image.tmdb.org/t/p/w185/gwQ5MfY68BvvyIbef3kr2XPilTx.jpg')])
 
-		if 'cast' in metadata:
+		if metadata and 'cast' in metadata:
 			cast = metadata['cast']
 			if cast:
 				if Tools.isDictionary(cast[0]):
@@ -1648,115 +1712,119 @@ class MetaTools(object):
 		item.setProperties(properties)
 
 	def itemPlayback(self, media, metadata, item, tag = None):
-		if tag is None: tag = self.itemTag(item = item)
+		if metadata:
+			if tag is None: tag = self.itemTag(item = item)
 
-		try: idImdb = metadata['imdb']
-		except: idImdb = None
-		try: idTmdb = metadata['tmdb']
-		except: idTmdb = None
-		try: idTvdb = metadata['tvdb']
-		except: idTvdb = None
-		try: idTrakt = metadata['trakt']
-		except: idTrakt = None
-		try: season = metadata['extra']['season']
-		except:
-			try: season = metadata['season']
-			except: season = None
-		try: episode = metadata['extra']['episode']
-		except:
-			try: episode = metadata['episode']
-			except: episode = None
+			try: idImdb = metadata['imdb']
+			except: idImdb = None
+			try: idTmdb = metadata['tmdb']
+			except: idTmdb = None
+			try: idTvdb = metadata['tvdb']
+			except: idTvdb = None
+			try: idTrakt = metadata['trakt']
+			except: idTrakt = None
+			try: season = metadata['extra']['season']
+			except:
+				try: season = metadata['season']
+				except: season = None
+			try: episode = metadata['extra']['episode']
+			except:
+				try: episode = metadata['episode']
+				except: episode = None
 
-		# Series menu.
-		if media == Media.TypeSeason and not 'season' in metadata: media = Media.TypeShow
+			# Series menu.
+			if media == Media.TypeSeason and not 'season' in metadata: media = Media.TypeShow
 
-		playback = self.mItemPlayback.retrieve(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, adjust = self.mItemPlayback.AdjustSettings)
-		count = playback['history']['count']['total']
-		time = playback['history']['time']['last']
-		progress = playback['progress']
-		rating = playback['rating']
+			playback = self.mItemPlayback.retrieve(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, adjust = self.mItemPlayback.AdjustSettings)
+			count = playback['history']['count']['total']
+			time = playback['history']['time']['last']
+			progress = playback['progress']
+			rating = playback['rating']
 
-		# Do not use overlay/watched attribute, since Kodi (or maybe the Kodi skin) resets the playcount to 1, even if playcount is higher than 1.
-		# https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/GUIListItem.h
-		#metadata['overlay'] = 5 if count else 4
+			# Do not use overlay/watched attribute, since Kodi (or maybe the Kodi skin) resets the playcount to 1, even if playcount is higher than 1.
+			# https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/GUIListItem.h
+			#metadata['overlay'] = 5 if count else 4
 
-		metadata['playcount'] = count
+			metadata['playcount'] = count
 
-		if time: metadata['lastplayed'] = Time.format(time, format = Time.FormatDateTime)
+			if time: metadata['lastplayed'] = Time.format(time, format = Time.FormatDateTime)
 
-		# Resume/Progress
-		# Do not set TotalTime, otherwise Kodi shows a resume popup dialog when clicking on the item, instead of going directly to scraping.
-		# item.setProperty('TotalTime', str(metadata['duration']))
-		# For some skins (eg: skin.eminence.2) the TotalTime has to be set for a different progress icon to show (25%, 50%, 75%).
-		# Without TotalTime, the skins justs shows the default 25% icon.
-		if progress:
-			# Not listed under the Python docs, but listed under the infolabels docs.
-			# Do not add, since Kodi throws a warning in the log: Unknown Video Info Key "percentplayed"
-			#metadata['percentplayed'] = progress * 100
+			# Resume/Progress
+			# Do not set TotalTime, otherwise Kodi shows a resume popup dialog when clicking on the item, instead of going directly to scraping.
+			# item.setProperty('TotalTime', str(metadata['duration']))
+			# For some skins (eg: skin.eminence.2) the TotalTime has to be set for a different progress icon to show (25%, 50%, 75%).
+			# Without TotalTime, the skins justs shows the default 25% icon.
+			if progress:
+				# Not listed under the Python docs, but listed under the infolabels docs.
+				# Do not add, since Kodi throws a warning in the log: Unknown Video Info Key "percentplayed"
+				#metadata['percentplayed'] = progress * 100
 
-			if not media == Media.TypeShow and not media == Media.TypeSeason:
-				if 'duration' in metadata and metadata['duration']: resume = progress * metadata['duration']
-				else: resume = progress * (3600 if Media.typeTelevision(media) else 7200)
-				try: tag.setResumePoint(int(resume))
-				except: item.setProperty('ResumeTime', str(int(resume)))
+				if not media == Media.TypeShow and not media == Media.TypeSeason:
+					if 'duration' in metadata and metadata['duration']: resume = progress * metadata['duration']
+					else: resume = progress * (3600 if Media.typeTelevision(media) else 7200)
+					try: tag.setResumePoint(int(resume))
+					except: item.setProperty('ResumeTime', str(int(resume)))
 
-			# Used by the context menu to add a "Clear Progress" option.
-			if not media == Media.TypeShow and not media == Media.TypeSeason: metadata['progress'] = progress
+				# Used by the context menu to add a "Clear Progress" option.
+				if not media == Media.TypeShow and not media == Media.TypeSeason: metadata['progress'] = progress
 
-		if rating: metadata['userrating'] = rating
+			if rating:
+				try: tag.setUserRating(rating) # Kodi 20+
+				except: pass
+				metadata['userrating'] = rating
 
-		if Media.typeTelevision(media):
-			seasonsTotal = None
-			episodesTotal = None
-			episodesWatched = None
-			episodesUnwatched = None
+			if Media.typeTelevision(media):
+				seasonsTotal = None
+				episodesTotal = None
+				episodesWatched = None
+				episodesUnwatched = None
 
-			if 'pack' in metadata and metadata['pack']:
-				pack = metadata['pack']
-				if season is None and episode is None:
-					key = 'total' if self.mShowCounterSpecial else 'main'
-					seasonsTotal = pack['count']['season'][key]
-					episodesTotal = pack['count']['episode'][key]
-				elif episode is None:
-					seasonsTotal = 1
-					for i in pack['seasons']:
-						if i['number'][MetaData.NumberOfficial] == season:
-							episodesTotal = i['count']
-							break
-				else:
-					seasonsTotal = 1
-					episodesTotal = 1
+				if 'pack' in metadata and metadata['pack']:
+					pack = metadata['pack']
+					if season is None and episode is None:
+						key = 'total' if self.mShowCounterSpecial else 'main'
+						seasonsTotal = pack['count']['season'][key]
+						episodesTotal = pack['count']['episode'][key]
+					elif episode is None:
+						seasonsTotal = 1
+						for i in pack['seasons']:
+							if i['number'][MetaData.NumberOfficial] == season:
+								episodesTotal = i['count']
+								break
+					else:
+						seasonsTotal = 1
+						episodesTotal = 1
 
-			episodesWatched = playback['history']['count']['main']['unique'] if ('main' in playback['history']['count'] and not self.mShowCounterSpecial) else playback['history']['count']['unique']
-			if not episodesWatched: episodesWatched = 0
-			if episodesTotal: episodesUnwatched = episodesTotal - episodesWatched
+				episodesWatched = playback['history']['count']['main']['unique'] if ('main' in playback['history']['count'] and not self.mShowCounterSpecial) else playback['history']['count']['unique']
+				if not episodesWatched: episodesWatched = 0
+				if episodesTotal: episodesUnwatched = episodesTotal - episodesWatched
 
-			if self.mShowCounterEnabled:
-				if not seasonsTotal is None: item.setProperty('TotalSeasons', str(seasonsTotal))
-				if not episodesTotal is None: item.setProperty('TotalEpisodes', str(episodesTotal))
-				if not episodesWatched is None: item.setProperty('WatchedEpisodes', str(episodesWatched))
-				if not episodesUnwatched is None and self.mShowCounterUnwatched:
-					if self.mShowCounterLimit: episodesUnwatched = min(99, episodesUnwatched)
-					item.setProperty('UnWatchedEpisodes', str(episodesUnwatched))
+				if self.mShowCounterEnabled:
+					if not seasonsTotal is None: item.setProperty('TotalSeasons', str(seasonsTotal))
+					if not episodesTotal is None: item.setProperty('TotalEpisodes', str(episodesTotal))
+					if not episodesWatched is None: item.setProperty('WatchedEpisodes', str(episodesWatched))
+					if not episodesUnwatched is None and self.mShowCounterUnwatched:
+						if self.mShowCounterLimit: episodesUnwatched = min(99, episodesUnwatched)
+						item.setProperty('UnWatchedEpisodes', str(episodesUnwatched))
 
-				# Set this to allow the context menu to add "Mark As Unwatched" for partially watched shows/seasons.
-				metadata['count'] = {
-					'season' : {'total' : seasonsTotal},
-					'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched},
-				}
+					# Set this to allow the context menu to add "Mark As Unwatched" for partially watched shows/seasons.
+					metadata['count'] = {
+						'season' : {'total' : seasonsTotal},
+						'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched},
+					}
 
-			# For shows and seasons, only mark as watched if all episodes were watched.
-			# If some episodes are watched and some are unwatched, add a resume time to indicate there are still some unwatched episodes.
-			if media == Media.TypeShow or media == Media.TypeSeason:
-				if episodesUnwatched and episodesUnwatched > 0:
-					metadata['playcount'] = None
-				else:
-					count, remaining = self.mItemPlayback.count(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, specials = self.mShowCounterSpecial, metadata = metadata, history = playback['history'])
-					metadata['playcount'] = count
+				# For shows and seasons, only mark as watched if all episodes were watched.
+				# If some episodes are watched and some are unwatched, add a resume time to indicate there are still some unwatched episodes.
+				if media == Media.TypeShow or media == Media.TypeSeason:
+					if episodesUnwatched and episodesUnwatched > 0:
+						metadata['playcount'] = None
+					else:
+						count, remaining = self.mItemPlayback.count(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, specials = self.mShowCounterSpecial, metadata = metadata, history = playback['history'])
+						metadata['playcount'] = count
 
-				if episodesWatched and episodesUnwatched:
-					try: tag.setResumePoint(1)
-					except: item.setProperty('ResumeTime', str(1))
+					if episodesWatched and episodesUnwatched:
+						try: tag.setResumePoint(1)
+						except: item.setProperty('ResumeTime', str(1))
 
 	def itemContext(self,
 		item,
@@ -2166,7 +2234,6 @@ class MetaTools(object):
 		if not metadata: return None
 		if Tools.isString(metadata): metadata = Converter.jsonFrom(metadata)
 		else: metadata = self.copy(metadata) # Create a copy, since we do not want to edit the outside dictionary passed to this function.
-
 		if media is None: media = self.media(metadata = metadata)
 
 		# Do not replace if already set (eg: video.py -> playing trailers in cinematic mode).
@@ -2207,6 +2274,31 @@ class MetaTools(object):
 		self.cleanStudio(metadata = metadata, media = media, empty = studio)
 
 		return metadata
+
+	@classmethod
+	def cleanId(self, metadata = None, id = None):
+		# Sometimes IMDb IDs show up as "ttt..." (tripple t).
+		# Not sure where it comes from.
+		# Maybe some APIs have mistakes in their IDs.
+		# Eg: ttt4154796
+		# Update: this was caused by:
+		#	'tt' + Regex.remove(data = str(idImdb), expression = '[^0-9]', all = True)
+		# That was called without "all = True", therefore only replacing the first t.
+		# This has been fixed now.
+		if metadata:
+			try:
+				if metadata['imdb'].startswith('ttt'): metadata['imdb'] = 'tt' + metadata['imdb'].replace('t', '')
+			except: pass
+			for i in ['show', 'season', 'episode']:
+				try:
+					if metadata['id'][i]['imdb'].startswith('ttt'): metadata['id'][i]['imdb'] = 'tt' + metadata['id'][i]['imdb'].replace('t', '')
+				except: pass
+			return metadata
+		elif id:
+			if id.startswith('ttt'): id = 'tt' + id.replace('t', '')
+			return id
+		else:
+			return None
 
 	@classmethod
 	def cleanSeason(self, metadata):
@@ -2258,7 +2350,12 @@ class MetaTools(object):
 		'''
 		voting = self.voting(metadata = metadata)
 		if voting:
-			for i in ['rating', 'userrating', 'votes']:
+			for i in ['rating', 'userrating']:
+				if i in voting and not voting[i] is None:
+					rating = voting[i]
+					if rating and rating > 0 and rating < 0.1: rating = 0.1 # Some skins (eg: Estaury) show a 0.0 rating for low ratings like 0.004 (eg: Jeopardy! S38).
+					metadata[i] = rating
+			for i in ['votes']:
 				if i in voting and not voting[i] is None: metadata[i] = voting[i]
 
 	def cleanCast(self, metadata):
@@ -2318,39 +2415,40 @@ class MetaTools(object):
 
 	@classmethod
 	def cleanTrailer(self, metadata, media = None):
-		trailer = {}
-		if media is None: media = self.media(metadata = metadata)
+		if metadata:
+			trailer = {}
+			if media is None: media = self.media(metadata = metadata)
 
-		trailer['video'] = 'trailer'
-		trailer['media'] = media
-		try:
-			if metadata['imdb']: trailer['imdb'] = metadata['imdb']
-		except: pass
-		try:
-			if metadata['tmdb']: trailer['tmdb'] = metadata['tmdb']
-		except: pass
-		try:
-			if metadata['tvdb']: trailer['tvdb'] = metadata['tvdb']
-		except: pass
-		try: trailer['title'] = metadata['tvshowtitle']
-		except:
-			try: trailer['title'] = metadata['title']
+			trailer['video'] = 'trailer'
+			trailer['media'] = media
+			try:
+				if metadata['imdb']: trailer['imdb'] = metadata['imdb']
 			except: pass
-		try: trailer['year'] = metadata['year']
-		except: pass
-		try: trailer['season'] = metadata['season']
-		except: pass
-		try: trailer['link'] = metadata['trailer']
-		except: pass
+			try:
+				if metadata['tmdb']: trailer['tmdb'] = metadata['tmdb']
+			except: pass
+			try:
+				if metadata['tvdb']: trailer['tvdb'] = metadata['tvdb']
+			except: pass
+			try: trailer['title'] = metadata['tvshowtitle']
+			except:
+				try: trailer['title'] = metadata['title']
+				except: pass
+			try: trailer['year'] = metadata['year']
+			except: pass
+			try: trailer['season'] = metadata['season']
+			except: pass
+			try: trailer['link'] = metadata['trailer']
+			except: pass
 
-		metadata['trailer'] = System.command(action = 'streamsVideo', parameters = trailer)
+			metadata['trailer'] = System.command(action = 'streamsVideo', parameters = trailer)
 
 	###################################################################
 	# VOTING
 	###################################################################
 
 	def voting(self, metadata):
-		if not 'voting' in metadata: return None
+		if not metadata or not 'voting' in metadata: return None
 
 		settingMain = None
 		settingFallback = None
@@ -2503,24 +2601,54 @@ class MetaTools(object):
 
 		return result
 
-	def filterDuplicate(self, items, number = False):
-		duplicates = {'imdb' : [], 'tmdb' : [], 'tvdb' : [], 'trakt' : []}
-		result = []
-		for item in items:
-			found = False
-			for id in duplicates.keys():
-				if id in item and item[id]:
-					i = item[id]
-					if number:
-						try: season = str(item['season'])
-						except: season = 'z'
-						try: episode = str(item['episode'])
-						except: episode = 'z'
-						i = '%s_%s_%s' % (i, season, episode)
-					if i in duplicates[id]: found = True
-					else: duplicates[id].append(i)
-			if not found: result.append(item)
-		return result
+	def filterDuplicate(self, items, id = True, title = False, number = False):
+		if id:
+			result = []
+			duplicates = {'imdb' : [], 'tmdb' : [], 'tvdb' : [], 'trakt' : []}
+			keys = list(duplicates.keys())
+			for item in items:
+				found = False
+				for i in keys:
+					if i in item and item[i]:
+						j = item[i]
+						if number:
+							try: season = str(item['season'])
+							except: season = 'z'
+							try: episode = str(item['episode'])
+							except: episode = 'z'
+							j = '%s_%s_%s' % (j, season, episode)
+						if j in duplicates[i]:
+							found = True
+							break
+						else: duplicates[i].append(j)
+				if not found: result.append(item)
+			items = result
+
+		if title:
+			result = []
+			duplicates = []
+			keys = ['title', 'originaltitle']
+			for item in items:
+				found = False
+				values = []
+				for i in keys:
+					if i in item and item[i]:
+						# Important to use lower case, since sometimes the titles between IMDb and TMDb do not use the sasme case.
+						# Eg: "Operation Fortune: Ruse de guerre" vs Operation Fortune: Ruse de Guerre
+						j = Regex.remove(data = item[i].lower(), expression = Regex.Symbol, all = True).replace('  ', ' ')
+						if number:
+							try: season = str(item['season'])
+							except: season = 'z'
+							try: episode = str(item['episode'])
+							except: episode = 'z'
+							j = '%s_%s_%s' % (j, season, episode)
+						if j in duplicates: found = True
+						else: values.append(j)
+				duplicates.extend(values)
+				if not found: result.append(item)
+			items = result
+
+		return items
 
 	def filterContains(self, items, item, number = False, result = False):
 		duplicates = {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None}
@@ -2873,16 +3001,22 @@ class MetaTools(object):
 		return Cache.instance().cache(None, Cache.TimeoutWeek1, None, function, **kwargs)
 
 	@classmethod
-	def idMovie(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
+	def id(self, media, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, deviation = True, cache = True, extra = False, extended = False):
+		if media == Media.TypeSet: return self.idSet(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, deviation = deviation, cache = cache, extra = extra, extended = extended)
+		elif Media.typeTelevision(media): return self.idShow(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, deviation = deviation, cache = cache, extra = extra)
+		else: return self.idMovie(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, deviation = deviation, cache = cache, extra = extra)
+
+	@classmethod
+	def idMovie(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, deviation = True, cache = True, extra = False):
 		if cache:
 			# Do these separately, otherwise if this function is called with different ID-combination, it will not use the cached result.
 			# Eg: the function is called 1st with only an IMDb ID, and a 2nd time with an IMDb and TMDb ID.
 			result = None
-			if not result and idImdb: result = self._idCache(function = self.idMovie, idImdb = idImdb, cache = False)
-			if not result and idTmdb: result = self._idCache(function = self.idMovie, idTmdb = idTmdb, cache = False)
-			if not result and idTrakt: result = self._idCache(function = self.idMovie, idTrakt = idTrakt, cache = False)
-			if not result and idTvdb: result = self._idCache(function = self.idMovie, idTvdb = idTvdb, cache = False)
-			if not result and title: result = self._idCache(function = self.idMovie, title = title, year = year, cache = False)
+			if not result and idImdb: result = self._idCache(function = self.idMovie, idImdb = idImdb, extra = extra, cache = False)
+			if not result and idTmdb: result = self._idCache(function = self.idMovie, idTmdb = idTmdb, extra = extra, cache = False)
+			if not result and idTrakt: result = self._idCache(function = self.idMovie, idTrakt = idTrakt, extra = extra, cache = False)
+			if not result and idTvdb: result = self._idCache(function = self.idMovie, idTvdb = idTvdb, extra = extra, cache = False)
+			if not result and title: result = self._idCache(function = self.idMovie, title = title, year = year, deviation = deviation, extra = extra, cache = False)
 			return result
 
 		result = {}
@@ -2894,12 +3028,14 @@ class MetaTools(object):
 				if idImdb or idTmdb or idTvdb or idTrakt:
 					from lib.modules import trakt
 					lookup = True
-					data = trakt.SearchMovie(imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, single = True, full = False, cache = False)
+					data = trakt.SearchMovie(imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, single = True, full = extra, cache = False)
 					if data and 'movie' in data:
 						ids = data['movie'].get('ids')
 						if ids:
 							ids = {k : str(v) for k, v in ids.items() if v}
-							if ids: Tools.update(result, ids, none = False)
+							if ids:
+								Tools.update(result, ids, none = False)
+								if extra: Tools.update(result, {'title' : data['movie'].get('title'), 'year' : data['movie'].get('year'), 'score' : data.get('score'), 'rating' : data['movie'].get('rating'), 'votes' : data['movie'].get('votes'), 'comments' : data['movie'].get('comment_count')}, none = False)
 		except: Logger.error()
 
 		# Search TMDb by ID.
@@ -2916,13 +3052,23 @@ class MetaTools(object):
 						data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
 						if data:
 							id = data.get('imdb_id')
-							if id: Tools.update(result, {'imdb' : id}, none = False)
+							if id:
+								Tools.update(result, {'imdb' : id}, none = False)
+								if extra: Tools.update(result, {'score' : data.get('popularity'), 'rating' : data.get('vote_average'), 'votes' : data.get('vote_count')}, none = False)
 					elif idImdb:
 						link = 'https://api.themoviedb.org/3/find/%s' % idImdb
 						data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'external_source' : 'imdb_id'})
 						if data and 'movie_results' in data and data['movie_results']:
 							id = data['movie_results'][0].get('id')
-							if id: Tools.update(result, {'tmdb' : id}, none = False)
+							if id:
+								Tools.update(result, {'tmdb' : id}, none = False)
+								if extra:
+									data2 = data['movie_results'][0]
+									release = None
+									if 'release_date' in data2:
+										release = Regex.extract(data = data2['release_date'], expression = '(\d{4})-', group = 1)
+										release = int(release) if release else None
+									Tools.update(result, {'title' : data2.get('title'), 'year' : release, 'score' : data2.get('popularity'), 'rating' : data2.get('vote_average'), 'votes' : data2.get('vote_count')}, none = False)
 		except: Logger.error()
 
 		if not lookup and title:
@@ -2931,13 +3077,16 @@ class MetaTools(object):
 			try:
 				if not result or not 'imdb' in result or not result['imdb']:
 					from lib.modules import trakt
-					data = trakt.SearchMovie(title = title, year = year, single = True, full = False, cache = False)
+					data = trakt.SearchMovie(title = title, year = year, single = True, full = extra, cache = False)
+					if not(data and 'movie' in data and data['movie']) and deviation and year: data = trakt.SearchMovie(title = title, year = [int(year) - 1, int(year) + 1], single = True, full = extra, cache = False)
 					if data and 'movie' in data:
 						ids = data['movie'].get('ids')
 						if ids:
 							result = {}
 							ids = {k : str(v) for k, v in ids.items() if v}
-							if ids: Tools.update(result, ids, none = False)
+							if ids:
+								Tools.update(result, ids, none = False)
+								if extra: Tools.update(result, {'title' : data.get('title'), 'year' : data.get('year'), 'score' : data.get('score'), 'rating' : data['movie'].get('rating'), 'votes' : data['movie'].get('votes'), 'comments' : data['movie'].get('comment_count')}, none = False)
 			except: Logger.error()
 
 			# Search TMDb by title.
@@ -2949,8 +3098,17 @@ class MetaTools(object):
 					from lib.modules.clean import Title
 					key = Tmdb().key()
 					query = Title.clean(title)
+					yearDeviated = year
 					link = 'https://api.themoviedb.org/3/search/movie'
+
 					data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : year})
+					if not(data and 'results' in data and data['results']) and deviation and year:
+						yearDeviated = int(year) + 1
+						data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : yearDeviated})
+						if not(data and 'results' in data and data['results']) and deviation and year:
+							yearDeviated = int(year) - 1
+							data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : yearDeviated})
+
 					if data and 'results' in data:
 						data = data['results']
 						for i in data:
@@ -2958,29 +3116,31 @@ class MetaTools(object):
 								release = None
 								if 'release_date' in i:
 									release = Regex.extract(data = i['release_date'], expression = '(\d{4})-', group = 1)
-									if release: release = int(release)
-								if not year or year == release:
+									release = int(release) if release else None
+								if not year or yearDeviated == release:
 									link = 'https://api.themoviedb.org/3/movie/%s/external_ids' % str(i['id'])
-									data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
-									if data:
-										id = data.get('imdb_id')
-										if id: Tools.update(result, {'imdb' : id, 'tmdb' : str(data.get('id'))}, none = False)
+									data2 = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
+									if data2:
+										id = data2.get('imdb_id')
+										if id:
+											Tools.update(result, {'imdb' : id, 'tmdb' : str(data2.get('id'))}, none = False)
+											if extra: Tools.update(result, {'title' : i.get('title'), 'year' : release, 'score' : i.get('popularity'), 'rating' : i.get('vote_average'), 'votes' : i.get('vote_count')}, none = False)
 									break
 			except: Logger.error()
 
 		return result if result else None
 
 	@classmethod
-	def idSet(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
+	def idSet(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, deviation = True, cache = True, extra = False, extended = False):
 		if cache:
 			result = None
-			if not result and title: result = self._idCache(function = self.idSet, title = title, year = year, cache = False)
+			if not result and title: result = self._idCache(function = self.idSet, title = title, year = year, deviation = deviation, extra = extra, extended = extended, cache = False)
 			return result
 
 		result = {}
 		lookup = False
-		keyword = ' collection'
-
+		prefix = 'the '
+		suffix = ' collection'
 		if not lookup and title:
 
 			# Search TMDb by title.
@@ -2991,31 +3151,95 @@ class MetaTools(object):
 					from lib.modules.clean import Title
 					key = Tmdb().key()
 					query = Title.clean(title)
+
 					link = 'https://api.themoviedb.org/3/search/collection'
 					data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query})
+
+					# Searching "The Harry Potter Collection" does not return anything, but "Harry Potter Collection" does return.
+					if data and 'results' in data and not data['results'] and query.startswith(prefix):
+						data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : Tools.stringRemovePrefix(data = query, remove = prefix)})
+
 					if data and 'results' in data:
 						data = data['results']
-						query = query.rstrip(keyword)
+						query = Tools.stringRemoveAffix(data = query, prefix = prefix, suffix = suffix)
+
+						# Find exact match.
 						for i in data:
-							if query == Title.clean(i['name']).rstrip(keyword):
+							if query == Tools.stringRemoveAffix(data = Title.clean(i['name']), prefix = prefix, suffix = suffix):
 								id = i.get('id')
-								if id: Tools.update(result, {'tmdb' : str(id)}, none = False)
-								break
+								if id:
+									Tools.update(result, {'tmdb' : str(id)}, none = False)
+									if extra: Tools.update(result, {'title' : i.get('name'), 'score' : i.get('popularity'), 'rating' : i.get('vote_average'), 'votes' : i.get('vote_count')}, none = False)
+									break
+
+						# Find closest match.
+						if not result:
+							from lib.modules.tools import Matcher
+							matches = []
+							for i in data:
+								if i.get('id'):
+									match = Matcher.levenshtein(title, i['name'], ignoreCase = True, ignoreSpace = True, ignoreNumeric = False, ignoreSymbol = True)
+									matches.append((match, i))
+							if matches:
+								matches = Tools.listSort(matches, key = lambda x : x[0])
+								i = matches[-1][1]
+								if i:
+									Tools.update(result, {'tmdb' : str(i.get('id'))}, none = False)
+									if extra: Tools.update(result, {'title' : i.get('name'), 'score' : i.get('popularity'), 'rating' : i.get('vote_average'), 'votes' : i.get('vote_count')}, none = False)
+			except: Logger.error()
+
+		# Search for the movie title that is part of the collection, instead of searching the collection name.
+		if not result and extended and title:
+			try:
+				if not result or not 'imdb' in result or not result['imdb']:
+					from lib.modules.account import Tmdb
+					from lib.modules.network import Networker
+					from lib.modules.clean import Title
+					key = Tmdb().key()
+					query = Title.clean(title)
+					yearDeviated = year
+					link = 'https://api.themoviedb.org/3/search/movie'
+
+					data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : year})
+					if not(data and 'results' in data and data['results']) and deviation and year:
+						yearDeviated = int(year) + 1
+						data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : yearDeviated})
+						if not(data and 'results' in data and data['results']) and deviation and year:
+							yearDeviated = int(year) - 1
+							data = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key, 'query' : query, 'year' : yearDeviated})
+
+					if data and 'results' in data:
+						data = data['results']
+						for i in data:
+							if (query == Title.clean(i['title']) or query == Title.clean(i['original_title'])):
+								id = i['id']
+								if id:
+									link = 'https://api.themoviedb.org/3/movie/%s' % id
+									data2 = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
+									if data2 and 'belongs_to_collection' in data2 and data2['belongs_to_collection']:
+										id = data2['belongs_to_collection']['id']
+										if id:
+											link = 'https://api.themoviedb.org/3/collection/%s' % id
+											data3 = Networker().requestJson(method = Networker.MethodGet, link = link, data = {'api_key' : key})
+											if data3:
+												Tools.update(result, {'tmdb' : str(data3.get('id'))}, none = False)
+												if extra: Tools.update(result, {'title' : data3.get('name'), 'score' : data3.get('popularity'), 'rating' : data3.get('vote_average'), 'votes' : data3.get('vote_count')}, none = False)
+											break
 			except: Logger.error()
 
 		return result if result else None
 
 	@classmethod
-	def idShow(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, cache = True):
+	def idShow(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, deviation = True, cache = True, extra = False):
 		if cache:
 			# Do these separately, otherwise if this function is called with different ID-combination, it will not use the cached result.
 			# Eg: the function is called 1st with only an IMDb ID, and a 2nd time with an IMDb and TVDb ID.
 			result = None
-			if not result and idImdb: result = self._idCache(function = self.idShow, idImdb = idImdb, cache = False)
-			if not result and idTvdb: result = self._idCache(function = self.idShow, idTvdb = idTvdb, cache = False)
-			if not result and idTrakt: result = self._idCache(function = self.idShow, idTrakt = idTrakt, cache = False)
-			if not result and idTmdb: result = self._idCache(function = self.idShow, idTmdb = idTmdb, cache = False)
-			if not result and title: result = self._idCache(function = self.idShow, title = title, year = year, cache = False)
+			if not result and idImdb: result = self._idCache(function = self.idShow, idImdb = idImdb, extra = extra, cache = False)
+			if not result and idTvdb: result = self._idCache(function = self.idShow, idTvdb = idTvdb, extra = extra, cache = False)
+			if not result and idTrakt: result = self._idCache(function = self.idShow, idTrakt = idTrakt, extra = extra, cache = False)
+			if not result and idTmdb: result = self._idCache(function = self.idShow, idTmdb = idTmdb, extra = extra, cache = False)
+			if not result and title: result = self._idCache(function = self.idShow, title = title, year = year, deviation = deviation, extra = extra, cache = False)
 			return result
 
 		result = {}
@@ -3024,50 +3248,98 @@ class MetaTools(object):
 
 		# Search TVDb by ID.
 		# Search TVDb before Trakt, since Trakt sometimes returns multiple shows.
-		try:
-			if not result or not 'tvdb' in result or not result['tvdb']:
-				if idImdb or idTvdb or idTmdb: # TVDb does not have the Trakt ID.
-					if manager is None:
-						from lib.meta.manager import MetaManager
-						manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDisable)
-					lookup = True
-					data = manager.search(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, media = MetaData.MediaShow, limit = 1, cache = False)
-					if data:
-						result = {}
-						ids = data.id()
-						if ids: Tools.update(result, ids, none = False)
-		except: Logger.error()
+		def _idShowTvdbId():
+			try:
+				nonlocal idImdb
+				nonlocal idTmdb
+				nonlocal idTvdb
+				nonlocal idTrakt
+				nonlocal title
+				nonlocal year
+				nonlocal result
+				nonlocal manager
+				nonlocal lookup
+				nonlocal extra
+				nonlocal deviation
+
+				if not result or not 'tvdb' in result or not result['tvdb']:
+					if idImdb or idTvdb or idTmdb: # TVDb does not have the Trakt ID.
+						if manager is None:
+							from lib.meta.manager import MetaManager
+							manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDisable)
+						lookup = True
+						data = manager.search(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, media = MetaData.MediaShow, limit = 1, cache = False)
+						if data:
+							result = {}
+							ids = data.id()
+							if ids:
+								Tools.update(result, ids, none = False)
+								if extra: Tools.update(result, {'title' : data.title(), 'year' : data.year(), 'rating' : data.voteRating(), 'votes' : data.voteCount()}, none = False)
+			except: Logger.error()
 
 		# Search Trakt by ID.
 		# Trakt can sometimes return multiple shows for the same IMDb ID.
 		# Eg: For "TVF Pitchers" Trakt returns
 		#	{"trakt":100814,"slug":"tvf-pitchers-2015","tvdb":298807,"imdb":"tt4742876","tmdb":63180}
 		#	{"trakt":185757,"slug":"tvf-pitchers-2015-185757","tvdb":298868,"imdb":"tt4742876","tmdb":63180}
-		try:
-			if not result or not 'tvdb' in result or not result['tvdb']:
-				if idImdb or idTvdb or idTrakt:
-					from lib.modules import trakt
-					lookup = True
-					data = trakt.SearchTVShow(imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, single = True, full = False, cache = False)
-					if data and 'show' in data:
-						ids = data['show'].get('ids')
-						if ids:
-							result = {}
-							ids = {k : str(v) for k, v in ids.items() if v}
-							if ids: Tools.update(result, ids, none = False)
-		except: Logger.error()
-
-		if not lookup and title:
-
-			# Search TVDb by title.
+		def _idShowTraktId():
 			try:
+				nonlocal idImdb
+				nonlocal idTmdb
+				nonlocal idTvdb
+				nonlocal idTrakt
+				nonlocal title
+				nonlocal year
+				nonlocal result
+				nonlocal manager
+				nonlocal lookup
+				nonlocal extra
+				nonlocal deviation
+
+				if not result or not 'tvdb' in result or not result['tvdb']:
+					if idImdb or idTvdb or idTrakt:
+						from lib.modules import trakt
+						lookup = True
+						data = trakt.SearchTVShow(imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, single = True, full = extra, cache = False)
+						if data and 'show' in data:
+							ids = data['show'].get('ids')
+							if ids:
+								result = {}
+								ids = {k : str(v) for k, v in ids.items() if v}
+								if ids:
+									Tools.update(result, ids, none = False)
+									if extra: Tools.update(result, {'title' : data['show'].get('title'), 'year' : data['show'].get('year'), 'score' : data.get('score'), 'rating' : data['show'].get('rating'), 'votes' : data['show'].get('votes'), 'comments' : data['show'].get('comment_count')}, none = False)
+			except: Logger.error()
+
+		# Search TVDb by title.
+		def _idShowTvdbTitle():
+			try:
+				nonlocal idImdb
+				nonlocal idTmdb
+				nonlocal idTvdb
+				nonlocal idTrakt
+				nonlocal title
+				nonlocal year
+				nonlocal result
+				nonlocal manager
+				nonlocal lookup
+				nonlocal extra
+				nonlocal deviation
+
 				if not result or not 'tvdb' in result or not result['tvdb']:
 					from lib.modules.clean import Title
 					if manager is None:
 						from lib.meta.manager import MetaManager
 						manager = MetaManager(provider = MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedDisable)
 					query = Title.clean(title)
-					years = [year, year + 1, year - 1] if year else [None]
+
+					if year:
+						year = int(year)
+						if deviation: years = [year, year + 1, year - 1]
+						else: years = [year]
+					else:
+						years = [None]
+
 					found = False
 					for i in years:
 						data = manager.search(query = query, year = i, media = MetaData.MediaShow, cache = False)
@@ -3078,23 +3350,55 @@ class MetaTools(object):
 									ids = j.id()
 									if ids:
 										Tools.update(result, ids, none = False)
+										if extra: Tools.update(result, {'title' : j.title(), 'year' : j.year(), 'rating' : j.voteRating(), 'votes' : j.voteCount()}, none = False)
 										found = True
 										break
 							if found: break
 			except: Logger.error()
 
-			# Search Trakt by title.
+		# Search Trakt by title.
+		def _idShowTraktTitle():
 			try:
+				nonlocal idImdb
+				nonlocal idTmdb
+				nonlocal idTvdb
+				nonlocal idTrakt
+				nonlocal title
+				nonlocal year
+				nonlocal result
+				nonlocal manager
+				nonlocal lookup
+				nonlocal extra
+				nonlocal deviation
+
 				if not result or not 'tvdb' in result or not result['tvdb']:
 					from lib.modules import trakt
-					data = trakt.SearchTVShow(title = title, year = year, single = True, full = False, cache = False)
+					data = trakt.SearchTVShow(title = title, year = year, single = True, full = extra, cache = False)
+					if not(data and 'show' in data and data['show']) and deviation and year: data = trakt.SearchTVShow(title = title, year = [int(year) - 1, int(year) + 1], single = True, full = extra, cache = False)
 					if data and 'show' in data:
 						ids = data['show'].get('ids')
 						if ids:
 							result = {}
 							ids = {k : str(v) for k, v in ids.items() if v}
-							if ids: Tools.update(result, ids, none = False)
+							if ids:
+								Tools.update(result, ids, none = False)
+								if extra: Tools.update(result, {'title' : data['show'].get('title'), 'year' : data['show'].get('year'), 'score' : data.get('score'), 'rating' : data['show'].get('rating'), 'votes' : data['show'].get('votes'), 'comments' : data['show'].get('comment_count')}, none = False)
 			except: Logger.error()
+
+		# TVDb does not have rating/votes in the search endpoint.
+		# Utilize Trakt first. Used by Oracle to determine if a title is a movie or show based on these values.
+		if extra:
+			_idShowTraktId()
+			_idShowTvdbId()
+			if not lookup and title:
+				_idShowTraktTitle()
+				_idShowTvdbTitle()
+		else:
+			_idShowTvdbId()
+			_idShowTraktId()
+			if not lookup and title:
+				_idShowTvdbTitle()
+				_idShowTraktTitle()
 
 		return result if result else None
 

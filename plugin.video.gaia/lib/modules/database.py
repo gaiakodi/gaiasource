@@ -56,7 +56,7 @@ class Database(object):
 	NameDownloads = 'downloads'
 	NameSettings = 'settings'
 
-	def __init__(self, name = None, addon = None, default = None, path = None, connect = True):
+	def __init__(self, name = None, addon = None, default = None, path = None, label = False, connect = True):
 		try:
 			if name is None and path: name = hashlib.sha256(path.encode('utf-8')).hexdigest().upper()
 
@@ -66,6 +66,7 @@ class Database(object):
 			self._mAddon = addon
 			self._mDatabase = None
 			self._mConnection = None
+			self._mLabel = label
 
 			# Locks are required to query the database from multiple threads.
 			# Otherwise errors like these occur: ProgrammingError -> Recursive use of cursors not allowed.
@@ -150,7 +151,10 @@ class Database(object):
 			self.__lock()
 			try: self._mConnection = database.connect(self._mPath, check_same_thread = False, timeout = Database.Timeout)
 			except: self._mConnection = database.connect(self._mPath, timeout = Database.Timeout)
+
+			if self._mLabel: self._mConnection.row_factory = database.Row # SELECT rows as a dictionary instead of a list.
 			self._mDatabase = self._mConnection.cursor()
+
 			self.__unlock()
 
 			self._initialize()
@@ -274,7 +278,9 @@ class Database(object):
 	def _select(self, query, parameters = None, lock = True, unlock = True):
 		try:
 			self._execute(query, parameters = parameters, commit = False, lock = lock, unlock = False)
-			return self._mDatabase.fetchall()
+			result = self._mDatabase.fetchall()
+			if self._mLabel and result: result = [dict(i) for i in result]
+			return result
 		finally:
 			if unlock: self.__unlock()
 
@@ -284,7 +290,9 @@ class Database(object):
 	def _selectSingle(self, query, parameters = None, lock = True, unlock = True):
 		try:
 			self._execute(query, parameters = parameters, commit = False, lock = lock, unlock = False)
-			return self._mDatabase.fetchone()
+			result = self._mDatabase.fetchone()
+			if self._mLabel and result: result = dict(result)
+			return result
 		finally:
 			if unlock: self.__unlock()
 
@@ -293,7 +301,8 @@ class Database(object):
 	def _selectValues(self, query, parameters = None, lock = True, unlock = True):
 		try:
 			result = self._select(query, parameters = parameters, lock = lock, unlock = unlock)
-			return [i[0] for i in result]
+			if self._mLabel: return [list(i.values())[0] for i in result]
+			else: return [i[0] for i in result]
 		except:
 			return []
 

@@ -437,7 +437,30 @@ elif action.startswith('seasons'):
 elif action.startswith('episodes'):
 
 	if action == 'episodesRetrieve':
-		from lib.indexers.episodes import Episodes
+		# There is a problem with opening the context menu on an episode in the Arrivals submenu.
+		# For some reason Kodi executes the command of the item the context was opened on, and all its submenu items.
+		# This causes "episodesRetrieve" (and sometimes "seasonsRetrieve") to be called many times, causing the context menu to take very long to open.
+		# Especially if S00 or other extras are in the submenu, Kodi can take minutes to load the context, sometimes hanging so long that a restart is required.
+		# UPDATE: The problem is the "Next Page" menu entry in the submenus. If Kodi encounters the next item in a page, it loads thaty submenu.
+		# UPDATE: That submenu also has a next page. So Kodi continues to sequentially load all submenus from the next entry, one after the other, which can take a long time for shows with a lot of unwatched episodes.
+		# This only happens with episode submenus that have a folder underneath it.
+		# This does not happen with any other show/season/episode/movie/generic menu.
+		# Also, if the "Direct Scraping" setting is enabled, this also does not happen, since the Arrivals menu entries are not folders anymore, but initiate the scrape process directly.
+		# This is also not caused by the custom Gaia context menu. Even if not context menu is added at all, this problem persists.
+		# Only if the link/command attribute is removed from items passed to xbmcplugin.addDirectoryItems(), is this problem gone.
+		# This inidcates that this is a Kodi bug. Maybe if Kodi sees an episode folder menu, it scans all subitems to determine which labels to add to the context.
+		# There is no way to differentiate this endpoint being executed by Kodi when the context is opened, vs if the user just manually clicks on it to open the submenu (handle, plugin origin, etc is all the same).
+		# There also does not seem any way to prevent this from happening by calling functions on xbmcplugin, listitem, etc.
+		# So the only way is a dirty hack. We simply check if this endpoint is called with the same title within a few seconds of each other using global variables.
+		# Any subsequent "duplicate" requests are blocked, making the context load faster.
+		# There is still one minor problem: if the user manually opens the submenu within this time period, it might be detected as a "dupliacte" request and the menu is not loaded.
+		# The user will have to wait a few seconds and then reopen the submenu.
+		# Same happens if the user opens a submenu, quickly navigates back and tries to reopen the same menu.
+		# UPDATE: We changed the global property code and now detect the context menu using "Container.HasFiles". This will still call "episodesRetrieve" once, but not subsequent times.
+		# UPDATE: And the problem with quickly manually opening submenus is also gone with this alternative.
+		submenu = parameters.get('submenu')
+		context = submenu == 'next' and not tools.System.visible('Container.HasFiles')
+
 		link = parameters.get('link')
 		imdb = parameters.get('imdb')
 		tvdb = parameters.get('tvdb')
@@ -454,7 +477,12 @@ elif action.startswith('episodes'):
 		reduce = tools.Converter.boolean(parameters.get('reduce'))
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
 		next = tools.Converter.boolean(parameters.get('next', True))
-		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
+
+		if context:
+			tools.Logger.log('Blocking episode retrieval during context menu opening of episode submenus.', type = tools.Logger.TypeError)
+		else:
+			from lib.indexers.episodes import Episodes
+			Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
 
 	elif action == 'episodesUserlists':
 		from lib.indexers.episodes import Episodes
@@ -1107,6 +1135,62 @@ elif action.startswith('services'):
 	elif action == 'servicesUtilityNavigator':
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids).servicesUtilityNavigator()
+
+####################################################
+# ORACLE
+####################################################
+
+elif action.startswith('oracle'):
+
+	if action == 'oracle':
+		# Hitting the ENTER key twice shortly after each other calls this endpoint twice.
+		property = 'GaiaOracleBusy'
+		id = tools.System.windowPropertyGet(property)
+		time = tools.Time.timestamp()
+
+		# In case a previous search did not clear the property, allow a new scrape after 2 seconds.
+		if not id or (time - int(id) > 2):
+			try:
+				tools.System.windowPropertySet(property, str(time))
+				from lib.oracle import Oracle
+				media = parameters.get('media')
+				full = tools.Converter.boolean(parameters.get('full'))
+				history = parameters.get('history')
+				if history: history = tools.System.commandDecode(history)
+				Oracle.show(media = media, full = full, history = history)
+			except: tools.Logger.error()
+			tools.System.windowPropertyClear(property)
+
+	elif action == 'oracleMenu':
+		from lib.oracle import Oracle
+		service = parameters.get('service')
+		data = parameters.get('data')
+		loader = tools.Converter.boolean(parameters.get('loader'))
+		Oracle.instance(service = service).menu(data = data, loader = loader)
+
+	elif action == 'oracleAuthentication':
+		from lib.oracle import Oracle
+		service = parameters.get('service')
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Oracle.instance(service = service).settingsAuthenticationDialog(settings = settings)
+
+	elif action == 'oraclePlayground':
+		from lib.oracle import Oracle
+		service = parameters.get('service')
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Oracle.instance(service = service).settingsPlaygroundDialog(settings = settings)
+
+	elif action == 'oracleModel':
+		from lib.oracle import Oracle
+		service = parameters.get('service')
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Oracle.instance(service = service).settingsModelDialog(settings = settings)
+
+	elif action == 'oracleQuery':
+		from lib.oracle import Oracle
+		service = parameters.get('service')
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Oracle.instance(service = service).settingsQueryDialog(settings = settings)
 
 ####################################################
 # PREMIUMIZE

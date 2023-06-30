@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter
+from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter, Language, Archive
 from lib.modules.account import Tmdb
 from lib.modules.network import Networker
 from lib.modules.cache import Cache
@@ -52,7 +52,18 @@ class MetaTmdb(object):
 	LinkGenreMovie		= 'https://api.themoviedb.org/3/genre/movie/list'
 	LinkGenreShow		= 'https://api.themoviedb.org/3/genre/tv/list'
 
-	SortRelease			= 'release_date'
+	# https://developers.themoviedb.org/3/movies/get-movie-release-dates
+	ReleasePremiere		= 1
+	ReleaseLimited		= 2
+	ReleaseTheatre		= 3
+	ReleaseDigital		= 4
+	ReleasePhysical		= 5
+	ReleaseTelevision	= 6
+
+	# https://developers.themoviedb.org/3/genres/get-movie-list
+	GenreDocumentary	= 99
+
+	SortRelease			= 'primary_release_date'
 	SortTitle			= 'original_title'
 	SortPopularity		= 'popularity'
 	SortRating			= 'vote_average'
@@ -69,6 +80,10 @@ class MetaTmdb(object):
 		SortVotes		: OrderDescending,
 		SortRevenue		: OrderDescending,
 	}
+
+	# TMDb does not allow one to specify the number of items to retrieve (eg: in discover()).
+	# TMDb uses a fixed limit and then requirrs paging.
+	LimitFixed			= 20
 
 	Lock				= Lock()
 
@@ -122,8 +137,9 @@ class MetaTmdb(object):
 
 		if not query is None and not 'query' in data: data['query'] = query
 		if not page is None and not 'page' in data: data['page'] = page
-		if not language is None and not 'language' in data: data['language'] = language
+		if not language is None and not 'language' in data: data['language'] = language[0] if Tools.isArray(language) else language
 		if not 'include_adult' in data: data['include_adult'] = False
+		if not 'include_video' in data: data['include_video'] = False # https://www.themoviedb.org/talk/5f2d3257cdbaff0035a40753
 
 		return data
 
@@ -194,6 +210,14 @@ class MetaTmdb(object):
 				result['premiered'] = premiered
 				year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
 				if year: result['year'] = int(year)
+
+		rating = item.get('vote_average')
+		votes = item.get('vote_count')
+		if not rating is None or not votes is None:
+			value = {}
+			if not rating is None: value['rating'] = rating
+			if not votes is None: value['votes'] = votes
+			result.update({'temp' : {'tmdb' : value}})
 
 		if next: result['next'] = next
 
@@ -298,7 +322,7 @@ class MetaTmdb(object):
 	# rating: integer = single minimum rating | tuple = range of rating (from and to) | tuple = if one value is None, ignore that and only use upper or lower rating.
 	# votes: integer = single minimum vote | tuple = range of votes (from and to) | tuple = if one value is None, ignore that and only use upper or lower votes.
 	@classmethod
-	def discover(self, media, page = 1, language = None, sort = None, order = None, year = None, release = None, rating = None, votes = None, link = None):
+	def discover(self, media, page = 1, language = None, sort = None, order = None, type = None, release = None, year = None, genre = None, rating = None, votes = None, link = None):
 		if link:
 			data = self.linkDencode(link = link)
 			if data:
@@ -317,11 +341,22 @@ class MetaTmdb(object):
 				if 'year' in data:
 					year = int(data['year'])
 					del data['year']
+				if 'type' in data:
+					type = data['type']
+					if '|' in type: type = [int(i) if Tools.isNumeric(i) else i for i in type.split('|')]
+					elif Tools.isNumeric(type): type = int(type)
+					del data['type']
 				if 'release' in data:
 					release = data['release']
 					if ',' in release: release = [int(i) if Tools.isNumeric(i) else i for i in release.split(',')]
 					elif Tools.isNumeric(release): release = int(release)
 					del data['release']
+				if 'genre' in data:
+					if genre is None: genre = []
+					genres = data['genre']
+					if ',' in genres: genre.extend([int(i) if Tools.isNumeric(i) else i for i in genres.split(',')])
+					elif Tools.isNumeric(genres): genre.append(int(genres))
+					del data['genre']
 				if 'rating' in data:
 					rating = data['rating']
 					if ',' in rating: rating = [float(i) for i in rating.split(',')]
@@ -332,6 +367,8 @@ class MetaTmdb(object):
 					if ',' in votes: votes = [int(i) for i in votes.split(',')]
 					else: votes = int(votes)
 					del data['votes']
+		else:
+			data = None
 
 		if not data: data = {}
 
@@ -339,7 +376,13 @@ class MetaTmdb(object):
 			if not order: order = MetaTmdb.OrderDefault[sort]
 			data['sort_by'] = sort + '.' + order
 
+		if type:
+			if Tools.isArray(type): type = '|'.join([str(i) for i in type])
+			data['with_release_type'] = type
+
 		if release:
+			# NB: Use "primary_release_date" instead of "release_date".
+			# Otherwise when returning the latests digital/physical releases, old items are returned (sometimes 20+ years old).
 			releaseStart = None
 			releaseEnd = None
 			if Tools.isArray(release):
@@ -349,12 +392,22 @@ class MetaTmdb(object):
 				releaseStart = release
 			if releaseStart:
 				if Tools.isInteger(releaseStart): releaseStart = Time.format(releaseStart, format = Time.FormatDate)
-				data['release_date.gte'] = releaseStart
+				data['primary_release_date.gte'] = releaseStart
 			if releaseEnd:
 				if Tools.isInteger(releaseEnd): releaseEnd = Time.format(releaseEnd, format = Time.FormatDate)
-				data['release_date.lte'] = releaseEnd
+				data['primary_release_date.lte'] = releaseEnd
 
 		if year: data['year'] = year
+
+		if genre:
+			if not Tools.isArray(genre): genre = [genre]
+			genreInclude = []
+			genreExclude = []
+			for i in genre:
+				if i < 0: genreExclude.append(str(-1 * i))
+				else: genreInclude.append(str(i))
+			if genreInclude: data['with_genres'] = ','.join(genreInclude)
+			if genreExclude: data['without_genres'] = ','.join(genreExclude)
 
 		if not rating is None:
 			ratingStart = None
@@ -378,18 +431,23 @@ class MetaTmdb(object):
 			if votesStart: data['vote_count.gte'] = votesStart
 			if votesEnd: data['vote_count.lte'] = votesEnd
 
+		if language:
+			if not Tools.isArray(language): language = [language]
+			if not Language.EnglishCode in language: language.insert(0, Language.EnglishCode)
+			data['with_original_language'] = '|'.join(language)
+
 		link = Networker.linkClean(link = link, parametersStrip = True, headersStrip = True)
 		link = Networker.linkCreate(link = link, parameters = data, duplicates = False)
 
 		return self.retrieve(link = MetaTmdb.LinkDiscoverShow if Media.typeTelevision(media) else MetaTmdb.LinkDiscoverMovie, linkExtra = link, page = page, language = language, data = data)
 
 	@classmethod
-	def discoverMovie(self, page = 1, language = None, sort = None, order = None, release = None, year = None, rating = None, votes = None, link = None):
-		return self.discover(media = Media.TypeMovie, page = page, language = language, sort = sort, order = order, release = release, year = year, rating = rating, votes = votes, link = link)
+	def discoverMovie(self, page = 1, language = None, sort = None, order = None, type = None, release = None, year = None, genre = None, rating = None, votes = None, link = None):
+		return self.discover(media = Media.TypeMovie, page = page, language = language, sort = sort, order = order, type = type, release = release, year = year, genre = genre, rating = rating, votes = votes, link = link)
 
 	@classmethod
-	def discoverShow(self, page = 1, language = None, sort = None, order = None, release = None, year = None, rating = None, votes = None, link = None):
-		return self.discover(media = Media.TypeShow, page = page, language = language, sort = sort, order = order, release = release, year = year, rating = rating, votes = votes, link = link)
+	def discoverShow(self, page = 1, language = None, sort = None, order = None, rtype = None, elease = None, year = None, genre = None, rating = None, votes = None, link = None):
+		return self.discover(media = Media.TypeShow, page = page, language = language, sort = sort, order = order, type = type, release = release, year = year, genre = genre, rating = rating, votes = votes, link = link)
 
 	##############################################################################
 	# RATED
@@ -414,7 +472,7 @@ class MetaTmdb(object):
 			link = MetaTmdb.LinkSetIds % Time.past(days = 1, format = '%m_%d_%Y')
 			data = Networker().requestData(link = link)
 			if data:
-				data = Tools.gzUncompress(data = data)
+				data = Archive.gzipDecompress(data = data)
 				if data:
 					data = Converter.unicode(data)
 					if data:

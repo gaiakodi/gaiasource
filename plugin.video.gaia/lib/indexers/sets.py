@@ -227,6 +227,9 @@ class Sets(object):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
 			for item in items: item['next'] = next
 
+		for item in items:
+			if 'nextFixed' in item: item['next'] = item['nextFixed']
+
 		return items
 
 	##############################################################################
@@ -318,17 +321,17 @@ class Sets(object):
 
 	def search(self, terms = None):
 		try:
-			from lib.modules.search import Searches
+			from lib.modules.search import Search
 
 			if terms:
 				if not terms: return None
 				Loader.show()
-				Searches().updateSets(terms)
+				Search().updateSet(terms)
 			else:
 				terms = Dialog.input(title = 32010)
 				if not terms: return None
 				Loader.show()
-				Searches().insertSets(terms, self.mKids)
+				Search().insertSet(terms, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
@@ -735,7 +738,7 @@ class Sets(object):
 						if ids: result['id'] = ids
 
 						title = dataSet.get('name')
-						if title: result['title'] = result['set'] = Regex.remove(data = Networker.htmlDecode(title), expression = '(?:\s*-\s*)?(?:\s*movie\s*)?(?:\s*[\[\(\{])?\s*((?:d(?:i|uo|ou)|tr[iy]|(?:quadr[iao]|tetr[ao])|penta|hex[ao]|hept[ao]|oct[ao]|enn?e[ao]|dec[ao]|antho)log(?:(?:i|í)[ae]?|y)s?|coll?ecti(?:on|e)s?|sagas?|set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|seri|sammlung|(?:film)?reihe|komplett|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный)(?:\s*[\]\)\}])?$')
+						if title: result['title'] = result['set'] = Regex.remove(data = Networker.htmlDecode(title), expression = '(?:\s*-\s*)?(?:\s*movie\s*)?(?:\s*[\[\(\{])?\s*((?:d(?:i|uo|ou)|tr[iy]|(?:quadr[iao]|tetr[ao])|penta|hex[ao]|hept[ao]|oct[ao]|enn?e[ao]|dec[ao]|antho)log(?:(?:i|í)[ae]?|y)s?|coll?ecti(?:on|e)s?|sagas?|set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|seri|sammlung|(?:film)?reihe|komplett|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный)(?:\s*[\]\)\}])?$', all = True)
 
 						plot = dataSet.get('overview')
 						if plot: result['plot'] = result['setoverview'] = Networker.htmlDecode(plot)
@@ -747,7 +750,7 @@ class Sets(object):
 								premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
 								if premiered: values.append(premiered)
 						if values:
-							premiered = max(values, key = lambda i : Time.integer(i))
+							premiered = min(values, key = lambda i : Time.integer(i))
 							if premiered:
 								result['premiered'] = premiered
 								year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)

@@ -1,0 +1,17 @@
+#########################################################################################################################
+
+Download:			https://pypi.org/project/bardapi/#files
+					https://github.com/dsdanielpark/Bard-API/releases
+Current Version:	0.1.17 (2023-06-21)
+Used By:			Gaia
+
+#########################################################################################################################
+
+find ./ -type f -exec sed -i -e 's/from bardapi/from externals.bardapi/g' {} \;
+find ./ -type f -exec sed -i -e 's/from deep_translator/from externals.deeptranslator/g' {} \;
+find ./ -type f -exec sed -i -e 's/import requests/from externals import requests/g' {} \;
+find ./ -type f -exec sed -i -e 's/from colorama/#from colorama/g' {} \;
+find ./ -type f -exec sed -i -e 's/from externals.bardapi.core_async import BardAsync/#from externals.bardapi.core_async import BardAsync/g' {} \;
+find ./ -type f -exec sed -i -e 's/USER_PROMPT = Fore.BLUE + "You: " + Fore.RESET/USER_PROMPT = "You: "/g' {} \;
+
+#########################################################################################################################

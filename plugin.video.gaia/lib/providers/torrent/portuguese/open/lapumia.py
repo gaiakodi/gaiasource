@@ -249,7 +249,7 @@ class Provider(ProviderHtml):
 
 				# Subtitle
 				values[Provider._CustomSubtitle] = subtitles if subtitles and not subtitlesBlock else ''
-				if subtitlesBlock: values[Provider._CustomInfo] = Regex.remove(data = values[Provider._CustomInfo], expression = Provider._ExpressionSubtitle3)
+				if subtitlesBlock: values[Provider._CustomInfo] = Regex.remove(data = values[Provider._CustomInfo], expression = Provider._ExpressionSubtitle3, all = True)
 
 				entry = ''
 				for key, value in values.items():

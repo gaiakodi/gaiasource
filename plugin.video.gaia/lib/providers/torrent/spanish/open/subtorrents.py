@@ -139,18 +139,18 @@ class Provider(ProviderHtml):
 			language = Regex.extract(data = value, expression = Provider._ExpressionAudioLanguage, group = None, all = True)
 			if language:
 				language = self.extractHtmlDecode(language)
-				language = [Regex.remove(data = i, expression = Provider._ExpressionLanguage) for i in language]
+				language = [Regex.remove(data = i, expression = Provider._ExpressionLanguage, all = True) for i in language]
 				language.insert(0, 'Audio')
 				result.append(language)
 
 			subtitles = Regex.extract(data = value, expression = Provider._ExpressionSubtitleType)
 			if subtitles:
 				subtitles = self.extractHtmlDecode(subtitles)
-				subtitles = Regex.remove(data = subtitles, expression = Provider._ExpressionSubtitle)
+				subtitles = Regex.remove(data = subtitles, expression = Provider._ExpressionSubtitle, all = True)
 			language = Regex.extract(data = value, expression = Provider._ExpressionSubtitleLanguage, group = None, all = True)
 			if language:
 				language = self.extractHtmlDecode(language)
-				language = [Regex.remove(data = i, expression = Provider._ExpressionLanguage) for i in language]
+				language = [Regex.remove(data = i, expression = Provider._ExpressionLanguage, all = True) for i in language]
 				if subtitles: language.insert(0, subtitles)
 				language.insert(0, 'Subtitulos')
 				result.append(language)

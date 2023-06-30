@@ -112,8 +112,8 @@ class ProviderLocal(ProviderBase):
 		# This should be very lenient matching, since proper validation is done by Stream.
 		# Only filter out clearly incorrect files, since disk I/O has do be reduced when the Extractor detects metadata from the file in Stream.
 
-		name = Regex.remove(data = name, expression = Regex.Symbol)
-		parents = [Regex.remove(data = i, expression = Regex.Symbol) for i in Tools.copy(parents)]
+		name = Regex.remove(data = name, expression = Regex.Symbol, all = True)
+		parents = [Regex.remove(data = i, expression = Regex.Symbol, all = True) for i in Tools.copy(parents)]
 
 		extras = ['']
 		if years: extras.extend(years['all'])
@@ -121,7 +121,7 @@ class ProviderLocal(ProviderBase):
 		extras = [(' ' + str(i)) for i in extras if not i is None]
 
 		for title in titles['processed']['all']:
-			title = Regex.remove(data = title, expression = Regex.Symbol)
+			title = Regex.remove(data = title, expression = Regex.Symbol, all = True)
 			titleLower = title.lower()
 			extra = [(name + i) for i in extras]
 			for i in extra:

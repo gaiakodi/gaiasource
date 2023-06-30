@@ -928,6 +928,7 @@ class Networker(object):
 				'request' : <Dictionary - The original request.>,
 				'success' : <Boolean - Whether or not the request was successful.>,
 				'link' : <None/String - The final redirect URL.>,
+				'path' : <None/String - Download the link contents to a local file>,
 				'status' : {
 					'code' : <None/Integer - The HTTP status code.>,
 					'message' : <None/String - The HTTP status description.>,
@@ -952,19 +953,20 @@ class Networker(object):
 				'cookies' : <None/Dictionary - The response cookies (case sensitive keys - can be accessed with any case, since it uses CaseInsensitiveDict).>,
 			}
 	'''
-	def request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None, cache = False):
+	def request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None, cache = False):
 		if cache is False:
-			return self._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+			return self._request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
 		else:
 			from lib.modules.cache import Cache
 			if tools.Tools.isFunction(cache):
-				return cache(function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+				self.mResponse = cache(function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
 			else:
 				if tools.Tools.isNumber(cache): time = cache
 				else: time = Cache.TimeoutMedium
-				return Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+				self.mResponse = Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+			return self.mResponse
 
-	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None):
+	def _request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None):
 		try:
 			if link is None: return self.mRequest
 
@@ -1051,7 +1053,7 @@ class Networker(object):
 						Networker.ConcurrencySemaphore[concurrency].acquire()
 
 					if Cloudflare.enabled():
-						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, log = False)
+						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, path = path, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, log = False)
 						response = result['response']
 						responseCookies = result['cookies']
 						duration = result['duration']
@@ -1061,7 +1063,19 @@ class Networker(object):
 
 						session, domain = self._session(reuse = reuse, validate = certificate, curve = curve, link = link)
 						timer = tools.Time(start = True)
-						response = session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect)
+
+						if path:
+							# https://stackoverflow.com/questions/16694907/download-large-file-in-python-with-requests
+							file = tools.File.write(path = path, bytes = True)
+							if file:
+								with session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect, stream = True) as response:
+									response.raise_for_status()
+									for chunk in response.iter_content(chunk_size = 8192):
+										file.write(chunk)
+								file.close()
+						else:
+							response = session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect)
+
 						duration = timer.elapsed(milliseconds = True)
 
 						# NB: session.response.cookies does not return all of the cookies.
@@ -1242,7 +1256,6 @@ class Networker(object):
 			self.mResponse['request'] = tools.Tools.copy(self.mRequest)
 
 			if reuse and session: self._sessionReuse(session = session, domain = domain)
-
 
 			return self.mResponse
 		except:
@@ -1493,12 +1506,16 @@ class Networker(object):
 	###################################################################
 
 	# Downloads a file to disk.
-	# NB: Be careful with big files, since the entire file is downloaded into memory before saving it to disk.
-	def download(self, link, path, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None):
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout)
-		if not response['success']: return False
-		tools.File.writeNow(path, self.responseDataBytes())
-		return True
+	# NB: Be careful with big files when memory=True, since the entire file is downloaded into memory before saving it to disk.
+	def download(self, link, path, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, memory = False):
+		if memory:
+			response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout)
+			if not response['success']: return False
+			tools.File.writeNow(path, self.responseDataBytes())
+		else:
+			response = self.request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout)
+			if not response['success']: return False
+		return tools.File.exists(path)
 
 
 class Geolocator(object):
@@ -2003,12 +2020,12 @@ class Geolocator(object):
 			asn = tools.Regex.extract(data = networkProvider, expression = expression)
 			if asn:
 				if not networkSystem: networkSystem = asn.strip()
-				networkProvider = tools.Regex.remove(data = networkProvider, expression = expression).strip()
+				networkProvider = tools.Regex.remove(data = networkProvider, expression = expression, all = True).strip()
 		if networkOrganization:
 			asn = tools.Regex.extract(data = networkOrganization, expression = expression)
 			if asn:
 				if not networkSystem: networkSystem = asn.strip()
-				networkOrganization = tools.Regex.remove(data = networkOrganization, expression = expression).strip()
+				networkOrganization = tools.Regex.remove(data = networkOrganization, expression = expression, all = True).strip()
 
 		if not networkProvider: networkProvider = networkOrganization if networkOrganization else None
 		if not networkOrganization: networkOrganization = networkProvider if networkProvider else None
@@ -2993,7 +3010,7 @@ class Container(object):
 			if self._torrentIsMagnet(link):
 				params = self._torrentMagnetParameters(link = link)
 				try:
-					hash = [tools.Regex.remove(data = i, expression = Container.ExpressionPrefix) for i in params['xt']]
+					hash = [tools.Regex.remove(data = i, expression = Container.ExpressionPrefix, all = True) for i in params['xt']]
 					del params['xt']
 				except: pass
 				try:
@@ -3099,13 +3116,13 @@ class Container(object):
 		if self._torrentIsMagnet(link):
 
 			# Replace &amps; with &.
-			if decode: link = tools.Regex.replace(data = link, expression = '(&amp;)([a-z]{2}=)', replacement = '&\g<2>')
+			if decode: link = tools.Regex.replace(data = link, expression = '(&amp;)([a-z]{2}=)', replacement = '&\g<2>', all = True)
 
 			hash = None
 			title = None
 			parameters = self._torrentMagnetParameters(link = link)
 			try:
-				hash = [self._torrentHashBase(hash = tools.Regex.remove(data = i, expression = Container.ExpressionPrefix), base = base) for i in parameters['xt']]
+				hash = [self._torrentHashBase(hash = tools.Regex.remove(data = i, expression = Container.ExpressionPrefix, all = True), base = base) for i in parameters['xt']]
 				del parameters['xt']
 			except: tools.Logger.error()
 			try:
@@ -3521,12 +3538,13 @@ class Tracker(object):
 		'udp://explodie.org:6969/announce',						# 99.5% uptime (United States)
 		'http://t.nyaatracker.com:80/announce',					# 98.6% uptime (Canada/France/Singapore)
 		'udp://bt1.archive.org:6969/announce',					# 98.3% uptime (United States)
-		'udp://9.rarbg.com:2890/announce',						# 97.9% uptime (France)
 		'udp://tracker.leech.ie:1337/announce',					# 97.7% uptime (Luxembourg)
 		'udp://tracker.openbittorrent.com:80/announce',			# 85.3% uptime (Sweden)
 		'https://1337.abcvg.info:443/announce',					# 75.6% uptime (United States/Canada)
 		'udp://retracker.netbynet.ru:2710/announce',			# 67.0% uptime (Russia)
 		'https://tracker.foreverpirates.co:443/announce',		# 54.4% uptime (United States)
+
+		#'udp://9.rarbg.com:2890/announce',						# 97.9% uptime (France) - RarBG shut down.
 	]
 
 	##############################################################################

@@ -19,147 +19,187 @@
 '''
 
 from lib.modules.database import Database
-from lib.modules.tools import Selection, Time, Tools
+from lib.modules.tools import Selection, Time, Tools, Converter, Media
 
-class Searches(Database):
+class Search(Database):
 
 	Name = 'searches' # The name of the file. Update version number of the database structure changes.
 
-	TypeMovies = 'movies'
-	TypeSets = 'sets'
-	TypeShows = 'shows'
-	TypeDocumentaries = 'documentaries'
-	TypeShorts = 'shorts'
-	TypePeople = 'people'
+	TypeMovie = Media.TypeMovie
+	TypeSet = Media.TypeSet
+	TypeShow = Media.TypeShow
+	TypeDocumentary = Media.TypeDocumentary
+	TypeShort = Media.TypeShort
+	TypePerson = Media.TypePerson
+	TypeOracle = 'oracle'
 
 	def __init__(self):
-		Database.__init__(self, Searches.Name)
+		Database.__init__(self, Search.Name)
 
 	def _initialize(self):
-		self._createAll('CREATE TABLE IF NOT EXISTS %s (terms TEXT PRIMARY KEY, time INTEGER, kids INTEGER);', [Searches.TypeMovies, Searches.TypeSets, Searches.TypeShows, Searches.TypeDocumentaries, Searches.TypeShorts, Searches.TypePeople])
+		self._createAll('CREATE TABLE IF NOT EXISTS `%s` (terms TEXT PRIMARY KEY, time INTEGER, kids INTEGER, data TEXT);', [Search.TypeMovie, Search.TypeSet, Search.TypeShow, Search.TypeDocumentary, Search.TypeShort, Search.TypePerson, Search.TypeOracle])
 
-	def insert(self, searchType, searchTerms, searchKids = Selection.TypeUndefined):
+	def insert(self, searchType, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
 		searchTerms = searchTerms.strip()
 		if searchTerms and len(searchTerms) > 0:
-			existing = self._select('SELECT terms FROM %s WHERE terms = "%s";' % (searchType, searchTerms))
+			existing = self._select('SELECT terms FROM `%s` WHERE terms = "%s";' % (searchType, searchTerms))
 			if existing:
 				self.update(searchType, searchTerms)
 			else:
-				self._insert('INSERT INTO %s (terms, time, kids) VALUES ("%s", %d, %d);' % (searchType, searchTerms, Time.timestamp(), searchKids))
+				self._insert('INSERT INTO `%s` (terms, time, kids, data) VALUES (?, ?, ?, ?);' % searchType, (searchTerms, Time.timestamp(), searchKids, Converter.jsonTo(searchData) if searchData else searchData))
 
-	def insertMovies(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypeMovies, searchTerms, searchKids)
+	def insertMovie(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeMovie, searchTerms, searchKids, searchData)
 
-	def insertSets(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypeSets, searchTerms, searchKids)
+	def insertSet(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeSet, searchTerms, searchKids, searchData)
 
-	def insertShows(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypeShows, searchTerms, searchKids)
+	def insertShow(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeShow, searchTerms, searchKids, searchData)
 
-	def insertDocumentaries(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypeDocumentaries, searchTerms, searchKids)
+	def insertDocumentary(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeDocumentary, searchTerms, searchKids, searchData)
 
-	def insertShorts(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypeShorts, searchTerms, searchKids)
+	def insertShort(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeShort, searchTerms, searchKids, searchData)
 
-	def insertPeople(self, searchTerms, searchKids = Selection.TypeUndefined):
-		self.insert(Searches.TypePeople, searchTerms, searchKids)
+	def insertPerson(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypePerson, searchTerms, searchKids, searchData)
 
-	def update(self, searchType, searchTerms):
+	def insertOracle(self, searchTerms, searchKids = Selection.TypeUndefined, searchData = None):
+		self.insert(Search.TypeOracle, searchTerms, searchKids, searchData)
+
+	def update(self, searchType, searchTerms, searchData = None):
 		searchTerms = searchTerms.strip()
-		self._update('UPDATE %s SET time = %d WHERE terms = "%s";' % (searchType, Time.timestamp(), searchTerms))
+		if searchData: self._update('UPDATE `%s` SET time = ?, data = ? WHERE terms = ?;' % searchType, (Time.timestamp(), Converter.jsonTo(searchData), searchTerms))
+		else: self._update('UPDATE `%s` SET time = %d WHERE terms = "%s";' % (searchType, Time.timestamp(), searchTerms))
 
-	def updateMovies(self, searchTerms):
-		self.update(Searches.TypeMovies, searchTerms)
+	def updateMovie(self, searchTerms, searchData = None):
+		self.update(Search.TypeMovie, searchTerms, searchData = searchData)
 
-	def updateSets(self, searchTerms):
-		self.update(Searches.TypeSets, searchTerms)
+	def updateSet(self, searchTerms, searchData = None):
+		self.update(Search.TypeSet, searchTerms, searchData = searchData)
 
-	def updateShows(self, searchTerms):
-		self.update(Searches.TypeShows, searchTerms)
+	def updateShow(self, searchTerms, searchData = None):
+		self.update(Search.TypeShow, searchTerms, searchData = searchData)
 
-	def updateDocumentaries(self, searchTerms):
-		self.update(Searches.TypeDocumentaries, searchTerms)
+	def updateDocumentary(self, searchTerms, searchData = None):
+		self.update(Search.TypeDocumentary, searchTerms, searchData = searchData)
 
-	def updateShorts(self, searchTerms):
-		self.update(Searches.TypeShorts, searchTerms)
+	def updateShort(self, searchTerms, searchData = None):
+		self.update(Search.TypeShort, searchTerms, searchData = searchData)
 
-	def updatePeople(self, searchTerms):
-		self.update(Searches.TypePeople, searchTerms)
+	def updatePerson(self, searchTerms, searchData = None):
+		self.update(Search.TypePerson, searchTerms, searchData = searchData)
+
+	def updateOracle(self, searchTerms, searchData = None):
+		self.update(Search.TypeOracle, searchTerms, searchData = searchData)
 
 	def retrieve(self, searchType, count = 30, kids = Selection.TypeUndefined):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
-		return self._select('SELECT terms, kids FROM %s %s ORDER BY time DESC LIMIT %d;' % (searchType, kids, count))
+		return self._select('SELECT terms, kids, data, "%s" as type FROM `%s` %s ORDER BY time DESC LIMIT %d;' % (searchType, searchType, kids, count))
 
 	def retrieveAll(self, count = 30, kids = Selection.TypeUndefined, type = None):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
 
-		if type is None: type = [Searches.TypeMovies, Searches.TypeSets, Searches.TypeShows, Searches.TypeDocumentaries, Searches.TypeShorts, Searches.TypePeople]
-		elif not Tools.isArray(type): type = [type]
+		typeFixed = None
+		if type is None:
+			type = [Search.TypeMovie, Search.TypeSet, Search.TypeShow, Search.TypeDocumentary, Search.TypeShort, Search.TypePerson, Search.TypeOracle]
+		elif not Tools.isArray(type):
+			type = [type]
+			typeFixed = type
+		else:
+			typeFixed = type
 
 		parameters = []
 		for i in type: parameters.extend([i, i])
 		parameters.extend([kids, count])
 
-		return self._select(('''
-			SELECT type, terms, kids FROM
-			(''' + (' UNION ALL '.join(['SELECT time, terms, kids, "%s" as type FROM %s' for i in range(len(type))])) + ''')
+		result = self._select(('''
+			SELECT terms, kids, data, type FROM
+			(''' + (' UNION ALL '.join(['SELECT time, terms, kids, data, "%s" as type FROM `%s`' for i in range(len(type))])) + ''')
 			%s
 			ORDER BY time DESC LIMIT %d;
 		''') % tuple(parameters))
 
-	def retrieveMovies(self, count = 30, kids = Selection.TypeUndefined):
-		if kids == Selection.TypeUndefined: kids = ''
-		else: kids = 'WHERE kids IS %d' % kids
-		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
-			%s
-			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypeMovies, Searches.TypeMovies, kids, count))
+		if result and typeFixed:
+			temp = []
+			for i in result:
+				if i[3] == Search.TypeOracle:
+					if Converter.jsonFrom(i[2])['media'] in typeFixed: temp.append(i)
+				else:
+					temp.append(i)
+			result = temp
 
-	def retrieveSets(self, count = 30, kids = Selection.TypeUndefined):
-		if kids == Selection.TypeUndefined: kids = ''
-		else: kids = 'WHERE kids IS %d' % kids
-		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
-			%s
-			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypeSets, Searches.TypeSets, kids, count))
+		return result
 
-	def retrieveShows(self, count = 30, kids = Selection.TypeUndefined):
+	def retrieveMovie(self, count = 30, kids = Selection.TypeUndefined):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
 		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
+			SELECT terms, kids, data, "%s" as type FROM `%s`
 			%s
 			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypeShows, Searches.TypeShows, kids, count))
+		''' % (Search.TypeMovie, Search.TypeMovie, kids, count))
 
-	def retrieveDocumentaries(self, count = 30, kids = Selection.TypeUndefined):
+	def retrieveSet(self, count = 30, kids = Selection.TypeUndefined):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
 		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
+			SELECT terms, kids, data, "%s" as type FROM `%s`
 			%s
 			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypeDocumentaries, Searches.TypeDocumentaries, kids, count))
+		''' % (Search.TypeSet, Search.TypeSet, kids, count))
 
-	def retrieveShorts(self, count = 30, kids = Selection.TypeUndefined):
+	def retrieveShow(self, count = 30, kids = Selection.TypeUndefined):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
 		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
+			SELECT terms, kids, data, "%s" as type FROM `%s`
 			%s
 			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypeShorts, Searches.TypeShorts, kids, count))
+		''' % (Search.TypeShow, Search.TypeShow, kids, count))
 
-	def retrievePeople(self, count = 30, kids = Selection.TypeUndefined):
+	def retrieveDocumentary(self, count = 30, kids = Selection.TypeUndefined):
 		if kids == Selection.TypeUndefined: kids = ''
 		else: kids = 'WHERE kids IS %d' % kids
 		return self._select('''
-			SELECT terms, kids, "%s" as type FROM %s
+			SELECT terms, kids, data, "%s" as type FROM `%s`
 			%s
 			ORDER BY time DESC LIMIT %d;
-		''' % (Searches.TypePeople, Searches.TypePeople, kids, count))
+		''' % (Search.TypeDocumentary, Search.TypeDocumentary, kids, count))
+
+	def retrieveShort(self, count = 30, kids = Selection.TypeUndefined):
+		if kids == Selection.TypeUndefined: kids = ''
+		else: kids = 'WHERE kids IS %d' % kids
+		return self._select('''
+			SELECT terms, kids, data, "%s" as type FROM `%s`
+			%s
+			ORDER BY time DESC LIMIT %d;
+		''' % (Search.TypeShort, Search.TypeShort, kids, count))
+
+	def retrievePerson(self, count = 30, kids = Selection.TypeUndefined):
+		if kids == Selection.TypeUndefined: kids = ''
+		else: kids = 'WHERE kids IS %d' % kids
+		return self._select('''
+			SELECT terms, kids, data, "%s" as type FROM `%s`
+			%s
+			ORDER BY time DESC LIMIT %d;
+		''' % (Search.TypePerson, Search.TypePerson, kids, count))
+
+	def retrieveOracle(self, count = 30, kids = Selection.TypeUndefined, type = None):
+		if kids == Selection.TypeUndefined: kids = ''
+		else: kids = 'WHERE kids IS %d' % kids
+		result = self._select('''
+			SELECT terms, kids, data, "%s" as type FROM `%s`
+			%s
+			ORDER BY time DESC LIMIT %d;
+		''' % (Search.TypeOracle, Search.TypeOracle, kids, count))
+
+		if result and type:
+			if not Tools.isArray(type): type = [type]
+			result = [i for i in result if Converter.jsonFrom(i[2])['media'] in type]
+
+		return result

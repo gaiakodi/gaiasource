@@ -1,0 +1,13 @@
+#########################################################################################################################
+
+Download:			https://pypi.org/project/deep-translator/#files
+Current Version:	1.11.0 (2023-05-25)
+Used By:			BardAPI
+
+#########################################################################################################################
+
+find ./ -type f -exec sed -i -e 's/from deep_translator/from externals.deeptranslator/g' {} \;
+find ./ -type f -exec sed -i -e 's/import requests/from externals import requests/g' {} \;
+find ./ -type f -exec sed -i -e 's/from bs4/from externals.beautifulsoup/g' {} \;
+
+#########################################################################################################################

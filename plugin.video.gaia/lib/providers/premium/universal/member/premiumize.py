@@ -30,7 +30,7 @@ class Provider(ProviderDebrid):
 	def initialize(self):
 		ProviderDebrid.initialize(self,
 			# Premiumize fixes the video links to a specific IP address.
-			# If the IP address used to retrieve the link through the API chaanges, the video link will not work anymore.
+			# If the IP address used to retrieve the link through the API changes, the video link will not work anymore.
 			# Restrict how long provider results are cached, so retrieve new links if the IP changes (eg: VPN changes overnight and now has a new IP).
 			cacheTime		= 10800, # 3 hours.
 

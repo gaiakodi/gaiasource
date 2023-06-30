@@ -305,22 +305,22 @@ class MetaManager(object):
 	###################################################################
 
 	@classmethod
-	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None, provider = ProviderDefault, threaded = ThreadedDefault):
-		return MetaManager(provider = provider, threaded = threaded).season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, level = level, cache = cache)
+	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, show = None, level = None, cache = None, provider = ProviderDefault, threaded = ThreadedDefault):
+		return MetaManager(provider = provider, threaded = threaded).season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, show = show, level = level, cache = cache)
 
-	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, level = None, cache = None, provider = ProviderDefault):
-		return self.providerExecute(provider = provider, function = 'season', id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, level = level, cache = cache)
+	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, show = None, level = None, cache = None, provider = ProviderDefault):
+		return self.providerExecute(provider = provider, function = 'season', id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, show = show, level = level, cache = cache)
 
 	###################################################################
 	# EPISODE
 	###################################################################
 
 	@classmethod
-	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, level = None, cache = None, provider = ProviderDefault, threaded = ThreadedDefault):
-		return MetaManager(provider = provider, threaded = threaded).episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level, cache = cache)
+	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, provider = ProviderDefault, threaded = ThreadedDefault):
+		return MetaManager(provider = provider, threaded = threaded).episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level, cache = cache)
 
-	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, level = None, cache = None, provider = ProviderDefault):
-		return self.providerExecute(provider = provider, function = 'episode', id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, level = level, cache = cache)
+	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, provider = ProviderDefault):
+		return self.providerExecute(provider = provider, function = 'episode', id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level, cache = cache)
 
 	###################################################################
 	# CHARACTER

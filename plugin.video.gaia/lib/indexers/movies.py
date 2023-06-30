@@ -161,25 +161,36 @@ class Movies(object):
 
 		self.random1_link = 'https://imdb.com/list/ls091294718/'
 		self.random2_link = 'https://imdb.com/list/ls080799519/'
-		self.random3_link = 'https://imdb.com/list/ls071457904/'
+		self.random3_link = 'https://imdb.com/list/ls054319665/'
 
-		self.mHomeBase = 'online_availability'
 		if self.mMedia == Media.TypeDocumentary or self.mMedia == Media.TypeShort:
 			# Documentaries and Shorts do not have a TOP list. Simply use a list sorted by ratings.
 			self.popular_link = 'https://imdb.com/search/title?title_type=%s&languages=en&production_status=released&sort=user_rating,desc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 			self.new_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 			self.home_link = 'https://imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid,DE/today/Amazon/subs,DE/today/Amazon/paid&title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[730],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
-			self.disc_link = None
+			#self.disc_link = None
 			self.trending_link = self.featured_link
 		else:
 			self.popular_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=1000,&production_status=released&groups=top_1000&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 			self.new_link = 'https://imdb.com/search/title?title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[%d],date[1]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, 180 if self.mKidsOnly else 90, self.mLimit, self.mCertificates)
-			self.home_link = 'https://imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid&title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
+			self.home_link = 'https://imdb.com/search/title?online_availability=US/today/Amazon/subs,US/today/Amazon/paid,GB/today/Amazon/subs,GB/today/Amazon/paid,DE/today/Amazon/subs,DE/today/Amazon/paid&title_type=%s&languages=en&num_votes=100,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc&count=%d&start=1%s' % (self.mCategory, self.mLimit, self.mCertificates)
 
 			# This redirects to an Amazon shop page.
 			# Another alternative might be (not managed by IMDb admins): https://imdb.com/list/ls093173574/
 			#self.disc_link = None if self.mLimit <= 20 else ('https://imdb.com/list/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
-			self.disc_link = None if self.mLimit <= 20 else ('https://imdb.com/imdbpicks/new-to-vod-dvd-blu-ray/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
+
+			# This page has been removed by IMDb.
+			# They now have various IMDb picks at: https://www.imdb.com/imdbpicks/
+			# There is also one for streaming: https://www.imdb.com/list/ls566661486/mediaviewer/rm3920182529
+			# However, this list is not in a normal view, but uses the IMDb "mediaviewer", which is a slideshow.
+			# The mediaviewer pages contain the JSON data for the items.
+			# However, it only has the JSON data of a few items before/after the current item in the slideshow.
+			# Hence, the mediaviewer page never contains the data of all 30 items in the list, but only a subset.
+			# The only way to get all data, is to scroll through the entire slideshow. With each step, the URL will change and the 'rm...' partr updates.
+			# Even when this list is loadaed normally: https://www.imdb.com/list/ls566661486
+			# It does not show in the normal view, but ust shows images for the 30 titles.
+			# It however, does not contain an titles/years or IMDb IDs, but only an image and a link that cannot be used to get the ID, except visiting each link.
+			#self.disc_link = None if self.mLimit <= 20 else ('https://imdb.com/imdbpicks/new-to-vod-dvd-blu-ray/ls016522954/?title_type=%s&languages=en&num_votes=50,&production_status=released&release_date=date[365],date[30]&sort=moviemeter,asc' % self.mCategory) # Has some extra movies to home_link. Updated often and maintained by IMDB editors.
 
 			self.trending_link = 'https://api.trakt.tv/movies/trending?limit=%d&page=1' % self.mLimit
 
@@ -208,17 +219,23 @@ class Movies(object):
 			self.mModeRelease = link in ['new', 'home', 'disc']
 			if items is None: items = []
 
+			original = link
 			try: link = getattr(self, link + '_link')
 			except: pass
 
 			domain = Networker.linkDomain(link, subdomain = False, topdomain = False, ip = False, scheme = False, port = False)
 
-			if link == 'quick':
-
+			if original == 'quick':
 				self.mModeMixed = True # Hides 0-1% and 99-100% progress labels.
 				items = self.quick(limit = limit)
 				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 				items = self.sort(items = items, type = 'quick')
+
+			elif original and original.startswith('home'): # Startswith, since paging parameters are added to the link.
+				self.mModeRelease = True
+				items = self._home(refresh = refresh)
+				items = self.page(link = original, items = items)
+				if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 
 			elif domain == 'trakt':
 
@@ -289,29 +306,9 @@ class Movies(object):
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 					items = self.sort(items = items)
 
-				elif self.mHomeBase in link:
+				elif 'online_availability' in link:
 					self.mModeRelease = True
-
-					def home(result): result.append(self.cache('cacheMedium', refresh, self.imdbList, link = link, full = full))
-					def disc(result): result.append(self.cache('cacheMedium', refresh, self.imdbList, link = self.disc_link, full = full))
-
-					itemsHome = []
-					itemsDisc = []
-					threads = [Pool.thread(target = home, kwargs = {'result' : itemsHome}, start = True), Pool.thread(target = disc, kwargs = {'result' : itemsDisc}, start = True)]
-					[i.join() for i in threads]
-					if itemsHome: itemsHome = itemsHome[0] if itemsHome[0] else []
-					if itemsDisc: itemsDisc = itemsDisc[0] if itemsDisc[0] else []
-
-					if Regex.match(data = link, expression = '&start=1(?:&|$)'): # Combine for first page
-						# In few cases, itemsHome or itemsDisc can contain duplicate items.
-						# Therefore first extend the list, and afterwards filter out duplicates.
-						ids = [i['imdb'] for i in itemsHome]
-						itemsHome.extend(itemsDisc)
-						items = Tools.listUnique(itemsHome, attribute = 'imdb')
-					else: # For subsequent pages, exclude any that appeared on first page.
-						ids = [i['imdb'] for i in itemsDisc]
-						items = [i for i in itemsHome if not i['imdb'] in ids]
-
+					items = self.cache('cacheRefreshLong', refresh, self.imdbList, link = link, full = full)
 					if detailed: items = self.metadata(items = items, clean = clean, quick = quick, refresh = refresh)
 				else:
 					items = self.cache('cacheMedium', refresh, self.imdbList, link = link, full = full)
@@ -370,8 +367,8 @@ class Movies(object):
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
 			if genre:
-				if self.mMedia == Media.TypeDocumentary: items = [i for i in items if 'genre' in i and 'documentary' in [j.lower() for j in i['genre']]]
-				elif self.mMedia == Media.TypeShort: items = [i for i in items if 'genre' in i and 'short' in [j.lower() for j in i['genre']]]
+				if self.mMedia == Media.TypeDocumentary: items = [i for i in items if not 'genre' in i or not i['genre'] or ('genre' in i and 'documentary' in [j.lower() for j in i['genre']])]
+				elif self.mMedia == Media.TypeShort: items = [i for i in items if not 'genre' in i or not i['genre'] or ('genre' in i and 'short' in [j.lower() for j in i['genre']])]
 
 			if kids: items = self.mMetatools.filterKids(items = items, kids = self.mKids)
 
@@ -404,7 +401,7 @@ class Movies(object):
 	# PAGE
 	##############################################################################
 
-	def page(self, link, items, limit = None, sort = None, maximum = None):
+	def page(self, link, items, limit = None, sort = None, maximum = None, next = True):
 		# Some Trakt API endpoint do not support pagination.
 		# If the user has many watched shows, these list can get very long, making menu loading slow while extended metadata is retrieved.
 		# Manually handle paging.
@@ -424,6 +421,9 @@ class Movies(object):
 		if len(items) >= limit and (not maximum or (page + 1) * limit <= maximum):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
 			for item in items: item['next'] = next
+
+		for item in items:
+			if 'nextFixed' in item: item['next'] = item['nextFixed']
 
 		return items
 
@@ -677,10 +677,6 @@ class Movies(object):
 	# ARRIVALS
 	##############################################################################
 
-	def home(self, menu = True, quick = None, refresh = False, next = True):
-		self.mModeRelease = True
-		return self.retrieve(self.home_link, menu = menu, quick = quick, refresh = refresh, next = next)
-
 	def arrivals(self, menu = True, quick = None, refresh = False, next = True):
 		self.mModeRelease = True
 		setting = Settings.getInteger('menu.arrival.' + self.mMedia)
@@ -698,26 +694,173 @@ class Movies(object):
 		self.retrieve(link = self.trakthistory_link, menu = False)
 
 	##############################################################################
+	# HOME
+	##############################################################################
+
+	def home(self, menu = True, quick = None, refresh = False, next = True):
+		self.mModeRelease = True
+		return self.retrieve(link = 'home', menu = menu, quick = quick, refresh = refresh, next = next)
+
+	def _home(self, refresh = False):
+		return self.cache('cacheLong', refresh, self._homeRetrieve)
+
+	def _homeRetrieve(self):
+		threads = []
+		cutoff = int(self.mLimit / 2.0)
+
+		itemsImdb = [[], [], []]
+		threads.append(Pool.thread(target = self._homeImdb, kwargs = {'items' : itemsImdb, 'level' : 0}, start = True))
+		threads.append(Pool.thread(target = self._homeImdb, kwargs = {'items' : itemsImdb, 'level' : 1}, start = True))
+		threads.append(Pool.thread(target = self._homeImdb, kwargs = {'items' : itemsImdb, 'level' : 2}, start = True))
+
+		itemsTmdb = [[], [], []]
+		threads.append(Pool.thread(target = self._homeTmdb, kwargs = {'items' : itemsTmdb, 'level' : 0}, start = True))
+		threads.append(Pool.thread(target = self._homeTmdb, kwargs = {'items' : itemsTmdb, 'level' : 1}, start = True))
+		threads.append(Pool.thread(target = self._homeTmdb, kwargs = {'items' : itemsTmdb, 'level' : 2}, start = True))
+
+		[thread.join() for thread in threads]
+
+		itemsImdb = itemsImdb[1] + itemsImdb[2][:cutoff] + Tools.listInterleave(itemsImdb[2][cutoff:], itemsImdb[0])
+		itemsImdb = self.mMetatools.filterDuplicate(items = itemsImdb, id = True, title = False)
+
+		itemsTmdb = itemsTmdb[1] + itemsTmdb[2][:cutoff] + Tools.listInterleave(itemsTmdb[2][cutoff:], itemsTmdb[0])
+		itemsTmdb = self.mMetatools.filterDuplicate(items = itemsTmdb, id = True, title = False)
+
+		items = Tools.listInterleave(itemsImdb, itemsTmdb)
+		items = self.mMetatools.filterDuplicate(items = items, id = True, title = True) # Also filter by title, since TMDb items only have a TMDb ID.
+		#items = self.sort(items = items, type = 'release') # Does not work, IMDb does not have a date, only a year.
+
+		# Sometimes older movies are returned.
+		# Remove any that were not released in the past 2 years.
+		year = self.mYear - 1
+		items = [i for i in items if not 'year' in i or not i['year'] or i['year'] >= year]
+
+		# Move very bad movies to the end.
+		good = []
+		medium = []
+		bad = []
+		for i in items:
+			try: ratingImdb = i['temp']['imdb']['rating']
+			except: ratingImdb = None
+			try: ratingTmdb = i['temp']['tmdb']['rating']
+			except: ratingTmdb = None
+
+			rating = []
+			if ratingImdb: rating.append(ratingImdb)
+			if ratingTmdb: rating.append(ratingTmdb)
+
+			if rating:
+				rating = sum(rating) / len(rating)
+				if rating >= 5.0: good.append(i)
+				elif rating < 4.0: bad.append(i)
+				else: medium.append(i)
+			else:
+				medium.append(i)
+		items = good + medium + bad
+
+		# Remove 'next', since we manually page.
+		if items:
+			for i in items:
+				try: del i['next']
+				except: pass
+
+			# Add a next page to the last item, so that we can page even further.
+			items[-1]['nextFixed'] = Regex.replace(data = self.home_link, expression = '[?&](start=\d+)', replacement = 'start=%d' % 201, group = 1)
+
+		return items
+
+	def _homeImdb(self, items, level = None):
+		# NB: Any limit above 200 will fail and only return 50 items.
+
+		if level == 0:
+			limit = 10
+			votes = 1000
+			sort = 'release_date,desc'
+			release = 'date[60],date[1]'
+		elif level == 1:
+			limit = 20
+			votes = 10000
+			sort = 'moviemeter,asc'
+			release = 'date[90],date[1]'
+		else:
+			limit = 200
+			votes = 2000
+			sort = 'moviemeter,asc'
+			release = 'date[365],date[30]'
+
+		link = self.home_link
+		link = Regex.replace(data = link, expression = '[?&](count=\d+)', replacement = 'count=%d' % min(200, limit), group = 1)
+		link = Regex.replace(data = link, expression = '[?&](sort=.*?)(?:$|&)', replacement = 'sort=%s' % sort, group = 1)
+		link = Regex.replace(data = link, expression = '[?&](release_date=.*?)(?:$|&)', replacement = 'release_date=%s' % release, group = 1)
+		link = Regex.replace(data = link, expression = '[?&](num_votes=\d+)', replacement = 'num_votes=%d' % votes, group = 1)
+
+		for i in range(1, 50):
+			result = self.imdbList(link = Regex.replace(data = link, expression = '[?&](start=\d+)', replacement = 'start=%d' % i, group = 1))
+			if result:
+				items[level].extend(result)
+				if len(items[level]) >= limit: break
+			else: break
+			if limit <= 200: break
+
+	def _homeTmdb(self, items, level = None):
+		# NB: Each page has only 20 items and this limit cannot be changed.
+		if not self.mMedia == Media.TypeShort:
+			if self.mMedia == Media.TypeDocumentary: genre = MetaTmdb.GenreDocumentary
+			else: genre = -MetaTmdb.GenreDocumentary
+			type = [MetaTmdb.ReleaseDigital, MetaTmdb.ReleasePhysical]
+
+			language = []
+			if self.mLanguage: language.append(self.mLanguage)
+			language.extend(Language.settingsCode())
+			language = Tools.listUnique(language)
+
+			if level == 0:
+				limit = 10
+				release = Time.past(days = 30)
+				votes = 75 # Do not make too large, otherwise few titles are returned.
+				sort = MetaTmdb.SortRelease
+				order = MetaTmdb.OrderDescending
+			elif level == 1:
+				limit = 20
+				release = Time.past(days = 60)
+				votes = 500
+				sort = MetaTmdb.SortPopularity
+				order = MetaTmdb.OrderDescending
+			else:
+				limit = 100
+				release = Time.past(days = 365)
+				votes = 150
+				sort = MetaTmdb.SortPopularity
+				order = MetaTmdb.OrderDescending
+
+			for i in range(1, 50):
+				result = MetaTmdb.discoverMovie(genre = genre, type = type, release = release, votes = votes, language = language, sort = sort, order = order, page = i)
+				if result:
+					items[level].extend(result)
+					if len(items[level]) >= limit: break
+				if not result or len(result) < MetaTmdb.LimitFixed: break # Last page.
+
+	##############################################################################
 	# SEARCH
 	##############################################################################
 
 	def search(self, terms = None):
 		try:
-			from lib.modules.search import Searches
+			from lib.modules.search import Search
 
 			if terms:
 				if not terms: return None
 				Loader.show()
-				if self.mMedia == Media.TypeDocumentary: Searches().updateDocumentaries(terms)
-				elif self.mMedia == Media.TypeShort: Searches().updateShorts(terms)
-				else: Searches().updateMovies(terms)
+				if self.mMedia == Media.TypeDocumentary: Search().updateDocumentary(terms)
+				elif self.mMedia == Media.TypeShort: Search().updateShort(terms)
+				else: Search().updateMovie(terms)
 			else:
 				terms = Dialog.input(title = 32010)
 				if not terms: return None
 				Loader.show()
-				if self.mMedia == Media.TypeDocumentary: Searches().insertDocumentaries(terms, self.mKids)
-				elif self.mMedia == Media.TypeShort: Searches().insertShorts(terms, self.mKids)
-				else: Searches().insertMovies(terms, self.mKids)
+				if self.mMedia == Media.TypeDocumentary: Search().insertDocumentary(terms, self.mKids)
+				elif self.mMedia == Media.TypeShort: Search().insertShort(terms, self.mKids)
+				else: Search().insertMovie(terms, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
@@ -985,15 +1128,15 @@ class Movies(object):
 
 	def person(self, terms = None):
 		try:
-			from lib.modules.search import Searches
+			from lib.modules.search import Search
 
 			if terms:
 				if not terms: return None
-				Searches().updatePeople(terms)
+				Search().updatePerson(terms)
 			else:
 				terms = Dialog.keyboard(title = 32010)
 				if not terms: return None
-				Searches().insertPeople(terms, self.mKids)
+				Search().insertPerson(terms, self.mKids)
 
 			# Use executeContainer() instead of directly calling get().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
@@ -1129,19 +1272,20 @@ class Movies(object):
 
 				title = item['title']
 				title = Networker.htmlDecode(title)
-				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
+				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$', all = True)
 
 				try:
 					year = item['year']
 					if year > self.mYear: continue
 				except: year = None
 
+				idImdb = None
 				try:
 					idImdb = item['ids']['imdb']
-					idImdb = 'tt' + Regex.remove(data = str(idImdb), expression = '[^0-9]')
-					if idImdb == 'tt': idImdb = None
-				except:
-					idImdb = None
+					if idImdb:
+						idImdb = 'tt' + Regex.remove(data = str(idImdb), expression = '[^0-9]', all = True)
+						if idImdb == 'tt': idImdb = None
+				except: pass
 
 				idTmdb = item.get('ids', {}).get('tmdb', None)
 				if idTmdb: idTmdb = str(idTmdb)

@@ -64,7 +64,7 @@ class History(Database):
 		else: return media
 
 	def _prepare(self, data):
-		if data is None: data = self._null()
+		if data is None: return self._null()
 		elif not Tools.isString(data): data = Converter.jsonTo(data)
 		return '"%s"' % data.replace('"', '""')
 

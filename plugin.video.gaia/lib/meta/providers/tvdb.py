@@ -196,7 +196,7 @@ class MetaTvdb(MetaProvider):
 	###################################################################
 
 	@classmethod
-	def _retrieve(self, media, type, extended = False, translations = False, episodes = False, id = None, level = None):
+	def _retrieve(self, media, type, extended = False, translations = False, episodes = False, show = None, season = None, id = None, level = None):
 		if id:
 			parts = [type, id]
 			if extended and level >= MetaProvider.Level2: parts.append(MetaTvdb.ParameterExtended)
@@ -211,7 +211,7 @@ class MetaTvdb(MetaProvider):
 				if episodes and level == MetaProvider.Level4: data[MetaTvdb.ParameterMeta].append(MetaTvdb.ParameterEpisodes)
 
 			data = self._request(parts = parts, data = data)
-			return self._process(media = media, data = data)
+			return self._process(media = media, data = data, show = show, season = season)
 		return None
 
 	###################################################################
@@ -934,20 +934,36 @@ class MetaTvdb(MetaProvider):
 		except: return None
 
 	@classmethod
-	def _extractSpecial(self, data, media):
+	def _extractSpecial(self, data, media, show = None, season = None):
 		try:
 			special = []
 
-			if 'tagOptions' in data:
+			if 'tagOptions' in data and data['tagOptions']:
 				for i in data['tagOptions']:
 					try: special.append(MetaTvdb.Special[i['id']])
 					except: pass
 
 			if 'isMovie' in data and data['isMovie']: special.append(MetaData.SpecialMovie)
-			if 'name' in data and data['name'] and Regex.match(data = data['name'], expression = '((?:un)?(?:aired|released)\s*pilot|pilot\s*episode)'): special.append(MetaData.SpecialPilot) # Eg: Sherlock S00E01.
+
+			if 'name' in data and data['name']:
+				# Maybe not absolutely necessary to exclude show titles from detection, but it might be useful in rare cases where these keywords appear in the title.
+				exclude = None
+				if show:
+					try:
+						titles = show.title(language = True, selection = MetaData.SelectionList)
+						exclude = []
+						for key, value in titles.items():
+							exclude.extend(value)
+						exclude = Tools.listUnique(exclude)
+					except: pass
+
+				extracted = MetaData.specialExtract(data = data['name'], exclude = exclude)
+				if extracted: special.extend(extracted)
 
 			return Tools.listUnique(special) if special else None
-		except: return None
+		except:
+			Logger.error()
+			return None
 
 	@classmethod
 	def _extractReleaseCountry(self, data):
@@ -1026,13 +1042,13 @@ class MetaTvdb(MetaProvider):
 	###################################################################
 
 	@classmethod
-	def _process(self, media, data):
+	def _process(self, media, data, show = None, season = None):
 		try:
 			if data:
 				if media is MetaData.MediaDefault: media = self._extractMedia(data = data)
 				metadata = MetaData(media = media)
 
-				if metadata.mediaContent(): self._processContent(metadata = metadata, data = data)
+				if metadata.mediaContent(): self._processContent(metadata = metadata, data = data, show = show, season = season)
 				elif metadata.mediaPerson(): self._processPerson(metadata = metadata, data = data)
 				elif metadata.mediaCharacter(): self._processCharacter(metadata = metadata, data = data, single = True)
 				elif metadata.mediaCompany(): self._processCompany(metadata = metadata, data = data)
@@ -1042,7 +1058,7 @@ class MetaTvdb(MetaProvider):
 		return None
 
 	@classmethod
-	def _processContent(self, metadata, data):
+	def _processContent(self, metadata, data, show = None, season = None):
 		self._processShow(metadata = metadata, data = data)
 		self._processSeason(metadata = metadata, data = data)
 		self._processEpisode(metadata = metadata, data = data)
@@ -1066,7 +1082,7 @@ class MetaTvdb(MetaProvider):
 
 		self._processVote(metadata = metadata, data = data)
 		self._processStatus(metadata = metadata, data = data)
-		self._processSpecial(metadata = metadata, data = data)
+		self._processSpecial(metadata = metadata, data = data, show = show)
 		self._processDuration(metadata = metadata, data = data)
 		self._processMoney(metadata = metadata, data = data)
 		self._processCertificate(metadata = metadata, data = data)
@@ -1313,8 +1329,8 @@ class MetaTvdb(MetaProvider):
 		metadata.statusSet(value = self._extractStatus(data = data, media = metadata.media()))
 
 	@classmethod
-	def _processSpecial(self, metadata, data):
-		metadata.specialSet(value = self._extractSpecial(data = data, media = metadata.media()))
+	def _processSpecial(self, metadata, data, show = None):
+		metadata.specialSet(value = self._extractSpecial(data = data, media = metadata.media(), show = show))
 
 	@classmethod
 	def _processDuration(self, metadata, data):
@@ -1729,16 +1745,16 @@ class MetaTvdb(MetaProvider):
 	###################################################################
 
 	@classmethod
-	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, level = None):
-		return self._retrieve(media = MetaData.MediaSeason, type = MetaTvdb.ParameterSeasons, extended = True, translations = True, id = id, level = level)
+	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, show = None, level = None):
+		return self._retrieve(media = MetaData.MediaSeason, type = MetaTvdb.ParameterSeasons, extended = True, translations = True, id = id, show = show, level = level)
 
 	###################################################################
 	# EPISODE
 	###################################################################
 
 	@classmethod
-	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, level = None):
-		return self._retrieve(media = MetaData.MediaEpisode, type = MetaTvdb.ParameterEpisodes, extended = True, translations = True, id = id, level = level)
+	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None):
+		return self._retrieve(media = MetaData.MediaEpisode, type = MetaTvdb.ParameterEpisodes, extended = True, translations = True, id = id, show = show, season = season, level = level)
 
 	###################################################################
 	# CHARACTER

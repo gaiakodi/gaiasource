@@ -142,6 +142,7 @@ class Player(xbmc.Player):
 			self.bingeDialogUpNext = tools.Binge.dialogUpNext()
 			self.bingeSuppress = tools.Binge.suppress()
 			self.bingeDelay = None
+			self.bingeDelayBefore = None
 			self.bingeContinue = False
 			self.bingePlay = False
 			self.bingeFinishedScrape = False
@@ -154,12 +155,6 @@ class Player(xbmc.Player):
 			self.playback = Playback.instance()
 			self.playback.refresh(media = self.media, wait = False)
 			self.playbackWatched = False
-
-			self.progress = None
-			self.progressBusy = False
-			self.progressInitialized = False
-			self.progressThread = None
-			self.progressRetrieve()
 
 			self.source = source
 			self.source['stream'] = Stream.load(data = self.source['stream'])
@@ -181,6 +176,18 @@ class Player(xbmc.Player):
 				self.autopack = self.source['stream'].hash()
 				if not self.autopack: self.autopack = self.source['stream'].linkPrimary()
 
+			self.metatools = MetaTools.instance()
+			self.metadata = metadata
+			item = self.metatools.item(metadata = metadata, command = self.url, context = False, label = False) # Do not create custom label with episode number.
+			self.item = item['item']
+			self.metadataCleaned = item['metadata']
+
+			self.progress = None
+			self.progressBusy = False
+			self.progressInitialized = False
+			self.progressThread = None
+			self.progressRetrieve()
+
 			self.timeTotal = 0
 			self.timeCurrent = 0
 			self.timeProgress = 0
@@ -197,12 +204,6 @@ class Player(xbmc.Player):
 			self.playbackFinalized = False
 			self.libraryUpdated = False
 			self.libraryUpdated = False
-
-			self.metatools = MetaTools.instance()
-			self.metadata = metadata
-			item = self.metatools.item(metadata = metadata, command = self.url, context = False, label = False) # Do not create custom label with episode number.
-			self.item = item['item']
-			self.metadataCleaned = item['metadata']
 
 			# This is used by the Gaia Eminence to hide "Source too slow" notifications, since Gaia has its own buffering notifications.
 			tools.System.windowPropertySet('GaiaPlayerLink', self.url)
@@ -245,6 +246,7 @@ class Player(xbmc.Player):
 			self.bufferFailures = 0
 			self.bufferDuration = 0
 
+			self.retryBusy = False
 			self.retryMessage = ''
 			self.retryRemaining = 0
 			self.retryTotal = 1
@@ -285,10 +287,13 @@ class Player(xbmc.Player):
 				interface.Loader.hide()
 
 				success = self.keepPlaybackAlive()
+
 				if success or tools.System.aborted() or self.core.progressPlaybackCanceled():
+					self.retryBusy = False
 					self._closeFailure()
 					break
 				if self.retryRemaining > 0:
+					self.retryBusy = True
 					tools.Logger.log('Retrying Playback')
 
 					if interface.Core.background() and not self.core.progressPlaybackEnabled():
@@ -300,6 +305,7 @@ class Player(xbmc.Player):
 			self._errorLog(finish = True)
 
 			if not success and self.retryRemaining == 0:
+				self.retryBusy = False
 				self._closeFailure()
 				interface.Dialog.notification(title = 33448, message = 33450, icon = interface.Dialog.IconError)
 
@@ -338,6 +344,23 @@ class Player(xbmc.Player):
 		# This allows some idle/sleep time in between checks, which in turn allows Kodi's player code to execute and fire the right events.
 		# This should probably only affect blocking joins started from the main thread (inside self.run()), but just do it for all threads here, in case it affects non-blocking joins within sub-threads.
 		Pool.join(instance = thread, busy = True)
+
+	def detailsRefresh(self):
+		self.detailsSet()
+		self.detailsUpdateSpeed()
+		self.detailsNotification()
+
+		# Sometimes the metadata is not set in the player.
+		# This causes the title/plot/poster/etc not to show in the Kore app.
+		# This typically happens if Gaia retries playback after failing to establish a stream connection.
+		# This is probably caused by updateInfoTag() in detailsSet(), which only works if the player is currently playing.
+		# Retry a few times. Hopefully the player has started by then.
+		Pool.thread(target = self._detailsRefresh, start = True)
+
+	def _detailsRefresh(self):
+		for i in range(30):
+			tools.Time.sleep(2)
+			if self.detailsSet(): break
 
 	def detailsUpdate(self):
 		try:
@@ -432,29 +455,33 @@ class Player(xbmc.Player):
 
 	def detailsSet(self):
 		try:
-			newline = interface.Format.newline()
+			if self.metadataCleaned:
+				newline = interface.Format.newline()
 
-			details = []
-			if 'speed' in self.details: details.append((35418, self.details['speed']))
-			if 'service' in self.details: details.append((35420, self.details['service']))
-			if 'device' in self.details: details.append((35419, self.details['device']))
-			if 'server' in self.details: details.append((35207, self.details['server']))
-			if 'name' in self.details: details.append((35724, self.details['name']))
-			if 'link' in self.details: details.append((33702, self.details['link']))
-			details = newline.join([interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1] for i in details])
+				details = []
+				if 'speed' in self.details: details.append((35418, self.details['speed']))
+				if 'service' in self.details: details.append((35420, self.details['service']))
+				if 'device' in self.details: details.append((35419, self.details['device']))
+				if 'server' in self.details: details.append((35207, self.details['server']))
+				if 'name' in self.details: details.append((35724, self.details['name']))
+				if 'link' in self.details: details.append((33702, self.details['link']))
+				details = newline.join([interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1] for i in details])
 
-			metadata = tools.Tools.copy(self.metadataCleaned)
-			if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = ''
-			metadata['plot'] = metadata['plot'].strip('\n').strip('\r')
-			separator = (newline * 2) if metadata['plot'] else ''
+				metadata = tools.Tools.copy(self.metadataCleaned)
+				if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = ''
+				metadata['plot'] = metadata['plot'].strip('\n').strip('\r')
+				separator = (newline * 2) if metadata['plot'] else ''
 
-			if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
-			else: metadata['plot'] = metadata['plot'] + separator + details + newline
+				if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
+				else: metadata['plot'] = metadata['plot'] + separator + details + newline
 
-			self.metatools.itemInfo(item = self.item, metadata = metadata)
-			try: self.updateInfoTag(self.item)
-			except: pass # Not yet playing.
+				self.metatools.itemInfo(item = self.item, metadata = metadata)
+				try:
+					self.updateInfoTag(self.item)
+					return True
+				except: pass # Not yet playing.
 		except: tools.Logger.error()
+		return False
 
 	def detailsNotification(self):
 		try:
@@ -496,36 +523,40 @@ class Player(xbmc.Player):
 		except: tools.Logger.error()
 
 	def rate(self):
-		try:
-			self.rateLock.acquire() # Can be called multiple times simultaneously (_bingePlay and playbackFinalize).
-			if not self.rated and self.bingeSuppress <= 1:
-				if self.playbackWatched or self.timeProgress >= 0.75:
-					self.rated = True
-					self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, binge = self.bingeContinue, automatic = bool(self.autoplay or self.autopack))
-		finally: self.rateLock.release()
+		if self.metadata: # Do not rate exact searches.
+			try:
+				self.rateLock.acquire() # Can be called multiple times simultaneously (_bingePlay and playbackFinalize).
+				if not self.rated and self.bingeSuppress <= 1:
+					if self.playbackWatched or self.timeProgress >= 0.75:
+						self.rated = True
+						self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, binge = self.bingeContinue, automatic = bool(self.autoplay or self.autopack))
+			finally: self.rateLock.release()
 
 	def _showStreams(self):
 		if self.reload and (not self.binge or (self.binge and not self.bingeFinishedCheck)):
 			if self.navigationStreamsSpecial and not self.autoplay:
-				# Only show the streams window when launched from Gaia.
-				# Do not reload if this is launched from eg the local library.
-				if tools.System.originGaia():
-					reload = False
-					setting = tools.Settings.getInteger('interface.stream.interface.reload')
-					if setting == 1:
-						reload == self.status == Player.StatusPaused
-					elif setting == 2:
-						if self.status == Player.StatusPaused: reload = True
-						elif self.status in [Player.StatusStopped, Player.StatusEnded]: reload = not self.playbackWatched
-					elif setting == 3:
-						if self.status == Player.StatusPaused: reload = True
-						elif self.status in [Player.StatusStopped, Player.StatusEnded]: reload = True
+				# Do not reload the streams window if playback failed and we are busy retrying playback.
+				# Otherwise when trying playback, it mostly succeeds and then the Kodi player shows, and shortly after, the streams window is reloaded on top.
+				if not self.retryBusy:
+					# Only show the streams window when launched from Gaia.
+					# Do not reload if this is launched from eg the local library.
+					if tools.System.originGaia():
+						reload = False
+						setting = tools.Settings.getInteger('interface.stream.interface.reload')
+						if setting == 1:
+							reload == self.status == Player.StatusPaused
+						elif setting == 2:
+							if self.status == Player.StatusPaused: reload = True
+							elif self.status in [Player.StatusStopped, Player.StatusEnded]: reload = not self.playbackWatched
+						elif setting == 3:
+							if self.status == Player.StatusPaused: reload = True
+							elif self.status in [Player.StatusStopped, Player.StatusEnded]: reload = True
 
-					if reload:
-						# Reload streams in a separate process.
-						# Otherwise we might end up in a long loop of play->reload->play->reload which might not clean up memory and increase the chance of running out of threads on low-end devices.
-						#self.core.showStreams(filter = True, binge = self.binge, autoplay = self.autoplay)
-						self.core.showStreamsExternal(filter = True, binge = self.binge, autoplay = self.autoplay, reload = True)
+						if reload:
+							# Reload streams in a separate process.
+							# Otherwise we might end up in a long loop of play->reload->play->reload which might not clean up memory and increase the chance of running out of threads on low-end devices.
+							#self.core.showStreams(filter = True, binge = self.binge, autoplay = self.autoplay)
+							self.core.showStreamsExternal(filter = True, binge = self.binge, autoplay = self.autoplay, reload = True)
 
 	def _debridClear(self):
 		debrid.Debrid.deletePlayback(link = self.url, source = self.source)
@@ -672,6 +703,7 @@ class Player(xbmc.Player):
 	def _bingeDelay(self):
 		if self.bingeDelay is None:
 			# If an outro chapter is available, sync the binge window accordingly.
+			outro = None
 			try:
 				outro = Chapter.chapterOutro(single = True)
 				if outro: self.bingeDelay = int(self.getTotalTime() - outro['time']['start'] + 1)
@@ -679,7 +711,9 @@ class Player(xbmc.Player):
 
 			if not self.bingeDelay: self.bingeDelay = tools.Binge.delay()
 
+			automatic = False
 			if self.bingeDelay == 0:
+				automatic = True
 				try: self.bingeDelay = self.getTotalTime()
 				except:
 					try: self.bingeDelay = int(self.metadata['duration'])
@@ -687,6 +721,13 @@ class Player(xbmc.Player):
 				self.bingeDelay = 30 if self.bingeDelay == 0 else int(self.bingeDelay / 60.0)
 				if tools.Binge.dialogFull(): self.bingeDelay = int(self.bingeDelay / 3.0)
 				self.bingeDelay = min(90, self.bingeDelay)
+
+			# Increase the time for the overlay dialog.
+			# The dialog is shown hidden at this time and can be manually shown or wait for it to show automatically.
+			# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
+			#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
+			if self.bingeDialogOverlay: self.bingeDelayBefore = int(self.bingeDelay * 3)
+
 		return self.bingeDelay
 
 	def _bingeCheck(self):
@@ -703,9 +744,12 @@ class Player(xbmc.Player):
 							# NB: AddonSignals cannot be called from a thread, otherwise the callback never fires.
 							self.bingeFinishedCheck = True
 							self._bingeUpNext()
-					elif self.bingeDialogOverlay and remaining <= self._bingeDelay():
-						self.bingeFinishedCheck = True
-						self._bingeShow()
+					elif self.bingeDialogOverlay:
+						delay = self._bingeDelay()
+						if self.bingeDelayBefore: delay = self.bingeDelayBefore
+						if remaining <= delay:
+							self.bingeFinishedCheck = True
+							self._bingeShow()
 		except:
 			tools.Logger.error()
 
@@ -791,17 +835,36 @@ class Player(xbmc.Player):
 						thread.start()
 					if not self.bingeDialogNone:
 						images = MetaImage.setEpisode(data = self.bingeMetadata, season = False, episode = False)
+
+						background = None
 						try: background = images['fanart']
-						except: background = None
+						except: pass
+						if not background:
+							try: background = images['tvshow.fanart']
+							except: pass
+							if not background:
+								try: background = images['tvshow.landscape']
+								except: pass
+
+						poster = None
 						try: poster = images['poster']
-						except: poster = None
+						except: pass
+						if not poster:
+							try: poster = images['tvshow.poster']
+							except: pass
+							if not poster:
+								try: poster = images['tvshow.keyart']
+								except: pass
+
 						if self.bingeDialogFull:
 							delay = self._bingeDelay()
 							self.bingeContinue = window.WindowBingeFull.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay)
 						elif self.bingeDialogOverlay:
 							try: delay = self.getTotalTime() - self.getTime()
 							except: delay = 0
-							self.bingeContinue = window.WindowBingeOverlay.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay)
+							automatic = self._bingeDelay()
+							if self.bingeDelayBefore: automatic = max(0, self.bingeDelayBefore - automatic)
+							self.bingeContinue = window.WindowBingeOverlay.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay, automatic = automatic)
 
 				if self.bingeContinue:
 					if self.status == Player.StatusStopped:
@@ -950,7 +1013,7 @@ class Player(xbmc.Player):
 		try: return self.isPlaying() and self.isPlayingVideo() and self.getTime() >= 0 and (not started or self.statusStarted)
 		except: False
 
-	def isBusy(self, started = False):
+	def isBusy(self):
 		return self.isPlayingVideo() and not tools.System.aborted()
 
 	def keepPlaybackWait(self, title, message, status, substatus1, substatus2, timeout):
@@ -1070,9 +1133,7 @@ class Player(xbmc.Player):
 
 			if self.vpnMonitor: Vpn.killPlayback()
 
-			self.detailsSet()
-			self.detailsUpdateSpeed()
-			self.detailsNotification()
+			self.detailsRefresh()
 
 			while self.isBusy():
 				self.timeTotal = self.getTotalTime()
@@ -1125,7 +1186,9 @@ class Player(xbmc.Player):
 			return False
 
 	def progressRetrieve(self):
-		if self.playback.settingsHistoryEnabled() and self.playback.settingsHistoryResume() > 0: self.progressThread = Pool.thread(target = self._progressRetrieve, start = True)
+		if self.metadata: # Do not do for exact searches.
+			if self.playback.settingsHistoryEnabled() and self.playback.settingsHistoryProgressResume() > 0: self.progressThread = Pool.thread(target = self._progressRetrieve, start = True)
+			else: self.progress = 0
 		else: self.progress = 0
 
 	def _progressRetrieve(self):
@@ -1133,22 +1196,23 @@ class Player(xbmc.Player):
 		self.progress = self.playback.progress(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, adjust = self.playback.AdjustInternal)
 
 	def progressUpdate(self, action = None):
-		if self.progressInitialized and not self.progressBusy:
-			if action is None:
-				if self.status == Player.StatusPlaying:
-					action = Playback.ActionStart
-				elif self.status == Player.StatusPaused:
-					action = Playback.ActionPause
-				elif self.status == Player.StatusStopped or self.status == Player.StatusEnded:
-					# NB: When a title is played for the first time and scrobble is stopped (aka the "stop" action is submitted to Trakt's API), the progress status can later be retrieved and playback resumed.
-					# However, when a title was already watched, and the user watches it again, and then scrobble is stopped, the progress is not returned by "sync/playback".
-					# When scrobble is paused instead of stopped, the correct progress can be retrieved through "sync/playback".
-					# Hence, only stop scrobble if the playback actually finished, and not just when the user hits the stop button in Kodi's player.
-					# This is not a huge issue, since the playback progress can still be retrieved from the local database, but it is still better to get the progress from Trakt, in case the user watched it on a different device.
-					if self.playbackWatched: action = Playback.ActionStop
-					else: action = Playback.ActionPause
+		if self.metadata: # Do not do for exact searches.
+			if self.progressInitialized and not self.progressBusy:
+				if action is None:
+					if self.status == Player.StatusPlaying:
+						action = Playback.ActionStart
+					elif self.status == Player.StatusPaused:
+						action = Playback.ActionPause
+					elif self.status == Player.StatusStopped or self.status == Player.StatusEnded:
+						# NB: When a title is played for the first time and scrobble is stopped (aka the "stop" action is submitted to Trakt's API), the progress status can later be retrieved and playback resumed.
+						# However, when a title was already watched, and the user watches it again, and then scrobble is stopped, the progress is not returned by "sync/playback".
+						# When scrobble is paused instead of stopped, the correct progress can be retrieved through "sync/playback".
+						# Hence, only stop scrobble if the playback actually finished, and not just when the user hits the stop button in Kodi's player.
+						# This is not a huge issue, since the playback progress can still be retrieved from the local database, but it is still better to get the progress from Trakt, in case the user watched it on a different device.
+						if self.playbackWatched: action = Playback.ActionStop
+						else: action = Playback.ActionPause
 
-			if action: self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
+				if action: self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
 
 	def progressInitialize(self):
 		try:
@@ -1171,7 +1235,7 @@ class Player(xbmc.Player):
 					seconds = self.progress * self.timeTotal
 					if seconds > 0:
 						if self.playback.settingsHistoryEnabled():
-							resume = self.playback.settingsHistoryResume()
+							resume = self.playback.settingsHistoryProgressResume()
 							if resume == 4:
 								if self.progress <= 0.02 or self.progress >= 0.98:
 									resume = -1
@@ -1396,7 +1460,7 @@ class Player(xbmc.Player):
 				tools.Logger.error()
 
 	def streamSelect(self):
-		Audio.select() # Must be before subtitles, since the subtitles might need the current audio stream/language.
+		Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
 		Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
 		if self.mediaTelevision: Chapter.select()
 
@@ -1588,8 +1652,12 @@ class Streamer(object):
 	def log(self, message, stream = None):
 		message = '[%s] %s' % (self.name().upper(), message)
 		if stream:
-			if tools.Tools.isArray(stream): tools.Logger.log('%s: %s' % (message, ' | '.join(['%s (%s)' % (str(i['language'][tools.Language.Name][tools.Language.NameDefault] if i['language'] else None), str(i['name'] if i['name'] else None)) for i in stream])))
-			else: tools.Logger.log('%s: %s (%s)' % (message, str(stream['language'][tools.Language.Name][tools.Language.NameDefault] if stream['language'] else None), str(stream['name'] if stream['name'] else None)))
+			if tools.Tools.isArray(stream):
+				if tools.Tools.isString(stream[0]): tools.Logger.log('%s: %s' % (message, ' | '.join([str(tools.Language.name(i)) for i in stream])))
+				elif not 'language' in stream[0]: tools.Logger.log('%s: %s' % (message, ' | '.join([str(i[tools.Language.Name][tools.Language.NameDefault]) for i in stream])))
+				else: tools.Logger.log('%s: %s' % (message, ' | '.join(['%s (%s)' % (str(i['language'][tools.Language.Name][tools.Language.NameDefault] if i['language'] else None), str(i['name'] if i['name'] else None)) for i in stream])))
+			else:
+				tools.Logger.log('%s: %s (%s)' % (message, str(stream['language'][tools.Language.Name][tools.Language.NameDefault] if stream['language'] else None), str(stream['name'] if stream['name'] else None)))
 		else:
 			if not stream is None: message + ': None'
 			tools.Logger.log(message)
@@ -1620,10 +1688,7 @@ class Streamer(object):
 				if language[tools.Language.Code][tools.Language.CodePrimary] == variation[tools.Language.Original]:
 					result.append(variation)
 
-		if log:
-			if result: values = ' | '.join([i[tools.Language.Name][tools.Language.NameDefault] for i in result])
-			else: values = 'None'
-			self.log('Language preferences: %s' % values)
+		if log: self.log('Language preferences', [i[tools.Language.Name][tools.Language.NameDefault] for i in result])
 		return [i[tools.Language.Code][code] for i in result]
 
 
@@ -1638,11 +1703,28 @@ class Audio(Streamer):
 		return player.audioStream(retrieve = retrieve, process = process, unknown = unknown)
 
 	@classmethod
-	def select(self, unknown = False):
+	def select(self, metadata = None, unknown = False):
 		try:
+			# In sporadic cases, the streams returned might be None.
+			# This is probably because the player has not fully initialized.
+			# Wait and try again.
+			streams = None
+			for i in range(5):
+				streams = self.streams(unknown = unknown)
+				if streams and streams[0]: break
+				tools.Time.sleep(0.2)
+
 			settings = self.settingsLanguage(log = not unknown)
-			streams = self.streams(unknown = unknown)
 			current = self.streamCurrent(unknown = unknown)
+
+			original = None
+			try:
+				original = metadata['language']
+				if original and not tools.Tools.isArray(original): original = [original]
+				original = [tools.Language.code(i, code = tools.Language.CodeStream) for i in original]
+				original = [i for i in original if i]
+				self.log('Original audio language', original)
+			except: pass
 
 			if not unknown: self.log('Available streams', streams if streams else [])
 
@@ -1652,28 +1734,61 @@ class Audio(Streamer):
 				self.log('No audio streams detected.')
 			else:
 				best = None
-				for code in settings:
-					for stream in streams:
-						if code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
-							if best is None:
-								if stream['name']: # Ingore commentary audio.
-									lower = stream['name'].lower()
-									if not 'comment' in lower  and not 'director' in lower:
+				bestOriginal = False
+
+				# First try to use the language the title was originally released in.
+				# Pick any language that is in the user's settings, even if it is the secondary/tertiary language.
+				# No user wants to watch dubbed content if the user can (to some extend) understand the original language.
+				# Eg: If a movie is in French, but the file also contains an English audio stream: French should be used instead of English if the user has French in any of the language settings.
+				if best is None and original:
+					for code in original:
+						if code in settings:
+							for stream in streams:
+								if stream and code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
+									if best is None:
+										if stream['name']: # Ingore commentary audio.
+											lower = stream['name'].lower()
+											if not 'comment' in lower  and not 'director' in lower:
+												best = stream
+										else:
+											best = stream
+									else:
+										better = False
+										if stream['channels'] and best['channels']:
+											if stream['channels'] > best['channels']: better = True
+											elif stream['bitrate'] and best['bitrate'] and stream['channels'] == best['channels'] and stream['bitrate'] > best['bitrate']: better = True
+											if better and stream['name']: # Ingore commentary audio.
+												lower = stream['name'].lower()
+												if 'comment' in lower or 'director' in lower: better = False
+										if better: best = stream
+							if best:
+								bestOriginal = True
+								break
+
+				if best is None:
+					for code in settings:
+						for stream in streams:
+							if stream and code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
+								if best is None:
+									if stream['name']: # Ingore commentary audio.
+										lower = stream['name'].lower()
+										if not 'comment' in lower  and not 'director' in lower:
+											best = stream
+									else:
 										best = stream
 								else:
-									best = stream
-							else:
-								better = False
-								if stream['channels'] and best['channels']:
-									if stream['channels'] > best['channels']: better = True
-									elif stream['bitrate'] and best['bitrate'] and stream['channels'] == best['channels'] and stream['bitrate'] > best['bitrate']: better = True
-									if better and stream['name']: # Ingore commentary audio.
-										lower = stream['name'].lower()
-										if 'comment' in lower or 'director' in lower: better = False
-								if better: best = stream
-					if best: break
+									better = False
+									if stream['channels'] and best['channels']:
+										if stream['channels'] > best['channels']: better = True
+										elif stream['bitrate'] and best['bitrate'] and stream['channels'] == best['channels'] and stream['bitrate'] > best['bitrate']: better = True
+										if better and stream['name']: # Ingore commentary audio.
+											lower = stream['name'].lower()
+											if 'comment' in lower or 'director' in lower: better = False
+									if better: best = stream
+						if best: break
+
 				if best:
-					self.log('Using %s stream' % ('unknown' if unknown else 'preferred'), best)
+					self.log('Using %s stream' % ('original' if bestOriginal else 'unknown' if unknown else 'preferred'), best)
 					self.player().audioSelect(best)
 				else:
 					undefined = False
@@ -1848,8 +1963,16 @@ class Subtitle(Streamer):
 				settingsLanguage = [assumed[tools.Language.Code][tools.Language.CodeStream]]
 				self.log('No subtitle language preferences. Assuming the language: ' + str(assumed[tools.Language.Name][tools.Language.NameDefault]))
 
+			# In sporadic cases, the streams returned might be None.
+			# This is probably because the player has not fully initialized.
+			# Wait and try again.
+			streams = None
+			for i in range(5):
+				streams = self.streams()
+				if streams and streams[0]: break
+				tools.Time.sleep(0.2)
+
 			player = self.player()
-			streams = self.streams()
 			current = self.streamCurrent()
 			self.log('Available streams', streams if streams else [])
 
@@ -1863,7 +1986,7 @@ class Subtitle(Streamer):
 			else:
 				# Use the cached integrated subtitles, otherwise newley downloaded subtitles will be listed as "integrated" in the dialog if opened again.
 				if Subtitle.InternalIntegrated is None:
-					if streams: Subtitle.InternalIntegrated = [Subtitler.process(data = i, integrated = True) for i in streams]
+					if streams: Subtitle.InternalIntegrated = [Subtitler.process(data = i, integrated = True) for i in streams if i]
 					else: Subtitle.InternalIntegrated = False
 
 				player.subtitleSelect(path = pathDisable, enable = False)
@@ -1878,7 +2001,7 @@ class Subtitle(Streamer):
 					loadedStreams = self.streams()
 					if loadedStreams:
 						for stream in loadedStreams:
-							if stream['name'].startswith(Subtitle.InternalDisable) or stream['name'].startswith(Subtitle.InternalSelect):
+							if stream and stream['name'].startswith(Subtitle.InternalDisable) or stream['name'].startswith(Subtitle.InternalSelect):
 								loaded += 1
 								if loaded >= 2: break
 						if loaded >= 2: break
@@ -1905,8 +2028,18 @@ class Subtitle(Streamer):
 				elif settingsStream == Subtitle.StreamAutomatic:
 					if Audio.streamKnown():
 						if current and current['forced']:
-							self.log('Audio stream known. Leaving forced subtitles.')
-							return self._finish(status = Subtitle.StatusForced, subtitle = current)
+							try: code = current['language'][tools.Language.Code][tools.Language.CodeDefault]
+							except: code = None
+
+							# If the forced subtitles are in a language the user does not know and the audio stream is known, disable the subtitles.
+							# If the language of the forced subtitles is unknown, leave them on.
+							if code and not code == tools.Language.UniversalCode and settingsLanguage and not code in settingsLanguage:
+								self.log('Audio stream known. Disabling forced subtitles.')
+								player.subtitleDisable()
+								return self._finish(status = Subtitle.StatusDisabled)
+							else:
+								self.log('Audio stream known. Leaving forced subtitles.')
+								return self._finish(status = Subtitle.StatusForced, subtitle = current)
 						else:
 							self.log('Audio stream known. Disabling subtitles.')
 							player.subtitleDisable()

@@ -1,4 +1,68 @@
 
+[B]6.3.0 (2023.06.30)[/B]
+- Added Oracle chatbot support.
+- Improved launch after addon update.
+- Fixed network caching.
+- Fixed episode posters and thumbnails.
+- Added submenu paging setting.
+- Fixed multiple episode paging.
+- Fixed Trakt authentication refresh.
+- Combined Bluetooth and Lightpack settings tab.
+- Added more episode cast members.
+- Fixed bold formatting of menu labels.
+- Increased thread count for premium providers.
+- Extended video context menu.
+- Added customizable stream save time.
+- Added customizable cache save time.
+- Fixed new external provider detection.
+- Changed restrictive filter dialog.
+- Improved prohibited title filtering.
+- Improved local and native title retrieval.
+- Improved original title processing.
+- Added original language keyword scraping.
+- Reordered original language queries.
+- Improved automatic audio stream selection.
+- Improved automatic subtitle stream selection.
+- Fixed umlaut replacement in titles.
+- Improved provider query priorities.
+- Rewritten provider query generation.
+- Fixed exact search.
+- Changed default sorting settings.
+- Improved special episode categorization.
+- Improved special exclusions from menus.
+- Fixed metadata serialization.
+- Changed show menu interleave settings.
+- Improved stream window reloading.
+- Fixed stream reloading on playback failure.
+- Load providers during addon initialization.
+- Added Dolby Vision notification.
+- Added support for movie sets in mixed menus.
+- Fixed movie set release year.
+- Fixed local playback history tracking.
+- Improved stream release edition extraction.
+- Fixed Golden Globes show menu.
+- Improved IMDb ID handling.
+- Improved language detection from file names.
+- Improved alias title matching.
+- Improved movie home releases.
+- Updated random movie lists.
+- Added additional show rating setting.
+- Added default rating setting.
+- Improved GloTorrents categories.
+- Added TorrentsCSV provider.
+- Updated PopcornTime provider.
+- Added offline provider category.
+- Added ThePirateBay offline provider.
+- Added RarBG offline provider.
+- Added TorrentsCSV offline provider.
+- Added TorrentParadise offline provider.
+- Added more details to provider help sections.
+- Redesign of the activity settings.
+- Added custom time periods for rerating titles.
+- Improved the rating and rerating process.
+- Added early binge dialog toggle.
+- Fixed hanging binge scraping process.
+
 [B]6.2.0 (2023.03.19)[/B]
 - Support for Kodi 20.1.
 - Major fixes for slow Trakt progress lists.

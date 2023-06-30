@@ -17,7 +17,7 @@ msgid "Series"
 msgstr ""
 
 msgctxt "#32004"
-msgid "Progress Mode"
+msgid "Playback Progress"
 msgstr ""
 
 msgctxt "#32005"
@@ -1683,7 +1683,7 @@ msgid "Metadata Prechecks"
 msgstr ""
 
 msgctxt "#33261"
-msgid "Exclude Supplementary"
+msgid "Exclude Extra"
 msgstr ""
 
 msgctxt "#33262"
@@ -3339,7 +3339,7 @@ msgid "Initiating Stream Connection"
 msgstr ""
 
 msgctxt "#33675"
-msgid "[GAIA-NO-LABEL]"
+msgid "Oracle"
 msgstr ""
 
 msgctxt "#33676"
@@ -3347,7 +3347,7 @@ msgid "Temporary Trakt Server Problems"
 msgstr ""
 
 msgctxt "#33677"
-msgid "Reauthenticate Trakt Access"
+msgid "Reauthenticate Trakt Account"
 msgstr ""
 
 msgctxt "#33678"
@@ -3359,7 +3359,7 @@ msgid "Sorting Order"
 msgstr ""
 
 msgctxt "#33680"
-msgid "[GAIA-NO-LABEL]"
+msgid "Tokens"
 msgstr ""
 
 msgctxt "#33681"
@@ -3443,7 +3443,7 @@ msgid "All Categories"
 msgstr ""
 
 msgctxt "#33701"
-msgid "[GAIA-NO-LABEL]"
+msgid "Response Placement"
 msgstr ""
 
 msgctxt "#33702"
@@ -3471,7 +3471,7 @@ msgid "Host Name"
 msgstr ""
 
 msgctxt "#33708"
-msgid "[GAIA-NO-LABEL]"
+msgid "Reinitializing Provider Structure"
 msgstr ""
 
 msgctxt "#33709"
@@ -3715,11 +3715,11 @@ msgid "Premium"
 msgstr ""
 
 msgctxt "#33769"
-msgid "[GAIA-NO-LABEL]"
+msgid "Do not use any playground"
 msgstr ""
 
 msgctxt "#33770"
-msgid "[GAIA-NO-LABEL]"
+msgid "Randomly pick a working playground"
 msgstr ""
 
 msgctxt "#33771"
@@ -3895,23 +3895,23 @@ msgid "VPN Settings"
 msgstr ""
 
 msgctxt "#33814"
-msgid "[GAIA-NO-LABEL]"
+msgid "ChatGPT (OpenAI)"
 msgstr ""
 
 msgctxt "#33815"
-msgid "[GAIA-NO-LABEL]"
+msgid "ChatGPT"
 msgstr ""
 
 msgctxt "#33816"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chatbot Model"
 msgstr ""
 
 msgctxt "#33817"
-msgid "[GAIA-NO-LABEL]"
+msgid "Randomness Level"
 msgstr ""
 
 msgctxt "#33818"
-msgid "[GAIA-NO-LABEL]"
+msgid "Creativity Level"
 msgstr ""
 
 msgctxt "#33819"
@@ -4015,7 +4015,7 @@ msgid "Speed Results Submission Failure"
 msgstr ""
 
 msgctxt "#33844"
-msgid "[GAIA-NO-LABEL]"
+msgid "Free Playground"
 msgstr ""
 
 msgctxt "#33845"
@@ -4023,7 +4023,7 @@ msgid "Speedtest"
 msgstr ""
 
 msgctxt "#33846"
-msgid "[GAIA-NO-LABEL]"
+msgid "Playground"
 msgstr ""
 
 msgctxt "#33847"
@@ -4055,7 +4055,7 @@ msgid "International"
 msgstr ""
 
 msgctxt "#33854"
-msgid "[GAIA-NO-LABEL]"
+msgid "Output Limit"
 msgstr ""
 
 msgctxt "#33855"
@@ -4115,7 +4115,7 @@ msgid "Remaining Percentage"
 msgstr ""
 
 msgctxt "#33869"
-msgid "[GAIA-NO-LABEL]"
+msgid "Report"
 msgstr ""
 
 msgctxt "#33870"
@@ -4171,7 +4171,7 @@ msgid "Preemptive Termination"
 msgstr ""
 
 msgctxt "#33883"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat Interface"
 msgstr ""
 
 msgctxt "#33884"
@@ -4187,11 +4187,11 @@ msgid "Nominees"
 msgstr ""
 
 msgctxt "#33887"
-msgid "[GAIA-NO-LABEL]"
+msgid "Save Streams"
 msgstr ""
 
 msgctxt "#33888"
-msgid "[GAIA-NO-LABEL]"
+msgid "Save Cache"
 msgstr ""
 
 msgctxt "#33889"
@@ -4447,7 +4447,7 @@ msgid "Settings related to menus, quick and arrival sections."
 msgstr ""
 
 msgctxt "#33952"
-msgid "[GAIA-NO-LABEL]"
+msgid "Refine"
 msgstr ""
 
 msgctxt "#33953"
@@ -4539,15 +4539,15 @@ msgid "Please consider donating to the Gaia  project to[CR]help keep the lights 
 msgstr ""
 
 msgctxt "#33975"
-msgid "[GAIA-NO-LABEL]"
+msgid "Oracle is an artificial intelligence (AI) powered search assistant that allows[CR]you to query chatbots and media recommenders with human language. [CR][CR]The [I]Help[/I]  menu explains various aspects and limitations of the chatbots.[CR]The [I]Options[/I]  menu has advanced features for interacting with the chatbots."
 msgstr ""
 
 msgctxt "#33976"
-msgid "[GAIA-NO-LABEL]"
+msgid "Refine and narrow down the chat by incorporating the history"
 msgstr ""
 
 msgctxt "#33977"
-msgid "[GAIA-NO-LABEL]"
+msgid "Start a new chat from the scratch without using the history"
 msgstr ""
 
 msgctxt "#33978"
@@ -4563,11 +4563,11 @@ msgid "The backup is from old version of Gaia which is not supported in newer ve
 msgstr ""
 
 msgctxt "#33981"
-msgid "[GAIA-NO-LABEL]"
+msgid "Terminate the chat assistance and close the Oracle"
 msgstr ""
 
 msgctxt "#33982"
-msgid "[GAIA-NO-LABEL]"
+msgid "Get help with chatbot limitations and using the Oracle"
 msgstr ""
 
 msgctxt "#33983"
@@ -4575,11 +4575,11 @@ msgid "Overwrite"
 msgstr ""
 
 msgctxt "#33984"
-msgid "[GAIA-NO-LABEL]"
+msgid "Show chat history and technical details of the Oracle"
 msgstr ""
 
 msgctxt "#33985"
-msgid "[GAIA-NO-LABEL]"
+msgid "Save the chat history and details for debugging purposes"
 msgstr ""
 
 msgctxt "#33986"
@@ -4615,11 +4615,11 @@ msgid "Menu Metadata Successfully Preloaded"
 msgstr ""
 
 msgctxt "#33994"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat report successfully saved"
 msgstr ""
 
 msgctxt "#33995"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat report could not be saved"
 msgstr ""
 
 msgctxt "#33996"
@@ -4695,7 +4695,7 @@ msgid "Mark movies and episodes as watched when their playback has finished. The
 msgstr ""
 
 msgctxt "#34014"
-msgid "Resume playback of unfinished streams from the previous position. The [I]Disabled[/I]  option will not resume playback and always restart from beginning. The [I]Automatic[/I]  option will always resume playback automatically. The [I]Manual[/I]  option will show a dialog asking wether to resume or restart playback. The [I]Timeout[/I]  option will show a dialog asking wether to resume or restart playback, and automatically resume playback if no choice was made within a certain period. The [I]35233[/I]  option will automatically restart playback if the progress is in the first or last 2%, show a dialog with a timeout if the progress is in the first or last 10%, and otherwise resume playback automatically."
+msgid "Resume playback of unfinished streams from the previous position. The [I]Disabled[/I]  option will not resume playback and always restart from beginning. The [I]Automatic[/I]  option will always resume playback automatically. The [I]Manual[/I]  option will show a dialog asking wether to resume or restart playback. The [I]Timeout[/I]  option will show a dialog asking wether to resume or restart playback, and automatically resume playback if no choice was made within a certain period. The [I]Custom[/I]  option will automatically restart playback if the progress is in the first or last 2%, show a dialog with a timeout if the progress is in the first or last 10%, and otherwise resume playback automatically."
 msgstr ""
 
 msgctxt "#34015"
@@ -4947,7 +4947,7 @@ msgid "Change the download directory for movies."
 msgstr ""
 
 msgctxt "#34077"
-msgid "Do not mark items as watched if they fall within a grace period of the previous playback. Items can be marked as watched multiple times. If the item is watched again within the specified period, the playback is ignored and not marked as watched again. This is useful if, for instance, you fall asleep while watching a movie and it is marked as watched. If you restart the movie the next day, you might not want it to be marked as watched a second time. A value of [I]0[/I]  will always mark rewatched playbacks. An [I]empty[/I]  value will reset to default."
+msgid "Do not mark titles as watched if they fall within a grace period of the previous playback. Titles can be marked as watched multiple times. If the title is watched again within the specified period, the playback is ignored and not marked as watched again. This is useful if, for instance, you fall asleep while watching a movie and it is marked as watched. If you restart the movie the next day, you might not want it to be marked as watched a second time. A value of [I]0[/I]  will always mark rewatched playbacks. An [I]empty[/I]  value will reset to default."
 msgstr ""
 
 msgctxt "#34078"
@@ -5547,7 +5547,7 @@ msgid "Interleave special episodes in flattened and series menus. Special episod
 msgstr ""
 
 msgctxt "#34227"
-msgid "Exclude unofficial special episodes from the interleaved menus. Some specials are only available on TMDb or trakt, but not on TVDb. In most cases these specials are short and unimportant, like deleted or behind the scenes."
+msgid "Exclude unofficial special episodes from the interleaved menus. Some specials are only available on TMDb or Trakt, but not on TVDb. In most cases these specials are short and unimportant, like deleted or behind the scenes. The [I]Disabled[/I]  option will not exclude any specials. The [I]Strict[/I]  option will only show official specials. The [I]Automatic[/I]  option will show all specials for series menus, but apply strict filtering to other interleaved submenus. "
 msgstr ""
 
 msgctxt "#34228"
@@ -5583,7 +5583,7 @@ msgid "Automatically delete items if the download fails. Remove no, all, or only
 msgstr ""
 
 msgctxt "#34236"
-msgid "Exclude short special episodes from the interleaved menus. The [I]Lenient[/I]  option will remove all specials that are shorter than 25% of the average episode duration. The [I]Strict[/I]  option will remove all specials that are shorter than 50% of the average episode duration. The [I]Automatic[/I]  option will show all specials for series menus, but apply strict filtering to other interleaved submenus."
+msgid "Exclude short special episodes from the interleaved menus. The [I]Disabled[/I]  option will not exclude any specials based on their duration. The [I]Lenient[/I]  option will remove all specials that are shorter than 25% of the average episode duration. The [I]Strict[/I]  option will remove all specials that are shorter than 50% of the average episode duration. The [I]Automatic[/I]  option will show all specials for series menus, but apply strict filtering to other interleaved submenus."
 msgstr ""
 
 msgctxt "#34237"
@@ -5595,7 +5595,7 @@ msgid "Use the IP address from your ISP or from your VPN for detection. The [I]V
 msgstr ""
 
 msgctxt "#34239"
-msgid "Settings related to ambient lighting and LED strips."
+msgid "Settings related to Bluetooth and ambient lighting."
 msgstr ""
 
 msgctxt "#34240"
@@ -5879,7 +5879,7 @@ msgid "Display the number of unwatched episodes. Some skins overlay the watched 
 msgstr ""
 
 msgctxt "#34310"
-msgid "Exclude additional special episodes that do not form part of the main storyline from the interleaved menus. Note that episodes belonging to the main storyline are based on user-added tags on TVDb. Some specials might not have been tagged by users and enabling this setting might occasionally result in some important specials not being listed."
+msgid "Exclude additional special episodes that do not form part of the main storyline from the interleaved menus. Note that episodes belonging to the main storyline are based on user-added tags on TVDb. Some specials might not have been tagged by users and enabling this setting might occasionally result in some important specials not being listed. The [I]Disabled[/I]  option will not exclude any specials. The [I]Lenient[/I]  option will show storyline specials that were explicitly tagged, not tagged at all, or are not part of a non-storyline category. The [I]Strict[/I]  option will only show storyline specials if they were explicitly tagged by users. The [I]Automatic[/I]  option will show all specials for series menus, but apply lenient filtering to other interleaved submenus."
 msgstr ""
 
 msgctxt "#34311"
@@ -5971,7 +5971,7 @@ msgid "Use variations of titles that have special or language-specific character
 msgstr ""
 
 msgctxt "#34333"
-msgid "Adjust the maximum number of episodes to list per page for menus containing episodes from multiple shows, before having to navigate to the next page. The more episodes are listed, the more metadata has to be retrieved and the longer it takes to load menus. This page limit is used for episode menus when direct scraping is disabled."
+msgid "Adjust the maximum number of episodes to list per page for menus containing episodes from multiple shows, before having to navigate to the next page. The more episodes are listed, the more metadata has to be retrieved and the longer it takes to load menus."
 msgstr ""
 
 msgctxt "#34334"
@@ -6783,7 +6783,7 @@ msgid "Rate movies after playback has finished.  The [B]Disabled[/B]  option wil
 msgstr ""
 
 msgctxt "#34546"
-msgid "Rate shows after playback has finished. The [B]Disabled[/B]  option will not show a dialog at all. The [B]Show End[/B]  option will show a dialog after the entire show has finished. The [B]Season End[/B]  option will show a dialog after each season. The [B]Episode End[/B]  option will show a dialog after each episode. The [B]Airing End[/B]  option will show a dialog after each season if the season is the last one or the next season has not been released yet. Note that this might pop up multiple rating dialogs at the end of the show, one for the episode, one for the season, and one for the show."
+msgid "Rate shows after playback has finished. The [B]Disabled[/B]  option will not show a dialog at all. The [B]Show End[/B]  option will show a dialog after the entire show has finished. The [B]Season End[/B]  option will show a dialog after each season. The [B]Episode End[/B]  option will show a dialog after each episode. The [B]Airing End[/B]  option will show a dialog after each season if the season is the last one or the next season has not been released yet. The [B]Binging End[/B]  option is similar to the [B]Airing End[/B]  option, but will also show the dialog at the end of an intermediate season if binging is not continuing. The [B]End Gap[/B]  option will show a dialog at the end of each season while the show was not rated yet, and also display the dialog after the last season of the show. The [B]Airing Gap[/B]  option will show a dialog at the end of each season while the show was not rated yet, and also display the dialog if the season is the last one or the next season has not been released yet. Note that these options might pop up multiple rating dialogs at the end of the show, one for the episode, one for the season, and one for the show."
 msgstr ""
 
 msgctxt "#34547"
@@ -6795,7 +6795,7 @@ msgid "Rate episodes after playback has finished. The [B]Disabled[/B]  option wi
 msgstr ""
 
 msgctxt "#34549"
-msgid "Rerate items that you already rated previously. If disabled, the rating dialog will not be shown after playback if you already provided a rating previously."
+msgid "Rerate titles that you already rated previously. If disabled, the rating dialog will not be shown after playback if you already provided a rating previously."
 msgstr ""
 
 msgctxt "#34550"
@@ -6815,7 +6815,7 @@ msgid "Reuse the Python interpreter instead of initializing a new one for every 
 msgstr ""
 
 msgctxt "#34554"
-msgid "Settings related to Bluetooth devices and monitoring."
+msgid "Settings related to the artificial intelligence powered search assistant and chatbots."
 msgstr ""
 
 msgctxt "#34555"
@@ -6938,7 +6938,153 @@ msgctxt "#34584"
 msgid "Show the changelog with bug fixes and alterations to the addon if a new version was released."
 msgstr ""
 
+msgctxt "#34585"
+msgid "Adjust the maximum number of episodes to list per page for submenus containing only a subset of episodes from the same shows, before having to navigate to the next page. The more episodes are listed, the more metadata has to be retrieved and the longer it takes to load menus. This page limit is used for episode menus when direct scraping is disabled."
+msgstr ""
 
+msgctxt "#34586"
+msgid "Enable the use of ChatGPT for the search Oracle."
+msgstr ""
+
+msgctxt "#34587"
+msgid "Use a free chat playground if no OpenAI account was authenticated or if the limits of your OpenAI account were reached. Playgrounds are public projects built on top of ChatGPT, but are standalone and not part of the official OpenAI. Most playgrounds have limited customizability, but are free to use within limits and do not require an account. Since playgrounds are community projects, they are unreliable and can get closed down at any moment. If none of the playgrounds work for you, just create an official OpenAI account and use the free grant awarded during registration. The [I]Disabled[/I]  option will not use a playground at all. The [I]Automatic[/I]  option will try the playgrounds sequentially until a working one is found."
+msgstr ""
+
+msgctxt "#34588"
+msgid "Change the model used by the chatbot. Models have different capabilities and are trained differently, which can result in distinct replies."
+msgstr ""
+
+msgctxt "#34589"
+msgid "Change the randomness of the chatbot. Higher values will make the output more random, while lower values will make it more focused and deterministic. This option is the [I]temperature[/I]  parameter in the ChatGPT API and might not be available for some free playgrounds."
+msgstr ""
+
+msgctxt "#34590"
+msgid "Change the creativity of the chatbot. Higher values will penalize new words based on whether they appear in the text so far, increasing the likelihood to talk about new topics. This option is the [I]presence_penalty[/I]  parameter in the ChatGPT API and might not be available for some free playgrounds."
+msgstr ""
+
+msgctxt "#34591"
+msgid "Limit the message length of the chatbot. Different chatbot models have varying maximum message lengths measured in tokens. In most cases the chatbot will not come close to this maximum. Reduce the length to make sure a chat never exceeds a certain number of tokens and contain the cost. A value of [I]0[/I]  will use unlimited tokens. An [I]empty[/I]  value will reset to default. This option is the [I]max_tokens[/I]  parameter in the ChatGPT API. This option might not be used by all free playgrounds."
+msgstr ""
+
+msgctxt "#34592"
+msgid "Change the placement of the chatbot repose. The reply can not be shown at all, or [B]appended[/B]  or [B]prepended[/B]  to the plot."
+msgstr ""
+
+msgctxt "#34593"
+msgid "Enable the use of an artificial intelligence powered search assistant throughout the addon."
+msgstr ""
+
+msgctxt "#34594"
+msgid "Change the type of interface to show during the chat process. The [I]Special[/I]  option uses the custom Gaia window. The [I]Plain[/I]  option shows a simple native Kodi dialog with a single line per entry without icons and is supported by all skins. The [I]Details[/I]  option shows an advanced native Kodi dialog with icons and detailed info across multiple lines, but is not supported by all skins. The [I]Automatic[/I]  option attempts to pick the best dialog for well-known skins. It is recommended to test both dialogs if you use a custom Kodi skin, since there is not way to determine if the skin supports the detailed dialog."
+msgstr ""
+
+msgctxt "#34595"
+msgid "Save scraped streams locally for a certain period of time. If the same title is scraped again within this period, saved streams are quickly retrieved locally, instead of doing a fresh scrape which can take a long time. A fresh scrape can always be manually initiated from the context menu."
+msgstr ""
+
+msgctxt "#34596"
+msgid "Save the debrid cache status locally for a certain period of time. If the same title is scraped again within this period, saved cache statuses are quickly retrieved locally, instead of doing a fresh cache inspection which can take some time. Note that if this duration is too long, reloaded streams might still be labeled as cached, although the debrid services might have already removed the files from their caches. A fresh scrape and cache inspection can always be manually initiated from the context menu."
+msgstr ""
+
+msgctxt "#34597"
+msgid "Adjust the level of technical detail to include in the chat report. More details can help you identify limitations in the chatbot."
+msgstr ""
+
+msgctxt "#34598"
+msgid "Automatically show the chat report after a conversation. The report can always be manually opened during the chat process. The [I]Disabled[/I]  option will not show the report automatically. The [I]Always[/I]  option will always show the report. The [I]Success[/I]  option will only show the report if the conversation was successful. The [I]Failure[/I]  option will only show the report if the conversation was unsuccessful. "
+msgstr ""
+
+msgctxt "#34599"
+msgid "Use keywords of the language the title was originally published in. For instance, if a title was originally released in French, use French keywords. [I]Quick[/I]  only searches the essential keywords, which might miss a few links, but is faster to scrape. [I]Full[/I]  uses all keywords, therefore slightly increasing the chance of finding more links, but scraping is slower."
+msgstr ""
+
+msgctxt "#34600"
+msgid "Show artwork in the background during the chat process."
+msgstr ""
+
+msgctxt "#34601"
+msgid "Preload menus in the background if the chat produced valid results. This reduces loading time, since the menu is populated in the background while you might still view the chat response or analyze the report."
+msgstr ""
+
+msgctxt "#34602"
+msgid "Customize the queries used to communicate with the chatbot. By default queries are in English. Adjusting the queries can improve the quality of the chatbot response and reduce the time it takes for the chatbot to respond."
+msgstr ""
+
+msgctxt "#34603"
+msgid "Enable the use of WatchThis for the search Oracle."
+msgstr ""
+
+msgctxt "#34604"
+msgid "Enable the use of YouChat for the search Oracle."
+msgstr ""
+
+msgctxt "#34605"
+msgid "Adjust the number of items returned by the chatbot. Only list-based queries utilize this setting through the [I]{count}[/I]  parameter."
+msgstr ""
+
+msgctxt "#34606"
+msgid "Change how results are merged from refined queries. With each refinement step, the chatbot might provide new titles. The [I]Combined[/I]  option merges the results from all refinement steps. The [I]Latest[/I]  option only uses the results from the last refinement step. The [I]Automatic[/I]  option will either merge all or use the last results, depending on how the chatbot works."
+msgstr ""
+
+msgctxt "#34607"
+msgid "Enable the use of KeyTalk for the search Oracle."
+msgstr ""
+
+msgctxt "#34608"
+msgid "Specify how the search is conducted. The [I]Keywords[/I]  option extracts terms from your query which are then used for searching. The [I]Summary[/I]  option directly searches the movie or show summary. The [I]Fallback[/I]  option first attempts to search keywords and falls back to searching summaries if nothing can be found."
+msgstr ""
+
+msgctxt "#34609"
+msgid "Change the language used to query the chatbot. The [I]Automatic[/I]  option uses the language specified in your [I]General[/I]  language settings. Note that not all languages are supported by the chatbot."
+msgstr ""
+
+msgctxt "#34610"
+msgid "Determine the default rating to initialize the rating dialog with. The [I]Round Down[/I]  option will round down the global average rating. The [I]Round Up[/I]  option will round up the global average rating. The [I]Round Closest[/I]  option will round the global average rating to the closest integer. The [I]Fixed Maximum[/I]  option will use 10 as the default rating. The [I]Fixed Minimum[/I]  option will use 1 as the default rating. The [I]Fixed Half[/I]  option will use 5 as the default rating."
+msgstr ""
+
+msgctxt "#34611"
+msgid "Show the intro window when using the Oracle. The [I]Disabled[/I]  option will never show the intro. The [I]Always[/I]  option will always show the intro. The [I]Tutorial[/I]  option will initially show the intro and hide it once the Oracle was used a few times."
+msgstr ""
+
+msgctxt "#34612"
+msgid "Show the chatbot selection window when using the Oracle. The [I]Always[/I]  option will always show the chatbot selection. The [I]Tutorial[/I]  option will initially show the chatbot selection and then automatically select the most chosen one once the Oracle was used a few times. Alternatively, a default service can also be specified. Note that you can always launch a full Oracle without default values from the context menu."
+msgstr ""
+
+msgctxt "#34613"
+msgid "Show the mode selection window when using the Oracle. The [I]Always[/I]  option will always show the mode selection. The [I]Tutorial[/I]  option will initially show the mode selection and then automatically select the most chosen one once the Oracle was used a few times. Alternatively, a default mode can also be specified. Note that you can always launch a full Oracle without default values from the context menu."
+msgstr ""
+
+msgctxt "#34614"
+msgid "Show the busy conversation window when using the Oracle. The [I]Always[/I]  option will always show the busy conversation. The [I]Loader[/I]  option will show the default Kodi loading icon instead of the window."
+msgstr ""
+
+msgctxt "#34615"
+msgid "Show the conversation result window when using the Oracle. The [I]Always[/I]  option will always show the conversation results. The [I]Failure[/I]  option will only show the conversation results if the chat failed, otherwise the menu is loaded immediately."
+msgstr ""
+
+msgctxt "#34616"
+msgid "Enable the use of Bard for the search Oracle."
+msgstr ""
+
+msgctxt "#34617"
+msgid "Show a rating dialog for the title after playback has finished."
+msgstr ""
+
+msgctxt "#34618"
+msgid "Rerate movies after a grace period of the previous rating. If your previous rating for a title falls within this time period, no rating dialog will be shown after playback. If your previous rating is older than this time, a rating dialog will be shown after playback so you can rerate the title. A value of [I]0[/I]  will always rerate titles. An [I]empty[/I]  value will reset to default. A very [I]large[/I]  value, like [I]9999[/I], will never rerate titles."
+msgstr ""
+
+msgctxt "#34619"
+msgid "Rerate shows after a grace period of the previous rating. If your previous rating for a title falls within this time period, no rating dialog will be shown after playback. If your previous rating is older than this time, a rating dialog will be shown after playback so you can rerate the title. A value of [I]0[/I]  will always rerate titles. An [I]empty[/I]  value will reset to default. A very [I]large[/I]  value, like [I]9999[/I], will never rerate titles."
+msgstr ""
+
+msgctxt "#34620"
+msgid "Rerate seasons after a grace period of the previous rating. If your previous rating for a title falls within this time period, no rating dialog will be shown after playback. If your previous rating is older than this time, a rating dialog will be shown after playback so you can rerate the title. A value of [I]0[/I]  will always rerate titles. An [I]empty[/I]  value will reset to default. A very [I]large[/I]  value, like [I]9999[/I], will never rerate titles."
+msgstr ""
+
+msgctxt "#34621"
+msgid "Rerate episodes after a grace period of the previous rating. If your previous rating for a title falls within this time period, no rating dialog will be shown after playback. If your previous rating is older than this time, a rating dialog will be shown after playback so you can rerate the title. A value of [I]0[/I]  will always rerate titles. An [I]empty[/I]  value will reset to default. A very [I]large[/I]  value, like [I]9999[/I], will never rerate titles."
+msgstr ""
 
 # [/GAIACODE]
 
@@ -7040,19 +7186,19 @@ msgid "UTC"
 msgstr ""
 
 msgctxt "#35024"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat Service"
 msgstr ""
 
 msgctxt "#35025"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat Mode"
 msgstr ""
 
 msgctxt "#35026"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat Query"
 msgstr ""
 
 msgctxt "#35027"
-msgid "[GAIA-NO-LABEL]"
+msgid "Original Keywords [COLOR FFA0C12C][B]↑[/B][/COLOR]"
 msgstr ""
 
 msgctxt "#35028"
@@ -7128,7 +7274,7 @@ msgid "Could Not Unrate %s"
 msgstr ""
 
 msgctxt "#35046"
-msgid "Rerate Items"
+msgid "Rerate Titles"
 msgstr ""
 
 msgctxt "#35047"
@@ -7352,7 +7498,7 @@ msgid "Remove the download from the account"
 msgstr ""
 
 msgctxt "#35102"
-msgid "[GAIA-NO-LABEL]"
+msgid "Options"
 msgstr ""
 
 msgctxt "#35103"
@@ -7496,7 +7642,7 @@ msgid "Tools Menu"
 msgstr ""
 
 msgctxt "#35138"
-msgid "Playcount Mode"
+msgid "Playback Count"
 msgstr ""
 
 msgctxt "#35139"
@@ -7584,7 +7730,7 @@ msgid "This feature searches for streams using an exact phrase or file name. Exa
 msgstr ""
 
 msgctxt "#35160"
-msgid "[GAIA-NO-LABEL]"
+msgid "Exact Search"
 msgstr ""
 
 msgctxt "#35161"
@@ -7664,7 +7810,7 @@ msgid "Are you sure you want to add this range of items to your local library?"
 msgstr ""
 
 msgctxt "#35180"
-msgid "[GAIA-NO-LABEL]"
+msgid "Chat Options"
 msgstr ""
 
 msgctxt "#35181"
@@ -7684,11 +7830,11 @@ msgid "Rating Mode"
 msgstr ""
 
 msgctxt "#35185"
-msgid "[GAIA-NO-LABEL]"
+msgid "Dolby Vision"
 msgstr ""
 
 msgctxt "#35186"
-msgid "[GAIA-NO-LABEL]"
+msgid "You are trying to play a Dolby Vision (%s) video. Your device and TV must support this format, otherwise the video will not play or have a purple-greenish tint. You can remove %s files from the list using the filter settings. Do you want to [B]cancel[/B] playback, [B]ignore[/B] this message in the future, or [B]continue[/B] and show this message again?"
 msgstr ""
 
 msgctxt "#35187"
@@ -8460,7 +8606,7 @@ msgid "Play Now"
 msgstr ""
 
 msgctxt "#35379"
-msgid "[GAIA-NO-LABEL]"
+msgid "Background Artwork"
 msgstr ""
 
 msgctxt "#35380"
@@ -9108,7 +9254,7 @@ msgid "Remote Source Link"
 msgstr ""
 
 msgctxt "#35541"
-msgid "[GAIA-NO-LABEL]"
+msgid "Submenu Paging"
 msgstr ""
 
 msgctxt "#35542"
@@ -9408,7 +9554,7 @@ msgid "Menus might temporarily load slow until the cache fills up with the new i
 msgstr ""
 
 msgctxt "#35616"
-msgid "[GAIA-NO-LABEL]"
+msgid "Selection Dialog"
 msgstr ""
 
 msgctxt "#35617"
@@ -10156,7 +10302,7 @@ msgid "Do you want to mark [B]all[/B] episodes as watched, only the [B]remaining
 msgstr ""
 
 msgctxt "#35803"
-msgid "[GAIA-NO-LABEL]"
+msgid "Conversation"
 msgstr ""
 
 msgctxt "#35804"
@@ -10188,7 +10334,7 @@ msgid "Pages"
 msgstr ""
 
 msgctxt "#35811"
-msgid "[GAIA-NO-LABEL]"
+msgid "Query Parameters"
 msgstr ""
 
 msgctxt "#35812"
@@ -10200,7 +10346,7 @@ msgid "Diagnosing Keywords"
 msgstr ""
 
 msgctxt "#35814"
-msgid "[GAIA-NO-LABEL]"
+msgid "Query Configuration"
 msgstr ""
 
 msgctxt "#35815"
@@ -10208,7 +10354,7 @@ msgid "Results"
 msgstr ""
 
 msgctxt "#35816"
-msgid "[GAIA-NO-LABEL]"
+msgid "Item Count"
 msgstr ""
 
 msgctxt "#35817"
@@ -10568,15 +10714,15 @@ msgid "Featured Items"
 msgstr ""
 
 msgctxt "#36024"
-msgid "[GAIA-NO-LABEL]"
+msgid "Best"
 msgstr ""
 
 msgctxt "#36025"
-msgid "[GAIA-NO-LABEL]"
+msgid "Token"
 msgstr ""
 
 msgctxt "#36026"
-msgid "[GAIA-NO-LABEL]"
+msgid "Raw"
 msgstr ""
 
 msgctxt "#36027"
@@ -10588,11 +10734,11 @@ msgid "Light"
 msgstr ""
 
 msgctxt "#36029"
-msgid "[GAIA-NO-LABEL]"
+msgid "Unguided Plain Search"
 msgstr ""
 
 msgctxt "#36030"
-msgid "[GAIA-NO-LABEL]"
+msgid "Search With A Raw Query"
 msgstr ""
 
 msgctxt "#36031"
@@ -10600,19 +10746,19 @@ msgid "Icon Configuration"
 msgstr ""
 
 msgctxt "#36032"
-msgid "[GAIA-NO-LABEL]"
+msgid "Guided List Search"
 msgstr ""
 
 msgctxt "#36033"
-msgid "[GAIA-NO-LABEL]"
+msgid "Search For A List Of Titles"
 msgstr ""
 
 msgctxt "#36034"
-msgid "[GAIA-NO-LABEL]"
+msgid "Guided Single Search"
 msgstr ""
 
 msgctxt "#36035"
-msgid "[GAIA-NO-LABEL]"
+msgid "Search For A Single Title"
 msgstr ""
 
 msgctxt "#36036"
@@ -10972,11 +11118,11 @@ msgid "Error Processing Subtitles"
 msgstr ""
 
 msgctxt "#36125"
-msgid "[GAIA-NO-LABEL]"
+msgid "Report Detail"
 msgstr ""
 
 msgctxt "#36126"
-msgid "[GAIA-NO-LABEL]"
+msgid "Automatic Report"
 msgstr ""
 
 msgctxt "#36127"
@@ -11328,11 +11474,11 @@ msgid "Set View"
 msgstr ""
 
 msgctxt "#36214"
-msgid "[GAIA-NO-LABEL]"
+msgid "List Search"
 msgstr ""
 
 msgctxt "#36215"
-msgid "[GAIA-NO-LABEL]"
+msgid "Single Search"
 msgstr ""
 
 msgctxt "#36216"
@@ -11581,4 +11727,416 @@ msgstr ""
 
 msgctxt "#36279"
 msgid "Thank you for supporting Gaia!"
+msgstr ""
+
+msgctxt "#36280"
+msgid "Generic Queries"
+msgstr ""
+
+msgctxt "#36281"
+msgid "Movie Queries"
+msgstr ""
+
+msgctxt "#36282"
+msgid "Show Queries"
+msgstr ""
+
+msgctxt "#36283"
+msgid "Docu Queries"
+msgstr ""
+
+msgctxt "#36284"
+msgid "Short Queries"
+msgstr ""
+
+msgctxt "#36285"
+msgid "Set Queries"
+msgstr ""
+
+msgctxt "#36286"
+msgid "Chatbot Context"
+msgstr ""
+
+msgctxt "#36287"
+msgid "Text"
+msgstr ""
+
+msgctxt "#36288"
+msgid "Plain Queries"
+msgstr ""
+
+msgctxt "#36289"
+msgid "ID Queries"
+msgstr ""
+
+msgctxt "#36290"
+msgid "Title Queries"
+msgstr ""
+
+msgctxt "#36291"
+msgid "Context Queries"
+msgstr ""
+
+msgctxt "#36292"
+msgid "All Queries"
+msgstr ""
+
+msgctxt "#36293"
+msgid "Do you want to toggle [B]all[/B] possible queries of this type, or only those queries known to be widely [B]supported[/B] by the chatbot?"
+msgstr ""
+
+msgctxt "#36294"
+msgid "%s and %s chatted and understood each other"
+msgstr ""
+
+msgctxt "#36295"
+msgid "%s and %s chatted, but did not understood each other"
+msgstr ""
+
+msgctxt "#36296"
+msgid "%s and %s could not chat or understand each other"
+msgstr ""
+
+msgctxt "#36297"
+msgid "WatchThis (WatchThis)"
+msgstr ""
+
+msgctxt "#36298"
+msgid "YouChat (You)"
+msgstr ""
+
+msgctxt "#36299"
+msgid "Latest"
+msgstr ""
+
+msgctxt "#36300"
+msgid "Refined Result"
+msgstr ""
+
+msgctxt "#36301"
+msgid "KeyTalk (MyCelebs)"
+msgstr ""
+
+msgctxt "#36302"
+msgid "Plain Search"
+msgstr ""
+
+msgctxt "#36303"
+msgid "Search Type"
+msgstr ""
+
+msgctxt "#36304"
+msgid "Search Language"
+msgstr ""
+
+msgctxt "#36305"
+msgid "Generic AI Chatbot"
+msgstr ""
+
+msgctxt "#36305"
+msgid "Generic AI Chatbot"
+msgstr ""
+
+msgctxt "#36306"
+msgid "Show the menu with the detected titles"
+msgstr ""
+
+msgctxt "#36307"
+msgid "Generic AI Chatbot"
+msgstr ""
+
+msgctxt "#36308"
+msgid "AI Media Recommender"
+msgstr ""
+
+msgctxt "#36309"
+msgid "Intelligence"
+msgstr ""
+
+msgctxt "#36310"
+msgid "Choose a Search Chatbot"
+msgstr ""
+
+msgctxt "#36311"
+msgid "Choose a Search Mode"
+msgstr ""
+
+msgctxt "#36312"
+msgid "Binging End"
+msgstr ""
+
+msgctxt "#36313"
+msgid "Default Rating"
+msgstr ""
+
+msgctxt "#36314"
+msgid "Round Down"
+msgstr ""
+
+msgctxt "#36315"
+msgid "Round Up"
+msgstr ""
+
+msgctxt "#36316"
+msgid "Round Closest"
+msgstr ""
+
+msgctxt "#36317"
+msgid "Fixed Maximum"
+msgstr ""
+
+msgctxt "#36318"
+msgid "Fixed Minimum"
+msgstr ""
+
+msgctxt "#36319"
+msgid "Fixed Half"
+msgstr ""
+
+msgctxt "#36320"
+msgid "Altered Query With Extra Keywords"
+msgstr ""
+
+msgctxt "#36321"
+msgid "Unaltered Query Without Extra Keywords"
+msgstr ""
+
+msgctxt "#36322"
+msgid "The Oracle is thinking"
+msgstr ""
+
+msgctxt "#36323"
+msgid "Finding an available chatbot"
+msgstr ""
+
+msgctxt "#36324"
+msgid "Chatting with the chatbot"
+msgstr ""
+
+msgctxt "#36325"
+msgid "Interpreting the conversation"
+msgstr ""
+
+msgctxt "#36326"
+msgid "Searching for media IDs"
+msgstr ""
+
+msgctxt "#36327"
+msgid "Retrieving media metadata"
+msgstr ""
+
+msgctxt "#36328"
+msgid "Processing media metadata"
+msgstr ""
+
+msgctxt "#36329"
+msgid "Finalizing the conversation"
+msgstr ""
+
+msgctxt "#36330"
+msgid "The Oracle is done"
+msgstr ""
+
+msgctxt "#36331"
+msgid "Generic Search"
+msgstr ""
+
+msgctxt "#36332"
+msgid "Movie Search"
+msgstr ""
+
+msgctxt "#36333"
+msgid "Show Search"
+msgstr ""
+
+msgctxt "#36334"
+msgid "Docu Search"
+msgstr ""
+
+msgctxt "#36335"
+msgid "Short Search"
+msgstr ""
+
+msgctxt "#36336"
+msgid "Set Search"
+msgstr ""
+
+msgctxt "#36337"
+msgid "Official"
+msgstr ""
+
+msgctxt "#36338"
+msgid "Unofficial"
+msgstr ""
+
+msgctxt "#36339"
+msgid "Waiting for user input"
+msgstr ""
+
+msgctxt "#36340"
+msgid "Tutorial"
+msgstr ""
+
+msgctxt "#36341"
+msgid "Show Intro"
+msgstr ""
+
+msgctxt "#36342"
+msgid "Show Service"
+msgstr ""
+
+msgctxt "#36343"
+msgid "Show Mode"
+msgstr ""
+
+msgctxt "#36344"
+msgid "WatchThis"
+msgstr ""
+
+msgctxt "#36345"
+msgid "KeyTalk"
+msgstr ""
+
+msgctxt "#36346"
+msgid "YouChat"
+msgstr ""
+
+msgctxt "#36347"
+msgid "Preload Menus"
+msgstr ""
+
+msgctxt "#36348"
+msgid "Show Busy"
+msgstr ""
+
+msgctxt "#36349"
+msgid "Loader"
+msgstr ""
+
+msgctxt "#36350"
+msgid "Show Results"
+msgstr ""
+
+msgctxt "#36351"
+msgid "No Reply"
+msgstr ""
+
+msgctxt "#36352"
+msgid "Bard (Google)"
+msgstr ""
+
+msgctxt "#36353"
+msgid "Bard"
+msgstr ""
+
+msgctxt "#36354"
+msgid "Cookie"
+msgstr ""
+
+msgctxt "#36355"
+msgid "Offline Providers"
+msgstr ""
+
+msgctxt "#36356"
+msgid "Access Offline"
+msgstr ""
+
+msgctxt "#36357"
+msgid "Dead"
+msgstr ""
+
+msgctxt "#36358"
+msgid "Hidden"
+msgstr ""
+
+msgctxt "#36359"
+msgid "The provider should work as expected and return links."
+msgstr ""
+
+msgctxt "#36360"
+msgid "The provider might be impaired and not return any links. Strong Cloudflare protection, country or ISP domain blocking, or other restrictions might limit access to the provider."
+msgstr ""
+
+msgctxt "#36361"
+msgid "The provider is most likely dead and will probably not return any links. Websites shutting down permanently, domains being annulled, or projects being abandoned will make the provider inaccessible."
+msgstr ""
+
+msgctxt "#36362"
+msgid "The provider is only available for internal or development use."
+msgstr ""
+
+msgctxt "#36363"
+msgid "The overall rating, speed, reliability, and quality of links returned by the provider."
+msgstr ""
+
+msgctxt "#36364"
+msgid "The number of internet requests that have to be made to retrieve the data and the local processing power required to extract the data."
+msgstr ""
+
+msgctxt "#36365"
+msgid "Insufficient Disk Space"
+msgstr ""
+
+msgctxt "#36366"
+msgid "Required"
+msgstr ""
+
+msgctxt "#36367"
+msgid "Data Repositories Unreachable"
+msgstr ""
+
+msgctxt "#36368"
+msgid "Dataset Download Failure"
+msgstr ""
+
+msgctxt "#36369"
+msgid "Dataset Decompress Failure"
+msgstr ""
+
+msgctxt "#36370"
+msgid "Dataset Preparation Failure"
+msgstr ""
+
+msgctxt "#36371"
+msgid "Dataset Installation Failure"
+msgstr ""
+
+msgctxt "#36372"
+msgid "Dataset Successfully Installed"
+msgstr ""
+
+msgctxt "#36373"
+msgid "Downloading Dataset"
+msgstr ""
+
+msgctxt "#36374"
+msgid "Updating Dataset"
+msgstr ""
+
+msgctxt "#36375"
+msgid "Rate Titles"
+msgstr ""
+
+msgctxt "#36376"
+msgid "End Gap"
+msgstr ""
+
+msgctxt "#36377"
+msgid "Airing Gap"
+msgstr ""
+
+msgctxt "#36378"
+msgid "Rerate Movies"
+msgstr ""
+
+msgctxt "#36379"
+msgid "Rerate Shows"
+msgstr ""
+
+msgctxt "#36380"
+msgid "Rerate Seasons"
+msgstr ""
+
+msgctxt "#36381"
+msgid "Rerate Episodes"
 msgstr ""

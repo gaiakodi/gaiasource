@@ -130,9 +130,10 @@ class Provider(ProviderJson):
 
 		ProviderJson.initialize(self,
 			name					= 'TorrentAPI',
-			description				= '{name} is the backend {container} API used by Rarbg. The API contains results in various languages, but most of them are in English. Searches are conducted using the IMDb ID. The API is fast and reliable, but queries are limited to %d results without paging support and will therefore not always return all the results that are available. The API has a 1 request per %d seconds limit and scraping might therefore take longer when searching packs or foreign titles.' % (Provider._LimitOffset, Provider._LimitDelay),
+			description				= '{name} is the backend {container} API used by RarBg. The API contains results in various languages, but most of them are in English. Searches are conducted using the IMDb ID. The API is fast and reliable, but queries are limited to %d results without paging support and will therefore not always return all the results that are available. The API has a 1 request per %d seconds limit and scraping might therefore take longer when searching packs or foreign titles.' % (Provider._LimitOffset, Provider._LimitDelay),
 			rank					= 5,
 			performance				= ProviderJson.PerformanceExcellent - ProviderJson.PerformanceStep,
+			status					= ProviderJson.StatusDead, # RarBG shut down. Cloudflare cannot connect to the TorrentAPI server anymore. Is probably due to the same reasons.
 
 			link					= Provider._Link,
 

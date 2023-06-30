@@ -309,10 +309,20 @@ class Core(object):
 			# Otherwise this thread might run forever.
 
 			from lib.modules.player import Player
+			from lib.modules.interface import Player as PlayerBase
+			player = PlayerBase()
+			finished = False
 
 			wait = int(Player.BingeTime * 2)
 			step = 0.5
 			for i in range(int(wait / step)):
+				# Make sure the loop is exited once the player stops playing.
+				# Otherwise this loop continues even though binging was continued/cancled.
+				busy = player.isPlayingVideo() and not tools.System.aborted()
+				if not busy:
+					tools.Time.sleep(step)
+					finished = True
+
 				silent = self.propertySilent()
 				if silent == 'cancel':
 					break
@@ -326,6 +336,8 @@ class Core(object):
 					elif not status == Core.StatusFinalize:
 						self._scrapeProgressShow()
 						self._scrapeProgressUpdate()
+					break
+				elif finished:
 					break
 
 				if tools.System.aborted(): break
@@ -387,8 +399,15 @@ class Core(object):
 					counts = interface.Format.iconJoin(['%s: %d' % (interface.Translation.string(i[0]), i[1]) for i in counts])
 					interface.Dialog.notification(title = 35373, message = counts, icon = interface.Dialog.IconWarning if self.filter['filter'] == 0 else interface.Dialog.IconSuccess, time = 5000)
 			if self.filter and self.filter['final'] == 0 and self.filter['initial'] > 0:
-				self.loaderHide()
-				result = interface.Dialog.option(title = 33448, message = 35380)
+				# Always show unfiltered results without asking first if:
+				#	1. We are currently bingeing.
+				#	2. The user has the default filter configuration.
+				#	3. There are less than 100 unfiltered streams.
+				if self.binge or Settings.settingsFilterDefault() or self.filter['initial'] <= 100:
+					result = True
+				else:
+					self.loaderHide()
+					result = interface.Dialog.option(title = 33448, message = 35380)
 				if result: self.loaderShow()
 				return result
 			else:
@@ -554,7 +573,7 @@ class Core(object):
 
 			# Retrieve metadata if not available.
 			# Applies to links from Kodi's local library or when launched from an external addon. The metadata cannot be saved in the link, since Kodi cuts off the link if too long. Retrieve it here afterwards.
-			if not metadata:
+			if not metadata and not exact:
 				if tvshowtitle or not season is None:
 					from lib.indexers.episodes import Episodes
 					metadata = Episodes().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, filter = True)
@@ -793,7 +812,7 @@ class Core(object):
 
 	def scrapeItem(self, title, year, imdb, tmdb, tvdb, season, episode, tvshowtitle, premiered, metadata = None, preset = None, pack = None, exact = False, autoplay = False, cache = True):
 		try:
-			def titleClean(value, year = None):
+			def titleClean(value, year = None, internal = False):
 				values = []
 				if value is None: return values
 
@@ -816,9 +835,9 @@ class Core(object):
 				# Remove apostrophes.
 				# Create two different versions of apostrophes (one with "'s" -> "s", and the other one "'s" -> ""), since some sites can only use one of them.
 
-				valueNew = re.sub('([\'\`])([a-zA-Z](?:$|[\s\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]))', '\g<2>', value) # Replace apostrophes at the end of the word with an empty string (eg: Peter's -> Peters).
+				valueNew = re.sub('([\'\`])([a-zA-Z](?:$|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]))', '\g<2>', value) # Replace apostrophes at the end of the word with an empty string (eg: Peter's -> Peters).
 				if value == valueNew: values1 = [valueNew]
-				else: values1 = [valueNew, re.sub('([\'\`][a-zA-Z])($|[\s\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/])', '\g<2>', value)]
+				else: values1 = [valueNew, re.sub('([\'\`][a-zA-Z])($|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/])', '\g<2>', value)]
 
 				values2 = []
 				for val in values1:
@@ -833,12 +852,22 @@ class Core(object):
 					# Remove symbols.
 					# Eg: Heartland (CA) -> Heartland CA
 					# Replace with space: Brooklyn Nine-Nine -> Brooklyn Nine Nine
-					val = re.sub('[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]', ' ', val)
+					val = re.sub('[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]', ' ', val)
 
 					# Replace extra spaces.
 					val = re.sub('\s+', ' ', val).strip()
 
 					values.append(val)
+
+				# Censored words which are mostly given in full in the filename.
+				# Eg: The Pimp No F**ing Fairytale
+				if not internal:
+					censored = {'(s\*x)' : 'sex', '(p\*+r?n)[a-z]*' : 'porn', '(f\*+(?:c?k|ck)?)(?:ed|ing)?' : 'fuck'}
+					expression = '(?:^|[\.\,\:\-\–\s])%s(?:$|[\.\,\:\-\–\s])'
+					for valFrom, valTo in censored.items():
+						if tools.Regex.match(data = value, expression = expression % valFrom):
+							# Add the unccensored title in FRONT, ssince it is more likley to find values.
+							values = titleClean(tools.Regex.replace(data = value, expression = expression % valFrom, replacement = valTo, group = 1), year = year, internal = True) + values
 
 				seen = set()
 				values = [i for i in values if not (i in seen or seen.add(i))]
@@ -912,13 +941,23 @@ class Core(object):
 					try: self.titles['abbreviation'] = titleAbbreviation.decode('utf-8')
 					except: self.titles['abbreviation'] = titleAbbreviation
 
-				limit = min(10, max(4, int(ProviderBase.settingsGlobalLimitQuery() / (2.0 if titleShow else 1.5))))
+				limit = min(10, max(5, int(ProviderBase.settingsGlobalLimitQuery() / (2.0 if titleShow else 1.2))))
 				character = ProviderBase.settingsGlobalTitleCharacter()
 				titles = []
 				processedMain = []
 				processedCollection = []
 				processedEpisode = []
 				processedBasic = []
+
+				# In the US, the movie is named "Sorcerer" and in the rest of the world "Philosopher".
+				# Both return links, but "Sorcerer" returns slightly more.
+				# "Sorcerer" is part of the aliases, but can be cut off if there the query limit setting is strict (considering there are a few collection queries).
+				# Push to the front. Maybe not a nice thing to hard-code this, but this seems to be an exception.
+				if self.titles['main'] == 'Harry Potter and the Philosopher\'s Stone':
+					potter = 'Harry Potter and the Sorcerer\'s Stone'
+					titles.append(potter)
+					processedMain.append(potter)
+					processedBasic.append(potter)
 
 				if 'main' in self.titles and self.titles['main']:
 					titles.append(self.titles['main'])
@@ -943,6 +982,9 @@ class Core(object):
 					titles.append(self.titles['local'])
 					processedMain.append(self.titles['local'])
 					processedBasic.append(self.titles['local'])
+				if 'extra' in self.titles and self.titles['extra']:
+					processedMain.extend(tools.Tools.listFlatten(self.titles['extra'].values()))
+					processedBasic.extend(tools.Tools.listFlatten(self.titles['extra'].values()))
 				if 'abbreviation' in self.titles and self.titles['abbreviation']:
 					titles.append(self.titles['abbreviation'])
 					processedMain.append(self.titles['abbreviation'])
@@ -993,7 +1035,7 @@ class Core(object):
 						if capital:
 							capital = ''.join(capital)
 							if abbreviation.startswith(capital):
-								capital = tools.Regex.remove(data = processedMain[0], expression = '^(%s.*?\s)' % abbreviation)
+								capital = tools.Regex.remove(data = processedMain[0], expression = '^(%s.*?\s)' % abbreviation, all = True)
 								if capital:
 									titles.append(capital)
 									processedMain.insert(1, capital)
@@ -1038,7 +1080,7 @@ class Core(object):
 											#	Westworld: The Door
 											#	Westworld: The New World
 											# We do not want to search eg "The Door S01E01", since it might actually be a different show.
-											if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
+											if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\–\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
 												self.titles[type][key].append(titleStripped)
 												if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
 												processedMain.append(titleStripped)
@@ -1177,10 +1219,11 @@ class Core(object):
 				# Remove similar titles that would just increase scraping time.
 				# Eg: with a current search list of: ["Taken","96 Hours","Taken 1 96 hours","96 Hours Taken","Taken 01 Taken","Taken 1"]
 				# It should only search: ["Taken","96 Hours"]
-				# Count this as a percentage of totla words in the other titles.
+				# Count this as a percentage of total words in the other titles.
 				# Otherwise similar, but clearly different search queries, will get ignored.
 				# Eg: "Harry Potter and the Philosophers Stone" vs "Harry Potter and the Sorcerers Stone".
 				if search:
+					searchExtra = search
 					searchMain = [search[0]]
 					countMain = len(searchMain[0].split(' '))
 					for i in search:
@@ -1197,7 +1240,7 @@ class Core(object):
 							searchMain.append(i)
 
 					temp = tools.Tools.copy(searchMain)
-					searchBasic = tools.Regex.remove(data = searchMain[0], expression = '^((?:the|an?)\s)')
+					searchBasic = tools.Regex.remove(data = searchMain[0], expression = '^((?:the|an?)\s)', all = True)
 					for i in search:
 						searchBase = i
 						searchReplace = None
@@ -1207,7 +1250,7 @@ class Core(object):
 							i = tools.Tools.replaceInsensitive(data = i, value = j, replacement = '')
 
 							# Eg: "The Terminator": replace "Terminator" and not just the full "The Terminator".
-							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = '((?:the|an?)\s)'), replacement = '')
+							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = '((?:the|an?)\s)'), replacement = '', all = True)
 
 						if i:
 							i = ' '.join([j for j in i.split(' ') if j])
@@ -1227,11 +1270,11 @@ class Core(object):
 
 								# Ignore numbers.
 								# Eg: If "Terminator" is already in the list, do not use "Terminator 1".
-								if tools.Regex.remove(data = i, expression = '(\s\d)$').strip() in temp: continue
+								if tools.Regex.remove(data = i, expression = '(\s\d)$', all = True).strip() in temp: continue
 
 								# Ignore only symbols  or single digit.
 								# Eg: "#9" -> "9".
-								if tools.Regex.match(data = i, expression = '^[\d\s\-\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
+								if tools.Regex.match(data = i, expression = '^[\d\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
 
 								# Do not include short titles.
 								# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
@@ -1242,6 +1285,11 @@ class Core(object):
 								if searchReplace and tools.Regex.match(data = searchBase, expression = '^%s (the|an?)(\s*[a-z]+){1,2}$' % searchReplace): continue
 
 								if not i.lower() in people: temp.append(i)
+
+					# Add all removed titles again.
+					# The ones later in the list will get removed by the limit below.
+					temp.extend(searchExtra)
+
 					search = tools.Tools.listUnique(temp)
 
 				# Remove specific titles.
@@ -1294,7 +1342,7 @@ class Core(object):
 				# This is important for matching titles in stream.py.
 				# Eg: The title "Amélie", but most file names contain "Amelie".
 				processedExtra = []
-				expression = re.compile('^\s*[\s\d\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
+				expression = re.compile('^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
 				seen = set()
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
 				for title in processedMain:
@@ -1316,7 +1364,7 @@ class Core(object):
 					if not tools.Regex.match(data = self.titles['main'], expression = expression):
 						for j in range(len(processedMain)):
 							processedNew = tools.Regex.remove(data = processedMain[j], expression = expression, group = 1, all = True)
-							if not processedNew == processedMain[j]: processedMain[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ')
+							if not processedNew == processedMain[j]: processedMain[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
 
 				seen = set()
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))]
@@ -1333,6 +1381,22 @@ class Core(object):
 				self.titles['processed']['main'] = processedMain
 				self.titles['processed']['collection'] = processedCollection
 				self.titles['processed']['episode'] = processedEpisode
+
+				# Used by providers -> web.py -> queryGenerate().
+				if 'original' in self.titles and self.titles['original']:
+					original = self.titles['original']
+
+					titles = []
+					titles.extend([i for i in self.titles['search']['main'] if tools.Matcher.levenshtein(original, i) > 0.75])
+					seen = set()
+					titles = [i for i in titles if i and not(i.lower() in seen or seen.add(i.lower()))]
+					self.titles['search']['original'] = titles
+
+					titles = [original]
+					titles.extend([i for i in self.titles['processed']['main'] if tools.Matcher.levenshtein(original, i) > 0.75])
+					seen = set()
+					titles = [i for i in titles if i and not(i.lower() in seen or seen.add(i.lower()))]
+					self.titles['processed']['original'] = titles
 
 				# Convert all titles to unicode, otherwise there are encode/decode errors down the line during scraping and in stream.py.
 				titleDecode(self.titles)
@@ -1353,7 +1417,7 @@ class Core(object):
 			def titleFinish(title):
 				try: title = title.decode('utf-8')
 				except: pass
-				title = tools.Regex.replace(data = title, expression = '\s{2,}', replacement = ' ')
+				title = tools.Regex.replace(data = title, expression = '\s{2,}', replacement = ' ', all = True)
 				return title
 
 			def additional(title, titleShow, year, imdb, tvdb):
@@ -1600,7 +1664,7 @@ class Core(object):
 							if titleOriginal:
 								index = titleOriginal.rfind('(')
 								if index >= 0: titleOriginal = titleOriginal[:index]
-								titleOriginal = tools.Regex.remove(data = titleOriginal, expression = 'original\s*title\s*:\s*')
+								titleOriginal = tools.Regex.remove(data = titleOriginal, expression = 'original\s*title\s*:\s*', all = True)
 							try:
 								resultLanguage = result.find_all('li', {'data-testid' : 'title-details-languages'})
 								if resultLanguage:
@@ -1624,36 +1688,60 @@ class Core(object):
 						languagesProviders = [i.languages() for i in self.providers]
 						languagesProviders = tools.Tools.listFlatten(languagesProviders)
 						languagesProviders = tools.Tools.listUnique(languagesProviders)
-						try: del languages[tools.Language.UniversalCode]
-						except: pass
-						try: del languages[tools.Language.EnglishCode]
-						except: pass
+						languages = [i for i in languages if not i == tools.Language.UniversalCode and not i == tools.Language.EnglishCode]
 						if languagesProviders: languages.extend(languagesProviders)
 
 					translations = {language : [] for language in languages}
+					extra = {}
 
 					self.progressTitleTranslation = 25
 					if titleShow and (imdb or tvdb):
 						from lib.meta.data import MetaData
 						from lib.meta.manager import MetaManager
-						items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
+
+						# Do not filter by language here. We do it manually below, so that we can use all titlers for 'extra'.
+						#items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
+						items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb)
+
 						if items:
 							for key, val in items.items():
-								translations[key].extend(val)
+								if key in languages: translations[key].extend(val)
+
+								if not key in extra: extra[key] = []
+								extra[key].extend(val)
 
 					self.progressTitleTranslation = 50
-					found = True
-					for language in languages:
-						if not translations[language]:
-							found = False
-							break
+					found = False
+					if languages:
+						found = True
+						for language in languages:
+							if not language in translations or not translations[language]:
+								found = False
+								break
 
 					if not found and imdb:
 						items = traktx.getTVShowTranslation if titleShow else traktx.getMovieTranslation
-						items = items(imdb, languages, full = True)
+
+						# Do not filter by language here. We do it manually below, so that we can use all titlers for 'extra'.
+						#items = items(imdb, languages, full = True)
+						items = items(imdb, full = True)
+
 						if items:
 							for item in items:
-								translations[item['language']].append(item['title'])
+								if not item['language'] in translations: translations[item['language']] = []
+								if item['title']: # Sometimes title is null and there is only an overview.
+									key = item['language']
+									if key in languages: translations[key].append(item['title'])
+
+									if not key in extra: extra[key] = []
+									extra[key].append(item['title'])
+
+					# We use all alias titles here.
+					# If the user has disabled 'alias' searches from the settings (to reduce scraping time), no alias titles are retrieved.
+					# These aliases titles are retrieved here as well. So we can just use them without increasing time.
+					# These 'extra' titles are only used for stream matching (eg: exclude in languageExtract()), and not for scraping.
+					# This can cause eg incorrect language detection. The Polish title for "Peter Pan & Wendy" is "Piotrus Pan i Wendy". Without the Polish title, the "Pan" will be detected as Punjabi language, since the exclude does not work with "Piotrus" instead of "Peter".
+					self.titles['extra'] = extra
 
 					self.progressTitleTranslation = 75
 					titleLower = titleShow.lower() if titleShow else title.lower()
@@ -1824,6 +1912,7 @@ class Core(object):
 
 			self.languageOriginal = None
 			self.titles = {}
+			self.years = None
 			if exact:
 				if not movie and not title: title = tvshowtitle
 				self.titles['processed'] = {'all' : [title], 'main' : [title]}
@@ -1914,6 +2003,7 @@ class Core(object):
 			self.cacheEnabledAlldebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.alldebrid') == 1
 			self.cacheTime = tools.Settings.getCustom('scrape.cache.inspection.time')
 			self.cacheTimeLabel = tools.Settings.customLabel(id = 'scrape.cache.inspection.time', value = self.cacheTime)
+			self.cacheSave = tools.Time.timestamp() - ProviderBase.settingsGlobalSaveCache()
 
 			self.enabledExtra = self.cacheEnabled or self.precheckLink or self.precheckMetadata
 
@@ -2670,6 +2760,7 @@ class Core(object):
 			items2 = [
 				{'label' : 'Alternative Keywords', 'value' : enabled if keywordEnabled else disabled},
 				{'label' : 'English Keywords', 'value' : quick if ProviderBase.settingsGlobalKeywordEnglish() == 1 else full if ProviderBase.settingsGlobalKeywordEnglish() == 2 else disabled} if keywordEnabled else None,
+				{'label' : 'Original Keywords', 'value' : quick if ProviderBase.settingsGlobalKeywordOriginal() == 1 else full if ProviderBase.settingsGlobalKeywordOriginal() == 2 else disabled} if keywordEnabled else None,
 				{'label' : 'Native Keywords', 'value' : quick if ProviderBase.settingsGlobalKeywordNative() == 1 else full if ProviderBase.settingsGlobalKeywordNative() == 2 else disabled} if keywordEnabled else None,
 				{'label' : 'Custom Keywords', 'value' : quick if ProviderBase.settingsGlobalKeywordCustom() == 1 else full if ProviderBase.settingsGlobalKeywordCustom() == 2 else disabled} if keywordEnabled else None,
 				{'label' : 'Keyword Language', 'value' : tools.Language.name(ProviderBase.settingsGlobalKeywordLanguage())} if keywordEnabled and ProviderBase.settingsGlobalKeywordCustom() > 0 else None,
@@ -3055,6 +3146,7 @@ class Core(object):
 		except: poster2 = None
 		try: poster3 = posters[2]
 		except: poster3 = None
+		if not poster1 and not poster2 and not poster3: poster1 = Theme.poster() # Exact searches.
 
 		encoded = tools.System.commandEncode({'metadata' : metadata})
 		if self.navigationStreamsDirectory: metadataKodi = metatools.clean(metadata = metadata, exclude = True)
@@ -3148,7 +3240,7 @@ class Core(object):
 							try: title = metadata['originaltitle']
 							except:
 								try: title = metadata['title']
-								except: title = ''
+								except: title = interface.Translation.string(35160) # Exact searches have not metadata.
 
 						try: year = metadata['year']
 						except: year = None
@@ -3164,7 +3256,7 @@ class Core(object):
 						try: tvdb = metadata['tvdb']
 						except: tvdb = None
 
-						extra = interface.Format.font(title + ' ' + tools.Media.title(metadata = None, title = '', year = year, season = season, episode = episode, skin = False).strip(), bold = True)
+						extra = interface.Format.font((title + ' ' + tools.Media.title(metadata = None, title = '', year = year, season = season, episode = episode, skin = False).strip()).strip(), bold = True)
 						if not self.navigationStreamsSpecial: extra += Stream.labelSeparator()
 
 						images = MetaImage.extract(data = metadata)
@@ -3176,6 +3268,7 @@ class Core(object):
 						except: poster2 = None
 						try: poster3 = posters[2]
 						except: poster3 = None
+						if not poster1 and not poster2 and not poster3: poster1 = Theme.poster() # Exact searches.
 				except:
 					tools.Logger.error()
 
@@ -4138,7 +4231,10 @@ class Core(object):
 				if not source['stream'].exclusionDuplicate():
 					if (source['stream'].sourceType() in type or (modeLink and handler.Handler.TypeHoster in type)) and (not 'premium' in source or not source['premium']):
 						# Only check those that were not previously inspected.
-						if not source['stream'].accessCacheHas(debridId, exact = Stream.ExactYes):
+						if not source['stream'].accessCacheHas(debridId, exact = Stream.ExactYes, time = self.cacheSave):
+							# Make sure the new cache status is written to the database and overwrites the old cache status and cache time values.
+							if source['stream'].accessCacheExpired(debridId, time = self.cacheSave): source['stream'].infoCacheExpire()
+
 							# NB: Do not calculate the hash if it is not available.
 							# The hash is not available because the NZB could not be downloaded, or is still busy in the thread.
 							# Calling container.hash() will cause the NZB to download again, which causes long delays.
@@ -4166,13 +4262,14 @@ class Core(object):
 			# Only check if there are a bunch of them, otherwise there are too many API calls (heavy load on both server and local machine).
 			if not hashes or (partial and len(hashes) < 40): return
 			self.cacheLookup = True
+			time = tools.Time.timestamp()
 
 			# NB: Set all statuses to false, otherwise the same links will be send multiple times for inspection, if multiple hosters finish in a short period of time before the previous inspection is done.
 			# This will exclude all currently-being-looked-up links from the next iteration in the for-loop above.
 			for i in range(len(self.sourcesAdjusted)):
 				hash = self.sourcesAdjusted[i]['stream'].hashContainer()
 				if (modeHash and hash and hash in hashes) or (modeLink and self.sourcesAdjusted[i]['stream'].linkPrimary() in hashes):
-					self.sourcesAdjusted[i]['stream'].accessCacheSet(id = debridId, value = False, exact = Stream.ExactYes)
+					self.sourcesAdjusted[i]['stream'].accessCacheSet(id = debridId, value = False, time = time, exact = Stream.ExactYes)
 					self.sourcesAdjusted[i]['stream'].infoTerminationClear() # Clear the termination status, since it could change after the cache changed.
 			self.adjustUnlock()
 
@@ -4185,7 +4282,7 @@ class Core(object):
 						try:
 							if self.sourcesAdjusted[i]['stream'].hashContainer() == hashLower or self.sourcesAdjusted[i]['stream'].linkPrimary() == hash:
 								if cached and not self.sourcesAdjusted[i]['stream'].accessCache(id, exact = Stream.ExactYes):
-									self.sourcesAdjusted[i]['stream'].accessCacheSet(id = id, value = cached, exact = Stream.ExactYes)
+									self.sourcesAdjusted[i]['stream'].accessCacheSet(id = id, value = cached, time = time, exact = Stream.ExactYes)
 									self.sourcesAdjusted[i]['stream'].infoTerminationClear() # Clear the termination status, since it could change after the cache changed.
 									if cached and self.sourcesAdjusted[i]['stream'].accessCacheCount(account = True) == 1: # Only count one of the debird service caches.
 										self.streamsCached += 1
@@ -4266,8 +4363,9 @@ class Core(object):
 							if cache is None: cache = cacheNew
 							elif not cacheNew is None: cache = cache or cacheNew
 							if not cache is None:
-								sourceAdjusted['stream'].accessCacheSet(id = id, value = cache, exact = exact)
-								source['stream'].accessCacheSet(id = id, value = cache, exact = exact)
+								time = sourceAdjusted['stream'].accessCache(id = id, exact = Stream.ExactTime)
+								sourceAdjusted['stream'].accessCacheSet(id = id, value = cache, time = time, exact = exact)
+								source['stream'].accessCacheSet(id = id, value = cache, time = time, exact = exact)
 								source['stream'].infoTerminationClear() # Clear the termination status, since it could change after the cache changed.
 
 					contains = True
@@ -4307,7 +4405,11 @@ class Core(object):
 				try:
 					result = items[i]
 					stream = result['stream']
-					if stream.infoCache(): continue
+
+					# Make sure not to skip the stream if the cache status was newley looked up.
+					# Otherwise, if the cache status expired and we do a fresh cache lookup, the new cache status is not written to the database.
+					# That means, reloading the streams a few seconds appart will always cause a new cache lookup, since the cache lookup time of the stream is still the original/first lookup, instead of the new lookup a few seconds ago.
+					if stream.infoCache(expired = False): continue
 
 					provider = stream.provider()
 					imdb = stream.idImdb()
@@ -4605,6 +4707,14 @@ class Core(object):
 
 			item['stream'] = Stream.load(data = item['stream'])
 			url = self.sourceResolveProvider(item = item)
+
+			if item['stream'].videoRangeDolby():
+				if not tools.Settings.getBoolean('internal.dolbyvision'):
+					hdr = item['stream'].videoRange(label = Stream.LabelShort)
+					message = interface.Translation.string(35186) % (hdr, hdr)
+					choice = interface.Dialog.options(title = 35185, message = message, labelDeny = 33065, labelCustom = 33821, labelConfirm = 33743, default = interface.Dialog.ChoiceCustom)
+					if choice == interface.Dialog.ChoiceYes: return self.sourceResult(link = url, error = 'dolbyvision', loader = loader)
+					elif choice == interface.Dialog.ChoiceNo: tools.Settings.set('internal.dolbyvision', True)
 
 			if resolve == network.Resolver.ModeProvider: return self.sourceResult(link = url, loader = loader)
 

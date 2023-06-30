@@ -687,7 +687,7 @@ class ConverterDuration(ConverterBase):
 		if days > 0: units.append(self._stringWord(days, ConverterDuration.UnitDay, places = places))
 		if hours > 0: units.append(self._stringWord(hours, ConverterDuration.UnitHour, places = places))
 		if minutes > 0: units.append(self._stringWord(minutes, ConverterDuration.UnitMinute, places = places))
-		if seconds > 0: units.append(self._stringWord(seconds, ConverterDuration.UnitSecond))
+		if seconds > 0: units.append(self._stringWord(seconds, ConverterDuration.UnitSecond, places = 0 if units else places))
 		result = ', '.join(filter(None, units)) # Join if not empty.
 		if result is None or result == '':
 			result = self._stringWord(0, ConverterDuration.UnitSecond)
@@ -704,7 +704,7 @@ class ConverterDuration(ConverterBase):
 		if days > 0: units.append(self._stringAbbreviation(days, ConverterDuration.UnitDay, places = places))
 		if hours > 0: units.append(self._stringAbbreviation(hours, ConverterDuration.UnitHour, places = places))
 		if minutes > 0: units.append(self._stringAbbreviation(minutes, ConverterDuration.UnitMinute, places = places))
-		if seconds > 0: units.append(self._stringAbbreviation(seconds, ConverterDuration.UnitSecond))
+		if seconds > 0: units.append(self._stringAbbreviation(seconds, ConverterDuration.UnitSecond, places = 0 if units else places))
 		result = ', '.join(filter(None, units)) # Join if not empty.
 		if result is None or result == '':
 			result = self._stringAbbreviation(0, ConverterDuration.UnitSecond)
@@ -757,13 +757,13 @@ class ConverterDuration(ConverterBase):
 		return str(value) + label
 
 	def string(self, format = FormatDefault, unit = UnitNone, places = ConverterData.PlacesUnknown, years = True, months = True, days = True, hours = True, minutes = True, seconds = True, capitalize = False):
-		places = 0
+		placed = 0
 		if format in [ConverterDuration.FormatWordMinimal, ConverterDuration.FormatAbbreviationMinimal, ConverterDuration.FormatInitialMinimal]:
-			places = 1
+			placed = 1
 			valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds = self._unitsMinimal()
 		elif format in [ConverterDuration.FormatWordOptimal, ConverterDuration.FormatAbbreviationOptimal, ConverterDuration.FormatInitialOptimal]:
 			valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds = self._unitsOptimal()
-			places = 0 if (valueYears == 0 or valueYears >= 10 or format == ConverterDuration.FormatInitialOptimal) else 1
+			placed = 0 if (valueYears == 0 or valueYears >= 10 or format == ConverterDuration.FormatInitialOptimal) else 1
 		else:
 			start = ConverterDuration.UnitYear
 			if format in [ConverterDuration.FormatClockMini]:
@@ -773,6 +773,8 @@ class ConverterDuration(ConverterBase):
 			elif format in [ConverterDuration.FormatWordMedium, ConverterDuration.FormatAbbreviationMedium, ConverterDuration.FormatInitialMedium, ConverterDuration.FormatClockMedium]:
 				start = ConverterDuration.UnitDay
 			valueYears, valueMonths, valueDays, valueHours, valueMinutes, valueSeconds = self._units(start = start)
+
+		if places == ConverterData.PlacesUnknown: places = placed
 
 		if not years: valueYears = 0
 		if not months: valueMonths = 0
@@ -809,6 +811,9 @@ class ConverterTime(ConverterBase):
 	FormatDateTimeJson = '%Y-%m-%dT%H:%M:%S.%fZ' # Timezone microseconds with 6 decimal places.
 	FormatDateTimeJsonShort = '%Y-%m-%dT%H:%M:%S._Z' # Timezone microseconds with 3 decimal places. Some features (like Trakt) can only handle 3 decimal places.
 	FormatDateShort = '%d %b %Y'
+	FormatDateLong = '%d %B %Y'
+	FormatMonth = '%B %Y'
+	FormatMonthShort = '%b %Y'
 	FormatTime = '%H:%M:%S'
 	FormatTimeShort = '%H:%M'
 	FormatTimestamp = 'timestamp'

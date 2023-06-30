@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window>
+	<views>50</views>
+	<zorder>0</zorder>
+	<coordinates>
+		<left>0</left>
+		<top>0</top>
+	</coordinates>
+
+	<controls>
+
+		<!-- MAIN -->
+		<control type="group">
+			<top>[GAIAOFFSET]</top>
+			<left>0</left>
+			<width>100%</width>
+			<height>100%</height>
+
+			<control type="label">
+				<top>200</top>
+				<left>0</left>
+				<width>100%</width>
+				<height>30</height>
+				<font>[GAIAFONTBIG]</font>
+				<aligny>center</aligny>
+				<align>center</align>
+				<label>$INFO[Window.Property(GaiaTitle)]</label>
+			</control>
+			<control type="label">
+				<top>230</top>
+				<left>0</left>
+				<width>100%</width>
+				<height>30</height>
+				<font>[GAIAFONTLARGE]</font>
+				<aligny>center</aligny>
+				<align>center</align>
+				<label>$INFO[Window.Property(GaiaDescription1)]</label>
+			</control>
+			<control type="label">
+				<top>240</top>
+				<left>0</left>
+				<width>100%</width>
+				<height>30</height>
+				<font>[GAIAFONTMEDIUM]</font>
+				<aligny>center</aligny>
+				<align>center</align>
+				<label>$INFO[Window.Property(GaiaDescription2)]</label>
+			</control>
+
+			<!-- LIST -->
+
+			<control type="group">
+				<visible>Integer.IsGreater(Container(52000).NumItems, 0)</visible> <!-- Slightly reduce the time when items are added and various things, like the splotlight, flicker while being initialized from Python. -->
+
+				<control type="fixedlist" id="52000">
+					<top>280</top>
+					<left>140</left>
+					<width>1000</width>
+					<height>320</height>
+
+					<visible>true</visible>
+					<viewtype label="535">list</viewtype>
+					<orientation>vertical</orientation>
+
+					<scrolltime tween="cubic">1500</scrolltime>
+					<!--<autoscroll>!String.IsEqual(Window.Property(GaiaScroll),0)</autoscroll>-->
+
+					<itemlayout width="1000" height="220">
+
+						<!-- CHATBOT - NORMAL -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),chatbot) + Integer.IsEqual(ListItem.Property(GaiaLast),0)</visible>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>200</height>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallouter.png</texture>
+							</control>
+							<control type="image">
+								<top>78</top>
+								<left>20</left>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<left>0</left>
+								<top>150</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>166</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+						<!-- CHATBOT - LAST -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),chatbot) + Integer.IsEqual(ListItem.Property(GaiaLast),1)</visible>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>300</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblelargeinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>300</height>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblelargeouter.png</texture>
+							</control>
+							<control type="image">
+								<top>128</top>
+								<left>20</left>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<left>0</left>
+								<top>200</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>266</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+						<!-- USER -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),system) | String.IsEqual(ListItem.Property(GaiaAgent),user)</visible>
+							<control type="image">
+								<top>10</top>
+								<left>110</left>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture flipx="true">special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<left>110</left>
+								<width>800</width>
+								<height>200</height>
+								<texture flipx="true">special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallouter.png</texture>
+							</control>
+							<control type="image">
+								<top>78</top>
+								<right>20</right>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<right>0</right>
+								<top>140</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>166</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+					</itemlayout>
+
+					<focusedlayout width="1000" height="220">
+
+						<!-- CHATBOT - NORMAL -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),chatbot) + Integer.IsEqual(ListItem.Property(GaiaLast),0)</visible>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>88000000</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>200</height>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallouter.png</texture>
+							</control>
+							<control type="image">
+								<top>78</top>
+								<left>20</left>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<left>0</left>
+								<top>150</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>166</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+						<!-- CHATBOT - LAST -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),chatbot) + Integer.IsEqual(ListItem.Property(GaiaLast),1)</visible>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>300</height>
+								<colordiffuse>88000000</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblelargeinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>300</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblelargeinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<right>110</right>
+								<width>800</width>
+								<height>300</height>
+								<texture>special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblelargeouter.png</texture>
+							</control>
+							<control type="image">
+								<top>128</top>
+								<left>20</left>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<left>0</left>
+								<top>200</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>266</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+						<!-- CHATBOT - USER -->
+						<control type="group">
+							<visible>String.IsEqual(ListItem.Property(GaiaAgent),system) | String.IsEqual(ListItem.Property(GaiaAgent),user)</visible>
+							<control type="image">
+								<top>10</top>
+								<left>110</left>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>88000000</colordiffuse>
+								<texture flipx="true">special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<left>110</left>
+								<width>800</width>
+								<height>200</height>
+								<colordiffuse>$INFO[Container(52000).ListItem.Property(GaiaColorFill)]</colordiffuse>
+								<texture flipx="true">special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallinner.png</texture>
+							</control>
+							<control type="image">
+								<top>10</top>
+								<left>110</left>
+								<width>800</width>
+								<height>200</height>
+								<texture flipx="true">special://home/addons/script.gaia.resources/resources/media/interface/oracle/bubblesmallouter.png</texture>
+							</control>
+							<control type="image">
+								<top>78</top>
+								<right>20</right>
+								<width>64</width>
+								<height>64</height>
+								<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							</control>
+							<control type="label">
+								<right>0</right>
+								<top>140</top>
+								<width>104</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>center</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaName)][/B]</label>
+							</control>
+							<control type="textbox">
+								<left>130</left>
+								<top>27</top>
+								<width>710</width>
+								<height>166</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<align>justify</align>
+								<aligny>top</aligny>
+								<textcolor>FFFFFFFF</textcolor>
+								<wrapmultiline>true</wrapmultiline>
+								<scrolltime>200</scrolltime>
+								<autoscroll delay="3000" time="2000" repeat="5000"></autoscroll>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							</control>
+						</control>
+
+					</focusedlayout>
+				</control>
+
+			</control>
+
+		</control>
+
+	</controls>
+</window>

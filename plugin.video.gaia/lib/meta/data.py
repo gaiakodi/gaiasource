@@ -381,14 +381,26 @@ class MetaData(Serializer):
 	SpecialPilot				= 'pilot'		# The special is a pilot episode (TVDb: 4453).
 	SpecialRecap				= 'recap'		# The special is a season recap (TVDb: 4454).
 	SpecialShort				= 'short'		# The special is a webisode or short (TVDb: 4456).
+	SpecialPodcast				= 'podcast'		# The special is a podcast. Not an official special type, but some shows have a lot of podcasts (eg Last of Us S01).
+	SpecialDefault				= Default
 
-	SpecialStory				= {
+	SpecialStory				= {				# Part of the main storyline.
 		SpecialImportant		: True,
 		SpecialCrossover		: True,
 		SpecialMovie			: True,
 		SpecialEpisode			: True,
 		SpecialOriginal			: True,
 		SpecialPilot			: True,
+	}
+	SpecialExtra				= {				# Not part of the main storyline.
+		SpecialUnimportant		: True,
+		SpecialBehind			: True,
+		SpecialBlooper			: True,
+		SpecialInterview		: True,
+		SpecialDeleted			: True,
+		SpecialMaking			: True,
+		SpecialRecap			: True,
+		SpecialPodcast			: True,
 	}
 
 	# Duration
@@ -655,6 +667,23 @@ class MetaData(Serializer):
 		return data
 
 	@classmethod
+	def dataFix(self, media, data):
+		# Sometimes there are exceptions thrown:
+		#	data.py", line 920, in personKodi\n    characterName = i.name()\n', "AttributeError: 'dict' object has no attribute 'name'\n"
+		# This happens with person, character, company, and possibly others.
+		# Not sure why this happens.
+		# Maybe when old metadata from the cache is used that has a different old/legacy structure?
+		# Or maybe when the metadata object is serialized, and later unserialized, that only the parent dictionary is converted back to a Metadata object and not its internal child dictionaries (person, character, company).
+		# In any case, we have a dirty fix here. Just convert to a MetaData object if a dictionary is detected.
+		# NB: Use MetaData() and not self.dataCreate(), since the latter throws other errors.
+		try:
+			if not data: return data
+			if Tools.isArray(data): data = [MetaData(media = media, data = i) if Tools.isDictionary(i) else i for i in data]
+			elif Tools.isDictionary(data): data = MetaData(media = media, data = data)
+		except: Logger.error()
+		return data
+
+	@classmethod
 	def dataClean(self, data, newline = True, space = True):
 		# TVDb character names sometimes contain space characters (eg: "Self \n  \n  \n  (archive footage)").
 		if Tools.isDictionary(data):
@@ -664,10 +693,10 @@ class MetaData(Serializer):
 		else:
 			# Use faster Python replacements.
 			'''if newline:
-				data = Regex.remove(data = data, expression = '[\r\n]', cache = True)
+				data = Regex.remove(data = data, expression = '[\r\n]', all = True, cache = True)
 			if space:
-				data = Regex.remove(data = data, expression = '\t', cache = True)
-				data = Regex.replace(data = data, expression = '\s{2,}', replacement = ' ', cache = True)'''
+				data = Regex.remove(data = data, expression = '\t', all = True, cache = True)
+				data = Regex.replace(data = data, expression = '\s{2,}', replacement = ' ', all = True, cache = True)'''
 			if newline: data = data.replace('\r', '').replace('\n', '')
 			if space: data = ' '.join(data.split())
 		return data
@@ -794,6 +823,7 @@ class MetaData(Serializer):
 		if result is None:
 			character = self.character(type = type, role = role, selection = selection)
 			if character:
+				character = self.dataFix(media = MetaData.MediaCharacter, data = character)
 				if Tools.isArray(character):
 					result = [i.person(selection = self.selectionDefault(selection = selection, default = MetaData.SelectionSingle)) for i in character]
 
@@ -862,6 +892,7 @@ class MetaData(Serializer):
 	def personName(self, type = CharacterTypeDefault, role = CharacterRoleDefault, language = LanguageDefault, format = FormatNone, selection = SelectionDefault, fallback = FallbackDefault):
 		person = self.person(type = type, role = role, selection = selection)
 		if person:
+			person = self.dataFix(media = MetaData.MediaPerson, data = person)
 			if Tools.isArray(person):
 				person = [i.name(language = language, selection = MetaData.SelectionSingle, fallback = fallback) for i in person]
 				person = [i for i in person if i]
@@ -900,6 +931,8 @@ class MetaData(Serializer):
 	def personKodi(self, type = CharacterTypeDefault, role = CharacterRoleDefault, selection = SelectionDefault, multiple = True):
 		character = self.character(type = type, role = role, selection = selection)
 		if character:
+			character = self.dataFix(media = MetaData.MediaCharacter, data = character)
+
 			multi = Tools.isArray(character)
 			if not multi: character = [character]
 			result = []
@@ -909,6 +942,7 @@ class MetaData(Serializer):
 				characterPhoto = i.image(type = MetaData.ImageTypePhoto, selection = MetaData.SelectionSingle)
 
 				person = i.person()
+				person = self.dataFix(media = MetaData.MediaPerson, data = person)
 				if not person: continue
 				personName = person.name()
 				personPhoto = person.image(type = MetaData.ImageTypePhoto, selection = MetaData.SelectionSingle)
@@ -1022,6 +1056,8 @@ class MetaData(Serializer):
 	def characterKodi(self, type = CharacterTypeDefault, role = CharacterRoleDefault, selection = SelectionDefault, multiple = True):
 		character = self.character(type = type, role = role, selection = selection)
 		if character:
+			character = self.dataFix(media = MetaData.MediaCharacter, data = character)
+
 			multi = Tools.isArray(character)
 			if not multi: character = [character]
 			result = []
@@ -1032,6 +1068,7 @@ class MetaData(Serializer):
 				characterPhoto = i.image(type = MetaData.ImageTypePhoto, selection = MetaData.SelectionSingle)
 
 				person = i.person()
+				person = self.dataFix(media = MetaData.MediaPerson, data = person)
 				personName = None
 				personPhoto = None
 				if person:
@@ -1181,6 +1218,7 @@ class MetaData(Serializer):
 	def companyName(self, type = CompanyTypeDefault, language = LanguageDefault, selection = SelectionDefault, fallback = FallbackDefault):
 		company = self.company(type = type, selection = selection)
 		if company:
+			company = self.dataFix(media = MetaData.MediaCompany, data = company)
 			if Tools.isArray(company):
 				company = [i.name(language = language, selection = MetaData.SelectionSingle, fallback = fallback) for i in company]
 				return [i for i in company if i]
@@ -2093,6 +2131,7 @@ class MetaData(Serializer):
 
 	def namePerson(self, language = LanguageDefault, selection = SelectionDefault, fallback = FallbackDefault):
 		person = self.person(selection = selection)
+		person = self.dataFix(media = MetaData.MediaPerson, data = person)
 		if Tools.isArray(person):
 			result = [i.name(language = language, selection = selection, fallback = fallback) for i in person]
 			result = Tools.listUnique([i for i in result if i])
@@ -2114,6 +2153,7 @@ class MetaData(Serializer):
 
 	def nameCharacter(self, type = CharacterTypeDefault, role = CharacterRoleDefault, language = LanguageDefault, selection = SelectionDefault, fallback = FallbackDefault):
 		character = self.character(type = type, role = role, selection = selection)
+		character = self.dataFix(media = MetaData.MediaCharacter, data = character)
 		if Tools.isArray(character):
 			result = [i.name(language = language, selection = selection, fallback = fallback) for i in character]
 			result = Tools.listUnique([i for i in result if i])
@@ -2243,6 +2283,7 @@ class MetaData(Serializer):
 
 	def nameCompany(self, type = CompanyTypeDefault, language = LanguageDefault, selection = SelectionDefault, fallback = FallbackDefault):
 		company = self.company(type = type, selection = selection)
+		company = self.dataFix(media = MetaData.MediaCompany, data = company)
 		if Tools.isArray(company):
 			result = [i.name(language = language, selection = selection, fallback = fallback) for i in company]
 			result = Tools.listUnique([i for i in result if i])
@@ -2369,7 +2410,7 @@ class MetaData(Serializer):
 			# Also remove this, since the user will be able to identify the correct show based on the poster/fanart.
 			# And even without that, the release country is still available in the info dialog.
 			for k, v in value.items():
-				value[k] = Tools.listUnique([Regex.remove(data = i, expression = '\s+[\(\[](?:(?:19|2[01])\d{2}|[A-Z]{2})[\)\]]$', flags = Regex.FlagNone) for i in v] if v else v)
+				value[k] = Tools.listUnique([Regex.remove(data = i, expression = '\s+[\(\[](?:(?:19|2[01])\d{2}|[A-Z]{2})[\)\]]$', all = True, flags = Regex.FlagNone) for i in v] if v else v)
 
 			value = self.dataClean(data = value, newline = True, space = True)
 			self.dataUpdate(data = {'title' : value}, media = media)
@@ -3361,13 +3402,64 @@ class MetaData(Serializer):
 	def special(self, media = MediaDefault, selection = SelectionDefault):
 		return self.dataRetrieve(type = 'special', media = media, selection = selection)
 
-	def specialStory(self, media = MediaDefault):
-		special = self.special(media = media, selection = MetaData.SelectionList)
+	def specialStory(self, special = None, media = MediaDefault):
+		if special is None: special = self.special(media = media, selection = MetaData.SelectionList)
+		elif not Tools.isArray(special): special = [special]
 		if special: return any(i in MetaData.SpecialStory for i in special)
+		return None
+
+	def specialExtra(self, special = None, media = MediaDefault):
+		if special is None: special = self.special(media = media, selection = MetaData.SelectionList)
+		elif not Tools.isArray(special): special = [special]
+		if special: return any(i in MetaData.SpecialExtra for i in special)
+		return None
+
+	@classmethod
+	def specialExtraLegacy(self, special = None, title = None, exclude = None):
+		if not special: special = []
+		if title:
+			extracted = self.specialExtract(data = title, exclude = exclude)
+			if extracted: special.extend(extracted)
+			special = Tools.listUnique(special)
+		if special: return any(i in MetaData.SpecialExtra for i in special)
 		return None
 
 	def specialSet(self, value, media = MediaDefault):
 		if value: self.dataUpdate(data = {'special' : self.dataList(value)}, media = media)
+
+	@classmethod
+	def specialExtract(self, data, exclude = None):
+		special = []
+		if exclude and not Tools.isArray(exclude): exclude = [exclude]
+
+		expression = {
+			MetaData.SpecialBehind		: '(behind[\s\-]*the[\s\-]*(?:scenes?|casts?|shows?|series?|seasons?|drama))',	# Eg: Downton Abbey S00E01
+			MetaData.SpecialBlooper		: '(bloopers?)',
+			MetaData.SpecialInterview	: '(interview(?:s|ed|ing)?)',
+			MetaData.SpecialCrossover	: '(cross-?over(?:s|ed|ing)?)',
+			MetaData.SpecialDeleted		: '(deleted[\s\-]*scenes?)',
+			MetaData.SpecialMovie		: '((?:tv[\s\-]*)?movie)',
+			MetaData.SpecialExtended	: '(extended[\s\-]*scenes?)',
+			MetaData.SpecialMaking		: '(making[\s\-]of)',
+			MetaData.SpecialOriginal	: '(ova|original[\s\-]*video[\s\-]*animations?)',
+			MetaData.SpecialPilot		: '((?:un)?(?:aired|released)[\s\-]*pilot|pilot(?:[\s\-]*episode)?)',			# Eg: Sherlock S00E01.
+			MetaData.SpecialRecap		: '((?:(?:show|series|season)[\s\-]*)?recap)',
+			MetaData.SpecialShort		: '(short(?:[\s\-]*episode)?|webisode|webinar)',
+			MetaData.SpecialPodcast		: '((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)', 								# Eg: Last of Us S00E02, S00E06, S00E07, etc.
+		}
+
+		for key, value in expression.items():
+			value += '(?:$|[\s\,\.\!\?\:\-])'
+			if Regex.match(data = data, expression = value):
+				ignore = False
+				if exclude:
+					for j in exclude:
+						if Regex.match(data = j, expression = value):
+							ignore = True
+							break
+				if not ignore: special.append(key)
+
+		return special if special else MetaData.SpecialDefault
 
 	###################################################################
 	# DURATION

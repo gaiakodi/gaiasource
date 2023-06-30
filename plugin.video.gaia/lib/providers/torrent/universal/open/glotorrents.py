@@ -27,11 +27,12 @@ class Provider(ProviderHtml):
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'glotorrents', ProviderHtml.UnblockFormat3 : 'glotorrents', ProviderHtml.UnblockFormat4 : 'glotorrents'}
 	_Path					= 'search_results.php'
 
-	_CategoryMovie			= '1'
-	_CategoryShow			= '41'
+	_CategoryMovie			= ['1', '72', '28']		# 72 = Packs, 28 = Anime
+	_CategoryShow			= ['41', '72', '28']	# 72 = Packs, 28 = Anime
 
 	_ParameterSearch		= 'search'
 	_ParameterCategory		= 'cat'
+	_ParameterCategory2		= 'c'
 	_ParameterPage			= 'page'
 	_ParameterSort			= 'sort'
 	_ParameterSeeds			= 'seeders'
@@ -78,19 +79,30 @@ class Provider(ProviderHtml):
 
 			searchQuery					= {
 											ProviderHtml.RequestMethod : ProviderHtml.RequestMethodGet,
-											ProviderHtml.RequestPath : Provider._Path,
+
+											# Combine categories.
+											#ProviderHtml.RequestPath : Provider._Path,
+											ProviderHtml.RequestPath : Provider._Path + '?' + ProviderHtml.TermCategory,
+
 											ProviderHtml.RequestData : {
 												Provider._ParameterSearch	: ProviderHtml.TermQuery,
-												Provider._ParameterCategory	: ProviderHtml.TermCategory,
 												Provider._ParameterPage		: ProviderHtml.TermOffset,
 												Provider._ParameterSort		: Provider._ParameterSeeds,
 												Provider._ParameterOrder	: Provider._ParameterDescending,
 												Provider._ParameterDead		: 1, # Included dead results.
 												Provider._ParameterExternal	: 0, # Included local and external.
+
+												# Combine categories.
+												#Provider._ParameterCategory	: ProviderHtml.TermCategory,
+												Provider._ParameterCategory	: 0,
 											},
 										},
-			searchCategoryMovie			= Provider._CategoryMovie,
-			searchCategoryShow			= Provider._CategoryShow,
+
+			# Combine categories.
+			#searchCategoryMovie		= Provider._CategoryMovie,
+			#searchCategoryShow			= Provider._CategoryShow,
+			searchCategoryMovie			= '&'.join(['%s%s=1' % (Provider._ParameterCategory2, i) for i in Provider._CategoryMovie]),
+			searchCategoryShow			= '&'.join(['%s%s=1' % (Provider._ParameterCategory2, i) for i in Provider._CategoryShow]),
 
 			extractOptimizeData			= HtmlDiv(id_ = Provider._AttributeContainer), # To detect the last page in processOffset().
 			extractList					= [HtmlResults(class_ = Provider._AttributeTable, skip = 1)], # Every other row is a divider.

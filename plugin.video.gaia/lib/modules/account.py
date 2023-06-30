@@ -34,6 +34,7 @@ class Account(object):
 	ModeEmail				= 'email'			# Email & Passsword
 	ModeKey					= 'key'				# API Key
 	ModePin					= 'pin'				# API Pin
+	ModeCookie				= 'cookie'			# Cookie or session.
 	ModeId					= 'id'				# Identifier or Username
 	ModeExternal			= 'external'		# External Authentication
 
@@ -51,6 +52,7 @@ class Account(object):
 	AttributeKey			= 'key'
 	AttributePin			= 'pin'
 	AttributeSecret			= 'secret'
+	AttributeCookie			= 'cookie'
 	AttributeId				= 'id'
 	AttributeType			= 'type'
 	AttributeVersion		= 'version'
@@ -68,6 +70,8 @@ class Account(object):
 
 	SettingsAccount			= 'account'
 	SettingsPremium			= 'premium'
+	SettingsNetwork			= 'network'
+	SettingsOracle			= 'oracle'
 	SettingsEnabled			= 'enabled'
 	SettingsAuthentication	= 'authentication'
 
@@ -243,6 +247,10 @@ class Account(object):
 		try: return self.data()[Account.AttributeSecret]
 		except: return default
 
+	def dataCookie(self, default = None):
+		try: return self.data()[Account.AttributeCookie]
+		except: return default
+
 	def dataId(self, default = None):
 		try: return self.data()[Account.AttributeId]
 		except: return default
@@ -278,7 +286,7 @@ class Account(object):
 		Settings.set(self.settingsIdEnabled(), False)
 		Account.Data[self.mIdentifier] = None
 
-	def update(self, token = None, refresh = None, label = None, username = None, email = None, password = None, key = None, pin = None, secret = None, id = None, type = None, version = None, data = None):
+	def update(self, token = None, refresh = None, label = None, username = None, email = None, password = None, key = None, pin = None, secret = None, cookie = None, id = None, type = None, version = None, data = None):
 		if not data: data = self.data()
 		if not token is None: data[Account.AttributeToken] = token
 		if not refresh is None: data[Account.AttributeRefresh] = refresh
@@ -289,6 +297,7 @@ class Account(object):
 		if not key is None: data[Account.AttributeKey] = key
 		if not pin is None: data[Account.AttributePin] = pin
 		if not secret is None: data[Account.AttributeSecret] = secret
+		if not cookie is None: data[Account.AttributeCookie] = cookie
 		if not id is None: data[Account.AttributeId] = id
 		if not type is None: data[Account.AttributeType] = type
 		if not version is None: data[Account.AttributeVersion] = version
@@ -458,6 +467,10 @@ class Account(object):
 			Geolocation(type = Geolocation.TypePrimary),
 			Geolocation(type = Geolocation.TypeSecondary),
 			Geolocation(type = Geolocation.TypeTertiary),
+
+			Openai(),
+			Bard(),
+			Betterapi(),
 		]
 
 		for i in range(len(accounts)):
@@ -483,9 +496,13 @@ class Account(object):
 		functionUser = None,		# Function executed to before the user input dialog is shown (username/email).
 		functionSecret = None,		# Function executed to before the secret input dialog is shown (password/key/pin) was entered.
 
-		# Retrieves the authnetication data externally, like from another addon.
+		# Retrieves the authentication data externally, like from another addon.
 		# If external data is returned by this function, the user will be asked if this data should be used, or new data be entered.
 		functionExternal = None,
+
+		# Retrieves the authentication data internally, like automatically generating a free API key.
+		# If data is returned by this function, it will be used as default authentication data without asking the user for manual input.
+		functionInternal = None,
 
 		# Function executed to initiate the authentication proccess. Must return False on failures or a dictionary on success.
 		# For OAuth: Return True or {AttributeLink : <required>, AttributeCode : <required>, AttributeDevice : <optional>, AttributeExpiration : <optional>, AttributeInterval : <optional>}.
@@ -581,12 +598,30 @@ class Account(object):
 			self._authenticateMessage(messageInitial)
 			if functionInitial and functionInitial() is False: return _authenticateReturn()
 
-			if self.mMode == Account.ModeOauth: result = self._authenticateOauth(functionInitiate = functionInitiate, functionVerify = functionVerify)
-			elif self.mMode == Account.ModeUsername: result = self._authenticateUsername(functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
-			elif self.mMode == Account.ModeEmail: result = self._authenticateEmail(functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
-			elif self.mMode == Account.ModeKey: result = self._authenticateKey(functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
-			elif self.mMode == Account.ModePin: result = self._authenticatePin(functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
-			elif self.mMode == Account.ModeId: result = self._authenticateId(functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
+			default = None
+			if functionInternal:
+				internal = functionInternal()
+				if internal:
+					default = {}
+					if Tools.isDictionary(internal):
+						default.update(internal)
+					else:
+						if self.mMode == Account.ModeUsername: default[Account.AttributeUsername] = internal
+						elif self.mMode == Account.ModeEmail: default[Account.AttributeEmail] = internal
+						elif self.mMode == Account.ModeKey: default[Account.AttributeKey] = internal
+						elif self.mMode == Account.ModePin: default[Account.AttributePin] = internal
+						elif self.mMode == Account.ModeCookie: default[Account.AttributeCookie] = internal
+						elif self.mMode == Account.ModeId: default[Account.AttributeId] = internal
+						else: default = None
+
+			if not result:
+				if self.mMode == Account.ModeOauth: result = self._authenticateOauth(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify)
+				elif self.mMode == Account.ModeUsername: result = self._authenticateUsername(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+				elif self.mMode == Account.ModeEmail: result = self._authenticateEmail(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+				elif self.mMode == Account.ModeKey: result = self._authenticateKey(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
+				elif self.mMode == Account.ModePin: result = self._authenticatePin(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
+				elif self.mMode == Account.ModeCookie: result = self._authenticateCookie(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
+				elif self.mMode == Account.ModeId: result = self._authenticateId(default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageUser = messageUser, messageVerify = messageVerify, messageSecret = messageSecret)
 
 			self._authenticateMessage(messageFinal)
 			if functionFinal and functionFinal() is False: return _authenticateReturn()
@@ -657,7 +692,7 @@ class Account(object):
 			Logger.error()
 			return False
 
-	def _authenticateBasic(self, id = None, username = None, email = None, password = None, key = None, pin = None, functionInitiate = None, functionVerify = None, functionUser = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
+	def _authenticateBasic(self, id = None, username = None, email = None, password = None, key = None, pin = None, cookie = None, default = None, functionInitiate = None, functionVerify = None, functionUser = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
 		if functionInitiate and functionInitiate() is False: return None
 
 		result = {}
@@ -667,32 +702,43 @@ class Account(object):
 		if password: result[Account.AttributePassword] = self.dataPassword()
 		if key: result[Account.AttributeKey] = self.dataKey()
 		if pin: result[Account.AttributePin] = self.dataPin()
+		if cookie: result[Account.AttributeCookie] = self.dataCookie()
 
 		while True:
 			if username or email or id:
 				self._authenticateMessage(messageUser)
 				if functionUser and functionUser() is False: return None
 				if username:
-					result[Account.AttributeUsername] = Dialog.input(title = self._authenticateTitle(33267), type = Dialog.InputAlphabetic, default = result[Account.AttributeUsername] if Account.AttributeUsername in result else None)
+					if default and Account.AttributeUsername in default: result[Account.AttributeUsername] = default[Account.AttributeUsername]
+					else: result[Account.AttributeUsername] = Dialog.input(title = self._authenticateTitle(33267), type = Dialog.InputAlphabetic, default = result[Account.AttributeUsername] if Account.AttributeUsername in result else None)
 					if not result[Account.AttributeUsername]: return None # Cancel
 				elif email:
-					result[Account.AttributeEmail] = Dialog.input(title = self._authenticateTitle(32304), type = Dialog.InputAlphabetic, default = result[Account.AttributeEmail] if Account.AttributeEmail in result else None)
+					if default and Account.AttributeEmail in default: result[Account.AttributeEmail] = default[Account.AttributeEmail]
+					else: result[Account.AttributeEmail] = Dialog.input(title = self._authenticateTitle(32304), type = Dialog.InputAlphabetic, default = result[Account.AttributeEmail] if Account.AttributeEmail in result else None)
 					if not result[Account.AttributeEmail]: return None # Cancel
 				elif id:
-					result[Account.AttributeId] = Dialog.input(title = self._authenticateTitle(32305), type = Dialog.InputAlphabetic, default = result[Account.AttributeId] if Account.AttributeId in result else None)
+					if default and Account.AttributeId in default: result[Account.AttributeId] = default[Account.AttributeId]
+					else: result[Account.AttributeId] = Dialog.input(title = self._authenticateTitle(32305), type = Dialog.InputAlphabetic, default = result[Account.AttributeId] if Account.AttributeId in result else None)
 					if not result[Account.AttributeId]: return None # Cancel
-			if password or key or pin:
+			if password or key or pin or cookie:
 				self._authenticateMessage(messageSecret)
 				if functionSecret and functionSecret() is False: return None
 				if password:
-					result[Account.AttributePassword] = Dialog.input(title = self._authenticateTitle(32307), type = Dialog.InputAlphabetic, default = result[Account.AttributePassword] if Account.AttributePassword in result else None)
+					if default and Account.AttributePassword in default: result[Account.AttributePassword] = default[Account.AttributePassword]
+					else: result[Account.AttributePassword] = Dialog.input(title = self._authenticateTitle(32307), type = Dialog.InputAlphabetic, default = result[Account.AttributePassword] if Account.AttributePassword in result else None)
 					if not result[Account.AttributePassword]: return None # Cancel
 				elif key:
-					result[Account.AttributeKey] = Dialog.input(title = self._authenticateTitle(33100), type = Dialog.InputAlphabetic, default = result[Account.AttributeKey] if Account.AttributeKey in result else None)
+					if default and Account.AttributeKey in default: result[Account.AttributeKey] = default[Account.AttributeKey]
+					else: result[Account.AttributeKey] = Dialog.input(title = self._authenticateTitle(33100), type = Dialog.InputAlphabetic, default = result[Account.AttributeKey] if Account.AttributeKey in result else None)
 					if not result[Account.AttributeKey]: return None # Cancel
 				elif pin:
-					result[Account.AttributePin] = Dialog.input(title = self._authenticateTitle(33103), type = Dialog.InputAlphabetic, default = result[Account.AttributePin] if Account.AttributePin in result else None)
+					if default and Account.AttributePin in default: result[Account.AttributePin] = default[Account.AttributePin]
+					else: result[Account.AttributePin] = Dialog.input(title = self._authenticateTitle(33103), type = Dialog.InputAlphabetic, default = result[Account.AttributePin] if Account.AttributePin in result else None)
 					if not result[Account.AttributePin]: return None # Cancel
+				elif cookie:
+					if default and Account.AttributeCookie in default: result[Account.AttributeCookie] = default[Account.AttributeCookie]
+					else: result[Account.AttributeCookie] = Dialog.input(title = self._authenticateTitle(36354), type = Dialog.InputAlphabetic, default = result[Account.AttributeCookie] if Account.AttributeCookie in result else None)
+					if not result[Account.AttributeCookie]: return None # Cancel
 
 			failed = False
 			if result:
@@ -710,20 +756,23 @@ class Account(object):
 
 		return False
 
-	def _authenticateUsername(self, functionVerify = None, functionUser = None, functionInitiate = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
-		return self._authenticateBasic(username = True, password = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+	def _authenticateUsername(self, default = None, functionVerify = None, functionUser = None, functionInitiate = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
+		return self._authenticateBasic(username = True, default = default, password = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
 
-	def _authenticateEmail(self, functionUser = None, functionInitiate = None, functionVerify = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
-		return self._authenticateBasic(email = True, password = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+	def _authenticateEmail(self, default = None, functionUser = None, functionInitiate = None, functionVerify = None, functionSecret = None, messageVerify = None, messageUser = None, messageSecret = None):
+		return self._authenticateBasic(email = True, default = default, password = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionUser = functionUser, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
 
-	def _authenticateKey(self, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
-		return self._authenticateBasic(key = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+	def _authenticateKey(self, default = None, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
+		return self._authenticateBasic(key = True, default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
 
-	def _authenticatePin(self, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
-		return self._authenticateBasic(pin = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+	def _authenticatePin(self, default = None, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
+		return self._authenticateBasic(pin = True, default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
 
-	def _authenticateId(self, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
-		return self._authenticateBasic(id = True, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+	def _authenticateCookie(self, default = None, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
+		return self._authenticateBasic(cookie = True, default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
+
+	def _authenticateId(self, default = None, functionSecret = None, functionInitiate = None, functionVerify = None, messageUser = None, messageVerify = None, messageSecret = None):
+		return self._authenticateBasic(id = True, default = default, functionInitiate = functionInitiate, functionVerify = functionVerify, functionSecret = functionSecret, messageVerify = messageVerify, messageUser = messageUser, messageSecret = messageSecret)
 
 class Premium(Account):
 
@@ -1019,7 +1068,7 @@ class Trakt(Account):
 		fileOriginal = None
 		if File.exists(path):
 			fileOriginal = file = File.readNow(path)
-			file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all.*?\)[\'"]\)', replacement = 'pass')
+			file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all.*?\)[\'"]\)', replacement = 'pass', all = True)
 			File.writeNow(path, file)
 		Time.sleep(0.1)
 
@@ -1346,7 +1395,7 @@ class Geolocation(Account):
 
 	def __init__(self, type):
 		try:
-			self.mService = Geolocation.Services[Settings.getInteger(self.settingsId(category = 'network', id = type))]
+			self.mService = Geolocation.Services[Settings.getInteger(self.settingsId(category = Account.SettingsNetwork, id = type))]
 			name = self.mService['name']
 			linkDirect = self.mService['link']
 			linkRedirect = 'internal.link.' + self.mService['service']
@@ -1372,7 +1421,7 @@ class Geolocation(Account):
 
 			level = 2,
 			rank = 1,
-			category = 'network',
+			category = Account.SettingsNetwork,
 			color = 'FFFF8A00',
 		)
 
@@ -1784,3 +1833,175 @@ class Smoozed(Resolver):
 			rank = 2,
 			color = 'FFDD1F1F',
 		)
+
+###################################################################
+# OPENAI
+###################################################################
+
+class Openai(Account):
+
+	def __init__(self):
+		from lib.oracle.chatgpt import Chatgpt
+		self.mOracle = Chatgpt.instance()
+
+		Account.__init__(self,
+			#id = 'openai',
+			id = self.mOracle.id(), # To set the correct value in settings.xml.
+			mode = Premium.ModeKey,
+
+			name = self.mOracle.organization(),
+			description = self.mOracle.helpDescription(),
+			free = True,
+			optional = True,
+
+			linkDirect = self.mOracle.linkAccount(),
+			linkRedirect = self.mOracle.linkRedirect(),
+
+			level = 1,
+			rank = 5,
+			category = Account.SettingsOracle,
+			color = self.mOracle.color(),
+		)
+
+	def help(self):
+		self.mOracle.helpAuthentication()
+
+	def _verify(self, data = None):
+		if data is None: key = self.dataKey()
+		else: key = data['key']
+
+		valid = self.mOracle.accountVerification(key = key)
+
+		# NB: Enable the playground if an account was successfully authenticated.
+		# Serves as a fallback if the OpenAI account reaches its limits or in some other way does not work (eg: OpenAI servers currently overloaded).
+		# Only do this if the setting is disabled (default) and not if the user already changed the setting.
+		if key and valid and self.mOracle.settingsPlaygroundDisabled(): self.mOracle.settingsPlaygroundEnable()
+
+		return valid
+
+	def _select(self):
+		if self.mOracle.settingsPlaygroundDisabled() or not self.authenticated():
+			choice = Dialog.options(title = self._authenticateTitle(), message = 'Do you want to use a [B]free[/B] account with limited capabilities or authenticate a [B]custom[/B] account with advanced capabilities?', labelDeny = 33334, labelConfirm = 33743, labelCustom = 35233)
+			if choice == Dialog.ChoiceNo:
+				choice = Dialog.options(title = self._authenticateTitle(), message = 'Do you want to use an [B]unofficial[/B] free playground or authenticate an [B]official[/B] %s trial account? The free playground does not require account registration, but is unreliable, constrained, slow, and uncustomizable. The official %s account requires registration, but is reliable, unconstrained, fast, and customizable.' % (self.mOracle.organization(), self.mOracle.organization()), labelDeny = 36338, labelConfirm = 33743, labelCustom = 36337)
+				if choice == Dialog.ChoiceNo:
+					# Only do this if the setting is disabled (default) and not if the user already changed the setting.
+					if self.mOracle.settingsPlaygroundDisabled(): self.mOracle.settingsPlaygroundEnable()
+			if not choice == Dialog.ChoiceCustom: return False # Cancel, Close, Free.
+
+		self._authenticateMessage({
+			'type' : Dialog.TypeDetails, 'text' : False, 'items' : [
+				{'type' : 'text', 'value' : 'Authenticate with your API key which can be found on %s\'s website under the [I]Account[/I]  tab:' % self.mOracle.organization()},
+				{'type' : 'link', 'value' : self.mOracle.linkAccount()},
+			]
+		})
+
+	def authenticate(self, help = True, settings = True):
+		return Account.authenticate(self, functionVerify = self._verify, functionHelp = self.help if help else None, functionBefore = self._select, settings = settings)
+
+###################################################################
+# BARD
+###################################################################
+
+class Bard(Account):
+
+	def __init__(self):
+		from lib.oracle.bard import Bard
+		self.mOracle = Bard.instance()
+
+		Account.__init__(self,
+			#id = 'bard',
+			id = self.mOracle.id(), # To set the correct value in settings.xml.
+			mode = Premium.ModeCookie,
+
+			name = self.mOracle.organization(),
+			description = self.mOracle.helpDescription(),
+			free = True,
+			optional = True,
+
+			linkDirect = self.mOracle.linkAccount(),
+			linkRedirect = self.mOracle.linkRedirect(),
+
+			level = 1,
+			rank = 4,
+			category = Account.SettingsOracle,
+			color = self.mOracle.color(),
+		)
+
+	def help(self):
+		self.mOracle.helpAuthentication()
+
+	def _verify(self, data = None):
+		if data is None: cookie = self.dataCookie()
+		else: cookie = data['cookie']
+		return self.mOracle.accountVerification(cookie = cookie)
+
+	def authenticate(self, help = True, settings = True):
+		return Account.authenticate(self, functionVerify = self._verify, functionHelp = self.help if help else None, settings = settings)
+
+###################################################################
+# BETTERAPI
+###################################################################
+
+class Betterapi(Account):
+
+	def __init__(self):
+		from lib.oracle.youchat import Youchat
+		self.mOracle = Youchat.instance()
+
+		Account.__init__(self,
+			#id = 'betterapi',
+			id = self.mOracle.id(), # To set the correct value in settings.xml.
+			mode = Premium.ModeKey,
+
+			name = self.mOracle.name(),
+			description = self.mOracle.helpDescription(),
+			free = True,
+			optional = True,
+
+			linkDirect = self.mOracle.linkAccount(),
+			linkRedirect = self.mOracle.linkRedirect(),
+
+			level = 1,
+			rank = 2,
+			category = Account.SettingsOracle,
+			color = self.mOracle.color(),
+		)
+
+	def help(self):
+		self.mOracle.helpAuthentication()
+
+	def _free(self):
+		if self.mFreeKey:
+			Loader.show()
+			key = self.mOracle.accountKeyGenerate()
+			Loader.hide()
+			return key
+		return None
+
+	def _verify(self, data = None):
+		if data is None: key = self.dataKey()
+		else: key = data['key']
+
+		result = self.mOracle.accountVerification(key = key)
+		if result: self.mOracle.settingsEnable()
+		return result
+
+	def _select(self):
+		self.mFreeKey = False
+		if not self.authenticated():
+			choice = Dialog.options(title = self._authenticateTitle(), message = 'Do you want to generate a [B]free[/B] key or authenticate a [B]custom[/B] account?', labelDeny = 33334, labelConfirm = 33743, labelCustom = 35233)
+			if choice == Dialog.ChoiceNo:
+				self.mFreeKey = True
+				return True
+			if not choice == Dialog.ChoiceCustom: return False # Cancel, Close.
+
+		self._authenticateMessage({
+			'type' : Dialog.TypeDetails, 'text' : False, 'items' : [
+				{'type' : 'text', 'value' : 'Authenticate with your API key which can be found on %s\'s website:' % self.name()},
+				{'type' : 'link', 'value' : self.mOracle.linkAccount()},
+			]
+		})
+
+	def authenticate(self, help = True, settings = True):
+		return Account.authenticate(self, functionInternal = self._free, functionVerify = self._verify, functionHelp = self.help if help else None, functionBefore = self._select, settings = settings)

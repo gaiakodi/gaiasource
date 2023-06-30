@@ -175,6 +175,15 @@ class View(object):
 			interations = 200
 			interval = 0.05
 
+			# Wait for the Oracle window to close, otherwise the 1st item is not selected, since getting the ListItem will get the list from Oracle window and not the menu.
+			# If the WindowOracleResults is shown for longer than 10 secs, this problem happens.
+			# Wait for WindowOracleResults to close before determining which item to select.
+			from lib.modules.window import WindowOracle
+			if WindowOracle.visible():
+				for i in range(0, interations * 30):
+					if not WindowOracle.visible(): break
+					Time.sleep(interval)
+
 			if id:
 				# NB: When the Back entry (..) is hidden, the 1st item has an index of 0 instead of 1.
 				# Gaia Eminence hides the back button on first install.
@@ -283,7 +292,7 @@ class View(object):
 				if selection == View.SelectionAlways or (not current is None and currentValue == 0):
 					import xbmcgui
 					try: id = int(System.infoLabel('System.CurrentControlID')) # Sometimes this returns nothing.
-					except: id = None
+					except: id = None					
 					if not id is None:
 						window = xbmcgui.Window(xbmcgui.getCurrentWindowId())
 						try: list = window.getControl(id)

@@ -20,6 +20,7 @@
 
 # https://popcorntime.api-docs.io/api/welcome/introduction
 # https://github.com/popcorn-official/popcorn-api
+# https://github.com/popcorn-official/popcorn-desktop/wiki/FAQ (listed new domain).
 
 from lib.providers.core.json import ProviderJson
 from lib.modules.stream import Stream
@@ -31,11 +32,12 @@ class Provider(ProviderJson):
 	# Only .tk domain works, but keep the other ones in case they come up again.
 	# Although movies/shows/anime have different subdomains, it seems all of them can be used to search anything.
 	_Link				= [
+							'https://shows.cf',
 							'https://popcorn-time.ga',
-							'https://popcorn-ru.tk', # Not reachable by some VPNs. Seems to be down.
-							'https://tv-v2.api-fetch.sh',
-							'https://tv-v2.api-fetch.am',
-							'https://tv-v2.api-fetch.website',
+							#'https://popcorn-ru.tk', # Not reachable by some VPNs. Seems to be down.
+							#'https://tv-v2.api-fetch.sh',
+							#'https://tv-v2.api-fetch.am',
+							#'https://tv-v2.api-fetch.website',
 						]
 	_Path				= '%s/%s'
 

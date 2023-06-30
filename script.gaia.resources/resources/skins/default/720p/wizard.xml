@@ -20,9 +20,10 @@
 			<left>0</left>
 			<width>100%</width>
 			<height>100%</height>
-			<visible>Integer.IsGreater(Container(52000).NumItems, 0)</visible> <!-- Slightly reduce the time when items are added and various things, like the splotlight, flicker while being initialized from Python. -->
 
 			<control type="image">
+				<visible>Integer.IsGreater(Container(52000).NumItems, 0)</visible> <!-- Slightly reduce the time when items are added and various things, like the splotlight, flicker while being initialized from Python. -->
+
 				<!-- [GAIATYPELARGE/] -->
 				<height>275</height>
 				<!-- [/GAIATYPELARGE/] -->
@@ -63,7 +64,13 @@
 				<!-- [GAIATYPEQR/] -->
 				<top>210</top>
 				<!-- [/GAIATYPEQR/] -->
+
+				<!-- [GAIATYPESTATIC/] -->
+				<top>240</top>
+				<!-- [/GAIATYPESTATIC/] -->
 				<top>190</top>
+				<!-- [/GAIATYPESTATIC] -->
+
 				<!-- [/GAIATYPEQR] -->
 
 				<left>0</left>
@@ -78,7 +85,13 @@
 				<!-- [GAIATYPEQR/] -->
 				<top>190</top>
 				<!-- [/GAIATYPEQR/] -->
+
+				<!-- [GAIATYPESTATIC/] -->
+				<top>280</top>
+				<!-- [/GAIATYPESTATIC/] -->
 				<top>170</top>
+				<!-- [/GAIATYPESTATIC] -->
+
 				<!-- [/GAIATYPEQR] -->
 
 				<left>0</left>
@@ -92,482 +105,487 @@
 
 			<!-- LIST -->
 
-			<!-- [GAIATYPESTATIC/] -->
-			<control type="fixedlist" id="52000">
-			<!-- [/GAIATYPESTATIC/] -->
-			<control type="wraplist" id="52000">
-			<!-- [/GAIATYPESTATIC] -->
-
-				<!-- [GAIATYPELARGE/] -->
-				<top>280</top>
-				<left>140</left>
-				<width>999</width>
-				<focusposition>2</focusposition>
-				<!-- [/GAIATYPELARGE/] -->
-				<left>256</left>
-				<width>767</width>
-				<focusposition>1</focusposition>
+			<control type="group">
+				<visible>Integer.IsGreater(Container(52000).NumItems, 0)</visible> <!-- Slightly reduce the time when items are added and various things, like the splotlight, flicker while being initialized from Python. -->
 
 				<!-- [GAIATYPESTATIC/] -->
-				<top>270</top>
+				<control type="fixedlist" id="52000">
 				<!-- [/GAIATYPESTATIC/] -->
-				<top>300</top>
+				<control type="wraplist" id="52000">
 				<!-- [/GAIATYPESTATIC] -->
 
-				<!-- [/GAIATYPELARGE] -->
+					<!-- [GAIATYPELARGE/] -->
+					<top>280</top>
+					<left>140</left>
+					<width>999</width>
+					<focusposition>2</focusposition>
+					<!-- [/GAIATYPELARGE/] -->
+					<left>256</left>
+					<width>767</width>
+					<focusposition>1</focusposition>
 
-				<height>340</height>
-				<visible>true</visible>
-				<viewtype label="535">list</viewtype>
-				<orientation>horizontal</orientation>
+					<!-- [GAIATYPESTATIC/] -->
+					<top>270</top>
+					<!-- [/GAIATYPESTATIC/] -->
+					<top>300</top>
+					<!-- [/GAIATYPESTATIC] -->
 
-				<!-- [GAIATYPESCROLL/] -->
-				<scrolltime tween="cubic">1500</scrolltime>
-				<autoscroll>!String.IsEqual(Window.Property(GaiaScroll),0)</autoscroll>
-				<!-- [/GAIATYPESCROLL/] -->
-				<scrolltime tween="cubic">500</scrolltime>
-				<autoscroll>false</autoscroll>
-				<!-- [/GAIATYPESCROLL] -->
+					<!-- [/GAIATYPELARGE] -->
 
-				<!-- [GAIATYPELARGE/] -->
-				<itemlayout width="200" height="340">
-				<!-- [/GAIATYPELARGE/] -->
-				<itemlayout width="256" height="340">
-				<!-- [/GAIATYPELARGE] -->
+					<height>340</height>
+					<visible>true</visible>
+					<viewtype label="535">list</viewtype>
+					<orientation>horizontal</orientation>
 
-					<control type="image">
-						<width>98</width>
-						<height>98</height>
-						<left>51</left>
-						<top>51</top>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaEmpty)]</texture>
-						<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>100</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>133</width>
-						<!-- [/GAIATYPELARGE] -->
+					<!-- [GAIATYPESCROLL/] -->
+					<scrolltime tween="cubic">1500</scrolltime>
+					<autoscroll>!String.IsEqual(Window.Property(GaiaScroll),0)</autoscroll>
+					<!-- [/GAIATYPESCROLL/] -->
+					<scrolltime tween="cubic">500</scrolltime>
+					<autoscroll>false</autoscroll>
+					<!-- [/GAIATYPESCROLL] -->
 
-						<left>38</left>
-						<top>50</top>
-						<height>100</height>
-						<aspectratio>keep</aspectratio>
+					<!-- [GAIATYPELARGE/] -->
+					<itemlayout width="200" height="340">
+					<!-- [/GAIATYPELARGE/] -->
+					<itemlayout width="256" height="340">
+					<!-- [/GAIATYPELARGE] -->
 
-						<!-- [GAIATYPEQR/] -->
-						<!-- [/GAIATYPEQR/] -->
-						<colordiffuse>FF333333</colordiffuse>
-						<!-- [/GAIATYPEQR] -->
-
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>100</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>133</width>
-						<!-- [/GAIATYPELARGE] -->
-
-						<left>50</left>
-						<top>50</top>
-						<height>100</height>
-						<aspectratio>keep</aspectratio>
-
-						<!-- [GAIATYPEQR/] -->
-						<!-- [/GAIATYPEQR/] -->
-						<colordiffuse>FF333333</colordiffuse>
-						<!-- [/GAIATYPEQR] -->
-
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>100</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>133</width>
-						<!-- [/GAIATYPELARGE] -->
-
-						<left>62</left>
-						<top>50</top>
-						<height>100</height>
-						<aspectratio>keep</aspectratio>
-
-						<!-- [GAIATYPEQR/] -->
-						<!-- [/GAIATYPEQR/] -->
-						<colordiffuse>FF333333</colordiffuse>
-						<!-- [/GAIATYPEQR] -->
-
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
-					</control>
-
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<left>86</left>
-						<!-- [/GAIATYPELARGE/] -->
-						<left>115</left>
-						<!-- [/GAIATYPELARGE] -->
-
-						<top>123</top>
-						<width>28</width>
-						<height>28</height>
-						<aspectratio>keep</aspectratio>
-						<colordiffuse>FF333333</colordiffuse>
-						<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/unselected.png</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaSelected),0)</visible>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<left>86</left>
-						<!-- [/GAIATYPELARGE/] -->
-						<left>115</left>
-						<!-- [/GAIATYPELARGE] -->
-
-						<top>123</top>
-						<width>28</width>
-						<height>28</height>
-						<aspectratio>keep</aspectratio>
-						<colordiffuse>FF333333</colordiffuse>
-						<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
-					</control>
-
-					<control type="label">
-						<!-- [GAIATYPELARGE/] -->
-						<left>0</left>
-						<!-- [/GAIATYPELARGE/] -->
-						<left>-13</left>
-						<!-- [/GAIATYPELARGE] -->
-
-						<top>150</top>
-						<width>100%</width>
-						<height>30</height>
-						<font>[GAIAFONTMEDIUM]</font>
-						<aligny>center</aligny>
-						<align>center</align>
-						<textcolor>FF333333</textcolor>
-						<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
-					</control>
-				</itemlayout>
-
-				<!-- [GAIATYPELARGE/] -->
-				<focusedlayout width="200" height="340">
-				<!-- [/GAIATYPELARGE/] -->
-				<focusedlayout width="256" height="340">
-				<!-- [/GAIATYPELARGE] -->
-
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>170</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>226</width>
-						<!-- [/GAIATYPELARGE] -->
-						<left>-5</left>
-						<top>15</top>
-						<height>170</height>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
-						<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
-							<effect type="fade" tween="cubic" start="20" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="20" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>170</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>226</width>
-						<!-- [/GAIATYPELARGE] -->
-						<left>15</left>
-						<top>15</top>
-						<height>170</height>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
-						<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="20" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="20" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<width>170</width>
-						<!-- [/GAIATYPELARGE/] -->
-						<width>226</width>
-						<!-- [/GAIATYPELARGE] -->
-						<height>170</height>
-						<left>35</left>
-						<top>15</top>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
-						<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
-							<effect type="fade" tween="cubic" start="20" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="20" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<width>170</width>
-						<height>170</height>
-						<left>15</left>
-						<top>15</top>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaQr)]</texture>
-						<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
-							<effect type="fade" tween="cubic" start="0" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="0" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="0" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<width>54</width>
-						<height>54</height>
-						<left>72</left>
-						<top>157</top>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaEmpty)]</texture>
-						<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="178.5714285714286" end="100" center="100,185" time="500" />
-							<effect type="slide" tween="cubic" start="1,-46" end="0,0" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="178.5714285714286" center="100,185" time="500" />
-							<effect type="slide" tween="cubic" start="0,0" end="1,-46" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<width>56</width>
-						<height>56</height>
-						<left>71</left>
-						<top>156</top>
-						<aspectratio>keep</aspectratio>
-						<texture>$INFO[Container(52000).ListItem.Property(GaiaIconSmall)]</texture>
-						<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="178.5714285714286" end="100" center="100,185" time="500" />
-							<effect type="slide" tween="cubic" start="0,-46" end="0,0" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="178.5714285714286" center="100,185" time="500" />
-							<effect type="slide" tween="cubic" start="0,0" end="1,-46" time="500" />
-						</animation>
-					</control>
-
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<left>76</left>
-						<!-- [/GAIATYPELARGE/] -->
-						<left>104</left>
-						<!-- [/GAIATYPELARGE] -->
-
-						<top>140</top>
-						<width>48</width>
-						<height>48</height>
-						<aspectratio>keep</aspectratio>
-						<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/unselected.png</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaSelected),0)</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="20" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="20" time="500" />
-						</animation>
-					</control>
-					<control type="image">
-						<!-- [GAIATYPELARGE/] -->
-						<left>76</left>
-						<!-- [/GAIATYPELARGE/] -->
-						<left>104</left>
-						<!-- [/GAIATYPELARGE] -->
-
-						<top>140</top>
-						<width>48</width>
-						<height>48</height>
-						<aspectratio>keep</aspectratio>
-						<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
-						<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
-						<animation type="Focus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="20" end="100" time="500" />
-						</animation>
-						<animation type="Unfocus" condition="Control.HasFocus(52000)">
-							<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
-							<effect type="fade" tween="cubic" start="100" end="20" time="500" />
-						</animation>
-					</control>
-
-					<control type="group">
-						<!-- [GAIATYPEQR/] -->
-						<top>20</top>
-						<!-- [/GAIATYPEQR] -->
-
-						<control type="label">
+						<control type="image">
+							<width>98</width>
+							<height>98</height>
+							<left>51</left>
+							<top>51</top>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaEmpty)]</texture>
+							<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
+						</control>
+						<control type="image">
 							<!-- [GAIATYPELARGE/] -->
-							<left>-400</left>
+							<width>100</width>
 							<!-- [/GAIATYPELARGE/] -->
-							<left>-372</left>
+							<width>133</width>
 							<!-- [/GAIATYPELARGE] -->
 
-							<top>200</top>
-							<width>1000</width>
-							<height>30</height>
-							<font>[GAIAFONTBIG]</font>
-							<aligny>center</aligny>
-							<align>center</align>
-							<textcolor>FFFFFFFF</textcolor>
-							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+							<left>38</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
 
 							<!-- [GAIATYPEQR/] -->
-							<animation type="Focus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="63" end="100" center="100,185" time="500" />
-								<effect type="slide" tween="cubic" start="1,-92" end="0,0" time="500" />
-							</animation>
-							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="63" center="100,185" time="500" />
-								<effect type="slide" tween="cubic" start="0,0" end="1,-92" time="500" />
-							</animation>
 							<!-- [/GAIATYPEQR/] -->
-							<animation type="Focus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="63" end="100" center="100,185" time="500" />
-								<effect type="slide" tween="cubic" start="1,-60" end="0,0" time="500" />
-								<effect type="fade" tween="cubic" start="30" end="100" time="500" />
-							</animation>
-							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="63" center="100,185" time="500" />
-								<effect type="slide" tween="cubic" start="0,0" end="1,-60" time="500" />
-								<effect type="fade" tween="cubic" start="100" end="30" time="500" />
-							</animation>
+							<colordiffuse>FF333333</colordiffuse>
 							<!-- [/GAIATYPEQR] -->
+
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
 						</control>
-						<control type="label">
+						<control type="image">
 							<!-- [GAIATYPELARGE/] -->
-							<left>-400</left>
+							<width>100</width>
 							<!-- [/GAIATYPELARGE/] -->
-							<left>-372</left>
+							<width>133</width>
 							<!-- [/GAIATYPELARGE] -->
 
-							<top>230</top>
-							<width>1000</width>
+							<left>50</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
+
+							<!-- [GAIATYPEQR/] -->
+							<!-- [/GAIATYPEQR/] -->
+							<colordiffuse>FF333333</colordiffuse>
+							<!-- [/GAIATYPEQR] -->
+
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>100</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>133</width>
+							<!-- [/GAIATYPELARGE] -->
+
+							<left>62</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
+
+							<!-- [GAIATYPEQR/] -->
+							<!-- [/GAIATYPEQR/] -->
+							<colordiffuse>FF333333</colordiffuse>
+							<!-- [/GAIATYPEQR] -->
+
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
+						</control>
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/unselected.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaSelected),0)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
+						</control>
+
+						<control type="label">
+							<!-- [GAIATYPELARGE/] -->
+							<left>0</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>-13</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>150</top>
+							<width>100%</width>
 							<height>30</height>
 							<font>[GAIAFONTMEDIUM]</font>
 							<aligny>center</aligny>
 							<align>center</align>
-							<textcolor>FFFFFFFF</textcolor>
-							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel1)][/B]</label>
+							<textcolor>FF333333</textcolor>
+							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+						</control>
+					</itemlayout>
 
+					<!-- [GAIATYPELARGE/] -->
+					<focusedlayout width="200" height="340">
+					<!-- [/GAIATYPELARGE/] -->
+					<focusedlayout width="256" height="340">
+					<!-- [/GAIATYPELARGE] -->
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<left>-5</left>
+							<top>15</top>
+							<height>170</height>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
+							<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<left>15</left>
+							<top>15</top>
+							<height>170</height>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
+							<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<height>170</height>
+							<left>35</left>
+							<top>15</top>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIcon)]</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
+							<visible>String.IsEmpty(ListItem.Property(GaiaQr))</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<width>170</width>
+							<height>170</height>
+							<left>15</left>
+							<top>15</top>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaQr)]</texture>
+							<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
 							<animation type="Focus" condition="Control.HasFocus(52000)">
 								<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
 								<effect type="fade" tween="cubic" start="0" end="100" time="500" />
 							</animation>
 							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
+								<effect type="zoom" tween="cubic" start="100" end="0" center="100,100" time="500" />
 								<effect type="fade" tween="cubic" start="100" end="0" time="500" />
 							</animation>
 						</control>
-						<control type="label">
-							<!-- [GAIATYPELARGE/] -->
-							<left>-400</left>
-							<!-- [/GAIATYPELARGE/] -->
-							<left>-372</left>
-							<!-- [/GAIATYPELARGE] -->
-
-							<top>250</top>
-							<width>1000</width>
-							<height>30</height>
-							<font>[GAIAFONTMEDIUM]</font>
-							<aligny>center</aligny>
-							<align>center</align>
-							<textcolor>FFFFFFFF</textcolor>
-							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel2)][/B]</label>
-
+						<control type="image">
+							<width>54</width>
+							<height>54</height>
+							<left>72</left>
+							<top>157</top>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaEmpty)]</texture>
+							<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
 							<animation type="Focus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								<effect type="zoom" tween="cubic" start="178.5714285714286" end="100" center="100,185" time="500" />
+								<effect type="slide" tween="cubic" start="1,-46" end="0,0" time="500" />
 							</animation>
 							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								<effect type="zoom" tween="cubic" start="100" end="178.5714285714286" center="100,185" time="500" />
+								<effect type="slide" tween="cubic" start="0,0" end="1,-46" time="500" />
 							</animation>
 						</control>
-						<control type="label">
-							<!-- [GAIATYPELARGE/] -->
-							<left>-400</left>
-							<!-- [/GAIATYPELARGE/] -->
-							<left>-372</left>
-							<!-- [/GAIATYPELARGE] -->
-
-							<top>270</top>
-							<width>1000</width>
-							<height>30</height>
-							<font>[GAIAFONTMEDIUM]</font>
-							<aligny>center</aligny>
-							<align>center</align>
-							<textcolor>FFFFFFFF</textcolor>
-							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel3)][/B]</label>
-
+						<control type="image">
+							<width>56</width>
+							<height>56</height>
+							<left>71</left>
+							<top>156</top>
+							<aspectratio>keep</aspectratio>
+							<texture>$INFO[Container(52000).ListItem.Property(GaiaIconSmall)]</texture>
+							<visible>!String.IsEmpty(ListItem.Property(GaiaQr))</visible>
 							<animation type="Focus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								<effect type="zoom" tween="cubic" start="178.5714285714286" end="100" center="100,185" time="500" />
+								<effect type="slide" tween="cubic" start="0,-46" end="0,0" time="500" />
 							</animation>
 							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								<effect type="zoom" tween="cubic" start="100" end="178.5714285714286" center="100,185" time="500" />
+								<effect type="slide" tween="cubic" start="0,0" end="1,-46" time="500" />
 							</animation>
 						</control>
-						<control type="label">
+
+						<control type="image">
 							<!-- [GAIATYPELARGE/] -->
-							<left>-400</left>
+							<left>76</left>
 							<!-- [/GAIATYPELARGE/] -->
-							<left>-372</left>
+							<left>104</left>
 							<!-- [/GAIATYPELARGE] -->
 
-							<top>290</top>
-							<width>1000</width>
-							<height>30</height>
-							<font>[GAIAFONTMEDIUM]</font>
-							<aligny>center</aligny>
-							<align>center</align>
-							<textcolor>FFFFFFFF</textcolor>
-							<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel4)][/B]</label>
-
+							<top>140</top>
+							<width>48</width>
+							<height>48</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/unselected.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaSelected),0)</visible>
 							<animation type="Focus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
 							</animation>
 							<animation type="Unfocus" condition="Control.HasFocus(52000)">
-								<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
-								<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
 							</animation>
 						</control>
-					</control>
-				</focusedlayout>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>76</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>104</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>140</top>
+							<width>48</width>
+							<height>48</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+
+						<control type="group">
+							<!-- [GAIATYPEQR/] -->
+							<top>20</top>
+							<!-- [/GAIATYPEQR] -->
+
+							<control type="label">
+								<!-- [GAIATYPELARGE/] -->
+								<left>-400</left>
+								<!-- [/GAIATYPELARGE/] -->
+								<left>-372</left>
+								<!-- [/GAIATYPELARGE] -->
+
+								<top>200</top>
+								<width>1000</width>
+								<height>30</height>
+								<font>[GAIAFONTBIG]</font>
+								<aligny>center</aligny>
+								<align>center</align>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel)][/B]</label>
+
+								<!-- [GAIATYPEQR/] -->
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="63" end="100" center="100,185" time="500" />
+									<effect type="slide" tween="cubic" start="1,-92" end="0,0" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="63" center="100,185" time="500" />
+									<effect type="slide" tween="cubic" start="0,0" end="1,-92" time="500" />
+								</animation>
+								<!-- [/GAIATYPEQR/] -->
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="63" end="100" center="100,185" time="500" />
+									<effect type="slide" tween="cubic" start="1,-60" end="0,0" time="500" />
+									<effect type="fade" tween="cubic" start="30" end="100" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="63" center="100,185" time="500" />
+									<effect type="slide" tween="cubic" start="0,0" end="1,-60" time="500" />
+									<effect type="fade" tween="cubic" start="100" end="30" time="500" />
+								</animation>
+								<!-- [/GAIATYPEQR] -->
+							</control>
+							<control type="label">
+								<!-- [GAIATYPELARGE/] -->
+								<left>-400</left>
+								<!-- [/GAIATYPELARGE/] -->
+								<left>-372</left>
+								<!-- [/GAIATYPELARGE] -->
+
+								<top>230</top>
+								<width>1000</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<aligny>center</aligny>
+								<align>center</align>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel1)][/B]</label>
+
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								</animation>
+							</control>
+							<control type="label">
+								<!-- [GAIATYPELARGE/] -->
+								<left>-400</left>
+								<!-- [/GAIATYPELARGE/] -->
+								<left>-372</left>
+								<!-- [/GAIATYPELARGE] -->
+
+								<top>250</top>
+								<width>1000</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<aligny>center</aligny>
+								<align>center</align>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel2)][/B]</label>
+
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								</animation>
+							</control>
+							<control type="label">
+								<!-- [GAIATYPELARGE/] -->
+								<left>-400</left>
+								<!-- [/GAIATYPELARGE/] -->
+								<left>-372</left>
+								<!-- [/GAIATYPELARGE] -->
+
+								<top>270</top>
+								<width>1000</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<aligny>center</aligny>
+								<align>center</align>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel3)][/B]</label>
+
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								</animation>
+							</control>
+							<control type="label">
+								<!-- [GAIATYPELARGE/] -->
+								<left>-400</left>
+								<!-- [/GAIATYPELARGE/] -->
+								<left>-372</left>
+								<!-- [/GAIATYPELARGE] -->
+
+								<top>290</top>
+								<width>1000</width>
+								<height>30</height>
+								<font>[GAIAFONTMEDIUM]</font>
+								<aligny>center</aligny>
+								<align>center</align>
+								<textcolor>FFFFFFFF</textcolor>
+								<label>[B]$INFO[Container(52000).ListItem.Property(GaiaLabel4)][/B]</label>
+
+								<animation type="Focus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="0" end="100" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+								</animation>
+								<animation type="Unfocus" condition="Control.HasFocus(52000)">
+									<effect type="zoom" tween="cubic" start="100" end="0" center="100,185" time="500" />
+									<effect type="fade" tween="cubic" start="100" end="0" time="500" />
+								</animation>
+							</control>
+						</control>
+					</focusedlayout>
+				</control>
+
 			</control>
 
 		</control>

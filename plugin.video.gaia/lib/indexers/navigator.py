@@ -21,6 +21,7 @@
 from lib.modules.tools import Media, Selection, Kids, System, Tools, Settings, Logger, Converter, Math
 from lib.modules.interface import Dialog, Icon, Context, Directory, Format, Translation, Loader
 from lib.modules.shortcuts import Shortcuts
+from lib.oracle import Oracle
 
 class Navigator(object):
 
@@ -77,6 +78,7 @@ class Navigator(object):
 		if Settings.getBoolean('menu.main.shortcut'): self.shortcutsItems(location = Shortcuts.LocationMain)
 
 		if Settings.getBoolean('menu.main.quick') and Settings.getBoolean('menu.quick.enabled'): self.addDirectoryItem(name = 35550, query = self.parameterize('quick'), icon = 'quick.png', iconDefault = 'DefaultFavourite.png')
+		self.oracle()
 		if Settings.getBoolean('menu.main.arrival'): self.addDirectoryItem(name = 33490, query = self.parameterize('navigatorArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png')
 		if Settings.getBoolean('menu.main.favourite'): self.addDirectoryItem(name = 33000, query = 'navigatorFavourites', icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
 
@@ -127,6 +129,11 @@ class Navigator(object):
 		directory.addItems(items = metatools.items(metadatas = metadatas, media = media, multiple = True, mixed = True, submenu = submenu, kids = self.mKids, contextPlaylist = True, contextShortcutCreate = True))
 		directory.finish()
 
+	def oracle(self, media = None, search = False):
+		if not self.kidsOnly() and Oracle.instance().settingsEnabled():
+			if media is None: media = self.mMedia
+			self.addDirectoryItem(name = 33675, query = self.parameterize('oracle', media = media), icon = 'searchoracle.png' if search else 'oracle.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+
 	def movies(self, lite = False):
 		advanced = not self.kidsOnly() and not lite
 
@@ -136,6 +143,7 @@ class Navigator(object):
 			else: self.shortcutsItems(location = Shortcuts.LocationMovies)
 
 		if advanced and Settings.getBoolean('menu.quick.enabled'): self.addDirectoryItem(name = 35550, query = self.parameterize('moviesQuick'), icon = 'quick.png', iconDefault = 'DefaultFavourite.png')
+		self.oracle()
 		self.addDirectoryItem(name = 33490, query = self.parameterize('moviesArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
 		if advanced: self.addDirectoryItem(name = 33000, query = self.parameterize('moviesFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
 		self.addDirectoryItem(name = 33001, query = self.parameterize('moviesCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
@@ -279,6 +287,7 @@ class Navigator(object):
 		self.addDirectoryItem(name = 33470, query = self.parameterize('moviesSearch', media = Media.TypeDocumentary), icon = 'searchdocumentaries.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(name = 33471, query = self.parameterize('moviesSearch', media = Media.TypeShort), icon = 'searchshorts.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(name = 32013, query = self.parameterize('moviesPerson'), icon = 'searchpeople.png', iconDefault = 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.oracle(search = True)
 		self.addDirectoryItem(name = 32036, query = self.parameterize('searchHistory'), icon = 'searchhistory.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.addDirectoryItem(name = 35157, query = self.parameterize('searchExact'), icon = 'searchexact.png', iconDefault = 'DefaultAddonsSearch.png')
 		self.endDirectory()
@@ -291,64 +300,66 @@ class Navigator(object):
 		self.endDirectory()
 
 	def searchHistory(self):
-		from lib.modules.search import Searches
+		from lib.modules.search import Search
 		from lib.modules.network import Networker
-		searches = Searches().retrieveAll(kids = self.mKids)
+		searches = Search().retrieveAll(kids = self.mKids)
 		for item in searches:
-			if item[0] == Searches.TypeMovies:
+			if item[3] == Search.TypeMovie:
 				icon = 'searchmovies.png'
 				action = self.parameterize('moviesSearch', media = Media.TypeMovie)
-			elif item[0] == Searches.TypeSets:
+			elif item[3] == Search.TypeSet:
 				icon = 'searchsets.png'
 				action = self.parameterize('setsSearch', media = Media.TypeSet)
-			elif item[0] == Searches.TypeShows:
+			elif item[3] == Search.TypeShow:
 				icon = 'searchshows.png'
 				action = self.parameterize('showsSearch', media = Media.TypeShow)
-			elif item[0] == Searches.TypeDocumentaries:
+			elif item[3] == Search.TypeDocumentary:
 				icon = 'searchdocumentaries.png'
 				action = self.parameterize('moviesSearch', media = Media.TypeDocumentary)
-			elif item[0] == Searches.TypeShorts:
+			elif item[3] == Search.TypeShort:
 				icon = 'searchshorts.png'
 				action = self.parameterize('moviesSearch', media = Media.TypeShort)
-			elif item[0] == Searches.TypePeople:
+			elif item[3] == Search.TypePerson:
 				icon = 'searchpeople.png'
 				action = self.parameterize('moviesPerson')
+			elif item[3] == Search.TypeOracle:
+				icon = 'searchoracle.png'
+				action = self.parameterize('oracle&history=%s' % System.commandEncode(Converter.jsonFrom(item[2])))
 			else:
 				continue
 
-			if item[2]: icon = 'searchkids.png'
-			self.addDirectoryItem(item[1], '%s&terms=%s' % (action, Networker.linkQuote(item[1], plus = True)), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			if item[1]: icon = 'searchkids.png'
+			self.addDirectoryItem(item[0], '%s&terms=%s' % (action, Networker.linkQuote(item[0], plus = True)), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def searchHistoryMovies(self):
-		from lib.modules.search import Searches
+		from lib.modules.search import Search
 		from lib.modules.network import Networker
 
 		if self.mMedia == Media.TypeDocumentary:
 			icon = 'searchdocumentaries.png'
-			searches = Searches().retrieveDocumentaries(kids = self.mKids)
+			searches = Search().retrieveAll(kids = self.mKids, type = [Search.TypeDocumentary, Search.TypeOracle])
 		elif self.mMedia == Media.TypeShort:
 			icon = 'searchshorts.png'
-			searches = Searches().retrieveShorts(kids = self.mKids)
+			searches = Search().retrieveAll(kids = self.mKids, type = [Search.TypeShort, Search.TypeOracle])
 		else:
 			icon = 'searchmovies.png'
-			#searches = Searches().retrieveMovies(kids = self.mKids)
-			searches = Searches().retrieveAll(kids = self.mKids, type = [Searches.TypeMovies, Searches.TypeSets])
+			searches = Search().retrieveAll(kids = self.mKids, type = [Search.TypeMovie, Search.TypeSet, Search.TypeOracle])
 
 		for item in searches:
-			if len(item) == 3:
-				if item[0] == Searches.TypeSets: self.addDirectoryItem(item[1], self.parameterize('setsSearch&terms=%s' % Networker.linkQuote(item[1], plus = True), media = Media.TypeSet), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-				else: self.addDirectoryItem(item[1], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[1], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-			else:
-				self.addDirectoryItem(item[0], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			if item[3] == Search.TypeOracle: self.addDirectoryItem(item[0], self.parameterize('oracle&history=%s' % System.commandEncode(Converter.jsonFrom(item[2]))), 'searchoracle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			elif item[3] == Search.TypeSet: self.addDirectoryItem(item[0], self.parameterize('setsSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeSet), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			else: self.addDirectoryItem(item[0], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def searchHistoryShows(self):
-		from lib.modules.search import Searches
+		from lib.modules.search import Search
 		from lib.modules.network import Networker
-		searches = Searches().retrieveShows(kids = self.mKids)
+		searches = Search().retrieveAll(kids = self.mKids, type = [Search.TypeShow, Search.TypeOracle])
+
 		for item in searches:
-			self.addDirectoryItem(item[0], self.parameterize('showsSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeShow), 'searchshows.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			if item[3] == Search.TypeOracle: self.addDirectoryItem(item[0], self.parameterize('oracle&history=%s' % System.commandEncode(Converter.jsonFrom(item[2]))), 'searchoracle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			else: self.addDirectoryItem(item[0], self.parameterize('showsSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeShow), 'searchshows.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def tools(self):
@@ -537,6 +548,7 @@ class Navigator(object):
 		#self.addDirectoryItem(33040, self.parameterize('moviesSearch'), 'searchdescription.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		if self.mMedia == Media.TypeMovie: self.addDirectoryItem(33527, self.parameterize('setsSearch'), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(32013, self.parameterize('moviesPerson'), 'searchpeople.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.oracle(search = True)
 		self.addDirectoryItem(32036, self.parameterize('searchHistoryMovies'), 'searchhistory.png', 'DefaultAddonsSearch.png')
 		self.addDirectoryItem(35157, self.parameterize('scrapeExact', media = self.mMedia), 'searchexact.png', 'DefaultAddonsSearch.png')
 		self.endDirectory()
@@ -546,6 +558,7 @@ class Navigator(object):
 		self.addDirectoryItem(33490, self.parameterize('setsRetrieve&link=arrivals'), 'new.png', 'DefaultVideoPlaylists.png')
 		self.addDirectoryItem(35375, self.parameterize('setsRetrieve&link=random'), 'random.png', 'DefaultVideoPlaylists.png')
 		self.addDirectoryItem(33565, self.parameterize('setsAlphabetic'), 'alphabet.png', 'DefaultVideoPlaylists.png')
+		self.oracle(media = Media.TypeSet)
 		self.addDirectoryItem(32010, self.parameterize('setsSearch'), 'search.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
@@ -553,6 +566,7 @@ class Navigator(object):
 		advanced = not self.kidsOnly() and not lite
 		if Settings.getBoolean('menu.main.shortcut'): self.shortcutsItems(location = Shortcuts.LocationShows)
 		if advanced and Settings.getBoolean('menu.quick.enabled'): self.addDirectoryItem(name = 35550, query = self.parameterize('showsQuick'), icon = 'quick.png', iconDefault = 'DefaultFavourite.png')
+		self.oracle()
 		self.addDirectoryItem(name = 33490, query = self.parameterize('showsArrivals'), icon = 'new.png', iconDefault = 'DefaultAddSource.png', library = 'arrivals')
 		if advanced: self.addDirectoryItem(name = 33000, query = self.parameterize('showsFavourites', lite = True), icon = 'favourites.png', iconDefault = 'DefaultFavourite.png')
 		self.addDirectoryItem(name = 33001, query = self.parameterize('showsCategories'), icon = 'categories.png', iconDefault = 'DefaultTags.png')
@@ -608,6 +622,7 @@ class Navigator(object):
 		self.addDirectoryItem(33039, self.parameterize('showsSearch'), 'searchtitle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		#self.addDirectoryItem(33040, self.parameterize('showsSearch'), 'searchdescription.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.addDirectoryItem(32013, self.parameterize('showsPerson'), 'searchpeople.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+		self.oracle(search = True)
 		self.addDirectoryItem(32036, self.parameterize('searchHistoryShows'), 'searchhistory.png', 'DefaultAddonsSearch.png')
 		self.addDirectoryItem(35157, self.parameterize('scrapeExact', media = self.mMedia), 'searchexact.png', 'DefaultAddonsSearch.png')
 		self.endDirectory()

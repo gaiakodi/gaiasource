@@ -100,11 +100,13 @@ class ProviderBase(object):
 	AccessUnknown						= None
 	AccessOpen							= 'open'
 	AccessMember						= 'member'
+	AccessOffline						= 'offline'
 	AccessDistributed					= 'distributed'
-	Accesses							= [AccessOpen, AccessMember, AccessDistributed]
+	Accesses							= [AccessOpen, AccessMember, AccessOffline, AccessDistributed]
 	AccessesData						= {
 											AccessOpen			: {'enabled' : True,	'label' : 33046},
 											AccessMember		: {'enabled' : True,	'label' : 33047},
+											AccessOffline		: {'enabled' : True,	'label' : 36355},
 											AccessDistributed	: {'enabled' : True,	'label' : 33941},
 										}
 
@@ -151,7 +153,6 @@ class ProviderBase(object):
 	VerifyColors						= {VerifySuccess : 'colorExcellent', VerifyLimited : 'colorMedium', VerifyFailure : 'colorBad'}
 
 	# Time
-	TimeCache							= 259200		# 3 Days - For how long to cache provider results before doing a new scrape.
 	TimeDefault							= 60
 	TimeFactorFull						= 1.00
 	TimeFactorScrape					= 0.95			# Timeout factor for main outer scrape function.
@@ -175,8 +176,10 @@ class ProviderBase(object):
 	StatusOperational					= 'operational'	# The provider works as expected.
 	StatusImpaired						= 'impaired'	# The provider is impaired, such as strong Cloudflare protection, inaccessible by some VPNs, or other restrictions. Impaired providers are show in a light font in the manager dialog.
 	StatusDead							= 'dead'		# The provider is dead, such as having no working domain or the website has closed down. Dead providers are disabled by default and are show in an italic font in the manager dialog.
-	StatusHidden						= 'hidden'		# The provider is completely ignored as if itdoes not exist. Hidden providers are not shown in the manager dialog at all.
+	StatusHidden						= 'hidden'		# The provider is completely ignored as if it does not exist. Hidden providers are not shown in the manager dialog at all.
 	StatusDefault						= StatusOperational
+	StatusLabels						= {StatusOperational : 33430, StatusImpaired : 33431, StatusDead : 36357, StatusHidden : 36358}
+	StatusDescriptions					= {StatusOperational : 36359, StatusImpaired : 36360, StatusDead : 36361, StatusHidden : 36362}
 
 	# Process
 	ProcessRequest						= 'request'
@@ -234,6 +237,7 @@ class ProviderBase(object):
 	SettingsLabel						= 'label'
 	SettingsDefault						= 'default'
 	SettingsType						= 'type'
+	SettingsMode						= 'mode'
 	SettingsFormat						= 'format'
 	SettingsDescription					= 'description'
 	SettingsRefresh						= 'refresh'
@@ -253,6 +257,7 @@ class ProviderBase(object):
 	SettingsTypeBoolean					= 'boolean'
 	SettingsTypeNumber					= 'number'
 	SettingsTypeString					= 'string'
+	SettingsTypePath					= 'path'
 
 	# Settings - Format
 	SettingsFormatDuration				= 'duration'	# Assumes the user input is in number of seconds.
@@ -269,12 +274,20 @@ class ProviderBase(object):
 	SettingsFormatRequest				= 'request'
 	SettingsFormatVersion				= 'version'
 
+	# Settings - Path
+	SettingsPathFile					= 'file'		# Readable file path.
+	SettingsPathRead					= 'read'		# Readable directory path.
+	SettingsPathWrite					= 'write'		# Writable directory path.
+
 	# Settings - Global
 
 	SettingsGlobalLimitTime				= 'scrape.limit.time'
 	SettingsGlobalLimitQuery			= 'scrape.limit.query'
 	SettingsGlobalLimitPage				= 'scrape.limit.page'
 	SettingsGlobalLimitRequest			= 'scrape.limit.request'
+
+	SettingsGlobalSaveStream			= 'scrape.save.stream'
+	SettingsGlobalSaveCache				= 'scrape.save.cache'
 
 	SettingsGlobalConcurrencyMode		= 'scrape.concurrency.mode'
 	SettingsGlobalConcurrencyLimit		= 'scrape.concurrency.limit'
@@ -303,6 +316,7 @@ class ProviderBase(object):
 
 	SettingsGlobalKeywordEnabled		= 'scrape.query.keyword'
 	SettingsGlobalKeywordEnglish		= 'scrape.query.keyword.english'
+	SettingsGlobalKeywordOriginal		= 'scrape.query.keyword.original'
 	SettingsGlobalKeywordNative			= 'scrape.query.keyword.native'
 	SettingsGlobalKeywordCustom			= 'scrape.query.keyword.custom'
 	SettingsGlobalKeywordLanguage		= 'scrape.query.keyword.language'
@@ -398,6 +412,8 @@ class ProviderBase(object):
 	PerformanceStep						= 0.1
 	PerformanceHalf						= 0.05
 
+	PerformanceLabels					= {PerformanceBad : 35244, PerformancePoor : 35243, PerformanceMedium : 33999, PerformanceGood : 35242, PerformanceExcellent : 35241}
+
 	# Unblock
 	UnblockTypeCustom					= 0
 	UnblockTypeProxybitcasa				= 1
@@ -447,6 +463,10 @@ class ProviderBase(object):
 												ScrapePage : None,
 												ScrapeRequest : None,
 											},
+											'save' : {
+												'stream' : None,
+												'cache' : None,
+											},
 											'pack' : {
 												'enabled' : None,
 												'movie' : None,
@@ -476,6 +496,7 @@ class ProviderBase(object):
 											'keyword' : {
 												'enabled' : None,
 												'english' : None,
+												'original' : None,
 												'native' : None,
 												'custom' : None,
 												'language' : None,
@@ -525,6 +546,8 @@ class ProviderBase(object):
 		self.log = self._log
 		self.logError = self._logError
 		self.logMessage = self._logMessage
+
+		self.mLock = Lock()
 
 		self.mVerify = None
 		self.mParameters = {}
@@ -754,7 +777,7 @@ class ProviderBase(object):
 				'custom' : custom,
 
 				'cache' : {
-					ProviderBase.ScrapeTime : ProviderBase.TimeCache if cacheTime is None else cacheTime,
+					ProviderBase.ScrapeTime : self.settingsGlobalSaveStream() if cacheTime is None else cacheTime,
 				},
 			}
 			if language: data['language'] = language # Do not replace with None if it was set in initializeCore().
@@ -821,6 +844,18 @@ class ProviderBase(object):
 
 		if settings:
 			ProviderBase.SettingsData = Tools.copy(ProviderBase.SettingsDataBase)
+
+	##############################################################################
+	# LOCK
+	##############################################################################
+
+	def lock(self):
+		try: self.mLock.acquire()
+		except: pass
+
+	def unlock(self):
+		try: self.mLock.release()
+		except: pass
 
 	##############################################################################
 	# COPY
@@ -1137,6 +1172,21 @@ class ProviderBase(object):
 	def rankIcon(self, rank = 1, color = True):
 		return Format.iconRating(count = rank, fixed = ProviderBase.RankLimit, color = color)
 
+	def rankLabel(self, rank = None, icon = True, percent = True, description = True, color = True):
+		try:
+			from lib.modules.interface import Translation, Format
+			if rank is None: rank = self.rank()
+
+			result = ''
+
+			if icon: result += self.rankIcon(rank = rank, color = color)
+			if percent: result = Format.iconJoin([result, '%d%%' % Math.roundClosest((rank / 5.0) * 100.0)])
+			if description: result += ' (%s)' % Translation.string(36363)
+
+			if result: return result
+		except: self.logError()
+		return None
+
 	##############################################################################
 	# PERFORMANCE
 	##############################################################################
@@ -1156,6 +1206,40 @@ class ProviderBase(object):
 	def performanceSet(self, performance = None, rank = None):
 		if performance is None and not rank is None: performance = self._performance(rank = rank)
 		self.mData['performance'] = performance
+
+	def performanceLabel(self, performance = None, label = True, percent = True, description = True, color = True):
+		try:
+			from lib.modules.interface import Translation, Format
+			if performance is None: performance = self.performance()
+
+			result = ''
+
+			if performance >= ProviderBase.PerformanceExcellent:
+				type = ProviderBase.PerformanceExcellent
+				if color: color = Format.colorExcellent()
+			elif performance >= ProviderBase.PerformanceGood:
+				type = ProviderBase.PerformanceGood
+				if color: color = Format.colorGood()
+			elif performance >= ProviderBase.PerformanceMedium:
+				type = ProviderBase.PerformanceMedium
+				if color: color = Format.colorMedium()
+			elif performance >= ProviderBase.PerformancePoor:
+				type = ProviderBase.PerformancePoor
+				if color: color = Format.colorPoor()
+			else:
+				type = ProviderBase.PerformanceBad
+				if color: color = Format.colorBad()
+
+			if label:
+				label = Translation.string(ProviderBase.PerformanceLabels[type])
+				if color: label = Format.fontColor(label, color = color)
+				result += label
+			if percent: result = Format.iconJoin([result, '%d%%' % Math.roundClosest(performance * 100.0)])
+			if description: result += ' (%s)' % Translation.string(36364)
+
+			if result: return result
+		except: self.logError()
+		return None
 
 	##############################################################################
 	# ORDER
@@ -1272,6 +1356,27 @@ class ProviderBase(object):
 
 	def statusActive(self):
 		return self.statusOperational() or self.statusImpaired()
+
+	def statusLabel(self, status = None, label = True, description = True, color = True):
+		try:
+			from lib.modules.interface import Translation, Format
+			if status is None: status = self.status()
+
+			result = ''
+
+			if status == ProviderBase.StatusOperational: color = Format.colorExcellent()
+			elif status == ProviderBase.StatusImpaired: color = Format.colorMedium()
+			elif status == ProviderBase.StatusDead: color = Format.colorBad()
+			else: color = None
+
+			if label:
+				result += Translation.string(ProviderBase.StatusLabels[status])
+				if color: result = Format.fontColor(result, color = color)
+			if description: result += ' (%s)' % Translation.string(ProviderBase.StatusDescriptions[status])
+
+			if result: return result
+		except: self.logError()
+		return None
 
 	##############################################################################
 	# LANGUAGE
@@ -1695,6 +1800,9 @@ class ProviderBase(object):
 	def accessMember(self):
 		return self.access() == ProviderBase.AccessMember
 
+	def accessOffline(self):
+		return self.access() == ProviderBase.AccessOffline
+
 	def accessDistributed(self):
 		return self.access() == ProviderBase.AccessDistributed
 
@@ -1927,7 +2035,7 @@ class ProviderBase(object):
 	def accountLabel(self, type):
 		from lib.modules.interface import Translation
 		try: return Translation.string(ProviderBase.AccountTypeLabels[type])
-		except: return Non
+		except: return None
 
 	def accountFormat(self, type = None, value = None):
 		from lib.modules.interface import Format
@@ -2220,6 +2328,8 @@ class ProviderBase(object):
 					except: format = None
 					try: refresh = item[ProviderBase.SettingsRefresh]
 					except: refresh = None
+					try: mode = item[ProviderBase.SettingsMode]
+					except: mode = None
 
 					# Assume it is the index for the list.
 					# Try-except in case a future version removes the option that is saved in the settings. If the option is gone, usae the default.
@@ -2245,6 +2355,18 @@ class ProviderBase(object):
 						if not value is None: value = int(value)
 					elif type == ProviderBase.SettingsTypeString:
 						value = Dialog.input(title = item[ProviderBase.SettingsLabel], default = value, type = Dialog.InputAlphabetic)
+					elif type == ProviderBase.SettingsTypePath:
+						if mode == ProviderBase.SettingsPathRead: browse = Dialog.BrowseDirectoryRead
+						elif mode == ProviderBase.SettingsPathWrite: browse = Dialog.BrowseDirectoryWrite
+						else: browse = Dialog.BrowseFile
+						if value and (mode == ProviderBase.SettingsPathRead or mode == ProviderBase.SettingsPathWrite):
+							# If the directory does not exist yet (eg: first scrape), Kodi will not open at the dialog at the default location.
+							# Do this for both read/write directories, and put it inn a try-catch in case the directory is not writeable.
+							try:
+								from lib.modules.tools import File
+								File.makeDirectory(value)
+							except: self.logError()
+						value = Dialog.browse(title = item[ProviderBase.SettingsLabel], type = browse, default = value)
 					elif Tools.isArray(type):
 						if Tools.isDictionary(type[0]):
 							selection = None
@@ -2383,6 +2505,38 @@ class ProviderBase(object):
 	def settingsGlobalLimitRequestLabel(self, value = None):
 		if value is None: value = self.settingsGlobalLimitRequest()
 		return Settings.customLabel(id = ProviderBase.SettingsGlobalLimitRequest, value = value)
+
+	@classmethod
+	def settingsGlobalSaveStream(self):
+		result = ProviderBase.SettingsData['save']['stream']
+		if result is None: result = ProviderBase.SettingsData['save']['stream'] = Settings.getCustom(ProviderBase.SettingsGlobalSaveStream)
+		return result
+
+	@classmethod
+	def settingsGlobalSaveStreamSet(self, value):
+		Settings.setCustom(ProviderBase.SettingsGlobalSaveStream, value)
+		ProviderBase.SettingsData['save']['stream'] = None
+
+	@classmethod
+	def settingsGlobalSaveStreamLabel(self, value = None):
+		if value is None: value = self.settingsGlobalSaveStream()
+		return Settings.customLabel(id = ProviderBase.SettingsGlobalSaveStream, value = value)
+
+	@classmethod
+	def settingsGlobalSaveCache(self):
+		result = ProviderBase.SettingsData['save']['cache']
+		if result is None: result = ProviderBase.SettingsData['save']['cache'] = Settings.getCustom(ProviderBase.SettingsGlobalSaveCache)
+		return result
+
+	@classmethod
+	def settingsGlobalSaveCacheSet(self, value):
+		Settings.setCustom(ProviderBase.SettingsGlobalSaveCache, value)
+		ProviderBase.SettingsData['save']['cache'] = None
+
+	@classmethod
+	def settingsGlobalSaveCacheLabel(self, value = None):
+		if value is None: value = self.settingsGlobalSaveCache()
+		return Settings.customLabel(id = ProviderBase.SettingsGlobalSaveCache, value = value)
 
 	@classmethod
 	def settingsGlobalConcurrencyMode(self):
@@ -2591,6 +2745,19 @@ class ProviderBase(object):
 	def settingsGlobalKeywordEnglishSet(self, value):
 		Settings.set(ProviderBase.SettingsGlobalKeywordEnglish, value)
 		ProviderBase.SettingsData['keyword']['english'] = None
+
+	@classmethod
+	def settingsGlobalKeywordOriginal(self):
+		if self.settingsGlobalKeywordEnabled():
+			result = ProviderBase.SettingsData['keyword']['original']
+			if result is None: result = ProviderBase.SettingsData['keyword']['original'] = Settings.getInteger(ProviderBase.SettingsGlobalKeywordOriginal)
+			return result
+		return None
+
+	@classmethod
+	def settingsGlobalKeywordOriginalSet(self, value):
+		Settings.set(ProviderBase.SettingsGlobalKeywordOriginal, value)
+		ProviderBase.SettingsData['keyword']['original'] = None
 
 	@classmethod
 	def settingsGlobalKeywordNative(self):
@@ -3774,7 +3941,8 @@ class ProviderBase(object):
 	##############################################################################
 
 	def result(self):
-		return ProviderBase.ResultStreams[self.id()]
+		try: return ProviderBase.ResultStreams[self.id()]
+		except: return None
 
 	def resultJson(self):
 		return Converter.jsonTo(self.result())
@@ -3790,7 +3958,8 @@ class ProviderBase(object):
 		return None
 
 	def resultCount(self):
-		return len(self.result())
+		result = self.result()
+		return len(result) if result else 0
 
 	def resultClear(self):
 		id = self.id()
@@ -3873,7 +4042,7 @@ class ProviderBase(object):
 
 				metaMedia = self.parameterMedia(),
 				metaTitle = self.parameterTitles(),
-				metaYear = self.parameterYears()['median'],
+				metaYear = self.parameterYears()['median'] if self.parameterYears() else None,
 				metaSeason = self.parameterNumberSeason(),
 				metaEpisode = self.parameterNumberEpisode(),
 				metaLanguage = self.parameterLanguage(),
@@ -3994,8 +4163,9 @@ class ProviderBase(object):
 	def concurrencyProcess(self):
 		return self.concurrency() == ProviderBase.ConcurrencyProcess
 
+	# minimum/maximum should not be changed, except in rare cases, like with debrid providers.
 	@classmethod
-	def concurrencyTasks(self, level = None):
+	def concurrencyTasks(self, level = None, minimum = 1, maximum = 10):
 		if level is None or not ProviderBase.ConcurrencyTasks: return ProviderBase.ConcurrencyTasks
 
 		tasks = 1
@@ -4009,7 +4179,7 @@ class ProviderBase(object):
 		# Number of sub-queries for each entry of a details page running concurrently.
 		elif level == 3: tasks = max(3, (10.0 / ProviderBase.ConcurrencyTasks) * 10)
 
-		return max(1, min(10, int(tasks)))
+		return max(minimum, min(maximum, int(tasks)))
 
 	@classmethod
 	def concurrencyTasksSet(self, tasks):

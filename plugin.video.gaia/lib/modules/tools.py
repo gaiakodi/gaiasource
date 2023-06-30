@@ -97,7 +97,7 @@ class Time(object):
 	@classmethod
 	def integer(self, date = None):
 		if date is None: date = self.format(format = Time.FormatDate)
-		return int(Regex.remove(data = date, expression = '[^\d]'))
+		return int(Regex.remove(data = date, expression = '[^\d]', all = True))
 
 	@classmethod
 	def time(self, mode = ModeThread):
@@ -125,7 +125,7 @@ class Time(object):
 	# UTC timestamp
 	# iso: Convert ISO to UTC timestamp.
 	@classmethod
-	def timestamp(self, fixedTime = None, format = None, iso = False):
+	def timestamp(self, fixedTime = None, format = None, iso = False, milliseconds = False):
 		if iso:
 			if not fixedTime: return 0
 
@@ -161,19 +161,19 @@ class Time(object):
 			delta = date - difference - datetime.datetime.utcfromtimestamp(0)
 			try: seconds = delta.total_seconds() # Works only on 2.7.
 			except: seconds = delta.seconds + (delta.days * 86400) # Close enough.
-			return int(seconds)
+			return (int(seconds) * 1000) if milliseconds else int(seconds)
 		else:
 			if fixedTime is None:
 				# Do not use time.clock(), gives incorrect result for search.py
-				return int(time.time())
+				return int(time.time() * 1000) if milliseconds else int(time.time())
 			else:
 				if format:
 					fixedTime = self.datetime(fixedTime, format)
 					if not fixedTime: return 0
-				try: return int(time.mktime(fixedTime.timetuple()))
+				try: return int(time.mktime(fixedTime.timetuple()) * 1000) if milliseconds else int(time.mktime(fixedTime.timetuple()))
 				except:
 					# Somtimes mktime fails (mktime argument out of range), which seems to be an issue with very large dates (eg 2120-02-03) on Android.
-					try: return int(time.strftime('%s', fixedTime))
+					try: return int(time.strftime('%s', fixedTime) * 1000) if milliseconds else int(time.strftime('%s', fixedTime))
 					except: return 0
 
 	@classmethod
@@ -620,6 +620,40 @@ class Tools(object):
 		if not join is None: result = join.join(result)
 		return result
 
+	# Either provide alphabet or uppercase/lowercase/digits.
+	@classmethod
+	def stringRandom(self, length = 8, alphabet = None, uppercase = True, lowercase = True, digits = True, symbols = False):
+		import random
+		if not alphabet:
+			import string
+			alphabet = ''
+			if uppercase: alphabet += string.ascii_uppercase
+			if lowercase: alphabet += string.ascii_lowercase
+			if digits: alphabet += string.digits
+			if symbols: alphabet += string.punctuation
+		return ''.join(random.choice(alphabet) for i in range(length))
+
+	@classmethod
+	def stringRemovePrefix(self, data, remove):
+		if data.startswith(remove): data = data[len(remove):]
+		return data
+
+	@classmethod
+	def stringRemoveSuffix(self, data, remove):
+		if data.endswith(remove): data = data[:len(remove)]
+		return data
+
+	@classmethod
+	def stringRemoveAffix(self, data, remove = None, prefix = None, suffix = None):
+		if remove: data = self.stringRemoveSuffix(data = self.stringRemovePrefix(data = data, remove = remove), remove = remove)
+		if prefix: data = self.stringRemovePrefix(data = data, remove = prefix)
+		if suffix: data = self.stringRemoveSuffix(data = data, remove = suffix)
+		return data
+
+	@classmethod
+	def isClass(self, value):
+		return isinstance(value, type)
+
 	@classmethod
 	def isInstance(self, value, type):
 		return isinstance(value, type)
@@ -682,19 +716,177 @@ class Tools(object):
 	def isStructure(self, value):
 		return isinstance(value, (dict, list, tuple))
 
+
+class Archive(object):
+
+	TypeZip			= 'zip'
+	TypeGzip		= 'gzip'
+	Type7zip		= '7zip'
+	TypeXz			= 'xz'
+	TypeUnknown		= None
+
+	ExtensionZip	= 'zip'
+	ExtensionGzip	= 'gz'
+	Extension7zip	= '7z'
+	ExtensionXz		= 'xz'
+
+	# https://en.wikipedia.org/wiki/List_of_file_signatures
+	Magic			= {
+		TypeZip		: [b'\x50\x4b\x03\x04', b'\x50\x4b\x05\x06', b'\x50\x4b\x07\x08'],
+		TypeGzip	: [b'\x1f\x8b'],
+		Type7zip	: [b'\x37\x7a\xbc\xaf\x27\x1c'],
+		TypeXz		: [b'\xfd\x37\x7a\x58\x5a\x00'],
+	}
+
 	@classmethod
-	def gzUncompress(self, data):
+	def extension(self, type, dot = True):
+		extension = None
+		if type == Archive.TypeZip: extension = Archive.ExtensionZip
+		elif type == Archive.TypeGzip: extension = Archive.ExtensionGzip
+		elif type == Archive.Type7zip: extension = Archive.Extension7zip
+		elif type == Archive.TypeXz: extension = Archive.ExtensionXz
+		if extension and dot: extension = '.' + extension
+		return extension
+
+	@classmethod
+	def size(self, magic):
+		return len(Converter.unicode(magic))
+
+	@classmethod
+	def magic(self, path = None, data = None, size = 2):
 		try:
-			from io import BytesIO
-			from gzip import GzipFile
-			data = BytesIO(data)
-			file = GzipFile(fileobj = data)
-			result = file.read()
-			file.close()
-			return result
-		except:
-			Logger.error()
-			return None
+			if path:
+				with open(path, 'rb') as file:
+					return file.read(size)
+			elif data:
+				return data[:size]
+		except: return None
+
+	@classmethod
+	def type(self, path = None, data = None):
+		for type, magic in Archive.Magic.items():
+			if self.magic(path = path, data = data, size = self.size(magic[0])) in magic:
+				return type
+		return Archive.TypeUnknown
+
+	@classmethod
+	def isArchive(self, path = None, data = None):
+		return not self.type(path = path, data = data) == Archive.TypeUnknown
+
+	@classmethod
+	def isType(self, type, path = None, data = None):
+		try:
+			magic = Archive.Magic[type]
+			return self.magic(path = path, data = data, size = self.size(magic[0])) in magic
+		except: return False
+
+	@classmethod
+	def compress(self, type, path = None, output = None, flatten = True):
+		if type == Archive.TypeZip: return self.zipCompress(path = path, output = output, flatten = flatten)
+		else: return None
+
+	@classmethod
+	def decompress(self, path = None, output = None, data = None):
+		type = self.type(path = path, data = data)
+		if type == Archive.TypeZip: return self.zipDecompress(path = path, output = output, data = data)
+		elif type == Archive.TypeGzip: return self.gzipDecompress(path = path, output = output, data = data)
+		elif type == Archive.Type7zip: return self.szipDecompress(path = path, output = output, data = data)
+		elif type == Archive.TypeXz: return self.xzDecompress(path = path, output = output, data = data)
+		else: return None
+
+	@classmethod
+	def zipIs(self, path = None, data = None):
+		return self.isType(type = Archive.TypeZip, path = path, data = data)
+
+	@classmethod
+	def zipCompress(self, path = None, output = None, flatten = True):
+		try:
+			if Tools.isString(path):
+				if File.existsDirectory(path = path): _, path = File.listDirectory(path)
+				else: path = [path]
+
+			from zipfile import ZipFile, ZIP_DEFLATED
+			zip = ZipFile(output, 'w', ZIP_DEFLATED)
+			for i in path:
+				if flatten: zip.write(i, File.name(path = i, extension = True))
+				else: zip.write(i)
+			zip.close()
+
+			return True
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def zipDecompress(self, path = None, output = None, data = None):
+		try:
+			from zipfile import ZipFile
+			if path:
+				with ZipFile(path, 'r') as zip:
+					zip.extractall(path = output)
+				return True
+			elif data:
+				# NB: Not tested.
+				from io import BytesIO
+				data = BytesIO(data)
+				file = ZipFile(file = data)
+				result = file.read()
+				file.close()
+				return result
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def gzipIs(self, path):
+		return self.isType(type = Archive.TypeGzip, path = path, data = data)
+
+	@classmethod
+	def gzipDecompress(self, path = None, output = None, data = None):
+		try:
+			if path:
+				import gzip
+				with gzip.open(path, 'rb') as fileIn:
+					with open(File.joinPath(output, File.name(path = path, extension = False)), 'wb') as fileOut:
+						for line in fileIn: fileOut.write(line)
+			elif data:
+				from gzip import GzipFile
+				from io import BytesIO
+				data = BytesIO(data)
+				file = GzipFile(fileobj = data)
+				result = file.read()
+				file.close()
+				return result
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def szipIs(self, path):
+		return self.isType(type = Archive.Type7zip, path = path, data = data)
+
+	@classmethod
+	def szipDecompress(self, path = None, output = None, data = None):
+		try:
+			if path:
+				Subprocess.open(command = '7z x "%s" -o"%s"' % (path, output))
+			elif data:
+				raise Exception('7zip in-memory decompression is not implemented yet.')
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def xzIs(self, path):
+		return self.isType(type = Archive.TypeXz, path = path, data = data)
+
+	@classmethod
+	def xzDecompress(self, path = None, output = None, data = None):
+		try:
+			if path:
+				File.makeDirectory(output)
+				Subprocess.open(command = 'xz -dc "%s" > "%s"' % (path, File.joinPath(output, File.name(path = path, extension = False))))
+			elif data:
+				raise Exception('XZ in-memory decompression is not implemented yet.')
+		except: Logger.error()
+		return None
+
 
 class Regex(object):
 
@@ -705,8 +897,8 @@ class Regex(object):
 
 	FlagsDefault 		= FlagCaseInsensitive
 
-	Symbol				= '[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
-	Nonalpha			= '[\d\s\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
+	Symbol				= '[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
+	Nonalpha			= '[\d\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
 
 	Cache				= {}
 
@@ -722,6 +914,10 @@ class Regex(object):
 				return compiled
 		else:
 			return re.compile(expression, flags = flags)
+
+	@classmethod
+	def escape(self, data):
+		return re.escape(data)
 
 	@classmethod
 	def match(self, data, expression, flags = FlagsDefault, cache = False):
@@ -790,11 +986,17 @@ class Regex(object):
 				if match: data = data[:match.start(group)] + replacement + data[match.end(group):]
 			return data
 		else:
-			return re.sub(expression, replacement, data, flags = flags)
+			if all is True: return re.sub(expression, replacement, data, flags = flags)
+			else: return re.sub(expression, replacement, data, count = all if Tools.isInteger(all, bool = False) else 1, flags = flags)
 
 	@classmethod
 	def remove(self, data, expression, group = None, all = False, flags = FlagsDefault, cache = False):
 		return self.replace(data = data, expression = expression, replacement = '', group = group, all = all, flags = flags, cache = cache)
+
+	@classmethod
+	def split(self, data, expression, flags = FlagsDefault, cache = False):
+		if cache: return self.expression(expression = expression, flags = flags, cache = cache).split(data)
+		else: return re.split(expression, data, flags = flags)
 
 
 class JavaScript(object):
@@ -2228,6 +2430,11 @@ class Hash(object):
 		return str(uuid.uuid4().hex).upper()
 
 	@classmethod
+	def uuid(self):
+		import uuid
+		return str(uuid.uuid4())
+
+	@classmethod
 	def sha1(self, data):
 		try: return hashlib.sha1(data.encode('utf-8')).hexdigest().upper()
 		except: return hashlib.sha1(data).hexdigest().upper() # If data contains non-encodable characters, like YggTorrent containers.
@@ -2607,9 +2814,11 @@ class Converter(object):
 			if not string: return string
 			try: string = string.decode('utf-8')
 			except: pass
+
 			if umlaut:
-				try: string = string.replace(unichr(196), 'Ae').replace(unichr(203), 'Ee').replace(unichr(207), 'Ie').replace(unichr(214), 'Oe').replace(unichr(220), 'Ue').replace(unichr(228), 'ae').replace(unichr(235), 'ee').replace(unichr(239), 'ie').replace(unichr(246), 'oe').replace(unichr(252), 'ue')
-				except: pass
+				try: string = string.replace(chr(196), 'Ae').replace(chr(203), 'Ee').replace(chr(207), 'Ie').replace(chr(214), 'Oe').replace(chr(220), 'Ue').replace(chr(228), 'ae').replace(chr(235), 'ee').replace(chr(239), 'ie').replace(chr(246), 'oe').replace(chr(252), 'ue')
+				except: Logger.error(developer = True)
+
 			# It seems unidecode does not work in Python 2, only in Python 3.
 			# In Python 2 the letter is removed instead of being replaced with a non-accent ASCII letter.
 			#from lib.modules.external import Importer
@@ -2619,6 +2828,7 @@ class Converter(object):
 			import unicodedata
 			return unicodedata.normalize('NFKD', string).encode('ascii', 'ignore').decode('ascii')
 		except:
+			Logger.error(developer = True)
 			return self.unicodeStrip(string = string)
 
 	# Removes all unicode characters.
@@ -2679,6 +2889,11 @@ class Converter(object):
 		return self.unicode(base64.b32encode(self.bytes(data)))
 
 	@classmethod
+	def base64Hex(self, data):
+		import base64
+		return self.unicode(base64.b64decode(data).hex())
+
+	@classmethod
 	def base64From(self, data, url = False):
 		import base64
 		if url: data = base64.urlsafe_b64decode(data)
@@ -2704,8 +2919,22 @@ class Converter(object):
 		return Json.decode(data = data, default = default)
 
 	@classmethod
-	def jsonTo(self, data, default = None):
-		return Json.encode(data = data, default = default)
+	def jsonTo(self, data, ascii = True, default = None):
+		return Json.encode(data = data, ascii = ascii, default = default)
+
+	@classmethod
+	def jsonPrettify(self, data, ascii = True, default = None, indent = True):
+		return Json.prettify(data = data, ascii = ascii, default = default, indent = indent)
+
+	# Extract a JSON object/list from a larger non-JSON text body.
+	@classmethod
+	def jsonExtract(self, data, multiple = True, text = False, uncomment = False, bounds = None):
+		return Json.extract(data = data, multiple = multiple, text = text, uncomment = uncomment, bounds = bounds)
+
+	# Remove comments from JSON.
+	@classmethod
+	def jsonUncomment(self, data):
+		return Json.uncomment(data = data)
 
 	@classmethod
 	def quoteFrom(self, data, default = None):
@@ -2816,7 +3045,9 @@ class Logger(object):
 		xbmc.log(message, type)
 
 	@classmethod
-	def error(self, message = None, exception = True, level = LevelEssential, exit = False):
+	def error(self, message = None, exception = True, level = LevelEssential, exit = False, developer = False):
+		if developer and not System.developer(): return
+
 		if exception:
 			type, value, trace = sys.exc_info()
 			try: filename = trace.tb_frame.f_code.co_filename
@@ -3133,6 +3364,15 @@ class File(object):
 		return File.DirectoryTemporary
 
 	@classmethod
+	def pathCurrent(self, caller = True):
+		if caller:
+			import inspect
+			path = inspect.stack()[1].filename
+		else:
+			path = __file__
+		return os.path.abspath(os.path.realpath(path))
+
+	@classmethod
 	def exists(self, path): # Directory must end with slash
 		# Do not use xbmcvfs.exists, since it returns true for http links.
 		if path.startswith('http:') or path.startswith('https:') or path.startswith('ftp:') or path.startswith('ftps:'):
@@ -3187,6 +3427,15 @@ class File(object):
 	@classmethod
 	def directoryName(self, path):
 		return os.path.basename(self.directory(path))
+
+	@classmethod
+	def directoryCurrent(self, caller = True):
+		if caller:
+			import inspect
+			path = inspect.stack()[1].filename
+		else:
+			path = __file__
+		return self.directory(path)
 
 	@classmethod
 	def deleteDirectory(self, path, force = True, check = True):
@@ -3315,6 +3564,23 @@ class File(object):
 				result = file.write(value)
 				file.close()
 				return result
+		except:
+			Logger.error()
+			return None
+
+	@classmethod
+	def write(self, path, bytes = False, native = False):
+		try:
+			if not path:
+				try:
+					import inspect
+					trace = inspect.stack()[1][3]
+				except: trace = None
+				Logger.log('Invalid file path: ' + str(trace))
+				return None
+
+			if native: return open(path, 'wb' if bytes else 'w')
+			else: return xbmcvfs.File(path, 'w')
 		except:
 			Logger.error()
 			return None
@@ -3775,8 +4041,8 @@ class System(object):
 		except: return None
 
 	@classmethod
-	def pathProviders(self, provider = None):
-		path = File.joinPath(self.profile(), 'Providers')
+	def pathProviders(self, provider = None, translate = True):
+		path = File.joinPath(self.profile(translate = translate), 'Providers')
 		if provider: path = File.joinPath(path, provider)
 		return path
 
@@ -3786,7 +4052,10 @@ class System(object):
 
 	@classmethod
 	def origin(self):
-		return xbmc.getInfoLabel('Container.PluginName')
+		# When originGaia() is called from player.py, sometimes in sporadic cases, the info label returns "".
+		# This makes the stream window not reload in a few cases.
+		# Waiting and retying then typically return the addon path.
+		return self.infoLabel('Container.PluginName', empty = True, wait = True)
 
 	@classmethod
 	def originGaia(self):
@@ -3857,6 +4126,10 @@ class System(object):
 		return Converter.base64To(Converter.jsonTo(parameters)).replace('+', '%2B').replace('/', '%2F').replace('=', '%3D')
 
 	@classmethod
+	def commandDecode(self, data):
+		return Converter.jsonFrom(Converter.base64From(data))
+
+	@classmethod
 	def commandResolve(self, command = None, initialize = False):
 		if initialize: self.argumentsInitialize()
 
@@ -3868,10 +4141,10 @@ class System(object):
 			if Tools.isArray(command['data']):
 				data = {}
 				for i in command['data']:
-					data.update(Converter.jsonFrom(Converter.base64From(i)))
-				command =  data
+					data.update(self.commandDecode(i))
+				command = data
 			else:
-				command = Converter.jsonFrom(Converter.base64From(command['data']))
+				command = self.commandDecode(command['data'])
 
 		return command
 
@@ -3918,8 +4191,10 @@ class System(object):
 		return self.addon(id = id).getAddonInfo('author')
 
 	@classmethod
-	def profile(self, id = GaiaAddon):
-		return File.translatePath(self.addon(id = id).getAddonInfo('profile'))
+	def profile(self, id = GaiaAddon, translate = True):
+		profile = self.addon(id = id).getAddonInfo('profile')
+		if translate: profile = File.translatePath(profile)
+		return profile
 
 	@classmethod
 	def description(self, id = GaiaAddon):
@@ -4059,10 +4334,11 @@ class System(object):
 		}
 
 	@classmethod
-	def infoLabel(self, value, wait = True):
+	def infoLabel(self, value, empty = False, wait = True):
 		# Some values (eg: System.CpuUsage) will return "Busy" when called first. Wait for Kodi to load the value.
 		if wait:
 			counter = 0
+			interations = 50 if empty else 100
 			while True:
 				result = xbmc.getInfoLabel(value)
 
@@ -4070,12 +4346,15 @@ class System(object):
 				# Eg: Container.PluginName in origin() will return "" when the context menu is opened from a widget, causing the context menu to load very long.
 				# Only wait if the label returns "busy", but not if the label is empty.
 				#if result and not 'busy' in result.lower(): return result
-				try: busy = result.lower().strip() == 'busy'
+				try:
+					data = result.lower().strip()
+					busy = data == 'busy'
+					if not busy and empty: busy = data == ''
 				except: busy = False
 				if not busy: return result
 
 				counter += 1
-				if counter > 100: return None
+				if counter > interations: return None
 				Time.sleep(0.05)
 		else:
 			return xbmc.getInfoLabel(value)
@@ -4194,8 +4473,7 @@ class System(object):
 
 	@classmethod
 	def temporaryRandom(self, directory = None, extension = 'dat', gaia = True, make = True, clear = False):
-		if extension and not extension == '' and not extension.startswith('.'):
-			extension = '.' + extension
+		if extension and not extension == '' and not extension.startswith('.'): extension = '.' + extension
 		file = Hash.random() + extension
 		path = self.temporary(directory = directory, file = file, gaia = gaia, make = make, clear = clear)
 		while File.exists(path):
@@ -4259,8 +4537,9 @@ class System(object):
 		self.windowPropertySet(System.PropertyLaunch, Converter.jsonTo(data))
 
 	@classmethod
-	def launchDataClear(self):
+	def launchDataClear(self, full = False):
 		self.windowPropertyClear(System.PropertyLaunch)
+		if full: self.windowPropertyClear(System.PropertyInitial)
 
 	@classmethod
 	def launched(self):
@@ -4506,12 +4785,13 @@ class System(object):
 				Settings.default(id = 'general.cache.expression')
 
 			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.1.10') and version['new']['number'] > self.versionNumber(version = '6.1.10'):
-				Settings.default(id = 'activity.history.resume')
-				Settings.default(id = 'activity.rating.movie')
-				Settings.default(id = 'activity.rating.show')
-				Settings.default(id = 'activity.rating.season')
-				Settings.default(id = 'activity.rating.episode')
+			if version['old']['number'] <= self.versionNumber(version = '6.2.0') and version['new']['number'] >= self.versionNumber(version = '6.3.0'):
+				Settings.default(id = 'navigation.show.interleave.unofficial')
+				Settings.default(id = 'navigation.show.interleave.supplementary')
+				Settings.default(id = 'navigation.show.interleave.duration')
+
+				from lib.modules.search import Search
+				Search()._deleteFile()
 
 		_launchProgress(4) # 25%
 
@@ -4520,7 +4800,7 @@ class System(object):
 		# Providers
 		def _launchProviders():
 			from lib.providers.core.manager import Manager
-			Manager.check(progress = False, wait = True)
+			Manager.check(progress = False, load = True, wait = True) # load = True: Load them here already. Should decrease the provider initializtion time on first scrape.
 			if self.tInitial: Manager.optimizeInternal()
 		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 41%
 
@@ -4955,6 +5235,8 @@ class Settings(object):
 	#		'special' : {
 	#			'zero' : <optional special value for 0>,
 	#			'none' : <optional special value for None>,
+	#			'minimum' : <optional special value for those below the minimum value>,
+	#			'minimum' : <optional special value for those above the maximum value>,
 	#		},
 	#	},
 	Custom = {
@@ -5157,6 +5439,34 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
+		'scrape.save.stream' : {
+			'type' : CustomDuration,
+			'title' : 33887,
+			'value' : {
+				'unit' : UnitHour,
+				'default' : 168,
+				'minimum' : 0,
+				'maximum' : 2190,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
+		'scrape.save.cache' : {
+			'type' : CustomDuration,
+			'title' : 33888,
+			'value' : {
+				'unit' : UnitHour,
+				'default' : 72,
+				'minimum' : 0,
+				'maximum' : 2190,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
 		'scrape.concurrency.limit' : {
 			'type' : CustomNumber,
 			'title' : 36037,
@@ -5250,21 +5560,21 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'activity.history.rewatch' : {
+		'activity.history.count.rewatch' : {
 			'type' : CustomDuration,
 			'title' : 35405,
 			'value' : {
-				'unit' : UnitHour,
-				'default' : 336,
+				'unit' : UnitDay,
+				'default' : 60,
 				'minimum' : 1,
-				'maximum' : 17520,
+				'maximum' : 3650,
 			},
 			'special' : {
 				'zero' : SpecialAlways,
 				'none' : SpecialDefault,
 			},
 		},
-		'activity.rating.timeout' : {
+		'activity.rating.binge.timeout' : {
 			'type' : CustomDuration,
 			'title' : 33660,
 			'value' : {
@@ -5276,6 +5586,66 @@ class Settings(object):
 			'special' : {
 				'zero' : SpecialNever,
 				'none' : SpecialDefault,
+			},
+		},
+		'activity.rating.rerate.movie' : {
+			'type' : CustomDuration,
+			'title' : 36378,
+			'value' : {
+				'unit' : UnitDay,
+				'default' : 90,
+				'minimum' : 1,
+				'maximum' : 3650,
+			},
+			'special' : {
+				'zero' : SpecialAlways,
+				'none' : SpecialDefault,
+				'maximum' : SpecialNever,
+			},
+		},
+		'activity.rating.rerate.show' : {
+			'type' : CustomDuration,
+			'title' : 36379,
+			'value' : {
+				'unit' : UnitDay,
+				'default' : 90,
+				'minimum' : 1,
+				'maximum' : 3650,
+			},
+			'special' : {
+				'zero' : SpecialAlways,
+				'none' : SpecialDefault,
+				'maximum' : SpecialNever,
+			},
+		},
+		'activity.rating.rerate.season' : {
+			'type' : CustomDuration,
+			'title' : 36380,
+			'value' : {
+				'unit' : UnitDay,
+				'default' :180,
+				'minimum' : 1,
+				'none' : SpecialDefault,
+				'maximum' : SpecialNever,
+			},
+			'special' : {
+				'zero' : SpecialAlways,
+				'none' : SpecialDefault,
+			},
+		},
+		'activity.rating.rerate.episode' : {
+			'type' : CustomDuration,
+			'title' : 36381,
+			'value' : {
+				'unit' : UnitDay,
+				'default' : 365,
+				'minimum' : 1,
+				'maximum' : 3650,
+			},
+			'special' : {
+				'zero' : SpecialAlways,
+				'none' : SpecialDefault,
+				'maximum' : SpecialNever,
 			},
 		},
 		'playback.time.wait' : {
@@ -5362,7 +5732,7 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'bluetooth.monitor.interval' : {
+		'utility.bluetooth.monitor.interval' : {
 			'type' : CustomDuration,
 			'title' : 33538,
 			'value' : {
@@ -5402,6 +5772,21 @@ class Settings(object):
 			'special' : {
 				'zero' : SpecialDefault,
 				'none' : SpecialDefault,
+			},
+		},
+		'oracle.chatgpt.model.limit' : {
+			'type' : CustomNumber,
+			'title' : 33854,
+			'label' : {
+				'suffix' : 33680,
+			},
+			'value' : {
+				'minimum' : 100,
+				'maximum' : 32768,
+			},
+			'special' : {
+				'zero' : SpecialUnlimited,
+				'none' : SpecialAutomatic,
 			},
 		},
 	}
@@ -5855,8 +6240,12 @@ class Settings(object):
 				value = Dialog.input(type = Dialog.InputNumeric, title = title, default = self._customValue(id = id, value = value, inverse = True))
 				special = self._customSpecial(id = id)
 				if not special or not value in special:
-					if not valueMinimum is None and value < valueMinimum: value = valueMinimum
-					elif not valueMaximum is None and value > valueMaximum: value = valueMaximum
+					if not valueMinimum is None and value < valueMinimum:
+						if False in special: value = False
+						else: value = valueMinimum
+					elif not valueMaximum is None and value > valueMaximum:
+						if True in special: value = True
+						else: value = valueMaximum
 				value = self._customValue(id = id, value = value, inverse = False)
 
 		self.customSet(id = id, value = value)
@@ -5942,6 +6331,8 @@ class Settings(object):
 		if not special: special = {}
 		if 'zero' in special: special[0] = special['zero']
 		if 'none' in special: special[None] = special['none']
+		if 'minimum' in special: special[False] = special['minimum']
+		if 'maximum' in special: special[True] = special['maximum']
 		return special
 
 	@classmethod
@@ -5975,6 +6366,9 @@ class Settings(object):
 
 	@classmethod
 	def _customValue(self, id, value = None, inverse = False, convert = True):
+		# Special below-minimum or above-maximum.
+		if value is True or value is False: return None if inverse else value
+
 		type = self._customParameter(id, 'type')
 		if type == Settings.CustomColor:
 			from lib.modules.interface import Format
@@ -6203,35 +6597,37 @@ class Settings(object):
 
 	@classmethod
 	def default(self, id, database = False):
-		# This does not always work.
-		# Sometimes when writing the truncated data to file, Kodi later replaces the content with its in-memory version.
-		'''
-		data = self.cacheDataUser()
-		expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
-		if not Tools.isArray(id): id = [id]
+		try:
+			# This does not always work.
+			# Sometimes when writing the truncated data to file, Kodi later replaces the content with its in-memory version.
+			'''
+			data = self.cacheDataUser()
+			expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
+			if not Tools.isArray(id): id = [id]
 
-		for i in id:
-			data = Regex.remove(data = data, expression = expression % i, group = 1)
-			try: del Settings.CacheValuesUser[i]
-			except: pass
+			for i in id:
+				data = Regex.remove(data = data, expression = expression % i, group = 1)
+				try: del Settings.CacheValuesUser[i]
+				except: pass
 
-		File.writeNow(self.pathProfile(), data)
-		System.windowPropertySet(Settings.PropertyCacheDataUser, data)
-		'''
+			File.writeNow(self.pathProfile(), data)
+			System.windowPropertySet(Settings.PropertyCacheDataUser, data)
+			'''
 
-		data = self.cacheDataUser()
-		expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
-		if not Tools.isArray(id): id = [id]
+			data = self.cacheDataUser()
+			expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
+			if not Tools.isArray(id): id = [id]
 
-		for i in id:
-			value = None if database else self.raw(id = i, parameter = Settings.ParameterDefault)
-			self.set(id = i, value = value, database = database)
+			for i in id:
+				value = None if database else self.raw(id = i, parameter = Settings.ParameterDefault)
+				self.set(id = i, value = value, database = database)
 
-			data = Regex.remove(data = data, expression = expression % i, group = 1)
-			try: del Settings.CacheValuesUser[i]
-			except: pass
+				data = Regex.remove(data = data, expression = expression % i, group = 1)
+				try: del Settings.CacheValuesUser[i]
+				except: pass
 
-		System.windowPropertySet(Settings.PropertyCacheDataUser, data)
+			System.windowPropertySet(Settings.PropertyCacheDataUser, data)
+		except: logger.error()
 
 	@classmethod
 	def defaultIs(self, id):
@@ -6317,17 +6713,21 @@ class Settings(object):
 		return self.getObject(id = id, raw = raw, cached = cached, default = default)
 
 	@classmethod
-	def getData(self, id, raw = False, cached = True, default = None):
-		if self.getBoolean(id): return self.getObject(id = self.idDataValue(id), raw = raw, cached = cached, default = default)
+	def getData(self, id, raw = False, cached = True, default = None, verify = True):
+		if self.getBoolean(id) or not verify: return self.getObject(id = self.idDataValue(id), raw = raw, cached = cached, default = default)
 		else: return default # Eg: The "Default" button used in the settings dialog will reset the value to False.
 
 	@classmethod
-	def getDataObject(self, id, raw = False, cached = True, default = None):
-		return self.getData(id = id, raw = raw, cached = cached, default = default)
+	def getDataObject(self, id, raw = False, cached = True, default = None, verify = True):
+		return self.getData(id = id, raw = raw, cached = cached, default = default, verify = verify)
 
 	@classmethod
-	def getDataList(self, id, raw = False, cached = True, default = []):
-		return self.getData(id = id, raw = raw, cached = cached, default = default)
+	def getDataList(self, id, raw = False, cached = True, default = [], verify = True):
+		return self.getData(id = id, raw = raw, cached = cached, default = default, verify = verify)
+
+	@classmethod
+	def getDataLabel(self, id, raw = False, cached = True):
+		return self.getString(self.idDataLabel(id), raw = raw, cached = cached)
 
 	@classmethod
 	def getCustom(self, id, raw = False, cached = True, default = None):
@@ -6529,13 +6929,13 @@ class Cleanup(object):
 
 	@classmethod
 	def databaseSearchSize(self):
-		from lib.modules.search import Searches
-		return Searches()._size()
+		from lib.modules.search import Search
+		return Search()._size()
 
 	@classmethod
 	def databaseSearchClean(self):
-		from lib.modules.search import Searches
-		Searches().clear(confirm = False)
+		from lib.modules.search import Search
+		Search().clear(confirm = False)
 
 	@classmethod
 	def databasePlaybackSize(self):
@@ -7079,24 +7479,24 @@ class Lightpack(object):
 	def __init__(self):
 		self.mError = False
 
-		self.mEnabled = Settings.getBoolean('ambilight.lightpack.enabled')
+		self.mEnabled = Settings.getBoolean('utility.lightpack.enabled')
 
-		self.mPrismatikMode = Settings.getInteger('ambilight.lightpack.prismatik')
-		self.mPrismatikLocation = Settings.getString('ambilight.lightpack.prismatik.location')
+		self.mPrismatikMode = Settings.getInteger('utility.lightpack.prismatik')
+		self.mPrismatikLocation = Settings.getString('utility.lightpack.prismatik.location')
 
-		self.mLaunchAutomatic = Settings.getInteger('ambilight.lightpack.launch')
-		self.mLaunchAnimation = Settings.getBoolean('ambilight.lightpack.launch.animation')
+		self.mLaunchAutomatic = Settings.getInteger('utility.lightpack.launch')
+		self.mLaunchAnimation = Settings.getBoolean('utility.lightpack.launch.animation')
 
-		self.mProfileCustom = Settings.getBoolean('ambilight.lightpack.profile')
-		self.mProfileName = Settings.getString('ambilight.lightpack.profile.name')
+		self.mProfileCustom = Settings.getBoolean('utility.lightpack.profile')
+		self.mProfileName = Settings.getString('utility.lightpack.profile.name')
 
-		self.mCount = Settings.getInteger('ambilight.lightpack.count')
+		self.mCount = Settings.getInteger('utility.lightpack.count')
 		self.mMap = self._map()
 
-		if Settings.getBoolean('ambilight.lightpack.connection'):
-			self.mHost = Settings.getString('ambilight.lightpack.connection.host')
-			self.mPort = Settings.getInteger('ambilight.lightpack.connection.port')
-			self.mKey = Settings.getString('ambilight.lightpack.connection.key').strip()
+		if Settings.getBoolean('utility.lightpack.connection'):
+			self.mHost = Settings.getString('utility.lightpack.connection.host')
+			self.mPort = Settings.getInteger('utility.lightpack.connection.port')
+			self.mKey = Settings.getString('utility.lightpack.connection.key').strip()
 		else:
 			self.mHost = Lightpack.DefaultAddress
 			self.mPort = Lightpack.DefaultPort
@@ -7381,6 +7781,31 @@ class Subprocess(object):
 			#	subprocess.CalledProcessError: Command 'lscpu' returned non-zero exit status 127.
 			# Do not print the error.
 			pass
+		except Exception as exception:
+			if self._error(exception = exception): Logger.error()
+			return False
+
+	@classmethod
+	def live(self, command, function = None):
+		try:
+			if function is None: function = Logger.log
+			from subprocess import Popen, PIPE
+			process = Popen(self.command(command), stdout = PIPE, stderr = PIPE, stdin = PIPE, shell = True)
+			while process.poll() is None:
+				output = process.stdout.readline()
+				if output: function(Converter.unicode(output).strip())
+				if System.aborted():
+					try:
+						# NB: It is very important to sleep after calling kill().
+						# If not, for some reason the process remains active.
+						process.kill()
+						Time.sleep(0.1)
+						return None
+					except:
+						Logger.error()
+						return False
+					break
+			process.poll()
 		except Exception as exception:
 			if self._error(exception = exception): Logger.error()
 			return False
@@ -11151,7 +11576,7 @@ class Resolver(object):
 					fileOriginal = None
 					if File.exists(path):
 						fileOriginal = file = File.readNow(path)
-						file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all\)[\'"]\)', replacement = 'pass')
+						file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all\)[\'"]\)', replacement = 'pass', all = True)
 						File.writeNow(path, file)
 
 					if authenticate:
@@ -11964,7 +12389,7 @@ class Backup(object):
 		from lib.modules import convert
 		date = convert.ConverterTime(Time.timestamp(), convert.ConverterTime.FormatTimestamp).string(convert.ConverterTime.FormatDateTime)
 		date = date.replace(':', '.') # Windows does not support colons in file names.
-		return System.name() + ' ' + interface.Translation.string(33773) + ' '+ date + '%s.' + Backup.Extension
+		return System.name() + ' ' + interface.Translation.string(33773) + ' ' + date + '%s.' + Backup.Extension
 
 	@classmethod
 	def _import(self, path):
@@ -12458,8 +12883,8 @@ class Playlist(object):
 				if choice == Dialog.ChoiceYes:
 					return self._settingsResult(result = None, settings = settings)
 				elif choice == Dialog.ChoiceYes:
-					data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags)
-					data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags)
+					data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+					data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					if File.writeNow(System.AdvancedSettings, data):
 						data = File.readNow(System.AdvancedSettings)
 						if '<playlistretries>' in data or '<playlisttimeout>' in data:
@@ -12473,8 +12898,8 @@ class Playlist(object):
 		playlistTimeout = '<playlisttimeout>7200</playlisttimeout>'
 
 		if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-		data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags)
-		data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags)
+		data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+		data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 		data = data.replace('</advancedsettings>', '\n\t%s%s\n\t%s%s\n</advancedsettings>' % (playlistRetries, comment, playlistTimeout, comment))
 		if File.writeNow(System.AdvancedSettings, data):
 			data = File.readNow(System.AdvancedSettings)
@@ -12923,7 +13348,7 @@ class Buffer(object):
 			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
-				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags)
+				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
 				if File.writeNow(System.AdvancedSettings, data):
 					data = File.readNow(System.AdvancedSettings)
 					if '<cache>' in data and '<memorysize>' in data:
@@ -12972,7 +13397,7 @@ class Buffer(object):
 			elif choice == Dialog.ChoiceNo:
 				cache = '\n\t<cache>\n\t\t<buffermode>1</buffermode>%s\n\t\t<memorysize>%d</memorysize>%s\n\t\t<readfactor>%d</readfactor>%s\n\t</cache>\n' % (comment, newBuffer, comment, factor, comment)
 				if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags)
+				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
 				data = data.replace('</advancedsettings>', cache + '</advancedsettings>')
 				if File.writeNow(System.AdvancedSettings, data):
 					if ('<memorysize>%d</memorysize>' % newBuffer) in File.readNow(System.AdvancedSettings):
@@ -13050,7 +13475,7 @@ class Timeout(object):
 			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
-				data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags)
+				data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 				if File.writeNow(System.AdvancedSettings, data):
 					data = File.readNow(System.AdvancedSettings)
 					if '<network>' in data and '<curlclienttimeout>' in data:
@@ -13068,7 +13493,7 @@ class Timeout(object):
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceNo:
 				if not new:
-					data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags)
+					data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					if File.writeNow(System.AdvancedSettings, data):
 						data = File.readNow(System.AdvancedSettings)
 						if '<network>' in data and '<curlclienttimeout>' in data:
@@ -13079,13 +13504,13 @@ class Timeout(object):
 							return self._settingsResult(result = True, settings = settings)
 
 				if network:
-					network = Regex.remove(data = network, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags)
+					network = Regex.remove(data = network, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					network = network.replace('</network>', '\t<curlclienttimeout>%d</curlclienttimeout>%s\n\t</network>' % (new, comment))
 				else:
 					network = '<network>\n\t\t<curlclienttimeout>%d</curlclienttimeout>%s\n\t</network>\n' % (new, comment)
 
 				if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-				data = Regex.remove(data = data, expression = '(\n?\s*<network>.*?<\/network>)', flags = flags)
+				data = Regex.remove(data = data, expression = '(\n?\s*<network>.*?<\/network>)', flags = flags, all = True)
 				data = data.replace('</advancedsettings>', '\n\t' + network + '\n</advancedsettings>')
 				if File.writeNow(System.AdvancedSettings, data):
 					if ('<curlclienttimeout>%d</curlclienttimeout>' % new) in File.readNow(System.AdvancedSettings):

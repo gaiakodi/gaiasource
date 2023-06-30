@@ -110,7 +110,7 @@ class Provider(ProviderHtml):
 		except: self.logError()
 
 	def processSourceTimeInexact(self, value, item, details = None, entry = None):
-		if value: value = Regex.remove(data = value, expression = Provider._ExpressionAge)
+		if value: value = Regex.remove(data = value, expression = Provider._ExpressionAge, all = True)
 		return value
 
 	def processSourceApproval(self, value, item, details = None, entry = None):

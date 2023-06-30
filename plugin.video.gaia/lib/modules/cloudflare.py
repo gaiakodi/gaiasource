@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Settings, Logger, Time, Subprocess, System
+from lib.modules.tools import Settings, Logger, Time, Subprocess, System, File
 from lib.modules.external import Importer
 from lib.modules.concurrency import Lock
 
@@ -407,7 +407,7 @@ class Cloudflare(object):
 
 	# Sometimes the bypass fails, but when retyring again it works.
 	# This is due to new Cloudflare V2 challenges, which are currently returned +-80% of the time, whereas the other 20% returns old/solvable challenges.
-	def request(self, link, method = None, headers = None, data = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, redirect = True, log = True):
+	def request(self, link, method = None, headers = None, data = None, path = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, redirect = True, log = True):
 		# Old bypasser.
 		#cfscrape = Importer.moduleCfScrape()
 		#scraper = cfscrape.CloudflareScraper()
@@ -430,7 +430,19 @@ class Cloudflare(object):
 		for i in range(retry):
 			try:
 				timer = Time(start = True)
-				scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect)
+
+				if path:
+					# https://stackoverflow.com/questions/16694907/download-large-file-in-python-with-requests
+					file = File.write(path = path, bytes = True)
+					if file:
+						with scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect, stream = True) as stream:
+							stream.raise_for_status()
+							for chunk in stream.iter_content(chunk_size = 8192):
+								file.write(chunk)
+						file.close()
+				else:
+					scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect)
+
 				duration = timer.elapsed(milliseconds = True)
 				break
 			except cloudscraper.exceptions.CloudflareException as error:

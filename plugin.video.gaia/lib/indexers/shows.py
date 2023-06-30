@@ -339,6 +339,9 @@ class Shows(object):
 			next = Networker.linkCreate(link = Networker.linkClean(link, parametersStrip = True, headersStrip = True), parameters = parameters).replace('%2C', ',')
 			for item in items: item['next'] = next
 
+		for item in items:
+			if 'nextFixed' in item: item['next'] = item['nextFixed']
+
 		return items
 
 	##############################################################################
@@ -483,17 +486,17 @@ class Shows(object):
 
 	def search(self, terms = None):
 		try:
-			from lib.modules.search import Searches
+			from lib.modules.search import Search
 
 			if terms:
 				if not terms: return None
 				Loader.show()
-				Searches().updateShows(terms)
+				Search().updateShow(terms)
 			else:
 				terms = Dialog.input(title = 32010)
 				if not terms: return None
 				Loader.show()
-				Searches().insertShows(terms, self.mKids)
+				Search().insertShow(terms, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
@@ -761,7 +764,7 @@ class Shows(object):
 		if type is None:
 			items = [
 				{'name' : Translation.string(33326), 'image' : 'emmyawards.png', 'action' : 'showsAwards', 'parameters' : {'type' : 'emmyawards'}},
-				{'name' : Translation.string(33325), 'image' : 'goldenglobes.png', 'action' : 'moviesAwards', 'parameters' : {'type' : 'goldenglobes'}},
+				{'name' : Translation.string(33325), 'image' : 'goldenglobes.png', 'action' : 'showsAwards', 'parameters' : {'type' : 'goldenglobes'}},
 			]
 		elif type == 'academyawards' and category == 'people' and subcategory is None:
 			items = [
@@ -835,15 +838,15 @@ class Shows(object):
 
 	def person(self, terms = None):
 		try:
-			from lib.modules.search import Searches
+			from lib.modules.search import Search
 
 			if terms:
 				if not terms: return None
-				Searches().updatePeople(terms)
+				Search().updatePerson(terms)
 			else:
 				terms = Dialog.keyboard(title = 32010)
 				if not terms: return None
-				Searches().insertPeople(terms, self.mKids)
+				Search().insertPerson(terms, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
@@ -967,7 +970,7 @@ class Shows(object):
 			try:
 				title = item['title']
 				title = Networker.htmlDecode(title)
-				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
+				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$', all = True)
 
 				try:
 					year = item['year']
@@ -1500,7 +1503,7 @@ class Shows(object):
 			item = Networker().requestJson(link = self.tvmaze_info_link % id)
 			if item: # This can fail if the rate limit was exceeded.
 				title = item['name']
-				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$')
+				title = Regex.remove(data = title, expression = '\s+[\|\[\(](us|uk|gb|au|\d{4})[\|\]\)]\s*$', all = True)
 				title = Networker.htmlDecode(title)
 
 				try:
@@ -1508,13 +1511,13 @@ class Shows(object):
 					if year > self.mYear: return None
 				except: year = None
 
+				idImdb = None
 				try:
 					idImdb = item['externals']['imdb']
 					if idImdb:
-						idImdb = 'tt' + Regex.remove(data = str(idImdb), expression = '[^0-9]')
+						idImdb = 'tt' + Regex.remove(data = str(idImdb), expression = '[^0-9]', all = True)
 						if idImdb == 'tt': idImdb = None
-					else: idImdb = None
-				except: idImdb = None
+				except: pass
 
 				try:
 					idTvdb = item['externals']['thetvdb']

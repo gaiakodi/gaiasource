@@ -124,11 +124,11 @@ try:
 				directory = System.path(id = Orionoid.Id)
 				path = File.joinPath(directory, 'addon.xml')
 				data = File.readNow(path)
-				data = Regex.replace(data = data, expression = 'id="' + Orionoid.Id + '"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '\sname="Orion"', replacement = ' name="Orion Dummy"', flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.service".*?\/>', replacement = '', flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = 'id="' + Orionoid.Id + '"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = '\sname="Orion"', replacement = ' name="Orion Dummy"', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.service".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
 				File.writeNow(path, data)
 				directories, files = File.listDirectory(directory, absolute = True)
 				for i in directories: File.deleteDirectory(i)
@@ -656,8 +656,11 @@ try:
 			try:
 				link = stream.linkPrimary()
 
-				# Locally cached streams - already submitted on the previous run
-				if stream.infoCache(): return True
+				# Locally cached streams - already submitted on the previous run.
+				# Still keep those marked as AccessCacheExpired, since all newley scraped links will have this value.
+				# Only check timestamps.
+				cache = stream.infoCache()
+				if cache and not cache == Stream.AccessCacheExpired: return True
 
 				# Exclude duplicates
 				# Check if True, since the function can also return "orion".

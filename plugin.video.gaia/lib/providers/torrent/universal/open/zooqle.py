@@ -97,7 +97,7 @@ class Provider(ProviderHtml):
 		except: self.logError()
 
 	def processFileExtra(self, value, item, details = None, entry = None):
-		try: value = Regex.remove(data = value, expression = Provider._ExpressionExclude).strip()
+		try: value = Regex.remove(data = value, expression = Provider._ExpressionExclude, all = True).strip()
 		except: pass
 		return value
 

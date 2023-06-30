@@ -125,7 +125,7 @@ class Channels(object):
 
 	def nameClean(self, name, group = None):
 		name = name.replace('horhd', 'horror hd')
-		name = Regex.remove(data = name, expression = '\s*hd$')
+		name = Regex.remove(data = name, expression = '\s*hd$', all = True)
 
 		if group:
 			group = group.lower()

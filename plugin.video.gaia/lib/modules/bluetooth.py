@@ -26,10 +26,10 @@ class Bluetooth(object):
 	PropertySupport 	= 'GaiaBluetoothSupport'
 	PropertyBusy 		= 'GaiaBluetoothBusy'
 
-	SettingEnabled		= 'bluetooth.general.enabled'
-	SettingDevices		= 'bluetooth.device.list'
-	SettingReconnect	= 'bluetooth.monitor.enabled'
-	SettingInterval		= 'bluetooth.monitor.interval'
+	SettingEnabled		= 'utility.bluetooth.enabled'
+	SettingDevices		= 'utility.bluetooth.devices'
+	SettingReconnect	= 'utility.bluetooth.monitor.enabled'
+	SettingInterval		= 'utility.bluetooth.monitor.interval'
 
 	Count				= None
 

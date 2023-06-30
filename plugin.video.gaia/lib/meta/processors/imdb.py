@@ -33,7 +33,7 @@ class MetaImdb(object):
 	LinkSeason		= 'https://imdb.com/title/%s/episodes?season=%d'
 
 	CacheDetails	= Cache.TimeoutWeek1
-	CacheList		= Cache.TimeoutWeek1
+	CacheList		= [Cache.TimeoutRefresh, Cache.TimeoutDay3]
 	CacheDefault	= Cache.TimeoutLong
 	CacheNone		= None
 
@@ -48,6 +48,7 @@ class MetaImdb(object):
 	def retrieve(self, link, timeout = CacheNone, full = False):
 		networker = Networker()
 		if timeout is MetaImdb.CacheNone: result = networker.requestText(link = link, headers = self.headers())
+		elif Tools.isArray(timeout): result = Cache.instance().cache(None, timeout[0], timeout[1], networker.requestText, link = link, headers = self.headers())
 		else: result = Cache.instance().cache(None, timeout, None, networker.requestText, link = link, headers = self.headers())
 		return networker if full else result
 
@@ -128,8 +129,12 @@ class MetaImdb(object):
 	##############################################################################
 
 	@classmethod
-	def _fatal(self, id = None):
-		Logger.log('IMDB DATA%s: The structure of the IMDb data has changed and cannot be processed anymore. Please contact the Gaia developer if you see this message.' % (' [%s]' % id) if id else '', type = Logger.TypeFatal)
+	def _fatal(self, id = None, code = None):
+		details = ''
+		if id and code: details = ' [%s - %s]' % (id, code)
+		elif id: details = ' [%s]' % id
+		elif code: details = ' [%s]' % code
+		Logger.log('IMDB DATA%s: The structure of the IMDb data has changed and cannot be processed anymore. Please contact the Gaia developer if you see this message.' % details, type = Logger.TypeFatal)
 		return None
 
 	@classmethod
@@ -234,7 +239,8 @@ class MetaImdb(object):
 			if data:
 				result = []
 				for item in data:
-					try: result.append(item['credits'][0]['name']['nameText']['text'])
+					try:
+						if item['credits']: result.append(item['credits'][0]['name']['nameText']['text'])
 					except: Logger.error()
 				if result: return result
 		except: Logger.error()
@@ -296,14 +302,14 @@ class MetaImdb(object):
 			except: pass
 
 		try: datas = data['props']['pageProps']
-		except: return self._fatal(id = id)
+		except: return self._fatal(id = id, code = 'details-a')
 
 		data = []
 		try: data.append(datas['mainColumnData'])
 		except: pass
 		try: data.append(datas['aboveTheFoldData'])
 		except: pass
-		if not data: return self._fatal(id = id)
+		if not data: return self._fatal(id = id, code = 'details-b')
 
 		result = {}
 		finance = {}
@@ -314,7 +320,7 @@ class MetaImdb(object):
 		if 'imdb' in result:
 			id = result['imdb']
 			result['id'] = {'imdb' : result['imdb']}
-		else: return self._fatal(id = id)
+		else: return self._fatal(id = id, code = 'details-c')
 
 		self._extract(id = id, result = result, data = data, attribute = 'title', keys = ['titleText', 'text'])
 		self._extract(id = id, result = result, data = data, attribute = 'originaltitle', keys = ['originalTitleText', 'text'])
@@ -378,7 +384,7 @@ class MetaImdb(object):
 			if not episodes: return None
 
 			episodes = episodes.find_all('div', {'class' : 'list_item'})
-			if not episodes: return self._fatal(id = id)
+			if not episodes: return self._fatal(id = id, code = 'details-season-a')
 
 			try:
 				show = parser.find('div', {'class' : 'subpage_title_block'}).find('a', {'itemprop' : 'url'})
@@ -460,4 +466,4 @@ class MetaImdb(object):
 			return {'episodes' : result}
 		except:
 			Logger.error()
-			return self._fatal(id = id)
+			return self._fatal(id = id, code = 'details-season-z')

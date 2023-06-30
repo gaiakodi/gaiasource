@@ -114,8 +114,8 @@ class Provider(ProviderJson):
 		data = data.replace('[GAIA_APOSTROPHE]', '\'')
 
 		# Remove trailing commas.
-		data = Regex.replace(data = data, expression = ',\s+}', replacement = '}')
-		data = Regex.replace(data = data, expression = ',\s+\]', replacement = ']')
+		data = Regex.replace(data = data, expression = ',\s+}', replacement = '}', all = True)
+		data = Regex.replace(data = data, expression = ',\s+\]', replacement = ']', all = True)
 
 		return data
 

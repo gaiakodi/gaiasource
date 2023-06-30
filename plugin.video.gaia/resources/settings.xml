@@ -1899,6 +1899,34 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## SCRAPE - SAVE ########## -->
+			<group id="scrape.save" label="33686">
+				<setting id="scrape.save.stream" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="scrape.save.stream.label" type="string" label="33887" help="34595">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.save.stream&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="scrape.save.cache" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="sscrape.save.cache.label" type="string" label="33888" help="34596" parent="scrape.save.stream.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.save.cache&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+			</group>
+
 			<!-- ########## SCRAPE - CONCURRENCY ########## -->
 			<group id="scrape.concurrency" label="36042">
 				<setting id="scrape.concurrency.mode" type="integer" label="36062" help="34475">
@@ -2044,6 +2072,21 @@ The label is then added to the action element:
 					<default>true</default>
 				</setting>
 				<setting id="scrape.query.keyword.english" type="integer" label="36075" help="34323" parent="scrape.query.keyword">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35550">1</option>
+							<option label="35049">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.query.keyword">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.query.keyword.original" type="integer" label="35027" help="34599" parent="scrape.query.keyword">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>2</level>
@@ -3482,7 +3525,7 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
-				<setting id="playback.subtitle.dialog" type="integer" label="35876" help="34447">
+				<setting id="playback.subtitle.dialog" type="integer" label="35616" help="34447">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -3795,105 +3838,6 @@ The label is then added to the action element:
 					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="activity.history.count" type="integer" label="35138" help="34013" parent="activity.history.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="activity.history.enabled">true</condition>
-								<or>
-									<condition setting="account.trakt.enabled">false</condition>
-									<condition setting="account.trakt.authentication">false</condition>
-								</or>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="activity.history.count.alternative" type="integer" label="35138" help="34013" parent="activity.history.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-							<option label="32315">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="activity.history.enabled">true</condition>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="activity.history.progress" type="integer" label="32004" help="34244" parent="activity.history.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="activity.history.enabled">true</condition>
-								<or>
-									<condition setting="account.trakt.enabled">false</condition>
-									<condition setting="account.trakt.authentication">false</condition>
-								</or>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="activity.history.progress.alternative" type="integer" label="32004" help="34244" parent="activity.history.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-							<option label="32315">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="activity.history.enabled">true</condition>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="activity.history.resume" type="integer" label="32344" help="34014" parent="activity.history.enabled">
-					<control type="spinner" format="string"/>
-					<default>4</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33800">1</option>
-							<option label="33110">2</option>
-							<option label="33273">3</option>
-							<option label="35233">4</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="activity.history.enabled">true</dependency>
-					</dependencies>
-				</setting>
 				<setting id="activity.history.end" type="integer" label="35309" help="34308" parent="activity.history.enabled">
 					<control type="slider" format="percentage">
 						<heading>35309</heading>
@@ -3910,16 +3854,115 @@ The label is then added to the action element:
 						<dependency type="visible" setting="activity.history.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.history.rewatch" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="activity.history.rewatch.label" type="string" label="35405" help="34077" parent="activity.history.enabled">
+				<setting id="activity.history.count" type="integer" label="35138" help="34013">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.history.enabled">true</condition>
+								<or>
+									<condition setting="account.trakt.enabled">false</condition>
+									<condition setting="account.trakt.authentication">false</condition>
+								</or>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.history.count.alternative" type="integer" label="35138" help="34013">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+							<option label="32315">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.history.enabled">true</condition>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.history.count.rewatch" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="activity.history.count.rewatch.label" type="string" label="35405" help="34077" parent="activity.history.count">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.history.rewatch&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.history.count.rewatch&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
 					<level>3</level>
 					<constraints>
 						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.history.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.history.progress" type="integer" label="32004" help="34244">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.history.enabled">true</condition>
+								<or>
+									<condition setting="account.trakt.enabled">false</condition>
+									<condition setting="account.trakt.authentication">false</condition>
+								</or>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.history.progress.alternative" type="integer" label="32004" help="34244">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+							<option label="32315">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.history.enabled">true</condition>
+								<condition setting="account.trakt.enabled">true</condition>
+								<condition setting="account.trakt.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.history.progress.resume" type="integer" label="32344" help="34014" parent="activity.history.progress">
+					<control type="spinner" format="string"/>
+					<default>4</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33800">1</option>
+							<option label="33110">2</option>
+							<option label="33273">3</option>
+							<option label="35233">4</option>
+						</options>
 					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.history.enabled">true</dependency>
@@ -3975,7 +4018,25 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.binge" type="integer" label="33227" help="34551" parent="activity.rating.enabled">
+				<setting id="activity.rating.default" type="integer" label="36313" help="34610" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="36314">0</option>
+							<option label="36315">1</option>
+							<option label="36316">2</option>
+							<option label="36317">3</option>
+							<option label="36318">4</option>
+							<option label="36319">5</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.binge" type="integer" label="33227" help="34551">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>2</level>
@@ -3994,17 +4055,17 @@ The label is then added to the action element:
 						</dependency>
 						<dependency type="enable">
 							<or>
-								<condition setting="activity.rating.show" operator="gt">0</condition>
-								<condition setting="activity.rating.season" operator="gt">0</condition>
-								<condition setting="activity.rating.episode" operator="gt">0</condition>
+								<condition setting="activity.rating.rate.show" operator="gt">0</condition>
+								<condition setting="activity.rating.rate.season" operator="gt">0</condition>
+								<condition setting="activity.rating.rate.episode" operator="gt">0</condition>
 							</or>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.timeout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="activity.rating.timeout.label" type="string" label="33660" help="34583" parent="activity.rating.enabled">
+				<setting id="activity.rating.binge.timeout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.rating.binge.timeout.label" type="string" label="33660" help="34583" parent="activity.rating.binge">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.timeout&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.binge.timeout&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -4013,18 +4074,23 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.binge" operator="gt">0</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.rerate" type="boolean" label="35046" help="34549" parent="activity.rating.enabled">
+				<setting id="activity.rating.rate" type="boolean" label="36375" help="34617">
 					<control type="toggle"/>
-					<level>2</level>
+					<level>1</level>
 					<default>true</default>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.movie" type="integer" label="35335" help="34545" parent="activity.rating.enabled">
+				<setting id="activity.rating.rate.movie" type="integer" label="35335" help="34545" parent="activity.rating.rate">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
@@ -4035,12 +4101,17 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rate">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.show" type="integer" label="35336" help="34546" parent="activity.rating.enabled">
+				<setting id="activity.rating.rate.show" type="integer" label="35336" help="34546" parent="activity.rating.rate">
 					<control type="spinner" format="string"/>
-					<default>4</default>
+					<default>7</default>
 					<level>3</level>
 					<constraints>
 						<options>
@@ -4049,13 +4120,21 @@ The label is then added to the action element:
 							<option label="33792">2</option>
 							<option label="33793">3</option>
 							<option label="33796">4</option>
+							<option label="36312">5</option>
+							<option label="36376">6</option>
+							<option label="36377">7</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rate">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.season" type="integer" label="35337" help="34547" parent="activity.rating.enabled">
+				<setting id="activity.rating.rate.season" type="integer" label="35337" help="34547" parent="activity.rating.rate">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
@@ -4067,10 +4146,15 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rate">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.episode" type="integer" label="35338" help="34548" parent="activity.rating.enabled">
+				<setting id="activity.rating.rate.episode" type="integer" label="35338" help="34548" parent="activity.rating.rate">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
@@ -4081,12 +4165,131 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rate">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.rerate" type="boolean" label="35046" help="34549">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+						<dependency type="enable" setting="activity.rating.rate">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.rerate.movie" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="activity.rating.rerate.movie.label" type="string" label="36378" help="34618" parent="activity.rating.rerate">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.rerate.movie&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rerate">true</condition>
+							</and>
+						</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="activity.rating.rate">true</condition>
+								<condition setting="activity.rating.rate.movie" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.rerate.show" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="activity.rating.rerate.show.label" type="string" label="36379" help="34619" parent="activity.rating.rerate">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.rerate.show&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rerate">true</condition>
+							</and>
+						</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="activity.rating.rate">true</condition>
+								<condition setting="activity.rating.rate.show" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.rerate.season" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="activity.rating.rerate.season.label" type="string" label="36380" help="34620" parent="activity.rating.rerate">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.rerate.season&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rerate">true</condition>
+							</and>
+						</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="activity.rating.rate">true</condition>
+								<condition setting="activity.rating.rate.season" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.rerate.episode" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="activity.rating.rerate.episode.label" type="string" label="36381" help="34621" parent="activity.rating.rerate">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.rerate.episode&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.rating.enabled">true</condition>
+								<condition setting="activity.rating.rerate">true</condition>
+							</and>
+						</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="activity.rating.rate">true</condition>
+								<condition setting="activity.rating.rate.episode" operator="gt">0</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
 			</group>
 
 		</category>
+
 
 		<!-- ########## METADATA ########## -->
 		<category id="metadata" label="33015" help="34358">
@@ -5638,10 +5841,17 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave.supplementary" type="boolean" label="33261" help="34310" parent="navigation.show.interleave">
-					<control type="toggle"/>
+				<setting id="navigation.show.interleave.unofficial" type="integer" label="33254" help="34227" parent="navigation.show.interleave">
+					<control type="spinner" format="string"/>
+					<default>2</default>
 					<level>2</level>
-					<default>false</default>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33800">1</option>
+							<option label="35441">2</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="navigation.show.interleave">true</dependency>
 						<dependency type="enable">
@@ -5655,10 +5865,18 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave.unofficial" type="boolean" label="33254" help="34227" parent="navigation.show.interleave">
-					<control type="toggle"/>
+				<setting id="navigation.show.interleave.extra" type="integer" label="33261" help="34310" parent="navigation.show.interleave">
+					<control type="spinner" format="string"/>
+					<default>1</default>
 					<level>2</level>
-					<default>true</default>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33800">1</option>
+							<option label="35439">2</option>
+							<option label="35441">3</option>
+						</options>
+					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="navigation.show.interleave">true</dependency>
 						<dependency type="enable">
@@ -5762,7 +5980,7 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
 					</constraints>
 				</setting>
 				<setting id="navigation.page.show" type="integer" label="35383" help="34156">
@@ -5775,7 +5993,7 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
 					</constraints>
 				</setting>
 				<setting id="navigation.page.episode" type="integer" label="35384" help="34134" parent="navigation.page.show">
@@ -5788,24 +6006,8 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
 					</constraints>
-				</setting>
-				<setting id="navigation.page.flatten" type="integer" label="35388" help="34353" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35388</heading>
-						<popup>true</popup>
-					</control>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>200</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="enable" setting="navigation.show.flatten">true</dependency>
-					</dependencies>
 				</setting>
 				<setting id="navigation.page.multiple" type="integer" label="35385" help="34333" parent="navigation.page.show">
 					<control type="slider" format="integer">
@@ -5817,10 +6019,39 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
+					</constraints>
+				</setting>
+				<setting id="navigation.page.submenu" type="integer" label="35541" help="34585" parent="navigation.page.show">
+					<control type="slider" format="integer">
+						<heading>35385</heading>
+						<popup>true</popup>
+					</control>
+					<default>10</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
 					</constraints>
 					<dependencies>
 						<dependency type="enable" setting="navigation.show.direct">false</dependency>
+					</dependencies>
+				</setting>
+				<setting id="navigation.page.flatten" type="integer" label="35388" help="34353" parent="navigation.page.show">
+					<control type="slider" format="integer">
+						<heading>35388</heading>
+						<popup>true</popup>
+					</control>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" setting="navigation.show.flatten">true</dependency>
 					</dependencies>
 				</setting>
 				<setting id="navigation.page.search" type="integer" label="35437" help="34423">
@@ -5833,7 +6064,7 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
 					</constraints>
 				</setting>
 				<setting id="navigation.page.mixed" type="integer" label="35513" help="34577">
@@ -5846,7 +6077,7 @@ The label is then added to the action element:
 					<constraints>
 						<minimum>1</minimum>
 						<step>1</step>
-						<maximum>200</maximum>
+						<maximum>100</maximum>
 					</constraints>
 				</setting>
 			</group>
@@ -7469,6 +7700,763 @@ The label is then added to the action element:
 		</category>
 
 
+		<!-- ########## ORACLE ########## -->
+		<category id="oracle" label="33675" help="34554">
+
+			<!-- ########## ORACLE - GENERAL ########## -->
+			<group id="oracle.general" label="32310">
+				<setting id="oracle.general.enabled" type="boolean" label="33192" help="34593">
+					<control type="toggle"/>
+					<level>0</level>
+					<default>true</default>
+				</setting>
+				<setting id="oracle.general.interface" type="integer" label="33883" help="34594">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33105">0</option>
+							<option label="33800">1</option>
+							<option label="33379">2</option>
+							<option label="33455">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.background" type="boolean" label="35379" help="34600" parent="oracle.general.interface">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.general.interface" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.intro" type="integer" label="36341" help="34611" parent="oracle.general.interface">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32017">1</option>
+							<option label="36340">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.service" type="integer" label="36342" help="34612" parent="oracle.general.interface">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32017">0</option>
+							<option label="36340">1</option>
+							<option label="33815">2</option>
+							<option label="36353">3</option>
+							<option label="36346">4</option>
+							<option label="36344">5</option>
+							<option label="36345">6</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.mode" type="integer" label="36343" help="34613" parent="oracle.general.interface">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32017">0</option>
+							<option label="36340">1</option>
+							<option label="36214">2</option>
+							<option label="36215">3</option>
+							<option label="36302">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.busy" type="integer" label="36348" help="34614" parent="oracle.general.interface">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32017">0</option>
+							<option label="36349">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.interface.results" type="integer" label="36350" help="34615" parent="oracle.general.interface">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32017">0</option>
+							<option label="33023">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.preload" type="boolean" label="36347" help="34601">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.placement" type="integer" label="33701" help="34592" parent="oracle.general.preload">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32053">1</option>
+							<option label="32052">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.report" type="integer" label="36125" help="34597">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35465">0</option>
+							<option label="36091">1</option>
+							<option label="36092">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.general.report.automatic" type="integer" label="36126" help="34598" parent="oracle.general.report">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32017">1</option>
+							<option label="33025">2</option>
+							<option label="33023">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ORACLE - CHATGPT ########## -->
+			<group id="oracle.chatgpt" label="33814">
+				<setting id="oracle.chatgpt.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://platform.openai.com</default>
+					<level>1</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.enabled" type="boolean" label="33192" help="34586">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="oracle.chatgpt.authentication.label" type="string" label="33101" help="34219">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleAuthentication&service=chatgpt&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.playground" type="string" label="33844" help="34587">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oraclePlayground&service=chatgpt&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 32302]</default> <!-- Leave disabled by default. Will be set by the Oracle window on 1st use. Required to determine if a "free" account was authenticated. -->
+					<level>1</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.model" type="string" label="33816" help="34588">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleModel&service=chatgpt&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.model.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.chatgpt.model.limit.label" type="string" label="33854" help="34591" parent="oracle.chatgpt.model">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=oracle.chatgpt.model.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.model.randomness" type="integer" label="33817" help="34589" parent="oracle.chatgpt.model">
+					<control type="slider" format="percentage">
+						<heading>33817</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.model.creativity" type="integer" label="33818" help="34590" parent="oracle.chatgpt.model">
+					<control type="slider" format="percentage">
+						<heading>33818</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.query" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.chatgpt.query.label" type="string" label="35814" help="34602">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleQuery&service=chatgpt&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.query.limit" type="integer" label="35816" help="34605" parent="oracle.chatgpt.query.label">
+					<control type="slider" format="integer">
+						<heading>35816</heading>
+						<popup>true</popup>
+					</control>
+					<default>20</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.chatgpt.query.refine" type="integer" label="36300" help="34606" parent="oracle.chatgpt.query.label">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="33248">1</option>
+							<option label="36299">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.chatgpt.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ORACLE - BARD ########## -->
+			<group id="oracle.bard" label="36352">
+				<setting id="oracle.bard.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://bard.google.com</default>
+					<level>1</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.enabled" type="boolean" label="33192" help="34616">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="oracle.bard.authentication.label" type="string" label="33101" help="34219">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleAuthentication&service=bard&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.bard.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.query" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.bard.query.label" type="string" label="35814" help="34602">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleQuery&service=bard&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.bard.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.query.limit" type="integer" label="35816" help="34605" parent="oracle.bard.query.label">
+					<control type="slider" format="integer">
+						<heading>35816</heading>
+						<popup>true</popup>
+					</control>
+					<default>20</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.bard.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.query.refine" type="integer" label="36300" help="34606" parent="oracle.bard.query.label">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="33248">1</option>
+							<option label="36299">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.bard.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.bard.query.language" type="string" label="36304" help="34609" parent="oracle.bard.query.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=oracle.bard.query.language&title=36303&automatic=true&none=false)</data>
+						<close>false</close>
+					</control>
+					<default>English</default>
+					<level>3</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.bard.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ORACLE - YOUCHAT ########## -->
+			<group id="oracle.youchat" label="36298">
+				<setting id="oracle.youchat.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://you.com/chat</default>
+					<level>1</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.youchat.enabled" type="boolean" label="33192" help="34604">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.youchat.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="oracle.youchat.authentication.label" type="string" label="33101" help="34219">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleAuthentication&service=youchat&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.youchat.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.youchat.query" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.youchat.query.label" type="string" label="35814" help="34602">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleQuery&service=youchat&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.youchat.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.youchat.query.limit" type="integer" label="35816" help="34605" parent="oracle.youchat.query.label">
+					<control type="slider" format="integer">
+						<heading>35816</heading>
+						<popup>true</popup>
+					</control>
+					<default>20</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.youchat.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.youchat.query.refine" type="integer" label="36300" help="34606" parent="oracle.youchat.query.label">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="33248">1</option>
+							<option label="36299">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.youchat.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ORACLE - WATCHTHIS ########## -->
+			<group id="oracle.watchthis" label="36297">
+				<setting id="oracle.watchthis.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://watchthis.dev</default>
+					<level>1</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.watchthis.enabled" type="boolean" label="33192" help="34603">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.watchthis.query" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.watchthis.query.label" type="string" label="35814" help="34602">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleQuery&service=watchthis&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.watchthis.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ORACLE - KEYTALK ########## -->
+			<group id="oracle.keytalk" label="36301">
+				<setting id="oracle.keytalk.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://deepsearch.mycelebs.com</default>
+					<level>1</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.enabled" type="boolean" label="33192" help="34607">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="oracle.general.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.query" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="oracle.keytalk.query.label" type="string" label="35814" help="34602">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=oracleQuery&service=keytalk&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.keytalk.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.query.limit" type="integer" label="35816" help="34605" parent="oracle.keytalk.query.label">
+					<control type="slider" format="integer">
+						<heading>35816</heading>
+						<popup>true</popup>
+					</control>
+					<default>20</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.keytalk.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.query.refine" type="integer" label="36300" help="34606" parent="oracle.keytalk.query.label">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="33248">1</option>
+							<option label="36299">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.keytalk.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.query.type" type="integer" label="36303" help="34608" parent="oracle.keytalk.query.label">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35194">0</option>
+							<option label="35484">1</option>
+							<option label="33690">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.keytalk.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="oracle.keytalk.query.language" type="string" label="36304" help="34609" parent="oracle.keytalk.query.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=oracle.keytalk.query.language&title=36303&automatic=true&none=false)</data>
+						<close>false</close>
+					</control>
+					<default>English</default>
+					<level>3</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="oracle.general.enabled">true</condition>
+								<condition setting="oracle.keytalk.enabled">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+		</category>
+
+
 		<!-- ########## LIBRARY ########## -->
 		<category id="library" label="35170" help="34256">
 
@@ -8567,21 +9555,17 @@ The label is then added to the action element:
 		</category>
 
 
-		<!-- ########## BLUETOOTH ########## -->
-		<category id="bluetooth" label="33529" help="34554">
+		<!-- ########## UTILITY ########## -->
+		<category id="utility" label="35330" help="34239">
 
-			<!-- ########## BLUETOOTH - GENERAL ########## -->
-			<group id="bluetooth.general" label="32310">
-				<setting id="bluetooth.general.enabled" type="boolean" label="33539" help="34555">
+			<!-- ########## UTILITY - BLUETOOTH ########## -->
+			<group id="utility.bluetooth" label="33529">
+				<setting id="utility.bluetooth.enabled" type="boolean" label="33539" help="34555">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-			</group>
-
-			<!-- ########## BLUETOOTH - DEVICE ########## -->
-			<group id="bluetooth.device" label="33536">
-				<setting id="bluetooth.device.list" type="string" label="33532" help="34556">
+				<setting id="utility.bluetooth.devices" type="string" label="33532" help="34556">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=bluetoothDialog&settings=true)</data>
 						<close>true</close>
@@ -8592,27 +9576,23 @@ The label is then added to the action element:
 					<default>0 $ADDON[plugin.video.gaia 33536]</default>
 					<level>2</level>
 					<dependencies>
-						<dependency type="visible" setting="bluetooth.general.enabled">true</dependency>
+						<dependency type="visible" setting="utility.bluetooth.enabled">true</dependency>
 						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
 					</dependencies>
 				</setting>
-			</group>
-
-			<!-- ########## BLUETOOTH - MONITOR ########## -->
-			<group id="bluetooth.monitor" label="33540">
-				<setting id="bluetooth.monitor.enabled" type="boolean" label="33537" help="34557">
+				<setting id="utility.bluetooth.monitor.enabled" type="boolean" label="33537" help="34557">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>false</default>
 					<dependencies>
-						<dependency type="visible" setting="bluetooth.general.enabled">true</dependency>
+						<dependency type="visible" setting="utility.bluetooth.enabled">true</dependency>
 						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
 					</dependencies>
 				</setting>
-				<setting id="bluetooth.monitor.interval" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="bluetooth.monitor.interval.label" type="string" label="33538" help="34558" parent="bluetooth.monitor.enabled">
+				<setting id="utility.bluetooth.monitor.interval" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="utility.bluetooth.monitor.interval.label" type="string" label="33538" help="34558" parent="utility.bluetooth.monitor.enabled">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=bluetooth.monitor.interval&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=utility.bluetooth.monitor.interval&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -8623,8 +9603,8 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="bluetooth.general.enabled">true</condition>
-								<condition setting="bluetooth.monitor.enabled">true</condition>
+								<condition setting="utility.bluetooth.enabled">true</condition>
+								<condition setting="utility.bluetooth.monitor.enabled">true</condition>
 							</and>
 						</dependency>
 						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
@@ -8632,20 +9612,14 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-		</category>
-
-
-		<!-- ########## AMBILIGHT ########## -->
-		<category id="ambilight" label="33311" help="34239">
-
-			<!-- ########## AMBILIGHT - LIGHTPACK ########## -->
-			<group id="ambilight.lightpack" label="33406">
-				<setting id="ambilight.lightpack.enabled" type="boolean" label="33312" help="34094">
+			<!-- ########## UTILITY - LIGHTPACK ########## -->
+			<group id="utility.lightpack" label="33406">
+				<setting id="utility.lightpack.enabled" type="boolean" label="33312" help="34094">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>false</default>
 				</setting>
-				<setting id="ambilight.lightpack.count" type="integer" label="33405" help="34101">
+				<setting id="utility.lightpack.count" type="integer" label="33405" help="34101">
 					<control type="slider" format="integer">
 						<heading>33405</heading>
 						<popup>true</popup>
@@ -8658,10 +9632,10 @@ The label is then added to the action element:
 						<maximum>10</maximum>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="ambilight.lightpack.enabled">true</dependency>
+						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.prismatik" type="integer" label="33400" help="34095">
+				<setting id="utility.lightpack.prismatik" type="integer" label="33400" help="34095">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>3</level>
@@ -8672,10 +9646,10 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="ambilight.lightpack.enabled">true</dependency>
+						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.prismatik.location" type="path" label="33403" help="34096" parent="ambilight.lightpack.prismatik">
+				<setting id="utility.lightpack.prismatik.location" type="path" label="33403" help="34096" parent="utility.lightpack.prismatik">
 					<control type="button" format="file">
 						<heading>33403</heading>
 					</control>
@@ -8688,13 +9662,13 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.prismatik">1</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.prismatik">1</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.launch" type="integer" label="33257" help="34097">
+				<setting id="utility.lightpack.launch" type="integer" label="33257" help="34097">
 					<control type="spinner" format="string"/>
 					<default>3</default>
 					<level>3</level>
@@ -8707,31 +9681,31 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="ambilight.lightpack.enabled">true</dependency>
+						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.launch.animation" type="boolean" label="33397" help="34098" parent="ambilight.lightpack.launch">
+				<setting id="utility.lightpack.launch.animation" type="boolean" label="33397" help="34098" parent="utility.lightpack.launch">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>true</default>
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.launch" operator="!is">0</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.launch" operator="!is">0</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.profile" type="boolean" label="33398" help="34099">
+				<setting id="utility.lightpack.profile" type="boolean" label="33398" help="34099">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>false</default>
 					<dependencies>
-						<dependency type="visible" setting="ambilight.lightpack.enabled">true</dependency>
+						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.profile.name" type="string" label="33399" help="34100" parent="ambilight.lightpack.profile">
+				<setting id="utility.lightpack.profile.name" type="string" label="33399" help="34100" parent="utility.lightpack.profile">
 					<control type="edit" format="string">
 						<heading>33399</heading>
 					</control>
@@ -8743,21 +9717,21 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.profile">true</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.profile">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.connection" type="boolean" label="33360" help="34093">
+				<setting id="utility.lightpack.connection" type="boolean" label="33360" help="34093">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>false</default>
 					<dependencies>
-						<dependency type="visible" setting="ambilight.lightpack.enabled">true</dependency>
+						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.connection.address" type="string" label="33394" help="34102" parent="ambilight.lightpack.connection">
+				<setting id="utility.lightpack.connection.address" type="string" label="33394" help="34102" parent="utility.lightpack.connection">
 					<control type="edit" format="ip">
 						<heading>33394</heading>
 					</control>
@@ -8769,13 +9743,13 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.connection">true</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.connection">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.connection.port" type="integer" label="33395" help="34103" parent="ambilight.lightpack.connection">
+				<setting id="utility.lightpack.connection.port" type="integer" label="33395" help="34103" parent="utility.lightpack.connection">
 					<control type="edit" format="integer">
 						<heading>33395</heading>
 					</control>
@@ -8788,13 +9762,13 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.connection">true</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.connection">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="ambilight.lightpack.connection.key" type="string" label="33100" help="34105" parent="ambilight.lightpack.connection">
+				<setting id="utility.lightpack.connection.key" type="string" label="33100" help="34105" parent="utility.lightpack.connection">
 					<control type="edit" format="string">
 						<heading>33100</heading>
 						<hidden>true</hidden>
@@ -8807,8 +9781,8 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="ambilight.lightpack.enabled">true</condition>
-								<condition setting="ambilight.lightpack.connection">true</condition>
+								<condition setting="utility.lightpack.enabled">true</condition>
+								<condition setting="utility.lightpack.connection">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -8830,6 +9804,7 @@ The label is then added to the action element:
 				<setting id="internal.identifier" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
 				<setting id="internal.speedtest" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.lottery" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.dolbyvision" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.initial.launch" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.wizard" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
@@ -8883,7 +9858,15 @@ The label is then added to the action element:
 				<setting id="internal.link.opensubtitles" type="string"><default>https://gaiakodi.com/opensubtitles</default><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.link.youtube" type="string"><default>https://gaiakodi.com/youtube</default><level>4</level><visible>false</visible></setting>
-				<setting id="internal.link.youtubeaddon" type="string"><default>https://gaiakodi.com/youtubeaddon</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.youtubehelp" type="string"><default>https://gaiakodi.com/youtubehelp</default><level>4</level><visible>false</visible></setting>
+
+				<setting id="internal.link.bard" type="string"><default>https://gaiakodi.com/bard</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.bardhelp" type="string"><default>https://gaiakodi.com/bardhelp</default><level>4</level><visible>false</visible></setting>
+
+				<setting id="internal.link.chatgpt" type="string"><default>https://gaiakodi.com/chatgpt</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.youchat" type="string"><default>https://gaiakodi.com/youchat</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.watchthis" type="string"><default>https://gaiakodi.com/watchthis</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.link.keytalk" type="string"><default>https://gaiakodi.com/keytalk</default><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.link.ipgeolocationio" type="string"><default>https://gaiakodi.com/ipgeolocationio</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.link.geoapifycom" type="string"><default>https://gaiakodi.com/geoapifycom</default><level>4</level><visible>false</visible></setting>

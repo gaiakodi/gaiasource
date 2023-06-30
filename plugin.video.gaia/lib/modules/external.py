@@ -135,7 +135,7 @@ class Importer(object):
 							value = Regex.extract(data = data, expression = b'(.{0,20}__version__.{0,20})', flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
 							if value:
 								value = str(value)
-								value = Regex.remove(data = value, expression = '\\\\x[0-9a-f]{2}')
+								value = Regex.remove(data = value, expression = '\\\\x[0-9a-f]{2}', all = True)
 								value = Regex.extract(data = value, expression = '(\d+\.\d+\.\d+)')
 								if value: result = value
 				except: pass
@@ -468,6 +468,18 @@ class Importer(object):
 	@classmethod
 	def moduleCpuInfo(self, error = True):
 		return self.module(module = 'externals.cpuinfo.cpuinfo', error = error)
+
+	###################################################################
+	# BARD
+	###################################################################
+
+	@classmethod
+	def moduleBard(self, error = True):
+		return self.module(module = 'externals.bardapi', submodule = 'Bard', error = error)
+
+	@classmethod
+	def moduleBardConstants(self, error = True):
+		return self.module(module = 'externals.bardapi.constants', error = error)
 
 
 class Loader(object):

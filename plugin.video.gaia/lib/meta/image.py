@@ -87,10 +87,11 @@ class MetaImage(object):
 									}
 	TypesFallback					= {
 										MediaSeason : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}},
+										MediaEpisode : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}},
 										MediaSpecialSeason : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}},
-										MediaSpecialEpisode : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
-										MediaSpecialRecap : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
-										MediaSpecialExtra : {TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+										MediaSpecialEpisode : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}, TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+										MediaSpecialRecap : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}, TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
+										MediaSpecialExtra : {TypePoster : {OptionMedia : MediaShow, OptionType : TypePoster}, TypeThumb : {OptionMedia : MediaSeason, OptionType : TypeLandscape}},
 									}
 	TypesRecover					= {
 										TypePoster : [TypeKeyart, TypeThumb, TypeLandscape, TypeFanart, TypeBanner, TypeClearart, TypeClearlogo, TypeDiscart],
@@ -225,6 +226,7 @@ class MetaImage(object):
 
 	@classmethod
 	def settings(self, mode, media, type = None):
+		if not media: media = MetaImage.MediaMovie # For exact searches.
 		if not mode in MetaImage.SettingsData or not media in MetaImage.SettingsData[mode]:
 			MetaImage.SettingsLock.acquire()
 			if not mode in MetaImage.SettingsData or not media in MetaImage.SettingsData[mode]:
@@ -1055,19 +1057,20 @@ class MetaImage(object):
 	def extract(self, data, media = None, preference = True, fallback = True, recover = True, limit = True, default = True, show = True, season = True, episode = True, previous = True, next = True):
 		try:
 			if media is None:
-				if 'tvshowtitle' in data:
-					if 'season' in data:
-						if 'episode' in data: media = MetaImage.MediaEpisode
-						else: media = MetaImage.MediaSeason
-					else: media = MetaImage.MediaShow
-				else:
-					if 'set' in data and data['set'] and 'tmdb' in data and data['tmdb'] and not('imdb' in data and data['tmdb']) and not('trakt' in data and data['trakt']): media = MetaImage.MediaSet
-					else: media = MetaImage.MediaMovie
+				if data:
+					if 'tvshowtitle' in data:
+						if 'season' in data:
+							if 'episode' in data: media = MetaImage.MediaEpisode
+							else: media = MetaImage.MediaSeason
+						else: media = MetaImage.MediaShow
+					else:
+						if 'set' in data and data['set'] and 'tmdb' in data and data['tmdb'] and not('imdb' in data and data['tmdb']) and not('trakt' in data and data['trakt']): media = MetaImage.MediaSet
+						else: media = MetaImage.MediaMovie
 
 			television = Media.typeTelevision(media) or media == MetaImage.MediaMultiple
 
 			images = {}
-			if MetaImage.Attribute in data:
+			if data and MetaImage.Attribute in data:
 				levels = []
 				if television:
 					if show: levels.append((MetaImage.MediaShow, MetaImage.PrefixShow))
@@ -1105,7 +1108,7 @@ class MetaImage(object):
 
 			# Add show.xxx and season.xxx images.
 			# Only do here, after preference/fallback, since we might not want to use these images as replacements.
-			if MetaImage.Attribute in data and television:
+			if data and MetaImage.Attribute in data and television:
 				levels = []
 				if media in [MetaImage.MediaSeason, MetaImage.MediaEpisode, MetaImage.MediaMultiple, MetaImage.MediaSpecialSeason, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra]: levels.append((MetaImage.MediaShow, MetaImage.PrefixShow))
 				if media in [MetaImage.MediaEpisode, MetaImage.MediaMultiple, MetaImage.MediaSpecialEpisode, MetaImage.MediaSpecialRecap, MetaImage.MediaSpecialExtra]: levels.append((MetaImage.MediaSeason, MetaImage.PrefixSeason))
@@ -1382,15 +1385,23 @@ class MetaImage(object):
 
 	@classmethod
 	def _set(self, media, data, item, default = True, show = None, season = None, episode = True, previous = True, next = True, function = None):
-		if show is None: show = self.settingsFallback(media = media, fallback = MetaImage.MediaShow)
-		if season is None: season = self.settingsFallback(media = media, fallback = MetaImage.MediaSeason)
+		images = {}
+		if data: # No data for exact searches.
+			if show is None: show = self.settingsFallback(media = media, fallback = MetaImage.MediaShow)
+			if season is None: season = self.settingsFallback(media = media, fallback = MetaImage.MediaSeason)
 
-		images = self.extract(media = media, data = data, default = False, show = show, season = season, episode = episode, previous = previous, next = next)
+			images = self.extract(media = media, data = data, default = False, show = show, season = season, episode = episode, previous = previous, next = next)
 
-		images = self.replaceThumbnail(images = images)
-		if media == MetaImage.MediaSpecialRecap or media == MetaImage.MediaSpecialExtra: images = self.replacePoster(images = images, force = True)
-		if media == MetaImage.MediaMultiple: images = self.replaceSeason(images = images)
-		if function: function(images)
+			images = self.replaceThumbnail(images = images)
+			if media == MetaImage.MediaSpecialRecap or media == MetaImage.MediaSpecialExtra: images = self.replacePoster(images = images, force = True)
+			if media == MetaImage.MediaMultiple: images = self.replaceSeason(images = images)
+			if function: function(images)
+
+			# Delete the poster for episode menus.
+			# Otherwise many skins (eg: Estaury), the Kore remote app, and the info dialog, will use this instead of the thumbnail.
+			# Most skins will automatically use the season.poster or tvshow.poster if a poster (instead of a thumbnail) has to be displayed.
+			# NB: Do not delete the image, otherwise it will be replaced by the gaia default in set().
+			if media == MetaImage.MediaEpisode: images['poster'] = None
 
 		if item: self.set(images = images, item = item, default = default)
 		return images
