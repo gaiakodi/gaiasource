@@ -228,11 +228,19 @@ class Bard(Oracle):
 		return self.account().authenticated()
 
 	def accountAuthentication(self, settings = False):
-		return self.account().authenticate(settings = settings)
+		try:
+			return self.account().authenticate(settings = settings)
+		except:
+			# Eg: externals.requests.exceptions.SSLError: HTTPSConnectionPool(host='bard.google.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)')))
+			return False
 
 	def accountVerification(self, cookie = None):
-		result = self._requestChat(message = 'hi', cookie = cookie, notification = True)
-		return bool(result and result['success'])
+		try:
+			result = self._requestChat(message = 'hi', cookie = cookie, notification = True)
+			return bool(result and result['success'])
+		except:
+			# Eg: Exception: __Secure-1PSID value must end with a single dot. Enter correct __Secure-1PSID value.
+			return False
 
 	##############################################################################
 	# MODULE

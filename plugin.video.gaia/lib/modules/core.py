@@ -615,6 +615,7 @@ class Core(object):
 					self.navigationCinemaTrailer.cinemaStart(media = self.media, background = background)
 				tools.Logger.log('Scraping Initialized', name = 'CORE', type = tools.Logger.TypeInfo)
 
+				self.timerTotal = None
 				self.timerGlobal = tools.Time(start = True)
 				self.propertyStatusSet(Core.StatusScrape)
 				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, season = season, episode = episode, tvshowtitle = tvshowtitle, premiered = premiered, metadata = metadata, preset = preset, pack = pack, exact = exact, autoplay = autoplay, cache = cache)
@@ -645,6 +646,10 @@ class Core(object):
 
 			self.propertyStatusSet(Core.StatusFinalize)
 
+			# Measure the time here, since the propertySilentCheck() below could wait 10 mins or more.
+			# Otherwise the total time in the scrape report will be too high for background binge scraping.
+			self.timerTotal = self.timerGlobal.elapsed()
+
 			# There are 2 ways in which binge scraping can be done.
 			#	1. Run the background scraping, let the process finish, and after playback call scrape again which will pull the streams using self.propertyItems().
 			#	   This can take a long time, since self.propertyItems() can take 5-10 seconds for a few 100 streams, since they all have to be loaded from JSON again.
@@ -660,6 +665,9 @@ class Core(object):
 					self.silent = False
 					if autoplay: self.loaderShow()
 				if tools.System.aborted(): return None
+
+			# Restart here and add to self.timerTotal in scrapeStatistics().
+			self.timerGlobal = tools.Time(start = True)
 
 			if self.silent:
 				self.sourcesFilter(items = self.sources, metadata = metadata, autoplay = autoplay)
@@ -2600,7 +2608,9 @@ class Core(object):
 
 			# Summary
 
-			duration = ConverterDuration(self.timerGlobal.elapsed(), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatInitialShort).lower()
+			duration = self.timerGlobal.elapsed()
+			if self.timerTotal: duration += self.timerTotal
+			duration = ConverterDuration(duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatInitialShort).lower()
 			items1 = [
 				{'label' : 'Scrape Title', 'value' : self.scrapeLabel},
 				{'label' : 'Scrape Duration', 'value' : duration},

@@ -55,7 +55,7 @@ if not Settings.interpreterSelect(notification = True, silent = True):
 	Library.service()
 
 	# Context Menu
-	Context.initialize()
+	Context.initialize(force = True)
 
 	# Bluetooth Monitor
 	Bluetooth.service()

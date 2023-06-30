@@ -3727,15 +3727,15 @@ class Context(object):
 			tools.Logger.error()
 
 	@classmethod
-	def initialize(self):
-		if Context.LabelMenu is None:
+	def initialize(self, force = False):
+		if Context.LabelMenu is None or force:
 			from lib.modules.cache import Memory
 
 			thread = Pool.thread(target = self._initializeRefresh)
 			thread.start()
 
 			data = Memory.get(id = Context.Id, local = True, kodi = True)
-			if not data:
+			if not data or force:
 				thread.join()
 				data = Memory.get(id = Context.Id, local = True, kodi = True)
 
