@@ -5,6 +5,7 @@ import json
 import re
 from externals import requests
 from externals.deeptranslator import GoogleTranslator
+#from google.cloud import translate_v2 as translate
 from externals.bardapi.constants import ALLOWED_LANGUAGES, SESSION_HEADERS
 
 
@@ -20,6 +21,7 @@ class Bard:
         proxies: dict = None,
         session: requests.Session = None,
         conversation_id: str = None,
+        google_translator_api_key: str = None,
         language: str = None,
         run_code: bool = False,
     ):
@@ -30,9 +32,11 @@ class Bard:
             token (str): Bard API token.
             timeout (int): Request timeout in seconds.
             proxies (dict): Proxy configuration for requests.
-            conversation_id: ID to fetch conversational context
             session (requests.Session): Requests session object.
+            conversation_id: ID to fetch conversational context
+            google_translator_api_key (str): Google cloud translation API key.
             language (str): Language code for translation (e.g., "en", "ko", "ja").
+            run_code (bool): Whether to directly execute the code included in the answer (Python only)
         """
         self.token = token or os.getenv("_BARD_API_KEY")
         self.proxies = proxies
@@ -41,9 +45,9 @@ class Bard:
         self.conversation_id = ""
         self.response_id = ""
         self.choice_id = ""
-        if conversation_id != None:
+        if conversation_id is not None:
             self.conversation_id = conversation_id
-        # Set session
+        # Set session or Get session
         if session is None:
             self.session = requests.Session()
             self.session.headers = SESSION_HEADERS
@@ -53,6 +57,7 @@ class Bard:
         self.SNlM0e = self._get_snim0e()
         self.language = language or os.getenv("_BARD_API_LANG")
         self.run_code = run_code or False
+        self.google_translator_api_key = google_translator_api_key
 
     def get_answer(self, input_text: str) -> dict:
         """
@@ -76,8 +81,9 @@ class Bard:
                     "factualityQueries": list,
                     "textQuery": str,
                     "choices": list,
-                    "links": list
-                    "imgaes": set
+                    "links": list,
+                    "imgaes": set,
+                    "code": str
                 }
         """
         params = {
@@ -85,10 +91,27 @@ class Bard:
             "_reqid": str(self._reqid),
             "rt": "c",
         }
+        if self.google_translator_api_key is not None:
+            google_official_translator = translate.Client(
+                api_key=self.google_translator_api_key
+            )
+
         # Set language (optional)
-        if self.language is not None and self.language not in ALLOWED_LANGUAGES:
+        if (
+            self.language is not None
+            and self.language not in ALLOWED_LANGUAGES
+            and self.google_translator_api_key is None
+        ):
             translator_to_eng = GoogleTranslator(source="auto", target="en")
             input_text = translator_to_eng.translate(input_text)
+        elif (
+            self.language is not None
+            and self.language not in ALLOWED_LANGUAGES
+            and self.google_translator_api_key is not None
+        ):
+            input_text = google_official_translator.translate(
+                input_text, target_language="en"
+            )
 
         # Make post data structure and insert prompt
         input_text_struct = [
@@ -114,37 +137,59 @@ class Bard:
         resp_dict = json.loads(resp.content.splitlines()[3])[0][2]
 
         if not resp_dict:
-            return {"content": f"Response Error: {resp.content}."}
+            return {"content": f"Response Error: {resp.content}. \nTemporarily unavailable due to traffic or an error in cookie values. Please double-check the cookie values and verify your network environment."}
         resp_json = json.loads(resp_dict)
 
-        # Gather image links
+        # Gather image links (optional)
         images = set()
-        if len(resp_json) >= 3:
-            if len(resp_json[4][0]) >= 4 and resp_json[4][0][4] is not None:
-                for img in resp_json[4][0][4]:
-                    try:
-                        images.add(img[0][0][0])
-                    except Exception:
-                        pass
+        try:
+            if len(resp_json) >= 3:
+                nested_list = resp_json[4][0][4]
+                for img in nested_list:
+                    images.add(img[0][0][0])
+        except (IndexError, TypeError, KeyError):
+            pass
+
+        # Parsed Answer Object
         parsed_answer = json.loads(resp_dict)
 
         # Translated by Google Translator (optional)
-        if self.language is not None and self.language not in ALLOWED_LANGUAGES:
+        # Unofficial for testing
+        if (
+            self.language is not None
+            and self.language not in ALLOWED_LANGUAGES
+            and self.google_translator_api_key is None
+        ):
             translator_to_lang = GoogleTranslator(source="auto", target=self.language)
-            parsed_answer[0][0] = translator_to_lang.translate(parsed_answer[0][0])
             parsed_answer[4] = [
-                (x[0], translator_to_lang.translate(x[1][0])) for x in parsed_answer[4]
+                [x[0], [translator_to_lang.translate(x[1][0])] + x[1][1:], x[2]]
+                for x in parsed_answer[4]
+            ]
+        # Official Google Cloud Translation API
+        elif (
+            self.language is not None
+            and self.language not in ALLOWED_LANGUAGES
+            and self.google_translator_api_key is not None
+        ):
+            parsed_answer[4] = [
+                [
+                    x[0],
+                    [google_official_translator(x[1][0], target_language=self.language)]
+                    + x[1][1:],
+                    x[2],
+                ]
+                for x in parsed_answer[4]
             ]
 
         # Get code
         try:
-            code = parsed_answer[0][0].split("```")[1][6:]
+            code = parsed_answer[4][0][1][0].split("```")[1][6:]
         except Exception:
             code = None
 
         # Returnd dictionary object
         bard_answer = {
-            "content": parsed_answer[0][0],
+            "content": parsed_answer[4][0][1][0],
             "conversation_id": parsed_answer[1][0],
             "response_id": parsed_answer[1][1],
             "factualityQueries": parsed_answer[3],
@@ -166,7 +211,7 @@ class Bard:
             try:
                 print(bard_answer["code"])
                 exec(bard_answer["code"])
-            except Exception:
+            except:
                 pass
 
         return bard_answer
@@ -194,7 +239,7 @@ class Bard:
         snim0e = re.search(r"SNlM0e\":\"(.*?)\"", resp.text)
         if not snim0e:
             raise Exception(
-                "SNlM0e value not found in response. Check __Secure-1PSID value."
+                "SNlM0e value not found. Double-check __Secure-1PSID value or pass it as token='xxxxx'."
             )
         return snim0e.group(1)
 
@@ -221,6 +266,7 @@ class Bard:
                     links.append(item)
         return links
 
+    # You can contribute by implementing a feature that automatically collects cookie values based on the input of the Chrome path.
     # def auth(self): #Idea Contribution
     #     url = 'https://bard.google.com'
     #     driver_path = "/path/to/chromedriver"

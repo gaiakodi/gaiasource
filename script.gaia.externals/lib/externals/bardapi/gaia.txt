@@ -2,7 +2,7 @@
 
 Download:			https://pypi.org/project/bardapi/#files
 					https://github.com/dsdanielpark/Bard-API/releases
-Current Version:	0.1.17 (2023-06-21)
+Current Version:	0.1.21 (2023-06-30)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -13,5 +13,6 @@ find ./ -type f -exec sed -i -e 's/import requests/from externals import request
 find ./ -type f -exec sed -i -e 's/from colorama/#from colorama/g' {} \;
 find ./ -type f -exec sed -i -e 's/from externals.bardapi.core_async import BardAsync/#from externals.bardapi.core_async import BardAsync/g' {} \;
 find ./ -type f -exec sed -i -e 's/USER_PROMPT = Fore.BLUE + "You: " + Fore.RESET/USER_PROMPT = "You: "/g' {} \;
+find ./ -type f -exec sed -i -e 's/from google.cloud/#from google.cloud/g' {} \;
 
 #########################################################################################################################

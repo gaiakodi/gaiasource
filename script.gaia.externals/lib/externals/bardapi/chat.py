@@ -1,3 +1,4 @@
+import os
 from externals import requests
 from externals.bardapi import Bard
 #from colorama import Fore, Back, Style
@@ -47,11 +48,11 @@ class ChatBard:
         else:
             self.session = session
         self.language = (
-            language.lower()
+            language
             or os.getenv(
                 "_BARD_API_LANG",
                 input("Enter the language (Just press enter to use English): "),
-            ).lower()
+            )
             or "english"
         )
         self.timeout = int(
@@ -60,11 +61,17 @@ class ChatBard:
             or input("Enter the timeout value (Just press enter to set 30 sec): ")
             or 30
         )
+        self.token = (
+            token
+            or os.getenv("_BARD_API_KEY")
+            or input("Enter the Bard API Key(__Secure-1PSID): ")
+            or print("Bard API(__Secure-1PSID) Key must be entered.")
+        )
         self.proxies = proxies
 
         # Set Bard object
         self.bard = Bard(
-            token=token,
+            token=self.token,
             session=self.session,
             timeout=self.timeout,
             language=self.language,
@@ -78,7 +85,6 @@ class ChatBard:
         Takes user input and retrieves responses from the Bard API until the user enters "quit", "q", or "stop".
         Prints the chatbot's response, including image links if available.
         """
-
         print(
             f"{SEPARATOR_LINE}\n{Back.BLUE}          Welcome to Chatbot        {Back.RESET}\n{SEPARATOR_LINE}"
         )
@@ -87,21 +93,23 @@ class ChatBard:
         # Start chat
         while True:
             user_input = input(USER_PROMPT).lower()
+            print(f"USER: {user_input}")
             if user_input in ["quit", "q", "stop"]:
                 break
 
             # Get response from bard
             response = self.bard.get_answer(user_input)
-
-            if response["images"]:
-                print(
-                    f"{Fore.BLUE}{Style.BRIGHT}Chatbot: {response['content']} \n\n Image links: {response['images']}{Fore.RESET}{Style.RESET_ALL}"
-                )
-            else:
-                print(
-                    f"{Fore.BLUE}{Style.BRIGHT}Chatbot: {response['content']} {Fore.RESET}{Style.RESET_ALL}"
-                )
-
+            try:
+                if response["images"]:
+                    print(
+                        f"{Fore.BLUE}{Style.BRIGHT}Chatbot: {response['content']} \n\n Image links: {response['images']}{Fore.RESET}{Style.RESET_ALL}"
+                    )
+                else:
+                    print(
+                        f"{Fore.BLUE}{Style.BRIGHT}Chatbot: {response['content']} {Fore.RESET}{Style.RESET_ALL}"
+                    )
+            except:
+                pass
         print(
             f"{SEPARATOR_LINE}\n{Fore.RED}Chat Ended.{Fore.RESET}\n\nDanielPark's Chat Template\n{SEPARATOR_LINE}"
         )

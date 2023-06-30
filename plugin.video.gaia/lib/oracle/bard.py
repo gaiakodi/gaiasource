@@ -232,6 +232,7 @@ class Bard(Oracle):
 			return self.account().authenticate(settings = settings)
 		except:
 			# Eg: externals.requests.exceptions.SSLError: HTTPSConnectionPool(host='bard.google.com', port=443): Max retries exceeded with url: / (Caused by SSLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:992)')))
+			Logger.error()
 			return False
 
 	def accountVerification(self, cookie = None):
@@ -240,6 +241,7 @@ class Bard(Oracle):
 			return bool(result and result['success'])
 		except:
 			# Eg: Exception: __Secure-1PSID value must end with a single dot. Enter correct __Secure-1PSID value.
+			Logger.error()
 			return False
 
 	##############################################################################
@@ -328,8 +330,13 @@ class Bard(Oracle):
 			if 'choice' in sessionData: bard.choice_id = sessionData['choice']
 
 		# Specifically retreive the content attribute, since the rest of the data is not a normal dictionary and causes things to fail (eg: save the report to file).
-		try: data = bard.get_answer(message)['content']
-		except Exception as error: data = str(error)
+		try:
+			data = bard.get_answer(message)
+			Logger.log("OIIIIIII: "+str(data))
+			data = data['content']
+		except Exception as error:
+			Logger.error()
+			data = str(error)
 		error = self._requestError(data = data, notification = notification)
 
 		return {

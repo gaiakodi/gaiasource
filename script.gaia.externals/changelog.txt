@@ -1,4 +1,7 @@
 
+[B]6.3.1 (2023.06.30)[/B]
+- Updated BardAPI module.
+
 [B]6.3.0 (2023.06.30)[/B]
 - Added BardAPI module.
 - Added DeepTranslator module.
