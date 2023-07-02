@@ -63,7 +63,7 @@
 					<orientation>vertical</orientation>
 
 					<scrolltime tween="cubic">1500</scrolltime>
-					<!--<autoscroll>!String.IsEqual(Window.Property(GaiaScroll),0)</autoscroll>-->
+					<autoscroll>!String.IsEqual(Window.Property(GaiaScroll),0)</autoscroll>
 
 					<itemlayout width="1000" height="220">
 

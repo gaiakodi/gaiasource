@@ -844,29 +844,31 @@ class Movies(object):
 	# SEARCH
 	##############################################################################
 
-	def search(self, terms = None):
+	# direct = True: when searching from TmdbHelper.
+	def search(self, query = None, direct = False):
 		try:
 			from lib.modules.search import Search
 
-			if terms:
-				if not terms: return None
-				Loader.show()
-				if self.mMedia == Media.TypeDocumentary: Search().updateDocumentary(terms)
-				elif self.mMedia == Media.TypeShort: Search().updateShort(terms)
-				else: Search().updateMovie(terms)
+			queryHas = query
+			if not query: query = Dialog.input(title = 32010)
+			if not query: return None
+
+			Loader.show()
+			if queryHas and not direct:
+				if self.mMedia == Media.TypeDocumentary: Search().updateDocumentary(query)
+				elif self.mMedia == Media.TypeShort: Search().updateShort(query)
+				else: Search().updateMovie(query)
 			else:
-				terms = Dialog.input(title = 32010)
-				if not terms: return None
-				Loader.show()
-				if self.mMedia == Media.TypeDocumentary: Search().insertDocumentary(terms, self.mKids)
-				elif self.mMedia == Media.TypeShort: Search().insertShort(terms, self.mKids)
-				else: Search().insertMovie(terms, self.mKids)
+				if self.mMedia == Media.TypeDocumentary: Search().insertDocumentary(query, self.mKids)
+				elif self.mMedia == Media.TypeShort: Search().insertShort(query, self.mKids)
+				else: Search().insertMovie(query, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
-			link = self.search_link + Networker.linkQuote(terms, plus = True)
-			System.executeContainer(action = 'moviesRetrieve', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
-			#return self.retrieve(link)
+			link = self.search_link + Networker.linkQuote(query, plus = True)
+
+			if direct: return self.retrieve(link = link)
+			else: System.executeContainer(action = 'moviesRetrieve', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
 		except:
 			Logger.error()
 			return None
@@ -1126,21 +1128,21 @@ class Movies(object):
 
 		return items
 
-	def person(self, terms = None):
+	def person(self, query = None):
 		try:
 			from lib.modules.search import Search
 
-			if terms:
-				if not terms: return None
-				Search().updatePerson(terms)
+			if query:
+				if not query: return None
+				Search().updatePerson(query)
 			else:
-				terms = Dialog.keyboard(title = 32010)
-				if not terms: return None
-				Search().insertPerson(terms, self.mKids)
+				query = Dialog.keyboard(title = 32010)
+				if not query: return None
+				Search().insertPerson(query, self.mKids)
 
 			# Use executeContainer() instead of directly calling get().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
-			link = self.persons_link % Networker.linkQuote(terms, plus = True)
+			link = self.persons_link % Networker.linkQuote(query, plus = True)
 			System.executeContainer(action = 'moviesPersons', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
 			#self.persons(link)
 		except: Logger.error()

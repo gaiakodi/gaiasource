@@ -1,4 +1,10 @@
 
+[B]6.3.2 (2023.07.02)[/B]
+- Added custom player integration for TMDbHelper.
+- Added scrolling to Oracle chat window.
+- Changed search interface parameters.
+- Added plugin menu category.
+
 [B]6.3.1 (2023.06.30)[/B]
 - Fixed context menu initialization.
 - Fixed binge scraping time measurement.

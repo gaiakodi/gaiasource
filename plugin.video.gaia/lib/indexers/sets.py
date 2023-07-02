@@ -99,7 +99,7 @@ class Sets(object):
 
 				if type == 'search':
 					self.mModeSearch = True
-					items = self.cache('cacheMedium', refresh, self.tmdbSearch, terms = parameters.get('terms'), link = parameters.get('link'))
+					items = self.cache('cacheMedium', refresh, self.tmdbSearch, query = parameters.get('query'), link = parameters.get('link'))
 				else:
 					items = self.cache('cacheExtended', refresh, self.tmdbList)
 
@@ -319,24 +319,25 @@ class Sets(object):
 	# SEARCH
 	##############################################################################
 
-	def search(self, terms = None):
+	# direct = True: when searching from TmdbHelper (although TmdbHelper cannot search sets atm).
+	def search(self, query = None, direct = False):
 		try:
 			from lib.modules.search import Search
 
-			if terms:
-				if not terms: return None
-				Loader.show()
-				Search().updateSet(terms)
-			else:
-				terms = Dialog.input(title = 32010)
-				if not terms: return None
-				Loader.show()
-				Search().insertSet(terms, self.mKids)
+			queryHas = query
+			if not query: query = Dialog.input(title = 32010)
+			if not query: return None
+
+			Loader.show()
+			if queryHas and not direct: Search().updateSet(query)
+			else: Search().insertSet(query, self.mKids)
 
 			# Use executeContainer() instead of directly calling retrieve().
 			# This is important for shows. Otherwise if you open the season menu of a searched show and go back to the previous menu, the search dialog pops up again.
-			link = 'search?' + Networker.linkEncode({'terms' : terms, 'limit' : self.mMetatools.settingsPageSearch()}, plus = True)
-			System.executeContainer(action = 'setsRetrieve', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
+			link = 'search?' + Networker.linkEncode({'query' : query, 'limit' : self.mMetatools.settingsPageSearch()}, plus = True)
+
+			if direct: return self.retrieve(link = link)
+			else:  System.executeContainer(action = 'setsRetrieve', parameters = {'link' : link, 'media' : self.mMedia, 'kids' : self.mKids})
 		except:
 			Logger.error()
 			return None
@@ -372,8 +373,8 @@ class Sets(object):
 				result = Tools.listSort(data = result, key = lambda i : i['premiered'] or 'zzzzzzzzzz')
 		return result
 
-	def tmdbSearch(self, terms = None, link = None):
-		return MetaTmdb.searchSet(query = terms, link = link, language = self.mLanguage)
+	def tmdbSearch(self, query = None, link = None):
+		return MetaTmdb.searchSet(query = query, link = link, language = self.mLanguage)
 
 	def tmdbFilter(self, items, sort = None, reverse = False, character = None):
 		if items:

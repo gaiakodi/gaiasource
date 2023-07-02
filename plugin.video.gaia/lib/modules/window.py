@@ -3801,20 +3801,20 @@ class WindowStepScroll(WindowStep):
 
 	ScrollNone = None
 	ScrollAuto = 'auto'	# Scroll permanently, even if the user selected an item from the list.
-	ScrollOnce = 'once'	# Scroll until the user selected an item from the list.
-	ScrollDefault = ScrollOnce
+	ScrollSelect = 'select'	# Scroll until the user selected an item from the list.
+	ScrollOnce = 'once'	# Scroll the list a single time.
+	ScrollDefault = ScrollSelect
 
 	FocusNone = None # Do not focus any control.
 	FocusList = 'list' # Focus the list control.
 	FocusNext = 'next' # Focus the Next button.
 	FocusDefault = FocusList
 
-	# Delay in seconds before autoscrolling starts.
-	DelayShort = 2
-	DelayLong = 5
-	DelayDefault = DelayLong
+	DurationShort = 2
+	DurationLong = 5
+	DurationDefault = DurationLong
 
-	def __init__(self, scrollMode = ScrollDefault, scrollDelay = DelayDefault, scrollFocus = FocusDefault, xmlType = None, **kwargs):
+	def __init__(self, scrollMode = ScrollDefault, scrollDelay = DurationDefault, scrollDuration = None, scrollFocus = FocusDefault, xmlType = None, **kwargs):
 		if scrollMode:
 			if not xmlType: xmlType = []
 			elif xmlType and not tools.Tools.isArray(xmlType): xmlType = [xmlType]
@@ -3824,12 +3824,14 @@ class WindowStepScroll(WindowStep):
 
 		self.mScrollMode = scrollMode
 		self.mScrollDelay = scrollDelay
+		self.mScrollDuration = scrollDelay if scrollDuration is None else scrollDuration
 		self.mScrollFocus = scrollFocus
 		self.mScrollAction = False
 
 	def _initializeEnd1(self):
 		super(WindowStepScroll, self)._initializeEnd1()
-		if self.mScrollMode == WindowStepScroll.ScrollOnce: Pool.thread(target = self._scroll, start = True)
+		if self.mScrollMode == WindowStepScroll.ScrollSelect or self.mScrollMode == WindowStepScroll.ScrollOnce:
+			Pool.thread(target = self._scroll, start = True)
 
 	def _scroll(self):
 		try:
@@ -3838,12 +3840,17 @@ class WindowStepScroll(WindowStep):
 				tools.Time.sleep(self.mScrollDelay)
 				self.propertySet(property = 'GaiaScroll', value = 1)
 
-			while self.visible() and not tools.System.aborted():
-				#if tools.System.visible('Control.HasFocus(%d)' % Window.IdListControl):
-				if self.mScrollAction:
+			if self.mScrollMode == WindowStepScroll.ScrollSelect:
+				while self.visible() and not tools.System.aborted():
+					#if tools.System.visible('Control.HasFocus(%d)' % Window.IdListControl):
+					if self.mScrollAction:
+						self.propertySet(property = 'GaiaScroll', value = 0)
+						break
+					tools.Time.sleep(0.2)
+			else:
+				if self.visible() and not tools.System.aborted():
+					tools.Time.sleep(self.mScrollDuration)
 					self.propertySet(property = 'GaiaScroll', value = 0)
-					break
-				tools.Time.sleep(0.2)
 		except: tools.Logger.error()
 
 	def _actionDefault(self, focus = True):
@@ -3978,7 +3985,7 @@ class WindowStepQr(WindowStepScroll):
 class WindowAttribution(WindowStepQr):
 
 	def __init__(self, **kwargs):
-		super(WindowAttribution, self).__init__(description = 33986, scrollDelay = WindowStepScroll.DelayShort, **kwargs)
+		super(WindowAttribution, self).__init__(description = 33986, scrollDelay = WindowStepScroll.DurationShort, **kwargs)
 
 	@classmethod
 	def _prepareRetrieve(self, data = None):
@@ -6170,10 +6177,14 @@ class WindowOracleBusy(WindowStep):
 			tools.Time.sleep(0.25)
 
 
-class WindowOracleResults(WindowStep):
+class WindowOracleResults(WindowStepScroll):
+
+	ScrollDuration = 1500 # Used in the XML.
 
 	def __init__(self, **kwargs):
-		super(WindowOracleResults, self).__init__(title = 36330, xml = True, xmlType = Window.TypeOracleResults, xmlOffset = None, orientation = WindowStep.OrientationVertical, navigationRow = 1, **kwargs)
+		interval = WindowOracleResults.ScrollDuration / 1000.0
+		duration = (len(WindowOracle.ChoiceConversation['chat']['history']) - 1) * interval
+		super(WindowOracleResults, self).__init__(title = 36330, xml = True, xmlType = Window.TypeOracleResults, xmlOffset = None, orientation = WindowStep.OrientationVertical, navigationRow = 1, scrollMode = WindowStepScroll.ScrollOnce, scrollDelay = interval, scrollDuration = duration, scrollFocus = WindowStepScroll.FocusNext, **kwargs)
 
 	def _initializeEnd1(self):
 		super(WindowOracleResults, self)._initializeEnd1()
@@ -6219,7 +6230,7 @@ class WindowOracleResults(WindowStep):
 				count = len(history)
 				for i in range(count):
 					items.append(self._addEntry(chat = history[i], last = i == count - 1))
-				self.itemAdd(item = items, select = -1)
+				self.itemAdd(item = items)
 		except: tools.Logger.error()
 
 	def _addEntry(self, chat, last = False):

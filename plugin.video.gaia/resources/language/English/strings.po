@@ -3799,7 +3799,7 @@ msgid "Release Date Not Found"
 msgstr ""
 
 msgctxt "#33790"
-msgid "In addition not the main episodes, do you also want to mark [B]all[/B] specials as watched, only specials that form part of the main [B]story[/B] line, or mark [B]none[/B] of the specials?"
+msgid "In addition to the main episodes, do you also want to mark [B]all[/B] specials as watched, only specials that are part of the main [B]story[/B] line, or mark [B]none[/B] of the specials?"
 msgstr ""
 
 msgctxt "#33791"
@@ -12139,4 +12139,44 @@ msgstr ""
 
 msgctxt "#36381"
 msgid "Rerate Episodes"
+msgstr ""
+
+msgctxt "#36382"
+msgid "TMDbHelper"
+msgstr ""
+
+msgctxt "#36383"
+msgid "The addon is required when scraping or searching Gaia from the [I]TMDbHelper[/I]  addon."
+msgstr ""
+
+msgctxt "#36384"
+msgid "Integrate"
+msgstr ""
+
+msgctxt "#36385"
+msgid "Do you want to add a Gaia player to TMDbHelper in order to scrape and search Gaia directly from TMDbHelper?"
+msgstr ""
+
+msgctxt "#36386"
+msgid "TMDbHelper is not installed or enabled and integrating Gaia is therefore impossible. Please install TMDbHelper first."
+msgstr ""
+
+msgctxt "#36387"
+msgid "Gaia cannot be integrated into TMDbHelper, due to write permissions or some other problem that prevents Gaia from creating the necessary files in TMDbHelper."
+msgstr ""
+
+msgctxt "#36388"
+msgid "There are other unofficial Gaia players already installed in TMDbHelper, which might be outdated or not work anymore. Do you want to remove the unofficial Gaia players?"
+msgstr ""
+
+msgctxt "#36389"
+msgid "The official Gaia player is already installed in TMDbHelper. Do you want to reinstall the Gaia player?"
+msgstr ""
+
+msgctxt "#36390"
+msgid "Successfully Integrated Gaia Into TMDbHelper"
+msgstr ""
+
+msgctxt "#36391"
+msgid "Failure To Integrate Gaia Into TMDbHelper"
 msgstr ""

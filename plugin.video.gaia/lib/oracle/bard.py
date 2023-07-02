@@ -330,10 +330,7 @@ class Bard(Oracle):
 			if 'choice' in sessionData: bard.choice_id = sessionData['choice']
 
 		# Specifically retreive the content attribute, since the rest of the data is not a normal dictionary and causes things to fail (eg: save the report to file).
-		try:
-			data = bard.get_answer(message)
-			Logger.log("OIIIIIII: "+str(data))
-			data = data['content']
+		try: data = bard.get_answer(message)['content']
 		except Exception as error:
 			Logger.error()
 			data = str(error)

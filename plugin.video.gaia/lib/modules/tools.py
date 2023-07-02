@@ -10716,6 +10716,7 @@ class Extension(object):
 	IdYouTube = 'plugin.video.youtube'
 	IdUpNext = 'service.upnext'
 	IdAddonSignals = 'script.module.addon.signals'
+	IdTmdbHelper = 'plugin.video.themoviedb.helper'
 	IdVpnManager = 'service.vpn.manager'
 
 	ConfirmDisabled = 0 # Do not show a confirmation dialog.
@@ -11125,6 +11126,13 @@ class Extension(object):
 				'type' : Extension.TypeOptional,
 				'description' : 35410,
 				'icon' : 'extensionsaddonsignals.png',
+			},
+			{
+				'id' : Extension.IdTmdbHelper,
+				'name' : 'TMDbHelper',
+				'type' : Extension.TypeOptional,
+				'description' : 36383,
+				'icon' : 'extensionstmdbhelper.png',
 			},
 			{
 				'id' : Extension.IdVpnManager,
@@ -12360,6 +12368,136 @@ class VpnManager(object):
 	def status(self, loader = True):
 		self.execute(action = 'display', loader = loader)
 		return True
+
+###################################################################
+# TMDBHELPER
+###################################################################
+
+class TmdbHelper(object):
+
+	Id = Extension.IdTmdbHelper
+	Directory = 'players'
+	Player = 'gaia.json'
+
+	@classmethod
+	def launch(self):
+		Extension.launch(id = TmdbHelper.Id)
+
+	@classmethod
+	def settings(self, wait = False):
+		Extension.settings(id = TmdbHelper.Id, wait = wait)
+
+	@classmethod
+	def installed(self):
+		return Extension.installed(id = TmdbHelper.Id)
+
+	@classmethod
+	def enable(self, refresh = False, confirm = True):
+		result = Extension.enable(id = TmdbHelper.Id, refresh = refresh, confirm = confirm)
+		return result
+
+	@classmethod
+	def disable(self, refresh = False):
+		return Extension.disable(id = TmdbHelper.Id, refresh = refresh)
+
+	@classmethod
+	def path(self, directory = False, player = False, translate = True):
+		path = System.profile(id = TmdbHelper.Id, translate = translate)
+		if directory or player: path = File.joinPath(path, TmdbHelper.Directory)
+		if player: path = File.joinPath(path, TmdbHelper.Player)
+		return path
+
+	@classmethod
+	def command(self, action, media, season = None, episode = None):
+		prefix = '-_1_-'
+		suffix = '-_2_-'
+		parameters = {}
+
+		if action == 'scrape':
+			parameters = {'action' : action, 'media' : media, 'imdb' : '{imdb}', 'tmdb' : '{tmdb}', 'tvdb' : '{tvdb}', 'trakt' : '{trakt}', 'title' : '{title_url}', 'year' : '{year}', 'premiered' : '{premiered}'}
+			if Media.typeTelevision(media):
+				parameters.update({
+					'season' : '{season}',
+					'episode' : '{episode}',
+					'tvshowtitle' : '{showname_url}',
+					'year' : '{showyear}',
+				})
+		elif action == 'search':
+			parameters = {'action' : action, 'media' : media, 'query' : '{clearname_url}'}
+
+		for key, value in parameters.items(): parameters[key] = value.replace('{', prefix).replace('}', suffix)
+		command = System.command(parameters = parameters, optimize = False)
+		command = command.replace(prefix, '{').replace(suffix, '}')
+
+		return command
+
+	@classmethod
+	def integrate(self):
+		try:
+			from lib.modules.interface import Dialog, Format
+			title = 36382
+
+			if Dialog.option(title = title, message = 36385):
+				directory = self.path(directory = True)
+				path = self.path(player = True)
+				plugin = System.id()
+
+				# Check if the addon is installed.
+				if not self.installed():
+					Dialog.confirm(title = title, message = 36386)
+					Dialog.notification(title = title, message = 36391, icon = Dialog.IconError)
+					return False
+
+				# Create the players directory.
+				if not File.existsDirectory(directory):
+					File.makeDirectory(directory)
+					if not File.existsDirectory(directory):
+						Dialog.confirm(title = title, message = 36387)
+						Dialog.notification(title = title, message = 36391, icon = Dialog.IconError)
+						return False
+
+				# Check if any other unofficial Gaia players are installed.
+				installed = []
+				_, files = File.listDirectory(path = directory, absolute = True)
+				for file in files:
+					if file.lower().endswith('.json') and not file == path:
+						try:
+							data = Converter.jsonFrom(File.readNow(file))
+							if data and data['plugin'].lower() == plugin: installed.append(file)
+						except:
+							Logger.error()
+							pass
+				if installed:
+					if Dialog.option(title = title, message = 36388):
+						for file in installed: File.delete(file)
+
+				# Check if the player was already installed.
+				if File.exists(path):
+					if not Dialog.option(title = title, message = 36389):
+						return False
+
+				data = {
+					'name' : Format.fontColor(System.name(), color = Format.colorPrimary()),
+					'plugin' : plugin,
+					'priority' : 200,
+					'is_resolvable' : 'false',
+					'play_movie' : self.command(action = 'scrape', media = Media.TypeMovie),
+					'play_episode' : self.command(action = 'scrape', media = Media.TypeShow),
+					'search_movie' : self.command(action = 'search', media = Media.TypeMovie),
+					'search_episode' : self.command(action = 'search', media = Media.TypeShow),
+				}
+
+				File.writeNow(path, Converter.jsonPrettify(data))
+				if not File.exists(path):
+					Dialog.notification(title = title, message = 36391, icon = Dialog.IconError)
+					Dialog.confirm(title = title, message = 36387)
+					return False
+
+				Dialog.notification(title = title, message = 36390, icon = Dialog.IconSuccess)
+				return True
+		except: Logger.error()
+		Dialog.notification(title = title, message = 36391, icon = Dialog.IconError)
+		return False
 
 ###################################################################
 # BACKUP

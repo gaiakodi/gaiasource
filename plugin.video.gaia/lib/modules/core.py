@@ -704,15 +704,15 @@ class Core(object):
 			Stream.reset()
 			manager.Manager.reset()
 
-	def scrapeExact(self, terms = None):
+	def scrapeExact(self, query = None):
 		if not tools.Settings.getBoolean('internal.initial.exact'):
 			interface.Dialog.confirm(title = 32010, message = 35159)
 			tools.Settings.set('internal.initial.exact', True)
-		if terms is None:
-			terms = interface.Dialog.input(title = 35158, type = interface.Dialog.InputAlphabetic)
-		if terms:
-			if tools.Media.typeTelevision(self.media): return self.scrape(title = terms, exact = True)
-			else: return self.scrape(title = terms, exact = True)
+		if query is None:
+			query = interface.Dialog.input(title = 35158, type = interface.Dialog.InputAlphabetic)
+		if query:
+			if tools.Media.typeTelevision(self.media): return self.scrape(title = query, exact = True)
+			else: return self.scrape(title = query, exact = True)
 
 	def scrapeExecute(self, link, parameters):
 		command = tools.System.commandResolve(command = link)

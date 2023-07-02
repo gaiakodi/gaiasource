@@ -3030,7 +3030,7 @@ class Directory(object):
 
 	PropertyId = 'GaiaMenuId'
 
-	def __init__(self, content = ContentDefault, media = ContentGeneral, view = True, cache = True, update = False, lock = False):
+	def __init__(self, content = ContentDefault, media = ContentGeneral, category = None, view = True, cache = True, update = False, lock = False):
 		self.mHandle = tools.System.handle()
 		self.mMedia = media
 
@@ -3049,6 +3049,8 @@ class Directory(object):
 		# Some skins add additional decorations if setInfo() is called with 'video' (eg Aeon Nox adds a yellow star in 'Icons' view).
 		# Disable descriptions for Aeon Nox (and  maybe other skins in the future).
 		self.mDescription = not Skin.isAeon()
+
+		self.mCategory = category
 
 	@classmethod
 	def back(self):
@@ -3174,7 +3176,23 @@ class Directory(object):
 		tools.System.windowPropertySet(property = 'GaiaIconBackSmall', value = Icon.path(icon = 'previous', type = Icon.TypeIcon, quality = Icon.QualitySmall))
 		tools.System.windowPropertySet(property = 'GaiaIconBackMini', value = Icon.path(icon = 'previous', type = Icon.TypeIcon, quality = Icon.QualityMini))
 
-		xbmcplugin.setContent(self.mHandle, self.mContent if content is None or self.mContent == Directory.ContentGeneral else content)
+		contented = self.mContent if content is None or self.mContent == Directory.ContentGeneral else content
+
+		# Shows a category path in the title bar of certain skins (eg: Estuary).
+		category = self.mCategory
+		if not category:
+			category = [] if contented else [tools.System.name()]
+			try: category.extend(tools.System.menu())
+			except: pass
+			if contented:
+				for i in [32001, 32002]:
+					try: category.remove(Translation.string(i))
+					except: pass
+			category = tools.Tools.listUnique(category)
+			category = ' / '.join(category[:2])
+		xbmcplugin.setPluginCategory(self.mHandle, category)
+
+		xbmcplugin.setContent(self.mHandle, contented)
 		xbmcplugin.endOfDirectory(self.mHandle, cacheToDisc = self.mCache if cache is None else cache, updateListing = self.mUpdate if update is None else update)
 
 		if loader: Loader.hide()

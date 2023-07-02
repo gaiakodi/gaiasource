@@ -36,7 +36,7 @@ if developer: tools.Logger.log('EXECUTION STARTED [Action: %s]' % str(action))
 
 # Execute on first launch.
 # Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
-if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search'): tools.System.launch()
+if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search') or action.startswith('scrape'): tools.System.launch()
 
 # For Gaia Eminence.
 tools.System.menuResolve(action = action, menu = parameters.get('menu'))
@@ -103,7 +103,7 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesSearch':
 		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).search(parameters.get('terms'))
+		Movies(media = media, kids = kids).search(parameters.get('query'))
 
 	elif action == 'moviesSearches':
 		from lib.indexers.navigator import Navigator
@@ -111,7 +111,7 @@ elif action.startswith('movies'):
 
 	elif action == 'moviesPerson':
 		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).person(parameters.get('terms'))
+		Movies(media = media, kids = kids).person(parameters.get('query'))
 
 	elif action == 'moviesPersons':
 		from lib.indexers.movies import Movies
@@ -245,7 +245,7 @@ elif action.startswith('sets'):
 
 	elif action == 'setsSearch':
 		from lib.indexers.sets import Sets
-		Sets(kids = kids).search(parameters.get('terms'))
+		Sets(kids = kids).search(parameters.get('query'))
 
 ####################################################
 # SHOW
@@ -272,7 +272,7 @@ elif action.startswith('shows'):
 
 	elif action == 'showsSearch':
 		from lib.indexers.shows import Shows
-		Shows(kids = kids).search(parameters.get('terms'))
+		Shows(kids = kids).search(parameters.get('query'))
 
 	elif action == 'showsSearches':
 		from lib.indexers.navigator import Navigator
@@ -306,7 +306,7 @@ elif action.startswith('shows'):
 
 	elif action == 'showsPerson':
 		from lib.indexers.shows import Shows
-		Shows(kids = kids).person(parameters.get('terms'))
+		Shows(kids = kids).person(parameters.get('query'))
 
 	elif action == 'showsPersons':
 		from lib.indexers.shows import Shows
@@ -861,8 +861,18 @@ elif action.startswith('verification'):
 elif action.startswith('search'):
 
 	if action == 'search':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).search()
+		query = parameters.get('query')
+		if query: # Called from TmdbHelper.
+			media = parameters.get('media')
+			if tools.Media.typeTelevision(media):
+				from lib.indexers.shows import Shows
+				Shows(kids = kids).search(query = query, direct = True)
+			else:
+				from lib.indexers.movies import Movies
+				Movies(media = media, kids = kids).search(query = query, direct = True)
+		else:
+			from lib.indexers.navigator import Navigator
+			Navigator(media = media, kids = kids).search()
 
 	elif action == 'searchExact':
 		from lib.indexers.navigator import Navigator
@@ -1807,6 +1817,28 @@ elif action.startswith('upnext'):
 		tools.UpNext.enable(refresh = True)
 
 ####################################################
+# TMDBHELPER
+####################################################
+
+elif action.startswith('tmdbhelper'):
+
+	if action == 'tmdbhelperNavigator':
+		from lib.indexers.navigator import Navigator
+		Navigator(media = media, kids = kids).tmdbhelperNavigator()
+
+	elif action == 'tmdbhelperLaunch':
+		tools.TmdbHelper.launch()
+
+	elif action == 'tmdbhelperSettings':
+		tools.TmdbHelper.settings()
+
+	elif action == 'tmdbhelperInstall':
+		tools.TmdbHelper.enable(refresh = True, confirm = True)
+
+	elif action == 'tmdbhelperIntegrate':
+		tools.TmdbHelper.integrate()
+
+####################################################
 # VPNMANAGER
 ####################################################
 
@@ -2684,13 +2716,10 @@ elif action.startswith('scrape'):
 				tvshowtitle = parameters.get('tvshowtitle')
 
 				year = parameters.get('year')
-				if year: year = int(year)
 				premiered = parameters.get('premiered')
 
 				season = parameters.get('season')
-				if not season is None: season = int(season)
 				episode = parameters.get('episode')
-				if not episode is None: episode = int(episode)
 
 				library = tools.Converter.boolean(parameters.get('library'))
 				autoplay = tools.Converter.boolean(parameters.get('autoplay'), none = True)
@@ -2700,6 +2729,22 @@ elif action.startswith('scrape'):
 				try: pack = tools.Converter.dictionary(parameters.get('pack'))
 				except: pack = None
 				items = parameters.get('items')
+
+				# When called by TmdbHelper.
+				if imdb == 'None': imdb = None
+				if tmdb == 'None': tmdb = None
+				if tvdb == 'None': tvdb = None
+				if trakt == 'None': trakt = None
+				if title == 'None': title = None
+				if tvshowtitle == 'None': tvshowtitle = None
+				if year == 'None': year = None
+				if premiered == 'None': premiered = None
+				if season == 'None': season = None
+				if episode == 'None': episode = None
+
+				if year: year = int(year)
+				if not season is None: season = int(season)
+				if not episode is None: episode = int(episode)
 
 				core.Core(media = media, kids = kids, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, premiered = premiered, metadata = metadata, autopack = autopack, autoplay = autoplay, library = library, preset = preset, binge = binge, cache = cache, pack = pack, items = items)
 			except: tools.Logger.error()
@@ -2742,8 +2787,8 @@ elif action.startswith('scrape'):
 
 	elif action == 'scrapeExact':
 		from lib.modules import core
-		terms = parameters.get('terms')
-		core.Core(media = media, kids = kids).scrapeExact(terms)
+		query = parameters.get('query')
+		core.Core(media = media, kids = kids).scrapeExact(query)
 
 	elif action == 'scrapeOptimize':
 		from lib.providers.core.manager import Manager

@@ -329,7 +329,7 @@ class Navigator(object):
 				continue
 
 			if item[1]: icon = 'searchkids.png'
-			self.addDirectoryItem(item[0], '%s&terms=%s' % (action, Networker.linkQuote(item[0], plus = True)), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			self.addDirectoryItem(item[0], '%s&query=%s' % (action, Networker.linkQuote(item[0], plus = True)), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def searchHistoryMovies(self):
@@ -348,8 +348,8 @@ class Navigator(object):
 
 		for item in searches:
 			if item[3] == Search.TypeOracle: self.addDirectoryItem(item[0], self.parameterize('oracle&history=%s' % System.commandEncode(Converter.jsonFrom(item[2]))), 'searchoracle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-			elif item[3] == Search.TypeSet: self.addDirectoryItem(item[0], self.parameterize('setsSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeSet), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-			else: self.addDirectoryItem(item[0], self.parameterize('moviesSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			elif item[3] == Search.TypeSet: self.addDirectoryItem(item[0], self.parameterize('setsSearch&query=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeSet), 'searchsets.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			else: self.addDirectoryItem(item[0], self.parameterize('moviesSearch&query=%s' % Networker.linkQuote(item[0], plus = True), media = self.mMedia), icon, 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def searchHistoryShows(self):
@@ -359,7 +359,7 @@ class Navigator(object):
 
 		for item in searches:
 			if item[3] == Search.TypeOracle: self.addDirectoryItem(item[0], self.parameterize('oracle&history=%s' % System.commandEncode(Converter.jsonFrom(item[2]))), 'searchoracle.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
-			else: self.addDirectoryItem(item[0], self.parameterize('showsSearch&terms=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeShow), 'searchshows.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
+			else: self.addDirectoryItem(item[0], self.parameterize('showsSearch&query=%s' % Networker.linkQuote(item[0], plus = True), media = Media.TypeShow), 'searchshows.png', 'DefaultAddonsSearch.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def tools(self):
@@ -807,6 +807,7 @@ class Navigator(object):
 	def servicesUtilityNavigator(self):
 		self.addDirectoryItem(35296, 'youtubeNavigator', 'youtube.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(33322, 'upnextNavigator', 'upnext.png', 'DefaultAddonProgram.png')
+		self.addDirectoryItem(36382, 'tmdbhelperNavigator', 'tmdbhelper.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(33709, 'vpnmanagerNavigator', 'vpnmanager.png', 'DefaultAddonProgram.png')
 		self.endDirectory()
 
@@ -1024,6 +1025,16 @@ class Navigator(object):
 		from lib.modules.tools import UpNext
 		if UpNext.installed(): self.addDirectoryItem(33011, 'upnextSettings', 'upnextsettings.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
 		else: self.addDirectoryItem(33474, 'upnextInstall', 'upnextinstall.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+		self.endDirectory()
+
+	def tmdbhelperNavigator(self):
+		from lib.modules.tools import TmdbHelper
+		if TmdbHelper.installed():
+			self.addDirectoryItem(33256, 'tmdbhelperLaunch', 'tmdbhelperlaunch.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+			self.addDirectoryItem(33011, 'tmdbhelperSettings', 'tmdbhelpersettings.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+			self.addDirectoryItem(36384, 'tmdbhelperIntegrate', 'tmdbhelperintegrate.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
+		else:
+			self.addDirectoryItem(33474, 'tmdbhelperInstall', 'tmdbhelperinstall.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def vpnmanagerNavigator(self):
