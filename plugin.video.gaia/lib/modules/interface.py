@@ -3179,21 +3179,28 @@ class Directory(object):
 		contented = self.mContent if content is None or self.mContent == Directory.ContentGeneral else content
 
 		# Shows a category path in the title bar of certain skins (eg: Estuary).
-		category = self.mCategory
-		if not category:
-			name = tools.System.name()
-			category = [] if contented else [name]
-			try: category.extend(tools.System.menu())
-			except: pass
-			if contented:
-				try: category.remove(name)
+		try:
+			category = self.mCategory
+			if not category:
+				name = tools.System.name()
+				category = []
+				try: category.extend(tools.System.menu())
 				except: pass
-				for i in [32001, 32002]:
-					try: category.remove(Translation.string(i))
+				category = tools.Tools.listUnique(category)
+				if contented:
+					try: category.remove(name)
 					except: pass
-			category = tools.Tools.listUnique(category)
-			category = ' / '.join(category[:2 if name in category else 1])
-		xbmcplugin.setPluginCategory(self.mHandle, category)
+					if len(category) >= 3:
+						for i in [32001, 32002]:
+							try: category.remove(Translation.string(i))
+							except: pass
+					category = [category[-1]] if category else []
+				else:
+					category = [name, category[-1]] if category else [name]
+				category = tools.Tools.listUnique(category)
+				category = ' / '.join(category)
+			xbmcplugin.setPluginCategory(self.mHandle, category)
+		except: tools.Logger.error()
 
 		xbmcplugin.setContent(self.mHandle, contented)
 		xbmcplugin.endOfDirectory(self.mHandle, cacheToDisc = self.mCache if cache is None else cache, updateListing = self.mUpdate if update is None else update)

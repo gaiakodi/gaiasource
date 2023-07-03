@@ -1,4 +1,7 @@
 
+[B]6.3.4 (2023.07.03)[/B]
+- Improved menu category labeling.
+
 [B]6.3.3 (2023.07.03)[/B]
 - Fixed OAuth for all accounts.
 - Improved episode submenu loading process.
