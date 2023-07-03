@@ -649,7 +649,7 @@ class Account(object):
 				if message['type'] == Dialog.TypeNotification: message['duplicates'] = True
 				Dialog.show(**message)
 
-	def _authenticateOauth(self, functionInitiate, functionVerify, parameters = None):
+	def _authenticateOauth(self, functionInitiate, functionVerify, parameters = None, default = None):
 		try:
 			Loader.show()
 			dataInitiate = functionInitiate()

@@ -437,16 +437,16 @@ elif action.startswith('seasons'):
 elif action.startswith('episodes'):
 
 	if action == 'episodesRetrieve':
-		# There is a problem with opening the context menu on an episode in the Arrivals submenu.
+		# There is a problem with opening the context menu on an episode in the Arrivals/Quick submenu.
 		# For some reason Kodi executes the command of the item the context was opened on, and all its submenu items.
 		# This causes "episodesRetrieve" (and sometimes "seasonsRetrieve") to be called many times, causing the context menu to take very long to open.
 		# Especially if S00 or other extras are in the submenu, Kodi can take minutes to load the context, sometimes hanging so long that a restart is required.
-		# UPDATE: The problem is the "Next Page" menu entry in the submenus. If Kodi encounters the next item in a page, it loads thaty submenu.
+		# UPDATE: The problem is the "Next Page" menu entry in the submenus. If Kodi encounters the next item in a page, it loads that submenu.
 		# UPDATE: That submenu also has a next page. So Kodi continues to sequentially load all submenus from the next entry, one after the other, which can take a long time for shows with a lot of unwatched episodes.
 		# This only happens with episode submenus that have a folder underneath it.
 		# This does not happen with any other show/season/episode/movie/generic menu.
 		# Also, if the "Direct Scraping" setting is enabled, this also does not happen, since the Arrivals menu entries are not folders anymore, but initiate the scrape process directly.
-		# This is also not caused by the custom Gaia context menu. Even if not context menu is added at all, this problem persists.
+		# This is also not caused by the custom Gaia context menu. Even if no context menu is added at all, this problem persists.
 		# Only if the link/command attribute is removed from items passed to xbmcplugin.addDirectoryItems(), is this problem gone.
 		# This inidcates that this is a Kodi bug. Maybe if Kodi sees an episode folder menu, it scans all subitems to determine which labels to add to the context.
 		# There is no way to differentiate this endpoint being executed by Kodi when the context is opened, vs if the user just manually clicks on it to open the submenu (handle, plugin origin, etc is all the same).
@@ -458,6 +458,7 @@ elif action.startswith('episodes'):
 		# Same happens if the user opens a submenu, quickly navigates back and tries to reopen the same menu.
 		# UPDATE: We changed the global property code and now detect the context menu using "Container.HasFiles". This will still call "episodesRetrieve" once, but not subsequent times.
 		# UPDATE: And the problem with quickly manually opening submenus is also gone with this alternative.
+		'''
 		submenu = parameters.get('submenu')
 		context = submenu == 'next' and not tools.System.visible('Container.HasFiles')
 
@@ -483,6 +484,37 @@ elif action.startswith('episodes'):
 		else:
 			from lib.indexers.episodes import Episodes
 			Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
+		'''
+
+		# UPDATE 2: Even with the solution above, opening the context menu of submenus on low-end devices is still very slow.
+		# We now use a better solution. Submenus are not marked as directories/folders anymore, but instead an action that calls the "episodesSubmenu" endpoint.
+		# "episodesSubmenu" then manually updates the container.
+		# If the "episodesSubmenu" endpoint is ever removed again, make sure to update the following:
+		#	1. Uncomment the code above in this endpoint.
+		#	2. In meta/tools.py, revert all statements marked as "gaiasubmenu".
+
+		link = parameters.get('link')
+		imdb = parameters.get('imdb')
+		tvdb = parameters.get('tvdb')
+		title = parameters.get('tvshowtitle')
+		if not title: title = parameters.get('title')
+		year = parameters.get('year')
+		if year: year = int(year)
+		season = parameters.get('season')
+		if not season is None: season = float(season) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
+		episode = parameters.get('episode')
+		if not episode is None: episode = float(episode) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
+		limit = parameters.get('limit')
+		if not limit is None: limit = int(limit)
+		reduce = tools.Converter.boolean(parameters.get('reduce'))
+		refresh = tools.Converter.boolean(parameters.get('refresh'))
+		next = tools.Converter.boolean(parameters.get('next', True))
+
+		from lib.indexers.episodes import Episodes
+		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
+
+	elif action == 'episodesSubmenu':
+		tools.System.executeContainer(action = 'episodesRetrieve', parameters = parameters)
 
 	elif action == 'episodesUserlists':
 		from lib.indexers.episodes import Episodes

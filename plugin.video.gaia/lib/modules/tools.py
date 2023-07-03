@@ -4149,16 +4149,16 @@ class System(object):
 		return command
 
 	@classmethod
-	def commandPlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, call = True):
+	def commandPlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True):
 		if id is None: id = System.GaiaAddon
-		if command is None: command = self.command(action = action, parameters = parameters, id = id)
+		if command is None: command = self.command(action = action, parameters = parameters, id = id, optimize = optimize)
 		if call: command = 'RunPlugin(%s)' % command
 		return command
 
 	@classmethod
-	def commandContainer(self, action = None, parameters = None, command = None, id = GaiaAddon, call = True, replace = False):
+	def commandContainer(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True, replace = False):
 		if id is None: id = System.GaiaAddon
-		if command is None: command = self.command(action = action, parameters = parameters, id = id)
+		if command is None: command = self.command(action = action, parameters = parameters, id = id, optimize = optimize)
 		if call: command = 'Container.Update(%s%s)' % (command, ',replace' if replace else '')
 		return command
 
@@ -12495,6 +12495,8 @@ class TmdbHelper(object):
 
 				Dialog.notification(title = title, message = 36390, icon = Dialog.IconSuccess)
 				return True
+			else:
+				return False
 		except: Logger.error()
 		Dialog.notification(title = title, message = 36391, icon = Dialog.IconError)
 		return False

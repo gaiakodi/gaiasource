@@ -182,6 +182,12 @@ class Player(xbmc.Player):
 			self.item = item['item']
 			self.metadataCleaned = item['metadata']
 
+			self.detailsThreadMain = None
+			self.detailsThreadUpdate = None
+			self.detailsThreadSpeed = None
+			self.detailsThreadStop = None
+			self.detailsPrevious = None
+
 			self.progress = None
 			self.progressBusy = False
 			self.progressInitialized = False
@@ -346,7 +352,14 @@ class Player(xbmc.Player):
 		Pool.join(instance = thread, busy = True)
 
 	def detailsRefresh(self):
-		self.detailsSet()
+		# If retry stream connection, stop the previous thread and restart.
+		if self.detailsThreadMain:
+			self.detailsThreadStop = True
+			try: self.detailsThread.join()
+			except: Logger.error()
+			self.detailsThreadStop = False
+
+		self.detailsSet(force = True)
 		self.detailsUpdateSpeed()
 		self.detailsNotification()
 
@@ -355,17 +368,18 @@ class Player(xbmc.Player):
 		# This typically happens if Gaia retries playback after failing to establish a stream connection.
 		# This is probably caused by updateInfoTag() in detailsSet(), which only works if the player is currently playing.
 		# Retry a few times. Hopefully the player has started by then.
-		Pool.thread(target = self._detailsRefresh, start = True)
+		self.detailsThreadMain = Pool.thread(target = self._detailsRefresh, start = True)
 
 	def _detailsRefresh(self):
 		for i in range(30):
 			tools.Time.sleep(2)
-			if self.detailsSet(): break
+			if self.detailsThreadStop or self.detailsSet(force = True): break
 
 	def detailsUpdate(self):
 		try:
 			if tools.Settings.getInteger('playback.details.description') > 0:
-				Pool.thread(target = self._detailsUpdate, start = True)
+				if self.detailsThreadUpdate is None:
+					self.detailsThreadUpdate = Pool.thread(target = self._detailsUpdate, start = True)
 		except: tools.Logger.error()
 
 	def _detailsUpdate(self):
@@ -437,7 +451,8 @@ class Player(xbmc.Player):
 	def detailsUpdateSpeed(self):
 		try:
 			if tools.Settings.getInteger('playback.details.description') > 0:
-				Pool.thread(target = self._detailsUpdateSpeed, start = True)
+				if self.detailsThreadSpeed is None: # Do not start multiple threads when retrying stream connection.
+					self.detailsThreadSpeed = Pool.thread(target = self._detailsUpdateSpeed, start = True)
 		except: tools.Logger.error()
 
 	def _detailsUpdateSpeed(self):
@@ -453,7 +468,7 @@ class Player(xbmc.Player):
 					tools.Time.sleep(15)
 		except: tools.Logger.error()
 
-	def detailsSet(self):
+	def detailsSet(self, force = False):
 		try:
 			if self.metadataCleaned:
 				newline = interface.Format.newline()
@@ -467,19 +482,30 @@ class Player(xbmc.Player):
 				if 'link' in self.details: details.append((33702, self.details['link']))
 				details = newline.join([interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1] for i in details])
 
-				metadata = tools.Tools.copy(self.metadataCleaned)
-				if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = ''
-				metadata['plot'] = metadata['plot'].strip('\n').strip('\r')
-				separator = (newline * 2) if metadata['plot'] else ''
+				# There is a weird sporadic error in the Kore remote app.
+				# After binging a few episodes, the Kore app suddenly says it is not connected to Kodi anymore. Restarting Kore does not help.
+				# When keeping the Kore app open, there might be a second every then and now where it connects back to Kodi, but then loses connection immediately afterwards.
+				# When stoping playback, Kore reconnect permanently and the error is gone.
+				# Not sure if this is a Kodi or Kore bug.
+				# Maybe it is caused by Gaia constantly setting updateInfoTag() and Kore getting confused or flooded.
+				# Now we just set the info if the details actually changed.
+				# If the speed setting was enabled, this problem might still remain, since the speed thread calls this function every 15 seconds.
+				# Not sure if this will fix the problem.
+				if force or not details == self.detailsPrevious:
+					self.detailsPrevious = details
+					metadata = tools.Tools.copy(self.metadataCleaned)
+					if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = ''
+					metadata['plot'] = metadata['plot'].strip('\n').strip('\r')
+					separator = (newline * 2) if metadata['plot'] else ''
 
-				if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
-				else: metadata['plot'] = metadata['plot'] + separator + details + newline
+					if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
+					else: metadata['plot'] = metadata['plot'] + separator + details + newline
 
-				self.metatools.itemInfo(item = self.item, metadata = metadata)
-				try:
-					self.updateInfoTag(self.item)
-					return True
-				except: pass # Not yet playing.
+					try:
+						self.metatools.itemInfo(item = self.item, metadata = metadata)
+						self.updateInfoTag(self.item)
+						return True
+					except: pass # Not yet playing.
 		except: tools.Logger.error()
 		return False
 

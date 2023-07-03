@@ -3181,15 +3181,18 @@ class Directory(object):
 		# Shows a category path in the title bar of certain skins (eg: Estuary).
 		category = self.mCategory
 		if not category:
-			category = [] if contented else [tools.System.name()]
+			name = tools.System.name()
+			category = [] if contented else [name]
 			try: category.extend(tools.System.menu())
 			except: pass
 			if contented:
+				try: category.remove(name)
+				except: pass
 				for i in [32001, 32002]:
 					try: category.remove(Translation.string(i))
 					except: pass
 			category = tools.Tools.listUnique(category)
-			category = ' / '.join(category[:2])
+			category = ' / '.join(category[:2 if name in category else 1])
 		xbmcplugin.setPluginCategory(self.mHandle, category)
 
 		xbmcplugin.setContent(self.mHandle, contented)

@@ -85,6 +85,8 @@ class MetaTools(object):
 	PropertyBusy			= 'GaiaMetadataBusy'
 	PropertySelect			= 'GaiaSelect'
 
+	Submenu					= 'submenu=true'
+
 	###################################################################
 	# CONSTRUCTOR
 	###################################################################
@@ -562,12 +564,16 @@ class MetaTools(object):
 
 		if submenu is None: submenu = self.submenu(media = media, multiple = multiple, force = force)
 
+		submenud = False
 		parameters = {}
 		if not action:
 			if not video is None: action = 'streamsVideo'
 			elif Media.typeTelevision(media) and submenu:
-				action = 'episodesRetrieve'
-				parameters['submenu'] = 'next' if next else True # Check addon.py -> episodesRetrieve for more info. # Do it differently for the "Next Page" in submenus.
+				# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
+				#action = 'episodesRetrieve'
+				#parameters['submenu'] = 'next' if next else True # Check addon.py -> episodesRetrieve for more info. # Do it differently for the "Next Page" in submenus.
+				action = 'episodesSubmenu'
+				submenud = True
 			elif media == Media.TypeSpecialExtra: action = 'seasonsExtras'
 			elif media == Media.TypeShow: action = 'seasonsRetrieve'
 			elif media == Media.TypeSeason: action = 'episodesRetrieve'
@@ -616,7 +622,11 @@ class MetaTools(object):
 
 		parameters['reduce'] = reduce
 
-		return System.command(action = action, parameters = parameters)
+		# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
+		#return System.command(action = action, parameters = parameters)
+		command = System.command(action = action, parameters = parameters)
+		if submenud: command += '&' + MetaTools.Submenu
+		return command
 
 	###################################################################
 	# MULTIPLE
@@ -701,12 +711,22 @@ class MetaTools(object):
 			#if title and not title in label and not label in title: label = '%s - %s' % (title, label)
 			if title: label = '%s - %s' % (title, label)
 
+		fontItalic = False
+		fontLight = False
 		if not future is None and not future is True:
-			if future > -MetaTools.TimeUnreleased: label = Format.fontItalic(label)
-			if future >= MetaTools.TimeFuture: label = Format.fontLight(label)
+			if future > -MetaTools.TimeUnreleased:
+				fontItalic = True
+				label = Format.fontItalic(label)
+			if future >= MetaTools.TimeFuture:
+				fontLight = True
+				label = Format.fontLight(label)
 
 		if media == Media.TypeEpisode and season == 0:
-			if not 'special' in metadata or not metadata['special'] or not 'story' in metadata['special'] or not metadata['special']['story']: label = Format.fontItalic(label)
+			if not 'special' in metadata or not metadata['special'] or not 'story' in metadata['special'] or not metadata['special']['story']:
+				# Only do this if not already made italic.
+				# Otherwise there might be nested italic tags, and then Kodi will display the title with an ending "[/I]" visible to the user.
+				# Eg: Breaking Bad S0, the last few specials that do not have a release date.
+				if not fontItalic: label = Format.fontItalic(label)
 
 		# Mark new episodes/seasons in multiple menus as bold.
 		if media == Media.TypeEpisode and (not future or future < 0):
@@ -1088,6 +1108,9 @@ class MetaTools(object):
 						itemMedia = self.media(metadata)
 						itemFolder = submenu or (itemMedia == Media.TypeSet or itemMedia == Media.TypeShow or itemMedia == Media.TypeSeason)
 					else: itemFolder = folder
+
+					# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
+					if MetaTools.Submenu in item['command']: itemFolder = False
 
 					if 'season' in metadata: seasons.append(metadata['season'])
 					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], itemFolder]})
@@ -1911,7 +1934,12 @@ class MetaTools(object):
 					else: action = 'moviesRetrieve'
 					command = System.command(action = action, parameters = parameters)
 
-				return [command, item, True]
+				folder = True
+
+				# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
+				if MetaTools.Submenu in command: folder = False
+
+				return [command, item, folder]
 		except: Logger.error()
 		return None
 

@@ -135,8 +135,17 @@ class Manager(object):
 		return self._database()._size()
 
 	@classmethod
-	def databaseClear(self, providers = True, links = True, streams = True, failures = True, compress = True):
+	def databaseClear(self, providers = True, links = True, failures = True, streams = True, compress = True):
 		base = self._database()
+
+		# This should only be used for streams.
+		# Check _databaseChanged() for more details.
+		changed = self._databaseChanged()
+		if providers is None: providers = changed
+		if links is None: links = changed
+		if failures is None: failures = changed
+		if streams is None: streams = changed
+
 		if providers:
 			base._drop(table = Manager.DatabaseProviders, compress = compress)
 			try: del Manager.Create[Manager.DatabaseProviders]
@@ -145,13 +154,13 @@ class Manager(object):
 			base._drop(table = Manager.DatabaseLinks, compress = compress)
 			try: del Manager.Create[Manager.DatabaseLinks]
 			except: pass
-		if streams:
-			base._drop(table = Manager.DatabaseStreams, compress = compress)
-			try: del Manager.Create[Manager.DatabaseStreams]
-			except: pass
 		if failures:
 			base._drop(table = Manager.DatabaseFailures, compress = compress)
 			try: del Manager.Create[Manager.DatabaseFailures]
+			except: pass
+		if streams:
+			base._drop(table = Manager.DatabaseStreams, compress = compress)
+			try: del Manager.Create[Manager.DatabaseStreams]
 			except: pass
 
 	@classmethod
@@ -204,6 +213,24 @@ class Manager(object):
 		id = [value if value else '' for value in values]
 		return Hash.sha256('_'.join(id))
 
+	@classmethod
+	def _databaseChanged(self, major = True, minor = True, patch = False, prerelease = True):
+		# Every time a new addon version is released, the cached streams (eg from binge scraping) are deleted.
+		# This will rescrape all episodes after a new version is installed, instead of retrieving them from cache.
+		# The idea is that in a new version the stream data structure might have changed which might end up being incompatible with the new version code.
+		# In reality this almost never happens, wasting a lot of rescrapes.
+		# Especially if only the patch version changed, it is unlikley that the stream structured changed.
+		# Patch versions might also be released only a few days apart, constantly clearing the cache.
+		# A better idea might be to only clear on major/minor version changes, and leave the stream cache if only the patch version changed.
+		try:
+			version = System.versionDataGet()['change']
+			if major and version['major']: return True
+			if minor and version['minor']: return True
+			if patch and version['patch']: return True
+			if prerelease and version['prerelease']: return True
+		except: Logger.error()
+		return False
+
 	##############################################################################
 	# PROVIDERS
 	##############################################################################
@@ -245,8 +272,7 @@ class Manager(object):
 										versions[module] = versionCurrent
 									if versionCurrent and not versionOld == versionCurrent:
 										return None
-						except:
-							Logger.error()
+						except: Logger.error()
 
 					settings = self.settingsLoad()
 					try: preset = preset['data']
@@ -313,7 +339,7 @@ class Manager(object):
 						providers[i] = provider
 						break
 
-			self.databaseClear()
+			self.databaseClear(streams = None)
 			data = '"%s"' % Converter.jsonTo(providers).replace('"', '""').replace("'", "''")
 			self._providersDatabaseInitialize()._insert('INSERT INTO %s (version, data) VALUES ("%s", %s);' % (Manager.DatabaseProviders, System.version(), data))
 		except: Logger.error()
@@ -443,7 +469,7 @@ class Manager(object):
 			if notification:
 				from lib.modules.interface import Dialog
 				Dialog.notification(title = 32345, message = 33708, icon = Dialog.IconWarning)
-			self.databaseClear()
+			self.databaseClear(streams = None)
 			self._providersClear()
 			return True
 		return False
@@ -1356,7 +1382,7 @@ class Manager(object):
 			# Make sure the code is copied over, prepared, etc, and everything from the database reloaded.
 			if scraper and Extension.installed(scraper):
 				Loader.show()
-				self.databaseClear(providers = True, links = False, streams = False, failures = False)
+				self.databaseClear(providers = True, links = False, failures = False, streams = False)
 				_settingsProviders(module = True)
 				Loader.hide()
 
@@ -1985,7 +2011,7 @@ class Manager(object):
 
 	@classmethod
 	def failureClear(self):
-		self.databaseClear(providers = False, links = False, streams = False, failures = True)
+		self.databaseClear(providers = False, links = False, failures = True, streams = False)
 
 	@classmethod
 	def failureEnabled(self):
@@ -2906,7 +2932,7 @@ class Manager(object):
 
 	@classmethod
 	def linksDatabaseClear(self, all = True, compress = True):
-		if all: self.databaseClear(providers = False, links = True, streams = False, failures = False)
+		if all: self.databaseClear(providers = False, links = True, failures = False, streams = False)
 		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.DatabaseLinks, parameters = [self.linksTime(time = True)], compress = compress)
 
 	@classmethod
@@ -2953,7 +2979,7 @@ class Manager(object):
 
 	@classmethod
 	def streamsDatabaseClear(self, all = True, compress = True):
-		if all: self.databaseClear(providers = False, links = False, streams = True, failures = False)
+		if all: self.databaseClear(providers = False, links = False, failures = False, streams = True)
 		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.DatabaseStreams, parameters = [self.streamsTime(time = True)], compress = compress)
 
 	@classmethod

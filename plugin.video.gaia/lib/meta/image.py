@@ -1265,7 +1265,7 @@ class MetaImage(object):
 	def extractDefault(self, images):
 		if not MetaImage.TypePoster in images: images[MetaImage.TypePoster] = Theme.poster()
 
-		# Rather use landscape image (fanart) than potrait image (poster), otherwise the image ratio between available and missing thumbbnails will differ.
+		# Rather use landscape image (fanart) than potrait image (poster), otherwise the image ratio between available and missing thumbnails will differ.
 		# Important for sets without a thumb/fanart.
 		#if not MetaImage.TypeThumb in images: images[MetaImage.TypeThumb] = Theme.thumbnail()
 		if not MetaImage.TypeThumb in images: images[MetaImage.TypeThumb] = Theme.fanart()
@@ -1372,7 +1372,9 @@ class MetaImage(object):
 				#	'TypeError: argument "value" for method "setArt" must be unicode or str
 				# Remove None values. In worst case, use a try-catch to prevent the error from propagating.
 				try: item.setArt({k : v for k, v in images.items() if v})
-				except: Logger.error()
+				except:
+					Logger.error()
+					Logger.log('Failed Images: ' + str(images))
 
 			# NB: Although deprecated, this is still used by most skins today (2022).
 			# Most skins will use this value above the one from setArt().
@@ -1401,7 +1403,7 @@ class MetaImage(object):
 			# Otherwise many skins (eg: Estaury), the Kore remote app, and the info dialog, will use this instead of the thumbnail.
 			# Most skins will automatically use the season.poster or tvshow.poster if a poster (instead of a thumbnail) has to be displayed.
 			# NB: Do not delete the image, otherwise it will be replaced by the gaia default in set().
-			if media == MetaImage.MediaEpisode: images['poster'] = None
+			if media == MetaImage.MediaEpisode or media == MetaImage.MediaSpecialEpisode: images['poster'] = None
 
 		if item: self.set(images = images, item = item, default = default)
 		return images

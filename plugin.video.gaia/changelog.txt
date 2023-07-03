@@ -1,4 +1,11 @@
 
+[B]6.3.3 (2023.07.03)[/B]
+- Fixed OAuth for all accounts.
+- Improved episode submenu loading process.
+- Changed stream persistency on version change.
+- Possible fix for Kore app connection loss.
+- Fixed special episode thumbnails.
+
 [B]6.3.2 (2023.07.02)[/B]
 - Added custom player integration for TMDbHelper.
 - Added scrolling to Oracle chat window.
