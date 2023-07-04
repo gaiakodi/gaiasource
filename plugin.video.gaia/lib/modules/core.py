@@ -3559,6 +3559,24 @@ class Core(object):
 		items = [i for i in items if ('autoplay' in i and i['autoplay'] == True) or not 'autoplay' in i]
 		items = self.sourcesFilter(items = items, metadata = metadata, autoplay = True)
 
+		autoplayInstant = tools.Settings.getBoolean('playback.autoplay.instant')
+		autoplayManual = tools.Settings.getBoolean('playback.autoplay.manual')
+		if autoplayInstant or autoplayManual:
+			instant = []
+			uninstant = []
+			for item in items:
+				stream = item['stream']
+				if stream.sourceTypeLocal() or stream.sourceTypePremium() or stream.accessTypeDirect() or stream.accessCacheAny(account = True): instant.append(item)
+				else: uninstant.append(item)
+			if instant:
+				# The order of the streams should be still be intact from sourcesFilter() above.
+				# We only move the instant streams to the front.
+				if autoplayInstant: items = instant + uninstant
+			else:
+				if autoplayManual:
+					interface.Dialog.notification(title = 35848, message = 36392, icon = interface.Dialog.IconWarning)
+					return self.showStreams(items = items, extras = extras, metadata = metadata, autoplay = False, library = library, new = new, add = add, binge = binge)
+
 		imdb = metadata['imdb'] if 'imdb' in metadata else None
 		tmdb = metadata['tmdb'] if 'tmdb' in metadata else None
 		tvdb = metadata['tvdb'] if 'tvdb' in metadata else None

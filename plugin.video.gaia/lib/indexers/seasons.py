@@ -571,6 +571,7 @@ class Seasons(object):
 										season['pack'] = pack
 
 								for season in item['seasons']:
+									if (not 'plot' in season or not season['plot']) and ('plot' in show and show['plot']): season['plot'] = show['plot'] # Unaired seasons.
 									MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(show[MetaImage.Attribute]), data = season, category = MetaImage.MediaShow) # Add show images.
 
 								break

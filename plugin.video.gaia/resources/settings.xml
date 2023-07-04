@@ -3191,6 +3191,22 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
+				<setting id="playback.autoplay.instant" type="boolean" label="36393" help="34622" parent="playback.autoplay.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="playback.autoplay.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.autoplay.manual" type="boolean" label="35646" help="34623" parent="playback.autoplay.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="playback.autoplay.enabled">true</dependency>
+					</dependencies>
+				</setting>
 				<setting id="playback.autoplay.sequential" type="boolean" label="35433" help="34354">
 					<control type="toggle"/>
 					<level>1</level>
@@ -3479,6 +3495,37 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
+				<setting id="playback.audio.orginal" type="integer" label="36394" help="34624">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35439">1</option>
+							<option label="35441">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.audio.stream">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.audio.orginal.exclude" type="string" label="36395" help="34625" parent="playback.audio.orginal">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=playback.audio.orginal.exclude&title=32357&none=true)</data>
+						<close>false</close>
+					</control>
+					<default>None</default>
+					<level>3</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="playback.audio.stream">1</condition>
+								<condition setting="playback.audio.orginal" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
 			</group>
 
 			<!-- ########## PLAYBACK - SUBTITLE ########## -->
@@ -3612,6 +3659,53 @@ The label is then added to the action element:
 							<and>
 								<condition setting="playback.subtitle.stream" operator="gt">0</condition>
 								<condition setting="playback.subtitle.language">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.subtitle.force" type="boolean" label="36396" help="34626">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="playback.subtitle.stream">3</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.subtitle.force.primary" type="boolean" label="32356" help="34627" parent="playback.subtitle.force">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="playback.subtitle.stream">3</condition>
+								<condition setting="playback.subtitle.force">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.subtitle.force.secondary" type="boolean" label="32357" help="34628" parent="playback.subtitle.force">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="playback.subtitle.stream">3</condition>
+								<condition setting="playback.subtitle.force">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.subtitle.force.tertiary" type="boolean" label="35036" help="34629" parent="playback.subtitle.force">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="playback.subtitle.stream">3</condition>
+								<condition setting="playback.subtitle.force">true</condition>
 							</and>
 						</dependency>
 					</dependencies>

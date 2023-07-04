@@ -1,4 +1,13 @@
 
+[B]6.3.5 (2023.07.04)[/B]
+- Added instant stream preference for autoplay.
+- Added manual selection for failed autoplay.
+- Improved episode cast lists.
+- Improved automatic audio stream selection.
+- Improved automatic subtitle stream selection.
+- Improved oracle chatbot error detection.
+- Fixed ChatGPT playground fallback.
+
 [B]6.3.4 (2023.07.03)[/B]
 - Improved menu category labeling.
 

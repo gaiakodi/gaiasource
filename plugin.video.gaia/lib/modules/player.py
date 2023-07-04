@@ -1661,12 +1661,23 @@ class Streamer(object):
 		return self._streamRetrieve(retrieve = interface.Player.RetrieveCurrent, unknown = unknown)
 
 	@classmethod
-	def streamKnown(self, unknown = True):
+	def streamKnown(self, unknown = True, primary = True, secondary = True, tertiary = True):
 		try:
 			current = self.streamCurrent(unknown = unknown)
 			if current:
 				settings = self.settingsLanguage()
-				if settings: return current['language'][tools.Language.Code][tools.Language.CodeStream] in settings
+				if settings:
+					languages = []
+					if primary:
+						try: languages.append(settings[0])
+						except: pass
+					if secondary:
+						try: languages.append(settings[1])
+						except: pass
+					if tertiary:
+						try: languages.append(settings[2])
+						except: pass
+					return current['language'][tools.Language.Code][tools.Language.CodeStream] in languages
 		except: tools.Logger.error()
 		return False
 
@@ -1724,6 +1735,10 @@ class Audio(Streamer):
 	StreamDefault = 0
 	StreamAutomatic = 1
 
+	OriginalDisabled = 0
+	OriginalLenient = 1
+	OriginalStrict = 2
+
 	@classmethod
 	def _stream(self, player, retrieve, process, unknown):
 		return player.audioStream(retrieve = retrieve, process = process, unknown = unknown)
@@ -1743,15 +1758,6 @@ class Audio(Streamer):
 			settings = self.settingsLanguage(log = not unknown)
 			current = self.streamCurrent(unknown = unknown)
 
-			original = None
-			try:
-				original = metadata['language']
-				if original and not tools.Tools.isArray(original): original = [original]
-				original = [tools.Language.code(i, code = tools.Language.CodeStream) for i in original]
-				original = [i for i in original if i]
-				self.log('Original audio language', original)
-			except: pass
-
 			if not unknown: self.log('Available streams', streams if streams else [])
 
 			if tools.Settings.getInteger('playback.audio.stream') == Audio.StreamDefault:
@@ -1759,6 +1765,29 @@ class Audio(Streamer):
 			elif not streams:
 				self.log('No audio streams detected.')
 			else:
+				original = None
+				try:
+					original = metadata['language']
+					if original and not tools.Tools.isArray(original): original = [original]
+					original = [tools.Language.code(i, code = tools.Language.CodeStream) for i in original]
+					original = [i for i in original if i]
+					self.log('Original audio language', original)
+				except: pass
+
+				originaled = None
+				try:
+					originaled = tools.Settings.getInteger('playback.audio.orginal')
+					if not originaled:
+						self.log('Ignoring original audio language', original)
+						original = None
+					else:
+						exclude = tools.Language.settingsCustom(id = 'playback.audio.orginal.exclude', code = tools.Language.CodeStream)
+						if exclude:
+							try: original.remove(exclude)
+							except: pass
+							self.log('Excluding original audio language', [exclude])
+				except: tools.Logger.error()
+
 				best = None
 				bestOriginal = False
 
@@ -1768,7 +1797,7 @@ class Audio(Streamer):
 				# Eg: If a movie is in French, but the file also contains an English audio stream: French should be used instead of English if the user has French in any of the language settings.
 				if best is None and original:
 					for code in original:
-						if code in settings:
+						if originaled == Audio.OriginalLenient or (originaled == Audio.OriginalStrict and code in settings):
 							for stream in streams:
 								if stream and code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
 									if best is None:
@@ -2052,7 +2081,15 @@ class Subtitle(Streamer):
 						self.log('Disabling subtitles.')
 						return self._finish(status = Subtitle.StatusDisabled)
 				elif settingsStream == Subtitle.StreamAutomatic:
-					if Audio.streamKnown():
+					primary = True
+					secondary = True
+					tertiary = True
+					if tools.Settings.getBoolean('playback.subtitle.force'):
+						if tools.Settings.getBoolean('playback.subtitle.force.primary'): primary = False
+						if tools.Settings.getBoolean('playback.subtitle.force.secondary'): secondary = False
+						if tools.Settings.getBoolean('playback.subtitle.force.tertiary'): tertiary = False
+
+					if Audio.streamKnown(primary = primary, secondary = secondary, tertiary = tertiary):
 						if current and current['forced']:
 							try: code = current['language'][tools.Language.Code][tools.Language.CodeDefault]
 							except: code = None

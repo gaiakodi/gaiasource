@@ -7086,6 +7086,39 @@ msgctxt "#34621"
 msgid "Rerate episodes after a grace period of the previous rating. If your previous rating for a title falls within this time period, no rating dialog will be shown after playback. If your previous rating is older than this time, a rating dialog will be shown after playback so you can rerate the title. A value of [I]0[/I]  will always rerate titles. An [I]empty[/I]  value will reset to default. A very [I]large[/I]  value, like [I]9999[/I], will never rerate titles."
 msgstr ""
 
+msgctxt "#34622"
+msgid "Try to autoplay instant streams first. Instant streams can be played immediately without any download or other delay, including local, premium, debrid cached, and other direct streams. Other streams are only tried if no instant streams are available. Note that this behavior can also be achieved through the [I]Filter Configuration[/I],  this is just a shortcut for grouping all instant streams."
+msgstr ""
+
+msgctxt "#34623"
+msgid "Show the manual stream selection dialog if there are no instant streams available. If there is an instant stream, autoplay will continue as usual. If there are no instant streams, one must be manually picked from the list."
+msgstr ""
+
+msgctxt "#34624"
+msgid "Prefer the original language the title was released in for the audio stream. If enabled and available, the original language will be chosen above any of the other languages from your preferences. The [I]Disabled[/I]  option will not select the original language automatically. The [I]Strict[/I]  option will only select the original language if it is part of your language preferences. The [I]Lenient[/I]  option will always select the original language, irrespective of your language preferences."
+msgstr ""
+
+msgctxt "#34625"
+msgid "Prefer the original language the title was released in, except for a specific language. If the original language is the same as this setting, t will be ignored and another audio stream will be chosen according to your language preferences."
+msgstr ""
+
+msgctxt "#34626"
+msgid "Force subtitles even if the audio language is known. If disabled, subtitles will not be shown if the audio language is known. If enabled, subtitles are shown even if the audio language is known. This is useful if you specified a certain language for the audio stream, but are not fully proficient in the language and still want to enable subtitles."
+msgstr ""
+
+msgctxt "#34627"
+msgid "Force subtitles if the selected language is the primary audio language preference."
+msgstr ""
+
+msgctxt "#34628"
+msgid "Force subtitles if the selected language is the secondary audio language preference."
+msgstr ""
+
+msgctxt "#34629"
+msgid "Force subtitles if the selected language is the tertiary audio language preference."
+msgstr ""
+
+
 # [/GAIACODE]
 
 
@@ -12179,4 +12212,24 @@ msgstr ""
 
 msgctxt "#36391"
 msgid "Failure To Integrate Gaia Into TMDbHelper"
+msgstr ""
+
+msgctxt "#36392"
+msgid "No Instant Streams Available For Autoplay"
+msgstr ""
+
+msgctxt "#36393"
+msgid "Prefer Instant"
+msgstr ""
+
+msgctxt "#36394"
+msgid "Original Language"
+msgstr ""
+
+msgctxt "#36395"
+msgid "Exclude Language"
+msgstr ""
+
+msgctxt "#36396"
+msgid "Force Subtitles"
 msgstr ""

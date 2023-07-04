@@ -1933,14 +1933,20 @@ class Episodes(object):
 										# Either no one has added the cast to the APIs, or it only lists the guest stars for that episode.
 										# In such a case, add the season/show cast as well.
 										# Only do this for <= 3. Some shows might just have few cast per episode (eg: 5-6).
+										# UPDATE: Not sure if this was always the case, or if TVDb changed something recently, or maybe only does this for newer shows.
+										# But it seems that all the stars of the show are listed as cast members of the show.
+										# Occasional guest stars on the other hand are listed as cast members of the individual episodes.
+										# Guest stars also seem to be less likley to have a thumbnail and/or character name. List them last.
+										#limit = 3
+										limit = 50
 										try:
-											if not 'cast' in episode or not episode['cast'] or len(episode['cast']) <= 3:
+											if not 'cast' in episode or not episode['cast'] or len(episode['cast']) <= limit:
 												id = '%s_%s' % (str(idImdb), str(idTvdb))
 
 												if not id in castSeason:
 													try: castSeason[id] = season['cast']
 													except: castSeason[id] = None
-												if (not castSeason[id] or len(castSeason[id]) <= 3) and not id in castShow:
+												if (not castSeason[id] or len(castSeason[id]) <= v) and not id in castShow:
 													show = Shows().metadata(idImdb = idImdb, idTvdb = idTvdb, idTmdb = idTmdb, idTrakt = idTrakt)
 													if show:
 														try: castShow[id] = show['cast']
@@ -1951,8 +1957,8 @@ class Episodes(object):
 												try: cast = episode['cast']
 												except: cast = None
 												if not cast: cast = []
-												if len(cast) <= 3 and castSeason[id]: cast = Tools.listUnique(cast + castSeason[id], attribute = 'name')
-												if len(cast) <= 3 and castShow[id]: cast = Tools.listUnique(cast + castShow[id], attribute = 'name')
+												if len(cast) <= limit and castSeason[id]: cast = Tools.listUnique(castSeason[id] + cast, attribute = 'name')
+												if len(cast) <= limit and castShow[id]: cast = Tools.listUnique(castShow[id] + cast, attribute = 'name')
 												episode['cast'] = cast
 										except: Logger.error()
 									break

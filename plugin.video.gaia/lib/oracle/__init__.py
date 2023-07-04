@@ -510,6 +510,11 @@ class Oracle(object):
 			# Otherwise a failed request (eg: from a playground) will be cached, and  if the user retries, it will just load the old values.
 			if invalid: Cache.instance().cacheDelete(self._chat, message = i, context = context, conversation = conversationOld, refine = refine, media = media)
 
+			# If the chat failed due to an error, instead of the chatbot not understanding the query, do not execute the rest of the queries.
+			# Eg: ChatGPT usage limit reached.
+			if data and data['error'] and not data['error']['type'] in [None, '', 'unknown']:
+				break
+
 		if data and data['success']:
 			if discover:
 				if self._chatProgress(instance = progress, progress = [0.65, 0.80], status = 36326) is False: return False
