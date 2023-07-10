@@ -1357,6 +1357,7 @@ class Manager(object):
 			if count:
 				count = int(count)
 				providers = sorted(providers, key = lambda i : i.order(), reverse = True)
+				providers = [i for i in providers if not i.statusDead() and not i.statusHidden()] + [i for i in providers if i.statusDead() or i.statusHidden()]
 				self.settingsToggle(providers = providers[:count], enable = True)
 				self.settingsToggle(providers = providers[count:], enable = False)
 			_settingsToggleBack(providers = providers, navigate = navigate)
@@ -2405,7 +2406,7 @@ class Manager(object):
 			# Unlimited: 84 seconds | 42% CPU load
 			concurrencyMode = ProviderBase.ConcurrencyThread
 
-			# Add a concurrency limit, since medium and low-end devices often have a maximum number of threads that can be created and run  in parallel.
+			# Add a concurrency limit, since medium and low-end devices often have a maximum number of threads that can be created and run in parallel.
 			#concurrencyLimit = 0
 			if performance['processor']['rating'] >= ProviderBase.Performance7:
 				concurrencyLimit = 0
@@ -2413,6 +2414,7 @@ class Manager(object):
 				threads = min(max(threads, 3), 5)
 				concurrencyLimit = scale(rating = rating, minimum = max(2, threads * 1.5), maximum = max(8, threads * 4) + 1)
 
+		concurrencyBinge = scale(rating = rating, minimum = 50, maximum = 100) / 100.0
 		concurrencyConnection = 0
 		concurrencyLabel = Translation.string(36039 if concurrencyMode == ProviderBase.ConcurrencyThread else 36040)
 
@@ -2515,6 +2517,7 @@ class Manager(object):
 				'concurrency' : {
 					'mode' : concurrencyMode,
 					'limit' : concurrencyLimit,
+					'binge' : concurrencyBinge,
 					'connection' : concurrencyConnection,
 				},
 				'pack' : {
@@ -2667,6 +2670,7 @@ class Manager(object):
 
 				ProviderBase.settingsGlobalConcurrencyModeSet(data['concurrency']['mode'])
 				ProviderBase.settingsGlobalConcurrencyLimitSet(data['concurrency']['limit'])
+				ProviderBase.settingsGlobalConcurrencyBingeSet(data['concurrency']['binge'])
 				ProviderBase.settingsGlobalConcurrencyConnectionSet(data['concurrency']['connection'])
 
 				ProviderBase.settingsGlobalPackEnabledSet(data['pack']['enabled'])

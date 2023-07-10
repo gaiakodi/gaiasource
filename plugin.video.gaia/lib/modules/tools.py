@@ -651,6 +651,12 @@ class Tools(object):
 		return data
 
 	@classmethod
+	def stringAscii(self, data):
+		try: data.encode('ascii')
+		except UnicodeEncodeError: return False
+		else: return True
+
+	@classmethod
 	def isClass(self, value):
 		return isinstance(value, type)
 
@@ -4689,6 +4695,8 @@ class System(object):
 					Backup.automaticExport()
 				Pool.thread(target = _launchBackup, start = True)
 
+			self.windowPropertySet(System.PropertyInitial, '3')
+
 		self.tInitial = not Settings.getBoolean('internal.initial.launch')
 		update = System.windowPropertyGet(System.PropertyUpdate)
 		if update:
@@ -4793,6 +4801,33 @@ class System(object):
 				from lib.modules.search import Search
 				Search()._deleteFile()
 
+			#gaiaremove
+			if version['old']['number'] <= self.versionNumber(version = '6.3.5') and version['new']['number'] >= self.versionNumber(version = '6.3.6'):
+				from lib.providers.core.base import ProviderBase
+
+				def scale(rating, minimum, maximum, base = None):
+					result = int(Math.round(Math.scale(value = rating, fromMinimum = 0, fromMaximum = 1, toMinimum = minimum, toMaximum = maximum), places = 0))
+					if not base is None: result = Math.roundClosest(value = result, base = base)
+					return result
+
+				performance = Hardware.performance()
+				rating = performance['rating']
+
+				concurrencyMode = ProviderBase.ConcurrencyThread
+				concurrencyBinge = scale(rating = rating, minimum = 50, maximum = 100) / 100.0
+				concurrencyConnection = 0
+				if performance['processor']['rating'] >= ProviderBase.Performance7:
+					concurrencyLimit = 0
+				else:
+					threads = Hardware.processorCountThread() or 0
+					threads = min(max(threads, 3), 5)
+					concurrencyLimit = scale(rating = rating, minimum = max(2, threads * 1.5), maximum = max(8, threads * 4) + 1)
+
+				ProviderBase.settingsGlobalConcurrencyModeSet(concurrencyMode)
+				ProviderBase.settingsGlobalConcurrencyLimitSet(concurrencyLimit)
+				ProviderBase.settingsGlobalConcurrencyBingeSet(concurrencyBinge)
+				ProviderBase.settingsGlobalConcurrencyConnectionSet(concurrencyConnection)
+
 		_launchProgress(4) # 25%
 
 		self.tStatus = []
@@ -4837,6 +4872,12 @@ class System(object):
 		# Clear Temporary
 		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 48%
 
+		# History
+		def _launchHistory():
+			from lib.modules.history import History
+			History().clean()
+		_launchAdd(1, 'Initializing Stream History', _launchHistory) # 49%
+
 		# Externals
 		def _launchExternals():
 			from lib.modules.external import Psutil, Ujson
@@ -4845,7 +4886,7 @@ class System(object):
 				Pool.thread(target = Ujson().moduleDetect, start = True),
 			]
 			[thread.join() for thread in threads]
-		_launchAdd(4, 'Initializing External Modules', _launchExternals) # 52%
+		_launchAdd(3, 'Initializing External Modules', _launchExternals) # 52%
 
 		# Local Library Update
 		def _launchLibrary(hidden):
@@ -5212,6 +5253,7 @@ class Settings(object):
 	SpecialAlways = 'always'
 
 	CustomNumber = 'number'
+	CustomPercent = 'percent'
 	CustomDuration = 'duration'
 	CustomSize = 'size'
 	CustomColor = 'color'
@@ -5374,6 +5416,67 @@ class Settings(object):
 				'none' : SpecialUnlimited,
 			},
 		},
+		'provider.concurrency.limit' : {
+			'type' : CustomNumber,
+			'title' : 36037,
+			'label' : {
+				'singular' : 33681,
+				'plural' : 32345,
+			},
+			'value' : {
+				'default' : 0,
+				'minimum' : 1,
+				'maximum' : 100,
+			},
+			'special' : {
+				'zero' : SpecialUnlimited,
+				'none' : SpecialUnlimited,
+			},
+		},
+		'provider.concurrency.binge' : {
+			'type' : CustomPercent,
+			'title' : 36400,
+			'value' : {
+				'default' : 0,
+				'minimum' : 1,
+				'maximum' : 100,
+			},
+			'special' : {
+				'zero' : SpecialUnlimited,
+				'none' : SpecialUnlimited,
+			},
+		},
+		'provider.concurrency.connection' : {
+			'type' : CustomNumber,
+			'title' : 32038,
+			'label' : {
+				'singular' : 33404,
+				'plural' : 33413,
+			},
+			'value' : {
+				'default' : 0,
+				'minimum' : 50,
+				'maximum' : 10000,
+			},
+			'special' : {
+				'zero' : SpecialUnlimited,
+				'none' : SpecialDefault,
+			},
+		},
+		'provider.failure.detection.time' : {
+			'type' : CustomDuration,
+			'title' : 33671,
+			'value' : {
+				'unit' : UnitDay,
+				'default' : 5,
+				'minimum' : 1,
+				'maximum' : 30,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
 		'scrape.limit.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
@@ -5467,40 +5570,6 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'scrape.concurrency.limit' : {
-			'type' : CustomNumber,
-			'title' : 36037,
-			'label' : {
-				'singular' : 33681,
-				'plural' : 32345,
-			},
-			'value' : {
-				'default' : 0,
-				'minimum' : 1,
-				'maximum' : 100,
-			},
-			'special' : {
-				'zero' : SpecialUnlimited,
-				'none' : SpecialUnlimited,
-			},
-		},
-		'scrape.concurrency.connection' : {
-			'type' : CustomNumber,
-			'title' : 32038,
-			'label' : {
-				'singular' : 33404,
-				'plural' : 33413,
-			},
-			'value' : {
-				'default' : 0,
-				'minimum' : 50,
-				'maximum' : 10000,
-			},
-			'special' : {
-				'zero' : SpecialUnlimited,
-				'none' : SpecialDefault,
-			},
-		},
 		'scrape.cache.inspection.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
@@ -5515,21 +5584,7 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'provider.failure.detection.time' : {
-			'type' : CustomDuration,
-			'title' : 33671,
-			'value' : {
-				'unit' : UnitDay,
-				'default' : 5,
-				'minimum' : 1,
-				'maximum' : 30,
-			},
-			'special' : {
-				'zero' : SpecialNever,
-				'none' : SpecialDefault,
-			},
-		},
-		'provider.termination.unresponsive.time' : {
+		'scrape.termination.unresponsive.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
 			'value' : {
@@ -5543,7 +5598,7 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'provider.termination.unresponsive.limit' : {
+		'scrape.termination.unresponsive.limit' : {
 			'type' : CustomNumber,
 			'title' : 33330,
 			'label' : {
@@ -5687,6 +5742,20 @@ class Settings(object):
 			},
 			'special' : {
 				'zero' : SpecialAutomatic,
+				'none' : SpecialDefault,
+			},
+		},
+		'playback.binge.scrape' : {
+			'type' : CustomDuration,
+			'title' : 35586,
+			'value' : {
+				'unit' : UnitMinute,
+				'default' : 10,
+				'minimum' : 1,
+				'maximum' : 120,
+			},
+			'special' : {
+				'zero' : SpecialDefault,
 				'none' : SpecialDefault,
 			},
 		},
@@ -6236,7 +6305,7 @@ class Settings(object):
 		else:
 			valueMinimum = self._customParameter(id, 'value', 'minimum')
 			valueMaximum = self._customParameter(id, 'value', 'maximum')
-			if type in [Settings.CustomNumber, Settings.CustomDuration, Settings.CustomSize]:
+			if type in [Settings.CustomNumber, Settings.CustomPercent, Settings.CustomDuration, Settings.CustomSize]:
 				value = Dialog.input(type = Dialog.InputNumeric, title = title, default = self._customValue(id = id, value = value, inverse = True))
 				special = self._customSpecial(id = id)
 				if not special or not value in special:
@@ -6285,6 +6354,7 @@ class Settings(object):
 		elif type == Settings.CustomIcon:
 			label = value
 		else:
+			labelExtra = None
 			labelSuffix = self._customParameter(id, 'label', 'suffix')
 			labelSingular = self._customParameter(id, 'label', 'singular')
 			labelPlural = self._customParameter(id, 'label', 'plural')
@@ -6307,6 +6377,11 @@ class Settings(object):
 				if type == Settings.CustomNumber:
 					if labelSingular and value == 1: labelSuffix = labelSingular
 					elif labelPlural: labelSuffix = labelPlural
+				elif type == Settings.CustomPercent:
+					labelExtra = '%'
+					value = int(value * 100.0)
+					if labelSingular and value == 1: labelSuffix = labelSingular
+					elif labelPlural: labelSuffix = labelPlural
 				elif type == Settings.CustomSize:
 					from lib.modules.convert import ConverterSize
 					label = ConverterSize(value, unit = ConverterSize.Byte).stringOptimal()
@@ -6317,7 +6392,10 @@ class Settings(object):
 					label = ConverterDuration(value, unit = ConverterDuration.UnitSecond).string(format = format, capitalize = True)
 
 				if Tools.isNumber(value): value = '{:,}'.format(value)
-				if labelSuffix: label = '%s %s' % (str(value), Translation.string(labelSuffix))
+				if labelExtra or labelSuffix:
+					label = str(value)
+					if labelExtra: label = '%s%s' % (label, Translation.string(labelExtra))
+					if labelSuffix: label = '%s %s' % (label, Translation.string(labelSuffix))
 
 		return label
 
@@ -6391,6 +6469,9 @@ class Settings(object):
 
 				if type == Settings.CustomNumber:
 					value = int(value)
+				elif type == Settings.CustomPercent:
+					if inverse: value = int(float(value) * 100.0)
+					else: value = float(value) / 100.0
 				elif type == Settings.CustomSize:
 					from lib.modules.convert import ConverterSize
 					base = ConverterSize.Byte
@@ -12327,7 +12408,7 @@ class VpnManager(object):
 			# Loader is still showing after VpnManager finished, even if it shows dialogs. Manually hide the loader.
 			from lib.modules.interface import Loader
 			Loader.show()
-			Pool.thread(target = Loader.hide, kwargs = {'delay' : 5}, start = True)
+			Pool.thread(target = Loader.hide, kwargs = {'delay' : 3}, start = True)
 
 		return result
 
@@ -13116,6 +13197,10 @@ class Binge(object):
 		return self.dialog() == Binge.DialogUpNext
 
 	@classmethod
+	def scrape(self):
+		return Settings.getCustom('playback.binge.scrape')
+
+	@classmethod
 	def delay(self):
 		return Settings.getInteger('playback.binge.delay')
 
@@ -13134,6 +13219,7 @@ class Binge(object):
 	@classmethod
 	def actionCancel(self):
 		return Settings.getInteger('playback.binge.action.cancel')
+
 
 ###################################################################
 # ANNOUNCEMENT

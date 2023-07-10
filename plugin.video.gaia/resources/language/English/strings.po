@@ -7118,6 +7118,14 @@ msgctxt "#34629"
 msgid "Force subtitles if the selected language is the tertiary audio language preference."
 msgstr ""
 
+msgctxt "#34630"
+msgid "Limit the number of providers that can be scraped in parallel during bingeing. On low-end devices or slow internet connections, the background scraping during binge playback can cause Kodi to become temporarily sluggish, since the device's resources are used up by the scraping process. Reduce the number of providers that are executed in parallel during bingeing in order to reduce processor and internet usage. Note that scraping will take longer the fewer providers run concurrently. This option is a percentage of the total providers specified in the [I]Concurrency Limit[/I]  setting. A value of [I]0[/I]  will execute all providers at once. An [I]empty[/I]  value will reset to default."
+msgstr ""
+
+msgctxt "#34631"
+msgid "Start scraping the next episode some time before the current episode playback finishes. Allow enough time for the scraping to finish before the end of the playback. Note that the [I]Concurrency Binge[/I]  setting under the [I]Provider[/I]  tab might reduce the number of providers that run concurrently and will therefore increase the total scraping time. Increase this time if scraping does not finish before the next binged episode starts.  A value of [I]0[/I]  will reset to default."
+msgstr ""
+
 
 # [/GAIACODE]
 
@@ -12232,4 +12240,24 @@ msgstr ""
 
 msgctxt "#36396"
 msgid "Force Subtitles"
+msgstr ""
+
+msgctxt "#36397"
+msgid "Browse Show"
+msgstr ""
+
+msgctxt "#36398"
+msgid "Browse Season"
+msgstr ""
+
+msgctxt "#36399"
+msgid "Concurrency Binge [COLOR FFA0C12C][B]↕[/B][/COLOR]"
+msgstr ""
+
+msgctxt "#36400"
+msgid "Concurrency Binge"
+msgstr ""
+
+msgctxt "#36401"
+msgid "Provider Presets"
 msgstr ""

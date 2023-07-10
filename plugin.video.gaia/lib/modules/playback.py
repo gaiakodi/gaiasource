@@ -460,6 +460,7 @@ class Playback(Database):
 	# Calculate the number of times an entire show/season was watched completely.
 	def count(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, specials = False, metadata = None, history = None):
 		if history is None: history = self.retrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, adjust = Playback.AdjustSettings)
+		if history and 'history' in history: history = history['history']
 		if not history or not 'count' in history: return None, None
 
 		if Media.typeMovie(media) or media == Media.TypeEpisode:
@@ -668,7 +669,7 @@ class Playback(Database):
 
 		if result:
 			Dialog.notification(title = title, message = Translation.string(35502 if alternative else 35510) % label, icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 		else:
 			Dialog.notification(title = title, message = Translation.string(35604 if alternative else 35554) % label, icon = Dialog.IconWarning)
 
@@ -727,7 +728,7 @@ class Playback(Database):
 
 		if result:
 			Dialog.notification(title = title, message = Translation.string(35503 if alternative else 35511) % label, icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 		else:
 			Dialog.notification(title = title, message = Translation.string(35605 if alternative else 35555) % label, icon = Dialog.IconWarning)
 
@@ -766,7 +767,7 @@ class Playback(Database):
 
 		if result:
 			Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, rating), icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 		elif result is None:
 			Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation)
 		else:
@@ -793,7 +794,7 @@ class Playback(Database):
 
 		if result:
 			Dialog.notification(title = title, message = Translation.string(35346 if alternative else 35043) % label, icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 		else:
 			Dialog.notification(title = title, message = Translation.string(35348 if alternative else 35045) % label, icon = Dialog.IconWarning)
 
@@ -860,7 +861,7 @@ class Playback(Database):
 				# If one dialog timed out and auto closed, do not show the remainder of the dialogs.
 				if self.dialogRate(**i) == Playback.Autoclosed: break
 
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 			return True
 
 	def dialogReset(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, refresh = True):
@@ -870,7 +871,7 @@ class Playback(Database):
 		Loader.hide()
 		if result:
 			Dialog.notification(title = 35006, message = 32308 if alternative else 32057, icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh()
+			if refresh: Directory.refresh(wait = False)
 		else:
 			Dialog.notification(title = 35006, message = 32309 if alternative else 32058, icon = Dialog.IconWarning)
 
@@ -879,7 +880,7 @@ class Playback(Database):
 		self.refresh(media = media, wait = True)
 		Loader.hide()
 		Dialog.notification(title = 35006, message = 35037, icon = Dialog.IconSuccess)
-		Directory.refresh()
+		Directory.refresh(wait = False)
 
 	##############################################################################
 	# COMBINED

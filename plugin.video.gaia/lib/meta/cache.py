@@ -61,14 +61,30 @@ class MetaCache(Database):
 	TimeOutdatedSeason	= TimeOutdated
 	TimeOutdatedEpisode	= TimeOutdated
 
-	# When the data should be forefully refreshed even if there is old cached data, since the metadata is too outdated to still be considered valid.
-	# Keep this at a very long time, since one can always show the new data by reloading the menu after it wass refreshed in the background.
+	# When the data should be forcefully refreshed even if there is old cached data, since the metadata is too outdated to still be considered valid.
+	# Keep this at a very long time, since one can always show the new data by reloading the menu after it was refreshed in the background.
 	TimeObsolete		= 31556952		# 1 Year.
 	TimeObsoleteMovie	= TimeObsolete
 	TimeObsoleteSet		= TimeObsolete
 	TimeObsoleteShow	= TimeObsolete
 	TimeObsoleteSeason	= TimeObsolete
 	TimeObsoleteEpisode	= TimeObsolete
+
+	# Recentley released titles should be refreshed more often, since they might have outdated metadata or ratings with a low vote count.
+	# Values are given as {age-of-release : outdate-time} pairs.
+	# Eg: {259200 : 43200} = If the title was released in the past 3 days, force refresh the data in the background if its last metadata update was more than 12 hours ago.
+	# Be conservative as we do not want to update the metadata too often.
+	TimeRelease			= {
+							259200 : 43200,		# 3 days : 12 hours.
+							604800 : 86400,		# 7 days : 1 day.
+							1209600 : 172800,	# 14 days : 2 days.
+							1814400 : 259200,	# 21 days : 3 days.
+						}
+	TimeReleaseMovie	= TimeRelease
+	TimeReleaseSet		= TimeRelease
+	TimeReleaseShow		= TimeRelease
+	TimeReleaseSeason	= TimeRelease
+	TimeReleaseEpisode	= TimeRelease
 
 	Instance			= None
 	External			= None
@@ -299,6 +315,24 @@ class MetaCache(Database):
 		elif type == MetaCache.TypeShow: return MetaCache.TimeObsoleteShow
 		elif type == MetaCache.TypeSeason: return MetaCache.TimeObsoleteSeason
 		elif type == MetaCache.TypeEpisode: return MetaCache.TimeObsoleteEpisode
+
+	@classmethod
+	def _timeRelease(self, type, release = None, time = None):
+		if release:
+			if type == MetaCache.TypeMovie: values = MetaCache.TimeReleaseMovie
+			elif type == MetaCache.TypeSet: values = MetaCache.TimeReleaseSet
+			elif type == MetaCache.TypeShow: values = MetaCache.TimeReleaseShow
+			elif type == MetaCache.TypeSeason: values = MetaCache.TimeReleaseSeason
+			elif type == MetaCache.TypeEpisode: values = MetaCache.TimeReleaseEpisode
+			else: values = None
+
+			if values:
+				if Tools.isString(release): release = Time.timestamp(fixedTime = release, format = Time.FormatDate)
+				if not time: time = Time.timestamp()
+				if release:
+					for timeReleased, timeOutdated in values.items():
+						if release <= (time - timeReleased): return timeOutdated
+		return None
 
 	@classmethod
 	def _id(self, item):
@@ -623,6 +657,19 @@ class MetaCache(Database):
 							if not selection: selection = datas[0]
 							time = selection[0]
 
+							metadata = Converter.jsonFrom(selection[3])
+
+							# If the release date of the title is recent, reduce the refresh time to update the metadata more often.
+							# For recently released movies, the rating is often higher than it should be, since the early ratings cast by people are often higher than the average rating after a few days/weeks with more votes.
+							# For newley released seasons/episodes, besides the rating, there mmight be oother outdated metadata, like the plot, cast, episode title, or release date.
+							release = None
+							try: release = metadata['premiered']
+							except: pass
+							if not release:
+								try: release = metadata['aired']
+								except: pass
+							timeCheck = self._timeRelease(type = type, release = release, time = timeCurrent) or timeOutdated
+
 							# Data comes from the external preprocessed database.
 							# Always force a refresh, since external data might be outdated or not according to the users settings.
 							if selection[2] is None:
@@ -647,7 +694,7 @@ class MetaCache(Database):
 								refresh = MetaCache.RefreshBackground
 								status = MetaCache.StatusSettings
 
-							elif (timeCurrent - time) > timeOutdated:
+							elif (timeCurrent - time) > timeCheck:
 								refresh = MetaCache.RefreshBackground
 								status = MetaCache.StatusOutdated
 
@@ -659,8 +706,7 @@ class MetaCache(Database):
 							items[i][MetaCache.Attribute][MetaCache.AttributeStatus] = status
 							items[i][MetaCache.Attribute][MetaCache.AttributeTime] = time
 							items[i][MetaCache.Attribute][MetaCache.AttributeSettings] = selection[2]
-
-							items[i].update(Converter.jsonFrom(selection[3]))
+							items[i].update(metadata)
 				except: Logger.error()
 		except: Logger.error()
 		return items

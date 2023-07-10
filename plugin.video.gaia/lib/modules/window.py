@@ -43,6 +43,10 @@ class WindowBase(object):
 	ActionShowInfo = 11
 	ActionItemNext = 14
 	ActionItemPrevious = 15
+	ActionMouseLeft = 100
+	ActionMouseRight = 101
+	ActionMouseMiddle = 102
+	ActionMouseDouble = 103
 	ActionsCancel = [ActionPreviousMenu, ActionNavigationBack, ActionBackSpace]
 
 	def __init__(self, **arguments):
@@ -3150,7 +3154,7 @@ class WindowBinge(WindowProgress):
 		self.mContinue = self.mAction == tools.Binge.ActionContinue
 		self.mFontSize = interface.Font.fontMedium() if self.mMode == WindowBinge.ModeOverlay else interface.Font.fontLarge()
 
-		for action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveRight, WindowBase.ActionMoveUp, WindowBase.ActionMoveDown, WindowBase.ActionItemNext, WindowBase.ActionItemPrevious, WindowBase.ActionSelectItem]:
+		for action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveRight, WindowBase.ActionMoveUp, WindowBase.ActionMoveDown, WindowBase.ActionItemNext, WindowBase.ActionItemPrevious, WindowBase.ActionSelectItem, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight]:
 			self._onAction(action, self._actionFocus)
 
 	@classmethod

@@ -7399,6 +7399,91 @@ class Tester(object):
 
 		{
 			'media' : tools.Media.TypeShow,
+			'year' : 2023,
+			'show' : {'season' : 1, 'episode' : 3},
+			'title' : (
+				'Hijack',
+				'Secuestro en el aire',
+				'Secuestro aéreo',
+				'Захваченный рейс',
+				'Угон самолёта',
+				'Угон',
+				'Hijack 2023',
+				'חטיפה',
+				'Hijack - Sette ore in alta quota',
+				'Sequestro no Ar',
+				'Kingdom',
+				'劫機七小時',
+				'\'하이재킹\' - Hijack',
+				'하이재킹',
+				'\'하이재킹\'',
+				'Secuestro aereo',
+				'\'\' - Hijack'
+			),
+			'valid' : [
+				'Hijack.2023.S01E03.720p.WEB.x265-MiNX [TGx]',
+				'Hijack.2023.S01E03.720p.x264-FENiX[eztv.re].mkv',
+				'Hijack.2023.S01E03.720p.x265-T0PAZ[eztv.re].mkv',
+				'Hijack.S01.1080p.WEB-DL.sbor',
+				'Hijack.s01.HD1080p.WEBRip.Atmos.Ukr.Eng.BaibaKo.tv',
+				'Hijack.2023.S01E03.WEB.x264-TORRENTGALAXY[TGx]',
+				'Hijack.S01.720p.WEB-DL.NF',
+				'Hijack.s01.HD720p.WEBRip.Atmos.Ukr.Eng.BaibaKo.tv',
+				'Hijack.2023.S01E03.WEBRip.x264-XEN0N',
+				'Hijack.S01.WEB-DLRip-AVC',
+				'Hijack.2023.S01E03.Draw.a.Blank.1080p.ATVP.WEB-DL.DDP5.1.H.264-NTb[eztv.re].mkv',
+				'Hijack.2023.S01E03.1080p.ATVP.WEB-DL.DDP5.1.H.264-NTb',
+				'Hijack.S01.1080p.Ultradox',
+				'Hijack.2023.S01E03.Draw.a.Blank.1080p.ATVP.WEB-DL.DDP5.1.H.264-NTb [TGx]',
+				'Hijack.2023.S01E03.XviD-AFG[eztv.re].avi',
+				'Hijack.2023.S01E03.Draw.a.Blank.720p.ATVP.WEB-DL.DDP5.1.H.264-NTb[eztv.re].mkv',
+				'Hijack.S01.WEB-DLRip.RGzsRutracker',
+				'Hijack.2023.S01E03.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.mkv',
+				'Hijack.S01E03.MULTi.HDR.1080p.WEB.AD.Atmos.H265-TFA',
+				'Hijack 2023 S01E03 Draw A Blank 720P ATVP WEB-DL DDP5 1 H 264-NTb (NL subs)',
+				'【高清剧集网发布 www.DDHDTV.com】劫机七小时[第03集][简繁英字幕].Hijack.S01.2160p.Apple.TV .WEB-DL.DDP.5.1.Atmos.HDR10 .H.265-BlackTV',
+				'Hijack.2023.S01E03.1080p.HEVC.x265-MeGusta',
+				'Hijack.S01.WEB-DLRip.HDRezka',
+				'Hijack.2023.S01E03.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv',
+				'Hijack.S01.400p.Ultradox',
+				'Hijack.Sette.Ore.in.Alta.Quota.S01E02.3.gradi.ITA.ENG.1080p.ATVP.WEB-DL.DDP5.1.H.264-MeM.GP.mkv',
+			],
+			'invalid' : [
+				'The Kingdom S01E03 1080p HEVC x265-MeGusta[eztv re]',
+				'The.Kingdom.S01E03.1080p.WEB.H264-FORSEE [eztv]',
+				'KINGDOM: Complete Series, Season 1, 2, 3 S01-S03: 720p Web-DL X2..',
+				'Kingdom S01 Season 01 Complete 720p WEB-DL x264 (nItRo)-XpoZ',
+				'The Last Kingdom Season 1 Complete 720p WEB-DL X264 [i C]',
+				'Kingdom 2014 S01E03 HDTV X264-2HD [eztv]',
+				'Kingdom Season 1 & 2 H264 Ac3 Kor Eng Sub Ita Eng-MIRCrew.torrent',
+				'The Last Kingdom SeasThe Last Kingdom 2015 S01E03 VOSTFR HDTV X264-BRN [Seedbox] MP4on 1 Complete Episodes 1-8 HDTV 1080p DinoMitey',
+				'Kingdom.2019.S01.1080p.NF.WEBRip.DD5.1.x264-MZABI',
+				'Kingdom.2019.S01.1080pWiFE.NF.WEBRip.DD5.1.x264-MZABI',
+				'Kingdom.2019.S01.KOREAN.2160p.NF.WEB-DL.x265.10bit.SDR.DDP5.1-NOGRP [rartv]',
+				'Kingdom.2019.S01.720p.NF.WEBRip.DD5.1.x264-MZABI',
+				'Kingdom.2019.S01.1080p.NF.WEBRip.DD5.1.x264-MZABI',
+				'Kingdom.2019.S01.KOREAN.2160p.NF.WEB-DL.x265.10bit.SDR.DDP5.1-NOGRP [rartv]',
+				'Kingdom.2019.S01.720p.NF.WEBRip.DD5.1.x264-MZABI',
+				'Kingdom Season 1 & 2 H264 Ac3 Kor Eng Sub Ita Eng-MIRCrew.torrent',
+				'Kingdom (2014) S01E03 720p Web DL NL Subs SAM 2LT',
+				'Kingdom 2019 S01E03 720p WEB DL Hindi 5 1 x264',
+				'Kingdom (2019) Season 1 S01 (1080p NF WEBRip X265 HEVC 10bit AAC 5.1 Korean Silence) [QxR]',
+				'Kingdom.2014.S01E03.HDTV.x264-2HD',
+				'Kingdom.2014.S01E03.480p.HDTV.x264-mSD',
+				'Kingdom S01E03 WEB x264-ANiURL',
+				'Kingdom Season 1 HDTV X264-PACK [SexyTv]',
+				'Kingdom 2019 S01E03 720p WEB DL Hindi 5 1 x264',
+				'Kingdom.S01E03.Piece.of.Plastic.720p.HDTV.DD5.1.x264 Weby',
+				'Kingdom (2014) Season 1',
+				'The Last Kingdom 2015 S01E03 VOSTFR HDTV X264-BRN [Seedbox] MP4',
+				'Kingdom S01E03 HDTV X264-Morgeinstein [eztv] .mp4',
+				'Kingdom.S01E03.480p.x264-mSD',
+				'Hijack.Sette.Ore.in.Alta.Quota.S01E02.gradi.ITA.ENG.1080p.ATVP.WEB-DL.DDP5.1.H.264-MeM.GP.mkv',
+			],
+		},
+
+		{
+			'media' : tools.Media.TypeShow,
 			'year' : 2019,
 			'show' : {'season' : 1, 'episode' : 1},
 			'title' : (
@@ -17269,7 +17354,7 @@ class Tester(object):
 		full = False
 		titles = None if full else 5
 
-		'''self.containerMagnet()
+		self.containerMagnet()
 
 		self.streamCleanBasic()
 		self.streamCleanKeyword()
@@ -17320,13 +17405,11 @@ class Tester(object):
 		if full:
 			self.streamTitleValid()
 			self.streamYearValid()
-		self.streamValid()'''
+		self.streamValid()
 
 		'''self.streamTimeExtract(titles = titles)
 		self.streamTimeValid(titles = titles)
 		self.streamTime(titles = titles)'''
-
-		self.streamLanguage()
 
 	@classmethod
 	def containerMagnet(self):
@@ -22444,6 +22527,7 @@ class Tester(object):
 
 			{'result' : Stream.FileContainerNone,	'data' : 'Once Upon A Time In Hollywood.2019.HDRip.XviD-EVO'},
 			{'result' : Stream.FileContainerNone,	'data' : 'Pokemon.Detective.Pikachu.2019.1080p.HDRip.x264-MkvCage'},
+			{'result' : Stream.FileContainerNone,	'data' : 'Its.Always.Sunny.in.Philadelphia.S06E13.720p.HDTV.x264-CTU [NO-RAR] - [ www.torrentday.com ]'},
 		)
 
 		timer = tools.Time(start = True)

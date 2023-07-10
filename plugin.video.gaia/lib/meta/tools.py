@@ -85,7 +85,10 @@ class MetaTools(object):
 	PropertyBusy			= 'GaiaMetadataBusy'
 	PropertySelect			= 'GaiaSelect'
 
-	Submenu					= 'submenu=true'
+	SubmenuParameter		= 'submenu'
+	SubmenuSeries			= 'series'		# Submenu under the Series menu.
+	SubmenuEpisodes			= 'episodes'	# Submenu under the Arrivals/Progress menu.
+	SubmenuHistory			= 3
 
 	###################################################################
 	# CONSTRUCTOR
@@ -557,14 +560,16 @@ class MetaTools(object):
 
 	def command(self, metadata, media = None, action = None, video = None, multiple = None, submenu = None, reduce = None, increment = False, next = False):
 		force = False
-		if media == Media.TypeSeason and not 'season' in metadata: # Series menu.
+
+		if (media == Media.TypeSeason and not 'season' in metadata) or self.submenuIs(submenu = submenu, type = MetaTools.SubmenuSeries): # Series menu.
 			media = Media.TypeShow
-			submenu = True
 			force = True
+			if not Tools.isString(submenu): submenu = MetaTools.SubmenuSeries
 
+		flatten = self.submenuFlatten(media = media, force = force)
 		if submenu is None: submenu = self.submenu(media = media, multiple = multiple, force = force)
+		if submenu is True: submenu = MetaTools.SubmenuSeries if flatten else MetaTools.SubmenuEpisodes
 
-		submenud = False
 		parameters = {}
 		if not action:
 			if not video is None: action = 'streamsVideo'
@@ -573,7 +578,6 @@ class MetaTools(object):
 				#action = 'episodesRetrieve'
 				#parameters['submenu'] = 'next' if next else True # Check addon.py -> episodesRetrieve for more info. # Do it differently for the "Next Page" in submenus.
 				action = 'episodesSubmenu'
-				submenud = True
 			elif media == Media.TypeSpecialExtra: action = 'seasonsExtras'
 			elif media == Media.TypeShow: action = 'seasonsRetrieve'
 			elif media == Media.TypeSeason: action = 'episodesRetrieve'
@@ -594,7 +598,8 @@ class MetaTools(object):
 		# NB: Make the season/episode number floats, since Python allows -0.0, but a negative zero is not possible for integers.
 		# -0.0 is used to indicate the offset for the Specials season.
 		if Media.typeTelevision(media) and (submenu or force):
-			if self.submenuFlatten(media = media, force = force) and self.mPageFlatten == 0: # Flattened show menus.
+			if flatten and self.mPageFlatten == 0: # Flattened show menus.
+
 				parameters['season'] = -1 * float((metadata['season'] if 'season' in metadata else 0) + int(increment))
 				try: del parameters['episode']
 				except: pass
@@ -603,7 +608,7 @@ class MetaTools(object):
 				season = metadata['season'] if 'season' in metadata else 1
 				episode = metadata['episode'] + int(increment)
 				if reduce is None:
-					episode -= 3
+					episode -= self.submenuHistory()
 					if season > 1 and episode <= 0 and 'pack' in metadata and metadata['pack']:
 						try:
 							for i in metadata['pack']['seasons']:
@@ -612,6 +617,7 @@ class MetaTools(object):
 									episode = i['count'] + episode - 1
 									break
 						except: Logger.error()
+
 				parameters['season'] = -1 * float(season)
 				parameters['episode'] = -1 * float(max(1, episode))
 
@@ -622,10 +628,18 @@ class MetaTools(object):
 
 		parameters['reduce'] = reduce
 
+		if submenu:
+			parameters[MetaTools.SubmenuParameter] = self.submenuIncrement(submenu = submenu)
+			submenu = '&%s=%s' % (MetaTools.SubmenuParameter, submenu)
+
 		# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
 		#return System.command(action = action, parameters = parameters)
 		command = System.command(action = action, parameters = parameters)
-		if submenud: command += '&' + MetaTools.Submenu
+
+		# Add this here as well, since elsewhere in this class we check if the parameter is in the commmand.
+		# Also add it to the parameters above, since we use the value in the episodesRetrieve endpoint.
+		if submenu: command += submenu
+
 		return command
 
 	###################################################################
@@ -663,12 +677,45 @@ class MetaTools(object):
 	def submenuDirect(self, media, multiple):
 		return media == Media.TypeEpisode and multiple and not self.mShowDirect
 
+	@classmethod
+	def submenuHistory(self):
+		return MetaTools.SubmenuHistory
+
+	@classmethod
+	def submenuContains(self, command):
+		return (MetaTools.SubmenuParameter + '=') in command
+
+	@classmethod
+	def submenuCreate(self, submenu, page = None):
+		try: submenu = submenu.split('-')[0]
+		except: pass
+		if submenu is True: submenu = MetaTools.SubmenuEpisodes
+		return submenu + ('' if page is None else ('-' + str(page)))
+
+	@classmethod
+	def submenuIncrement(self, submenu):
+		page = self.submenuPage(submenu = submenu)
+		page = 0 if page is None else (page + 1)
+		return self.submenuCreate(submenu = submenu, page = page)
+
+	@classmethod
+	def submenuIs(self, submenu, type):
+		return Tools.isString(submenu) and submenu.startswith(type)
+
+	@classmethod
+	def submenuPage(self, submenu):
+		try: return int(submenu.split('-')[-1])
+		except: return None
+
 	###################################################################
 	# LABEl
 	###################################################################
 
 	def label(self, metadata, media = None, future = None, multiple = False, extend = True):
 		if not media: media = self.media(metadata = metadata)
+
+		season = None
+		episode = None
 
 		if media == Media.TypeSeason:
 			try: title = metadata['title']
@@ -729,7 +776,7 @@ class MetaTools(object):
 				if not fontItalic: label = Format.fontItalic(label)
 
 		# Mark new episodes/seasons in multiple menus as bold.
-		if media == Media.TypeEpisode and (not future or future < 0):
+		if (media == Media.TypeSeason or media == Media.TypeEpisode) and (not future or future < 0):
 			new = False
 			time = Time.timestamp()
 
@@ -745,23 +792,29 @@ class MetaTools(object):
 			# New Season.
 			if not new and 'pack' in metadata and metadata['pack']:
 				date = 0
-				season = None
+				seasoned = None
 				for i in metadata['pack']['seasons']:
 					if i['time']['start'] and i['time']['start'] < time and i['time']['start'] >= date:
 						date = i['time']['start']
-						season = i['number']['official']
+						seasoned = i['number']['official']
 
 				# Only do this for the season that is newley released.
 				# Otherwise a new season might cause all unwatched episodes in older seasons to also be marked in bold.
 				# Or mark as bold if multiple, so that shows in the Arrivals menu are highlighted if a new season comes out, even if the user still watches an older season.
-				if date and (metadata['season'] == season or multiple):
+				if date and not seasoned is None and (season == seasoned or multiple):
 					date = time - date
 					if date > 0 and date < 2419200: # 4 weeks.
 						# NB: Only do this if at least 1 episode in the show was previously watched.
 						# Otherwise shows without any watched episodes also show in bold (Quick menu - recommendations/featured/trending/arrivals).
 						history = self.mItemPlayback.history(media = media, imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'))
 						if history and history['count']['total']:
-							new = True
+							if media == Media.TypeEpisode:
+								# Do not bolden already watched episodes.
+								history = self.mItemPlayback.history(media = media, imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = season, episode = episode)
+								if not history or not history['count']['total']:
+									new = True
+							else:
+								new = True
 
 			if new: label = Format.fontBold(label)
 
@@ -994,8 +1047,21 @@ class MetaTools(object):
 			))
 		items = Tools.listFlatten(data = items, recursive = False)
 
+		# Make sure that special episodes are listed after the recap.
+		# Check the series menu for Game of Thrones S02 and S03 which has specials before E01.
+		# Only do this for series menus, otherwise the recap will be pulled above specials from the previous seaosn in Arrivals/Progress.
+		if self.submenuIs(submenu = submenu, type = MetaTools.SubmenuSeries):
+			try:
+				for i in range(len(items)):
+					if 'metadata' in items[i]:
+						if not items[i]['metadata']['season'] == 0: break
+					else:
+						items.insert(0, items.pop(i))
+						break
+			except: Logger.error()
+
 		if next:
-			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids, multiple = multiple)
+			itemNext = self.itemNext(metadata = metadatas, media = media, kids = kids, multiple = multiple, submenu = submenu)
 			if itemNext: items.append({'data' : itemNext})
 
 		# Specify the last watched item to auto-select from view.py.
@@ -1110,7 +1176,7 @@ class MetaTools(object):
 					else: itemFolder = folder
 
 					# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
-					if MetaTools.Submenu in item['command']: itemFolder = False
+					if self.submenuContains(command = item['command']): itemFolder = False
 
 					if 'season' in metadata: seasons.append(metadata['season'])
 					items.append({'metadata' : item['metadata'], 'data' : [item['command'], item['item'], itemFolder]})
@@ -1764,6 +1830,14 @@ class MetaTools(object):
 			progress = playback['progress']
 			rating = playback['rating']
 
+			# If the 1st episode is in-progress, already mark the recap as watched, and not also as in-progress.
+			if progress:
+				if media == Media.TypeSpecialRecap:
+					progress = None
+					if not count: count = 1
+				elif media == Media.TypeSpecialExtra:
+					progress = None
+
 			# Do not use overlay/watched attribute, since Kodi (or maybe the Kodi skin) resets the playcount to 1, even if playcount is higher than 1.
 			# https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/GUIListItem.h
 			#metadata['overlay'] = 5 if count else 4
@@ -1845,7 +1919,7 @@ class MetaTools(object):
 						count, remaining = self.mItemPlayback.count(media = media, imdb = idImdb, tmdb = idTmdb, tvdb = idTvdb, trakt = idTrakt, season = season, episode = episode, specials = self.mShowCounterSpecial, metadata = metadata, history = playback['history'])
 						metadata['playcount'] = count
 
-					if episodesWatched and episodesUnwatched:
+					if (episodesWatched and episodesUnwatched) or progress:
 						try: tag.setResumePoint(1)
 						except: item.setProperty('ResumeTime', str(1))
 
@@ -1879,7 +1953,7 @@ class MetaTools(object):
 		if menu and (add or add is None): item.addContextMenuItems(menu.menu(full = True))
 		return menu
 
-	def itemNext(self, metadata = None, media = None, kids = None, multiple = False, link = None, item = None):
+	def itemNext(self, metadata = None, media = None, kids = None, multiple = False, submenu = None, link = None, item = None):
 		try:
 			if link is None:
 				if not Tools.isArray(metadata): metadata = [metadata]
@@ -1927,6 +2001,7 @@ class MetaTools(object):
 				else:
 					parameters = {'link' : link, 'media' : media}
 					if not kids is None: parameters['kids'] = kids
+					if submenu: parameters[MetaTools.SubmenuParameter] = self.submenuIncrement(submenu = submenu)
 					if 'person' in metadata[0] and metadata[0]['person']: action = 'showsPersons' if Media.typeTelevision(media) else 'moviesPersons'
 					elif media == Media.TypeShow or media == Media.TypeSeason: action = 'showsRetrieve'
 					elif media == Media.TypeEpisode: action = 'episodesRetrieve'
@@ -1937,7 +2012,7 @@ class MetaTools(object):
 				folder = True
 
 				# gaiasubmenu - Check addon.py -> episodesRetrieve for more info.
-				if MetaTools.Submenu in command: folder = False
+				if self.submenuContains(command = command): folder = False
 
 				return [command, item, folder]
 		except: Logger.error()
@@ -2807,6 +2882,19 @@ class MetaTools(object):
 				episodesNumber[number].append(i)
 				if number > 0: episodesOrder.append(_packNumber(season = number, episode = i.numberEpisode()))
 
+			# Some shows have 0 special episodes on TVDb, but do have specials on Trakt.
+			# Make sure to add the Trakt episodes even if TVDb does not have a S0.
+			# Eg: It's Always Sunny in Philadelphia
+			try:
+				if not 0 in episodesNumber and Tools.isArray(extended):
+					specials = False
+					for i in extended:
+						if i and 'season' in i and i['season'] == 0:
+							specials = True
+							break
+					if specials: episodesNumber[0] = []
+			except: Logger.error()
+
 			episodesOrder = Tools.listSort(episodesOrder)
 			temp = {}
 			for i in range(len(episodesOrder)):
@@ -2824,7 +2912,7 @@ class MetaTools(object):
 			time = Time.timestamp()
 			seasonItems = []
 			for number, item in episodesNumber.items():
-				if item:
+				if item or item == []:
 					try: numbersSeason = item[0].numbersSeason()
 					except: numbersSeason = None
 					if not numbersSeason: numbersSeason = {MetaData.NumberOfficial : number}

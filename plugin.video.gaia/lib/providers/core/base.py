@@ -289,9 +289,10 @@ class ProviderBase(object):
 	SettingsGlobalSaveStream			= 'scrape.save.stream'
 	SettingsGlobalSaveCache				= 'scrape.save.cache'
 
-	SettingsGlobalConcurrencyMode		= 'scrape.concurrency.mode'
-	SettingsGlobalConcurrencyLimit		= 'scrape.concurrency.limit'
-	SettingsGlobalConcurrencyConnection	= 'scrape.concurrency.connection'
+	SettingsGlobalConcurrencyMode		= 'provider.concurrency.mode'
+	SettingsGlobalConcurrencyLimit		= 'provider.concurrency.limit'
+	SettingsGlobalConcurrencyBinge		= 'provider.concurrency.binge'
+	SettingsGlobalConcurrencyConnection	= 'provider.concurrency.connection'
 
 	SettingsGlobalPackEnabled			= 'scrape.pack.enabled'
 	SettingsGlobalPackMovie				= 'scrape.pack.movie'
@@ -455,6 +456,7 @@ class ProviderBase(object):
 											'concurrency' : {
 												'mode' : None,
 												'limit' : None,
+												'binge' : None,
 												'connection' : None,
 											},
 											'limit' : {
@@ -2571,6 +2573,22 @@ class ProviderBase(object):
 		return Settings.customLabel(id = ProviderBase.SettingsGlobalConcurrencyLimit, value = value)
 
 	@classmethod
+	def settingsGlobalConcurrencyBinge(self):
+		result = ProviderBase.SettingsData['concurrency']['binge']
+		if result is None: result = ProviderBase.SettingsData['concurrency']['binge'] = Settings.getCustom(ProviderBase.SettingsGlobalConcurrencyBinge)
+		return result
+
+	@classmethod
+	def settingsGlobalConcurrencyBingeSet(self, value):
+		Settings.setCustom(ProviderBase.SettingsGlobalConcurrencyBinge, value)
+		ProviderBase.SettingsData['concurrency']['binge'] = None
+
+	@classmethod
+	def settingsGlobalConcurrencyBingeLabel(self, value = None):
+		if value is None: value = self.settingsGlobalConcurrencyBinge()
+		return Settings.customLabel(id = ProviderBase.SettingsGlobalConcurrencyBinge, value = value)
+
+	@classmethod
 	def settingsGlobalConcurrencyConnection(self):
 		result = ProviderBase.SettingsData['concurrency']['connection']
 		if result is None: result = ProviderBase.SettingsData['concurrency']['connection'] = Settings.getCustom(ProviderBase.SettingsGlobalConcurrencyConnection)
@@ -4193,8 +4211,12 @@ class ProviderBase(object):
 		except: pass
 
 	@classmethod
-	def concurrencyInitialize(self, tasks = None):
+	def concurrencyInitialize(self, tasks = None, binge = False):
 		limit = self.settingsGlobalConcurrencyLimit()
+		if binge:
+			binged = self.settingsGlobalConcurrencyBinge()
+			if binged: limit = int(max(2, limit * binged))
+		Logger.log('Maximum Concurrent Providers: %s (%s Scrape)' % (str(limit) if limit else 'Unlimited', 'Binge' if binge else 'Normal'))
 
 		if tasks: tasks = [tasks]
 		else: tasks = []

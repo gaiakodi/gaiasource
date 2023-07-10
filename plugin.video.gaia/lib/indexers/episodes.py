@@ -85,7 +85,7 @@ class Episodes(object):
 	# RETRIEVE
 	##############################################################################
 
-	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, season = None, episode = None, detailed = True, menu = True, single = False, clean = True, quick = None, limit = None, reduce = None, refresh = False, next = True):
+	def retrieve(self, link = None, idImdb = None, idTvdb = None, title = None, year = None, season = None, episode = None, detailed = True, menu = True, single = False, clean = True, quick = None, limit = None, reduce = None, refresh = False, next = True, submenu = None):
 		try:
 			items = []
 
@@ -178,13 +178,41 @@ class Episodes(object):
 					if limit is None: limit = self.mLimit # Since mutiple lists are requested, there can be too many items.
 
 			else:
-				if self.mInterleave and Math.negative(season):
-					if limit: reduce = True
-				items = self.metadata(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, season = season, episode = episode, clean = clean, quick = quick, reduce = reduce, refresh = refresh)
+				if self.mInterleave and Math.negative(season) and limit: reduce = True
+				items = self.metadata(idImdb = idImdb, idTvdb = idTvdb, title = title, year = year, season = season, episode = episode, clean = clean, submenu = submenu, quick = quick, reduce = reduce, refresh = refresh)
+				history = MetaTools.submenuHistory()
+
+				# Sometimes there are too many specials at the end of a season, which prevents a submenu from opening at the correct last watched episode.
+				# Eg: It's Always Sunny in Philadelphia - watch all episodes until and including S07E01.
+				# If one opens the submenu, one expects S07E02 to be listed.
+				# However, it still lists S06E11+ with all the specials at the end of S06, requiring to go to the next page before finding S07.
+				# Not sure if this impacts any other operations, like flatten series menus, etc.
+				try:
+					if self.mMetatools.submenuIs(submenu = submenu, type = MetaTools.SubmenuEpisodes):
+						if not limit: limit = self.mMetatools.settingsPageSubmenu()
+						actual = -1
+						for i in range(history, len(items)):
+							if items[i]['season'] > 0:
+								actual = i + 1
+								break
+						if actual > 0 and actual > limit: items = items[actual - history - 1:]
+				except: Logger.error()
+
+				# Limit the maximum number of specials before the 1st official episode to 3.
+				# Otherwise the submenu under Arrivals might only show 10 specials, and the user has to page to the next page to get the actual episode to watch.
+				try:
+					if self.mMetatools.submenuPage(submenu = submenu) == 0:
+						if not episode is None and Math.negative(episode):
+							index = 0
+							for item in items:
+								if item['season'] == 0: index += 1
+								else: break
+							if index >= history: items = items[index - history:]
+				except: Logger.error()
 
 			# Limit the number of episodes shown for indirect or flattened episode menus (eg Trakt Progress list).
 			# Otherwise menus with many episodes per season take too long to load and the user probably does not access the last episodes in the list anyway.
-			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMultiple()
+			if not limit and (not season is None and Math.negative(season)): limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageSubmenu()
 
 			items = self.mMetatools.filterNumber(items = items, season = season, episode = episode, single = single)
 		except: Logger.error()
@@ -1028,20 +1056,39 @@ class Episodes(object):
 			temp.extend([link + '&country=' + country for link in links])
 		links = temp
 
-		def _tvmazeSchedule(result, link, limit):
-			items = self.tvmazeList(link = link, limit = limit)
+		def _tvmazeSchedule(result, link, limit, semaphore):
+			items = self.tvmazeList(link = link, limit = limit, semaphore = semaphore)
 			if items: result.extend(items)
+
+		# Sometimes the request below bombs out with:
+		#	Network Error [Error Type: Certificate | Link: https://api.tvmaze.com/schedule?...]: Max retries exceeded with url: (Caused by SSLError(SSLZeroReturnError(6, 'TLS/SSL connection has been closed (EOF) (_ssl.c:997)
+		# When the threads in tvmazeSchedule() are executed sequentially (aka adding "join = True"), the problem seems to be mostly gone.
+		# Even when using concurrent threads, sometimes all API calls succeed, sometimes all fail with the SSL error.
+		# This is probably caused by the 20 calls per 10 seconds limit:
+		#	https://www.tvmaze.com/api#rate-limiting
+		# Update: We tried to implement this with a proper rate limiter, but there are still sporadic SSL errors.
+		# It seems that the SSL errors occur if there are multiple concurrent connections to the API, irrespective of the rate limit over 10 seconds.
+		# The only relibale solution seems to limit the number of conncurrent connections.
+		semaphore = Semaphore(3) # 5 is sometimes too much.
 
 		result = []
 		threads = []
-		for link in links: threads.append(Pool.thread(target = _tvmazeSchedule, kwargs = {'result' : result, 'link' : link, 'limit' : limit}, start = True))
+		for link in links: threads.append(Pool.thread(target = _tvmazeSchedule, kwargs = {'result' : result, 'link' : link, 'limit' : limit, 'semaphore' : semaphore}, start = True))
 		[thread.join() for thread in threads]
 
 		return result
 
-	def tvmazeList(self, link, limit = False):
+	def tvmazeList(self, link, limit = False, semaphore = None):
 		list = []
+
+		try: semaphore.acquire()
+		except: pass
 		items = Networker().requestJson(link = link)
+		if not items: # In case the semaphore limiting was not enough, try again.
+			Time.sleep(0.2)
+			items = Networker().requestJson(link = link)
+		try: semaphore.release()
+		except: pass
 
 		if items:
 			languages = [i.lower() for i in Language.settingsName()]
@@ -1227,6 +1274,7 @@ class Episodes(object):
 		timePrevious = None
 		timeNext = None
 		timeLimit = None
+		timeBefore = None
 		seasonLast = None
 		pack = None
 
@@ -1282,11 +1330,40 @@ class Episodes(object):
 				if seasonNext:
 					if 'time' in seasonNext and 'start' in seasonNext['time'] and seasonNext['time']['start']: timeNext = Time.integer(Time.format(timestamp = seasonNext['time']['start'], format = Time.FormatDate))
 				else:
-					timeEnd = None # Is the last season. Inluce all remaining specials.
+					timeEnd = None # Is the last season. Include all remaining specials
 
 		if timeLimit:
 			if timeStart: timeStart = max(timeStart, timeLimit)
 			else: timeStart = timeLimit
+
+		# Get the last episode of the previous submenu.
+		# This is used to filter out specials that belong to the previous submenu (aka they are actually placed before the last normal episode in the previous submenu).
+		try:
+			if pack:
+				lastSeason = 0
+				lastEpisode = 0
+				for item in items:
+					if item['season'] > 0:
+						lastSeason = item['season']
+						lastEpisode = item['episode']
+						break
+				if lastSeason > 1:
+					if lastEpisode == 1:
+						lastSeason -= 1
+						for i in pack['seasons']:
+							if i['number']['official'] == lastSeason:
+								lastEpisode = i['count']
+								break
+					else:
+						lastEpisode -= 1
+					for i in pack['seasons']:
+						if i['number']['official'] == lastSeason:
+							for j in i['episodes']:
+								if j['number']['official'] == lastEpisode:
+									timeBefore = Time.integer(Time.format(timestamp = j['time'], format = Time.FormatDate))
+									break
+							break
+		except: Logger.error()
 
 		if timeStart or timeEnd or offset:
 			submenu = bool(reduce) # Make sure it is boolean and not None.
@@ -1338,7 +1415,8 @@ class Episodes(object):
 							differenceCurrent = abs(timeStart - time)
 							differencePrevious = abs(timePrevious - time)
 							if differenceCurrent < differencePrevious:
-								result.append(item)
+								if not item['season'] == 0 or (timeBefore and time >= timeBefore):
+									result.append(item)
 						elif (timeEnd is None or time > timeEnd) and timeNext and time <= timeNext:
 							differenceCurrent = abs(timeEnd - time)
 							differenceNext = abs(timeNext - time)
@@ -1349,16 +1427,19 @@ class Episodes(object):
 		else:
 			result = items
 
-		result = sorted(result, key = lambda i : (Time.integer(i['aired']) if i['aired'] else 0, i['season'] if i['season'] else 0, i['episode'] if i['episode'] else 0))
-
-		# Limit the maximum number of specials before the 1st official episode to 3.
-		# Otherwise the submenu under Arrivals might only show 10 specials, and the user has to page to the next page to get the actual episode to watch.
-		if offset:
-			index = 0
-			for item in result:
-				if item['season'] == 0: index += 1
-				else: break
-			if index >= 3: result = result[index - 3:]
+		# Make sure that specials are interleaved by airing date.
+		# But also accomodate episodes that were not aired yet.
+		# Eg: If S03E01 was not released yet, it should not be moved to the front of the list because it has no airing date.
+		lastSeason = 0
+		lastEpisode = 0
+		lastAired = 0
+		for i in reversed(result):
+			if 'aired' in i and i['aired']:
+				lastSeason = i['season']
+				lastEpisode = i['episode']
+				lastAired = Time.integer(i['aired'])
+				break
+		result = sorted(result, key = lambda i : (Time.integer(i['aired']) if ('aired' in i and i['aired']) else lastAired if (i['season'] > lastSeason or (i['season'] == lastSeason and i['episode'] > lastEpisode)) else 0, i['season'] if i['season'] else 0, i['episode'] if i['episode'] else 0))
 
 		return result
 
@@ -1373,7 +1454,7 @@ class Episodes(object):
 	# quick = Quickly retrieve items from cache without holding up the process of retrieving detailed metadata in the foreground. This is useful if only a few random items are needed from the list and not all of them.
 	# quick = positive integer (retrieve the given number of items in the foreground and the rest in the background), negative integer (retrieve the given number of items in the foreground and do not retrieve the rest at all), True (retrieve whatever is in the cache and the rest in the background - could return no items at all), False (retrieve whatever is in the cache and the rest not at all - could return no items at all).
 	# threaded = If sub-function calls should use threads or not. None: threaded for single item, non-threaded for multiple items. True: threaded. False: non-threaded.
-	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, detailed = True, refresh = False, cache = False, threaded = None, discrepancy = None):
+	def metadata(self, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, title = None, year = None, season = None, episode = None, items = None, filter = None, clean = True, quick = None, reduce = None, next = True, submenu = None, detailed = True, refresh = False, cache = False, threaded = None, discrepancy = None):
 		try:
 			pickSingle = False
 			pickSingles = False
@@ -1392,7 +1473,7 @@ class Episodes(object):
 				# Negative values mean the season offset for flattened show menus. "-0.0" means offset from the Special season.
 				# Make sure this is not executed if +0.0 is passed in, meaning retrieve all episodes the Special season.
 				elif not season is None and Math.negative(season):
-					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageMultiple()
+					limit = self.mMetatools.settingsPageFlatten() if ((episode is None or self.mInterleave) and not reduce) else self.mMetatools.settingsPageSubmenu()
 
 					pickMultiple = True
 					seasonStart = abs(int(-1 if season == -0.0  else season))
@@ -1607,10 +1688,11 @@ class Episodes(object):
 				for item in result:
 					# Add an 'empty' command to force itemNext() in MetaTools to stop scanning previous episodes.
 					if (not seasonLast is None and item['season'] >= seasonLast) and (not episodeLast is None and item['episode'] >= episodeLast): command = None
-					else: command = self.mMetatools.command(metadata = item, media = Media.TypeShow if episode is None else Media.TypeEpisode, submenu = True, reduce = reduce, increment = True, next = True)
+					else: command = self.mMetatools.command(metadata = item, media = Media.TypeShow if episode is None else Media.TypeEpisode, submenu = submenu or True, reduce = reduce, increment = True, next = True)
 					item['next'] = command
 
 				if self.mInterleave: result = self.interleave(items = result, reduce = reduce, season = season, episode = episode)
+
 				return result
 			else:
 				return [item['episodes'] for item in items]

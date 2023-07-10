@@ -76,7 +76,7 @@ if action is None or action == 'home':
 	# Launch the donations dialog.
 	# Only show if System.launched(), since the donations dialog is also shown after the intial launch process and we do not want to show it twice.
 	# Also call it here, for users who do not shut down their devices and keep it running for a long time.
-	if tools.System.launched(): tools.Donations.popup(wait = True)
+	if tools.System.launched() == 3: tools.Donations.popup(wait = True)
 
 ####################################################
 # MOVIE
@@ -478,12 +478,13 @@ elif action.startswith('episodes'):
 		reduce = tools.Converter.boolean(parameters.get('reduce'))
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
 		next = tools.Converter.boolean(parameters.get('next', True))
+		submenu = parameters.get('submenu')
 
 		if context:
 			tools.Logger.log('Blocking episode retrieval during context menu opening of episode submenus.', type = tools.Logger.TypeError)
 		else:
 			from lib.indexers.episodes import Episodes
-			Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
+			Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next, submenu = submenu)
 		'''
 
 		# UPDATE 2: Even with the solution above, opening the context menu of submenus on low-end devices is still very slow.
@@ -509,9 +510,10 @@ elif action.startswith('episodes'):
 		reduce = tools.Converter.boolean(parameters.get('reduce'))
 		refresh = tools.Converter.boolean(parameters.get('refresh'))
 		next = tools.Converter.boolean(parameters.get('next', True))
+		submenu = parameters.get('submenu')
 
 		from lib.indexers.episodes import Episodes
-		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next)
+		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next, submenu = submenu)
 
 	elif action == 'episodesSubmenu':
 		tools.System.executeContainer(action = 'episodesRetrieve', parameters = parameters)

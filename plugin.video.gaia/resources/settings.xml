@@ -1549,7 +1549,7 @@ The label is then added to the action element:
 
 			<!-- ########## PROVIDER - PRESETS ########## -->
 			<group id="provider.presets" label="33682">
-				<setting id="provider.presets.enabled" type="boolean" label="33192" help="34177">
+				<setting id="provider.presets.enabled" type="boolean" label="36401" help="34177">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
@@ -1568,6 +1568,58 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible" setting="provider.presets.enabled">true</dependency>
 					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## PROVIDER - CONCURRENCY ########## -->
+			<group id="provider.concurrency" label="36042">
+				<setting id="provider.concurrency.mode" type="integer" label="36062" help="34475">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="36039">1</option>
+							<option label="36040">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="provider.concurrency.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="provider.concurrency.limit.label" type="string" label="36063" help="34474" parent="provider.concurrency.mode">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="provider.concurrency.binge" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="provider.concurrency.binge.label" type="string" label="36399" help="34630" parent="provider.concurrency.mode">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.binge&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="provider.concurrency.connection" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="provider.concurrency.connection.label" type="string" label="32038" help="34304">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.connection&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
 				</setting>
 			</group>
 
@@ -1656,103 +1708,6 @@ The label is then added to the action element:
 								<condition setting="provider.mirror.unblock.type">0</condition>
 							</and>
 						</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## PROVIDER - TERMINATION ########## -->
-			<group id="provider.termination" label="33217">
-				<setting id="provider.termination.preemption" type="boolean" label="36080" help="34201">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="provider.termination.preemption.notification" type="boolean" label="35850" help="34271" parent="provider.termination.preemption">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.preemption">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="provider.termination.preemption.mode" type="integer" label="33201" help="34249" parent="provider.termination.preemption">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33029">0</option>
-							<option label="33110">1</option>
-							<option label="35848">2</option>
-							<option label="33983">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.preemption">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="provider.termination.preemption.expression" type="integer" label="33202" help="34289" parent="provider.termination.preemption">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33873">0</option>
-							<option label="33872">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.preemption">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="provider.termination.preemption.condition" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.termination.preemption.condition.label" type="string" label="33128" help="34290" parent="provider.termination.preemption">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsTermination&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.preemption">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="provider.termination.unresponsive" type="boolean" label="36081" help="34479">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="provider.termination.unresponsive.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.termination.unresponsive.time.label" type="string" label="32312" help="34480" parent="provider.termination.unresponsive">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.termination.unresponsive.time&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.unresponsive">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="provider.termination.unresponsive.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.termination.unresponsive.limit.label" type="string" label="33330" help="34481" parent="provider.termination.unresponsive">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.termination.unresponsive.limit&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="provider.termination.unresponsive">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -1921,46 +1876,6 @@ The label is then added to the action element:
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
 					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-			</group>
-
-			<!-- ########## SCRAPE - CONCURRENCY ########## -->
-			<group id="scrape.concurrency" label="36042">
-				<setting id="scrape.concurrency.mode" type="integer" label="36062" help="34475">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="33800">0</option>
-							<option label="36039">1</option>
-							<option label="36040">2</option>
-						</options>
-					</constraints>
-				</setting>
-				<setting id="scrape.concurrency.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="scrape.concurrency.limit.label" type="string" label="36063" help="34474" parent="scrape.concurrency.mode">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.concurrency.limit&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="scrape.concurrency.connection" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="scrape.concurrency.connection.label" type="string" label="32038" help="34304">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.concurrency.connection&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
 					<constraints>
 						<allowempty>true</allowempty>
 					</constraints>
@@ -2249,6 +2164,103 @@ The label is then added to the action element:
 					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="scrape.cache.inspection">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## SCRAPE - TERMINATION ########## -->
+			<group id="scrape.termination" label="33217">
+				<setting id="scrape.termination.preemption" type="boolean" label="36080" help="34201">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="scrape.termination.preemption.notification" type="boolean" label="35850" help="34271" parent="scrape.termination.preemption">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.preemption">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.termination.preemption.mode" type="integer" label="33201" help="34249" parent="scrape.termination.preemption">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33029">0</option>
+							<option label="33110">1</option>
+							<option label="35848">2</option>
+							<option label="33983">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.preemption">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.termination.preemption.expression" type="integer" label="33202" help="34289" parent="scrape.termination.preemption">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33873">0</option>
+							<option label="33872">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.preemption">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.termination.preemption.condition" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="scrape.termination.preemption.condition.label" type="string" label="33128" help="34290" parent="scrape.termination.preemption">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsTermination&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.preemption">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.termination.unresponsive" type="boolean" label="36081" help="34479">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="scrape.termination.unresponsive.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="scrape.termination.unresponsive.time.label" type="string" label="32312" help="34480" parent="scrape.termination.unresponsive">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.termination.unresponsive.time&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.unresponsive">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.termination.unresponsive.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="scrape.termination.unresponsive.limit.label" type="string" label="33330" help="34481" parent="scrape.termination.unresponsive">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.termination.unresponsive.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.termination.unresponsive">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -3416,6 +3428,21 @@ The label is then added to the action element:
 								<condition setting="playback.binge.dialog" operator="!is">3</condition>
 							</and>
 						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.binge.scrape" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="playback.binge.scrape.label" type="string" label="35586" help="34631" parent="playback.binge.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=playback.binge.scrape&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.binge.enabled">true</dependency>
 					</dependencies>
 				</setting>
 			</group>

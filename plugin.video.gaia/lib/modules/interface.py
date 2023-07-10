@@ -236,7 +236,7 @@ class Font(object):
 	IconKodi		= 'kodi'
 	IconGaia		= 'gaia'
 	IconOrion		= 'orion'
-	IconTrakt		= 'trakt'
+	IconTrakt		= 'trakt' # Not used anymore, since Trakt was moved under the Activity context menu.
 	IconClose		= 'close'
 	IconBack		= 'back'
 	IconSettings	= 'settings'
@@ -3214,17 +3214,26 @@ class Directory(object):
 
 	# clear: Clear the path history. Can also be a path to reset to.
 	# position: After refresh, go to the previously selected position, becuase Kodi always jumps back to the top after refresh. Not perfect, since the list can become unfocused, or the user moves the mosue over another item before this code is executed.
-	# wait: NB: it seems that Kodi never finishes when executing Container.Refresh and wait=True.
 	@classmethod
-	def refresh(self, clear = False, position = False, force = False, wait = False, loader = False):
+	def refresh(self, clear = False, position = False, force = False, wait = True, loader = False):
 		# Do no refresh if we are in an invoker that did a scrape.
 		# Otherwise, when calling Container.Refresh, Kodi will execute the scrape command again.
 		if not force and tools.System.commandIsScrape(): return
 
+		if wait: self._refresh(clear = clear, position = position, loader = loader)
+		else: Pool.thread(target = self._refresh, kwargs = {'clear' : clear, 'position' : position, 'loader' : loader}, start = True)
+
+	@classmethod
+	def _refresh(self, clear = False, position = False, loader = False):
+		# wait: NB: it seems that Kodi never finishes when executing Container.Refresh and wait=True.
 		index = -1
-		if position: index = int(tools.System.infoLabel('Container.CurrentItem'))
-		tools.System.execute('Container.Refresh', wait = wait)
-		if clear: tools.System.execute('Container.Update(%s,replace)' % (clear if tools.Tools.isString(clear) else ''), wait = wait)
+		if position:
+			try: index = int(tools.System.infoLabel('Container.CurrentItem'))
+			except: pass
+
+		tools.System.execute('Container.Refresh', wait = False)
+		if clear: tools.System.execute('Container.Update(%s,replace)' % (clear if tools.Tools.isString(clear) else ''), wait = False)
+
 		if position and index >= 0:
 			try:
 				# Refreshing takes some time. Wait until done.
@@ -4128,6 +4137,9 @@ class Context(object):
 	def commandActivityReset(self):
 		return self._commandPlugin(action = 'playbackReset', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
+	def commandActivityTrakt(self):
+		return self._commandPlugin(action = 'traktManager', parameters = {'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
+
 	def commandScrapeAgain(self):
 		return self._commandPlugin(action = 'scrapeAgain', parameters = {'link' : self.mLink})
 
@@ -4189,9 +4201,10 @@ class Context(object):
 			except: pass
 		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'link' : link, 'selection' : Video.ModeAutomatic, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb})
 
-	def commandBrowse(self):
+	def commandBrowse(self, season = False):
 		tools.System.launchAddon() # Important when called from outside Gaia. Otherwise there is an error: Attempt to use invalid handle -1.
-		return self._commandContainer(action = 'seasonsRetrieve', parameters = {'tvshowtitle' : self.mTitle, 'year' : self.mYear, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb})
+		if season: return self._commandContainer(action = 'episodesRetrieve', parameters = {'tvshowtitle' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb})
+		else: return self._commandContainer(action = 'seasonsRetrieve', parameters = {'tvshowtitle' : self.mTitle, 'year' : self.mYear, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb})
 
 	def commandDownloadsCloud(self):
 		return self._commandPlugin(action = 'downloadCloud', parameters = {'source' : self.mSource})
@@ -4302,9 +4315,6 @@ class Context(object):
 
 	def commandShortcutDelete(self):
 		return self._commandPlugin(action = 'shortcutsShow', parameters = {'id' : self.mShortcutId, 'location' : self.mShortcutLocation, 'delete' : True})
-
-	def commandTrakt(self):
-		return self._commandPlugin(action = 'traktManager', parameters = {'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandOrionVoteUp(self):
 		return self._commandPlugin(action = 'orionVoteUp', parameters = {'idItem' : self.mOrion['item'], 'idStream' : self.mOrion['stream']})
@@ -4481,7 +4491,6 @@ class Context(object):
 				self.addScrape()
 				self.addLink()
 				self.addActivity()
-				self.addTrakt()
 				self.addLibrary()
 				self.addPlaylist()
 			self.addShortcut()
@@ -4499,7 +4508,6 @@ class Context(object):
 			self.addFile()
 			self.addFilters()
 			self.addActivity()
-			self.addTrakt()
 			self.addOrion()
 			self.addLibrary()
 			self.addPlaylist()
@@ -4518,7 +4526,6 @@ class Context(object):
 			self.addScrape()
 			self.addLink()
 			self.addActivity()
-			self.addTrakt()
 			self.addLibrary()
 			self.addPlaylist()
 			self.addShortcut()
@@ -4579,6 +4586,8 @@ class Context(object):
 
 		if progress: items.append({'label' : 33979, 'command' : 'commandActivityReset', 'loader' : True})
 		items.append({'label' : 33678, 'command' : 'commandActivityRefresh', 'loader' : True})
+
+		if Context.EnabledTrakt: items.append({'label' : 32070, 'command' : 'commandActivityTrakt', 'loader' : True})
 
 		self.add(label = 35051, icon = Font.IconActivity, items = items)
 
@@ -4651,7 +4660,13 @@ class Context(object):
 
 	def addBrowse(self):
 		if tools.Media.typeTelevision(self.mMedia):
-			self.add(label = 32071, icon = Font.IconBrowse, command = 'commandBrowse')
+			if self.mSeason is None:
+				self.add(label = 32071, icon = Font.IconBrowse, command = 'commandBrowse')
+			else:
+				self.add(label = 32071, icon = Font.IconBrowse, items = [
+					{'label' : 36397, 'command' : 'commandBrowse', 'parameters' : False},
+					{'label' : 36398, 'command' : 'commandBrowse', 'parameters' : True},
+				])
 
 	def addDownloads(self):
 		self.add(label = 32009, icon = Font.IconDownload, items = [
@@ -4712,9 +4727,6 @@ class Context(object):
 		if Shortcuts.enabled():
 			if self.mShortcutCreate: self.add(label = 35119, icon = Font.IconShortcut, command = 'commandShortcutCreate', loader = True)
 			elif self.mShortcutDelete: self.add(label = 35119, icon = Font.IconShortcut, command = 'commandShortcutDelete', loader = True)
-
-	def addTrakt(self):
-		self.add(label = 32315, icon = Font.IconTrakt, command = 'commandTrakt', condition = 'Context.EnabledTrakt', loader = True)
 
 	def addOrion(self):
 		if Context.EnabledOrion and self.mOrion:

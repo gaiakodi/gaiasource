@@ -3349,11 +3349,11 @@ class Stream(Serializer):
 			(FileContainerRmvb,	u'(rmvb)'),
 			(FileContainerMxf,	u'(mxf)'),
 
-			(FileContainerIso,	u'(iso|udf|img)'),
-			(FileContainerNrg,	u'(nrg)'),
-			(FileContainer7z,	u'(7z(?:ip)?|s7z)'),
-			(FileContainerZip,	u'(zipx?)'),
-			(FileContainerRar,	u'(rar)'),
+			(FileContainerIso,	u'((?<!{symbol}no{symbol})iso|udf|img)'),
+			(FileContainerNrg,	u'((?<!{symbol}no{symbol})nrg)'),
+			(FileContainer7z,	u'((?<!{symbol}no{symbol})7z(?:ip)?|s7z)'),
+			(FileContainerZip,	u'((?<!{symbol}no{symbol})zipx?)'),
+			(FileContainerRar,	u'((?<!{symbol}no{symbol})rar)'), # Exclude "no-rar".
 
 			(FileContainerStrm,	u'(strm)'),
 			(FileContainerM3u,	u'(m3u)'),
@@ -14189,6 +14189,7 @@ class Stream(Serializer):
 				'language' : None,
 				'query' : None,
 				'cache' : None,
+				'identifier' : None,
 			},
 		}
 		if len(kwargs) > 0:
@@ -15078,9 +15079,18 @@ class Stream(Serializer):
 				if validateYear and metaMediaMovie and metaYear and (not metaPack or (tools.Tools.isInteger(metaPack) and metaPack <= 1) or (tools.Tools.isDictionary(metaPack) and metaPack['count'] <= 1)) and self.__yearValid(year = metaYear, data = fileName, deviation = True) is False:
 					self.debug(reason = 'Invalid Year', link = link, name = fileNameExtra, extra = sourceProvider)
 					return cacheInvalid(id, cache, lock)
-				elif validateYear and metaMediaShow and metaPack and 'year' in metaPack and self.__yearValid(year = metaPack['year'], data = fileName, deviation = True) is False:
-					self.debug(reason = 'Invalid Year', link = link, name = fileNameExtra, extra = sourceProvider)
-					return cacheInvalid(id, cache, lock)
+				elif validateYear and metaMediaShow:
+					if metaPack and 'year' in metaPack and self.__yearValid(year = metaPack['year'], data = fileName, deviation = True) is False:
+						self.debug(reason = 'Invalid Year', link = link, name = fileNameExtra, extra = sourceProvider)
+						return cacheInvalid(id, cache, lock)
+					elif (not metaPack or not 'year' in metaPack) and metaYear and self.__yearValid(year = metaYear, data = fileName, deviation = True) is False:
+						# For some reason, sometimes the metaPack is None for some users. Maybe the pack was not created during metadata retrieval.
+						# Still check the year in such a case, to eliminate incorrect links.
+						# Eg: "Hijack 2023" has a GB alias "Kingdom"
+						# Eg (invalid): Kingdom.2014.S01E03.480p.HDTV.x264-mSD
+						# Eg (invalid): Kingdom.2019.S01.1080p.NF.WEBRip.DD5.1.x264-MZABI
+						self.debug(reason = 'Invalid Year', link = link, name = fileNameExtra, extra = sourceProvider)
+						return cacheInvalid(id, cache, lock)
 
 				if validateTitle and metaTitleAll and not self.__titleValidQuick(data = fileName, title = metaTitleAll) and (fileName == fileNameExtra or not self.__titleValidQuick(data = fileNameExtra, title = metaTitleAll)):
 					self.debug(reason = 'Invalid Title Quick', link = link, name = fileNameExtra, extra = sourceProvider)
@@ -17875,8 +17885,19 @@ class Stream(Serializer):
 					thresholdLongDouble = min(1, threshold['long']['double'] * adjust)
 					thresholdLongConcatenated = min(1, threshold['long']['concatenated'] * adjust)
 
-					for title in titles:
+					for i in range(len(titles)):
+						alias = i
+						title = titles[i]
 						length = len(title)
+
+						# English alias titles with a single word can lead to incorrect titles being detected.
+						# Eg: "Hijack" 2023 (has a GB alias "Kingdom").
+						# Eg (invalid): The Kingdom S01E03 1080p HEVC x265-MeGusta[eztv re]
+						# Eg (invalid): Kingdom.2019.S01.1080p.NF.WEBRip.DD5.1.x264-MZABI
+						exception = bool(alias and tools.Tools.stringAscii(title) and title.count(' ') == 0)
+						# Still allow similar aliases.
+						# Eg: "Terminator" vs "The Terminator" vs "Terminator 1"
+						if exception and title in titles[0]: exception = False
 
 						# Very short titles (eg: "9 (2009)")
 						if length <= thresholdShortLength:
@@ -17904,7 +17925,9 @@ class Stream(Serializer):
 
 						# Medium length titles.
 						else:
-							if obfuscated:
+							if exception:
+								ratio = 0
+							elif obfuscated:
 								ratio = tools.Matcher.levenshtein(title, name)
 								if length < 5: ratio *= 1.1 # Short titles, eg: "Dune" vs "Du00ne".
 							else:
@@ -17949,10 +17972,13 @@ class Stream(Serializer):
 								if allow:
 									titleConcatenated = __titleConcatenate(titles[0], title)
 									if titleConcatenated:
+										# Eg: Hijack 2023.
+										# Eg: Concatenated title: "hijack kingdom" - file name: "last kingdom"
+										thresholdExtra = 1.3 if titleConcatenated.count(' ') <= 1 else 1.0
+
 										ratio = tools.Matcher.levenshtein(titleConcatenated, name)
 										# Eg (Love & Death): Love.Death.and.Robots.S01.1080p.WEBRip.x265-RARBM
-										if ratio >= thresholdLongConcatenated:
-											return True
+										if ratio >= thresholdLongConcatenated * thresholdExtra: return True
 
 									titleConcatenated = __titleConcatenate(title, titles[0])
 									if titleConcatenated:
@@ -28024,7 +28050,7 @@ class Stream(Serializer):
 		PARAMETERS:
 			expired (boolean): If True, return the raw value. If False, return None if the cache expired, else the raw value.
 		RETURNS:
-			The query (boolean/string).
+			The cache (boolean/string).
 	'''
 	def infoCache(self, expired = True):
 		value = self.mData['info']['cache']
@@ -28064,6 +28090,39 @@ class Stream(Serializer):
 	'''
 	def infoCacheExpired(self):
 		return self.mData['info']['cache'] == Stream.AccessCacheExpired
+
+	##############################################################################
+	# INFO IDENTIFIER
+	##############################################################################
+
+	'''
+		FUNCTION:
+			Retrieves if the stream was already check for identifiers/hashes against Orion.
+		RETURNS:
+			The identifier (boolean).
+	'''
+	def infoIdentifier(self):
+		try: return self.mData['info']['identifier']
+		except: return False # gaiaremove - 2023.07.07 - only needed for a few versions that do not have this attribute.
+
+	'''
+		FUNCTION:
+			Sets if the stream was check for identifiers/hashes against Orion.
+		PARAMETERS:
+			value (boolean): The identifier.
+	'''
+	def infoIdentifierSet(self, value = True):
+		self.mData['info']['identifier'] = value
+
+	'''
+		FUNCTION:
+			Checks whether or not the identifiers/hashes have been set yet.
+		RETURNS:
+			If the identifier has been set (boolean).
+	'''
+	def infoIdentifierHas(self):
+		try: return not self.mData['info']['identifier'] is None
+		except: return False # gaiaremove - 2023.07.07 - only needed for a few versions that do not have this attribute.
 
 	##############################################################################
 	# CLEAN
@@ -32343,11 +32402,11 @@ class Termination(object):
 
 	DefaultLimit	= 200
 
-	IdEnabled		= 'provider.termination.preemption'
-	IdNotification	= 'provider.termination.preemption.notification'
-	IdMode			= 'provider.termination.preemption.mode'
-	IdExpression	= 'provider.termination.preemption.expression'
-	IdCondition		= 'provider.termination.preemption.condition'
+	IdEnabled		= 'scrape.termination.preemption'
+	IdNotification	= 'scrape.termination.preemption.notification'
+	IdMode			= 'scrape.termination.preemption.mode'
+	IdExpression	= 'scrape.termination.preemption.expression'
+	IdCondition		= 'scrape.termination.preemption.condition'
 
 	Instance		= None
 

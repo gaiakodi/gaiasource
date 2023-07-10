@@ -1,11 +1,36 @@
 
+[B]6.3.6 (2023.07.10)[/B]
+- More frequent metadata refreshing for recent releases.
+- Improved best provider toggling.
+- Moved Trakt to the Activity context submenu.
+- Fixed playback history count.
+- Improved playback progress for recaps and extras.
+- Improved file container detection.
+- Refresh directory after playback ended.
+- Improved submenu paging with a lot of specials.
+- Improved placement of special episodes in flattened menus.
+- Added TVmaze API rate limit.
+- Close binge overlay window if playback stops.
+- Fixed interleaving episodes without an airing date.
+- Improved special episode interleaving for submenus.
+- Expanded Browse action in the context menu.
+- Added automatic stream history cleaning.
+- Fixed Orion identifier lookup.
+- Fixed cache lookup on reloading streams.
+- Improved episode label formatting with airing date.
+- Improved statistics update in scraping window.
+- Fixed player service label.
+- Improved integrated subtitles selection.
+- Improved file name filtering with aliases.
+- Added customizable binge scrape initiation time.
+
 [B]6.3.5 (2023.07.04)[/B]
 - Added instant stream preference for autoplay.
 - Added manual selection for failed autoplay.
 - Improved episode cast lists.
 - Improved automatic audio stream selection.
 - Improved automatic subtitle stream selection.
-- Improved oracle chatbot error detection.
+- Improved Oracle chatbot error detection.
 - Fixed ChatGPT playground fallback.
 
 [B]6.3.4 (2023.07.03)[/B]

@@ -313,7 +313,9 @@ class Core(object):
 			player = PlayerBase()
 			finished = False
 
-			wait = int(Player.BingeTime * 2)
+			wait = tools.Binge.scrape()
+			wait += min(wait, 900) # Add a max overlap time of 15 mins, since the user can increase the binge scraping time. Eg: user pauses for a few minutes after binge scraping started.
+
 			step = 0.5
 			for i in range(int(wait / step)):
 				# Make sure the loop is exited once the player stops playing.
@@ -1974,11 +1976,11 @@ class Core(object):
 				mode = self.termination.mode()
 				self.terminationEnabled = (mode == Termination.ModeAny) or (mode == Termination.ModeOverwrite) or (mode == Termination.ModeManual and not autoplay) or (mode == Termination.ModeAutomatic and autoplay)
 
-			self.unresponsiveEnabled = tools.Settings.getBoolean('provider.termination.unresponsive')
-			self.unresponsiveTime = tools.Settings.getCustom('provider.termination.unresponsive.time')
-			self.unresponsiveTimeLabel = tools.Settings.customLabel(id = 'provider.termination.unresponsive.time', value = self.unresponsiveTime)
-			self.unresponsiveLimit = tools.Settings.getCustom('provider.termination.unresponsive.limit')
-			self.unresponsiveLimitLabel = tools.Settings.customLabel(id = 'provider.termination.unresponsive.limit', value = self.unresponsiveLimit)
+			self.unresponsiveEnabled = tools.Settings.getBoolean('scrape.termination.unresponsive')
+			self.unresponsiveTime = tools.Settings.getCustom('scrape.termination.unresponsive.time')
+			self.unresponsiveTimeLabel = tools.Settings.customLabel(id = 'scrape.termination.unresponsive.time', value = self.unresponsiveTime)
+			self.unresponsiveLimit = tools.Settings.getCustom('scrape.termination.unresponsive.limit')
+			self.unresponsiveLimitLabel = tools.Settings.customLabel(id = 'scrape.termination.unresponsive.limit', value = self.unresponsiveLimit)
 
 			self.enabledDeveloper = tools.System.developer(version = False)
 			self.enabledProviders = tools.Settings.getBoolean('interface.scrape.interface.providers')
@@ -2271,16 +2273,6 @@ class Core(object):
 						else: self.providersBusy = busy + self.providersWait
 						self.providersFinished = totalProviders - self.providersBusy
 
-						if self.providersBusy == 0 and ((threadProvider and not threadProvider.is_alive()) or self.stopThreads):
-							break
-
-						if self.unresponsiveEnabled:
-							if self.providersBusy <= self.unresponsiveLimit:
-								unresponsiveTime += timeStep
-								if unresponsiveTime >= self.unresponsiveTime:
-									tools.Logger.log('Unresponsive Termination Triggered', name = 'CORE', type = tools.Logger.TypeInfo)
-									break
-
 						foundStreams = []
 						if len(foundStreams) < 2 and self.streamsHdUltra > 0: foundStreams.append('%sx HDULTRA' % self.streamsHdUltra)
 						if len(foundStreams) < 2 and self.streamsHd1080 > 0: foundStreams.append('%sx HD1080' % self.streamsHd1080)
@@ -2296,6 +2288,15 @@ class Core(object):
 						if self.enabledProviders and busy > 0: stringProvidersValue1 += ' [%s]' % (', '.join(providersLabels[:3]))
 						stringProvidersValue1 += (stringInput3 % len(self.sourcesAdjusted)) + foundStreams
 						self._scrapeProgressUpdate(percentage, message, stringProvidersValue1, stringProvidersValue2)
+
+						# Make  sure to update the final stats in the window before breaking out.
+						if self.providersBusy == 0 and ((threadProvider and not threadProvider.is_alive()) or self.stopThreads): break
+						if self.unresponsiveEnabled:
+							if self.providersBusy <= self.unresponsiveLimit:
+								unresponsiveTime += timeStep
+								if unresponsiveTime >= self.unresponsiveTime:
+									tools.Logger.log('Unresponsive Termination Triggered', name = 'CORE', type = tools.Logger.TypeInfo)
+									break
 
 						tools.Time.sleep(timeStep)
 					except:
@@ -2590,9 +2591,9 @@ class Core(object):
 				unresponsiveTimeLabel = self.unresponsiveTimeLabel
 				unresponsiveLimitLabel = self.unresponsiveLimitLabel
 			except:
-				unresponsiveEnabled = tools.Settings.getBoolean('provider.termination.unresponsive')
-				unresponsiveTimeLabel = tools.Settings.customLabel(id = 'provider.termination.unresponsive.time', value = tools.Settings.getCustom('provider.termination.unresponsive.time'))
-				unresponsiveLimitLabel = tools.Settings.customLabel(id = 'provider.termination.unresponsive.limit', value = tools.Settings.getCustom('provider.termination.unresponsive.limit'))
+				unresponsiveEnabled = tools.Settings.getBoolean('scrape.termination.unresponsive')
+				unresponsiveTimeLabel = tools.Settings.customLabel(id = 'scrape.termination.unresponsive.time', value = tools.Settings.getCustom('scrape.termination.unresponsive.time'))
+				unresponsiveLimitLabel = tools.Settings.customLabel(id = 'scrape.termination.unresponsive.limit', value = tools.Settings.getCustom('scrape.termination.unresponsive.limit'))
 
 			try:
 				cacheEnabled = self.cacheEnabled
@@ -2834,7 +2835,8 @@ class Core(object):
 		except: tools.Logger.error()
 
 	def scrapeProviders(self, threads, labels, providers, media, titles, years, premiered, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
-		ProviderBase.concurrencyInitialize(tasks = len(providers))
+		binge = self.binge == tools.Binge.ModeBackground
+		ProviderBase.concurrencyInitialize(tasks = len(providers), binge = binge)
 
 		temp1 = []
 		temp2 = []
@@ -4095,7 +4097,13 @@ class Core(object):
 										debrid = True
 										break
 
-						source['stream'].infoTerminationClear() # Clear the termination status, since it could change after various parameters were set after the scraper returned it (debrid, provider, etc).
+						# Clear the termination status, since it could change after various parameters were set after the scraper returned it (debrid, provider, etc).
+						source['stream'].infoTerminationClear()
+
+						# Ignore duplicates if retrieving cached streams, otherwise the stats in the scraping window are incomplete when reloading cached streams.
+						# The duplication is checked and set again in adjustSourceAppend() below.
+						if not check: source['stream'].exclusionDuplicateSet(value = False)
+
 						self.adjustSourceAppend(source)
 
 						priority = False
@@ -4155,8 +4163,7 @@ class Core(object):
 
 				self.adjustSourceStart()
 				self.adjustTermination()
-				thread = Pool.thread(target = self.adjustSourceCache, args = (None, True))
-				thread.start()
+				Pool.thread(target = self.adjustSourceCache, args = (None, True), start = True)
 		except:
 			tools.Logger.error()
 
@@ -4214,7 +4221,14 @@ class Core(object):
 				links = []
 				for source in self.sourcesAdjusted:
 					if not source['stream'].hashContainer() and (source['stream'].sourceTypeTorrent() or source['stream'].sourceTypeUsenet()):
-						links.append(source['stream'].linkPrimary())
+						# NB: Only do this on a new scrape, not on reloading previously cached streams.
+						# Otherwise, if there are some links for which Orion does not have a hash, every time we reload the stream window, identifiers will be checked again on Orion, only for nothing to be returned.
+						# If on a new scrape no hahes are returned from Orion, do not check again when retrieving links from providers.db cache.
+						# Checking infoIdentifier() also prevents links from being checked multiple times during the same scrape if Orion did not return as hash the previous time this function was called.
+						# Also do not check if the link comes from  Orion. Since if Orion did not return a hash together with the link, checking through this function will also not return anything.
+						if not source['stream'].infoIdentifier() and not source['stream'].accessTypeOrion():
+							source['stream'].infoIdentifierSet()
+							links.append(source['stream'].linkPrimary())
 				if links:
 					identifiers = self.cacheOrion.identifiers(links = links, chunked = partial)
 					for link, identifier in identifiers.items():
@@ -4260,9 +4274,6 @@ class Core(object):
 					if (source['stream'].sourceType() in type or (modeLink and handler.Handler.TypeHoster in type)) and (not 'premium' in source or not source['premium']):
 						# Only check those that were not previously inspected.
 						if not source['stream'].accessCacheHas(debridId, exact = Stream.ExactYes, time = self.cacheSave):
-							# Make sure the new cache status is written to the database and overwrites the old cache status and cache time values.
-							if source['stream'].accessCacheExpired(debridId, time = self.cacheSave): source['stream'].infoCacheExpire()
-
 							# NB: Do not calculate the hash if it is not available.
 							# The hash is not available because the NZB could not be downloaded, or is still busy in the thread.
 							# Calling container.hash() will cause the NZB to download again, which causes long delays.
@@ -4273,16 +4284,34 @@ class Core(object):
 								source['stream'].hashContainerSet(container.hash(type = source['stream'].sourceType())) # Pass in the type, otherwise the container will load/construct the providers to check to which provider the container belongs to.
 							'''
 
+							added = False
 							torrentOrUsenet = source['stream'].sourceTypeTorrent() or source['stream'].sourceTypeUsenet()
 							hash = source['stream'].hashContainer()
 							if torrentOrUsenet and modeHash and hash:
+								added = True
 								hashes.append(hash)
 								sources.append(source)
 							elif not torrentOrUsenet and modeLink:
 								link = source['stream'].linkPrimary()
 								if link:
+									added = True
 									hashes.append(link)
 									sources.append(source)
+
+							# Make sure the new cache status is written to the database and overwrites the old cache status and cache time values.
+							# NB: Only do this if the stream was added to the cache lookup queue.
+							# Otherwise, NZBs coming from Orion might not have a hash.
+							# Without checking "added", these NZB streams will set their cache to expired.
+							# If the stream window is reloaded (with streams already cached in providers.db), these links will be written to the database again in adjustSourceDatabase(), since "stream.infoCache(expired = False)" will be false.
+							# This in turn will make all the old cached Orion streams in providers.db be overwritten with these few failed NZB links.
+							# To replicate this problem:
+							#	1. Scrape an episode where NZB links (that do not have a hash) are retrieved from Orion.
+							#	2. Make sure that the same Gaia NZB provider is also enabled and scrapes the same link.
+							#	3. Orion links will correctly show  in the stream window.
+							#	4. Back out and scrape the episoode again. Not rescrape, just retrieve the previously cached links.
+							#	5. The Orion links will still show at this point. However, a few NZB links will overwrite ALL the Orion links in providers.db.
+							#	6. Back out and scrape the episoode again. Now only/mostly Gaia links are shown, since most of the Orion links in providers.db were replaced in the previous step.
+							if added and source['stream'].accessCacheExpired(debridId, time = self.cacheSave): source['stream'].infoCacheExpire()
 
 			self.adjustUnlock()
 

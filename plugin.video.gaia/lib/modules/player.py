@@ -67,8 +67,6 @@ class Player(xbmc.Player):
 	DownloadChunk = 8 # 8 B. The number of null bytes that are considered the end of file.
 	DownloadNull = '\x00' * DownloadChunk
 
-	BingeTime = 600 # Start binge scrape if 10 minutes are left on the current playback.
-
 	ResumeTime = 10 # Resume playback a number of seconds before the recorded playback time, to catch up on the story.
 
 	DetailsSplit = 75 # 90 is just enough for default Estaury skin. Make it a bit less for other skins.
@@ -166,7 +164,13 @@ class Player(xbmc.Player):
 					origin = self.source['stream'].sourceOrigin()
 					if origin and origin.lower() in ['emby', 'jellyfin']: self.service = origin
 					else: self.service = 'Direct'
-				else: self.service = None
+				else:
+					if self.handle:
+						from lib.debrid import Debrid
+						debrid = Debrid.meta(id = self.handle)
+						if debrid: self.service = debrid['name']
+						else: self.service = None
+					else: self.service = None
 
 			self.url = self.source['stream'].streamLink() # Local cache downloads.
 			if not self.url: self.url = self.source['stream'].linkResolved()
@@ -583,6 +587,8 @@ class Player(xbmc.Player):
 							# Otherwise we might end up in a long loop of play->reload->play->reload which might not clean up memory and increase the chance of running out of threads on low-end devices.
 							#self.core.showStreams(filter = True, binge = self.binge, autoplay = self.autoplay)
 							self.core.showStreamsExternal(filter = True, binge = self.binge, autoplay = self.autoplay, reload = True)
+							return True
+		return False
 
 	def _debridClear(self):
 		debrid.Debrid.deletePlayback(link = self.url, source = self.source)
@@ -760,7 +766,10 @@ class Player(xbmc.Player):
 		try:
 			if self.binge:
 				remaining = self.timeTotal - self.timeCurrent
-				if not self.bingeFinishedScrape and remaining < Player.BingeTime:
+				# Do not start binge scraping before 5 minutes into playback, irrespective of the users binge time setting.
+				# Firstly, it might interfere with the early-playback features, eg auto resume, auto audio/subtitle selection, etc.
+				# Secondly, during the first few minutes the user might stop playback and select a different stream, due to buffering or video/audio problems, and we do not want to draw down the system during this time.
+				if not self.bingeFinishedScrape and self.timeCurrent > 300 and remaining < tools.Binge.scrape():
 					self.bingeFinishedScrape = True
 					thread = Pool.thread(target = self._bingeScrape)
 					thread.start()
@@ -1524,6 +1533,11 @@ class Player(xbmc.Player):
 
 			self.streamStop()
 
+			# When the binge overlay window starts (either hidden or if shown and the user hides it mannually), without clicking the Continue/Cancel buttons.
+			# If playback is stopped from the Kore app while the binge window is hidden, after playback finished, one can still pull down the binge window.
+			# Forcefully close the window if playback stopped.
+			if self.bingeDialogOverlay: window.WindowBingeOverlay.close()
+
 			# Do not do this (eg reload stream window) if playback failed.
 			if self.statusStarted and not self.error:
 				self.progressUpdate()
@@ -1532,11 +1546,18 @@ class Player(xbmc.Player):
 				# Otherwise the rating dialog might be closed or hidden underneath the stream window.
 				self.rate()
 
-				self._showStreams()
+				continued = self._showStreams()
 
 				if self.binge:
-					if self.bingePlay: self._bingePlay()
-					elif self.bingeDialogNone or self.bingeDialogFull: self._bingeShow()
+					if self.bingePlay:
+						continued = True
+						self._bingePlay()
+					elif self.bingeDialogNone or self.bingeDialogFull:
+						continued = True
+						self._bingeShow()
+
+				# Refresh the directory to show new progress or watched status.
+				if not continued: interface.Directory.refresh(position = True, wait = False)
 
 	def onPlayBackStarted(self):
 		tools.Logger.log('Playback Started')
@@ -2111,10 +2132,38 @@ class Subtitle(Streamer):
 				if settingsSelection == Subtitle.SelectionExact or settingsSelection == Subtitle.SelectionAutomatic:
 					# Already do this here, so that we can avoid a call to OpenSubtitles if we in any case use the integrated subtitles.
 					if Subtitle.InternalIntegrated:
+						# If there are multiple valid subtitles, try to pick the best one.
+						# Eg: We watch anime with Japanese audio (unknown to the user) and there are integrated French subtitles (known to the user).
+						# There are two French subtitles (forced and full). We want the full subtitles, since the audio language is unknown.
+						# Also do some other sorting. Eg: Rank available languages according to user preferences, try to avoid impaired subitles, etc.
+						known = Audio.streamKnown(primary = primary, secondary = secondary, tertiary = tertiary)
+						integrated = []
 						for stream in Subtitle.InternalIntegrated:
-							if stream['language'][tools.Language.Code][tools.Language.CodeStream] in settingsLanguage:
-								success, _ = self._load(subtitle = stream)
-								if success: return self._finish(status = Subtitle.StatusIntegrated, subtitle = stream)
+							try:
+								try: sort = 10 - settingsLanguage.index(stream['language'][tools.Language.Code][tools.Language.CodeStream])
+								except: sort = None
+								if not sort is None:
+									if stream['integrated']: sort += 0.001
+									else: sort -= 0.001
+
+									if stream['impaired']: sort -= 0.01
+									else: sort += 0.01
+
+									if known:
+										if stream['default']: sort += 0.1
+										else: sort -= 0.1
+									else:
+										if stream['name']:
+											if tools.Regex.match(data = stream['name'], expression = '(full|complete)'): sort += 0.1
+											elif tools.Regex.match(data = stream['name'], expression = '(force|foreign)'): sort -= 0.1
+
+									stream['sort'] = sort
+									integrated.append(stream)
+							except: tools.Logger.error()
+						integrated = tools.Tools.listSort(integrated, key = lambda i : i['sort'], reverse = True)
+						for stream in integrated:
+							success, _ = self._load(subtitle = stream)
+							if success: return self._finish(status = Subtitle.StatusIntegrated, subtitle = stream)
 
 			subtitles = []
 			failure = False
