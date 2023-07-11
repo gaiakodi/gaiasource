@@ -981,8 +981,7 @@ class Core(base.Core):
 			# Name must end in an extension, otherwise Premiumize throws an "unknown type" error for NZBs.
 			# Premiumize says this is fixed now. No extension has to be send.
 			# However, keeps this here in case of future changes. It doesn't hurt to send the extension.
-			if not name.endswith(source['extension']):
-				name += source['extension']
+			if source['extension'] and not name.endswith(source['extension']): name += source['extension']
 
 			boundry = 'X-X-X'
 			headers = {'Content-Type' : 'multipart/form-data; boundary=%s' % boundry}

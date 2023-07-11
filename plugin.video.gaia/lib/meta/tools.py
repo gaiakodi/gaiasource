@@ -1443,6 +1443,11 @@ class MetaTools(object):
 			context = None
 		else:
 			if contextMode is None and not content: contextMode = Context.ModeStream
+
+			# For episode submenus, make sure that the command passed to the context is the scrape command and not the episodesSubmenu command.
+			# Eg: Open the Arrivals main menu -> open the context menu on an episode -> Scrape -> Rescrape -> this should launch the scrape process.
+			if contextCommand is None and submenu: contextCommand = self.command(media = media, metadata = metadata, video = video, multiple = multiple, submenu = False)
+
 			context = self.itemContext(item = item, context = context, add = contextAdd, mode = contextMode, media = mediaOriginal, kids = kids, video = video, command = contextCommand if contextCommand else command, library = contextLibrary, playlist = contextPlaylist, source = contextSource, metadata = metadata, orion = contextOrion, shortcutId = contextShortcutId, shortcutLabel = contextShortcutLabel, shortcutLocation = contextShortcutLocation, shortcutCreate = contextShortcutCreate, shortcutDelete = contextShortcutDelete)
 
 		return {'item' : item, 'command' : command, 'context' : context, 'metadata' : cleaned, 'images' : images}

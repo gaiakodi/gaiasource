@@ -1356,7 +1356,7 @@ class HandleOrion(Handle):
 						if not containerName:
 							try: containerName = source.hash()
 							except: pass
-				if containerName and not containerName.endswith(container['extension']):
+				if containerName and container['extension'] and not containerName.endswith(container['extension']):
 					containerName += container['extension']
 
 		error = None
@@ -1634,7 +1634,7 @@ class HandleTorrenter(Handle):
 						try: name = stream.hash()
 						except: pass
 				if not name: name = 'Download'
-				if not name.endswith(source['extension']): name += source['extension']
+				if source['extension'] and not name.endswith(source['extension']): name += source['extension']
 
 				data.append({'name' : 'file', 'filename' : name, 'type' : source['mime'], 'data' : source['data']})
 			else:

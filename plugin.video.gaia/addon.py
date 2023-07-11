@@ -27,6 +27,7 @@ if developer:
 from lib.modules import tools
 
 parameters = tools.System.commandResolve(initialize = True)
+
 action = parameters.get('action')
 
 # For Gaia Eminence.
@@ -65,6 +66,10 @@ if not metadata is None: metadata = tools.Converter.dictionary(metadata)
 
 from lib.modules import shortcuts
 shortcuts.Shortcuts.process(parameters)
+
+####################################################
+# HOME
+####################################################
 
 if action is None or action == 'home':
 	from lib.indexers.navigator import Navigator
@@ -516,7 +521,13 @@ elif action.startswith('episodes'):
 		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next, submenu = submenu)
 
 	elif action == 'episodesSubmenu':
-		tools.System.executeContainer(action = 'episodesRetrieve', parameters = parameters)
+		if tools.System.originGaia(strict = True):
+			tools.System.executeContainer(action = 'episodesRetrieve', parameters = parameters)
+		else: # Widgets
+			tools.System.pluginResolvedSet(success = True, dummy = False)
+			parameters[tools.System.OriginParameter] = True # Allows selecting the next unwatched episodes from view.py.
+			command = tools.System.commandContainer(action = 'episodesRetrieve', parameters = parameters, replace = True, call = False)
+			tools.System.window(command = command, activate = True, update = False, refresh = False)
 
 	elif action == 'episodesUserlists':
 		from lib.indexers.episodes import Episodes

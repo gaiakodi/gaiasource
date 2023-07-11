@@ -1,4 +1,14 @@
 
+[B]6.3.7 (2023.07.11)[/B]
+- Added SceneNZBs German usenet provider.
+- Marked NZBServer as dead.
+- Marked SpotNZB as dead.
+- Fixed NZB file extension.
+- Fixed parameter encoding for menus.
+- Improved episode submenus launched from widgets.
+- Disabled external context menus.
+- Fixed context menus for episode submenus.
+
 [B]6.3.6 (2023.07.10)[/B]
 - More frequent metadata refreshing for recent releases.
 - Improved best provider toggling.

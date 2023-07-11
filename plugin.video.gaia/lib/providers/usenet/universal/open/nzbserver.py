@@ -34,6 +34,12 @@ class Provider(ProviderSpotJson):
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
 			rank					= 4,
 
+			# NZBserver still works, however, the download link/button now displays a Dutch notifcation saying you need a VPN to access NZBserver.
+			# Even with a Netherland VPN, the message remains.
+			# They probably want to force people to use the advertised VPN, because they earn comission for it, and then block any other VPN IP.
+			# gaiaremove - 2023-07-10 - check this in a few weeks/months again to see if they removed this restriction.
+			status					= ProviderSpotJson.StatusDead,
+
 			link					= Provider._Link,
 
 			# Does not support ID searches.

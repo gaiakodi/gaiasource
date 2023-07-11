@@ -3207,10 +3207,12 @@ class Directory(object):
 
 		if loader: Loader.hide()
 
-		if view is None: view = self.mView
-		if view:
-			from lib.modules.view import View
-			View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId, select = select)
+		# Do not do this for external addons or widgets.
+		if tools.System.originGaia():
+			if view is None: view = self.mView
+			if view:
+				from lib.modules.view import View
+				View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId, select = select)
 
 	# clear: Clear the path history. Can also be a path to reset to.
 	# position: After refresh, go to the previously selected position, becuase Kodi always jumps back to the top after refresh. Not perfect, since the list can become unfocused, or the user moves the mosue over another item before this code is executed.

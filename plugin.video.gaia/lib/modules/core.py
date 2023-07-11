@@ -553,8 +553,7 @@ class Core(object):
 			# Otherwise the directory with streams is not shown.
 			# Only has to be done if accessed from the home screen. Not necessary if the user is already in a directory structure.
 			# Check for tools.Binge.ModeBackground. Seems to be an issue on Mac devices causing the episode direcotry list to be loaded if binge scraping happens in the background.
-			if not binge == tools.Binge.ModeBackground and self.navigationStreamsDirectory and not 'plugin' in tools.System.infoLabel('Container.PluginName') and not tools.System.infoLabel('Container.FolderPath'):
-				tools.System.launchAddon()
+			if not binge == tools.Binge.ModeBackground and self.navigationStreamsDirectory and not tools.System.originGaia(): tools.System.launchAddon()
 
 			self.binge = binge
 			self.new = items is None

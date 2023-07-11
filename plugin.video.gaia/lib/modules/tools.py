@@ -3717,9 +3717,26 @@ class System(object):
 	KodiVersionFull = None
 	KodiVersionNew = None
 
+	OriginPlugin = False # Do not use None, since it can mean that the origin cannot be detected.
+	OriginGaia = None
+	OriginParameter = 'gaia'
+
 	Monitor = None
 	Arguments = None
 	Menu = []
+
+	##############################################################################
+	# RESET
+	##############################################################################
+
+	@classmethod
+	def reset(self, settings = True):
+		System.OriginPlugin = False
+		System.OriginGaia = None
+
+	##############################################################################
+	# GENERAL
+	##############################################################################
 
 	@classmethod
 	def arguments(self, index = None):
@@ -3882,7 +3899,8 @@ class System(object):
 
 	@classmethod
 	def menuParameter(self, name = None):
-		return 'menu=' + Converter.jsonTo(self.menu(name = name))
+		from lib.modules.network import Networker
+		return 'menu=' + Networker.linkQuote(Converter.jsonTo(self.menu(name = name)))
 
 	@classmethod
 	def menuDescription(self, name = None):
@@ -3915,10 +3933,11 @@ class System(object):
 
 		if menu:
 			if menu and Tools.isString(menu): menu = Converter.jsonFrom(menu)
-			if len(menu) > 1 and menu[0] == addon.getLocalizedString(35639): menu.pop(0)
-			self.pluginPropertySet(property = 'GaiaMenuCategory', value = menu[0])
-			submenu = menu[1:]
-			self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = '  •  '.join(submenu) if submenu else addon.getLocalizedString(33102))
+			if menu:
+				if len(menu) > 1 and menu[0] == addon.getLocalizedString(35639): menu.pop(0)
+				self.pluginPropertySet(property = 'GaiaMenuCategory', value = menu[0])
+				submenu = menu[1:]
+				self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = '  •  '.join(submenu) if submenu else addon.getLocalizedString(33102))
 		elif action is None or action == 'home':
 			self.pluginPropertySet(property = 'GaiaMenuCategory', value = 'Gaia')
 			self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = addon.getLocalizedString(33102))
@@ -4057,15 +4076,36 @@ class System(object):
 		return System.PluginPrefix + str(id)
 
 	@classmethod
-	def origin(self):
-		# When originGaia() is called from player.py, sometimes in sporadic cases, the info label returns "".
-		# This makes the stream window not reload in a few cases.
-		# Waiting and retying then typically return the addon path.
-		return self.infoLabel('Container.PluginName', empty = True, wait = True)
+	def origin(self, extended = True):
+		# If called multiple times within a single execution, this can make things slower.
+		# Detect once and reuse the value.
+		if System.OriginPlugin is False:
+			# When originGaia() is called from player.py, sometimes in sporadic cases, the info label returns "".
+			# This makes the stream window not reload in a few cases.
+			# Waiting and retying then typically return the addon path.
+			origin = self.infoLabel('Container.PluginName', empty = True, wait = True)
+
+			# If Gaia is launched from the addon menu, PluginName is None.
+			if not origin and extended:
+				if not self.query() and self.infoLabel('Container.FolderPath', empty = True, wait = True) == 'addons://sources/video':
+					origin = self.plugin()
+
+			System.OriginPlugin = origin
+		return System.OriginPlugin
 
 	@classmethod
-	def originGaia(self):
-		return self.origin() == System.GaiaAddon
+	def originGaia(self, strict = True):
+		if strict:
+			if System.OriginGaia is None:
+				if strict:
+					query = self.query(parse = True)
+					if query:
+						query = self.query(parse = True).get(System.OriginParameter)
+						if not query is None: System.OriginGaia = Converter.boolean(query)
+				if System.OriginGaia is None: System.OriginGaia = self.origin() == System.GaiaAddon
+			return System.OriginGaia
+		else:
+			return self.origin() == System.GaiaAddon
 
 	@classmethod
 	def originPlugin(self, gaia = True):
@@ -4084,7 +4124,7 @@ class System(object):
 		return not self.origin()
 
 	@classmethod
-	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, optimize = True):
+	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, gaia = True, optimize = True):
 		'''
 			The URL encoding and quote functions in urllib are very slow.
 			This is not an issue if we only have to encode a few small commands.
@@ -4099,6 +4139,13 @@ class System(object):
 		if query is None:
 			if parameters is None: parameters = {}
 			if not action is None: parameters['action'] = action
+
+			# This is to indicate wether or not the command is executed from within Gaia or from an external addon or widget.
+			# When we add a Gaia list to an external widget, and then click an item in the widget (eg: Show Arrivals with submenus), calling System.originGaia() will always be true.
+			# It seems the only way to make sure we can detect the origin correctly, is to add this parameter when we select the path of the widget from the Skin settings.
+			# When selecting the list from the Skin settings, the origin is correctly None.
+			# Used from addon.py -> episodesSubmenu.
+			if gaia: parameters[System.OriginParameter] = self.originGaia()
 
 			# Make it even faster by encoding the entire parameters.
 			# Besides being faster, we can also keep data types without having to convert them (eg bools or None).
@@ -6015,7 +6062,7 @@ class Settings(object):
 				Font, Icon, Format, CoreDialog, Dialog, Context,
 				Streamer, SubtitlePlayer,
 				Cache, Memory, Pool,
-				Language, Media,
+				Language, Media, System,
 			]
 			for i in classes:
 				try: i.reset(settings = settings)

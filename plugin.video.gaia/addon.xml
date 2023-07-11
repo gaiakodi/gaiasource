@@ -73,6 +73,8 @@
 		<provides>video</provides>
 	</extension>
 
+	<!-- Do we still need this? It seems that Gaia lists in external widgets now all have the default context menu entry. When enabling this code, there are 2 Gaia context menus added to widget items. -->
+	<!--
 	<extension point="kodi.context.item">
 		<menu id="kodi.core.main">
 			<item library="context.py">
@@ -89,6 +91,7 @@
 			</item>
 		</menu>
 	</extension>
+	-->
 
 	<extension point="xbmc.service" library="service.py" start="startup" /> <!-- Must be placed after xbmc.python.pluginsource, otherwise widgets do not pick up the addon. -->
 

@@ -18,33 +18,32 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.providers.core.spot import ProviderSpotJson
+# https://scenenzbs.com/apihelp
 
-class Provider(ProviderSpotJson):
+from lib.providers.core.newz import ProviderNewznab
 
-	_Link	= ['https://spotnzb.xyz']
+class Provider(ProviderNewznab):
+
+	_Link	= ['https://scenenzbs.com']
 
 	##############################################################################
 	# INITIALIZE
 	##############################################################################
 
 	def initialize(self):
-		ProviderSpotJson.initialize(self,
-			name					= 'SpotNZB',
-			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
-			rank					= 4,
-			status					= ProviderSpotJson.StatusDead, # Domain is unresponsive.
+		ProviderNewznab.initialize(self,
+			name					= 'SceneNZBs',
+			description				= '{name} is a usenet indexer based on {fork}. The API contains mostly German titles, but occasionaly also has English titles. {name} offers both free and premium accounts.',
+			rank					= 5,
 
 			link					= Provider._Link,
 
-			# Does not support ID searches for shows.
-			# Returns random results.
-			supportShowTvdb			= False,
-			supportShowImdb			= False,
+			# Does not return any episodes.
+			supportShowQuery		= False,
 
-			# Returns seasons instead of special episodes.
-			supportSpecialTitle		= False,
+			# Returns individual episodes.
+			supportPackShow			= False,
 
-			# Does not support searching with title and season/episode.
-			supportPackSeasonTitle	= False,
+			# Does not return any episodes.
+			supportPackSeasonQuery	= False,
 		)
