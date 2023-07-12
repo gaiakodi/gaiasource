@@ -565,7 +565,7 @@ class Core(base.Core):
 
 					if cached: result = cache.Cache.instance().cacheShort(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts)
 					else: result = cache.Cache.instance().cacheClear(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts)
-
+					
 					if not result is None:
 						for key, value in result.items():
 							if key: # Exclude "Remote".

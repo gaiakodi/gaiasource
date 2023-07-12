@@ -746,19 +746,23 @@ class Player(xbmc.Player):
 			automatic = False
 			if self.bingeDelay == 0:
 				automatic = True
-				try: self.bingeDelay = self.getTotalTime()
+				duration = None
+				try: duration = self.getTotalTime()
 				except:
-					try: self.bingeDelay = int(self.metadata['duration'])
+					try: duration = int(self.metadata['duration'])
 					except: pass
-				self.bingeDelay = 30 if self.bingeDelay == 0 else int(self.bingeDelay / 60.0)
-				if tools.Binge.dialogFull(): self.bingeDelay = int(self.bingeDelay / 3.0)
+				self.bingeDelay = int(duration / 60.0) if duration else 30
+				if self.bingeDialogFull: self.bingeDelay = int(self.bingeDelay / 3.0)
 				self.bingeDelay = min(90, self.bingeDelay)
 
-			# Increase the time for the overlay dialog.
-			# The dialog is shown hidden at this time and can be manually shown or wait for it to show automatically.
-			# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
-			#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
-			if self.bingeDialogOverlay: self.bingeDelayBefore = int(self.bingeDelay * 3)
+				# Increase the time for the overlay dialog.
+				# The dialog is shown hidden at this time and can be manually shown or wait for it to show automatically.
+				# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
+				#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
+				# UPDATE: Using (self.bingeDelay * 3) is too little for some shows like "The Witcher" which can have 3-5 minutes of credits for 45-55 minutes play time.
+				if self.bingeDialogOverlay:
+					multiplier = max(3.0, (duration / 8.0) if duration else 4.0)
+					self.bingeDelayBefore = int(self.bingeDelay * multiplier)
 
 		return self.bingeDelay
 
@@ -1495,9 +1499,16 @@ class Player(xbmc.Player):
 				tools.Logger.error()
 
 	def streamSelect(self):
+		enabled = tools.Settings.getBoolean('playback.general.pause')
+		if enabled and self.status == Player.StatusPlaying: self.pause()
+
 		Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
-		Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
+		thread = Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
 		if self.mediaTelevision: Chapter.select()
+
+		if enabled:
+			if thread: thread.join()
+			if self.status == Player.StatusPlaying: self.pause()
 
 	def streamSubtitle(self):
 		Subtitle.internal(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
@@ -2015,6 +2026,7 @@ class Subtitle(Streamer):
 	def select(self, name, imdb, title, season, episode, source, wait = False, internal = False):
 		thread = Pool.thread(target = self._select, kwargs = {'name' : name, 'imdb' : imdb, 'title' : title, 'season' : season, 'episode' : episode, 'source' : source, 'internal' : internal}, start = True)
 		if wait: Player.join(thread)
+		return thread
 
 	@classmethod
 	def _select(self, name, imdb, title, season, episode, source, internal = False):
@@ -2447,6 +2459,8 @@ class Chapter(Streamer):
 		if self.settingsEnabled():
 			thread = Pool.thread(target = self._select, start = True)
 			if wait: Player.join(thread)
+			return thread
+		return None
 
 	@classmethod
 	def _select(self):

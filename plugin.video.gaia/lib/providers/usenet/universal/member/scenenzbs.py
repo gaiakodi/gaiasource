@@ -34,7 +34,7 @@ class Provider(ProviderNewznab):
 		ProviderNewznab.initialize(self,
 			name					= 'SceneNZBs',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains mostly German titles, but occasionaly also has English titles. {name} offers both free and premium accounts.',
-			rank					= 5,
+			rank					= 4, # Since it mostly has German content only.
 
 			link					= Provider._Link,
 

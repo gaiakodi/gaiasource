@@ -3162,6 +3162,15 @@ The label is then added to the action element:
 		<!-- ########## PLAYBACK ########## -->
 		<category id="playback" label="32330" help="34424">
 
+			<!-- ########## PLAYBACK - GENERAL ########## -->
+			<group id="playback.general" label="32310">
+				<setting id="playback.general.pause" type="boolean" label="36402" help="34632">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>false</default>
+				</setting>
+			</group>
+
 			<!-- ########## PLAYBACK - AUTOPLAY ########## -->
 			<group id="playback.autoplay" label="35848">
 				<setting id="playback.autoplay.enabled" type="boolean" label="33461" help="34035">

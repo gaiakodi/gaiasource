@@ -7126,6 +7126,10 @@ msgctxt "#34631"
 msgid "Start scraping the next episode some time before the current episode playback finishes. Allow enough time for the scraping to finish before the end of the playback. Note that the [I]Concurrency Binge[/I]  setting under the [I]Provider[/I]  tab might reduce the number of providers that run concurrently and will therefore increase the total scraping time. Increase this time if scraping does not finish before the next binged episode starts.  A value of [I]0[/I]  will reset to default."
 msgstr ""
 
+msgctxt "#34632"
+msgid "Pause playback during the initialization phase. Kodi can sometimes take a few seconds to switch to another audio or subtitle stream. No audio or subtitles might be available during this time. This option will pause playback while the audio and subtitle streams are switched, and automatically resume once done, ensuring that no dialog is missed during the first few seconds of playback. In most cases the delay is short enough that this option is not needed."
+msgstr ""
+
 
 # [/GAIACODE]
 
@@ -12260,4 +12264,8 @@ msgstr ""
 
 msgctxt "#36401"
 msgid "Provider Presets"
+msgstr ""
+
+msgctxt "#36402"
+msgid "Initialization Pause"
 msgstr ""
