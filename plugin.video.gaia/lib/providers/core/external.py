@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import System, File, Hash, Language, Tools, Media, Settings, Converter, Regex, Extension, Math
+from lib.modules.tools import System, File, Hash, Language, Tools, Time, Media, Settings, Converter, Regex, Extension, Math
 from lib.modules.network import Networker
 from lib.providers.core.base import ProviderBase
 from lib.modules.stream import Stream
@@ -619,7 +619,7 @@ class ProviderExternalUnstructured(ProviderExternal):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		from lib.providers.core.manager import Manager
 		try:
 			url = None
@@ -635,6 +635,9 @@ class ProviderExternalUnstructured(ProviderExternal):
 					if 'alias' in titles:
 						for country, title in titles['alias'].items():
 							titleAliases.extend([{'country' : country, 'title' : t} for t in title])
+
+					date = None
+					if time: date = Time.format(timestamp = time, format = Time.FormatDate)
 
 					year = None
 					try: year = years['common']
@@ -798,7 +801,7 @@ class ProviderExternalStructured(ProviderExternal):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			from lib import debrid
 			debridHas = debrid.Debrid.enabled()

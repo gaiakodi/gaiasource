@@ -1831,12 +1831,18 @@ class Core(object):
 									if movie: threads.append(Pool.thread(target = tmdbDetails, kwargs = {'id' : movie['id'], 'key' : key}, start = True))
 								[thread.join() for thread in threads]
 
+								times = []
 								years = []
 								durations = []
 								countMovies = len(movies)
 
 								for i in range(countMovies):
 									movie = movies[i]
+									try: time = movie['release_date']
+									except: time = None
+									if time:
+										time = tools.Time.timestamp(fixedTime = time, format = tools.Time.FormatDate)
+										if time: times.append(time)
 									try: year = int(tools.Regex.extract(data = movie['release_date'], expression = '((?:1[89]|2[01])\d{2})'))
 									except: year = None
 									if year: years.append(year)
@@ -1846,6 +1852,7 @@ class Core(object):
 									movies[i] = {
 										'title' : tools.Tools.listUnique([movie['original_title'], movie['title']]),
 										'year' : year,
+										'time' : time,
 										'duration' : duration,
 									}
 
@@ -1853,6 +1860,13 @@ class Core(object):
 								duration = sum(durations)
 								durationMean = int(duration / float(countDuration))
 								if countDuration < countMovies: duration += int(duration / float(countDuration)) * (countMovies - countDuration) # Missing duration, use mean duration of other movies.
+
+								timeMinimum = None
+								timeMaximum = None
+								if times:
+									times = tools.Tools.listSort(times)
+									timeMinimum = min(times)
+									timeMaximum = max(times)
 
 								yearMinimum = None
 								yearMaximum = None
@@ -1867,6 +1881,11 @@ class Core(object):
 									'duration' : {
 										'total' : duration,
 										'mean' : durationMean,
+									},
+									'time' : {
+										'start' :timeMinimum,
+										'end' : timeMaximum,
+										'times' : times,
 									},
 									'year' : {
 										'start' :yearMinimum,
@@ -1895,6 +1914,18 @@ class Core(object):
 			threads = []
 			movie = tvshowtitle is None if self.media is None else (self.media == tools.Media.TypeMovie or self.media == tools.Media.TypeDocumentary or self.media == tools.Media.TypeShort)
 			media = tools.Media.TypeMovie if movie else tools.Media.TypeShow
+
+			release = None
+			if metadata:
+				try: release = metadata['premiered']
+				except: pass
+				if not release:
+					try: release = metadata['aired']
+					except: pass
+			if not release: release = premiered
+			if release and tools.Tools.isString(release):
+				try: release = tools.Time.timestamp(fixedTime = release, format = tools.Time.FormatDate)
+				except: release = None
 
 			try: duration = int(metadata['duration']) # Might come in as a string from "Random Play".
 			except: duration = None
@@ -2219,7 +2250,7 @@ class Core(object):
 			# Finding Sources
 			self.skip = True
 
-			threadProvider = Pool.thread(target = self.scrapeProviders, args = (threads, labels, self.providers, media, self.titles, self.years, premiered, imdb, tmdb, tvdb, season, episode, self.languageOriginal, self.pack, duration, exact, cache))
+			threadProvider = Pool.thread(target = self.scrapeProviders, args = (threads, labels, self.providers, media, self.titles, self.years, release, imdb, tmdb, tvdb, season, episode, self.languageOriginal, self.pack, duration, exact, cache))
 			threadProvider.start()
 
 			if (specialAllow or not self.progressCanceled()):
@@ -2833,7 +2864,7 @@ class Core(object):
 			tools.Logger.scrape(data)
 		except: tools.Logger.error()
 
-	def scrapeProviders(self, threads, labels, providers, media, titles, years, premiered, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
+	def scrapeProviders(self, threads, labels, providers, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
 		binge = self.binge == tools.Binge.ModeBackground
 		ProviderBase.concurrencyInitialize(tasks = len(providers), binge = binge)
 
@@ -2870,7 +2901,7 @@ class Core(object):
 			if not self.stopThreads:
 				threadsSub = []
 				for provider in sub:
-					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, titles, years, premiered, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache))
+					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache))
 					threadsSub.append(thread)
 					threads.append(thread)
 					labels.append(provider.label())
@@ -2887,13 +2918,13 @@ class Core(object):
 		# Use a second variable to indicate everything is done.
 		self.finishedThreads = True
 
-	def scrapeProvider(self, provider, media, titles, years, premiered, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
+	def scrapeProvider(self, provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
 		try:
 			streams = provider.execute(
 				media = media,
 				titles = titles,
 				years = years,
-				date = premiered,
+				time = time,
 
 				idImdb = imdb,
 				idTmdb = tmdb,

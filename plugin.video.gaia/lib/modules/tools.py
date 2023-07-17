@@ -4875,6 +4875,13 @@ class System(object):
 				ProviderBase.settingsGlobalConcurrencyBingeSet(concurrencyBinge)
 				ProviderBase.settingsGlobalConcurrencyConnectionSet(concurrencyConnection)
 
+			#gaiaremove
+			if version['old']['number'] <= self.versionNumber(version = '6.3.8') and version['new']['number'] >= self.versionNumber(version = '6.3.9'):
+				try:
+					from lib.providers.core.manager import Manager
+					Manager.streamsDatabaseClear()
+				except: Logger.error()
+
 		_launchProgress(4) # 25%
 
 		self.tStatus = []

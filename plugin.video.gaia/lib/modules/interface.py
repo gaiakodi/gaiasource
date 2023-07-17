@@ -3748,6 +3748,9 @@ class Context(object):
 				try: self.mSlug = metadata['slug']
 				except: pass
 
+				# "Series" menu under the season directory.
+				if self.mMedia == tools.Media.TypeSeason and self.mSeason is None: self.mMedia = tools.Media.TypeShow
+
 				if self.mShortcutLabel is None:
 					if tools.Media.typeTelevision(self.mMedia):
 						self.mShortcutLabel = tools.Media.title(type = tools.Media.TypeShow, title = self.mTitle, year = self.mYear)
@@ -4544,10 +4547,13 @@ class Context(object):
 			items.insert(0, {'label' : label, 'command' : 'commandInformation', 'loader' : True})
 		else:
 			if self.mMedia == tools.Media.TypePerson: items.insert(0, {'label' : 35819, 'command' : 'commandInformationPerson', 'loader' : True})
-			if not self.mEpisode is None: items.insert(0, {'label' : 35509, 'command' : 'commandInformationEpisode', 'loader' : True})
-			if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
-			if not self.mTvdb is None: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
-			if (self.mImdb is None or not self.mTmdb is None) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
+			if tools.Media.typeTelevision(self.mMedia):
+				if not self.mEpisode is None: items.insert(0, {'label' : 35509, 'command' : 'commandInformationEpisode', 'loader' : True})
+				if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
+				if not self.mTvdb is None: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
+			else:
+				if (self.mImdb is None or not self.mTmdb is None) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
+
 		if self.mMode == Context.ModeStream: items.insert(0, {'label' : 33415, 'command' : 'commandInformationStream', 'loader' : True})
 
 		if items:

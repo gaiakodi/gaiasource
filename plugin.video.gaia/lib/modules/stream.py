@@ -383,8 +383,8 @@ class Stream(Serializer):
 	NumberPack				= -1	# Season/episode number used to indicate an entire pack.
 	NumberSpecial			= 0		# Episode number used to indicate special episodes.
 
-	ExpressionNumberRange	= '{symbol_start}(?:(%s){separator}?[\-\–\/]{separator}?(%s))(?!{separator}+\d{separator}){symbol_end}'
-	ExpressionNumberList	= '{symbol_start}(?:(%s){separator}+)(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}*)?{symbol_end}'
+	ExpressionNumberRange	= '{symbol_start}(?<![^\d]\d{separator})(?:(%s){separator}?[\-\–\/]{separator}?(%s))(?!{separator}+\d{separator})(?!{separator}\d[^\d])(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
+	ExpressionNumberList	= '{symbol_start}(?:(%s){separator}+)(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}*)?(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
 
 	##############################################################################
 	# EXPRESSIONS
@@ -13886,6 +13886,7 @@ class Stream(Serializer):
 		self.sourcePeersValid = self._sourcePeersValid
 		self.sourceSeedsValid = self._sourceSeedsValid
 		self.sourceLeechesValid = self._sourceLeechesValid
+		self.releaseValid = self._releaseValid
 
 		self.mThreshold = {
 			'size' : {
@@ -13964,6 +13965,7 @@ class Stream(Serializer):
 				'media' : None,
 				'title' : None,
 				'year' : None,
+				'time' : None,
 				'season' : None,
 				'episode' : None,
 				'language' : None,
@@ -14374,6 +14376,7 @@ class Stream(Serializer):
 		metaMedia = None,
 		metaTitle = None,
 		metaYear = None,
+		metaTime = None,
 		metaSeason = None,
 		metaEpisode = None,
 		metaLanguage = None,
@@ -14558,6 +14561,7 @@ class Stream(Serializer):
 				if metaMedia is None: metaMedia = self.metaMedia()
 				if metaTitle is None: metaTitle = self.metaTitle(title = Stream.TitleNone) # TitleNone: make sure to retireve the entire ditionary of titles.
 				if metaYear is None: metaYear = self.metaYear()
+				if metaTime is None: metaTime = self.metaTime()
 				if metaSeason is None: metaSeason = self.metaSeason()
 				if metaEpisode is None: metaEpisode = self.metaEpisode()
 				if metaLanguage is None: metaLanguage = self.metaLanguage()
@@ -14675,6 +14679,7 @@ class Stream(Serializer):
 			if not metaMedia is None: self.metaMediaSet(metaMedia)
 			if not metaTitle is None: self.metaTitleSet(metaTitle)
 			if not metaYear is None: self.metaYearSet(metaYear)
+			if not metaTime is None: self.metaTimeSet(metaTime)
 			if not metaSeason is None: self.metaSeasonSet(metaSeason)
 			if not metaEpisode is None: self.metaEpisodeSet(metaEpisode)
 			if not metaLanguage is None: self.metaLanguageSet(metaLanguage)
@@ -14823,6 +14828,7 @@ class Stream(Serializer):
 					if not metaMedia is None: self.metaMediaSet(metaMedia)
 					if not metaTitle is None: self.metaTitleSet(metaTitle)
 					if not metaYear is None: self.metaYearSet(metaYear)
+					if not metaTime is None: self.metaTimeSet(metaTime)
 					if not metaSeason is None: self.metaSeasonSet(metaSeason)
 					if not metaEpisode is None: self.metaEpisodeSet(metaEpisode)
 					if not metaLanguage is None: self.metaLanguageSet(metaLanguage)
@@ -15464,6 +15470,11 @@ class Stream(Serializer):
 
 			if not sourcePopularity is None: self.sourcePopularitySet(sourcePopularity)
 			else: self.sourcePopularityCalculate(approval = sourceApproval)
+
+			# Testing if the pack was uploaded after the release of the movie/episode.
+			if self.__releaseValid(data = fileName, media = metaMedia, title = metaTitle, year = metaYear, time = metaTime, pack = metaPack, numberCollection = self.numberCollection(), filePack = self.filePack(), sourceTime = self.sourceTime(time = Stream.TimeNone)) is False:
+				self.debug(reason = 'Invalid Release', link = link, name = fileNameExtra, extra = sourceProvider)
+				return cacheInvalid(id, cache, lock)
 
 			# NB: Check (fileName or not fileNameInexact is True) for file names that are generate below with self.fileNameSet(fileNameInexact, exact = Stream.ExactNo)
 			# Eg: Popcorntime
@@ -16238,10 +16249,12 @@ class Stream(Serializer):
 		titleCollection = None,
 		titleEpisode = None,
 		year = None,
+		time = None,
 		season = None,
 		episode = None,
 		pack = None,
 
+		numberCollection = None,
 		fileRaw = None,
 		filePack = None,
 		fileSize = None,
@@ -16259,6 +16272,7 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
+		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16288,10 +16302,12 @@ class Stream(Serializer):
 			titleCollection = titleCollection,
 			titleEpisode = titleEpisode,
 			year = year,
+			time = time,
 			season = season,
 			episode = episode,
 			pack = pack,
 
+			numberCollection = numberCollection,
 			fileRaw = fileRaw,
 			filePack = filePack,
 			fileSize = fileSize,
@@ -16309,6 +16325,7 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
+			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
@@ -16337,6 +16354,7 @@ class Stream(Serializer):
 		titleCollection = None,
 		titleEpisode = None,
 		year = None,
+		time = None,
 		season = None,
 		episode = None,
 		pack = None,
@@ -16349,6 +16367,7 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
+		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16381,15 +16400,17 @@ class Stream(Serializer):
 			titleCollection = titleCollection if titleCollection else self.metaTitle(title = Stream.TitleCollection),
 			titleEpisode = titleEpisode if titleEpisode else self.metaTitle(title = Stream.TitleEpisode),
 			year = year if year else pack['year'] if pack and 'year' in pack and pack['year'] else self.metaYear(),
+			time = time if time else self.metaTime(),
 			season = season,
 			episode = episode if episode else self.metaEpisode(),
 			pack = pack,
 
+			numberCollection = self.numberCollection(),
 			fileRaw = self.fileName(exact = Stream.ExactRaw),
 			filePack = (self.filePack() or (count and count > 1)) if filePack is None else filePack,
 			fileSize = self.fileSize(),
 			sourceType = self.sourceType(),
-			sourceTime = self.sourceTime(),
+			sourceTime = self.sourceTime(time = Stream.TimeNone),
 			sourcePeers = self.sourcePeers(),
 			sourceSeeds = self.sourceSeeds(),
 			sourceLeeches = self.sourceLeeches(),
@@ -16402,6 +16423,7 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
+			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
@@ -16431,10 +16453,12 @@ class Stream(Serializer):
 		titleCollection,
 		titleEpisode,
 		year,
+		time,
 		season,
 		episode,
 		pack,
 
+		numberCollection,
 		fileRaw,
 		filePack,
 		fileSize,
@@ -16452,6 +16476,7 @@ class Stream(Serializer):
 
 		validateAdjust,
 		validateTitle,
+		validateRelease,
 		validateYear,
 		validateShow,
 		validateSeason,
@@ -16523,6 +16548,12 @@ class Stream(Serializer):
 		# Year
 		if validateYear:
 			if self.__yearValid(year = year, data = data, pack = filePack, deviation = deviation) is False:
+				self.unlock(lock)
+				return False
+
+		# Release
+		if validateRelease:
+			if not self.__releaseValid(data = data, media = media, title = title, year = year, time = time, pack = pack, numberCollection = numberCollection, filePack = filePack, sourceTime = sourceTime):
 				self.unlock(lock)
 				return False
 
@@ -17608,6 +17639,28 @@ class Stream(Serializer):
 	'''
 	def metaYearSet(self, value):
 		self.mData['meta']['year'] = value
+
+	##############################################################################
+	# META TIME
+	##############################################################################
+
+	'''
+		FUNCTION:
+			Retrieves the target release time.
+		RETURNS:
+			The release time (integer).
+	'''
+	def metaTime(self):
+		return self.mData['meta']['time']
+
+	'''
+		FUNCTION:
+			Sets the target release time.
+		PARAMETERS:
+			value (integer): The release time.
+	'''
+	def metaTimeSet(self, value):
+		self.mData['meta']['time'] = value
 
 	##############################################################################
 	# META SEASON
@@ -22811,6 +22864,79 @@ class Stream(Serializer):
 		data = self._expressionReplace(id = 'subtitleLanguageClean_' + str(guidance), data = data, expression = '(' + expression + ')', exclude = exclude, split = split)
 		if language: data = self.languageClean(data = data, exclude = exclude, encode = encode, guidance = guidance, native = native)
 		return data
+
+	##############################################################################
+	# RELEASE VALID
+	##############################################################################
+
+	'''
+		FUNCTION:
+			Checks wether the stream should be excluded, based on the release date and other attributes.
+			Can be called on an instance (without the data parameter), or on the class (with the data parameter).
+		PARAMETERS:
+			data (string): The file name.
+			media (string): The media type.
+			title (string/array): The title.
+			title (integer/array): The year.
+			time (integer): The release time.
+			pack (dictionary): The movie collection or show pack data.
+			numberCollection (list): The extracted movie collection numbers.
+			filePack (string): The extracted file pack.
+			sourceTime (integer): The extracted source time.
+		RETURNS:
+			Wether the file name should be excluded (boolean).
+	'''
+	@classmethod
+	def releaseValid(self, data, media = None, title = None, year = None, time = None, pack = None, numberCollection = None, filePack = None, sourceTime = None):
+		return self.__releaseValid(data = data, media = media, title = title, year = year, time = time, pack = pack, numberCollection = None, filePack = filePack, sourceTime = sourceTime)
+
+	def _releaseValid(self):
+		return self.__releaseValid(data = self.fileName(), media = self.metaMedia(), title = self.metaTitle(), year = self.metaYear(), time = self.metaTime(), pack = self.metaPack(), numberCollection = self.numberCollection(), filePack = self.filePack(), sourceTime = self.sourceTime(time = Stream.TimeNone))
+
+	@classmethod
+	def __releaseValid(self, data, media = None, title = None, year = None, time = None, pack = None, numberCollection = None, filePack = None, sourceTime = None):
+		if filePack:
+			# Sometimes the source time is incorrect.
+			# Eg: 9154202579
+			try:
+				if sourceTime and (sourceTime - tools.Time.timestamp()) > 86400: return False
+			except: tools.Logger.error()
+
+			# If the file pack was released BEFORE the actual episode or movie premiered.
+			# Eg: An old movie collection published 2 years ago should not be accepted as a pack for a new movie belonging to the collection that only premiered a few weeks ago.
+			# Allow some leniency, in case some titles are leaked before their official date.
+			try:
+				if time and sourceTime and (time - sourceTime) > (259200 if tools.Media.typeTelevision(media) else 604800): return False
+			except: tools.Logger.error()
+
+			# Ignore movie collections if the new movie number is not in the file name.
+			try:
+				if tools.Media.typeMovie(media) and title and numberCollection and pack:
+					numbers = [j for j in numberCollection if not j == Stream.NumberPack]
+					if numbers:
+						try: title = title[Stream.TitleAll]
+						except: pass
+						if tools.Tools.isString(title): title = [title]
+						title = [tools.Tools.replaceNotAlphaNumeric(j.lower()) for j in title]
+						if tools.Tools.isInteger(year): year = [year]
+
+						number = None
+						if not number:
+							for i in reversed(range(len(pack['movies']))):
+								titles = [tools.Tools.replaceNotAlphaNumeric(j.lower()) for j in pack['movies'][i]['title']]
+								if any(j in title for j in titles):
+									number = i + 1
+									break
+						if not number and year:
+							for i in reversed(range(len(pack['movies']))):
+								if pack['movies'][i]['year'] in year:
+									number = i + 1
+									break
+
+						if number and not number in numbers: return False
+			except: tools.Logger.error()
+
+		return True
 
 	##############################################################################
 	# RELEASE TYPE

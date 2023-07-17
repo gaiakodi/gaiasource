@@ -43,7 +43,7 @@ class Provider(ProviderDebrid):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			titlesAll = titles['processed']['all']
 			titlesMain = titles['processed']['main']
@@ -67,10 +67,10 @@ class Provider(ProviderDebrid):
 						try: parts = [part for part in item['parent']['parts'] if not part in folderExclude]
 						except: parts = []
 
-						time = item['time']
+						timed = item['time']
 						size = item['size']['bytes']
 
-						files.append({'id' : id, 'name' : name, 'parent' : parent, 'parts' : parts, 'time' : time, 'size' : size})
+						files.append({'id' : id, 'name' : name, 'parent' : parent, 'parts' : parts, 'time' : timed, 'size' : size})
 					except: self.logError()
 
 				if self.verifyBusy(): self.verifyCore()

@@ -1,4 +1,16 @@
 
+[B]6.3.9 (2023.07.17)[/B]
+- Added individual timestamps for movie collections.
+- Added individual timestamps for show packs.
+- Added release time to scraping process.
+- Fixed binge window delay.
+- Improved context menus.
+- Changed series context menu media.
+- Improved movie collection number detection.
+- Improved movie collection number filtering.
+- Improved source time filtering.
+- Fixed ChatGPT model selection.
+
 [B]6.3.8 (2023.07.12)[/B]
 - Increased overlay binge window delay time.
 - Added automatic pause during playback initialization.

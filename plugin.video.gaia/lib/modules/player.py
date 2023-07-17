@@ -751,7 +751,8 @@ class Player(xbmc.Player):
 				except:
 					try: duration = int(self.metadata['duration'])
 					except: pass
-				self.bingeDelay = int(duration / 60.0) if duration else 30
+				self.bingeDelay = int(duration / 50.0) if duration else 30
+				self.bingeDelay = max(30, self.bingeDelay)
 				if self.bingeDialogFull: self.bingeDelay = int(self.bingeDelay / 3.0)
 				self.bingeDelay = min(90, self.bingeDelay)
 
@@ -761,7 +762,7 @@ class Player(xbmc.Player):
 				#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
 				# UPDATE: Using (self.bingeDelay * 3) is too little for some shows like "The Witcher" which can have 3-5 minutes of credits for 45-55 minutes play time.
 				if self.bingeDialogOverlay:
-					multiplier = max(3.0, (duration / 8.0) if duration else 4.0)
+					multiplier = max(3.0, (duration / 600.0) if duration else 4.0)
 					self.bingeDelayBefore = int(self.bingeDelay * multiplier)
 
 		return self.bingeDelay
@@ -902,7 +903,10 @@ class Player(xbmc.Player):
 							try: delay = self.getTotalTime() - self.getTime()
 							except: delay = 0
 							automatic = self._bingeDelay()
-							if self.bingeDelayBefore: automatic = max(0, self.bingeDelayBefore - automatic)
+							if self.bingeDelayBefore:
+								if delay < self.bingeDelayBefore: start = delay # If progress is manually skipped to the end, where there is less playback time left than the value of "automatic".
+								else: start = self.bingeDelayBefore # Normal binge without playback skipping.
+								automatic = max(0, start - automatic)
 							self.bingeContinue = window.WindowBingeOverlay.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay, automatic = automatic)
 
 				if self.bingeContinue:

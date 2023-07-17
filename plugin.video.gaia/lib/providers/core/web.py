@@ -1296,7 +1296,7 @@ class ProviderWeb(ProviderBase):
 		result = Tools.listUnique(result)
 		return result
 
-	def queryGenerate(self, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, exact):
+	def queryGenerate(self, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, exact):
 		queries = []
 		queryTitles = []
 		try:
@@ -1537,7 +1537,7 @@ class ProviderWeb(ProviderBase):
 						'universal' : universal,
 						'original' : original,
 						'year' : None if pack else year if year else yearDefault,
-						'date' : None if pack else date,
+						'time' : None if pack else time,
 						'id' : {
 							'imdb' : None if pack == 'movie' else idImdb,
 							'tmdb' : None if pack == 'movie' else idTmdb,
@@ -1789,7 +1789,7 @@ class ProviderWeb(ProviderBase):
 
 		return queries
 
-	def queryReplacements(self, media, title, year, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, pack, exact, special):
+	def queryReplacements(self, media, title, year, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, pack, exact, special):
 		movie = Media.typeMovie(media)
 		show = Media.typeTelevision(media)
 
@@ -2735,7 +2735,7 @@ class ProviderWeb(ProviderBase):
 			validateEpisode = validateEpisode,
 		)
 
-	def search(self, link, subdomain, path, method, headers, cookies, data, replacements, category, validate, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack):
+	def search(self, link, subdomain, path, method, headers, cookies, data, replacements, category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack):
 		timer = self.statisticsTimer()
 		try:
 			offset = self.offsetStart()
@@ -2784,14 +2784,14 @@ class ProviderWeb(ProviderBase):
 	# EXECUTE
 	##############################################################################
 
-	def executeSearch(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeSearch(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
-			self.parametersSet(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+			self.parametersSet(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
 			self.processInitial()
 
 			validate = not exact
 			searches = self.searchQuery()
-			queries = self.queryGenerate(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, exact = exact)
+			queries = self.queryGenerate(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, exact = exact)
 			replacements = self.replacements()
 
 			if Media.typeMovie(media): categories = self.searchCategoryMovie()
@@ -2806,7 +2806,7 @@ class ProviderWeb(ProviderBase):
 
 					queryTitle = query['title']
 					queryYear = query['year']
-					queryDate = query['date']
+					queryTime = query['time']
 					queryIdImdb = query['id']['imdb']
 					queryIdTmdb = query['id']['tmdb']
 					queryIdTvdb = query['id']['tvdb']
@@ -2819,8 +2819,8 @@ class ProviderWeb(ProviderBase):
 
 					# Set the season/episode number to None for packs.
 					# Ensures that replacements will skip certain fallback queries (eg Newznab).
-					# Eg: if we are searching show packs, the season/episode number, year, and date should be None.
-					replacements.update(self.queryReplacements(media = media, title = queryTitle, year = queryYear, date = queryDate, idImdb = queryIdImdb, idTmdb = queryIdTmdb, idTvdb = queryIdTvdb, numberSeason = queryNumberSeason, numberEpisode = queryNumberEpisode, pack = queryPack, exact = exact, special = querySpecial))
+					# Eg: if we are searching show packs, the season/episode number, year, and time should be None.
+					replacements.update(self.queryReplacements(media = media, title = queryTitle, year = queryTime, time = queryTime, idImdb = queryIdImdb, idTmdb = queryIdTmdb, idTvdb = queryIdTvdb, numberSeason = queryNumberSeason, numberEpisode = queryNumberEpisode, pack = queryPack, exact = exact, special = querySpecial))
 
 					timer = self.statisticsTimer()
 					streams = self.cacheRetrieve(cache = cacheLoad, query = querySearch, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
@@ -2856,9 +2856,9 @@ class ProviderWeb(ProviderBase):
 								if values:
 									for value in values:
 										provider = self.copy() # Create a copy, since some class variables might be accessed by multiple threads (eg: self.added).
-										provider.parametersSet(query = query, media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+										provider.parametersSet(query = query, media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
 										provider.statisticsUpdateSearch(query = True)
-										threads.append(self.thread(provider.search, value['link'], value['subdomain'], value['path'], value['method'], value['headers'], value['cookies'], value['data'], value['replacements'], category, validate, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack))
+										threads.append(self.thread(provider.search, value['link'], value['subdomain'], value['path'], value['method'], value['headers'], value['cookies'], value['data'], value['replacements'], category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack))
 									break # Skip fallback queries.
 					else:
 						self.statisticsUpdateSearch(cache = True)

@@ -20,6 +20,8 @@
 
 # https://platform.openai.com/docs/
 
+#gaiaremove - add Chatgpt 4
+
 from lib.oracle import Oracle
 from lib.modules.tools import Media, Time, Tools, Math, Regex, Logger, Settings, Converter, Hash
 from lib.modules.interface import Dialog, Format, Font, Translation
@@ -62,7 +64,7 @@ class Chatgpt(Oracle):
 			'id'			: CategoryGpt40,
 			'name'			: 'GPT-4.0',
 			'description'	: 'Large multimodal models that can solve difficult problems with great accuracy.',
-			'release'		: ReleaseBeta,
+			'release'		: ReleaseStable,
 			'refine'		: True,
 		},
 		{
@@ -885,7 +887,6 @@ class Chatgpt(Oracle):
 	def _model(self, model, details = False, default = True):
 		try:
 			model = self._translate(model) # Default setting: $ADDON[plugin.video.gaia 33800]
-
 			if model is True or model is None or model == Translation.string(33800): model = Chatgpt.ModelDefault
 
 			if model:
@@ -894,7 +895,7 @@ class Chatgpt(Oracle):
 				else:
 					model = model.lower()
 					for i in Chatgpt.Models:
-						if model == i['id'] or model == self._modelLabel(model = i):
+						if model == i['id'] or model == self._modelLabel(model = i).lower():
 							return i if details else i['id']
 		except: Logger.error()
 
@@ -1095,7 +1096,6 @@ class Chatgpt(Oracle):
 
 			result = self._result()
 			result['error'] = self._requestError(type = Chatgpt.ErrorServer)
-
 			model = self._model(model = model, details = True, default = True)
 			category = self._category(category = model['category'], details = True)
 

@@ -3689,7 +3689,7 @@ class ProviderBase(object):
 			{
 				'titles'		: {'search':{'main':['The Office'],'episode':['Pilot'],'collection':[],'native':[]},'episode':'Pilot','collection':None,'abbreviation':'The Office','processed':{'all':['The Office','The Office (US)','美版办公室','O Escritório','The Office (US) – Das Büro','The Office (U.S.)','Vida de Escritório','O Escritorio','The Office (US)  Das Buro','Vida de Escritorio','Pilot'],'main':['The Office','The Office (US)','美版办公室','O Escritório','The Office (US) – Das Büro','The Office (U.S.)','Vida de Escritório','O Escritorio','The Office (US)  Das Buro','Vida de Escritorio'],'episode':['Pilot'],'collection':[]},'main':'The Office','local':'The Office (US)','original':'The Office'},
 				'years'			: {'common' : 2005, 'original' : 2005, 'median' : 2005, 'all' : [2005]},
-				'date'			: '2005-03-24',
+				'time'			: 1111622400,
 				'idImdb'		: 'tt0386676',
 				'idTmdb'		: '2316',
 				'idTvdb'		: '73244',
@@ -3699,7 +3699,7 @@ class ProviderBase(object):
 			{
 				'titles'		: {'search':{'main':['The Big Bang Theory'],'episode':['The Conjugal Conjecture'],'collection':[],'native':[]},'episode':'The Conjugal Conjecture','collection':None,'abbreviation':'The Big Bang Theory','processed':{'all':['The Big Bang Theory','天才理论传','Suure Paugu teooria','Enfejare Bozorg','Big Bang Theory','Vu No Lon','Teorie velkého třesku','Teorie velkého tresku','Teorie velkeho tresku','La teoría del Big Bang','תאוריית המפץ הגדול','Hamapats hagadol','SONY','Big Bang','Cómo se lo comí a tu madre','La Teoria del Big Bang','TBBT','A Teoria do Big Bang','Štreberi','宅男行不行','Didžiojo sprogimo teorija','Didziojo sprogimo teorija','ビッグバン★セオリー/ギークなボクらの恋愛法則','Agymenők','Agymenok','Teoria vel\'keho tresku','빅뱅이론','빅뱅 이론','Теорія великого вибуху','Como se lo comi a tu madre','Streberi','The Conjugal Conjecture'],'main':['The Big Bang Theory','天才理论传','Suure Paugu teooria','Enfejare Bozorg','Big Bang Theory','Vu No Lon','Teorie velkého třesku','Teorie velkého tresku','Teorie velkeho tresku','La teoría del Big Bang','תאוריית המפץ הגדול','Hamapats hagadol','SONY','Big Bang','Cómo se lo comí a tu madre','La Teoria del Big Bang','TBBT','A Teoria do Big Bang','Štreberi','宅男行不行','Didžiojo sprogimo teorija','Didziojo sprogimo teorija','ビッグバン★セオリー/ギークなボクらの恋愛法則','Agymenők','Agymenok','Teoria vel\'keho tresku','빅뱅이론','빅뱅 이론','Теорія великого вибуху','Como se lo comi a tu madre','Streberi'],'episode':['The Conjugal Conjecture'],'collection':[]},'main':'The Big Bang Theory','local':'The Big Bang Theory','original':'The Big Bang Theory'},
 				'years'			: {'common' : 2007, 'original' : 2007, 'median' : 2007, 'all' : [2007]},
-				'date'			: '2016-09-19',
+				'time'			: 1474243200,
 				'idImdb'		: 'tt0898266',
 				'idTmdb'		: '1418',
 				'idTvdb'		: '80379',
@@ -3709,7 +3709,7 @@ class ProviderBase(object):
 			{
 				'titles'		: {'search':{'main':['Game of Thrones'],'episode':['Winterfell'],'collection':[],'native':[]},'episode':'Winterfell','collection':None,'abbreviation':'Game of Thrones','processed':{'all':['Game of Thrones','Το Παιχνίδι του θρόνου','Παιχνίδι Του Στέμματος','Il Trono di Spade','بازی تاج و تخت','სამეფო კარის თამაშები','அரியணை விளையாட்டு','Juego de Tronos','冰与火之歌','权利的游戏','Game of Thrones (2011)','A Guerra dos Tronos','冰與火之歌：權力遊戲','Taht Oyunları','Sostų žaidimas','มหาศึกชิงบัลลังก์','Urzeala Tronurilor','Le Trône de fer','Le Throne de fer','Igra prijestolja','Game of Thrones- Das Lied von Eis und Feuer','Game of Thrones - Das Lied von Eis und Feuer','Trónok harca','صراع العروش','Jogo dos Tronos','A Song of Ice and Fire','GoT','Taht Oyunlar','Sostu zaidimas','Le Trone de fer','Tronok harca','Winterfell'],'main':['Game of Thrones','Το Παιχνίδι του θρόνου','Παιχνίδι Του Στέμματος','Il Trono di Spade','بازی تاج و تخت','სამეფო კარის თამაშები','அரியணை விளையாட்டு','Juego de Tronos','冰与火之歌','权利的游戏','Game of Thrones (2011)','A Guerra dos Tronos','冰與火之歌：權力遊戲','Taht Oyunları','Sostų žaidimas','มหาศึกชิงบัลลังก์','Urzeala Tronurilor','Le Trône de fer','Le Throne de fer','Igra prijestolja','Game of Thrones- Das Lied von Eis und Feuer','Game of Thrones - Das Lied von Eis und Feuer','Trónok harca','صراع العروش','Jogo dos Tronos','A Song of Ice and Fire','GoT','Taht Oyunlar','Sostu zaidimas','Le Trone de fer','Tronok harca'],'episode':['Winterfell'],'collection':[]},'main':'Game of Thrones','local':'Game of Thrones','original':'Game of Thrones'},
 				'years'			: {'common' : 2011, 'original' : 2011, 'median' : 2011, 'all' : [2011]},
-				'date'			: '2019-04-14',
+				'time'			: 1555200000,
 				'idImdb'		: 'tt0944947',
 				'idTmdb'		: '1399',
 				'idTvdb'		: '121361',
@@ -3719,7 +3719,7 @@ class ProviderBase(object):
 			{
 				'titles'		: {'search':{'main':['Rick and Morty'],'episode':['Total Rickall'],'collection':[],'native':[]},'episode':'Total Rickall','collection':None,'abbreviation':'Rick and Morty','processed':{'all':['Rick and Morty','Rick et Morty','Rick a Morty','瑞克与莫蒂','Total Rickall'],'main':['Rick and Morty','Rick et Morty','Rick a Morty','瑞克与莫蒂'],'episode':['Total Rickall'],'collection':[]},'main':'Rick and Morty','local':'Rick and Morty','original':'Rick and Morty'},
 				'years'			: {'common' : 2013, 'original' : 2013, 'median' : 2013, 'all' : [2013]},
-				'date'			: '2015-08-16',
+				'time'			: 1439683200,
 				'idImdb'		: 'tt2861424',
 				'idTmdb'		: '60625',
 				'idTvdb'		: '275274',
@@ -3729,7 +3729,7 @@ class ProviderBase(object):
 			{ # For NYAA.
 				'titles'		: {'search':{'main':['Dragon Ball Z'],'episode':['The Arrival of Raditz'],'collection':[],'native':[]},'episode':'The Arrival of Raditz','collection':None,'abbreviation':'Dragon Ball Z','processed':{'all':['Dragon Ball Z', 'Dragonball Z', 'DBZ', 'ドラゴンボールZ', 'The Arrival of Raditz'],'main':['Dragon Ball Z', 'Dragonball Z', 'DBZ', 'ドラゴンボールZ'],'episode':['The Arrival of Raditz'],'collection':[]},'main':'Dragon Ball Z','local':'Dragon Ball Z','original':'Dragon Ball Z'},
 				'years'			: {'common' : 2000, 'original' : 2000, 'median' : 2000, 'all' : [2000]},
-				'date'			: '2000-03-05',
+				'time'			: 952214400,
 				'idImdb'		: 'tt0214341',
 				'idTmdb'		: '12971',
 				'idTvdb'		: '81472',
@@ -3834,9 +3834,9 @@ class ProviderBase(object):
 	def parameters(self):
 		return self.mParameters
 
-	def parametersSet(self, query = None, media = None, titles = None, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = None, silent = None):
+	def parametersSet(self, query = None, media = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = None, silent = None):
 		# Copy the years, since the dictionary gets edited.
-		self.mParameters = {'query' : query, 'media' : media, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'date' : date, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
+		self.mParameters = {'query' : query, 'media' : media, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
 
 	def parametersImport(self, data):
 		if Tools.isString(data): data = Converter.jsonFrom(data)
@@ -3874,8 +3874,8 @@ class ProviderBase(object):
 		try: return self.parameterQuery()['title']
 		except: return None
 
-	def parameterQueryDate(self):
-		try: return self.parameterQuery()['date']
+	def parameterQueryTime(self):
+		try: return self.parameterQuery()['time']
 		except: return None
 
 	def parameterQueryId(self):
@@ -3921,8 +3921,8 @@ class ProviderBase(object):
 	def parameterYears(self):
 		return self.mParameters['years']
 
-	def parameterDate(self):
-		return self.mParameters['date']
+	def parameterTime(self):
+		return self.mParameters['time']
 
 	def parameterIdImdb(self):
 		return self.mParameters['idImdb']
@@ -4061,6 +4061,7 @@ class ProviderBase(object):
 				metaMedia = self.parameterMedia(),
 				metaTitle = self.parameterTitles(),
 				metaYear = self.parameterYears()['median'] if self.parameterYears() else None,
+				metaTime = self.parameterTime(),
 				metaSeason = self.parameterNumberSeason(),
 				metaEpisode = self.parameterNumberEpisode(),
 				metaLanguage = self.parameterLanguage(),
@@ -4245,7 +4246,7 @@ class ProviderBase(object):
 	# EXECUTE
 	##############################################################################
 
-	def execute(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def execute(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		result = []
 
 		self.stopClear()
@@ -4256,19 +4257,19 @@ class ProviderBase(object):
 		self.concurrencyLock()
 		timer = self.statisticsTimer()
 		if self.timerAllow() and not self.stopped():
-			if self.concurrencyProcess(): self.executeProcess(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
-			else: self.executeThread(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			if self.concurrencyProcess(): self.executeProcess(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			else: self.executeThread(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 		self.statisticsUpdate(duration = timer)
 		self.concurrencyUnlock()
 
 		return self.result()
 
-	def executeThread(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
-		self.executeSearch(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+	def executeThread(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		self.executeSearch(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 
-	def executeProcess(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeProcess(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		result = Pool.processData()
-		parameters = {'result' : result, 'media' : media, 'titles' : titles, 'years' : years, 'date' : date, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent, 'cacheLoad' : cacheLoad, 'cacheSave' : cacheSave, 'hostersAll' : hostersAll, 'hostersPremium' : hostersPremium}
+		parameters = {'result' : result, 'media' : media, 'titles' : titles, 'years' : years, 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent, 'cacheLoad' : cacheLoad, 'cacheSave' : cacheSave, 'hostersAll' : hostersAll, 'hostersPremium' : hostersPremium}
 
 		process = Pool.process(target = self._executeProcess, kwargs = parameters)
 		ProviderBase.Execution.append(process)
@@ -4284,7 +4285,7 @@ class ProviderBase(object):
 				self.resultSet([Stream.load(data = stream['stream']) for stream in streams])
 			except: pass
 
-	def _executeProcess(self, result, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def _executeProcess(self, result, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		# If the process is terminated (when calling stop() or when the timeout is reached with process.join(self.timerRemaining())), the "result" dictionary might be destroyed while the process is still running.
 		# Updating the dictionary in such a case throws a broken pipe error which is written to the Kodi log: BrokenPipeError: [Errno 32] Broken pipe
 		# Catch these errors to avoid filling up the log.
@@ -4299,22 +4300,22 @@ class ProviderBase(object):
 
 			result['result'] = None
 			result['statistics'] = None
-			self.executeSearch(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			self.executeSearch(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 			result['result'] = self.resultJson()
 			result['statistics'] = self.statistics()
 		except BrokenPipeError: pass
 		except: self.logError()
 
 	# NB: This function is overwritten in ProviderWeb. Make sure to add any future updates in this function to ProviderWeb as well.
-	def executeSearch(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeSearch(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			timer = self.statisticsTimer()
 			streams = self.cacheRetrieve(cache = cacheLoad, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
 			if streams is None:
 				if cacheSave: self.cacheInitialize(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
-				self.parametersSet(media = media, titles = titles, years = years, date = date, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+				self.parametersSet(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
 				self.statisticsUpdateSearch(query = True)
-				threads = [self.thread(self.search, media, titles, years, date, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack, exact, silent, cacheLoad, cacheSave, hostersAll, hostersPremium)]
+				threads = [self.thread(self.search, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack, exact, silent, cacheLoad, cacheSave, hostersAll, hostersPremium)]
 				self.threadExecute(threads = threads, factor = ProviderBase.TimeFactorScrape)
 			else:
 				self.statisticsUpdateSearch(cache = True)
@@ -4327,7 +4328,7 @@ class ProviderBase(object):
 	##############################################################################
 
 	# Can be implemented by subclasses.
-	def search(self, media, titles, years = None, date = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		pass
 
 	def searchValid(self, data, validateTitle = True, validateYear = True, validateShow = True, validateSeason = True, validateEpisode = True, validateAdjust = None, deviation = True, title = None, titleCollection = None):
@@ -4338,6 +4339,7 @@ class ProviderBase(object):
 			title = self.parameterTitles()['processed']['all'] if title is None else title,
 			titleCollection = self.parameterTitles()['processed']['collection'] if titleCollection else titleCollection,
 			year = self.parameterYears()['median'],
+
 			season = self.parameterNumberSeason(),
 			episode = self.parameterNumberEpisode(),
 

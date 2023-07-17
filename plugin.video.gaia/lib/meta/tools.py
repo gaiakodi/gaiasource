@@ -3007,7 +3007,7 @@ class MetaTools(object):
 						'status' : MetaData.StatusEnded if len(releases) > 1 and releases[-1] > 0 and max(releases) < time else MetaData.StatusContinuing, # TVDb only has a status for shows, but not for seasons. Calculate the status based on the episode release dates.
 						'count' : len(episodeItems),
 						'duration' : {'total' : duration, 'mean' : duration if duration is None else int(duration / float(len(episodeItems)))},
-						'time' : {'start' : episodeItems[0]['time'] if episodeItems else None, 'end' : episodeItems[-1]['time'] if episodeItems else None},
+						'time' : {'start' : episodeItems[0]['time'] if episodeItems else None, 'end' : episodeItems[-1]['time'] if episodeItems else None, 'times' : None},
 						'year' : {'start' : None, 'end' : None, 'years' : None},
 						'episodes' : sorted(episodeItems, key = lambda i : i['number'][MetaData.NumberOfficial]),
 					})
@@ -3017,7 +3017,7 @@ class MetaTools(object):
 						'status' : None,
 						'count' : 0,
 						'duration' : {'total' : None, 'mean' : None},
-						'time' : {'start' : None, 'end' : None},
+						'time' : {'start' : None, 'end' : None, 'times' : None},
 						'year' : {'start' : None, 'end' : None, 'years' : None},
 						'episodes' : [],
 					})
@@ -3040,13 +3040,16 @@ class MetaTools(object):
 
 			timeStart = None
 			timeEnd = None
+			timesShow = []
 			yearsShow = []
 			for itemSeason in seasonItems:
+				timesSeason = []
 				yearsSeason = []
 
 				# Calculate episode year.
 				for itemEpisode in itemSeason['episodes']:
 					if 'time' in itemEpisode and itemEpisode['time']:
+						timesSeason.append(itemEpisode['time'])
 						itemEpisode['year'] = Time.year(timestamp = itemEpisode['time'])
 						yearsSeason.append(itemEpisode['year'])
 
@@ -3054,6 +3057,10 @@ class MetaTools(object):
 				if 'status' in itemSeason and itemSeason['status'] and not itemSeason['status'] in [MetaData.StatusEnded, MetaData.StatusCanceled]:
 					try: itemSeason['time']['end'] = None
 					except: pass
+
+				# Calculate season time.
+				itemSeason['time']['times'] = Tools.listSort(Tools.listUnique(timesSeason))
+				timesShow.extend(itemSeason['time']['times'])
 
 				# Calculate season year.
 				if 'time' in itemSeason:
@@ -3079,7 +3086,7 @@ class MetaTools(object):
 					'count' : {
 						'season' : {'total' : countSeasonTotal, 'main' : countSeasonMain},
 					},
-					'time' : {'start' : timeStart, 'end' : timeEnd},
+					'time' : {'start' : timeStart, 'end' : timeEnd, 'times' : timesShow},
 					'year' : {'start' : yearStart, 'end' : yearEnd, 'years' : yearsShow},
 					'seasons' : seasonItems,
 				}
@@ -3106,7 +3113,7 @@ class MetaTools(object):
 						'show' : {'total' : durationShowTotal, 'main' : durationShowMain},
 						'mean' : {'total' : durationMeanTotal, 'main' : durationMeanMain},
 					},
-					'time' : {'start' : timeStart, 'end' : timeEnd},
+					'time' : {'start' : timeStart, 'end' : timeEnd, 'times' : timesShow},
 					'year' : {'start' : yearStart, 'end' : yearEnd, 'years' : yearsShow},
 					'seasons' : seasonItems,
 				}
