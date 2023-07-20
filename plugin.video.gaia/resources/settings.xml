@@ -4166,6 +4166,47 @@ The label is then added to the action element:
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
+				<setting id="activity.rating.power" type="integer" label="36403" help="34633" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36404">1</option>
+							<option label="36405">2</option>
+							<option label="36406">3</option>
+							<option label="36407">4</option>
+							<option label="36408">5</option>
+							<option label="36409">6</option>
+							<option label="36410">7</option>
+							<option label="36411">8</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.qr" type="integer" label="36412" help="34634" parent="activity.rating.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32315">1</option>
+							<option label="32034">2</option>
+							<option label="33508">3</option>
+							<option label="35668">4</option>
+							<option label="33105">5</option>
+							<option label="36413">6</option>
+							<option label="36414">7</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+					</dependencies>
+				</setting>
 				<setting id="activity.rating.binge" type="integer" label="33227" help="34551">
 					<control type="spinner" format="string"/>
 					<default>2</default>

@@ -20,7 +20,7 @@
 
 # https://platform.openai.com/docs/
 
-#gaiaremove - add Chatgpt 4
+#gaiaremove - test Chatgpt 4 - https://community.openai.com/t/gpt-4-model-does-not-exist/291988 - seems that OpenAI has only opened GPT4 to paying customers, not the free $5 accounts.
 
 from lib.oracle import Oracle
 from lib.modules.tools import Media, Time, Tools, Math, Regex, Logger, Settings, Converter, Hash

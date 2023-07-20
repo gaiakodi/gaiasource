@@ -7130,9 +7130,18 @@ msgctxt "#34632"
 msgid "Pause playback during the initialization phase. Kodi can sometimes take a few seconds to switch to another audio or subtitle stream. No audio or subtitles might be available during this time. This option will pause playback while the audio and subtitle streams are switched, and automatically resume once done, ensuring that no dialog is missed during the first few seconds of playback. In most cases the delay is short enough that this option is not needed."
 msgstr ""
 
+msgctxt "#34633"
+msgid "Change the default action of the power button in the rating dialog. The [I]Disabled[/I]  option will completely remove the power button. The [I]Powerdown[/I]  option powers down the system. The [I]Shutdown[/I]  option executes the default shutdown action defined in the Kodi system settings. The [I]Reboot[/I]  option restarts the system with a new power cycle. The [I]Suspend[/I]  option suspends the system with S3/S1 depending on the BIOS settings. The [I]Hibernate[/I]  option hibernates the system with S4. The [I]Minimize[/I]  option minimizes the Kodi window. The [I]Quit[/I]  option exits Kodi. The [I]Screensaver[/I]  option activates the screensaver."
+msgstr ""
+
+msgctxt "#34634"
+msgid "Change the default action of the QR button in the rating dialog. The [I]Disabled[/I]  option will completely remove the QR button. The [I]Trakt[/I], [I]IMDb[/I], [I]TMDb[/I], and [I]TVDb[/I]  options will open the title on the corresponding platform. The [I]Special[/I]  option will use [I]TMDb[/I]  for movies and [I]TVDb[/I]  for shows. The [I]Homepage[/I]  option will open the homepage of the title if available. The [I]Google[/I]  option will open a Google search for the title. If a specific option is not available for a title, the next best option will be used instead.
+"
+msgstr ""
+
+
 
 # [/GAIACODE]
-
 
 msgctxt "#35000"
 msgid "Few"
@@ -12268,4 +12277,52 @@ msgstr ""
 
 msgctxt "#36402"
 msgid "Initialization Pause"
+msgstr ""
+
+msgctxt "#36403"
+msgid "Power Button"
+msgstr ""
+
+msgctxt "#36404"
+msgid "Powerdown"
+msgstr ""
+
+msgctxt "#36405"
+msgid "Shutdown"
+msgstr ""
+
+msgctxt "#36406"
+msgid "Reboot"
+msgstr ""
+
+msgctxt "#36407"
+msgid "Suspend"
+msgstr ""
+
+msgctxt "#36408"
+msgid "Hibernate"
+msgstr ""
+
+msgctxt "#36409"
+msgid "Minimize"
+msgstr ""
+
+msgctxt "#36410"
+msgid "Quit"
+msgstr ""
+
+msgctxt "#36411"
+msgid "Screensaver"
+msgstr ""
+
+msgctxt "#36412"
+msgid "QR Button"
+msgstr ""
+
+msgctxt "#36413"
+msgid "Homepage"
+msgstr ""
+
+msgctxt "#36414"
+msgid "Google"
 msgstr ""

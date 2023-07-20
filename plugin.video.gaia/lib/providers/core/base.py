@@ -4243,17 +4243,23 @@ class ProviderBase(object):
 		Networker.modulePrepare()
 
 	##############################################################################
+	# CLEAR
+	##############################################################################
+
+	def clear(self):
+		self.concurrencyPrepare()
+		self.stopClear()
+		self.resultClear()
+		self.timerStart()
+
+	##############################################################################
 	# EXECUTE
 	##############################################################################
 
 	def execute(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		result = []
 
-		self.stopClear()
-		self.resultClear()
-		self.concurrencyPrepare()
-		self.timerStart()
-
+		self.clear()
 		self.concurrencyLock()
 		timer = self.statisticsTimer()
 		if self.timerAllow() and not self.stopped():
@@ -4364,6 +4370,13 @@ class ProviderBase(object):
 		self.mData['resolver'] = resolver
 
 	def resolve(self, link, renew = False):
+		# NB: Reset the scraping timeout.
+		# Otherwise resolving can fail during binge scraping.
+		# The provider is in idle state for a long time during binging, waiting for the current playback to finish.
+		# Once the next episode is started, resolving can fail, because any network request in the provider (eg: accountRequest()) checks the scraping timeout.
+		# Eg: YggTorrent.
+		self.clear()
+
 		return self.resolveLink(link = link, renew = renew)
 
 	# Can be implemented by subclasses.

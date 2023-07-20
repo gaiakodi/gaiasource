@@ -1,4 +1,17 @@
 
+[B]6.3.10 (2023.07.20)[/B]
+- Fixed stopped playback scrobbeling.
+- Possible fix for Trakt rate limit with scrobbeling.
+- Improved background binge scrape.
+- Increased binge delay for shorter episodes.
+- Improved chapter categorization for shorter episodes.
+- Fixed playback thread during binge overlay.
+- Fixed auto pause and resume during playback.
+- Improved player callbacks.
+- Fixed provider resolve timeouts during binging.
+- Added custom QR button to the rating dialog.
+- Added custom power button to the rating dialog.
+
 [B]6.3.9 (2023.07.17)[/B]
 - Added individual timestamps for movie collections.
 - Added individual timestamps for show packs.

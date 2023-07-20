@@ -3721,6 +3721,17 @@ class System(object):
 	OriginGaia = None
 	OriginParameter = 'gaia'
 
+	PowerPowerdown = 'powerdown'		# Power down the system.
+	PowerShutdown = 'shutdown'			# Default shutdown action defined in system settings.
+	PowerReboot = 'reboot'				# Cold reboot the system (power cycle).
+	PowerReset = 'reset'				# Reset the system (same as reboot).
+	PowerRestart = 'restart'			# Restart Kodi (only implemented under Windows and Linux).
+	PowerSuspend = 'suspend'			# Suspend the system (S3/S1 depending on bios setting).
+	PowerHibernate = 'hibernate'		# Hibernate the system (S4).
+	PowerMinimize = 'minimize'			# Minimize Kodi.
+	PowerQuit = 'quit'					# Quit Kodi.
+	PowerScreensaver = 'screensaver'	# Start the screensaver.
+
 	Monitor = None
 	Arguments = None
 	Menu = []
@@ -4122,6 +4133,25 @@ class System(object):
 	@classmethod
 	def originWidget(self):
 		return not self.origin()
+
+	@classmethod
+	def power(self, action):
+		actions = {
+			System.PowerPowerdown : 'Powerdown',
+			System.PowerShutdown : 'ShutDown',
+			System.PowerReboot : 'Reboot',
+			System.PowerReset : 'Reset',
+			System.PowerRestart : 'RestartApp',
+			System.PowerSuspend : 'Suspend',
+			System.PowerHibernate : 'Hibernate',
+			System.PowerMinimize : 'Minimize',
+			System.PowerQuit : 'Quit',
+			System.PowerScreensaver : 'ActivateScreensaver',
+		}
+		if action in actions:
+			self.execute(command = actions[action])
+			return True
+		return False
 
 	@classmethod
 	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, gaia = True, optimize = True):
@@ -6058,7 +6088,7 @@ class Settings(object):
 			from lib.modules.handler import Handler
 			from lib.modules.playback import Playback
 			from lib.modules.interface import Font, Icon, Format, Core as CoreDialog, Dialog, Context
-			from lib.modules.player import Streamer, Subtitle as SubtitlePlayer
+			from lib.modules.player import Player, Streamer, Subtitle as SubtitlePlayer
 			from lib.modules.subtitle import Subtitle
 			from lib.modules.window import Window
 			from lib.modules import trakt as Trakt
@@ -6067,7 +6097,7 @@ class Settings(object):
 				MetaTools, Debrid, Stream, Manager,
 				Account, Cloudflare, Core, Handler, Playback, Subtitle, Window, Trakt,
 				Font, Icon, Format, CoreDialog, Dialog, Context,
-				Streamer, SubtitlePlayer,
+				Player, Streamer, SubtitlePlayer,
 				Cache, Memory, Pool,
 				Language, Media, System,
 			]
@@ -13827,3 +13857,41 @@ class Timeout(object):
 					except: Logger.error()
 
 		return self._settingsResult(result)
+
+###################################################################
+# GOOGLE
+###################################################################
+
+class Google(object):
+
+	Link = 'https://google.com/search?q=%s'
+
+	@classmethod
+	def link(self, query = None, media = None, title = None, year = None, season = None, episode = None, metadata = None):
+		if not query:
+			if metadata:
+				try: media = Media.TypeShow if 'tvshowtitle' in metadata or 'season' in metadata else Media.TypeMovie
+				except: pass
+				try: title = metadata['tvshowtitle'] if Media.typeTelevision(media) else metadata['title']
+				except: pass
+				try: year = metadata['year']
+				except: pass
+				try: season = metadata['season']
+				except: pass
+				try: episode = metadata['episode']
+				except: pass
+
+			if not title: return None
+			query = [title]
+			if Media.typeTelevision(media):
+				if not season is None: query.extend(['Season', season])
+				if not episode is None: query.extend(['Episode', episode])
+			elif tools.Media.typeMovie(media):
+				if year: query.append(year)
+			query = [Converter.unicode(i) for i in query if not i is None]
+
+		if query:
+			from lib.modules.network import Networker
+			if Tools.isArray(query): query = ' '.join(query)
+			return Google.Link % Networker.linkQuote(data = query, plus = True)
+		return None

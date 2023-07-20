@@ -4302,17 +4302,7 @@ class Context(object):
 		elif mode == 'trailer':
 			link = self.mMetadata['trailer']
 		elif mode == 'google':
-			if tools.Media.typeTelevision(self.mMedia):
-				link = [self.mTitle]
-				if not self.mSeason is None: link.extend(['Season', self.mSeason])
-				if not self.mEpisode is None: link.extend(['Episode', self.mEpisode])
-			elif tools.Media.typeMovie(self.mMedia): link = [self.mTitle, self.mYear]
-			else: link = [self.mTitle]
-			link = [str(i) for i in link if not i is None]
-			if link:
-				from lib.modules.network import Networker
-				link = 'https://google.com/search?q=%s' % Networker.linkQuote(data = ' '.join(link), plus = True)
-			else: link = None
+			 link = tools.Google.link(metadata = self.mMetadata)
 		return self._commandPlugin(action = 'copy', parameters = {'link' : link})
 
 	def commandShortcutCreate(self):

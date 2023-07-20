@@ -71,25 +71,33 @@ class Player(xbmc.Player):
 
 	DetailsSplit = 75 # 90 is just enough for default Estaury skin. Make it a bit less for other skins.
 
-	def __init__ (self, media = None, kids = None):
-		from lib.modules import core
+	Instance = None
+
+	def __init__ (self,):
 		xbmc.Player.__init__(self)
-		self.media = media
-		self.kids = kids
 		self.status = Player.StatusIdle
 		self.statusStarted = False
-		self.core = core.Core(media = media, kids = kids)
 
 	def __del__(self):
-		self._downloadClear(delete = False)
-		self.core.progressPlaybackClose(loader = False)
+		try:
+			self._downloadClear(delete = False)
+			self.core.progressPlaybackClose(loader = False)
+		except: tools.Logger.error()
 		try: xbmc.Player.__del__(self)
 		except: pass
 
-	def run(self, media, title, year, season, episode, imdb, tmdb, tvdb, metadata, downloadType = None, downloadId = None, source = None, binge = None, resume = None, autoplay = None, reload = None, handle = None, service = None):
+	@classmethod
+	def instance(self, reinitialize = False):
+		if Player.Instance is None or reinitialize: Player.Instance = self()
+		return Player.Instance
+
+	@classmethod
+	def reset(self, settings = True):
+		Player.Instance = None
+
+	def run(self, media, title, year, season, episode, imdb, tmdb, tvdb, metadata, kids = None, downloadType = None, downloadId = None, source = None, binge = None, resume = None, autoplay = None, reload = None, handle = None, service = None):
 		try:
 			if interface.Player.canceled(): return False
-			tools.Time.sleep(0.2)
 
 			self.vpnMonitor = False
 			if Vpn.settingsEnabled():
@@ -99,7 +107,11 @@ class Player(xbmc.Player):
 
 			self.navigationStreamsSpecial = tools.Settings.getInteger('interface.stream.interface') == 0
 
+			from lib.modules import core
+			self.core = core.Core(media = media, kids = kids)
+
 			self.media = media
+			self.kids = kids
 			self.mediaMovie = tools.Media.typeMovie(self.media)
 			self.mediaTelevision = tools.Media.typeTelevision(self.media)
 
@@ -148,11 +160,17 @@ class Player(xbmc.Player):
 			self.bingeFinishedShow = False
 			self.bingeFinishedPlay = False
 			self.bingeMetadata = None
+			self.bingeThread = None
 
 			# Make sure the latests Trakt status is pulled in, so that the item can be correctly marked as watched if the user changes the playcount on Trakt's website just beforehand.
 			self.playback = Playback.instance()
 			self.playback.refresh(media = self.media, wait = False)
 			self.playbackWatched = False
+			self.playbackLock = Lock()
+
+			self.playbackEnd = 80
+			if self.playback.settingsHistoryEnabled(): self.playbackEnd = self.playback.settingsHistoryEnd()
+			self.playbackEnd = self.playbackEnd / 100.0
 
 			self.source = source
 			self.source['stream'] = Stream.load(data = self.source['stream'])
@@ -333,12 +351,14 @@ class Player(xbmc.Player):
 			tools.System.pluginResolvedSet(success = False, dummy = True) # When played from the local library, 'success = False' hides the dialog, 'success = True' still shows the dialog.
 
 			# Sometimes when stopping playback, the Kodi player does not fire the onPlayBackStopped/onPlayBackEnded events.
-			# This causes the stream window not to reloaded.
+			# This causes the stream window not to reload.
 			# Manually call the event in such a case.
-			if not self.status == Player.StatusStopped and not self.status == Player.StatusEnded: self.onPlayBackEnded()
+			# Update: Maybe this has been solved. Check the comments in onPlayBackStarted().
+			if not self.status == Player.StatusStopped and not self.status == Player.StatusEnded: self.onPlayBackStopped()
 
 			# In case the playback failed or timed out without finishing naturally.
 			# Only do this if not playing, otherwise this call can be sporadically triggered before the call from onPlayBackStopped(), and then the stream window is not reloaded.
+			# Update: Maybe this has been solved. Check the comments in onPlayBackStarted().
 			if not self.status == Player.StatusPlaying: self.playbackFinalize()
 
 			return success
@@ -744,26 +764,26 @@ class Player(xbmc.Player):
 			if not self.bingeDelay: self.bingeDelay = tools.Binge.delay()
 
 			automatic = False
+			duration = None
+			try: duration = self.getTotalTime()
+			except:
+				try: duration = int(self.metadata['duration'])
+				except: pass
 			if self.bingeDelay == 0:
 				automatic = True
-				duration = None
-				try: duration = self.getTotalTime()
-				except:
-					try: duration = int(self.metadata['duration'])
-					except: pass
-				self.bingeDelay = int(duration / 50.0) if duration else 30
-				self.bingeDelay = max(30, self.bingeDelay)
+				self.bingeDelay = int(duration / 50.0) if duration else 45
+				self.bingeDelay = max(45, self.bingeDelay)
 				if self.bingeDialogFull: self.bingeDelay = int(self.bingeDelay / 3.0)
 				self.bingeDelay = min(90, self.bingeDelay)
 
-				# Increase the time for the overlay dialog.
-				# The dialog is shown hidden at this time and can be manually shown or wait for it to show automatically.
-				# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
-				#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
-				# UPDATE: Using (self.bingeDelay * 3) is too little for some shows like "The Witcher" which can have 3-5 minutes of credits for 45-55 minutes play time.
-				if self.bingeDialogOverlay:
-					multiplier = max(3.0, (duration / 600.0) if duration else 4.0)
-					self.bingeDelayBefore = int(self.bingeDelay * multiplier)
+			# Increase the time for the overlay dialog.
+			# The dialog is shown hidden at this time and can be manually shown or wait for it to show automatically.
+			# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
+			#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
+			# UPDATE: Using (self.bingeDelay * 3) is too little for some shows like "The Witcher" which can have 3-5 minutes of credits for 45-55 minutes play time.
+			if self.bingeDialogOverlay:
+				multiplier = max(3.0, (duration / 600.0) if duration else 4.0)
+				self.bingeDelayBefore = int(self.bingeDelay * multiplier)
 
 		return self.bingeDelay
 
@@ -776,8 +796,7 @@ class Player(xbmc.Player):
 				# Secondly, during the first few minutes the user might stop playback and select a different stream, due to buffering or video/audio problems, and we do not want to draw down the system during this time.
 				if not self.bingeFinishedScrape and self.timeCurrent > 300 and remaining < tools.Binge.scrape():
 					self.bingeFinishedScrape = True
-					thread = Pool.thread(target = self._bingeScrape)
-					thread.start()
+					Pool.thread(target = self._bingeScrape, start = True)
 				if not self.bingeFinishedCheck and self.bingeMetadata:
 					if self.bingeDialogUpNext:
 						if not self.bingeMetadata is None:
@@ -790,8 +809,7 @@ class Player(xbmc.Player):
 						if remaining <= delay:
 							self.bingeFinishedCheck = True
 							self._bingeShow()
-		except:
-			tools.Logger.error()
+		except: tools.Logger.error()
 
 	def _bingeScrape(self):
 		try:
@@ -865,14 +883,20 @@ class Player(xbmc.Player):
 		self._bingeShow()
 
 	def _bingeShow(self):
+		# NB: Use a thread here.
+		# The binge windows are blocking and _bingeShowDialog() will only finish if the user closed/continued the binging.
+		# This in turn causes keepPlaybackAlive() to hang and not submit scrobble/watched status during the whole time the binge window is opened (including being hidden).
+		if self.bingeThread is None or not self.bingeThread.alive():
+			self.bingeThread = Pool.thread(target = self._bingeShowDialog, start = True)
+
+	def _bingeShowDialog(self):
 		try:
 			if self.binge and self.bingeMetadata and not self.bingeFinishedShow:
 				self.bingeFinishedShow = True
 				if not self.bingeDialogUpNext:
 					self.bingeContinue = True
 					if self.bingeSuppress:
-						thread = Pool.thread(target = self._bingeSuppress)
-						thread.start()
+						Pool.thread(target = self._bingeSuppress, start = True)
 					if not self.bingeDialogNone:
 						images = MetaImage.setEpisode(data = self.bingeMetadata, season = False, episode = False)
 
@@ -919,8 +943,7 @@ class Player(xbmc.Player):
 						self.bingePlay = True
 				elif tools.Binge.actionCancel() == tools.Binge.ActionInterrupt:
 					self.stop()
-		except:
-			tools.Logger.error()
+		except: tools.Logger.error()
 
 	def _bingePlay(self):
 		try:
@@ -972,6 +995,12 @@ class Player(xbmc.Player):
 			if self.bingeDialogFull: window.WindowBingeFull.cancel()
 			elif self.bingeDialogOverlay: window.WindowBingeOverlay.cancel()
 			self.bingeContinue = False
+
+			# If we stop playback in the middle (while the background scrape of the next episode is already done), the stream window of the NEXT episode is shown on "reload".
+			# By setting this status, the stream window of the current unfinished episode is shown instead.
+			if not self.core.propertyStatus() in [self.core.StatusCancel, self.core.StatusContinue]:
+				if self.timeProgress < self.playbackEnd and self.status == Player.StatusStopped: self.core.propertyStatusSet(self.core.StatusCancel)
+				else: self.core.propertyStatusSet(self.core.StatusContinue)
 
 	def _closeFailure(self):
 		# Close Kodi's "Playback Failed" dialog.
@@ -1167,10 +1196,6 @@ class Player(xbmc.Player):
 
 			addLibrary = tools.Settings.getBoolean('library.general.watched')
 
-			playbackEnd = 80
-			if self.playback.settingsHistoryEnabled(): playbackEnd = self.playback.settingsHistoryEnd()
-			playbackEnd = playbackEnd / 100.0
-
 			streamsHas = False
 			visibleWas = False
 
@@ -1188,14 +1213,13 @@ class Player(xbmc.Player):
 				# If the video clip is below 30 seconds, assume it is not a valid one, and do not mark progress, binge watch, etc.
 				if self.timeTotal and self.timeTotal > 30:
 					try:
-						if self.timeProgress >= playbackEnd and not self.playbackWatched:
+						if self.timeProgress >= self.playbackEnd and not self.playbackWatched:
 							try: orionoid.Orionoid().streamVote(idItem = self.source['stream'].idOrionItem(), idStream = self.source['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteUp)
 							except: pass
 							self.playbackWatched = True
 							if addLibrary: library.Library(media = self.media).add(title = self.title, year = self.year, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, metadata = self.metadata)
 							self._updateLibrary()
 					except: tools.Logger.error()
-
 					self.progressUpdate()
 					self._bingeCheck()
 
@@ -1253,60 +1277,80 @@ class Player(xbmc.Player):
 						# Hence, only stop scrobble if the playback actually finished, and not just when the user hits the stop button in Kodi's player.
 						# This is not a huge issue, since the playback progress can still be retrieved from the local database, but it is still better to get the progress from Trakt, in case the user watched it on a different device.
 						if self.playbackWatched: action = Playback.ActionStop
-						else: action = Playback.ActionPause
+						else: action = Playback.ActionFinish
 
 				if action: self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
 
 	def progressInitialize(self):
+		locked = False
 		try:
-			if self.timeTotal == 0: self.timeTotal = self.getTotalTime()
-			if self.timeCurrent == 0: self.timeCurrent = self.getTime()
-		except:
-			# When Kodi's player is not playing anything, it throws an exception when calling self.getTotalTime()
-			return
+			try:
+				if self.timeTotal == 0: self.timeTotal = self.getTotalTime()
+				if self.timeCurrent == 0: self.timeCurrent = self.getTime()
+			except:
+				# When Kodi's player is not playing anything, it throws an exception when calling self.getTotalTime()
+				return
 
-		if not self.progressInitialized:
-			self.progressInitialized = True
-			self.progressBusy = True
-			if self.progressThread:
-				self.join(self.progressThread)
-				self.progressThread = None
+			if not self.progressInitialized:
+				self.progressInitialized = True
+				self.progressBusy = True
+				if self.progressThread:
+					self.join(self.progressThread)
+					self.progressThread = None
 
-			if not self.resumeTime and self.progress > 0:
-				if self.timeTotal > 0:
-					paused = False
-					seconds = self.progress * self.timeTotal
-					if seconds > 0:
-						if self.playback.settingsHistoryEnabled():
-							resume = self.playback.settingsHistoryProgressResume()
-							if resume == 4:
-								if self.progress <= 0.02 or self.progress >= 0.98:
-									resume = -1
-									seconds = 0
-								elif self.progress <= 0.1 or self.progress >= 0.9:
-									resume = 3
-								else:
-									resume = -1
+				if not self.resumeTime and self.progress > 0:
+					if self.timeTotal > 0:
+						paused = False
+						seconds = self.progress * self.timeTotal
+						if seconds > 0:
+							if self.playback.settingsHistoryEnabled():
+								resume = self.playback.settingsHistoryProgressResume()
+								if resume == 4:
+									if self.progress <= 0.02 or self.progress >= 0.98:
+										resume = -1
+										seconds = 0
+									elif self.progress <= 0.1 or self.progress >= 0.9:
+										resume = 3
+									else:
+										resume = -1
 
-							if resume >= 2:
-								paused = True
-								self.pause()
-								timeMinutes, timeSeconds = divmod(float(seconds), 60)
-								timeHours, timeMinutes = divmod(timeMinutes, 60)
-								label = '%02d:%02d:%02d' % (timeHours, timeMinutes, timeSeconds)
-								label = interface.Translation.string(32502) % label
-								if resume == 3: label += ' ' + interface.Translation.string(34372)
-								choice = interface.Dialog.option(title = 32344, message = label, labelConfirm = 32501, labelDeny = 32503, timeout = 10000 if resume >= 3 else None)
-								if choice: seconds = 0
+								if resume >= 2:
+									paused = True
+									timeMinutes, timeSeconds = divmod(float(seconds), 60)
+									timeHours, timeMinutes = divmod(timeMinutes, 60)
+									label = '%02d:%02d:%02d' % (timeHours, timeMinutes, timeSeconds)
+									label = interface.Translation.string(32502) % label
+									if resume == 3: label += ' ' + interface.Translation.string(34372)
 
-					if seconds > 0: self.resume(seconds, offset = True)
-					if paused:
-						self.pause()
-						tools.Time.sleep(0.1) # Otherwise the onPlaybackResumed() can fire AFTER self.progressBusy is reset below.
+									# Lock, so that the subtitle dialog/paause and the resume dialog/pause do not intefer while running in threads.
+									self.playbackLock.acquire()
+									locked = True
 
-			self.progressBusy = False
+									Streamer.playerPause()
+									choice = interface.Dialog.option(title = 32344, message = label, labelConfirm = 32501, labelDeny = 32503, timeout = 10000 if resume >= 3 else None)
+									if choice: seconds = 0
 
-		self.progressUpdate()
+						if seconds > 0:
+							self.resume(seconds, offset = True)
+						if paused:
+							Streamer.playerUnpause()
+							try:
+								if locked: self.playbackLock.release()
+							except: pass
+							tools.Time.sleep(0.1) # Otherwise the onPlaybackResumed() can fire AFTER self.progressBusy is reset below.
+						else:
+							if locked:
+								try:
+									if locked: self.playbackLock.release()
+								except: pass
+
+				self.progressBusy = False
+
+			self.progressUpdate()
+		finally:
+			try:
+				if locked: self.playbackLock.release()
+			except: pass
 
 	def _bufferDetect(self, duration = 5, setting = None):
 		# Do not start the threads immediately, since we want to start them as close together as possible, since we want to get readings from the same time interval.
@@ -1503,16 +1547,25 @@ class Player(xbmc.Player):
 				tools.Logger.error()
 
 	def streamSelect(self):
-		enabled = tools.Settings.getBoolean('playback.general.pause')
-		if enabled and self.status == Player.StatusPlaying: self.pause()
+		locked = False
+		try:
+			enabled = tools.Settings.getBoolean('playback.general.pause')
+			if enabled:
+				self.playbackLock.acquire()
+				locked = True
+				Streamer.playerPause()
 
-		Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
-		thread = Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
-		if self.mediaTelevision: Chapter.select()
+			Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
+			thread = Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
+			if self.mediaTelevision: Chapter.select()
 
-		if enabled:
-			if thread: thread.join()
-			if self.status == Player.StatusPlaying: self.pause()
+			if enabled:
+				if thread: thread.join()
+				Streamer.playerUnpause()
+		finally:
+			try:
+				if locked: self.playbackLock.release()
+			except: pass
 
 	def streamSubtitle(self):
 		Subtitle.internal(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
@@ -1526,18 +1579,26 @@ class Player(xbmc.Player):
 	def playbackInitialize(self):
 		if not self.playbackInitialized:
 			self.playbackInitialized = True
-
-			for i in range(0, 600):
+			for i in range(0, 1200):
 				# Check "started" as well, otherwise the playback window is closed too quickly and the background menus are visible for a second.
 				# It seems that Kodi fixed the issue that onAvStarted() was not called, should now be correctly executed.
 				if self.isPlayback(started = True) or self.status == Player.StatusPaused: break
-				tools.Time.sleep(0.1)
+				tools.Time.sleep(0.05)
 			interface.Dialog.closeAll()
 
 			# Make sure progressInitialize() and streamSelect() are not executed at the same time.
 			# Otherise the resume and subtitles dialog might pop up at the same time.
-			self.progressInitialize()
-			self.streamSelect()
+			#self.progressInitialize()
+			#self.streamSelect()
+			# Update: We now do these in threads. They use a lock to prevent the dialogs/pause/resume from these functions to intefer.
+			# This is important for anime, where the dialog often starts in the 1st second of the video.
+			# If selecting the subtitles takes too long (when executing sequentially), the first few sentences might be missed.
+			# streamSelect() does pause playback until the subtitles were selected, but it might take too long before it is paused while the dialog already started.
+			threads = [
+				Pool.thread(target = self.streamSelect, start = True),
+				Pool.thread(target = self.progressInitialize, start = True),
+			]
+			[thread.join() for thread in threads]
 
 			# Only start this AFTER the resume feature and subtitle dialogs, since they pause playback which is incorrectly detected as buffering.
 			self.bufferMonitor()
@@ -1575,71 +1636,100 @@ class Player(xbmc.Player):
 				if not continued: interface.Directory.refresh(position = True, wait = False)
 
 	def onPlayBackStarted(self):
-		tools.Logger.log('Playback Started')
-
+		# NB: It seems that Kodi only executes callbacks if the previous callback is done executing.
+		# If within a callback, we execute a large function that itself relies on the status/data of another callback, it does not seem to work.
+		# It then looks like the callbacks never get executed.
+		# This might be the problem for various other parts of ther Player code, eg: the last few statements in run().
+		# Starting a thread seems to solve the problem.
 		self.status = Player.StatusPlaying
+		tools.Logger.log('Playback Started')
+		Pool.thread(target = self._onPlayBackStarted, start = True)
+
+	def _onPlayBackStarted(self):
 		interface.Loader.hide()
 
 	def onPlayBackPaused(self):
-		tools.Logger.log('Playback Paused')
-
 		self.status = Player.StatusPaused
+		tools.Logger.log('Playback Paused')
+		Pool.thread(target = self._onPlayBackPaused, start = True)
+
+	def _onPlayBackPaused(self):
 		self.progressUpdate()
 
 	def onPlayBackResumed(self):
-		tools.Logger.log('Playback Resumed')
-
 		self.status = Player.StatusPlaying
+		tools.Logger.log('Playback Resumed')
+		Pool.thread(target = self._onPlayBackResumed, start = True)
+
+	def _onPlayBackResumed(self):
 		self.progressUpdate()
 
 	def onPlayBackStopped(self):
-		tools.Logger.log('Playback Stopped')
-
 		self.status = Player.StatusStopped
+		tools.Logger.log('Playback Stopped')
+		Pool.thread(target = self._onPlayBackStopped, start = True)
 
+	def _onPlayBackStopped(self):
 		self._bingeCancel()
 		self._downloadStop()
 		self._debridClear()
+		self._downloadClear()
 
 		# Only do this if the video actually played and did not stop because of failure or timeout.
 		if self.statusStarted: self.playbackFinalize()
 
 	def onPlayBackEnded(self):
-		tools.Logger.log('Playback Ended')
-
-		self.onPlayBackStopped()
 		self.status = Player.StatusEnded
+		tools.Logger.log('Playback Ended')
+		Pool.thread(target = self._onPlayBackEnded, start = True)
 
-		self._downloadClear()
+	def _onPlayBackEnded(self):
+		self.onPlayBackStopped()
 
 	def onPlayBackError(self):
 		tools.Logger.log('Playback Error')
 		self.error = True
+		#Pool.thread(target = self._onPlayBackError, start = True)
+
+	def _onPlayBackError(self):
+		pass
 
 	def onAVStarted(self):
 		self.statusStarted = True
 		tools.Logger.log('Playback AV Started')
+		Pool.thread(target = self._onAVStarted, start = True)
 
+	def _onAVStarted(self):
 		# Do this here and not in onPlayBackStarted(), since onPlayBackStarted() is called even if the video doess not play (eg: link times out).
 		self.playbackInitialize()
 
 	def onAVChange(self):
 		tools.Logger.log('Playback AV Changed')
+		#Pool.thread(target = self._onAVChange, start = True)
+
+	def _onAVChange(self):
+		pass
 
 	def onPlayBackSeek(self, time, seekOffset):
 		tools.Logger.log('Playback Seek')
+		Pool.thread(target = self._onPlayBackSeek, start = True)
+
+	def _onPlayBackSeek(self):
 		self._bufferReset() # Show notification again if the playback position was changed, typically leading to some buffering.
 		self.progressUpdate()
 
 	def onPlayBackSeekChapter(self, chapter):
 		tools.Logger.log('Playback Seek Chapter')
+		Pool.thread(target = self._onPlayBackSeekChapter, start = True)
+
+	def _onPlayBackSeekChapter(self):
 		self._bufferReset() # Show notification again if the playback position was changed, typically leading to some buffering.
 		self.progressUpdate()
-
 
 class Streamer(object):
 
 	Player = None
+	Status = None
 	Language = None
 
 	# Must correspond with settings.xml.
@@ -1653,9 +1743,8 @@ class Streamer(object):
 	@classmethod
 	def reset(self, settings = True):
 		Streamer.Player = None
-
-		if settings:
-			Streamer.Language = None
+		Streamer.Status = None
+		if settings: Streamer.Language = None
 
 	##############################################################################
 	# GENERAL
@@ -1675,14 +1764,53 @@ class Streamer(object):
 		return Streamer.Player
 
 	@classmethod
-	def playerPause(self):
-		player = self.player()
-		if not player.status() == interface.Player.StatusPaused: player.pause()
+	def playerPause(self, wait = False):
+		# NB: For some reasons, the callbacks from interface.Player are never executed in playerPause() and playerUnpause().
+		# Use the status from player.py Player to solve the issue.
+		#player = self.player()
+		#if not player.status() == interface.Player.StatusPaused: player.pause()
+
+		player = Player.instance()
+		if Streamer.Status is None: Streamer.Status = player.status
+
+		#if not player.status == Player.StatusPaused:
+		if not Streamer.Status == Player.StatusPaused:
+			player.pause()
+			Streamer.Status = Player.StatusPaused
+			if wait: self.playerWait(status = Player.StatusPaused)
 
 	@classmethod
-	def playerUnpause(self):
-		player = self.player()
-		if player.status() == interface.Player.StatusPaused: player.pause()
+	def playerUnpause(self, wait = False):
+		# NB: For some reasons, the callbacks from interface.Player are never executed in playerPause() and playerUnpause().
+		# Use the status from player.py Player to solve the issue.
+		#player = self.player()
+		#if player.status() == interface.Player.StatusPaused: player.pause()
+
+		player = Player.instance()
+		if Streamer.Status is None: Streamer.Status = player.status
+
+		#if player.status == Player.StatusPaused:
+		if Streamer.Status == Player.StatusPaused:
+			player.pause()
+			Streamer.Status = Player.StatusPlaying
+			if wait: self.playerWait(status = Player.StatusPlaying)
+
+	@classmethod
+	def playerStatus(self, status = None):
+		if not status is None: Streamer.Status = status
+		return Streamer.Status
+
+	@classmethod
+	def playerWait(self, status):
+		# It can take a few 100 ms for Kodi to actually pause/unpause the playback and execute the callbacks that change the status.
+		# Without waiting, there are sporadic errors where it is playing while the subtitles/resume dialog are showing, or it stays paused after these dialogs were closed.
+		# Update: A better solution is to not wait (esepcially when pausing) and hold up the subtitle selection.
+		# Instead, use an internal state here.
+		# Note that this will only work if the functions of Styreamer are called directly. Calling pause() directly on the player will not update the status here.
+		player = Player.instance()
+		for i in range(100):
+			if player.status == status: break
+			tools.Time.sleep(0.01)
 
 	@classmethod
 	def streams(self, unknown = False):
@@ -1786,10 +1914,10 @@ class Audio(Streamer):
 			# This is probably because the player has not fully initialized.
 			# Wait and try again.
 			streams = None
-			for i in range(5):
+			for i in range(20):
 				streams = self.streams(unknown = unknown)
 				if streams and streams[0]: break
-				tools.Time.sleep(0.2)
+				tools.Time.sleep(0.05)
 
 			settings = self.settingsLanguage(log = not unknown)
 			current = self.streamCurrent(unknown = unknown)
@@ -2027,13 +2155,13 @@ class Subtitle(Streamer):
 				Subtitle.InternalValid = current # Last valid subtitles that are not InternalSelect.
 
 	@classmethod
-	def select(self, name, imdb, title, season, episode, source, wait = False, internal = False):
-		thread = Pool.thread(target = self._select, kwargs = {'name' : name, 'imdb' : imdb, 'title' : title, 'season' : season, 'episode' : episode, 'source' : source, 'internal' : internal}, start = True)
+	def select(self, name, imdb, title, season, episode, source, wait = False, internal = False, lock = None):
+		thread = Pool.thread(target = self._select, kwargs = {'name' : name, 'imdb' : imdb, 'title' : title, 'season' : season, 'episode' : episode, 'source' : source, 'internal' : internal, 'lock' : lock}, start = True)
 		if wait: Player.join(thread)
 		return thread
 
 	@classmethod
-	def _select(self, name, imdb, title, season, episode, source, internal = False):
+	def _select(self, name, imdb, title, season, episode, source, internal = False, lock = None):
 		unpause = False
 		try:
 			if Subtitle.Lock.locked(): return None
@@ -2059,10 +2187,10 @@ class Subtitle(Streamer):
 			# This is probably because the player has not fully initialized.
 			# Wait and try again.
 			streams = None
-			for i in range(5):
+			for i in range(20):
 				streams = self.streams()
 				if streams and streams[0]: break
-				tools.Time.sleep(0.2)
+				tools.Time.sleep(0.05)
 
 			player = self.player()
 			current = self.streamCurrent()
@@ -2088,7 +2216,7 @@ class Subtitle(Streamer):
 				# Kodi needs some time until subtitles are loaded from file. Wait, otherwise any other subtitle loading or info retrieval might be wrong.
 				# This often results in "pathSelect" to show up in the Kodi player subtitle dialog as the selected subtitles, although the code later on loads a different subtitle.
 				# NB: Just wiatimh: tools.Time.sleep(0.5), is sometimes not enough. Sometimes everything loads in a few ms, but sometimes we need more time. Check the subs instead.
-				for i in range(30):
+				for i in range(60):
 					loaded = 0
 					loadedStreams = self.streams()
 					if loadedStreams:
@@ -2097,7 +2225,7 @@ class Subtitle(Streamer):
 								loaded += 1
 								if loaded >= 2: break
 						if loaded >= 2: break
-					tools.Time.sleep(0.1)
+					tools.Time.sleep(0.05)
 
 				if current: player.subtitleSelect(id = current['id']) # Reset to default.
 
@@ -2189,6 +2317,9 @@ class Subtitle(Streamer):
 				# However, if during the initital run integrated subtitles are selected and the user later selects InternalSelect, a new search is done which can take time.
 				# Notify the user.
 				if not Subtitle.InternalExternal and internal:
+					if lock:
+						lock.acquire()
+						lock = None
 					unpause = True
 					self.playerPause()
 					self._notification(title = 36127, message = 36128, icon = interface.Dialog.IconInformation)
@@ -2277,6 +2408,9 @@ class Subtitle(Streamer):
 			subtitles = tools.Tools.listSort(data = subtitles, key = lambda i : i['sort'], reverse = True)
 
 			if settingsSelection == Subtitle.SelectionChoice:
+				if lock:
+					lock.acquire()
+					lock = None
 				self.playerPause()
 				choice = interface.Dialog.options(title = 32353, message = 35144, labelConfirm = 33110, labelDeny = 33800, labelCustom = 33743)
 				if choice == interface.Dialog.ChoiceCustom or choice == interface.Dialog.ChoiceCancelled:
@@ -2309,6 +2443,9 @@ class Subtitle(Streamer):
 							if success: break
 
 			if settingsSelection == Subtitle.SelectionManual:
+				if lock:
+					lock.acquire()
+					lock = None
 				details = settingsDialog == Subtitle.DialogDetails
 				self.playerPause()
 				while True:
@@ -2485,6 +2622,22 @@ class Chapter(Streamer):
 				chapters = [float(i) for i in chapters.split(',')]
 				if chapters:
 					time = tools.Math.roundUp(self.player().getTotalTime() or 0)
+
+					thresholdPromoPercent = 0.001
+					thresholdPromoDuration = 0.1
+					thresholdIntroPercent = 0.05 # House of Dragons: percent = 2.7%
+					thresholdIntroDuration = 0.25
+					thresholdOutroPercent = 0.05 # House of Dragons: percent = 2.4%
+					thresholdOutroDuration = 0.97
+					thresholdLastPercent = 0.06 # Similar to outro, but only if it is the last chapter.
+					thresholdLastDuration = 0.94
+					if time and time < 1800:
+						# Short episodes with less than 30 minutes.
+						# Heavenly Delusion: percent = 6.5%, end = 93.5%.
+						# Heavenly Delusion S01E06: percent = 12.3%, end = 87.6%.
+						thresholdLastPercent = 0.15
+						thresholdLastDuration = 0.85
+
 					chapters.append(100.0)
 					last = len(chapters) - 1
 					for i in range(last):
@@ -2509,9 +2662,10 @@ class Chapter(Streamer):
 									break
 							if not type:
 								percent = end - start
-								if percent < 0.001 and start < 0.1: type = Chapter.TypePromo
-								elif percent < 0.05 and start < 0.25: type = Chapter.TypeIntro # House of Dragons: 2.7%.
-								elif percent < 0.05 and end >= 0.99: type = Chapter.TypeOutro # House of Dragons: 2.4%.
+								if percent < thresholdPromoPercent and start < thresholdPromoDuration: type = Chapter.TypePromo
+								elif percent < thresholdIntroPercent and start < thresholdIntroDuration: type = Chapter.TypeIntro # House of Dragons: percent = 2.7%
+								elif percent < thresholdOutroPercent and end >= thresholdOutroDuration: type = Chapter.TypeOutro # House of Dragons: percent = 2.4% | Heavenly Delusion: percent = 6.5%, end = 93%.
+								elif next == last and percent < thresholdLastPercent and end >= thresholdLastDuration: type = Chapter.TypeOutro
 								else: type = Chapter.TypeDefault
 
 						Chapter.Chapters.append({

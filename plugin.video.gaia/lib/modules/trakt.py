@@ -83,7 +83,7 @@ def getTrakt(url, post = None, headers = None, cache = True, check = True, times
 		headers['trakt-api-key'] = getTraktId()
 		headers['trakt-api-version'] = '2'
 
-		if not post is None: post = tools.Converter.jsonTo(post)
+		if not post is None and not tools.Tools.isString(post): post = tools.Converter.jsonTo(post)
 
 		if direct or not valid:
 			# Some features, like searching, can be done without user authentication.
@@ -218,6 +218,7 @@ def _limit(url = None, data = None, wait = False):
 
 	if wait and not seconds is None:
 		seconds += (0.5 if seconds < 3 else 1 if seconds < 10 else 2)
+
 		if wait is True: retry = 'an infinite number of times'
 		elif wait == 1: retry = '1 time'
 		else: retry = '%d times' % wait

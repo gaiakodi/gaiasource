@@ -2877,6 +2877,13 @@ class ProviderWeb(ProviderBase):
 
 	def resolve(self, link, renew = False):
 		try:
+			# NB: Reset the scraping timeout.
+			# Otherwise resolving can fail during binge scraping.
+			# The provider is in idle state for a long time during binging, waiting for the current playback to finish.
+			# Once the next episode is started, resolving can fail, because any network request in the provider (eg: accountRequest()) checks the scraping timeout.
+			# Eg: YggTorrent.
+			self.clear()
+
 			# Always authenticate here again and readd the authentication headers/cookies to the link.
 			# This makes sure that new cookies are retireved if an old locally cached link is used which has expiered cookies.
 			# Or if unauthenticated links are returned by external services like Orion.

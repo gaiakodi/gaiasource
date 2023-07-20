@@ -1852,7 +1852,8 @@ class WindowRating(Window):
 	IdImagePoster = 51001
 
 	IdButtonClose = 50101
-	IdButtonQr = 50102
+	IdButtonPower = 50102
+	IdButtonQr = 50103
 	IdButtons = [52001, 52101, 52201, 52301, 52401, 52501, 52601, 52701, 52801, 52901]
 
 	IdLabelTitle = 51011
@@ -1869,6 +1870,25 @@ class WindowRating(Window):
 	IdGroupRater = 51100
 	IdGroupGlobal = 51200
 	IdGroupService = 51300
+
+	QrDisabled = 0
+	QrTrakt = 1
+	QrImdb = 2
+	QrTmdb = 3
+	QrTvdb = 4
+	QrSpecial = 5 # TMDb for movies and TVDb for shows.
+	QrHomepage = 6
+	QrGoogle = 7
+
+	PowerDisabled = 0
+	PowerPowerdown = 1
+	PowerShutdown = 2
+	PowerReboot = 3
+	PowerSuspend = 4
+	PowerHibernate = 5
+	PowerMinimize = 6
+	PowerQuit = 7
+	PowerScreensaver = 8
 
 	Rating = None
 
@@ -1889,6 +1909,9 @@ class WindowRating(Window):
 		self.mIcon = icon
 		self.mAnimation = animation
 		self.mInteracted = False
+
+		self.mPower = tools.Settings.getInteger('activity.rating.power')
+		self.mQr = tools.Settings.getInteger('activity.rating.qr')
 
 		self.mLabel = self._label()
 		self.mHighlight = self._label(partial = True)
@@ -1929,7 +1952,6 @@ class WindowRating(Window):
 			WindowRating.IdImagePoster,
 
 			WindowRating.IdButtonClose,
-			WindowRating.IdButtonQr,
 
 			WindowRating.IdLabelTitle,
 			WindowRating.IdLabelHighlight,
@@ -1944,6 +1966,8 @@ class WindowRating(Window):
 			WindowRating.IdImageImdb,
 			WindowRating.IdImageTmdb,
 		]
+		if self.mPower: controls.append(WindowRating.IdButtonPower)
+		if self.mQr: controls.append(WindowRating.IdButtonQr)
 
 		# Rating buttons.
 		for i in range(0, 10):
@@ -1966,7 +1990,6 @@ class WindowRating(Window):
 			{'id' : WindowRating.IdImageLogo, 'side' : 0, 'offset' : 20},
 
 			{'id' : WindowRating.IdButtonClose, 'side' : 1, 'offset' : 70},
-			{'id' : WindowRating.IdButtonQr, 'side' : 1, 'offset' : 124},
 
 			{'id' : WindowRating.IdLabelTitle, 'side' : 0, 'offset' : 186},
 			{'id' : WindowRating.IdLabelHighlight, 'side' : 0, 'offset' : 186},
@@ -1978,6 +2001,24 @@ class WindowRating(Window):
 			{'id' : WindowRating.IdGroupGlobal, 'side' : 0, 'offset' : 186 - offset2},
 			{'id' : WindowRating.IdGroupService, 'side' : 0, 'offset' : 192 - offset3},
 		]
+		if self.mPower and self.mQr:
+			self.propertySet('GaiaButtonPower', True)
+			self.propertySet('GaiaButtonQr', True)
+			controls.extend([
+				{'id' : WindowRating.IdButtonPower, 'side' : 1, 'offset' : 124},
+				{'id' : WindowRating.IdButtonQr, 'side' : 1, 'offset' : 178},
+			])
+		elif self.mPower:
+			self.propertySet('GaiaButtonPower', True)
+			controls.extend([
+				{'id' : WindowRating.IdButtonPower, 'side' : 1, 'offset' : 124},
+			])
+		elif self.mQr:
+			self.propertySet('GaiaButtonQr', True)
+			controls.extend([
+				{'id' : WindowRating.IdButtonQr, 'side' : 1, 'offset' : 124},
+			])
+
 		for i in controls:
 			control = self.control(i['id'])
 			offset = self._scaleWidth(i['offset'])
@@ -1986,6 +2027,7 @@ class WindowRating(Window):
 			control.setPosition(offset, control.getY())
 
 		self._onClick(WindowRating.IdButtonClose, lambda : self._onInteraction(self._cancel))
+		self._onClick(WindowRating.IdButtonPower, lambda : self._onInteraction(self._power))
 		self._onClick(WindowRating.IdButtonQr, lambda : self._onInteraction(self._qr))
 		for button in WindowRating.IdButtons:
 			self._onClick(button, lambda : self._onInteraction(self._rate))
@@ -2093,7 +2135,7 @@ class WindowRating(Window):
 
 	def _link(self):
 		link = None
-		if link is None:
+		if link is None or self.mQr == WindowRating.QrTrakt:
 			try:
 				slug = self.mMetadata['id']['slug']
 				if slug:
@@ -2104,11 +2146,20 @@ class WindowRating(Window):
 					except: episode = None
 					link = Trakt.link(media = self.mMedia, slug = slug, season = season, episode = episode)
 			except: tools.Logger.error()
-		if link is None:
+		if link is None or self.mQr == WindowRating.QrImdb:
 			from lib.meta.processors.imdb import MetaImdb
 			link = MetaImdb.link(metadata = self.mMetadata)
-		if link is None:
+		if link is None or self.mQr == WindowRating.QrTmdb or (self.mQr == WindowRating.QrSpecial and not('tvshowtitle' in self.mMetadata or 'season' in self.mMetadata)):
+			from lib.meta.processors.tmdb import MetaTmdb
+			link = MetaTmdb.link(metadata = self.mMetadata)
+		if link is None or self.mQr == WindowRating.QrTvdb or (self.mQr == WindowRating.QrSpecial and ('tvshowtitle' in self.mMetadata or 'season' in self.mMetadata)):
+			from lib.meta.providers.tvdb import MetaTvdb
+			link = MetaTvdb.link(metadata = self.mMetadata)
+		if link is None or self.mQr == WindowRating.QrHomepage:
 			try: link = self.mMetadata['homepage']
+			except: pass
+		if link is None or self.mQr == WindowRating.QrGoogle:
+			try: link = tools.Google.link(metadata = self.mMetadata)
 			except: pass
 		return link
 
@@ -2127,6 +2178,20 @@ class WindowRating(Window):
 	def _cancel(self):
 		WindowRating.Rating = None
 		self.close()
+
+	def _power(self):
+		actions = {
+			WindowRating.PowerDisabled : tools.System.PowerPowerdown,
+			WindowRating.PowerPowerdown : tools.System.PowerPowerdown,
+			WindowRating.PowerShutdown : tools.System.PowerShutdown,
+			WindowRating.PowerReboot : tools.System.PowerReboot,
+			WindowRating.PowerSuspend : tools.System.PowerSuspend,
+			WindowRating.PowerHibernate : tools.System.PowerHibernate,
+			WindowRating.PowerMinimize : tools.System.PowerMinimize,
+			WindowRating.PowerQuit : tools.System.PowerQuit,
+			WindowRating.PowerScreensaver : tools.System.PowerScreensaver,
+		}
+		if self.mPower in actions: tools.System.power(action = actions[self.mPower])
 
 class WindowProgress(Window):
 

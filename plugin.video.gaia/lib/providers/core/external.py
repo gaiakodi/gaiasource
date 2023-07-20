@@ -605,6 +605,7 @@ class ProviderExternal(ProviderBase):
 	##############################################################################
 
 	def resolve(self, link, renew = False):
+		self.clear()
 		try: return self.instanceObject().resolve(link)
 		except: return link
 

@@ -33,6 +33,7 @@ class Playback(Database):
 	ActionStart			= 'start'
 	ActionPause			= 'pause'
 	ActionStop			= 'stop'
+	ActionFinish		= 'finish' # Pause when the title was already watched at least once, so we can resume later.
 
 	# Progress
 	# Percent when video is considered to have started or ended.
@@ -990,7 +991,8 @@ class Playback(Database):
 				if external:
 					self.mProgressExternal['action'] = action
 					self.mProgressExternal['time'] = time
-				if action == Playback.ActionPause: self.mProgressPause = time
+
+				if action == Playback.ActionPause or action == Playback.ActionFinish: self.mProgressPause = time
 
 				if wait: self._progressUpdate(time = time, action = action, duration = duration, current = current, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external)
 				else: Pool.thread(target = self._progressUpdate, kwargs = {'time' : time, 'action' : action, 'duration' : duration, 'current' : current, 'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'internal' : internal, 'external' : external}, start = True)
@@ -1003,6 +1005,7 @@ class Playback(Database):
 	def _progressUpdate(self, action, duration, current, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = True, external = True, time = None):
 		try:
 			duration, current, percent = self._time(duration = duration, current = current)
+			if action == Playback.ActionFinish: action = Playback.ActionPause
 
 			if internal:
 				if time is None: time = Time.timestamp()

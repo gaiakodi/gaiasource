@@ -85,10 +85,17 @@
 						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Focus</animation>
 						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Unfocus</animation>
 
-						<onleft>50102</onleft>
-						<onright>50102</onright>
 						<onup>51100</onup>
 						<ondown>51100</ondown>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50103</onright>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onright>
+
+						<onleft condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50103</onleft>
+						<onright condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50103</onright>
 
 						<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
 						<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
@@ -96,9 +103,39 @@
 						<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
 					</control>
 					<control type="button" id="50102">
+						<visible>!String.IsEmpty(Window.Property(GaiaButtonPower))</visible>
+	      				<description>Power down the system</description>
+						<left>916</left>
+						<top>208</top>
+						<width>64</width>
+						<height>64</height>
+						<texturenofocus>special://home/addons/script.gaia.resources/resources/media/icons/white/small/on.png</texturenofocus>
+						<texturefocus colordiffuse="$INFO[Window.Property(GaiaColorButton)]">special://home/addons/script.gaia.resources/resources/media/icons/white/small/on.png</texturefocus>
+						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Focus</animation>
+						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Unfocus</animation>
+
+						<onup>51100</onup>
+						<ondown>51100</ondown>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50103</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onright>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onright>
+
+						<onleft condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onleft>
+						<onright condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onright>
+
+						<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
+						<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>
+						<onup condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onup>
+						<ondown condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</ondown>
+					</control>
+					<control type="button" id="50103">
+						<visible>!String.IsEmpty(Window.Property(GaiaButtonQr))</visible>
 						<visible>!String.IsEmpty(Window.Property(GaiaLink))</visible>
 	      				<description>Show the QR code</description>
-						<left>916</left>
+						<left>862</left>
 						<top>208</top>
 						<width>64</width>
 						<height>64</height>
@@ -107,10 +144,17 @@
 						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Focus</animation>
 						<animation effect="fade" easing="inout" tween="cubic" start="80" end="100" time="150" reversible="false">Unfocus</animation>
 
-						<onleft>50101</onleft>
-						<onright>50101</onright>
 						<onup>51100</onup>
 						<ondown>51100</ondown>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onright>
+
+						<onleft condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onleft>
+						<onright condition="!String.IsEmpty(Window.Property(GaiaButtonPower)) + String.IsEmpty(Window.Property(GaiaButtonQr))">50102</onright>
+
+						<onleft condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onleft>
+						<onright condition="String.IsEmpty(Window.Property(GaiaButtonPower)) + !String.IsEmpty(Window.Property(GaiaButtonQr))">50101</onright>
 
 						<onleft condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onleft>
 						<onright condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">SetProperty(GaiaRatingInteract,1)</onright>

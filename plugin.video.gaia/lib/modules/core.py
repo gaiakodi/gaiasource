@@ -63,6 +63,8 @@ class Core(object):
 	StatusScrape = 'scrape'
 	StatusFinalize = 'finalize'
 	StatusFinished = 'finished'
+	StatusCancel = 'cancel'
+	StatusContinue = 'continue'
 
 	PropertyItems = 'GaiaScrapeItems'
 	PropertyMetadata = 'GaiaScrapeMetadata'
@@ -325,6 +327,11 @@ class Core(object):
 					tools.Time.sleep(step)
 					finished = True
 
+					# Allow enough time for player.py to call propertyStatusSet() with a new value.
+					for j in range(30):
+						tools.Time.sleep(0.1)
+						if not self.propertyStatus() == Core.StatusFinalize: break
+
 				silent = self.propertySilent()
 				if silent == 'cancel':
 					break
@@ -547,7 +554,8 @@ class Core(object):
 				#if self.navigationStreamsSpecial and binge == tools.Binge.ModeContinue: self.loaderHide()
 
 				if items is None: items = self.propertyItems()
-			self.propertyItemsClear()
+
+			#self.propertyItemsClear() # Do not do this, since the background binge scrape will reset these values, making reloading the stream window impossible if playback is paused in the middle.
 
 			# When the play action is called from the skin's widgets.
 			# Otherwise the directory with streams is not shown.
@@ -637,11 +645,6 @@ class Core(object):
 
 			self.sources = self.sourcesPrepare(items = self.sources)
 
-			self.propertyExtrasClear()
-			self.propertyItemsSet(self.sources)
-			self.propertyMetadataSet(metadata)
-			self.propertyProcessSet(process)
-
 			if self.new and Termination.settingsEnabled() and Termination.settingsMode() == Termination.ModeOverwrite:
 				autoplay = self.terminated or self.timerGlobal.elapsed() < ProviderBase.settingsGlobalLimitTime()
 
@@ -669,6 +672,14 @@ class Core(object):
 
 			# Restart here and add to self.timerTotal in scrapeStatistics().
 			self.timerGlobal = tools.Time(start = True)
+
+			# Do not set these values if playback was stopped in the middle during binge playback.
+			# Ensures that the stream window is reloaded for an unfinished episode.
+			if not self.propertyStatus() == Core.StatusCancel:
+				self.propertyExtrasClear()
+				self.propertyItemsSet(self.sources)
+				self.propertyMetadataSet(metadata)
+				self.propertyProcessSet(process)
 
 			if self.silent:
 				self.sourcesFilter(items = self.sources, metadata = metadata, autoplay = autoplay)
@@ -3648,8 +3659,8 @@ class Core(object):
 							self.progressPlaybackUpdate(progress = percentage, title = heading, message = message, force = True)
 
 						from lib.modules.player import Player
-						player = Player(media = self.media, kids = self.kids)
-						success = player.run(media = self.media, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, source = items[i], binge = binge, reload = reload, autoplay = self.autoplay, handle = result['handle'] if 'handle' in result else None, service = result['service'] if 'service' in result else None)
+						player = Player.instance(reinitialize = True)
+						success = player.run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, source = items[i], binge = binge, reload = reload, autoplay = self.autoplay, handle = result['handle'] if 'handle' in result else None, service = result['service'] if 'service' in result else None)
 
 						if success:
 							binging = player.bingeContinue
@@ -4021,7 +4032,7 @@ class Core(object):
 				#	self.loaderShow() # Since there is no dialog anymore.
 
 				from lib.modules.player import Player
-				Player(media = self.media, kids = self.kids).run(media = self.media, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, downloadType = downloadType, downloadId = downloadId, source = item, binge = binge, reload = reload, resume = resume, autoplay = self.autoplay, handle = self.tResolved['handle'] if 'handle' in self.tResolved else None, service = self.tResolved['service'] if 'service' in self.tResolved else None)
+				Player.instance(reinitialize = True).run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, downloadType = downloadType, downloadId = downloadId, source = item, binge = binge, reload = reload, resume = resume, autoplay = self.autoplay, handle = self.tResolved['handle'] if 'handle' in self.tResolved else None, service = self.tResolved['service'] if 'service' in self.tResolved else None)
 
 				return self.tResolved['link']
 			except:
