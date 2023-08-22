@@ -713,7 +713,7 @@ class Core(object):
 			# In this case, the user will just have to wait a few seconds for the next stream window to load with #1.
 			# If the user doesn't wait between episodes, then this waiting will work with #2 and loading time will be faster.
 			if self.binge == tools.Binge.ModeBackground:
-				tif not self.propertySilentCheck(wait = True):
+				if not self.propertySilentCheck(wait = True):
 					self.silent = False
 					if autoplay: self.loaderShow()
 				if tools.System.aborted(): return None
