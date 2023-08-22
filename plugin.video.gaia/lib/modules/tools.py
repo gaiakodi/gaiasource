@@ -2626,15 +2626,28 @@ class Sound(object):
 	StyleTone		= 'tone'		# Any other sound that is short.
 	StyleMelody		= 'melody'		# Any other sound that is long.
 
+	Delay			= 0.5
 	Files			= None
 	Extension		= '.wav'
 	Settings		= 'general.sound.effects'
 
 	@classmethod
-	def play(self, path, cached = True, stop = False):
-		if stop: self.stop()
-		if path: xbmc.playSFX(path, cached)
+	def play(self, path, cached = True, stop = False, delay = True):
+		if delay: Pool.thread(target = self._play, kwargs = {'path' : path, 'cached' : cached, 'stop' : stop, 'delay' : delay}, start = True)
+		else: self._play(path = path, cached = cached, stop = stop, delay = delay)
 		return bool(path)
+
+	@classmethod
+	def _play(self, path, cached = True, stop = False, delay = True):
+		if stop: self.stop()
+
+		# The sound effect starts playing too early, while the windows have not been displayed yet.
+		# Wait a little while to sync the sound with the window.
+		if delay:
+			if delay is True: delay = Sound.Delay
+			if delay: Time.sleep(delay)
+
+		if path: xbmc.playSFX(path, cached)
 
 	@classmethod
 	def stop(self):

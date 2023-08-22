@@ -2460,8 +2460,16 @@ class WindowDialog(Window):
 			self.propertySet('GaiaDescription2', self._description2() if self.mBinge else '')
 
 		if focus: self.focus(control = focus, sleep = False)
+
 		if timeout >= 0: Pool.thread(target = self._progress, start = True)
 		self.propertySet('GaiaInitialized', 1)
+
+		# Sometimes the Continue button is not focus.
+		# Maybe because the window is not fully initialized yet.
+		# Try again after "GaiaInitialized" was set.
+		if focus:
+			tools.Time.sleep(0.3)
+			self.focus(control = focus, sleep = False)
 
 	def _initializeEnd2(self):
 		super(WindowDialog, self)._initializeEnd2()

@@ -456,13 +456,13 @@ class Core(object):
 				self.propertyNotificationSet(True)
 		return False
 
-	def progressClose(self, loader = True, force = False):
+	def progressClose(self, loader = True, force = False, immediate = False):
 		if self.navigationCinema:
 			self.navigationCinemaTrailer.cinemaStop() # Eg if no streams were found.
 		if not self.silent:
 			if self.navigationScrapeSpecial:
 				if force or not self.navigationStreamsSpecial or self.autoplay:
-					window.WindowScrape.update(finished = True)
+					if not immediate: window.WindowScrape.update(finished = True)
 					window.WindowScrape.close()
 			else:
 				interface.Core.close()
@@ -739,9 +739,9 @@ class Core(object):
 			if not self.silent and not self.binge and not status == Core.StatusCancel and (not autoplay or not Sound.enabledStreamStart()): tools.Sound.executeScrapeFinish()
 
 			if self.silent or status == Core.StatusCancel:
-				self.propertyStatusSet(Core.StatusFinished)
 				self.sourcesFilter(items = self.sources, metadata = metadata, autoplay = autoplay)
 				self.scrapeStatistics()
+				self.progressClose(force = True, immediate = True) # Important when "Cancel" (not "Stop") is clicked in the Continue dialog.
 			elif not autoplay and self._autopack(id = autopack, metadata = metadata, binge = binge):
 				pass
 			elif not self.progressPlaybackCanceled(): # Do not show the streams if the playback window was canceled in _autopack().

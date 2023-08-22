@@ -996,7 +996,9 @@ class Format(object):
 	@classmethod
 	def colorToHex(self, rgb):
 		rgb = [int(i) for i in rgb]
-		return 'FF' + ''.join(['0{0:x}'.format(i) if i < 16 else '{0:x}'.format(i) for i in rgb]).upper()
+		hex = ''.join(['0{0:x}'.format(i) if i < 16 else '{0:x}'.format(i) for i in rgb]).upper()
+		if len(hex) == 6: hex = 'FF' + hex
+		return hex
 
 	@classmethod
 	def colorGradient(self, startHex, endHex, count = 10):
@@ -1110,7 +1112,7 @@ class Format(object):
 			Format.ColorPoor = self._colorSettings(Format.ColorCustom, 'poor', Format.ColorPoor)
 			Format.ColorBad = self._colorSettings(Format.ColorCustom, 'bad', Format.ColorBad)
 
-			try: Format.ColorTransparent = self.colorToHex([((100.0 - tools.Settings.getInteger('theme.color.transparent')) / 100.0) * 255.0])[2:]
+			try: Format.ColorTransparent = self.colorToHex([((100.0 - tools.Settings.getInteger('theme.color.transparent')) / 100.0) * 255.0])
 			except: tools.Logger.error()
 
 	@classmethod

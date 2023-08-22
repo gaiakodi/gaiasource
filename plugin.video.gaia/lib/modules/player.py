@@ -81,7 +81,13 @@ class Player(xbmc.Player):
 	def __del__(self):
 		try:
 			self._downloadClear(delete = False)
-			self.core.progressPlaybackClose(background = False, loader = False)
+
+			# Not sure why this statement is here.
+			# Why would we want to cancel the playback window at the end of playback?
+			# This causes a sporadic bug (maybe 10-20% of the time) during binge watching.
+			# After the rating/continue dialog, the playback of the next episode starts.
+			# Less than a second into it, the playback is canceled and the playback window closed, by this statement.
+			#self.core.progressPlaybackClose(background = False, loader = False)
 		except: tools.Logger.error()
 		try: xbmc.Player.__del__(self)
 		except: pass
