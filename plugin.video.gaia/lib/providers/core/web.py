@@ -291,7 +291,14 @@ class ProviderWeb(ProviderBase):
 	# And Russian titles often have a bunch of other keywords early in the file name.
 	# Eg: Аватар / Avatar (Джеймс Кэмерон) [2009, фантастика, боевик, триллер, драма, приключения, BDRip 1080p]
 	# Eg: Аватар 3Д / Avatar 3D (Джеймс Кэмерон / James Cameron) [2009 г., фантастика, боевик, триллер, драма, приключения, BDrip 720p] OverUnder / Вертикальная стереопара
-	StreamAdjustRussian				= 0.7
+	# UPDATE: This does not seem neccessary anymore with the new title validation code.
+	# Using 0.7 is too low, causing many incorrect links for "Oppenheimer" to be accepted.
+	# Eg: Покончить со всеми войнами: Оппенгеймер и атомная бомба / To End All War: Oppenheimer & the Atomic Bomb (2023) WEB-DL [H.264/1080p] [EN / RU, EN, SPA Sub]
+	# Eg: Кунг-фу жеребец / Long ma jing shen (2023) WEB-DL 1080p от ELEKTRI4KA | D
+	# Eg: Обитель зла: Остров смерти / Biohazard: Death Island / Resident Evil: Death Island (2023) BDRip 1080p от селезень | P
+	# Eg: Many more completely wrong names.
+	#StreamAdjustRussian			= 0.7
+	StreamAdjustRussian				= None
 
 	# Request - Error
 	RequestError					= {}
@@ -2737,6 +2744,7 @@ class ProviderWeb(ProviderBase):
 
 	def search(self, link, subdomain, path, method, headers, cookies, data, replacements, category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack):
 		timer = self.statisticsTimer()
+		lock = None
 		try:
 			offset = self.offsetStart()
 			replacement = self.replaceClean(ProviderWeb.TermOffset)
@@ -2766,18 +2774,24 @@ class ProviderWeb(ProviderBase):
 									if items and not items == ProviderBase.Skip and not self.stopped():
 										items = self.processItems(items = items)
 										if items and not items == ProviderBase.Skip and not self.stopped():
-											if self.searchConcurrency():
-												threads = [self.thread(self.searchProcess, added, item, validate) for item in items]
-												self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
-											else:
-												for item in items:
-													self.searchProcess(added = added, item = item, validate = validate)
+											chunks = self.priorityChunks(items)
+											for chunk in chunks:
+												lock = self.priorityStart(lock = lock)
+												if self.searchConcurrency():
+													threads = [self.thread(self.searchProcess, added, item, validate) for item in chunk]
+													self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
+												else:
+													for item in chunk:
+														self.searchProcess(added = added, item = item, validate = validate)
+												self.priorityEnd(lock = lock)
 
 				if offset is None or not added[0]: break
 				elif not self.timerAllow() or not self.scrapeRequestAllow() or self.stopped() or self.verifyBusy(): break
 				elif self.processOffset(data = result, items = items) == ProviderBase.Skip: break
 				else: offset += self.offsetIncrease()
-		except: self.logError()
+		except:
+			self.logError()
+			self.priorityEnd(lock = lock)
 		self.statisticsUpdateSearch(duration = timer)
 
 	##############################################################################

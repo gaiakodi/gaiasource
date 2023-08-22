@@ -37,9 +37,4 @@ if developer: Logger.log('EXECUTION FINISHING [Action: %s | Duration: %.3f secs]
 from lib.modules.concurrency import Pool
 Pool.join()
 
-# Do this at the end, so that timestamps of reloaded requests can be updated and won't be deleted.
-# Do this after the thread pool joining, since the cache might still have threads executing (refreshing data in the background).
-from lib.modules.cache import Cache
-Cache.instance().limitClear(log = developer)
-
 if developer: Logger.log('EXECUTION FINISHED [Action: %s | Duration: %.3f secs]' % ('Context', timer.time() - timeStart))

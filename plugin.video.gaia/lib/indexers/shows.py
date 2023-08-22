@@ -283,7 +283,7 @@ class Shows(object):
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = True, release = False, limit = False, refresh = False, next = True):
 		if items:
 			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
 
@@ -1626,6 +1626,13 @@ class Shows(object):
 					for item in items:
 						try: refreshing = item[MetaCache.Attribute][MetaCache.AttributeRefresh]
 						except: refreshing = MetaCache.RefreshForeground
+
+						# Sometimes the pack is not in the metadata.
+						# This causes the error in episodes.py: CANNOT DETERMINE NEXT EPISODE
+						# Refresh if the metadata if the pack is missing.
+						# Not sure why this would be the case. Maybe an old metadata.db was imported where pack data was not present.
+						if refreshing == MetaCache.RefreshNone and (not 'pack' in item or not item['pack']): refreshing = MetaCache.RefreshBackground
+
 						if refreshing == MetaCache.RefreshForeground or refresh:
 							self.mMetatools.busyStart(media = self.mMedia, item = item)
 							semaphore.acquire()

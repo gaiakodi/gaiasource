@@ -64,7 +64,11 @@ class Core(object):
 	StatusFinalize = 'finalize'
 	StatusFinished = 'finished'
 	StatusCancel = 'cancel'
-	StatusContinue = 'continue'
+
+	SilentActive = True
+	SilentInactive = False
+	SilentCancel = 'cancel'
+	SilentInteract = 'interact'
 
 	PropertyItems = 'GaiaScrapeItems'
 	PropertyMetadata = 'GaiaScrapeMetadata'
@@ -75,7 +79,9 @@ class Core(object):
 	PropertySilent = 'GaiaScrapeSilent'
 
 	GlobalItems = None
+	GlobalItemsJson = None
 	GlobalMetadata = None
+	GlobalMetadataJson = None
 	GlobalThreads = []
 
 	Instance = None
@@ -202,9 +208,21 @@ class Core(object):
 	def propertyItemsSet(self, items, wait = False):
 		Core.GlobalItems = items
 		def _propertyItemsSet(items):
-			window.Window.propertyGlobalSet(Core.PropertyItems, tools.Converter.jsonTo(items))
+			if Core.GlobalItemsJson:
+				window.Window.propertyGlobalSet(Core.PropertyItems, Core.GlobalItemsJson)
+				Core.GlobalItemsJson = None
+			else:
+				window.Window.propertyGlobalSet(Core.PropertyItems, tools.Converter.jsonTo(items))
 		if wait: _propertyItemsSet(items = items)
 		else: Core.GlobalThreads.append(Pool.thread(target = _propertyItemsSet, kwargs = {'items' : items}, start = True))
+
+	@classmethod
+	def propertyItemsPrepare(self, items, wait = False):
+		Core.GlobalItemsJson = None
+		def _propertyItemsPrepare(items):
+			Core.GlobalItemsJson = tools.Converter.jsonTo(items)
+		if wait: _propertyItemsPrepare(items = items)
+		else: Core.GlobalThreads.append(Pool.thread(target = _propertyItemsPrepare, kwargs = {'items' : items}, start = True))
 
 	@classmethod
 	def propertyItemsClear(self):
@@ -222,9 +240,21 @@ class Core(object):
 	def propertyMetadataSet(self, metadata, wait = False):
 		Core.GlobalMetadata = metadata
 		def _propertyMetadataSet(metadata):
-			window.Window.propertyGlobalSet(Core.PropertyMetadata, tools.Converter.jsonTo(metadata))
+			if Core.GlobalMetadataJson:
+				window.Window.propertyGlobalSet(Core.PropertyMetadata, Core.GlobalMetadataJson)
+				Core.GlobalMetadataJson = None
+			else:
+				window.Window.propertyGlobalSet(Core.PropertyMetadata, tools.Converter.jsonTo(metadata))
 		if wait: _propertyMetadataSet(metadata = metadata)
 		else: Core.GlobalThreads.append(Pool.thread(target = _propertyMetadataSet, kwargs = {'metadata' : metadata}, start = True))
+
+	@classmethod
+	def propertyMetadataPrepare(self, metadata, wait = False):
+		Core.GlobalMetadataJson = None
+		def _propertyMetadataPrepare(metadata):
+			Core.GlobalMetadataJson = tools.Converter.jsonTo(metadata)
+		if wait: _propertyMetadataPrepare(metadata = metadata)
+		else: Core.GlobalThreads.append(Pool.thread(target = _propertyMetadataPrepare, kwargs = {'metadata' : metadata}, start = True))
 
 	@classmethod
 	def propertyMetadataClear(self):
@@ -292,7 +322,7 @@ class Core(object):
 	@classmethod
 	def propertySilent(self):
 		silent = window.Window.propertyGlobal(Core.PropertySilent)
-		if silent == 'cancel': return silent
+		if silent == Core.SilentCancel or silent == Core.SilentInteract: return silent
 		else: return tools.Converter.boolean(silent)
 
 	@classmethod
@@ -323,7 +353,7 @@ class Core(object):
 				# Make sure the loop is exited once the player stops playing.
 				# Otherwise this loop continues even though binging was continued/cancled.
 				busy = player.isPlayingVideo() and not tools.System.aborted()
-				if not busy:
+				if not busy and not self.propertyStatus() == Core.StatusScrape: # Do not execute this if playback stopped before scraping finished.
 					tools.Time.sleep(step)
 					finished = True
 
@@ -333,21 +363,22 @@ class Core(object):
 						if not self.propertyStatus() == Core.StatusFinalize: break
 
 				silent = self.propertySilent()
-				if silent == 'cancel':
+				if silent == Core.SilentCancel:
 					break
-				elif not silent == self.silent:
-					self.silent = silent
-					status = self.propertyStatus()
-					# Do not popup the scraping window if background scraping has finished.
-					# Directly move to the stream window, or the playback window for autopack.
-					if status == Core.StatusFinished:
-						interface.Loader.show()
-					elif not status == Core.StatusFinalize:
-						self._scrapeProgressShow()
-						self._scrapeProgressUpdate()
-					break
-				elif finished:
-					break
+				elif not silent == Core.SilentInteract:
+					if not silent == self.silent:
+						self.silent = silent
+						status = self.propertyStatus()
+						# Do not popup the scraping window if background scraping has finished.
+						# Directly move to the stream window, or the playback window for autopack.
+						if status == Core.StatusFinished:
+							interface.Loader.show()
+						elif not status == Core.StatusFinalize:
+							self._scrapeProgressShow()
+							self._scrapeProgressUpdate()
+						break
+					elif finished:
+						break
 
 				if tools.System.aborted(): break
 				tools.Time.sleep(step)
@@ -359,7 +390,7 @@ class Core(object):
 		if wait: self.silentThread.join(wait if tools.Tools.isNumber(wait) else None)
 
 		silent = self.propertySilent()
-		return silent and not silent == 'cancel'
+		return silent and not silent == Core.SilentCancel and not silent == Core.SilentInteract
 
 	def parameterize(self, action = None, media = None, parameters = None):
 		if parameters is None:
@@ -399,6 +430,7 @@ class Core(object):
 			if not self.propertyNotification() or force:
 				self.progressClose(force = True, loader = loader)
 				if (not self.filter or self.filter['initial'] == 0) and not mixed:
+					window.WindowBackground.close()
 					interface.Dialog.notification(title = 33448, message = 35372, icon = interface.Dialog.IconError)
 				elif self.filter:
 					counts = []
@@ -418,6 +450,7 @@ class Core(object):
 					self.loaderHide()
 					result = interface.Dialog.option(title = 33448, message = 35380)
 				if result: self.loaderShow()
+				else: window.WindowBackground.close()
 				return result
 			else:
 				self.propertyNotificationSet(True)
@@ -483,7 +516,8 @@ class Core(object):
 					def _progressClose():
 						tools.Time.sleep(1)
 						window.WindowScrape.close()
-					Pool.thread(target = _progressClose).start()
+						window.WindowBackground.close() # Might still be open from player.py -> interact() to allow a continues background during rating/continue/next-episode-playback.
+					Pool.thread(target = _progressClose, start = True)
 				else:
 					if message is None: message = ''
 					else: message = interface.Format.fontBold(message) + '%s'
@@ -501,13 +535,14 @@ class Core(object):
 					else: message = interface.Format.fontBold(message) + '%s'
 					interface.Core.update(progress = progress, title = title, message = message)
 
-	def progressPlaybackClose(self, loader = True, force = False):
+	def progressPlaybackClose(self, background = True, loader = True, force = False):
 		if not self.silent:
 			self.progressPlaybackUpdate(progress = 100)
 
 			if self.navigationPlaybackSpecial:
 				window.WindowPlayback.update(finished = True)
 				window.WindowPlayback.close()
+				if background: window.WindowBackground.close()
 			else:
 				interface.Core.close()
 				if force: interface.Dialog.closeAllProgress() # If called from another process, the interface.Core instance might be lost. Close all progress dialogs.
@@ -523,7 +558,7 @@ class Core(object):
 						tools.System.exit()
 						return True
 				except: pass
-				return not window.WindowPlayback.visible()
+				return window.WindowPlayback.canceled()
 			else:
 				if interface.Core.background():
 					return False
@@ -552,8 +587,13 @@ class Core(object):
 				# The loader is shown in _bingePlay in the player.
 				# Update: not sure if the hiding the loader should be enabled again. This causes the loader to be hidden while propertyItems() executes for 5-10 seconds.
 				#if self.navigationStreamsSpecial and binge == tools.Binge.ModeContinue: self.loaderHide()
-
 				if items is None: items = self.propertyItems()
+			else:
+				# Only do this if it is not a binge scrape.
+				# That is, the user manually started the scraping, aka interacted.
+				tools.Observer.updateInteractScrape()
+
+				if not self.silent: tools.Sound.executeScrapeStart()
 
 			#self.propertyItemsClear() # Do not do this, since the background binge scrape will reset these values, making reloading the stream window impossible if playback is paused in the middle.
 
@@ -629,7 +669,7 @@ class Core(object):
 				self.propertyStatusSet(Core.StatusScrape)
 				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, season = season, episode = episode, tvshowtitle = tvshowtitle, premiered = premiered, metadata = metadata, preset = preset, pack = pack, exact = exact, autoplay = autoplay, cache = cache)
 
-				if result is None or (self.progressCanceled() and not self.navigationCinema): # Avoid the no-streams notification right after the unavailable notification
+				if result is None or (self.progressCanceled() and not self.navigationCinema): # Avoid the no-streams notification right after the unavailable notification.
 					self.progressClose(force = True)
 					self.propertyStatusSet(Core.StatusFinished)
 					return None
@@ -644,6 +684,14 @@ class Core(object):
 				self.sources = items
 
 			self.sources = self.sourcesPrepare(items = self.sources)
+
+			# Calling propertyItemsSet() can take a long time converting to JSON if the are 100s or 1000s of streams.
+			# This consumes processing power and the round progress bar in the rating/continue window takes a few seconds to update for the first time (in WindowRating._progress()).
+			# Convert to JSON here already, so free up the CPU if the current episode is done.
+			# UPDATE: Seems the problem is somewhere else which holds up the animation. But leave this here, since it cannot hurt to do this earlier.
+			if self.binge == tools.Binge.ModeBackground:
+				self.propertyItemsPrepare(self.sources, wait = True)
+				self.propertyMetadataPrepare(metadata, wait = True)
 
 			if self.new and Termination.settingsEnabled() and Termination.settingsMode() == Termination.ModeOverwrite:
 				autoplay = self.terminated or self.timerGlobal.elapsed() < ProviderBase.settingsGlobalLimitTime()
@@ -665,7 +713,7 @@ class Core(object):
 			# In this case, the user will just have to wait a few seconds for the next stream window to load with #1.
 			# If the user doesn't wait between episodes, then this waiting will work with #2 and loading time will be faster.
 			if self.binge == tools.Binge.ModeBackground:
-				if not self.propertySilentCheck(wait = True):
+				tif not self.propertySilentCheck(wait = True):
 					self.silent = False
 					if autoplay: self.loaderShow()
 				if tools.System.aborted(): return None
@@ -681,12 +729,22 @@ class Core(object):
 				self.propertyMetadataSet(metadata)
 				self.propertyProcessSet(process)
 
-			if self.silent:
+			# NB: Must be set here instead of AFTER self._autopack()/self.showStreams().
+			# Otherwise during binging, this status is only set AFTER the current episode playback finished, which sometimes sporadically interferes with the global status property of the NEXT episode being started.
+			# This in some cases causes the next episode to be played to start 2 playback processes after each other. The 1st one gets cancled quickly, and the 2nd one plays as intended.
+			status = self.propertyStatus() # We need the old value for the the code below.
+			self.propertyStatusSet(Core.StatusFinished)
+
+			# Do not play the sound if autoplay and there is also a sound for starting streaming, otherwise they will collide.
+			if not self.silent and not self.binge and not status == Core.StatusCancel and (not autoplay or not Sound.enabledStreamStart()): tools.Sound.executeScrapeFinish()
+
+			if self.silent or status == Core.StatusCancel:
+				self.propertyStatusSet(Core.StatusFinished)
 				self.sourcesFilter(items = self.sources, metadata = metadata, autoplay = autoplay)
 				self.scrapeStatistics()
 			elif not autoplay and self._autopack(id = autopack, metadata = metadata, binge = binge):
 				pass
-			else:
+			elif not self.progressPlaybackCanceled(): # Do not show the streams if the playback window was canceled in _autopack().
 				self.showStreams(items = self.sources, metadata = metadata, autoplay = autoplay, initial = True, library = library, direct = exact, new = self.new, process = process, binge = binge)
 
 			# When launching a scrape process from a STRM file from the Kodi library, and then exiting the streams window, Kodi shows a dialog:
@@ -706,7 +764,6 @@ class Core(object):
 			#tools.System.pluginResolvedSet(success = False)
 			tools.System.pluginResolvedSet(success = False, dummy = True)
 
-			self.propertyStatusSet(Core.StatusFinished)
 			return self.sources
 		except:
 			tools.Logger.error()
@@ -774,6 +831,7 @@ class Core(object):
 					try: background = MetaImage.extract(data = self.mLastMetadata)['fanart']
 					except: background = None
 					window.WindowScrape.show(background = background, status = self.mLastMessage1)
+					window.WindowBackground.close() # Might still be open from player.py -> interact() to allow a continues background during rating/continue/next-episode-playback.
 				else:
 					interface.Core.create(type = interface.Core.TypeScrape, background = self.navigationScrapeBar, title = self.mLastTitle, message = self.mLastMessage1)
 
@@ -2140,7 +2198,6 @@ class Core(object):
 			self.threadsLimit = max(tools.Hardware.processorCountCore() * 2, 10)
 
 			tools.File.makeDirectory(tools.System.profile())
-			self.sourceFile = Database.pathProviders()
 
 			self.progressTitleOriginal = 0
 			self.progressTitleTranslation = 0
@@ -2192,7 +2249,10 @@ class Core(object):
 			# Clear old sources from database.
 			# Due to long links and metadata, the database entries can grow very large, not only wasting disk space, but also reducing search/insert times.
 			# Delete old entries that will be ignored in any case.
-			manager.Manager.databaseInitialize()
+			# NB: quick = True: Do not clear the streams database.
+			# If the streams database is very large (300MB+), removing old streams and then compressing the database can take very long (15-20 secs).
+			# This holds up the scraping process ('Initializing Providers' takes 20secs+ instead of the normal 5secs). Instead compress the streams database only on addon launch.
+			manager.Manager.databaseInitialize(quick = True)
 
 			self.skip = False
 			specialAllow = False
@@ -2879,40 +2939,22 @@ class Core(object):
 		binge = self.binge == tools.Binge.ModeBackground
 		ProviderBase.concurrencyInitialize(tasks = len(providers), binge = binge)
 
-		temp1 = []
-		temp2 = []
-		temp3 = []
-		temp4 = []
-		temp5 = []
-		priorityMaximum = 0
-		for provider in providers:
-			priority = provider.scrapePriority()
-			if priority: priorityMaximum = max(priorityMaximum, priority)
+		# Do this here instead of inside scrapeProvider().
+		# Because the locking in those functions often cause the highest priority provider to get the lock last, while the lowest priority providers get it first.
+		# This basically reverses the order in which execute() in the scrapeProvider() threads are executed.
+		# This happens because all the hoster...() functions use the same lock.
+		hostersAll = self.hosters()
+		hostersPremium = self.hostersPremium()
 
-			# Always put certain providers first.
-			if provider.typeLocal(): temp1.append(provider)
-			elif provider.typeSpecial(): temp2.append(provider)
-			elif provider.typeCenter(): temp3.append(provider)
-			elif provider.typePremium(): temp4.append(provider)
-			else: temp5.append(provider)
-		providers = temp1 + temp2 + temp3 + temp4 + temp5
-
-		providersPriority = [[] for i in range(priorityMaximum + 1)]
-		providersNone = []
-		for provider in providers:
-			priority = provider.scrapePriority()
-			if priority is None: providersNone.append(provider)
-			else: providersPriority[priority].append(provider)
-		providersPriority = [provider for provider in providersPriority if provider]
-		providersPriority.append(providersNone)
-		self.providersWait = sum([len(sub) for sub in providersPriority])
-
+		providers = manager.Manager.providersPrioritize(providers = providers)
+		self.providersWait = sum([len(sub) for sub in providers])
 		self.finishedThreads = False
-		for sub in providersPriority:
+
+		for sub in providers:
 			if not self.stopThreads:
 				threadsSub = []
 				for provider in sub:
-					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache))
+					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache, hostersAll, hostersPremium))
 					threadsSub.append(thread)
 					threads.append(thread)
 					labels.append(provider.label())
@@ -2929,7 +2971,7 @@ class Core(object):
 		# Use a second variable to indicate everything is done.
 		self.finishedThreads = True
 
-	def scrapeProvider(self, provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
+	def scrapeProvider(self, provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache, hostersAll, hostersPremium):
 		try:
 			streams = provider.execute(
 				media = media,
@@ -2952,8 +2994,8 @@ class Core(object):
 				silent = self.silent,
 				cacheLoad = cache,
 
-				hostersAll = self.hosters(),
-				hostersPremium = self.hostersPremium(),
+				hostersAll = hostersAll,
+				hostersPremium = hostersPremium,
 			)
 
 			streamsCache = []
@@ -3210,6 +3252,7 @@ class Core(object):
 				self.navigationCinemaTrailer.cinemaStop()
 
 			window.WindowStreams.show(background = None if mixed else fanart, status = 'Loading Streams', metadata = metadata, items = items, close = not initial)
+			window.WindowBackground.close() # Might still be open from player.py -> interact() to allow a continues background during rating/continue/next-episode-playback.
 
 			window.Window.propertyGlobalSet('GaiaIndexId', id) # Used in WindowStreams.
 			window.Window.propertyGlobalSet('GaiaPosterStatic', tools.Settings.getInteger('interface.stream.interface.poster') == 0)
@@ -3658,6 +3701,7 @@ class Core(object):
 							self.progressPlaybackInitialize(title = heading, message = message, metadata = metadata, force = True) # Make sure it is shown after the trailer playback stops.
 							self.progressPlaybackUpdate(progress = percentage, title = heading, message = message, force = True)
 
+						tools.Sound.executeStreamFinish()
 						from lib.modules.player import Player
 						player = Player.instance(reinitialize = True)
 						success = player.run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, source = items[i], binge = binge, reload = reload, autoplay = self.autoplay, handle = result['handle'] if 'handle' in result else None, service = result['service'] if 'service' in result else None)
@@ -3690,6 +3734,7 @@ class Core(object):
 
 	def play(self, source, metadata = None, downloadType = None, downloadId = None, handle = None, handleMode = None, index = None, autoplay = None, autopack = None, library = None, new = None, add = None, binge = None, reload = True, resume = None, strict = False):
 		try:
+			tools.Sound.executeStreamStart()
 			interface.Player.canceledClear()
 			if autoplay and not autopack: return self._autoplay(library = library, new = new, add = add, binge = binge)
 
@@ -3998,7 +4043,6 @@ class Core(object):
 					interface.Core.close()
 
 				if self.progressPlaybackCanceled():
-					tools.Logger.error()
 					self.progressPlaybackClose(loader = loader)
 					return None
 				elif handler.Handler.serviceExternal(handle) and self.tResolved['error'] == handler.Handler.ReturnExternal: # Do not return if there is a different error.
@@ -4031,6 +4075,7 @@ class Core(object):
 				#	interface.Core.close()
 				#	self.loaderShow() # Since there is no dialog anymore.
 
+				tools.Sound.executeStreamFinish()
 				from lib.modules.player import Player
 				Player.instance(reinitialize = True).run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, downloadType = downloadType, downloadId = downloadId, source = item, binge = binge, reload = reload, resume = resume, autoplay = self.autoplay, handle = self.tResolved['handle'] if 'handle' in self.tResolved else None, service = self.tResolved['service'] if 'service' in self.tResolved else None)
 
@@ -4145,6 +4190,7 @@ class Core(object):
 						# The duplication is checked and set again in adjustSourceAppend() below.
 						if not check: source['stream'].exclusionDuplicateSet(value = False)
 
+						source['time'] = tools.Time.timestamp() # Used for cache lookup.
 						self.adjustSourceAppend(source)
 
 						priority = False
@@ -4304,6 +4350,7 @@ class Core(object):
 		try:
 			debridId = object.id()
 			self.adjustLock()
+			times = []
 			hashes = []
 			sources = []
 
@@ -4330,12 +4377,14 @@ class Core(object):
 							hash = source['stream'].hashContainer()
 							if torrentOrUsenet and modeHash and hash:
 								added = True
+								times.append(source['time'])
 								hashes.append(hash)
 								sources.append(source)
 							elif not torrentOrUsenet and modeLink:
 								link = source['stream'].linkPrimary()
 								if link:
 									added = True
+									times.append(source['time'])
 									hashes.append(link)
 									sources.append(source)
 
@@ -4358,7 +4407,12 @@ class Core(object):
 
 			# Partial will inspect the cache will the scraping is still busy.
 			# Only check if there are a bunch of them, otherwise there are too many API calls (heavy load on both server and local machine).
-			if not hashes or (partial and len(hashes) < 40): return
+			# Also check smaller chunks if the streams were added a while back (30 secs):
+			#	1. If there are only a few streams (eg 10) available for the title, this threshold is never reached, and cache lookup is only done at the end of the scrape process.
+			#	2. There are many streams. Currently there are 10 streams left for checkup, but the last provider is stuck (eg domain unreachable). Do not wait eg 1 minute for the provider to finish. While waiting, we can already look up.
+			if not hashes: return
+			if partial and len(hashes) < 40 and (tools.Time.timestamp() - min(times) < 30): return
+
 			self.cacheLookup = True
 			time = tools.Time.timestamp()
 
@@ -4538,6 +4592,7 @@ class Core(object):
 				for source in sources.values():
 					manager.Manager.streamsInsert(data = source['streams'], provider = source['provider'], query = source['query'], idImdb = source['imdb'], idTmdb = source['tmdb'], idTvdb = source['tvdb'], numberSeason = source['season'], numberEpisode = source['episode'])
 			except: tools.Logger.error()
+
 		except: tools.Logger.error()
 		finally: self.adjustUnlock()
 

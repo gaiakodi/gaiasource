@@ -1,4 +1,14 @@
 
+[B]6.4.0 (2023.08.22)[/B]
+- Added transparent button.
+- Updated button textures.
+- Added small circle texture.
+- Added RottenTomatoes icon.
+- Added Metacritic icon.
+- Added new sound effects.
+- Removed Lightpack icons.
+- Fixed CAM1080 icon in streams window.
+
 [B]6.3.11 (2023.07.20)[/B]
 - Updated rating window XML.
 

@@ -169,6 +169,7 @@ class ProviderDebrid(ProviderPremium):
 
 	# files = [{'name', 'parent', 'parts', 'link (optional)', 'size (optional)', 'couunt (optional)', 'time (optional)'}, ...]
 	def searchProcess(self, files, separateSize = True):
+		lock = None
 		try:
 			if files:
 				thread = self.searchThread()
@@ -219,6 +220,7 @@ class ProviderDebrid(ProviderPremium):
 				filePack = Stream.FilePackInternal if count and Media.typeTelevision(media) else None # So that OffCloud's show pack file sizes are estimated correctly.
 
 				threads = []
+				lock = self.priorityStart(lock = lock)
 				for i in range(len(items)):
 					for item in items[i]:
 						try:
@@ -266,10 +268,12 @@ class ProviderDebrid(ProviderPremium):
 								if thread: threads.append(self.thread(self.searchAdd, id, stream))
 								else: self.searchAdd(id = id, stream = stream)
 						except: self.logError()
+				self.priorityEnd(lock = lock)
 
 				# Use at least 5 threads, since Premiumize can be a bit slow, since it retrieves additional metadata in searchAdd().
 				if not self.stopped(): self.threadExecute(threads, limit = self.concurrencyTasks(level = 2, minimum = 5))
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	# Can be overwritten by subsclasses if additional metadata has to be retrieved.
 	def searchAdd(self, id, stream):

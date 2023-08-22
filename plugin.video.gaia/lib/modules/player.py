@@ -75,13 +75,13 @@ class Player(xbmc.Player):
 
 	def __init__ (self,):
 		xbmc.Player.__init__(self)
-		self.status = Player.StatusIdle
+		self.status = self.statusDone = Player.StatusIdle
 		self.statusStarted = False
 
 	def __del__(self):
 		try:
 			self._downloadClear(delete = False)
-			self.core.progressPlaybackClose(loader = False)
+			self.core.progressPlaybackClose(background = False, loader = False)
 		except: tools.Logger.error()
 		try: xbmc.Player.__del__(self)
 		except: pass
@@ -121,6 +121,10 @@ class Player(xbmc.Player):
 			self.idImdb = imdb
 			self.idTmdb = tmdb
 			self.idTvdb = tvdb
+			try: self.idTrakt = metadata['trakt']
+			except: self.idTrakt = None
+			try: self.idSet = metadata['collection']['id']
+			except: self.idSet = None
 
 			self.autoplay = autoplay
 			self.reload = reload
@@ -149,11 +153,14 @@ class Player(xbmc.Player):
 			self.bingeDialogNone = tools.Binge.dialogNone()
 			self.bingeDialogFull = tools.Binge.dialogFull()
 			self.bingeDialogOverlay = tools.Binge.dialogOverlay()
+			self.bingeDialogButton = tools.Binge.dialogButton()
 			self.bingeDialogUpNext = tools.Binge.dialogUpNext()
 			self.bingeSuppress = tools.Binge.suppress()
+			self.bingeScrape = None
 			self.bingeDelay = None
 			self.bingeDelayBefore = None
-			self.bingeContinue = False
+			self.bingeContinue = None
+			self.bingeTimeout = None
 			self.bingePlay = False
 			self.bingeFinishedScrape = False
 			self.bingeFinishedCheck = False
@@ -222,11 +229,19 @@ class Player(xbmc.Player):
 			self.sizeTotal = 0
 			self.sizeCurrent = 0
 			self.sizeProgress = 0
-			self.resumeTime = resume
 			self.dialog = None
+			self.resumeTime = resume
+			self.resumedTime = None
 
-			self.rated = False
-			self.rateLock = Lock()
+			self.interacted = False
+			self.interactBackground = False
+			self.interactRating = self.playback.settingsRatingEnabled()
+			self.interactContinue = tools.Binge.continueEnabled()
+			self.interactSpecial = self.playback.settingsDialogTypeSpecial()
+			self.interactPropagate = tools.Binge.continuePropagate()
+			self.interactObserver = None
+			self.interactLock = Lock()
+			self._interactObserverStart()
 
 			self.playbackInitialized = False
 			self.playbackFinalized = False
@@ -299,7 +314,7 @@ class Player(xbmc.Player):
 				self.retryRemaining -= 1
 				self.keepPlaybackProgress(update = True) # Make sure the retry window is shown if applicable. Must be before self.play(), because Kodi can freeze there.
 
-				self.status = Player.StatusIdle
+				self.status = self.statusDone = Player.StatusIdle
 				self.playbackInitialized = False
 				self.playbackFinalized = False
 
@@ -308,12 +323,18 @@ class Player(xbmc.Player):
 
 				# When retrying, Kodi player might still try to play from the previous time (eg: stuck at connection timeout).
 				# Manually stop to ensure everything is cleared.
-				self.stop()
-				tools.Time.sleep(0.1)
+				# NB: Only do this on retying connection. Otherwise this might (maybe) cause the problem with "Retrying Stream Connection", because of internal threads that might only fire after self.play() is called below.
+				if self.retryBusy:
+					self.stop()
+					for i in range(30): # Wait for self.stop() to finish.
+						if self.statusDone == Player.StatusStopped or self.statusDone == Player.StatusEnded: break
+						tools.Time.sleep(0.1)
+					if not self.statusDone == Player.StatusStopped and not self.statusDone == Player.StatusEnded:
+						tools.Time.sleep(2)
+					self.status = self.statusDone = Player.StatusIdle
 
 				self.play(self.url, self.item)
 				interface.Loader.hide()
-
 				success = self.keepPlaybackAlive()
 
 				if success or tools.System.aborted() or self.core.progressPlaybackCanceled():
@@ -572,15 +593,92 @@ class Player(xbmc.Player):
 			interface.Dialog.notification(title = title, message = message, icon = interface.Dialog.IconInformation, time = 10000)
 		except: tools.Logger.error()
 
-	def rate(self):
-		if self.metadata: # Do not rate exact searches.
-			try:
-				self.rateLock.acquire() # Can be called multiple times simultaneously (_bingePlay and playbackFinalize).
-				if not self.rated and self.bingeSuppress <= 1:
-					if self.playbackWatched or self.timeProgress >= 0.75:
-						self.rated = True
-						self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, binge = self.bingeContinue, automatic = bool(self.autoplay or self.autopack))
-			finally: self.rateLock.release()
+	def interact(self):
+		try:
+			self.interactLock.acquire() # Can be called multiple times simultaneously (_bingePlay and playbackFinalize).
+			if not self.interacted and self.bingeSuppress <= 1:
+				if self.playbackWatched:
+					if self.interactSpecial and not self.interactBackground:
+						self.interactBackground = True
+						window.WindowBackground.show(metadata = self.metadata, logo = True)
+						tools.Time.sleep(0.05) # Sometimes the background window shows on top of the rating window.
+
+					self.interacted = True
+					if self.core.propertySilent(): self.core.propertySilentSet(self.core.SilentInteract)
+
+					stopped = self.bingeContinue is None and self.bingeTimeout is None
+
+					# Only set this if the user did not manually select an option already.
+					# That is, stopping playback (eg from Kore app) without clicking on a button in the binge dialog before.
+					# Treat this as a timed-out non-action.
+					# If the current episode was stopped too early (not finished watching), do not continue with binge.
+					if stopped:
+						if self.playbackWatched: # Stopped close to the end of playback.
+							self.bingeContinue = tools.Binge.actionNone() == tools.Binge.ActionContinue
+							self.bingeTimeout = True
+						else: # Stopped somewhere 2/3 into playback.
+							self.bingeContinue = False
+							self.bingeTimeout = True
+
+					observation = self._interactObserverEvaluate()
+					binge = self.binge and (self.bingeContinue or (self.interactContinue and not stopped)) # Always allow if the continue dialog is enabled.
+					if not self.binge and observation: binge = True # For movies with an observer.
+
+					result = self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, binge = binge, automatic = bool(self.autoplay or self.autopack))
+
+					if result and binge and self.interactContinue and self.bingeMetadata:
+						default = None
+						fixed = False
+
+						if not self.bingeTimeout:
+							if self.interactPropagate > 0:
+								action = window.WindowContinue.ActionContinue if self.bingeContinue else window.WindowContinue.ActionStop
+								if self.interactPropagate == 1:
+									default = action
+								elif self.interactPropagate == 2:
+									fixed = True
+									result = {'action' : action, 'timeout' : False, 'interacted' : False}
+
+						if observation: default = observation
+						if not fixed:
+							self._interactObserverNotify(observation)
+							result = self.playback.dialogContinue(metadata = self.bingeMetadata, binge = True, default = default)
+
+						if result:
+							if result['action'] is window.WindowContinue.ActionNone:
+								self.bingeTimeout = result['timeout']
+								self.bingeContinue = tools.Binge.actionNone() == tools.Binge.ActionContinue
+							else:
+								self.bingeTimeout = result['timeout']
+								self.bingeContinue = result['action'] == window.WindowContinue.ActionContinue
+						else:
+							self.bingeTimeout = False
+							self.bingeContinue = False
+					elif observation:
+						self._interactObserverNotify(observation)
+						self.playback.dialogContinue(metadata = self.metadata, binge = False, default = observation)
+					else:
+						window.WindowBackground.close()
+
+		finally: self.interactLock.release()
+
+	def _interactObserver(self, type):
+		if not self.interactObserver == type:
+			self.interactObserver = type
+			tools.Observer.updatePlayback(type = type, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, set = self.idSet, season = self.season, episode = self.episode)
+
+	def _interactObserverStart(self):
+		self._interactObserver(type = tools.Observer.TypeStart)
+
+	def _interactObserverStop(self):
+		self._interactObserver(type = tools.Observer.TypeStop)
+
+	def _interactObserverEvaluate(self):
+		self._interactObserverStop()
+		return tools.Observer.evaluate(binge = bool(self.bingeMetadata) if self.mediaTelevision else None, notify = False) # Notify AFTER the rating dialog.
+
+	def _interactObserverNotify(self, observation):
+		tools.Observer.notify(observation = observation)
 
 	def _showStreams(self):
 		if self.reload and (not self.binge or (self.binge and not self.bingeFinishedCheck)):
@@ -603,11 +701,17 @@ class Player(xbmc.Player):
 							elif self.status in [Player.StatusStopped, Player.StatusEnded]: reload = True
 
 						if reload:
-							# Reload streams in a separate process.
-							# Otherwise we might end up in a long loop of play->reload->play->reload which might not clean up memory and increase the chance of running out of threads on low-end devices.
-							#self.core.showStreams(filter = True, binge = self.binge, autoplay = self.autoplay)
-							self.core.showStreamsExternal(filter = True, binge = self.binge, autoplay = self.autoplay, reload = True)
-							return True
+							setting = tools.Settings.getInteger('interface.stream.interface.reload.mode')
+							if setting > 0:
+								if setting == 1: reload = interface.Dialog.option(title = 35545, message = 36459, labelConfirm = 33149, labelDeny = 33743, default = interface.Dialog.ChoiceNo, timeout = 15000)
+								else: reload = not interface.Dialog.option(title = 35545, message = 36459, labelConfirm = 33743, labelDeny = 33149, default = interface.Dialog.ChoiceNo, timeout = 15000)
+
+							if reload:
+								# Reload streams in a separate process.
+								# Otherwise we might end up in a long loop of play->reload->play->reload which might not clean up memory and increase the chance of running out of threads on low-end devices.
+								#self.core.showStreams(filter = True, binge = self.binge, autoplay = self.autoplay)
+								self.core.showStreamsExternal(filter = True, binge = self.binge, autoplay = self.autoplay, reload = True)
+								return True
 		return False
 
 	def _debridClear(self):
@@ -781,9 +885,13 @@ class Player(xbmc.Player):
 			# Using the following is sometimes too little if you want to skip ahead ealier. Just use a multiplier of 3 for all cases.
 			#	self.bingeDelayBefore = int(self.bingeDelay * (3 if automatic and not outro else 2))
 			# UPDATE: Using (self.bingeDelay * 3) is too little for some shows like "The Witcher" which can have 3-5 minutes of credits for 45-55 minutes play time.
-			if self.bingeDialogOverlay:
-				multiplier = max(3.0, (duration / 600.0) if duration else 4.0)
+			# UPDATE 2: For "Andor" this is a few seconds too little: max(3.0, (duration / 600.0) if duration else 4.0)
+			if self.bingeDialogOverlay or self.bingeDialogButton:
+				multiplier = max(3.0, (duration / 550.0) if duration else 4.0)
 				self.bingeDelayBefore = int(self.bingeDelay * multiplier)
+
+			self.bingeDelay = int(self.bingeDelay)
+			self.bingeDelayBefore = int(self.bingeDelayBefore)
 
 		return self.bingeDelay
 
@@ -803,7 +911,7 @@ class Player(xbmc.Player):
 							# NB: AddonSignals cannot be called from a thread, otherwise the callback never fires.
 							self.bingeFinishedCheck = True
 							self._bingeUpNext()
-					elif self.bingeDialogOverlay:
+					elif self.bingeDialogOverlay or self.bingeDialogButton:
 						delay = self._bingeDelay()
 						if self.bingeDelayBefore: delay = self.bingeDelayBefore
 						if remaining <= delay:
@@ -833,7 +941,8 @@ class Player(xbmc.Player):
 					'autopack' : self.autopack,
 				})
 			elif self.bingeSuppress <= 1:
-				interface.Dialog.notification(title = 35580, message = 35587, icon = interface.Dialog.IconInformation)
+				if tools.Settings.getBoolean('activity.binge.notification'):
+					interface.Dialog.notification(title = 35580, message = 35587, icon = interface.Dialog.IconInformation)
 		except:
 			tools.Logger.error()
 
@@ -894,10 +1003,12 @@ class Player(xbmc.Player):
 			if self.binge and self.bingeMetadata and not self.bingeFinishedShow:
 				self.bingeFinishedShow = True
 				if not self.bingeDialogUpNext:
-					self.bingeContinue = True
+					self.bingeContinue = None
 					if self.bingeSuppress:
 						Pool.thread(target = self._bingeSuppress, start = True)
-					if not self.bingeDialogNone:
+					if self.bingeDialogNone:
+						self.bingeContinue = True
+					else:
 						images = MetaImage.setEpisode(data = self.bingeMetadata, season = False, episode = False)
 
 						background = None
@@ -920,18 +1031,36 @@ class Player(xbmc.Player):
 								try: poster = images['tvshow.keyart']
 								except: pass
 
+						bingeContinue = None
 						if self.bingeDialogFull:
 							delay = self._bingeDelay()
-							self.bingeContinue = window.WindowBingeFull.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay)
+							bingeContinue = window.WindowBingeFull.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay)
 						elif self.bingeDialogOverlay:
-							try: delay = self.getTotalTime() - self.getTime()
+							try: delay = int(self.getTotalTime() - self.getTime())
 							except: delay = 0
 							automatic = self._bingeDelay()
 							if self.bingeDelayBefore:
 								if delay < self.bingeDelayBefore: start = delay # If progress is manually skipped to the end, where there is less playback time left than the value of "automatic".
 								else: start = self.bingeDelayBefore # Normal binge without playback skipping.
 								automatic = max(0, start - automatic)
-							self.bingeContinue = window.WindowBingeOverlay.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay, automatic = automatic)
+							bingeContinue = window.WindowBingeOverlay.show(title = self.bingeMetadata['tvshowtitle'], season = self.bingeMetadata['season'], episode = self.bingeMetadata['episode'], duration = self.bingeMetadata['duration'], background = background, poster = poster, delay = delay, automatic = automatic)
+						elif self.bingeDialogButton:
+							try: remaining = int(self.getTotalTime() - self.getTime())
+							except: remaining = 0
+							duration = self._bingeDelay()
+							delay = 0
+							if self.bingeDelayBefore:
+								if remaining < self.bingeDelayBefore: start = remaining # If progress is manually skipped to the end, where there is less playback time left than the value of "automatic".
+								else: start = self.bingeDelayBefore # Normal binge without playback skipping.
+								delay = max(0, start - duration)
+							duration = min(duration, remaining)
+							bingeContinue = window.WindowBingeButton.show(delay = delay, duration = duration)
+
+						if self.bingeTimeout is None: self.bingeContinue = bingeContinue # And set this if we did not already change the values from onPlayBackStopped() -> _bingeCancel().
+
+				if self.bingeContinue is None and self.bingeTimeout is None:
+					self.bingeTimeout = True
+					self.bingeContinue = tools.Binge.actionNone() == tools.Binge.ActionContinue
 
 				if self.bingeContinue:
 					if self.status == Player.StatusStopped:
@@ -950,15 +1079,16 @@ class Player(xbmc.Player):
 			if self.binge and not self.bingeFinishedPlay:
 				self.bingeFinishedPlay = True
 
-				self.rate() # Rate here, since the call from onPlayBackStopped() only fires after the executePlugin() below is executed.
-				interface.Loader.show()
+				self.interact() # Rate here, since the call from onPlayBackStopped() only fires after the executePlugin() below is executed.
+				if not self.interactBackground and self.bingeContinue: interface.Loader.show()
 
 				# If the background scraping has not finished yet, show the scraping dialog of the current scrape process.
 				# This should not happen often, but can happen if the device is really slow, not able to finish the scrape in 10 minutes, or if the user skips to the end of the video (eg: 10 seconds before the end of the video).
-				if not self.core.propertyStatus() == self.core.StatusFinished:
-					self.core.propertySilentSet(False)
+				status = self.core.propertyStatus()
+				if not status == self.core.StatusFinished and not not status == self.core.StatusFinalize:
+					self.core.propertySilentSet(self.core.SilentInactive)
 				else:
-					self.core.propertySilentSet('cancel')
+					self.core.propertySilentSet(self.core.SilentCancel)
 					tools.System.executePlugin(action = 'scrape', parameters = {
 						'media' : self.media,
 						'kids' : self.kids,
@@ -974,7 +1104,7 @@ class Player(xbmc.Player):
 						'metadata' : tools.Converter.jsonTo(self.bingeMetadata),
 						'autopack' : self.autopack,
 					})
-					interface.Loader.show()
+					if not self.interactBackground and self.bingeContinue: interface.Loader.show()
 		except: tools.Logger.error()
 
 	def _bingeSuppress(self):
@@ -983,7 +1113,7 @@ class Player(xbmc.Player):
 			id = window.Window.current()
 			# Trakt addon crashes if it shows the rating dialog, but then gets closed forcefully by Gaia.
 			# Trakt addon then has to be restarted manually (disabled and re-enabled), or Kodi has to be restarted.
-			# The user either has to disable the rating dialog in Trakt's settings, or set Gaia's "playback.binge.suppress" setting to 0 or 1.
+			# The user either has to disable the rating dialog in Trakt's settings, or set Gaia's "activity.binge.suppress" setting to 0 or 1.
 			if id > window.Window.IdMaximum and not window.Window.currentGaia() and (not self.bingeSuppress == 1 or not window.Window.currentTraktRating()):
 				interface.Dialog.close(id)
 				break
@@ -992,15 +1122,14 @@ class Player(xbmc.Player):
 
 	def _bingeCancel(self):
 		if self.binge:
-			if self.bingeDialogFull: window.WindowBingeFull.cancel()
-			elif self.bingeDialogOverlay: window.WindowBingeOverlay.cancel()
-			self.bingeContinue = False
+			# Close not cancel.
+			if self.bingeDialogFull: window.WindowBingeFull.close()
+			elif self.bingeDialogOverlay: window.WindowBingeOverlay.close()
+			elif self.bingeDialogButton: window.WindowBingeButton.close()
 
 			# If we stop playback in the middle (while the background scrape of the next episode is already done), the stream window of the NEXT episode is shown on "reload".
 			# By setting this status, the stream window of the current unfinished episode is shown instead.
-			if not self.core.propertyStatus() in [self.core.StatusCancel, self.core.StatusContinue]:
-				if self.timeProgress < self.playbackEnd and self.status == Player.StatusStopped: self.core.propertyStatusSet(self.core.StatusCancel)
-				else: self.core.propertyStatusSet(self.core.StatusContinue)
+			if not self.core.propertyStatus() == self.core.StatusCancel and self.timeProgress < self.playbackEnd and self.status == Player.StatusStopped: self.core.propertyStatusSet(self.core.StatusCancel)
 
 	def _closeFailure(self):
 		# Close Kodi's "Playback Failed" dialog.
@@ -1167,8 +1296,7 @@ class Player(xbmc.Player):
 			if not timeout: timeout = 300 # Technically unlimited.
 
 			# Use a thread for Kodi 18, since the player freezes for a few seconds before starting playback.
-			thread = Pool.thread(target = self.keepPlaybackWait, args = (title, message, status, substatus1, substatus2, timeout))
-			thread.start()
+			thread = Pool.thread(target = self.keepPlaybackWait, args = (title, message, status, substatus1, substatus2, timeout), start = True)
 
 			# NB: Do not join(), but use a busy-wait instead.
 			# Check the comment in keepPlaybackWait() for more info.
@@ -1279,7 +1407,14 @@ class Player(xbmc.Player):
 						if self.playbackWatched: action = Playback.ActionStop
 						else: action = Playback.ActionFinish
 
-				if action: self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
+				# NB: Check the resume progress.
+				# The following scenario:
+				#	1. The user has a previous progress saved at 60%. A day later the user resumes playback.
+				#	2. Right after resuming, scrobbeling is set at around 0-1% before Kodi actually changes the position and the new scrobbeling progress is submitted.
+				#	3. If playback fails or the users stops playback BEFORE Kodi could fully resume, scrobbeling would have reset to 0% before being able to update it to the actual resume progress.
+				# Hence, the progress will be lost in such a case. Instead wait for the playback to resume before updating the scrobbeling progress.
+				if action and (not self.progress or self.progress < 0.5 or self.timeProgress > self.progress or self.timeCurrent > 5):
+					self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
 
 	def progressInitialize(self):
 		locked = False
@@ -1557,7 +1692,6 @@ class Player(xbmc.Player):
 
 			Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
 			thread = Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
-			if self.mediaTelevision: Chapter.select()
 
 			if enabled:
 				if thread: thread.join()
@@ -1574,7 +1708,8 @@ class Player(xbmc.Player):
 		Subtitle.stop()
 
 	def resume(self, seconds, offset = False):
-		self.seekTime(max(0, seconds - (Player.ResumeTime if offset else 0)))
+		self.resumedTime = max(0, seconds - (Player.ResumeTime if offset else 0))
+		self.seekTime(self.resumedTime)
 
 	def playbackInitialize(self):
 		if not self.playbackInitialized:
@@ -1600,6 +1735,10 @@ class Player(xbmc.Player):
 			]
 			[thread.join() for thread in threads]
 
+			# Only do this after the streamSelect() and progressInitialize().
+			# Otherwise the Skip button might show over the resume/subtitle dialogs making them unclickable until the Skip button ius canceled.
+			if self.mediaTelevision: Chapter.select(resume = self.resumedTime)
+
 			# Only start this AFTER the resume feature and subtitle dialogs, since they pause playback which is incorrectly detected as buffering.
 			self.bufferMonitor()
 
@@ -1613,6 +1752,7 @@ class Player(xbmc.Player):
 			# If playback is stopped from the Kore app while the binge window is hidden, after playback finished, one can still pull down the binge window.
 			# Forcefully close the window if playback stopped.
 			if self.bingeDialogOverlay: window.WindowBingeOverlay.close()
+			elif self.bingeDialogButton: window.WindowBingeButton.close()
 
 			# Do not do this (eg reload stream window) if playback failed.
 			if self.statusStarted and not self.error:
@@ -1620,10 +1760,9 @@ class Player(xbmc.Player):
 
 				# Must be BEFORE _showStreams() and _bingePlay(), since we want to wait for the rating dialog to close before we continue.
 				# Otherwise the rating dialog might be closed or hidden underneath the stream window.
-				self.rate()
+				self.interact()
 
 				continued = self._showStreams()
-
 				if self.binge:
 					if self.bingePlay:
 						continued = True
@@ -1631,9 +1770,19 @@ class Player(xbmc.Player):
 					elif self.bingeDialogNone or self.bingeDialogFull:
 						continued = True
 						self._bingeShow()
+					else:
+						if not self.bingeContinue:
+							self.core.propertyStatusSet(self.core.StatusCancel)
+							self.core.propertySilentSet(self.core.SilentActive)
+						elif self.core.propertySilent() == self.core.SilentInteract:
+							# If playback was stopped without picking a binge continue/cancel option.
+							self.core.propertySilentSet(self.core.SilentInactive)
 
 				# Refresh the directory to show new progress or watched status.
-				if not continued: interface.Directory.refresh(position = True, wait = False)
+				# Do not refresh if we are binging, otherwise the container refresh causes a loader to pop up for a short time.
+				if not continued and not self.bingeContinue: interface.Directory.refresh(position = True, loader = False, wait = False)
+
+				if not self.bingeContinue: window.WindowBackground.close()
 
 	def onPlayBackStarted(self):
 		# NB: It seems that Kodi only executes callbacks if the previous callback is done executing.
@@ -1647,6 +1796,7 @@ class Player(xbmc.Player):
 
 	def _onPlayBackStarted(self):
 		interface.Loader.hide()
+		self.statusDone = Player.StatusPlaying
 
 	def onPlayBackPaused(self):
 		self.status = Player.StatusPaused
@@ -1655,6 +1805,7 @@ class Player(xbmc.Player):
 
 	def _onPlayBackPaused(self):
 		self.progressUpdate()
+		self.statusDone = Player.StatusPaused
 
 	def onPlayBackResumed(self):
 		self.status = Player.StatusPlaying
@@ -1663,6 +1814,7 @@ class Player(xbmc.Player):
 
 	def _onPlayBackResumed(self):
 		self.progressUpdate()
+		self.statusDone = Player.StatusPlaying
 
 	def onPlayBackStopped(self):
 		self.status = Player.StatusStopped
@@ -1670,6 +1822,17 @@ class Player(xbmc.Player):
 		Pool.thread(target = self._onPlayBackStopped, start = True)
 
 	def _onPlayBackStopped(self):
+		# Show here already to reduce the period between playback end and a window popping up.
+		# Also do this if rating/continue was disabled and there is no binging.
+		# Only show if finished watching. Otherwise the window is shown if the cancel button was clicked in the playback window (that cancels the next episode before it even starts).
+		if self.playbackWatched and not self.interactBackground and self.interactSpecial:
+			special1 = self.interactRating or self.interactContinue
+			special2 = self.core.navigationPlaybackSpecial and self.bingeContinue
+			if special1 or special2:
+				self.interactBackground = True
+				window.WindowBackground.show(metadata = self.metadata, logo = True)
+
+		self._interactObserverStop()
 		self._bingeCancel()
 		self._downloadStop()
 		self._debridClear()
@@ -1677,6 +1840,7 @@ class Player(xbmc.Player):
 
 		# Only do this if the video actually played and did not stop because of failure or timeout.
 		if self.statusStarted: self.playbackFinalize()
+		self.statusDone = Player.StatusStopped
 
 	def onPlayBackEnded(self):
 		self.status = Player.StatusEnded
@@ -1685,6 +1849,7 @@ class Player(xbmc.Player):
 
 	def _onPlayBackEnded(self):
 		self.onPlayBackStopped()
+		self.statusDone = Player.StatusEnded
 
 	def onPlayBackError(self):
 		tools.Logger.log('Playback Error')
@@ -2526,7 +2691,9 @@ class Subtitle(Streamer):
 
 	@classmethod
 	def _finish(self, status, subtitle = False, unpause = False, notification = True):
-		if notification:
+		# Only show notifications if the player is actually playing.
+		# Otherwise, if there is a playback failure or if playback was manually canceled from WindowPlayback, the Subtitle.StatusFailed pops up.
+		if notification and self.player().isPlayback():
 
 			if not subtitle is False:
 				if subtitle:
@@ -2578,12 +2745,8 @@ class Chapter(Streamer):
 	Chapters = []
 
 	@classmethod
-	def settingsEnabled(self):
-		return tools.Settings.getBoolean('playback.skip.enabled')
-
-	@classmethod
-	def settingsTime(self):
-		return tools.Settings.getCustom('playback.skip.time')
+	def settingsSkip(self):
+		return tools.Settings.getBoolean('activity.skip.enabled')
 
 	@classmethod
 	def chapterSkip(self):
@@ -2596,133 +2759,162 @@ class Chapter(Streamer):
 		return None
 
 	@classmethod
-	def select(self, wait = False):
-		if self.settingsEnabled():
-			thread = Pool.thread(target = self._select, start = True)
+	def select(self, resume = None, wait = False):
+		if self.settingsSkip():
+			thread = Pool.thread(target = self._select, kwargs = {'resume' : resume}, start = True)
 			if wait: Player.join(thread)
 			return thread
 		return None
 
 	@classmethod
-	def _select(self):
-		# There is currently no way to get the chapter names, not from the RPC, not from the info labels, and not from Python.
-		# Often chapters are labeled as "Intro" or "Recap", which could be used to better determine which chapter is the intro.
-		# We could do:
-		#	tools.System.execute('ActivateWindow(videobookmarks)')
-		#	list = xbmcgui.Window(xbmcgui.getCurrentWindowId()).getControl(11)
-		#	item = list.getListItem(0).getLabel()
-		# However, getListItem() always returns None for lists populated from the skin (C++).
-
-		Chapter.Chapters = []
-
+	def _select(self, resume = None):
 		try:
-			from lib.modules.convert import ConverterDuration
-			chapters = tools.System.infoLabel('Player.Chapters')
-			if chapters:
-				chapters = [float(i) for i in chapters.split(',')]
+			# There is currently no way to get the chapter names, not from the RPC, not from the info labels, and not from Python.
+			# Often chapters are labeled as "Intro" or "Recap", which could be used to better determine which chapter is the intro.
+			# We could do:
+			#	tools.System.execute('ActivateWindow(videobookmarks)')
+			#	list = xbmcgui.Window(xbmcgui.getCurrentWindowId()).getControl(11)
+			#	item = list.getListItem(0).getLabel()
+			# However, getListItem() always returns None for lists populated from the skin (C++).
+
+			Chapter.Chapters = []
+
+			try:
+				from lib.modules.convert import ConverterDuration
+				chapters = tools.System.infoLabel('Player.Chapters')
 				if chapters:
-					time = tools.Math.roundUp(self.player().getTotalTime() or 0)
+					chapters = [float(i) for i in chapters.split(',')]
+					if chapters:
+						try: time = tools.Math.roundUp(self.player().getTotalTime() or 0)
+						except: time = 0 # RuntimeError: Kodi is not playing any media file
 
-					thresholdPromoPercent = 0.001
-					thresholdPromoDuration = 0.1
-					thresholdIntroPercent = 0.05 # House of Dragons: percent = 2.7%
-					thresholdIntroDuration = 0.25
-					thresholdOutroPercent = 0.05 # House of Dragons: percent = 2.4%
-					thresholdOutroDuration = 0.97
-					thresholdLastPercent = 0.06 # Similar to outro, but only if it is the last chapter.
-					thresholdLastDuration = 0.94
-					if time and time < 1800:
-						# Short episodes with less than 30 minutes.
-						# Heavenly Delusion: percent = 6.5%, end = 93.5%.
-						# Heavenly Delusion S01E06: percent = 12.3%, end = 87.6%.
-						thresholdLastPercent = 0.15
-						thresholdLastDuration = 0.85
+						thresholdPromoPercent = 0.001
+						thresholdPromoDuration = 0.1
+						thresholdIntroPercent = 0.05 # House of Dragons: percent = 2.7%
+						thresholdIntroDuration = 0.25
+						thresholdOutroPercent = 0.05 # House of Dragons: percent = 2.4%
+						thresholdOutroDuration = 0.97
+						thresholdLastPercent = 0.08 # Similar to outro, but only if it is the last chapter. 6% just too little for Band of Brothers (6.02%).
+						thresholdLastDuration = 0.92 # 94% just too little for Band of Brothers (93.97%).
+						if time and time < 1800:
+							# Short episodes with less than 30 minutes.
+							# Heavenly Delusion: percent = 6.5%, end = 93.5%.
+							# Heavenly Delusion S01E06: percent = 12.3%, end = 87.6%.
+							thresholdLastPercent = 0.15
+							thresholdLastDuration = 0.85
 
-					chapters.append(100.0)
-					last = len(chapters) - 1
-					for i in range(last):
-						next = i + 1
-						name = 'Chapter %d' % (i + 1)
+						chapters.append(100.0)
+						last = len(chapters) - 1
+						for i in range(last):
+							next = i + 1
+							name = 'Chapter %d' % (i + 1)
 
-						start = chapters[i] / 100.0
-						end = chapters[next] / 100.0
-						startTime = int(start * time)
-						endTime = int(end * time)
-						if not startTime == endTime and i < next: endTime -= 1
-						startFormat = ConverterDuration(value = startTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
-						endFormat = ConverterDuration(value = endTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
+							start = chapters[i] / 100.0
+							end = chapters[next] / 100.0
+							startTime = int(start * time)
+							endTime = int(end * time)
+							if not startTime == endTime and i < next: endTime -= 1
+							startFormat = ConverterDuration(value = startTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
+							endFormat = ConverterDuration(value = endTime, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort)
 
-						# In the future if we can get the chapter names, matching with regex will be better.
-						type = None
-						if start == end: type = Chapter.TypeEnd
-						if not type:
-							for t, e in Chapter.TypesExpression.items():
-								if tools.Regex.match(data = name, expression = e):
-									type = t
-									break
+							# In the future if we can get the chapter names, matching with regex will be better.
+							type = None
+							if start == end: type = Chapter.TypeEnd
 							if not type:
-								percent = end - start
-								if percent < thresholdPromoPercent and start < thresholdPromoDuration: type = Chapter.TypePromo
-								elif percent < thresholdIntroPercent and start < thresholdIntroDuration: type = Chapter.TypeIntro # House of Dragons: percent = 2.7%
-								elif percent < thresholdOutroPercent and end >= thresholdOutroDuration: type = Chapter.TypeOutro # House of Dragons: percent = 2.4% | Heavenly Delusion: percent = 6.5%, end = 93%.
-								elif next == last and percent < thresholdLastPercent and end >= thresholdLastDuration: type = Chapter.TypeOutro
-								else: type = Chapter.TypeDefault
+								for t, e in Chapter.TypesExpression.items():
+									if tools.Regex.match(data = name, expression = e):
+										type = t
+										break
+								if not type:
+									percent = end - start
+									if percent < thresholdPromoPercent and start < thresholdPromoDuration: type = Chapter.TypePromo
+									elif percent < thresholdIntroPercent and start < thresholdIntroDuration: type = Chapter.TypeIntro # House of Dragons: percent = 2.7%
+									elif percent < thresholdOutroPercent and end >= thresholdOutroDuration: type = Chapter.TypeOutro # House of Dragons: percent = 2.4% | Heavenly Delusion: percent = 6.5%, end = 93%.
+									elif next == last and percent < thresholdLastPercent and end >= thresholdLastDuration: type = Chapter.TypeOutro
+									else: type = Chapter.TypeDefault
 
-						Chapter.Chapters.append({
-							'name' : name,
-							'label' : '%s: %s (%s - %s)' % (name, type.title(), startFormat, endFormat),
-							'type' : type,
-							'skip' : type in Chapter.TypesSkip,
-							'percent' : {
-								'start' : start,
-								'end' : end,
-								'duration' : end - start,
-							},
-							'time' : {
-								'start' : startTime,
-								'end' : endTime,
-								'duration' : endTime - startTime,
-							},
-						})
-					self.log('Available chapters: ' + (' | '.join([i['label'] for i in Chapter.Chapters])))
-		except: tools.Logger.error()
+							Chapter.Chapters.append({
+								'name' : name,
+								'label' : '%s: %s (%s - %s)' % (name, type.title(), startFormat, endFormat),
+								'type' : type,
+								'skip' : type in Chapter.TypesSkip,
+								'percent' : {
+									'start' : start,
+									'end' : end,
+									'duration' : end - start,
+								},
+								'time' : {
+									'start' : startTime,
+									'end' : endTime,
+									'duration' : endTime - startTime,
+								},
+							})
+						self.log('Available chapters: ' + (' | '.join([i['label'] for i in Chapter.Chapters])))
+			except: tools.Logger.error()
 
-		self._update()
-		return Chapter.Chapters
+			self._update(resume = resume)
+			return Chapter.Chapters
+		except:
+			tools.Logger.error()
+			return []
 
 	@classmethod
-	def _update(self):
-		if Chapter.Chapters:
-			chapters = self.chapterSkip()
-			chapter = None
-			player = self.player()
-			timeTotal = float(player.getTotalTime())
-			progressPrevious = 0
-			second = 1 / timeTotal
-			offset = 3
+	def _update(self, resume = None):
+		try:
+			if Chapter.Chapters:
+				chapters = self.chapterSkip()
+				chapter = None
+				player = self.player()
+				timeTotal = float(player.getTotalTime())
+				progressPrevious = 0
+				second = 1 / timeTotal
+				offset = 3
 
-			while True:
-				if not player.isPlayingVideo() or tools.System.aborted():
-					window.WindowSkip.cancel()
-					return
+				# If playback is auto-resumed, the Kodi player needs some time to execute player.seekTime() and for player.getTime() to get updated.
+				# This means if the intro chapter is right at the start of video, the Skip button pops up for a short time before being hidden again when player.getTime() changes.
+				# To avoid this, use the passed in resume time instead.
+				# Waiting here is technically not required, but it cannot hurt to get the actual time in the loop below.
+				if resume:
+					for i in range(6):
+						try:
+							if player.getTime() >= resume: break
+						except: pass
+						tools.Time.sleep(0.05)
 
-				timeCurrent = player.getTime()
-				progress = timeCurrent / timeTotal
+				while True:
+					if not player.isPlayingVideo() or tools.System.aborted():
+						window.WindowButtonSkip.cancel()
+						return
 
-				if progress < progressPrevious: chapters = self.chapterSkip()
-				if chapter and (timeCurrent < chapter['time']['start'] - 1 or timeCurrent > chapter['time']['end'] + 1): window.WindowSkip.cancel()
-				progressPrevious = progress
+					# Only use the resume time once.
+					# Yesterday the user fell asleep, woke up in the middle of the episode progress and stopped playback.
+					# Next day the user starts playback again, it gets auto-resumed to th emiddle, but the user manually changes progress to 0% to start the episode from the beginning.
+					# In this case "resume" will be higher that the actual getTime(). But we still want the Skip button to show.
+					if resume:
+						timeCurrent = max(resume, player.getTime())
+						resume = None
+					else:
+						timeCurrent = player.getTime()
+					progress = timeCurrent / timeTotal
 
-				for percent in chapters.keys():
-					if progress >= percent and progress <= percent + (5 * second):
-						chapter = chapters[percent]
-						del chapters[percent]
+					if progress < progressPrevious: chapters = self.chapterSkip()
+					if chapter and (timeCurrent < chapter['time']['start'] - 1 or timeCurrent > chapter['time']['end'] + 1): window.WindowButtonSkip.cancel()
+					progressPrevious = progress
 
-						seekTime = chapter['time']['end'] - offset
-						seekDuration = chapter['time']['duration'] - offset
-						window.WindowSkip.show(duration = seekDuration, time = self.settingsTime(), callback = lambda : player.seekTime(seekTime))
-						break
+					for percent in chapters.keys():
+						# 5 secs is too little if the intro starts right at the start of the video (00:00). Eg: GoT S07E05.
+						# Probably because the audio/subtitle and auto resume threads are still busy.
+						if progress >= percent and progress <= percent + ((8 if percent < 0.01 else 5) * second):
+							chapter = chapters[percent]
+							del chapters[percent]
 
-				# Use longer sleeping time if the progress is closer to the end, in order to reduce processing.
-				# Still keep monitoring, in case the user is at the end of the progress and seeks to the start of the video.
-				tools.Time.sleep(0.5 if progress < 0.1 else 1 if progress < 0.2 else 1.5 if progress < 0.3 else 2 if progress < 0.5 else 5)
+							seekTime = chapter['time']['end'] - offset
+							seekDuration = chapter['time']['duration'] - offset
+
+							window.WindowButtonSkip.show(duration = seekDuration, callback = lambda : player.seekTime(seekTime))
+							break
+
+					# Use longer sleeping time if the progress is closer to the end, in order to reduce processing.
+					# Still keep monitoring, in case the user is at the end of the progress and seeks to the start of the video.
+					tools.Time.sleep(0.5 if progress < 0.1 else 1 if progress < 0.2 else 1.5 if progress < 0.3 else 2 if progress < 0.5 else 5)
+		except: tools.Logger.error()

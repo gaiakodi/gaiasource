@@ -28,7 +28,7 @@ class Bluetooth(object):
 
 	SettingEnabled		= 'utility.bluetooth.enabled'
 	SettingDevices		= 'utility.bluetooth.devices'
-	SettingReconnect	= 'utility.bluetooth.monitor.enabled'
+	SettingMonitor		= 'utility.bluetooth.monitor'
 	SettingInterval		= 'utility.bluetooth.monitor.interval'
 
 	Count				= None
@@ -54,7 +54,7 @@ class Bluetooth(object):
 
 		if not Tools.isArray(device): device = [device]
 		changed = []
-		for i in range(duration):
+		for i in range(int(duration / 2.0)):
 			if System.aborted(): return
 			devices = self.devices()
 			for j in device:
@@ -64,7 +64,7 @@ class Bluetooth(object):
 						if not address in changed and not j == k: changed.append(address)
 						break
 			if len(changed) >= len(device): break
-			Time.sleep(1)
+			Time.sleep(2)
 
 		if loader: Loader.hide()
 
@@ -127,6 +127,8 @@ class Bluetooth(object):
 			dataAll = self._extractDevice(data = dataAll)
 			if dataAll:
 				for device in dataAll:
+					if System.aborted(): break
+
 					deviceAddress = device[0]
 					deviceName = device[1]
 					devicePaired = False
@@ -166,6 +168,7 @@ class Bluetooth(object):
 			elif not Tools.isArray(device): device = [device]
 
 			for i in device:
+				if System.aborted(): break
 				address = i['address']
 
 				# Pairing can take some time, and we can therefore not execute all these commands right after each other.
@@ -173,7 +176,14 @@ class Bluetooth(object):
 				for action in ['pair', 'trust', 'connect']:
 					if loader: Loader.show()
 					self._execute(action = action + ' ' + address, exit = False, timeout = 15)
-					self._wait(device = i, loader = False, duration = 15)
+
+					# NB: Do not wait here.
+					# For some reason the bluetoothctl devices stats do not change for some time.
+					# This makes reconnecting a device take very long (1+ min).
+					# Maybe making so many calls to bluetoothctl prevents it internally from finishing the pair/trust/connect commands.
+					# Just skipping the wait seems to work just fine and connect very quickly.
+					#self._wait(device = i, loader = False, duration = 15)
+					Time.sleep(0.2)
 
 			if wait: self._wait(device = device, loader = loader)
 		except:
@@ -193,6 +203,7 @@ class Bluetooth(object):
 			elif not Tools.isArray(device): device = [device]
 
 			for i in device:
+				if System.aborted(): break
 				self._execute(action = 'disconnect ' + i['address'])
 
 			if wait: self._wait(device = device, loader = loader)
@@ -262,34 +273,27 @@ class Bluetooth(object):
 		return items
 
 	##############################################################################
-	# SERVICE
+	# MONITOR
 	##############################################################################
 
 	@classmethod
-	def service(self):
-		Pool.thread(target = self._serviceInitialize, start = True)
+	def monitor(self):
+		Pool.thread(target = self._monitorInitialize, start = True)
 
 	@classmethod
-	def _serviceInitialize(self):
-		# Intialize in the service, and not when Gaia is launched, since the initialization can take some time if not Bluetooth dongle is connected.
+	def _monitorInitialize(self):
+		# Intialize here, since the initialization can take some time if no Bluetooth dongle is connected.
 		self.initialize()
-		if Settings.getBoolean(Bluetooth.SettingReconnect) and self.supported():
-			Pool.thread(target = self._serviceMonitor, start = True)
+		if Settings.getBoolean(Bluetooth.SettingMonitor) and self.supported():
+			Pool.thread(target = self._monitorExecute, start = True)
 
 	@classmethod
-	def _serviceMonitor(self):
+	def _monitorExecute(self):
 		try:
 			interval = Settings.getCustom(Bluetooth.SettingInterval)
-			step = 5
-			steps = int(interval / step)
 			while not System.aborted():
 				# Do not autoconnect while the user is manually connecting, disconnecting, or pairing.
 				# Otherwise this might cause conflict.
-				if not self._busy():
-					self.connect(paired = True, connected = False, loader = False)
-
-				# Make the service abort more quickly when the interval is very long.
-				for i in range(steps):
-					if System.aborted(): return
-					Time.sleep(step)
+				if not self._busy(): self.connect(paired = True, connected = False, loader = False)
+				if System.abortWait(timeout = interval): break
 		except: Logger.error()

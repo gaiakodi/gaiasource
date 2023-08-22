@@ -75,7 +75,10 @@ class MetaCache(Database):
 	# Eg: {259200 : 43200} = If the title was released in the past 3 days, force refresh the data in the background if its last metadata update was more than 12 hours ago.
 	# Be conservative as we do not want to update the metadata too often.
 	TimeRelease			= {
-							259200 : 43200,		# 3 days : 12 hours.
+							None : 7200,		# Unreleased (release date in the future) : 2 hours.
+							86400 : 10800,		# 1 day : 3 hours.
+							172800 : 21600,		# 2 days : 6 hours.
+							345600 : 43200,		# 4 days : 12 hours.
 							604800 : 86400,		# 7 days : 1 day.
 							1209600 : 172800,	# 14 days : 2 days.
 							1814400 : 259200,	# 21 days : 3 days.
@@ -317,7 +320,8 @@ class MetaCache(Database):
 		elif type == MetaCache.TypeEpisode: return MetaCache.TimeObsoleteEpisode
 
 	@classmethod
-	def _timeRelease(self, type, release = None, time = None):
+	def _timeRelease(self, type, release = None, metadata = None, time = None):
+		if not release and metadata: release = self._timeExtract(metadata = metadata)
 		if release:
 			if type == MetaCache.TypeMovie: values = MetaCache.TimeReleaseMovie
 			elif type == MetaCache.TypeSet: values = MetaCache.TimeReleaseSet
@@ -325,14 +329,45 @@ class MetaCache(Database):
 			elif type == MetaCache.TypeSeason: values = MetaCache.TimeReleaseSeason
 			elif type == MetaCache.TypeEpisode: values = MetaCache.TimeReleaseEpisode
 			else: values = None
-
 			if values:
 				if Tools.isString(release): release = Time.timestamp(fixedTime = release, format = Time.FormatDate)
 				if not time: time = Time.timestamp()
 				if release:
 					for timeReleased, timeOutdated in values.items():
-						if release <= (time - timeReleased): return timeOutdated
+						if timeReleased is None: # Also do this for not-yet released episodes that have a later date than the current date.
+							if release > time: return timeOutdated
+						else:
+							if release >= (time - timeReleased): return timeOutdated
 		return None
+
+	@classmethod
+	def _timeExtract(self, metadata):
+		release = None
+		try:
+			try: release = metadata['premiered']
+			except: pass
+			if not release:
+				try: release = metadata['aired']
+				except: pass
+
+				# For season/episode metadata, extract the latests release date.
+				if not release:
+					values = []
+					for type in ['seasons', 'episodes']:
+						if type in metadata and Tools.isArray(metadata[type]):
+							for i in metadata[type]:
+								value = None
+								try: value = i['premiered']
+								except: pass
+								if not value:
+									try: value = i['aired']
+									except: pass
+								if value: values.append(value)
+							break
+					values = {Time.integer(i) : i for i in values}
+					if values: release = values[max(values, key = values.get)]
+		except: Logger.error()
+		return release
 
 	@classmethod
 	def _id(self, item):
@@ -656,19 +691,15 @@ class MetaCache(Database):
 							# Note that query returns the values in order of time, so picking the first is picking the newest.
 							if not selection: selection = datas[0]
 							time = selection[0]
+							timeDifference = timeCurrent - time
 
 							metadata = Converter.jsonFrom(selection[3])
 
 							# If the release date of the title is recent, reduce the refresh time to update the metadata more often.
 							# For recently released movies, the rating is often higher than it should be, since the early ratings cast by people are often higher than the average rating after a few days/weeks with more votes.
-							# For newley released seasons/episodes, besides the rating, there mmight be oother outdated metadata, like the plot, cast, episode title, or release date.
-							release = None
-							try: release = metadata['premiered']
-							except: pass
-							if not release:
-								try: release = metadata['aired']
-								except: pass
-							timeCheck = self._timeRelease(type = type, release = release, time = timeCurrent) or timeOutdated
+							# For newley released seasons/episodes, besides the rating, there might be other outdated metadata, like the plot, cast, episode title, or release date. For many new episodes there are no ratings within the first day or so of release.
+
+							timeCheck = self._timeRelease(type = type, metadata = metadata, time = timeCurrent) or timeOutdated
 
 							# Data comes from the external preprocessed database.
 							# Always force a refresh, since external data might be outdated or not according to the users settings.
@@ -684,7 +715,7 @@ class MetaCache(Database):
 								status = MetaCache.StatusIncomplete
 
 							# Always refresh obsolete data, even when they are from differnt settings.
-							elif (timeCurrent - time) > timeObsolete:
+							elif timeDifference > timeObsolete:
 								refresh = MetaCache.RefreshForeground
 								status = MetaCache.StatusObsolete
 
@@ -694,7 +725,7 @@ class MetaCache(Database):
 								refresh = MetaCache.RefreshBackground
 								status = MetaCache.StatusSettings
 
-							elif (timeCurrent - time) > timeCheck:
+							elif timeDifference > timeCheck:
 								refresh = MetaCache.RefreshBackground
 								status = MetaCache.StatusOutdated
 
@@ -718,6 +749,29 @@ class MetaCache(Database):
 	def delete(self, type, setting):
 		query = 'DELETE FROM `%s` WHERE setting = ?;' % type
 		return self._delete(query = query, parameters = [setting])
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time:
+			count = 0
+			query = 'DELETE FROM `%s` WHERE time <= ?;'
+			for type in MetaCache.Types:
+				count += self._delete(query = query % type, parameters = [time], commit = commit, compress = compress)
+			return count
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = []
+			query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;'
+			for type in MetaCache.Types:
+				time = self._selectValues(query = query % type, parameters = [count])
+				if time: times.extend(time)
+			if times: return Tools.listSort(times)[:count][-1]
+		return None
 
 	##############################################################################
 	# IMPORT

@@ -86,9 +86,9 @@ class Seasons(object):
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = True, release = False, limit = False, refresh = False, next = True):
 		if items:
-			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
+			if duplicate: items = self.mMetatools.filterDuplicate(items = items, number = True)
 
 			if kids: items = self.mMetatools.filterKids(items = items, kids = self.mKids)
 

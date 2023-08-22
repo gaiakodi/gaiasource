@@ -15869,10 +15869,11 @@ class Stream(Serializer):
 			# However, it is important for permanent caching (global var or database).
 			# If Kodi's version changes, Python's version might also change, possibly making the compiled regex from older versions incompatible with newer versions.
 			# If Gaia's version changes, it might mean that the expressions themeselves were changed.
+			from lib.providers.core.base import ProviderBase
 			Stream.CacheInit = {
 				'version' : tools.System.versionKodi(full = True) + '_' + tools.System.version(),
 				'developer' : tools.System.developer(code = False),
-				'settings' : tools.Settings.getInteger('general.cache.expression'),
+				'settings' : ProviderBase.settingsGlobalSaveExpression(),
 				'expression1' : re.compile('.+\smethod\s|.+function\s|\sat\s.+|\sof\s.+'),
 				'expression2' : re.compile('>'),
 			}
@@ -16586,6 +16587,7 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
+		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16609,6 +16611,7 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
+			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
@@ -16638,6 +16641,7 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
+		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16660,6 +16664,7 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
+			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
@@ -19763,61 +19768,67 @@ class Stream(Serializer):
 				languages = languagesCommon + languagesUncommon
 				languagesExpression = [(i['code'], i['expression']) for i in languages]
 
+				# Remove cut-off words.
+				# If it is at the end of the file name, starts with an uppercase and ends with lowercase.
+				# Eg: Game of Thrones (2011) Complete (1080p BluRay x265 HEVC 10bit Tr
+				# This probably was "TrueHD"
+				data = self._cacheId('languageExtract1', re.compile, lambda : self._expressionFormatCommon('{separator}([A-Z][a-z])$')).sub('', data)
+
 				# Replace domain names.
 				# Eg: Mulan [720p][Subtitulado][wWw.EliteTorrent.SE]
 				# Eg: Mulan [DVD_BR][Latino][wWw.EliteTorrent.NL])
 				# Eg: Avatar 2009 PROPER TS XviD Subtitulado www loco com ar
 				# Eg: Avatar (2009) PROPER TS XviD-MAXSPEED www torentz 3xforum ro
-				data = self._cacheId('languageExtract1', re.compile, 'w{3}[\s\.](?:[a-z\d]{3,}[\s\.]){1,2}[a-z]{2,3}', flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract2', re.compile, 'w{3}[\s\.](?:[a-z\d]{3,}[\s\.]){1,2}[a-z]{2,3}', flags = Stream.ExpressionFlags).sub('', data)
 
 				# Removing leading domain names without www.
 				# Eg: [ Torrent9.cz ] Avatar (2009) x264 1080p VFF DTS [email protected] - VFHD.mkv
 				# Eg: [aletorrenty pl] AVATAR_3D 2009 1080p H-SBS BDRip 48FPS-Sonda [AT-TEAM]
-				data = self._cacheId('languageExtract2', re.compile, lambda : self._expressionFormatCommon('^{brackets_start}{separator}*(?!lektor|napisy)[a-z\d]{{4,}}[\.\s][a-z]{{2,3}}{separator}*{brackets_end}'), flags = Stream.ExpressionFlags).sub('', data)
-				data = self._cacheId('languageExtract3', re.compile, lambda : self._expressionFormatCommon('{brackets_start}{separator}*(?!lektor|napisy)[a-z\d]{{4,}}[\.\s][a-z]{{2,3}}{separator}*{brackets_end}$'), flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract3', re.compile, lambda : self._expressionFormatCommon('^{brackets_start}{separator}*(?!lektor|napisy)[a-z\d]{{4,}}[\.\s][a-z]{{2,3}}{separator}*{brackets_end}'), flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract4', re.compile, lambda : self._expressionFormatCommon('{brackets_start}{separator}*(?!lektor|napisy)[a-z\d]{{4,}}[\.\s][a-z]{{2,3}}{separator}*{brackets_end}$'), flags = Stream.ExpressionFlags).sub('', data)
 
 				# Ignore the Spanish word "el", sinec it will be detected as Greek.
 				# Eg: Avatar (2009) V.Extendida 4K UHDRip 2160p El_Ranero
-				data = self._cacheId('languageExtract4', re.compile, lambda : self._expressionFormatCommon('{separator}(el)(\'|[\-\–\_\.][a-z]+$)'), flags = Stream.ExpressionFlags).sub(r' \2', data)
+				data = self._cacheId('languageExtract5', re.compile, lambda : self._expressionFormatCommon('{separator}(el)(\'|[\-\–\_\.][a-z]+$)'), flags = Stream.ExpressionFlags).sub(r' \2', data)
 
 				# Remove upload names.
 				# Eg: AVATAR 2009 DVD9 Rip By Antony_GR
 				# Eg: Avatar Extended 2009 by ErikB.NL
 				# Eg: Avatar Extended (2009) BRRip Avi by MaximE NL
 				# Eg: Nineteen Eighty-Four (1984), by George Orwell
-				data = self._cacheId('languageExtract5', re.compile, lambda : self._expressionFormatCommon('{separator}by{separator}[a-z\d]{{2,}}{separator}(?<![a-z\d])[a-z]{{2,3}}(?![a-z\d])'), flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract6', re.compile, lambda : self._expressionFormatCommon('{separator}by{separator}[a-z\d]{{2,}}{separator}(?<![a-z\d])[a-z]{{2,3}}(?![a-z\d])'), flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace multiples, sometimes found in Russian titles.
 				# Eg: Game.of.Thrones.S01.1080p.BDRemux.3xRus.Ukr.2xEng.HDCLUB
 				# Ignore multiple subtitles.
 				# Eg: The Terminator.Extended Edition.1984.DVDRip-AVC.8xRus.Eng.5xSubs.mkv
-				data = self._cacheId('languageExtract6', re.compile, '\d+x(sub)', flags = Stream.ExpressionFlags).sub(r' separator \1', data)
-				data = self._cacheId('languageExtract7', re.compile, '\d+x([a-z])', flags = Stream.ExpressionFlags).sub(r'\1', data)
+				data = self._cacheId('languageExtract7', re.compile, '\d+x(sub)', flags = Stream.ExpressionFlags).sub(r' separator \1', data)
+				data = self._cacheId('languageExtract8', re.compile, '\d+x([a-z])', flags = Stream.ExpressionFlags).sub(r'\1', data)
 
 				# Add a space between channels and language/codec.
 				# Eg: The Terminator 1 REMASTERED (1984) [BD RIP/1080p/5.1Eng/5.1Fre/Eng,Fre subs]
-				data = self._cacheId('languageExtract8', re.compile, '(\d' + Stream.ExpressionSymbol + '\d)([a-z0-9]{2,})', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
+				data = self._cacheId('languageExtract9', re.compile, '(\d' + Stream.ExpressionSymbol + '\d)([a-z0-9]{2,})', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
 
 				# Add a space between language/codec and channels.
 				# Eg: 터미네이터1.The.Terminator.1984.1080p.BR..DTS.Kor5.1.Eng-joon.mkv
-				data = self._cacheId('languageExtract9', re.compile, '([a-z0-9]{2,})(\d' + Stream.ExpressionSymbol + '\d)', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
+				data = self._cacheId('languageExtract10', re.compile, '([a-z0-9]{2,})(\d' + Stream.ExpressionSymbol + '\d)', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
 
 				# Split combined keywords.
 				# Eg: The Terminator (1984) BGAUDIO.BGSUB.DVD5-KING OF STORM
 				# Eg: Taken.2008.1080p.RoHardSubbed-DjLucifer
-				data = self._cacheId('languageExtract10', re.compile, '([a-z]{2,3})(audio|dual|dub|hard|soft)([a-z]*%s)' % Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(r'\1 \2 \3', data)
+				data = self._cacheId('languageExtract11', re.compile, '([a-z]{2,3})(audio|dual|dub|hard|soft)([a-z]*%s)' % Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(r'\1 \2 \3', data)
 
 				# Split combined keywords.
 				# Eg: The Terminator.Extended Edition.1984.DUALRUS.DVDRip.XviD.AC3
-				data = self._cacheId('languageExtract11', re.compile, '(audio|dual)([a-z]{2,3})', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
+				data = self._cacheId('languageExtract12', re.compile, '(audio|dual)([a-z]{2,3})', flags = Stream.ExpressionFlags).sub(r'\1 \2', data)
 
 				# Split combined languages.
 				# Eg: The Terminator (1984) BDRemux 1080p [Remastered] 4xUkrEng Sub UkrEng [Hurtom].mkv
-				data = self._cacheId('languageExtract12', re.compile, '(?![Bb][Ll][Uu][Rr][Aa][Yy])([A-Z][a-z]{2})(?![Ss][Uu][Bb])([A-Z][a-z]{2})(?:$|' + Stream.ExpressionSymbol + ')', flags = re.UNICODE).sub(r'\1 \2 ', data)
+				data = self._cacheId('languageExtract13', re.compile, '(?![Bb][Ll][Uu][Rr][Aa][Yy])([A-Z][a-z]{2})(?![Ss][Uu][Bb])([A-Z][a-z]{2})(?:$|' + Stream.ExpressionSymbol + ')', flags = re.UNICODE).sub(r'\1 \2 ', data)
 
 				# Exclude "Na'Vi", fictional language/people in Avatar.
 				# Eg: Avatar (w/Hardcoded Na'vi English Subs) [HDRip.4.iPod] -- VoV
-				data = self._cacheId('languageExtract13', re.compile, Stream.ExpressionSeparator + 'na' + Stream.ExpressionSymbol + 'vi' + Stream.ExpressionSeparator, flags = Stream.ExpressionFlags).sub(' navi ', data)
+				data = self._cacheId('languageExtract14', re.compile, Stream.ExpressionSeparator + 'na' + Stream.ExpressionSymbol + 'vi' + Stream.ExpressionSeparator, flags = Stream.ExpressionFlags).sub(' navi ', data)
 
 				# Remove the titles from the file name, in order to reduce false detection if a language appears in the title.
 				# Eg: The English Patient
@@ -19847,76 +19858,76 @@ class Stream(Serializer):
 						exclude = tools.Tools.listUnique(exclude + temp)
 
 					for ex in exclude:
-						ex = self._cacheId('languageExtract14', re.compile, Stream.ExpressionSymbol + '+', flags = Stream.ExpressionFlags).sub(titleReplace, ex)
+						ex = self._cacheId('languageExtract15', re.compile, Stream.ExpressionSymbol + '+', flags = Stream.ExpressionFlags).sub(titleReplace, ex)
 						ex = ex.replace(titleReplace, '\s*.?\s*') # Allow additional spaces instead of a single character. Eg: "Operation Fortune: Ruse de guerre"
 						ex = ex.replace(titleAny, '.') # Allow additional spaces instead of a single character. Eg: "Operation Fortune: Ruse de guerre"
-						data = self._cacheIdInternal('languageExtract15' + ex, re.compile, '(%s)' % ex, flags = Stream.ExpressionFlags).sub('', data)
+						data = self._cacheIdInternal('languageExtract16' + ex, re.compile, '(%s)' % ex, flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace separators.
 				# Eg: [DVDRIP][Eng][Spa Subs]
-				data = self._cacheId('languageExtract16', re.compile, Stream.ExpressionSubtitleSeparator, flags = Stream.ExpressionFlags).sub(' separator ', data)
+				data = self._cacheId('languageExtract17', re.compile, Stream.ExpressionSubtitleSeparator, flags = Stream.ExpressionFlags).sub(' separator ', data)
 
 				# Replace slash separators for subtitles with fixed subtitle keyword.
 				# Eg: Taken 2008 DVDr [eng/spanish] [swe/dan sub]
 				# Eg: "swe/dan sub" -> "swesub dan sub"
-				match = self._cacheId('languageExtract17', re.compile, lambda : self._expressionFormatCommon('((?:[a-z]{{2,3}}{separator}?\/{separator}?)+[a-z]{{2,3}}){separator}+' + Stream.ExpressionSubtitle), flags = Stream.ExpressionFlags).search(data)
+				match = self._cacheId('languageExtract18', re.compile, lambda : self._expressionFormatCommon('((?:[a-z]{{2,3}}{separator}?\/{separator}?)+[a-z]{{2,3}}){separator}+' + Stream.ExpressionSubtitle), flags = Stream.ExpressionFlags).search(data)
 				if match: data = data.replace(match.group(1), match.group(1).replace('/', 'sub '))
 
 				# Replace slash separators.
 				# Eg: The Terminator 1 REMASTERED (1984) [BD RIP/1080p/5.1Eng/5.1Fre/Eng,Fre subs]
 				# Eg: Alfred Hitchcock - The wrong man [1956] [ENG/FRA/ESP Subtitles]
-				match = self._cacheId('languageExtract18', re.compile, '\/.*?[^a-z\/].*?', flags = Stream.ExpressionFlags).search(data)
-				if match: data = self._cacheId('languageExtract19', re.compile, '\/', flags = Stream.ExpressionFlags).sub(' separator ', data)
+				match = self._cacheId('languageExtract19', re.compile, '\/.*?[^a-z\/].*?', flags = Stream.ExpressionFlags).search(data)
+				if match: data = self._cacheId('languageExtract20', re.compile, '\/', flags = Stream.ExpressionFlags).sub(' separator ', data)
 
 				# Replace alternative separators.
 				# Eg: [P] The Terminator (1984) 1080p x264 (DD5 1) NL Subs (P2H)
 				# Eg: Terminator Quadrilogy - BluRay 1080p x264 Rip ENG - French Dutch Engels Subs
-				if dataOriginal.count(' ') > 3 or dataOriginal.count('.') > 3 or dataOriginal.count('-') > 3: data = self._cacheId('languageExtract20', re.compile, '[\(\)\[\]\{\}]', flags = Stream.ExpressionFlags).sub(' separator ', data)
+				if dataOriginal.count(' ') > 3 or dataOriginal.count('.') > 3 or dataOriginal.count('-') > 3: data = self._cacheId('languageExtract21', re.compile, '[\(\)\[\]\{\}]', flags = Stream.ExpressionFlags).sub(' separator ', data)
 
 				# Replace audio and subtitle pairs.
 				# Eg: [aletorrenty pl] AVATAR_3D (2009) [60FPS 1080p H-OU DTS-HD MA 5.1 AC3 BluRay x264-Sonda] [Lektor i Napisy PL] [AT-TEAM]
-				data = self._cacheId('languageExtract21', re.compile, '(?:' + Stream.ExpressionAudio +'|lektor)' + Stream.ExpressionSeparator + '(?:and|with|i|\+)' + Stream.ExpressionSeparator + self._expressionFormatCommon(Stream.ExpressionSubtitle) + Stream.ExpressionSeparator + '([a-z]{2,})', flags = Stream.ExpressionFlags).sub(r' audio \1 subtitle \1', data)
+				data = self._cacheId('languageExtract22', re.compile, '(?:' + Stream.ExpressionAudio +'|lektor)' + Stream.ExpressionSeparator + '(?:and|with|i|\+)' + Stream.ExpressionSeparator + self._expressionFormatCommon(Stream.ExpressionSubtitle) + Stream.ExpressionSeparator + '([a-z]{2,})', flags = Stream.ExpressionFlags).sub(r' audio \1 subtitle \1', data)
 
 				# Replace any strings that can cause conflict with language keywords.
 				# Eg: Game Of Thrones S01 Complete 1080p MultiSubs-DunHD No Rars!
 				# "No Rars" is detected as Norwegian.
-				data = self._cacheId('languageExtract22', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleExclude), flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract23', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleExclude), flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace cutoff multi subtitles.
-				data = self._cacheId('languageExtract23', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleCutoffMulti), flags = Stream.ExpressionFlags).sub('multisubs', data)
+				data = self._cacheId('languageExtract24', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleCutoffMulti), flags = Stream.ExpressionFlags).sub('multisubs', data)
 
 				# Ignore cutoff subtitle keywords.
 				# Eg: Game Of Thrones Season 1 Complete 1080p BluRay 7GB English Subti..
 				# "Subti" will incorrectly be detected as Vietnamese (Tiếng Việt) subtitles.
-				match = self._cacheId('languageExtract24', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleCutoff), flags = Stream.ExpressionFlags).search(data)
+				match = self._cacheId('languageExtract25', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleCutoff), flags = Stream.ExpressionFlags).search(data)
 				if match: data = data.replace(match.group(1), 'subtitle')
 
 				# Remove trailing cutoffs with ..., where the cut word might be detected as a language.
 				# Eg: Game.of.Thrones.Seasons.1-6.S01-S06.Complete.720p.BluRay.x265.HE..
-				data = self._cacheId('languageExtract25', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleTrailing), flags = Stream.ExpressionFlags).sub('', data)
+				data = self._cacheId('languageExtract26', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleTrailing), flags = Stream.ExpressionFlags).sub('', data)
 
 				# Replace separated single-letter subs (eg e-subs -> esubs)
-				match = self._cacheId('languageExtract26', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleSingle), flags = Stream.ExpressionFlags).search(data)
+				match = self._cacheId('languageExtract27', re.compile, lambda : self._expressionFormatCommon(Stream.ExpressionSubtitleSingle), flags = Stream.ExpressionFlags).search(data)
 				if match: data = data.replace(match.group(1), tools.Tools.replaceNotAlpha(data = match.group(1), replace = ''))
 
 				# Replace dual keywords (contain both audio and subtitle).
 				for key, value in Stream.ExpressionSubtitleDual.items():
-					data = self._cacheId('languageExtract27', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(value)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' %s audio %s subtitle ' % (key, key), data)
+					data = self._cacheId('languageExtract28', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(value)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' %s audio %s subtitle ' % (key, key), data)
 
 				# Replace dubbed keywords, since they are detected in AudioType (VF -> French) and later removed from the string.
-				data = self._cacheId('languageExtract28', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioFrench)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' audio french audio ', data)
-				data = self._cacheId('languageExtract29', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioPolish)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' audio polish audio ', data)
+				data = self._cacheId('languageExtract29', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioFrench)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' audio french audio ', data)
+				data = self._cacheId('languageExtract30', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioPolish)) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' audio polish audio ', data)
 
 				# If the keyword "NORDiC" appears, it almost always means they are nordic subtitles, instead of nordic audio.
 				# In very few cases "NORDiC" refers to audio and can even appear next to an audio keyword (eg: "NORDiC.AAC").
 				# However, even with an audio keyword next to it (eg: "DTS.NORDIC+ENG.ISL.DVDR"), in most cases it still refers to subtitles.
 				# So always assume they are subtitles.
 				# If another language is present (eg: "Swedish, Nordic+Eng subs"), it typically means the language is audio, and "NORDiC" are the subtitles.
-				data = self._cacheId('languageExtract30', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioNordic[0])) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' subtitle ' + Stream.ExpressionAudioNordic[1] + ' subtitle ', data)
+				data = self._cacheId('languageExtract31', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioNordic[0])) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' subtitle ' + Stream.ExpressionAudioNordic[1] + ' subtitle ', data)
 
 				# Replace Hz and kpbs keywords.
 				# Eg: AVATAR (2009) Extended Collector\'s Cut 1080p BluRay x264 AVC [Org Hindi BD 5 1 448Kbps + English DD 5.1] ESubs ~ Tiberiumsun69 ...
-				data = self._cacheId('languageExtract31', re.compile, '(\d+(?:\.\d+)?(?:hz|kbps))', flags = Stream.ExpressionFlags).sub(' audio ', data)
+				data = self._cacheId('languageExtract32', re.compile, '(\d+(?:\.\d+)?(?:hz|kbps))', flags = Stream.ExpressionFlags).sub(' audio ', data)
 
 				# Replace audio keywords.
 				# Repalce with "a-u-d-i-o" and not "audio", since that is a keyword that will be replaced itself.
@@ -19928,7 +19939,7 @@ class Stream(Serializer):
 				expression.extend(self._audioChannelsKeyword())
 				expression.append(Stream.ExpressionAudio)
 				expression = '(?=' + Stream.ExpressionSymbolStart + '(' + ('|'.join([i for i in expression])) + ')' + Stream.ExpressionSymbolEnd + ')'
-				matches = self._cacheId('languageExtract32', re.compile, expression, flags = Stream.ExpressionFlags).finditer(data)
+				matches = self._cacheId('languageExtract33', re.compile, expression, flags = Stream.ExpressionFlags).finditer(data)
 				if matches:
 					for match in matches:
 						for group in match.groups():
@@ -19937,7 +19948,7 @@ class Stream(Serializer):
 				# Replace subtitle keywords.
 				expressionSubtitle = self._expressionFormatCommon(Stream.ExpressionSubtitleExtended)
 				expression = Stream.ExpressionSymbolStart + '(' + expressionSubtitle + ')' + Stream.ExpressionSymbolEnd
-				data = self._cacheId('languageExtract33', re.compile, expression, flags = Stream.ExpressionFlags).sub(' s-u-b-t-i-t-l-e ', data)
+				data = self._cacheId('languageExtract34', re.compile, expression, flags = Stream.ExpressionFlags).sub(' s-u-b-t-i-t-l-e ', data)
 
 				data = data.replace('a-u-d-i-o', 'audio').replace('s-u-b-t-i-t-l-e', 'subtitle')
 				parts = self.cleanSplit(data = data, single = ['i', 'v', 'x'], number = True) # Allow single characters that are roman numbers, to not mark "I - VI" as Vietnamese.
@@ -19950,7 +19961,7 @@ class Stream(Serializer):
 					other.extend(Stream.ExpressionSubtitleFrench)
 					other.extend(Stream.ExpressionSubtitleSpanish)
 					for j in other:
-						match = self._cacheId('languageExtract34', re.compile, lambda : self._expressionFormatCommon(j), flags = Stream.ExpressionFlags).search(parts[i])
+						match = self._cacheId('languageExtract35', re.compile, lambda : self._expressionFormatCommon(j), flags = Stream.ExpressionFlags).search(parts[i])
 						if match:
 							separators.append(i)
 							break
@@ -19976,8 +19987,8 @@ class Stream(Serializer):
 							if parts[i] == 'us': parts[i] = 'en'
 
 				# Find multi subtitle keywords (eg msubs or multi-sub).
-				expressionMulti1 = self._cacheId('languageExtract35', re.compile, '^' + Stream.ExpressionSubtitleMulti + expressionSubtitle + '$', flags = Stream.ExpressionFlags)
-				expressionMulti2 = self._cacheId('languageExtract36', re.compile, '^' + Stream.ExpressionSubtitleMulti + '$', flags = Stream.ExpressionFlags)
+				expressionMulti1 = self._cacheId('languageExtract36', re.compile, '^' + Stream.ExpressionSubtitleMulti + expressionSubtitle + '$', flags = Stream.ExpressionFlags)
+				expressionMulti2 = self._cacheId('languageExtract37', re.compile, '^' + Stream.ExpressionSubtitleMulti + '$', flags = Stream.ExpressionFlags)
 				for i in range(count):
 					if expressionMulti1.search(parts[i]):
 						labels[i] = {'type' : 'subtitle', 'language' : tools.Language.UniversalCode}
@@ -20009,7 +20020,7 @@ class Stream(Serializer):
 						for ex in language['exclude']:
 							languagesExpressions.append((language['code'], ex))
 				languagesString = ' '.join([i[1] for i in languagesParts])
-				match = self._expressionMatchMultiple(id = 'languageExtract36', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionSubtitle + '*', end = expressionSubtitle + '*(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract38', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionSubtitle + '*', end = expressionSubtitle + '*(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -20034,7 +20045,7 @@ class Stream(Serializer):
 				for language in languagesCommon:
 					languagesExpressions.append((language['code'], language['expression']))
 				languagesString = ' '.join([i[1] for i in languagesParts])
-				match = self._expressionMatchMultiple(id = 'languageExtract37', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionDubbed + '*', end = expressionDubbed + '*(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract39', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionDubbed + '*', end = expressionDubbed + '*(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -20060,7 +20071,7 @@ class Stream(Serializer):
 				try: del native[tools.Language.UniversalCode] # Universal providers do not add any extra language-specific keywords and we do not want to include it in the ID.
 				except: pass
 				expressionId = str(native)
-				match = self._expressionMatchMultiple(id = 'languageExtract38_' + expressionId, data = languagesString, expression = languagesExpression, count = len(languagesParts), start = '(?:\s|^)(?<!team' + Stream.ExpressionSeparator + ')', end = '(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract40_' + expressionId, data = languagesString, expression = languagesExpression, count = len(languagesParts), start = '(?:\s|^)(?<!team' + Stream.ExpressionSeparator + ')', end = '(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -20395,8 +20406,8 @@ class Stream(Serializer):
 
 				if exclude:
 					languagesCode = {i['code'] : i for i in languages}
-					expression1 = self._cacheId('languageExtract37', re.compile, '\.')
-					expression2 = self._cacheId('languageExtract38', re.compile, '\s+')
+					expression1 = self._cacheId('languageExtract41', re.compile, '\.')
+					expression2 = self._cacheId('languageExtract42', re.compile, '\s+')
 
 					for ex in exclude:
 						# Abbriviations (eg M.S. -> MS)
@@ -20434,7 +20445,7 @@ class Stream(Serializer):
 									#	Eg: [ OxTorrent sh ] The French Dispatch 2021 720p FRENCH HDTS MD x264-CZ530
 									# Once where are here, the "data" variable should already have stripped the title:
 									#	Eg: [ OxTorrent sh ]  2021 720p FRENCH HDTS MD x264-CZ530
-									expressioned = self._cacheId('languageExtract39_' + languagesCode[language]['code'], re.compile, expression, flags = Stream.ExpressionFlags)
+									expressioned = self._cacheId('languageExtract43_' + languagesCode[language]['code'], re.compile, expression, flags = Stream.ExpressionFlags)
 									if not expressioned.search(data):
 										for j in range(len(excludes)):
 											groups = expressioned.search(excludes[j])
@@ -24278,7 +24289,7 @@ class Stream(Serializer):
 		if value is None or (not label == Stream.LabelNone and value == Stream.FilePackInternal): return default
 		label = self.settingsLayout(label, 'file', 'pack')
 		value = self._label(value = value, values = Stream.LabelFilePack, format = format, label = label)
-		value = self._decorate(value = value, format = format, uppercase = True, color = self.filePackColor)
+		value = self._decorate(value = value, format = format, uppercase = True, bold = True, color = self.filePackColor)
 		return value
 
 	'''
@@ -24379,7 +24390,9 @@ class Stream(Serializer):
 	'''
 	@classmethod
 	def filePackColor(self):
-		return interface.Format.colorAlternative()
+		def _filePackColor():
+			return interface.Format.colorLighter(color = interface.Format.colorAlternative(), change = 0.5)
+		return self._cacheId('filePackColor', _filePackColor)
 
 	@classmethod
 	def _filePackExpression(self, collection = False, show = False, full = True):

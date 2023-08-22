@@ -27,9 +27,14 @@ from lib.modules.concurrency import Lock
 class MetaTmdb(object):
 
 	LinkMovie			= 'https://themoviedb.org/movie/%s'
+	LinkSet				= 'https://themoviedb.org/collection/%s'
 	LinkShow			= 'https://themoviedb.org/tv/%s'
 	LinkSeason			= 'https://themoviedb.org/tv/%s/season/%d'
 	LinkEpisode			= 'https://themoviedb.org/tv/%s/season/%d/episode/%d'
+
+	LinkFindMovie		= 'https://themoviedb.org/search/movie?query=%s'
+	LinkFindSet			= 'https://themoviedb.org/search/collection?query=%s'
+	LinkFindShow		= 'https://themoviedb.org/search/tv?query=%s'
 
 	LinkList			= 'https://api.themoviedb.org/3/list/%s'
 
@@ -92,23 +97,54 @@ class MetaTmdb(object):
 	##############################################################################
 
 	@classmethod
-	def link(self, media = None, id = None, season = None, episode = None, metadata = None):
-		if metadata:
-			try:
-				media = Media.TypeShow if 'tvshowtitle' in metadata or 'season' in metadata else Media.TypeMovie
-				id = metadata['id']['tmdb']
-				season = metadata['season']
-				episode = metadata['episode']
-			except: pass
+	def link(self, media = None, id = None, title = None, year = None, season = None, episode = None, metadata = None, search = False):
+		try:
+			if metadata:
+				if not media:
+					if 'tvshowtitle' in metadata:
+						if 'episode' in metadata: media = Media.TypeEpisode
+						elif 'season' in metadata: media = Media.TypeSeason
+						else: media = Media.TypeShow
+					elif 'set' in metadata and not 'collection' in metadata:
+						media = Media.TypeSet
+					else:
+						media = Media.TypeMovie
+				if media == Media.TypeSet:
+					try: id = metadata['collection']['id']
+					except: pass
+				if not id:
+					try: id = metadata['id']['tmdb']
+					except: pass
+				try: title = metadata['tvshowtitle'] if metadata['tvshowtitle'] else metadata['title']
+				except: pass
+				try: year = metadata['year']
+				except: pass
+				try: season = metadata['season']
+				except: pass
+				try: episode = metadata['episode']
+				except: pass
 
-		if id:
-			if Media.typeTelevision(media):
-				if not episode is None: return MetaTmdb.LinkEpisode % (id, season, episode)
-				elif not season is None: return MetaTmdb.LinkSeason % (id, season)
-				else: return MetaTmdb.LinkShow % id
-			else:
-				return MetaTmdb.LinkMovie % id
+			if media == Media.TypeShow:
+				episode = None
+				season = None
+			elif media == Media.TypeSeason:
+				episode = None
 
+			if id:
+				if Media.typeTelevision(media):
+					if not episode is None: return MetaTmdb.LinkEpisode % (id, season, episode)
+					elif not season is None: return MetaTmdb.LinkSeason % (id, season)
+					else: return MetaTmdb.LinkShow % id
+				elif media == Media.TypeSet:
+					return MetaTmdb.LinkSet % id
+				else:
+					return MetaTmdb.LinkMovie % id
+			elif search and title:
+				query = title
+				if year and Media.typeMovie(media): query += ' ' + str(year)
+				link = MetaImdb.LinkFindShow if Media.typeTelevision(media) else MetaImdb.LinkFindSet if media == Media.TypeSet else MetaImdb.LinkFindMovie
+				return link % Networker.linkQuote(data = query, plus = False)
+		except: Logger.error()
 		return None
 
 	@classmethod
@@ -322,7 +358,7 @@ class MetaTmdb(object):
 	# rating: integer = single minimum rating | tuple = range of rating (from and to) | tuple = if one value is None, ignore that and only use upper or lower rating.
 	# votes: integer = single minimum vote | tuple = range of votes (from and to) | tuple = if one value is None, ignore that and only use upper or lower votes.
 	@classmethod
-	def discover(self, media, page = 1, language = None, sort = None, order = None, type = None, release = None, year = None, genre = None, rating = None, votes = None, link = None):
+	def discover(self, media, page = 1, language = None, sort = None, order = None, type = None, region = None, release = None, year = None, genre = None, rating = None, votes = None, link = None):
 		if link:
 			data = self.linkDencode(link = link)
 			if data:
@@ -379,6 +415,16 @@ class MetaTmdb(object):
 		if type:
 			if Tools.isArray(type): type = '|'.join([str(i) for i in type])
 			data['with_release_type'] = type
+
+		if region or type: # Always add if type was added.
+			# NB: Add a region, otherwise the API call returns titles that were only theatrically released and were not digitially/physically released yet.
+			# Eg: Mission Impossible 7 is returned, although still in theaters.
+			# When getting the realease dates: https://api.themoviedb.org/3/movie/575264/release_dates?api_key=...
+			# The digital/physical release dates are correct. So without using region, it probably checks the wrong dates (eg theater dates).
+			# Do not add DE as region, because for some reason it still returns Mission Impossible 7.
+			if not region: region = ['US', 'GB', 'CA', 'FR', 'NL', 'PL', 'SE', 'NO', 'FI', 'ES', 'PT', 'IT', 'JP', 'AU', 'NZ', 'ZA', 'BR', 'MX']
+			if Tools.isArray(region): region = '|'.join([str(i) for i in region])
+			data['region'] = region
 
 		if release:
 			# NB: Use "primary_release_date" instead of "release_date".

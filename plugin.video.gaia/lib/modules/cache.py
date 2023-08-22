@@ -42,11 +42,6 @@ class Cache(Database):
 	StorageFull = 2		# Only cache non-empty data to the database.
 	StorageDefault = StorageAll
 
-	SizeMinimum = 104857600 # 100MB. The minimum cache size if SettingsLimit is automatic.
-	SizeMaximum = 1073741824 # 1GB. The maximum cache size if SettingsLimit is automatic.
-
-	SettingsLimit = 'general.cache.limit'
-
 	TimeoutMinute1 = 60 # 1 Minute.
 	TimeoutMinute5 = 300 # 5 Minutes.
 	TimeoutMinute10 = 600 # 10 Minutes.
@@ -497,62 +492,6 @@ class Cache(Database):
 		return self.cache(None, Cache.TimeoutExtended, None, function, *args, **kwargs)
 
 	##############################################################################
-	# CLEAR
-	##############################################################################
-
-	# Delete old entries, older than a specific time, or until a specific file size has been reached.
-	def clearOld(self, time = None, size = None, force = False):
-		if time:
-			# Ignore if the given time is within the past 24 hours.
-			# Otherwise entries are constantly deleted and filled up again immediately.
-			if not force: time = min(time, Time.past(days = 1))
-			self._delete('DELETE FROM %s WHERE time <= ?;', parameters = (time,), commit = True, compress = True)
-
-		elif size:
-			if not force: size = max(size, 5242880) # 5 MB
-
-			time = Time.past(days = 365)
-			yesterday = Time.past(days = 1)
-
-			day = 86400
-			week = 604800
-			month = 2592000
-
-			self._compress() # Compress before checking the size for the first time.
-			while self._size() > size and time <= yesterday:
-				self._delete('DELETE FROM %s WHERE time <= ?;', parameters = (time,), commit = True, compress = True)
-
-				# Reduce the number of queries and therefore disk I/O.
-				remaining = yesterday - time
-				if remaining > (month * 3): increase = month
-				elif remaining > (week * 2): increase = week
-				else: increase = day
-				time += increase
-
-	##############################################################################
-	# LIMIT
-	##############################################################################
-
-	def limit(self):
-		from lib.modules.tools import Settings
-		limit = Settings.getCustom(id = Cache.SettingsLimit)
-		if limit is None: # Automatic
-			from lib.modules.tools import Hardware
-			free = int(Hardware.storageUsageFreeBytes() * 0.7)
-			limit = max(Cache.SizeMinimum, min(Cache.SizeMaximum, free))
-		elif not limit: # Unlimited
-			limit = 0
-		return limit
-
-	def limitClear(self, force = False, log = False):
-		if force or Cache.Updated:
-			limit = self.limit()
-			if limit:
-				if log: Logger.log('CACHE: Cleanup Started')
-				self.clearOld(size = limit)
-				if log: Logger.log('CACHE: Cleanup Finished')
-
-	##############################################################################
 	# TRAKT
 	##############################################################################
 
@@ -589,6 +528,19 @@ class Cache(Database):
 		init = self._idInitialize()
 		return self._delete('DELETE FROM %s WHERE versionKodi <> ? OR versionAddon <> ?;' % Cache.NameExpression, parameters = (init['kodi'], init['addon']), compress = True)
 
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time: return self._delete(query = 'DELETE FROM `%s` WHERE time <= ?;' % Cache.Name, parameters = [time], commit = commit, compress = compress)
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = self._selectValues(query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;' % Cache.Name, parameters = [count])
+			if times: return Tools.listSort(times)[:count][-1]
+		return None
 
 # The idea behind this local memory cache is as follows:
 #	1. Try to load the cached value from a class variable.

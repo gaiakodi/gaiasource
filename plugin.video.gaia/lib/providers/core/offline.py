@@ -250,6 +250,7 @@ class ProviderOffline(ProviderBase):
 		except: self.logError()
 
 	def searchFind(self, path, media, titles):
+		lock = None
 		try:
 			if File.exists(path):
 				titles = titles['search']['main']
@@ -320,27 +321,32 @@ class ProviderOffline(ProviderBase):
 											break
 
 								if attributes:
-									for i in values:
-										if i:
-											parameters = Tools.copy(attributes)
-											for k, v in parameters.items():
-												try: parameters[k] = i[v]
-												except: parameters[k] = None
-											if (Stream.ParameterHash in parameters and parameters[Stream.ParameterHash]) or (Stream.ParameterLink in parameters and parameters[Stream.ParameterLink]):
-												if Stream.ParameterFileName in parameters and parameters[Stream.ParameterFileName]:
-													# The database can return a lot of incorrect links, which increases scraping time due to all the processing in stream.py.
-													# Eg: For "Game of Thrones" we also search "GoT", which with the SQL like "%" will match any name with a "got" substring.
-													if Regex.match(data = parameters[Stream.ParameterFileName], expression = matcher):
-														if not Stream.ParameterSourceType in parameters or not parameters[Stream.ParameterSourceType]: parameters[Stream.ParameterSourceType] = self.type()
+									chunks = self.priorityChunks(values)
+									for chunk in chunks:
+										lock = self.priorityStart(lock = lock)
+										for i in chunk:
+											if i:
+												parameters = Tools.copy(attributes)
+												for k, v in parameters.items():
+													try: parameters[k] = i[v]
+													except: parameters[k] = None
+												if (Stream.ParameterHash in parameters and parameters[Stream.ParameterHash]) or (Stream.ParameterLink in parameters and parameters[Stream.ParameterLink]):
+													if Stream.ParameterFileName in parameters and parameters[Stream.ParameterFileName]:
+														# The database can return a lot of incorrect links, which increases scraping time due to all the processing in stream.py.
+														# Eg: For "Game of Thrones" we also search "GoT", which with the SQL like "%" will match any name with a "got" substring.
+														if Regex.match(data = parameters[Stream.ParameterFileName], expression = matcher):
+															if not Stream.ParameterSourceType in parameters or not parameters[Stream.ParameterSourceType]: parameters[Stream.ParameterSourceType] = self.type()
 
-														# Used among others by Orion.
-														parameters[Stream.ParameterAccessOffline] = True
-														parameters[Stream.ParameterSourceHoster] = self.dumpProviderName()
+															# Used among others by Orion.
+															parameters[Stream.ParameterAccessOffline] = True
+															parameters[Stream.ParameterSourceHoster] = self.dumpProviderName()
 
-														stream = self.resultStream(**parameters)
-														if stream: self.resultAdd(stream)
+															stream = self.resultStream(**parameters)
+															if stream: self.resultAdd(stream)
+										self.priorityEnd(lock = lock)
 						database._close()
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	##############################################################################
 	# GENERATE

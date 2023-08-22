@@ -482,18 +482,67 @@ def request(imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, 
 def timeout(items):
 	return max(network.Networker.TimeoutLong, len(items) * 2)
 
-def link(media, slug, season = None, episode = None):
-	if not slug: return None
-	link = 'https://trakt.tv/%s/%s'
-	if tools.Media.typeTelevision(media):
-		type = 'shows'
-		if not season is None:
-			link += '/seasons/%d' % int(season)
-			if not episode is None:
-				link += '/episodes/%d' % int(episode)
-	else:
-		type = 'movies'
-	return link % (type, slug)
+# id = Trakt or IMDb ID.
+def link(media = None, id = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, search = False, test = False):
+	if metadata:
+		if not media:
+			if 'tvshowtitle' in metadata:
+				if 'episode' in metadata: media = tools.Media.TypeEpisode
+				elif 'season' in metadata: media = tools.Media.TypeSeason
+				else: media = tools.Media.TypeShow
+			else:
+				media = tools.Media.TypeMovie
+		if not id and 'id' in metadata and 'trakt' in metadata['id']: id = metadata['id']['trakt']
+		if not id and 'id' in metadata and 'imdb' in metadata['id']: id = metadata['id']['imdb']
+		if not slug and 'id' in metadata and 'slug' in metadata['id']: slug = metadata['id']['slug']
+		if not title and 'tvshowtitle' in metadata: title = metadata['tvshowtitle']
+		if not title and 'title' in metadata: title = metadata['title']
+		if not year and 'year' in metadata: year = metadata['year']
+		if season is None and 'season' in metadata: season = metadata['season']
+		if episode is None and 'episode' in metadata: episode = metadata['episode']
+
+	if media == tools.Media.TypeShow:
+		episode = None
+		season = None
+	elif media == tools.Media.TypeSeason:
+		episode = None
+
+	link = 'https://trakt.tv'
+	if tools.Media.typeTelevision(media): link += '/shows'
+	else: link += '/movies'
+	link += '/%s'
+
+	if id:
+		link = link % id
+	elif slug:
+		link = link % slug
+	elif title:
+		from lib.meta.tools import MetaTools
+		# Trakt slugs seem to always have a year for movies, but only occasional for shows (with duplicate names).
+		if test:
+			slug = MetaTools.slug(title = title, year = year, separator = '-', symbol = '-', lower = True)
+			if not network.Networker().requestSuccess(link = link % slug):
+				slug = MetaTools.slug(title = title, year = None, separator = '-', symbol = '-', lower = True)
+				if not network.Networker().requestSuccess(link = link % slug): slug = None
+		else:
+			slug = MetaTools.slug(title = title, year = None if tools.Media.typeTelevision(media) else year, separator = '-', symbol = '-', lower = True)
+		if slug: link = link % slug
+
+	if not link or '/%s' in link:
+		if search and title:
+			link = 'https://trakt.tv/search/%smovies?query='
+			if tools.Media.typeTelevision(media): link = link % 'shows'
+			else: link = link % 'movies'
+			query = title
+			if year and Media.typeMovie(media): query += ' ' + str(year)
+			return link + Networker.linkQuote(data = query, plus = False)
+		return None
+
+	if not season is None:
+		link += '/seasons/%s' % season
+		if not episode is None: link += '/episodes/%s' % episode
+
+	return link
 
 def settingsPlays():
 	return tools.Settings.getInteger('account.trakt.plays')
@@ -1600,8 +1649,8 @@ def ratingRetrieve(media, imdb = None, tmdb = None, tvdb = None, trakt = None, s
 					for id in ids.keys():
 						for item in items:
 							try:
-								if 'show' in item and 'episode' in item and id in item['show']['ids'] and item['show']['ids'][id] == ids[id]:
-									if item['episode']['season'] == season:
+								if 'show' in item and 'season' in item and id in item['show']['ids'] and item['show']['ids'][id] == ids[id]:
+									if item['season']['number'] == season:
 										return item[attribute] if attribute else {'rating' : item['rating'], 'time' : tools.Time.timestamp(item['rated_at'], iso = True)}
 							except: tools.Logger.error()
 				else:

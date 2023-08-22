@@ -37,7 +37,7 @@ if developer: tools.Logger.log('EXECUTION STARTED [Action: %s]' % str(action))
 
 # Execute on first launch.
 # Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
-if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search') or action.startswith('scrape'): tools.System.launch()
+if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search') or action.startswith('scrape') or action.startswith('oracle'): tools.System.launch()
 
 # For Gaia Eminence.
 tools.System.menuResolve(action = action, menu = parameters.get('menu'))
@@ -640,15 +640,12 @@ elif action.startswith('system'):
 	elif action == 'systemManager':
 		tools.System.manager()
 
-	elif action == 'systemTools':
-		tools.System.tools()
+	elif action == 'systemPower':
+		tools.System.power(action = None, level = 2)
 
 	if action == 'systemBenchmark':
 		from lib.modules.tester import Tester
 		Tester.benchmarkDialog()
-
-	elif action == 'systemRestart':
-		tools.System.restart()
 
 ####################################################
 # EXTERNAL
@@ -883,7 +880,8 @@ elif action.startswith('play'):
 elif action.startswith('clean'):
 
 	if action == 'clean':
-		tools.Cleanup.clean()
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		tools.Cleanup.clean(settings = settings)
 
 ####################################################
 # VERIFICATION
@@ -1069,40 +1067,6 @@ elif action.startswith('download'):
 		core.Core(media = media, kids = kids).sourceCloud(source)
 
 ####################################################
-# AMBILIGHT
-####################################################
-
-elif action.startswith('ambilight'):
-
-	if action == 'ambilightNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).ambilightNavigator()
-
-####################################################
-# LIGHTPACK
-####################################################
-
-elif action.startswith('lightpack'):
-
-	if action == 'lightpackNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).lightpackNavigator()
-
-	elif action == 'lightpackSwitchOn':
-		tools.Lightpack().switchOn(message = True)
-
-	elif action == 'lightpackSwitchOff':
-		tools.Lightpack().switchOff(message = True)
-
-	elif action == 'lightpackAnimate':
-		force = parameters.get('force')
-		force = True if force is None else tools.Converter.boolean(force)
-		tools.Lightpack().animate(force = force, message = True, delay = True)
-
-	elif action == 'lightpackSettings':
-		tools.Lightpack().settings()
-
-####################################################
 # KIDS
 ####################################################
 
@@ -1190,6 +1154,20 @@ elif action.startswith('services'):
 	elif action == 'servicesUtilityNavigator':
 		from lib.indexers.navigator import Navigator
 		Navigator(media = media, kids = kids).servicesUtilityNavigator()
+
+####################################################
+# SERVICE
+####################################################
+
+elif action.startswith('service'):
+
+	if action == 'serviceKodi':
+		from lib.modules.service import Service
+		Service.launchKodi()
+
+	elif action == 'serviceGaia':
+		from lib.modules.service import Service
+		Service.launchGaia()
 
 ####################################################
 # ORACLE
@@ -2385,6 +2363,19 @@ elif action.startswith('settings'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.Settings.interpreterSelect(settings = settings)
 
+	elif action == 'settingsDatabase':
+		from lib.modules.database import Database
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Database.cleanSettings(settings = settings)
+
+	elif action == 'settingsObserver':
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		tools.Observer.settingsUpdate(settings = settings)
+
+	elif action == 'settingsSound':
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		tools.Sound.settingsUpdate(settings = settings)
+
 ####################################################
 # DONATIONS
 ####################################################
@@ -2485,10 +2476,6 @@ elif action.startswith('library'):
 	elif action == 'libraryClean':
 		from lib.modules import library
 		library.Library(media = media).clean()
-
-	elif action == 'libraryService':
-		from lib.modules import library
-		library.Library.service(background = False)
 
 	elif action == 'libraryLocal':
 		from lib.modules import library
@@ -2718,7 +2705,6 @@ elif action.startswith('scrape'):
 			#################################################################################################################################################################
 		'''
 
-
 		# Sometimes when using the Kore remote app and clicking on a movie/episode to start a scrape, the user might accidentally click twice, which starts the scraping process twice.
 		# This is not a huge issue for other endpoints, but the scrape endpoint starts many threads and uses many resources, and should be avoided.
 		# This is not a perfect solution, since both processes might call windowPropertyGet() before the other process is able to call windowPropertySet().
@@ -2906,26 +2892,34 @@ elif action.startswith('context'):
 		menu.show()
 
 ####################################################
-# COPY
+# QR
 ####################################################
 
-elif action.startswith('copy'):
+elif action.startswith('qr'):
 
-	if action == 'copy':
-		from lib.modules.interface import Loader
+	if action == 'qr':
 		try:
+			from lib.modules.interface import Loader
 			Loader.show() # Needs some time to load. Show busy.
-			from lib.modules.window import WindowQr
 
-			link = parameters.get('link')
-			name = parameters.get('name')
-			hash = parameters.get('hash')
-			code = parameters.get('code')
-			wallet = parameters.get('wallet')
-			payment = parameters.get('payment')
-			symbol = parameters.get('symbol')
+			if metadata:
+				media = parameters.get('media')
+				type = parameters.get('type')
+				search = parameters.get('search', True)
+				test = parameters.get('test', True)
+				fallback = parameters.get('fallback', True)
+				tools.Link.qr(type = type, media = media, metadata = metadata, search = search, test = test, fallback = fallback, loader = True)
+			else:
+				link = parameters.get('link')
+				name = parameters.get('name')
+				hash = parameters.get('hash')
+				code = parameters.get('code')
+				wallet = parameters.get('wallet')
+				payment = parameters.get('payment')
+				symbol = parameters.get('symbol')
 
-			WindowQr.show(link = link, name = name, hash = hash, code = code, wallet = wallet, payment = payment, symbol = symbol)
+				from lib.modules.window import WindowQr
+				WindowQr.show(link = link, name = name, hash = hash, code = code, wallet = wallet, payment = payment, symbol = symbol)
 		except: tools.Logger.error()
 
 ####################################################
@@ -3078,11 +3072,6 @@ try:
 
 	from lib.modules.concurrency import Pool
 	Pool.join()
-
-	# Do this at the end, so that timestamps of reloaded requests can be updated and won't be deleted.
-	# Do this after the thread pool joining, since the cache might still have threads executing (refreshing data in the background).
-	from lib.modules.cache import Cache
-	Cache.instance().limitClear(log = developer)
 
 	# Reset global variables in case the invoker is reused.
 	tools.Settings.interpreterReset()

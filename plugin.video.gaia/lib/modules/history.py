@@ -25,8 +25,6 @@ class History(Database):
 
 	Name = 'history' # The name of the file. Update version number of the database structure changes.
 
-	Duration = 15778800 # 6 months. For how long to keep history entries, after which they get deleted to save some storage space.
-
 	def __init__(self):
 		Database.__init__(self, History.Name)
 
@@ -69,12 +67,6 @@ class History(Database):
 		if data is None: return self._null()
 		elif not Tools.isString(data): data = Converter.jsonTo(data)
 		return '"%s"' % data.replace('"', '""')
-
-	# The database can get very large over time (100MB+) due to all the show metadata stored.
-	# Clean to reduce the size.
-	def clean(self, time = None):
-		if time is None: time = Time.timestamp() - History.Duration
-		self._deleteAll('DELETE FROM `%s` WHERE time < ?;', parameters = (time,), compress = True)
 
 	def insert(self, media, link, metadata, source, kids = Selection.TypeUndefined):
 		media = self._media(media = media)
@@ -183,3 +175,26 @@ class History(Database):
 			%s
 			ORDER BY time DESC LIMIT %d;
 		''' % (Media.TypeShort, Media.TypeShort, kids, count))
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time:
+			count = 0
+			query = 'DELETE FROM `%s` WHERE time <= ?;'
+			for type in [Media.TypeMovie, Media.TypeShow, Media.TypeDocumentary, Media.TypeShort]:
+				count += self._delete(query = query % type, parameters = [time], commit = commit, compress = compress)
+			return count
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = []
+			query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;'
+			for type in [Media.TypeMovie, Media.TypeShow, Media.TypeDocumentary, Media.TypeShort]:
+				time = self._selectValues(query = query % type, parameters = [count])
+				if time: times.extend(time)
+			if times: return Tools.listSort(times)[:count][-1]
+		return None

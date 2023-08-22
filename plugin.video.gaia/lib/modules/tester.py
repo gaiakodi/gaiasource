@@ -266,6 +266,7 @@ class Tester(object):
 				{'fileName' : 'Mission Impossible_The Five disc Movie Collection BR HEVC D3FiL3R (discrips)', 'sourceTime' : None},
 			],
 			'invalid' : [
+				{'fileName' : 'Mission Impossible Trilogy', 'sourceTime' : None},
 				{'fileName' : 'Mission Impossible 1-5 Collection', 'sourceTime' : None},
 				{'fileName' : 'Mission Impossible Collection 1080p 10bit BluRay x265-MRN', 'sourceTime' : 1685879286},
 				{'fileName' : 'Mission Impossible Collection 1080p 10bit BluRay x265-MRN', 'sourceTime' : 1540771200},
@@ -17735,6 +17736,7 @@ class Tester(object):
 		self.streamTimeValid(titles = titles)
 		self.streamTime(titles = titles)'''
 
+
 	@classmethod
 	def containerMagnet(self):
 		tests = (
@@ -22426,6 +22428,7 @@ class Tester(object):
 			{'result' : {'audio' : ['pt'], 'subtitle' : []},								'data' : 'Português audio',														'native' : 'pt'},
 			{'result' : {'audio' : ['pt'], 'subtitle' : ['un']},							'data' : 'Português audio (FIXA)',												'native' : 'pt'},
 
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Game of Thrones (2011) Complete (1080p BluRay x265 HEVC 10bit Tr'}, # Probably cut-off from "TrueHD".
 			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'The Last of Us.S01E02.Infected.MULTi.1080p.HMAX.WEB-DL.DDP5.1.x264-Ralf - PSOTNIK HT.mkv'},
 			{'result' : {'audio' : [], 'subtitle' : ['un']},								'data' : 'Maggie.Moores.2023.2160p.Multi.Sub.DD5.1.HDR.x265.MP4-BEN.THE.MEN'},
 

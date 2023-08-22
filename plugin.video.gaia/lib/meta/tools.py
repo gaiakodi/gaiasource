@@ -554,6 +554,21 @@ class MetaTools(object):
 			else: return Media.TypeMovie
 		return None
 
+	@classmethod
+	def slug(self, title, year = None, separator = '-', symbol = None, lower = True):
+		slug = ''
+		try:
+			for char in title:
+				if char == ' ': slug += separator
+				elif char.isalnum(): slug += char.lower() if lower else char
+				elif symbol: slug += symbol
+		except: pass
+		if slug:
+			if year: slug += separator + str(year)
+			if separator: slug = Regex.replace(data = slug, expression = '(\%s{2,})' % separator, replacement = separator, group = None, all = True).strip(separator)
+			if symbol and not symbol == separator: slug = Regex.replace(data = slug, expression = '(\%s{2,})' % symbol, replacement = symbol, group = None, all = True).strip(symbol)
+		return slug if slug else None
+
 	###################################################################
 	# COMMAND
 	###################################################################

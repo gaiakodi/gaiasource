@@ -44,17 +44,22 @@ class Database(object):
 
 	Extension = '.db'
 
+	# Make sure to add new ones to _cleanSettingsDatabases().
 	NameCache = 'cache'
 	NameHistory = 'history'
 	NameLibrary = 'library'
 	NamePlayback = 'playback'
 	NameProviders = 'providers'
+	NameStreams = 'streams'
 	NameMetadata = 'metadata'
 	NameSearches = 'searches'
 	NameShortcuts = 'shortcuts'
 	NameTrailers = 'trailers'
 	NameDownloads = 'downloads'
 	NameSettings = 'settings'
+
+	LimitSetting = 'general.database.limit'
+	LimitFree = 0.8
 
 	def __init__(self, name = None, addon = None, default = None, path = None, label = False, connect = True):
 		try:
@@ -122,6 +127,10 @@ class Database(object):
 	@classmethod
 	def pathProviders(self):
 		return self.path(name = Database.NameProviders)
+
+	@classmethod
+	def pathStreams(self):
+		return self.path(name = Database.NameStreams)
 
 	@classmethod
 	def pathMetadata(self):
@@ -326,7 +335,9 @@ class Database(object):
 	# If table is none, assumes it was already set in the query
 	def _delete(self, query, table = None, parameters = None, commit = True, compress = False):
 		if not table is None: query = query % table
-		return self._execute(query, parameters = parameters, commit = commit, compress = compress)
+		self._execute(query, parameters = parameters, commit = commit, compress = compress)
+		try: return self._mDatabase.rowcount # Number of rows deleted.
+		except: return 0
 
 	# Deletes all rows in table.
 	# tables can be None, table name, or list of tables names.
@@ -363,6 +374,489 @@ class Database(object):
 
 				icon = os.path.join(icon, 'resources', 'media', 'notifications', 'information.png')
 				xbmcgui.Dialog().notification(title, message, icon = icon)
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	# time: delete everything before this time.
+	# size: delete until the size is lower than this.
+	def clean(self, time = None, size = None, force = False):
+		result = False
+		try:
+			if size:
+				if not force: size = max(size, 5242880) # 5 MB
+
+				sizeBefore = self._size()
+				if sizeBefore > size:
+					# Compress before checking the size for the first time.
+					# For large databases (300MB+) this can take 5secs+ on an SSD.
+					# Update: This can take long for large databases. Only makes sense to compress if we just removed rows from the database.
+					#self._compress()
+
+					if sizeBefore > size:
+						# We want to delete more rows in one go, since every deletion + compression can take a long time.
+						# A better way would be to count the rows. However, SQLite is very slow with COUNT(*).
+						count = max(10, min(100, int(sizeBefore / 5242880.0)))
+
+						sizeChanged = 0
+
+						for i in range(100000 if force else 1000):
+							timed = self._cleanTime(count = count)
+							if not timed: break
+							timed = self._cleanAdjust(time = timed, force = force)
+
+							if self._clean(time = timed, commit = False, compress = False):
+								self._commit()
+								self._compress()
+								sizeAfter = self._size()
+
+								# Sometimes deleting a few rows from a small database does not change the file size, even after compressing.
+								# Check a few iterations before breaking out of the loop.
+								if sizeBefore == sizeAfter:
+									sizeChanged += 1
+									if sizeChanged >= 2: break
+								else:
+									sizeChanged = 0
+
+								result = True
+								if sizeAfter < size: break
+								sizeBefore = sizeAfter
+							else:
+								break # No rows deleted.
+			if time:
+				if self._clean(time = self._cleanAdjust(time = time, force = force), commit = False, compress = False):
+					self._compress(commit = True)
+				result = True
+		except:
+			from lib.modules.tools import Logger
+			Logger.error()
+		return result
+
+	def cleanCompress(self):
+		self._compress()
+
+	def cleanReduce(self):
+		self.clean(size = self._cleanSettings(name = self._mName))
+
+	@classmethod
+	def cleanAutomatic(self, wait = False):
+		if wait:
+			self._cleanAutomatic()
+		else:
+			from lib.modules.concurrency import Pool
+			Pool.thread(target = self._cleanAutomatic, start = True)
+
+	@classmethod
+	def _cleanAutomatic(self):
+		settings = self._cleanSettings()
+		databases = self._cleanSettingsDatabases()
+
+		# Initialize with the recommended values.
+		if not settings:
+			for database in databases:
+				if database['type'] == 'automatic':
+					self._cleanSettingsUpdate(database = database, value = database['recommended'], validate = False)
+			settings = self._cleanSettings()
+
+		for database in databases:
+			if database['type'] == 'automatic':
+				name = database['name']
+				limit = settings[name] if name in settings else 0
+				if limit: database['instance']().clean(size = limit)
+
+	@classmethod
+	def cleanSettings(self, settings = False):
+		from lib.modules.tools import Settings
+		from lib.modules.interface import Dialog
+
+		self.tCanceled = False
+		Dialog.information(title = 36036, refresh = self._cleanSettingsItems, reselect = Dialog.ReselectYes)
+
+		if settings: Settings.launchData(id = Database.LimitSetting)
+
+	@classmethod
+	def _cleanSettings(self, name = None):
+		from lib.modules.tools import Settings
+		settings = Settings.getDataObject(Database.LimitSetting)
+		if not settings: settings = {}
+		if name: return settings[name] if name in settings else None
+		return settings
+
+	@classmethod
+	def _cleanSettingsDatabases(self):
+		from lib.meta.cache import MetaCache
+		from lib.providers.core.manager import Manager
+		from lib.modules.history import History
+		from lib.modules.cache import Cache
+		from lib.modules.playback import Playback
+		from lib.modules.search import Search
+		from lib.modules.video import Trailer
+
+		return [
+			{
+				'name'			: Database.NameMetadata,
+				'instance'		: MetaCache.instance,
+				'type'			: 'automatic',
+				'precent'		: 0.20,
+				'minimum'		: 52428800,				# 50MB
+				'maximum'		: 4294967296,			# 4GB
+				'recommended'	: 1073741824,			# 1GB
+			},
+			{
+				'name'			: Database.NameStreams,
+				'instance'		: Manager.streamsDatabaseInstance,
+				'type'			: 'automatic',
+				'precent'		: 0.45,
+				'minimum'		: 52428800,				# 50MB
+				'maximum'		: 4294967296,			# 4GB
+				'recommended'	: 1073741824,			# 1GB
+			},
+			{
+				'name'			: Database.NameHistory,
+				'instance'		: History,
+				'type'			: 'automatic',
+				'precent'		: 0.19,
+				'minimum'		: 52428800,				# 50MB
+				'maximum'		: 4294967296,			# 4GB
+				'recommended'	: 1073741824,			# 1GB
+			},
+			{
+				'name'			: Database.NameCache,
+				'instance'		: Cache.instance,
+				'type'			: 'automatic',
+				'precent'		: 0.10,
+				'minimum'		: 52428800,				# 50MB
+				'maximum'		: 2147483648,			# 2GB
+				'recommended'	: 262144000,			# 250MB
+			},
+			{
+				'name'			: Database.NamePlayback,
+				'instance'		: Playback.instance,
+				'type'			: 'automatic',
+				'precent'		: 0.02,
+				'minimum'		: 10485760,				# 10MB
+				'maximum'		: 1073741824,			# 1GB
+				'recommended'	: 104857600,			# 100MB
+			},
+			{
+				'name'			: Database.NameSearches,
+				'instance'		: Search,
+				'type'			: 'automatic',
+				'precent'		: 0.02,
+				'minimum'		: 10485760,				# 10MB
+				'maximum'		: 1073741824,			# 1GB
+				'recommended'	: 104857600,			# 100MB
+			},
+			{
+				'name'			: Database.NameTrailers,
+				'instance'		: Trailer,
+				'type'			: 'automatic',
+				'precent'		: 0.02,
+				'minimum'		: 10485760,				# 10MB
+				'maximum'		: 1073741824,			# 1GB
+				'recommended'	: 104857600,			# 100MB
+			},
+			{
+				'name'			: Database.NameLibrary,
+				'type'			: 'manual',
+				'precent'		: 0.0,
+				'minimum'		: 0,					# Unlimited
+				'maximum'		: 0,					# Unlimited
+				'recommended'	: 0,					# Unlimited
+			},
+			{
+				'name'			: Database.NameShortcuts,
+				'type'			: 'manual',
+				'precent'		: 0.0,
+				'minimum'		: 0,					# Unlimited
+				'maximum'		: 0,					# Unlimited
+				'recommended'	: 0,					# Unlimited
+			},
+			{
+				'name'			: Database.NameDownloads,
+				'type'			: 'manual',
+				'precent'		: 0.0,
+				'minimum'		: 0,					# Unlimited
+				'maximum'		: 0,					# Unlimited
+				'recommended'	: 0,					# Unlimited
+			},
+			{
+				'name'			: Database.NameProviders,
+				'type'			: 'fixed',
+				'precent'		: 0.0,
+				'minimum'		: 0,					# Unlimited
+				'maximum'		: 0,					# Unlimited
+				'recommended'	: 0,					# Unlimited
+			},
+			{
+				'name'			: Database.NameSettings,
+				'type'			: 'fixed',
+				'precent'		: 0.0,
+				'minimum'		: 0,					# Unlimited
+				'maximum'		: 0,					# Unlimited
+				'recommended'	: 0,					# Unlimited
+			},
+		]
+
+	@classmethod
+	def _cleanSettingsItems(self):
+		if self.tCanceled: return None
+
+		from lib.modules.interface import Loader, Dialog, Translation
+		from lib.modules.convert import ConverterSize
+		from lib.modules.tools import Hardware
+
+		Loader.show()
+
+		settings = self._cleanSettings()
+		of = Translation.string(33073)
+		unlimited = Translation.string(35221)
+
+		totalSize = 0
+		totalLimit = 0
+		totalUnlimited = False
+		free = Hardware.storageUsageFreeBytes(refresh = True)
+		usable = int(free * Database.LimitFree)
+
+		limits = []
+		for database in self._cleanSettingsDatabases():
+			name = database['name']
+
+			size = Database(name = name, connect = False)._size()
+			totalSize += size
+
+			limit = settings[name] if name in settings else 0
+			totalLimit += limit
+
+			if database['type'] == 'automatic' and not limit: totalUnlimited = True
+
+			database['optimized'] = max(database['minimum'], min(database['maximum'], int(database['precent'] * usable) - size))
+
+			label = '%s %s %s' % (ConverterSize(size, unit = ConverterSize.Byte).stringOptimal(), of, ConverterSize(limit, unit = ConverterSize.Byte).stringOptimal() if limit else unlimited)
+			limits.append({'title' : name.capitalize(), 'value' : label, 'prefix' : True, 'action' : self._cleanSettingsSelect, 'parameters' : {'database' : database}})
+
+		statistics = [
+			{'title' : 36435, 'value' : ConverterSize(free, unit = ConverterSize.Byte).stringOptimal()},
+			{'title' : 36436, 'value' : ConverterSize(totalSize, unit = ConverterSize.Byte).stringOptimal()},
+			{'title' : 36439, 'value' : ConverterSize(totalLimit, unit = ConverterSize.Byte).stringOptimal() if totalLimit and not totalUnlimited else unlimited},
+		]
+
+		items = [
+			{'title' : Dialog.prefixBack(33486), 'close' : True},
+			{'title' : Dialog.prefixNext(33239), 'action' : self._cleanSettingsHelp},
+			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompress},
+			{'title' : Dialog.prefixNext(35269), 'action' : self._cleanSettingsOptimize},
+			{'title' : 36437, 'items' : statistics},
+			{'title' : 35220, 'items' : limits},
+		]
+
+		Loader.hide()
+		return items
+
+	@classmethod
+	def _cleanSettingsHelp(self):
+		from lib.modules.interface import Dialog
+		Dialog.details(title = 36036, items = [
+			{'type' : 'title', 'value' : 'Overview', 'break' : 2},
+			{'type' : 'text', 'value' : 'Multiple databases are created by Gaia on the device\'s local disk. Some databases can grow very large over time. You can specify database file size limits if you have little storage space available. When Gaia is launched, these limits will be applied and old entries are deleted from the databases in order to reduce the file size. Note that this is only a best effort and there is no guarantee that the exact limits will always be maintained. Also note that these limits only apply to Gaia databases. Other files created by Gaia, other addons, or Kodi are not included.', 'break' : 2},
+			{'type' : 'title', 'value' : 'Limits', 'break' : 2},
+			{'type' : 'text', 'value' : 'Gaia should work well with at least [B]250MB[/B] of free disk space for all databases combined. Although Gaia might still work with less storage space, certain features might stop working after some time. To get the best performance out of Gaia, you should have [B]1GB[/B] or more free disk space.', 'break' : 2},
+			{'type' : 'text', 'value' : 'Take the following into account when choosing limits:', 'break' : 2},
+			{'type' : 'list', 'value' : [
+				{'title' : 'Low Limits', 'value' : 'If limits are too low (typically below 50MB per database), you might free up storage space, however there might be performance implications for the addon. If entries are constantly deleted from the databases in order to adhere to the file size limits, this data has to be retrieved again in the future, putting a burden on external servers and your internet connection. This in turn might slow down menu loading and various other features in the addon.'},
+				{'title' : 'High Limits', 'value' : 'If limits are too high (typically above 2GB per database), there should generally not be any issues. However, the larger a database becomes, the slower access to the database becomes. This slowdown should be marginal and will probably not be noticed while using the addon. It is typically better to keep a larger than a smaller database.'},
+			], 'number' : False},
+			{'type' : 'title', 'value' : 'Databases', 'break' : 2},
+			{'type' : 'text', 'value' : 'The following databases are utilized:', 'break' : 2},
+			{'type' : 'list', 'value' : [
+				{'title' : 'Metadata', 'value' : 'This stores all the movie and show metadata used by menus and other features. This database can grow large over time, but should generally not be limited too much, since it will slow down menus.'},
+				{'title' : 'Streams', 'value' : 'This stores all the streams returned by providers during scraping. Streams are stored locally so that they can be quickly reloaded without having to go through the scraping process again. For instance, during binging the next episode is scraped, but you might not want to watch it now. If you want to watch the episode a few days later, the streams can just be retrieved from disk instead of starting the scraping process again. This database can grow very large over time and should be limited to avoid performance implications during scraping. This database is also cleaned up automatically by the [I]Save Streams[/I]  settings under the [I]Scraping[/I]  tab, which automatically deletes old streams after a few days, instead of limiting it by size.'},
+				{'title' : 'History', 'value' : 'This stores the streams you played in the past, allowing you to quickly resume playback of the stream in the future. It is similar to the [I]Streams[/I]  database, except that it only stores the streams that you actually played. This database can grow large over time and should be limited to avoid performance implications.'},
+				{'title' : 'Cache', 'value' : 'This stores all the temporary network requests so that if a request is executed again in the near future, the results can be quickly retrieved from disk. This database should stay relatively small and should generally not be limited too much, since it will slow down most of the functionality.'},
+				{'title' : 'Playback', 'value' : 'This stores your playback progress, watched status, and various other playback attributes. Most of the data is also synchronized to Trakt if you have an account authenticated. This database should stay relatively small and should generally not be impacted a lot from strict limits.'},
+				{'title' : 'Searches', 'value' : 'This stores all the searches you made in the past, including chats with the Oracle. This database should stay relatively small and should generally not be impacted a lot from strict limits.'},
+				{'title' : 'Trailers', 'value' : 'This stores all the trailers you played in the past. This database should stay relatively small and should generally not be impacted a lot from strict limits.'},
+				{'title' : 'Library', 'value' : 'his stores data when using the addon in combination with Kodi\'s local library. Depending on how you use it, the size could grow large over time. This database is not controlled by any limits, since it does not contain historic data, but rather data manually added by you. You should manage this database yourself if you utilize the features.'},
+				{'title' : 'Shortcuts', 'value' : 'This stores shortcuts you manually create in the addon menus. This database will always stay small. This database is not controlled by any limits, since it does not contain historic data, but rather data manually added by you. You should manage this database yourself if you utilize the features.'},
+				{'title' : 'Downloads', 'value' : 'This stores information for the integrated download manager. This database will always stay small. This database is not controlled by any limits, since it does not contain historic data, but rather data manually added by you. You should manage this database yourself if you utilize the features.'},
+				{'title' : 'Providers', 'value' : 'This stores information about the providers in the addon. This database will always stay small. This database is not controlled by any limits, since it does not contain historic data.'},
+				{'title' : 'Settings', 'value' : 'This stores detailed settings that are too large to store in the normal Kodi addon settings. This database will always stay small. This database is not controlled by any limits, since it does not contain historic data.'},
+			], 'number' : False},
+		])
+
+	@classmethod
+	def _cleanSettingsCompress(self, database = None):
+		from lib.modules.interface import Dialog, Loader
+
+		choice = Dialog.options(title = 36036, message = 36448, labelConfirm = 32532, labelDeny = 36447, labelCustom = 33743)
+		if choice == Dialog.ChoiceCustom: return False
+
+		Loader.show()
+		try:
+			databases = [database] if database else self._cleanSettingsDatabases()
+			for database in databases:
+				if database['type'] == 'automatic':
+					instance = database['instance']()
+					if choice == Dialog.ChoiceYes: instance.cleanReduce()
+					elif choice == Dialog.ChoiceNo: instance.cleanCompress()
+		except:
+			from lib.modules.tools import Logger
+			Logger.error()
+		Loader.hide()
+		return True
+
+	@classmethod
+	def _cleanSettingsOptimize(self):
+		from lib.modules.tools import Hardware
+		from lib.modules.interface import Dialog, Translation
+		from lib.modules.convert import ConverterSize
+
+		choice = Dialog.options(title = 36036, message = 36449, labelConfirm = 35233, labelDeny = 33348, labelCustom = 33743)
+		if choice == Dialog.ChoiceCustom: return False
+
+		size = 0
+		free = Hardware.storageUsageFreeBytes(refresh = True)
+		databases = self._cleanSettingsDatabases()
+
+		if choice == Dialog.ChoiceYes:
+			for database in databases:
+				size += database['recommended']
+			size = ConverterSize(size, unit = ConverterSize.Byte).value(unit = ConverterSize.ByteMega, places = ConverterSize.PlacesNone)
+			size = Dialog.input(title = 36036, type = Dialog.InputNumeric, default = size)
+			if not size: return False
+			size = ConverterSize(size, unit = ConverterSize.ByteMega).value(unit = ConverterSize.Byte, places = ConverterSize.PlacesNone)
+		elif choice == Dialog.ChoiceNo:
+			precent = Dialog.input(title = 36036, type = Dialog.InputNumeric, default = 50)
+			if not precent: return False
+			size = int(free * (precent / 100.0))
+
+		if size:
+			labelFree = ConverterSize(free, unit = ConverterSize.Byte).stringOptimal()
+			labelSize = ConverterSize(size, unit = ConverterSize.Byte).stringOptimal()
+			if Dialog.option(title = 36036, message = Translation.string(36450) % (labelFree, labelSize)):
+				for database in databases:
+					if database['type'] == 'automatic':
+						self._cleanSettingsUpdate(database = database, value = database['precent'] * size, validate = False)
+				return True
+		return False
+
+	@classmethod
+	def _cleanSettingsSelect(self, database):
+		from lib.modules.interface import Dialog
+		from lib.modules.tools import Tools
+
+		if database['type'] == 'automatic':
+			choice = Dialog.information(title = 36036, refresh = lambda : self._cleanSettingsSelectItems(database), reselect = Dialog.ReselectYes)
+			if Tools.isInteger(choice) and choice < 0: self.tCanceled = True
+		else:
+			Dialog.confirm(title = 36036, message = 36445 if database['type'] == 'fixed' else 36446)
+
+	@classmethod
+	def _cleanSettingsSelectItems(self, database):
+		from lib.modules.interface import Dialog, Translation
+		from lib.modules.tools import Hardware
+		from lib.modules.convert import ConverterSize
+
+		unlimited = Translation.string(35221)
+
+		# Recalculate these, in case we use the "Compress" action.
+		name = database['name']
+		free = Hardware.storageUsageFreeBytes(refresh = True)
+		usable = int(free * Database.LimitFree)
+		size = Database(name = name, connect = False)._size()
+		settings = self._cleanSettings()
+		limit = settings[name] if name in settings else 0
+
+		return [
+			{'title' : Dialog.prefixBack(35374), 'close' : True},
+			{'title' : Dialog.prefixNext(33239), 'action' : self._cleanSettingsHelp},
+			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompress, 'parameters' : {'database' : database}},
+			{'title' : 36437, 'items' : [
+				{'title' : 33026, 'value' : database['name'].capitalize()},
+				{'title' : 36435, 'value' : ConverterSize(free, unit = ConverterSize.Byte).stringOptimal()},
+				{'title' : 36429, 'value' : ConverterSize(size, unit = ConverterSize.Byte).stringOptimal()},
+				{'title' : 36438, 'value' : ConverterSize(limit, unit = ConverterSize.Byte).stringOptimal() if limit else unlimited},
+			]},
+			{'title' : 35220, 'items' : [
+				{'title' : 36430, 'prefix' : True, 'close' : True, 'value' : ConverterSize(database['minimum'], unit = ConverterSize.Byte).stringOptimal(), 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : database['minimum']}},
+				{'title' : 36431, 'prefix' : True, 'close' : True, 'value' : ConverterSize(database['maximum'], unit = ConverterSize.Byte).stringOptimal(), 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : database['maximum']}},
+				{'title' : 36432, 'prefix' : True, 'close' : True, 'value' : ConverterSize(database['recommended'], unit = ConverterSize.Byte).stringOptimal(), 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : database['recommended']}},
+				{'title' : 36433, 'prefix' : True, 'close' : True, 'value' : ConverterSize(database['optimized'], unit = ConverterSize.Byte).stringOptimal(), 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : database['optimized']}},
+				{'title' : 36440, 'prefix' : True, 'close' : True, 'value' : unlimited, 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : 0}},
+				{'title' : 36434, 'prefix' : True, 'close' : True, 'value' : 35233, 'action' : self._cleanSettingsUpdate, 'parameters' : {'database' : database, 'limit' : limit, 'free' : free, 'usable' : usable, 'value' : None}},
+			]},
+		]
+
+	@classmethod
+	def _cleanSettingsUpdate(self, database, limit = None, free = None, usable = None, value = None, validate = True):
+		from lib.modules.tools import Settings
+		from lib.modules.interface import Dialog, Translation
+		from lib.modules.convert import ConverterSize
+
+		if validate:
+			if value is None:
+				value = ConverterSize(limit or database['recommended'], unit = ConverterSize.Byte).value(unit = ConverterSize.ByteMega, places = ConverterSize.PlacesNone)
+				value = Dialog.input(title = 36036, type = Dialog.InputNumeric, default = value)
+				value = ConverterSize(value, unit = ConverterSize.ByteMega).value(unit = ConverterSize.Byte, places = ConverterSize.PlacesNone)
+
+			if value == 0:
+				choice = Dialog.options(title = 36036, message = 36443, labelConfirm = 33925, labelDeny = 33633, labelCustom = 33743)
+				if choice == Dialog.ChoiceYes: value = database['maximum']
+				elif choice == Dialog.ChoiceCustom: return False
+
+			if value > 0 and value < database['minimum']:
+				choice = Dialog.options(title = 36036, message = 36441, labelConfirm = 33925, labelDeny = 33633, labelCustom = 33743)
+				if choice == Dialog.ChoiceYes: value = database['minimum']
+				elif choice == Dialog.ChoiceCustom: return False
+
+			if value > 0 and value > database['maximum']:
+				choice = Dialog.options(title = 36036, message = 36442, labelConfirm = 33925, labelDeny = 33633, labelCustom = 33743)
+				if choice == Dialog.ChoiceYes: value = database['maximum']
+				elif choice == Dialog.ChoiceCustom: return False
+
+			if value > usable:
+				choice = Dialog.options(title = 36036, message = 36444, labelConfirm = 33925, labelDeny = 33633, labelCustom = 33743)
+				if choice == Dialog.ChoiceYes: value = database['optimized']
+				elif choice == Dialog.ChoiceCustom: return False
+
+		settings = self._cleanSettings()
+		settings[database['name']] = value
+
+		label = 0
+		for database in self._cleanSettingsDatabases():
+			if database['type'] == 'automatic':
+				name = database['name']
+				if name in settings:
+					if settings[name] == 0:
+						label = 0
+						break
+					else:
+						label += settings[name]
+		if label == 0: label = Translation.string(35221)
+		else: label = ConverterSize(label, unit = ConverterSize.Byte).stringOptimal()
+
+		Settings.setData(id = Database.LimitSetting, value = settings, label = label)
+
+		return True
+
+	def _cleanAdjust(self, time, force = False):
+		# Ignore if the given time is within the past 30 hours.
+		# Otherwise entries are constantly deleted and filled up again immediately.
+		if not force:
+			from lib.modules.tools import Time
+			time = min(time, Time.past(hours = 30))
+		return time
+
+	# Should be overwritten by subclasses to clear older entries and reduce disk storage space.
+	def _clean(self, time, commit = True, compress = True):
+		return None
+
+	# Should be overwritten by subclasses.
+	# Takes in a number of rows to delete.
+	# Returns a singel timestamp for all tables in the database, which can be used to remove all old rows before the timestamp.
+	def _cleanTime(self, count):
+		return None
 
 
 class Dummy(Database):

@@ -529,7 +529,7 @@ class Oracle(object):
 			self._contentAfter(data = data)
 			if menu: self.menu(data = data, background = True)
 
-		data['duration'] = timer.elapsed(milliseconds = True)
+		if data: data['duration'] = timer.elapsed(milliseconds = True)
 		if self._chatProgress(instance = progress, progress = 1.00, status = 36329) is False: return False
 		return data
 
@@ -2988,7 +2988,11 @@ class Oracle(object):
 						except: pass
 
 		message = message.strip('\n').replace('\n', Format.newline())
-		if not message and default: message = Format.fontItalic(36351)
+		if not message and default:
+			try: error = chat['data']['error']['message']
+			except: error = None
+			if error: message = Format.font(error, color = Format.colorBad())
+			else: message = Format.fontItalic(36351)
 
 		return message
 

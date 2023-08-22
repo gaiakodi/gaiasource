@@ -32,6 +32,7 @@ class Search(Database):
 	TypeShort = Media.TypeShort
 	TypePerson = Media.TypePerson
 	TypeOracle = 'oracle'
+	Types = [TypeMovie, TypeSet, TypeShow, TypeDocumentary, TypeShort, TypePerson, TypeOracle]
 
 	def __init__(self):
 		Database.__init__(self, Search.Name)
@@ -203,3 +204,26 @@ class Search(Database):
 			result = [i for i in result if Converter.jsonFrom(i[2])['media'] in type]
 
 		return result
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time:
+			count = 0
+			query = 'DELETE FROM `%s` WHERE time <= ?;'
+			for type in Search.Types:
+				count += self._delete(query = query % type, parameters = [time], commit = commit, compress = compress)
+			return count
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = []
+			query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;'
+			for type in Search.Types:
+				time = self._selectValues(query = query % type, parameters = [count])
+				if time: times.extend(time)
+			if times: return Tools.listSort(times)[:count][-1]
+		return None

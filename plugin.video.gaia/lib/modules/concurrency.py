@@ -267,16 +267,25 @@ class Concurrency(object):
 				lock.release()
 				setting = Settings.getInteger(id = Pool.SettingNotifications)
 				if setting > 0:
-					from lib.modules.tools import Regex
-					from lib.modules.interface import Dialog, Translation
+					from lib.modules.tools import Regex, System
+					from lib.modules.interface import Dialog, Translation, Player
 					if setting == 1:
 						Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000)
 					elif setting == 2:
-						message = Translation.string(33246)
-						if System.commandIsScrape(): message = message % (Regex.extract(data = Translation.string(36063), expression = '(.*?)(?:$|\s*\[)'), Translation.string(35539))
-						else: message = message % (Translation.string(36038), Translation.string(32310))
-						Dialog.confirm(title = 36037, message = message)
+						playback = Player().isPlayback()
+						timeout = 30000 if playback else None
 
+						if System.commandIsScrape():
+							expression = '(.*?)(?:$|\s*\[)'
+							recommendation1 = Regex.extract(data = Translation.string(36063), expression = expression)
+							recommendation2 = Regex.extract(data = Translation.string(36078), expression = expression)
+							recommendation = Translation.string(36422) % (recommendation1, Translation.string(35539), recommendation2, Translation.string(32345))
+						else:
+							recommendation = Translation.string(36421) % (Translation.string(36038), Translation.string(32310))
+
+						message = '%s %s' % (Translation.string(33246), recommendation)
+						if Dialog.option(title = 36037, message = message, labelConfirm = 32501, labelDeny = 33486, timeout = timeout):
+							System.power(action = System.PowerRestart, proper = True, notification = True)
 
 class Thread(Concurrency, PyThread):
 
@@ -411,6 +420,9 @@ class Pool(object):
 	CountTotal				= {Thread : 0, Process : 0}	# The total number of threads created during this execution.
 	CountConcurrent			= {Thread : 0, Process : 0}	# The maximum number of threads that were running concurrently during this execution.
 
+	TimeoutStandard			= 1200	# 20 minutes.
+	TimeoutDeveloper		= 60	# 1 minute.
+
 	Instances				= {}
 	Lock					= None
 	Semaphore				= None
@@ -419,11 +431,58 @@ class Pool(object):
 	EventFinish				= {}
 
 	@classmethod
+	def _developer(self):
+		from lib.modules.tools import System
+		return System.developer()
+
+	@classmethod
+	def _timeout(self):
+		return Pool.TimeoutDeveloper if self._developer() else Pool.TimeoutStandard
+
+	@classmethod
 	def _log(self, message, prefix = True, developer = True):
-		from lib.modules.tools import Logger, System
-		if not developer or System.developer():
-			if prefix: message = 'CONCURRENCY POOL: ' + message
+		from lib.modules.tools import Logger
+		if not developer or self._developer():
+			if prefix is True: message = 'CONCURRENCY POOL: ' + message
+			elif prefix: message = prefix + message
 			Logger.log(message = message, type = Logger.TypeInfo, level = Logger.LevelExtended)
+
+	@classmethod
+	def _logLine(self, extra = '', developer = True):
+		self._log(message = '-' * 70 + extra, prefix = False, developer = developer)
+
+	@classmethod
+	def _logDangling(self, instance, developer = True):
+		from lib.modules.tools import System
+		if not developer or self._developer():
+			try: action = System.commandResolve(initialize = False).get('action')
+			except: action = 'Unknown'
+			label = instance.label()
+
+			# Note that certain invokers are ment to stay alive, like the "streamsShow" that will remain active until the stream window was closed.
+			excepted = False
+			exceptions = [
+				{'action' : 'scrape', 'instance' : 'Window._initialize1'},		# WindowStreams
+				{'action' : 'streamsShow', 'instance' : 'Window._initialize1'},	# WindowStreams
+			]
+			for exception in exceptions:
+				if action == exception['action'] and label == exception['instance']:
+					excepted = True
+					break
+
+			if not excepted:
+				self._logLine()
+				self._logLine(extra = ' ') # Avoid: Skipped 1 duplicate messages..
+				self._log('--  CONCURRENCY POOL - DANGLING PROCESS', prefix = False)
+				self._log('--     A concurrency instance did not finish for a long time', prefix = False)
+				self._log('--     and is still running. This is most likley a bug causing', prefix = False)
+				self._log('--     the current Python invoker to never finish. This will', prefix = False)
+				self._log('--     cause the Python invoker to never clean up and return', prefix = False)
+				self._log('--     threads back to the OS.', prefix = False)
+				self._log('--        ACTION: %s' % str(action), prefix = False)
+				self._log('--        INSTANCE: %s [%s]' % (instance.id(), label), prefix = False)
+				self._logLine()
+				self._logLine(extra = ' ')
 
 	@classmethod
 	def reset(self, settings = True):
@@ -498,8 +557,9 @@ class Pool(object):
 		return count
 
 	@classmethod
-	def join(self, instance = None, busy = False):
+	def join(self, instance = None, busy = False, timeout = None):
 		from lib.modules.tools import Time, System
+
 		if busy is True: busy = 0.05
 
 		if instance is None:
@@ -511,6 +571,13 @@ class Pool(object):
 			# Wait for all threads to return before exiting Gaia - not sure if this solves the problem.
 
 			time = Time(start = True)
+
+			# Use a timeout by default if joining all remaining instances at the end of invoker execution.
+			timeoutDefault = timeout is None
+			if timeout is None or timeout is True: timeout = self._timeout()
+			elif timeout is False: timeout = None
+
+			self._logLine()
 			self._log('Waiting for %d instances' % (self.count()))
 			for id, instance in self.processes().items():
 				self._log('   PROCESS: %s [%s]' % (id, instance.label()), prefix = False)
@@ -523,17 +590,45 @@ class Pool(object):
 			while recheck:
 				running = False
 				nonrunning = False
+
 				for instance in list(Pool.Instances.values()): # Use a list, since instances can be removed while iterating. Otherwise throws: dictionary changed size during iteration.
 					try:
 						if instance and not instance.isDaemon():
 							if busy:
-								while instance.alive(): Time.sleep(busy)
+								if timeout:
+									timer = Time(start = True)
+									while instance.alive():
+										Time.sleep(busy)
+										if timer.elapsed() > timeout:
+											if instance.alive(): self._logDangling(instance = instance)
+											break
+									if timeoutDefault:
+										while instance.alive():
+											Time.sleep(busy)
+								else:
+									while instance.alive():
+										Time.sleep(busy)
 							else:
-								instance.join()
+								instance.join(timeout = timeout)
+								if instance.alive():
+									self._logDangling(instance = instance)
+									if timeoutDefault: instance.join()
 							running = True
 					except:
 						nonrunning = True
+
 				recheck = running and nonrunning
+
+				# NB: Sometimes while one thread is joining, another thread might start a new sub-thread.
+				# This new sub-thread will then not be part of the instances in the for-loop above.
+				# Check here again and if there are any new still-running threads, restart the outer loop to join those as well.
+				if not recheck:
+					for instance in list(Pool.Instances.values()):
+						try:
+							if instance and not instance.isDaemon() and instance.alive():
+								recheck = True
+								break
+						except: pass
 
 			self._log('Total created instances')
 			self._log('   PROCESS: %s' % Pool.CountTotal[Process], prefix = False)
@@ -548,11 +643,26 @@ class Pool(object):
 
 			System.windowPropertyClear(Pool.PropertyNotification)
 			self._log('Finished in %s seconds' % time.elapsed())
+			self._logLine()
 		else:
+			# No timeout by default when joining individual instances.
+			if timeout is True: timeout = self._timeout()
+			elif timeout is None or timeout is False: timeout = None
+
 			if busy:
-				while instance.alive(): Time.sleep(busy)
+				if timeout:
+					timer = Time(start = True)
+					while instance.alive():
+						Time.sleep(busy)
+						if timer.elapsed() > timeout:
+							if instance.alive(): self._logDangling(instance = instance)
+							break
+				else:
+					while instance.alive():
+						Time.sleep(busy)
 			else:
-				instance.join()
+				instance.join(timeout = timeout)
+				if instance.alive(): self._logDangling(instance = instance)
 
 	@classmethod
 	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
@@ -615,11 +725,13 @@ class Pool(object):
 			except: pass
 
 	@classmethod
-	def instances(self, type = None):
+	def instances(self, type = None, alive = None):
 		# Use "list(Pool.Instances.items())" to create a copy of the items iterator.
 		# Otherwise there might be a rare error: RuntimeError: dictionary changed size during iteration
-		if type is None: return Pool.Instances
-		else: return {id : instance for id, instance in list(Pool.Instances.items()) if isinstance(instance, type)}
+		if type is None: instances = Pool.Instances
+		else: instances = {id : instance for id, instance in list(Pool.Instances.items()) if isinstance(instance, type)}
+		if not alive is None: instances = {id : instance for id, instance in list(Pool.Instances.items()) if instance.alive() is alive}
+		return instances
 
 	# A global lock that can be used by any classes to to minor quick/things that require mutual exclusion.
 	# Should not be used if the lock will be locked for a long time.
@@ -651,8 +763,8 @@ class Pool(object):
 			if not events: del Pool.EventFinish[rank] # Remove empty rank lists.
 
 	@classmethod
-	def count(self, type = None):
-		return len(self.instances(type = type).keys())
+	def count(self, type = None, alive = None):
+		return len(self.instances(type = type, alive = alive).keys())
 
 	@classmethod
 	def available(self, type = None, percent = False):

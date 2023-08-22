@@ -335,6 +335,10 @@ class ConverterData(ConverterBase):
 		if unit == ConverterData.Bit or unit == ConverterData.Byte:
 			places = 0
 		if not places == ConverterData.PlacesUnknown:
+			if places == ConverterData.PlacesNone: places = 0
+			elif places == ConverterData.PlacesSingle: places = 1
+			elif places == ConverterData.PlacesDouble: places = 2
+			elif places == ConverterData.PlacesTriple: places = 3
 			value = self._round(value, places)
 		return value
 
@@ -812,6 +816,7 @@ class ConverterTime(ConverterBase):
 	FormatDateTimeJsonShort = '%Y-%m-%dT%H:%M:%S._Z' # Timezone microseconds with 3 decimal places. Some features (like Trakt) can only handle 3 decimal places.
 	FormatDateShort = '%d %b %Y'
 	FormatDateLong = '%d %B %Y'
+	FormatDateAmerican = '%B %d, %Y'
 	FormatMonth = '%B %Y'
 	FormatMonthShort = '%b %Y'
 	FormatTime = '%H:%M:%S'

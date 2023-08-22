@@ -565,7 +565,7 @@ class Core(base.Core):
 
 					if cached: result = cache.Cache.instance().cacheShort(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts)
 					else: result = cache.Cache.instance().cacheClear(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts)
-					
+
 					if not result is None:
 						for key, value in result.items():
 							if key: # Exclude "Remote".
@@ -916,12 +916,12 @@ class Core(base.Core):
 											for file in files:
 												if source['stream'].validName(data = file):
 													result = True
+													break # Important. Otherwise cache lookup can take a long time for large packs having to match 100s or 1000s of names (eg: Game of Thrones)
 										else:
 											result = True
 									else:
 										result = True
-						except:
-							tools.Logger.error()
+						except: tools.Logger.error()
 
 						self.tCacheLock.acquire()
 						self.tCacheResult[key] = result
@@ -929,8 +929,7 @@ class Core(base.Core):
 						if callback:
 							try: callback(self.id(), key, result)
 							except: pass
-			except:
-				tools.Logger.error()
+			except: tools.Logger.error()
 
 		threads = []
 		for i in range(len(chunks)):

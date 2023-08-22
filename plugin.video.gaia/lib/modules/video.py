@@ -1067,6 +1067,21 @@ class Trailer(Video, Database):
 	def cinemaCanceled(self):
 		return self.mCinemaRunning is False # Can be None.
 
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time: return self._delete(query = 'DELETE FROM `%s` WHERE time <= ?;' % Trailer.Name, parameters = [time], commit = commit, compress = compress)
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = self._selectValues(query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;' % Trailer.Name, parameters = [count])
+			if times: return Tools.listSort(times)[:count][-1]
+		return None
+
+
 class Recap(Video):
 
 	Id = 'recap'

@@ -1,4 +1,57 @@
 
+[B]6.4.0 (2023.08.22)[/B]
+- Updated skip button.
+- Added skip button customization.
+- Updated concurrency warning dialog.
+- Added binge notification setting.
+- Improved RealDebrid cache lookup for packs.
+- Separated providers and streams databases.
+- Added databases size limiting.
+- Improved scraping speed.
+- Fixed order of provider execution during scraping.
+- Fixed scrape progress indicator.
+- Added internal priority for provider stream processing.
+- Fixed YouTube provider.
+- Improved debrid cache inspection.
+- Added customizable button colors.
+- Fixed the dangling stream window.
+- Fixed subtitle failure notifications.
+- Fixed playback window cancellation.
+- Enabled menu duplicate filtering by default.
+- Added binge continue button.
+- Moved skip intro settings to the activity category.
+- Moved binge settings to the activity category.
+- Improved episode intro skipping.
+- Improved addon launch process.
+- Fixed origin detection.
+- Fixed show pack metadata refreshing.
+- Added binge continue dialog.
+- Change the binge process.
+- Fixed binge concurrency limit.
+- Fixed binge scrape waiting during interaction.
+- Ask wether or not to reload the stream list.
+- Added media links for multiple platforms.
+- Improved release time metadata cache refresh.
+- Updated IMDb episode metadata extraction.
+- Hide skip button on playback resume.
+- Fixed the dangling background binge scrape process.
+- Fixed Trakt season rating.
+- Updated file pack label formatting.
+- Added proper interface sound support.
+- Added playback observer automation.
+- Improved language detection from cut-off file names.
+- Improved Oracle error messages.
+- Changed binge background scrape delay.
+- Improved concurrency management.
+- Improved closing windows from different processes.
+- Improved progress scrobbeling when resuming playback.
+- Updated local library service.
+- Added advanced service manager.
+- Removed old Lightpack code.
+- Improved Bluetooth monitor.
+- Improved outro chapter detection.
+- Possible fix for failed stream connection errors.
+
 [B]6.3.11 (2023.07.20)[/B]
 - Fixed rating window XML.
 

@@ -37,7 +37,8 @@ class Provider(ProviderSpotJson):
 			# NZBserver still works, however, the download link/button now displays a Dutch notifcation saying you need a VPN to access NZBserver.
 			# Even with a Netherland VPN, the message remains.
 			# They probably want to force people to use the advertised VPN, because they earn comission for it, and then block any other VPN IP.
-			# gaiaremove - 2023-07-10 - check this in a few weeks/months again to see if they removed this restriction.
+			# 2023-07-10 - check this in a few weeks/months again to see if they removed this restriction.
+			# 2023-08-18 - VPN restriction still in place.
 			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,

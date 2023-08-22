@@ -265,19 +265,19 @@ msgid "Add To Playlist"
 msgstr ""
 
 msgctxt "#32066"
-msgid "Reload Skin"
+msgid "Refresh Skin"
 msgstr ""
 
 msgctxt "#32067"
-msgid "Reload Kodi"
+msgid "Reload Profile"
 msgstr ""
 
 msgctxt "#32068"
-msgid "Restart Kodi"
+msgid "Relaunch"
 msgstr ""
 
 msgctxt "#32069"
-msgid "Restart Device"
+msgid "Relaunch Gaia"
 msgstr ""
 
 msgctxt "#32070"
@@ -1623,7 +1623,7 @@ msgid "Thread limit reached. Restart Kodi."
 msgstr ""
 
 msgctxt "#33246"
-msgid "The thread limit has been reached. No new threads can be created due to hardware limitations and the addon might stop functioning correctly. Please restart Kodi. Try to reduce the [I]%s[/I]  setting under the [I]%s[/I]  tab if this problem persists."
+msgid "The thread limit has been reached. No new threads can be created due to your device's hardware limitations and the addon might stop functioning correctly. Please restart Kodi."
 msgstr ""
 
 msgctxt "#33247"
@@ -1883,11 +1883,11 @@ msgid "Experimental Feature"
 msgstr ""
 
 msgctxt "#33311"
-msgid "Ambilight"
+msgid "Update Monitor"
 msgstr ""
 
 msgctxt "#33312"
-msgid "Lightpack Control"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33313"
@@ -1963,7 +1963,7 @@ msgid "Provider Limit"
 msgstr ""
 
 msgctxt "#33331"
-msgid "Finishes At"
+msgid "Ends At"
 msgstr ""
 
 msgctxt "#33332"
@@ -2239,7 +2239,7 @@ msgid "Profile Name"
 msgstr ""
 
 msgctxt "#33400"
-msgid "Prismatik Program"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33401"
@@ -2251,7 +2251,7 @@ msgid "Custom Location"
 msgstr ""
 
 msgctxt "#33403"
-msgid "Prismatik Location"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33404"
@@ -2263,7 +2263,7 @@ msgid "Pack Count"
 msgstr ""
 
 msgctxt "#33406"
-msgid "Lightpack"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33407"
@@ -2279,7 +2279,7 @@ msgid "Animate"
 msgstr ""
 
 msgctxt "#33410"
-msgid "The communication with the Lightpack failed. Make sure that your settings are correct, that the Lightpack is connected, and that Prismatik is running."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33411"
@@ -2331,27 +2331,27 @@ msgid "Mirror Domains"
 msgstr ""
 
 msgctxt "#33423"
-msgid "Startup Sound"
+msgid "Sound"
 msgstr ""
 
 msgctxt "#33424"
-msgid "Sound 1"
+msgid "Start Sound"
 msgstr ""
 
 msgctxt "#33425"
-msgid "Sound 2"
+msgid "Finish Sound"
 msgstr ""
 
 msgctxt "#33426"
-msgid "Sound 3"
+msgid "Playing Native Sound"
 msgstr ""
 
 msgctxt "#33427"
-msgid "Sound 4"
+msgid "Playing Custom Sound"
 msgstr ""
 
 msgctxt "#33428"
-msgid "Sound 5"
+msgid "Playing Selected Sound"
 msgstr ""
 
 msgctxt "#33429"
@@ -2543,7 +2543,7 @@ msgid "Embell"
 msgstr ""
 
 msgctxt "#33476"
-msgid "System Tools"
+msgid "System Power"
 msgstr ""
 
 msgctxt "#33477"
@@ -2787,11 +2787,11 @@ msgid "Devices"
 msgstr ""
 
 msgctxt "#33537"
-msgid "Automatic Reconnect"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33538"
-msgid "Reconnect Interval"
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#33539"
@@ -3995,7 +3995,7 @@ msgid "The VPN is [B]reconnecting[/B] and you are [B]not anonymous[/B] yet."
 msgstr ""
 
 msgctxt "#33839"
-msgid "Retrieving [B]Extended[/B] metadata takes about twice as long as [B]Standard[/B] metadata, increasing loading times of menus when opened for the first time. Do you want to keep the current metadata level or reduce it for faster menu loading?"
+msgid "Retrieving [B]Extended[/B] metadata takes about twice as long as [B]Standard[/B] metadata, increasing loading times of menus when opened for the [B]first[/B] time. Do you want to keep the current metadata level or reduce it for faster menu loading?"
 msgstr ""
 
 msgctxt "#33840"
@@ -4775,7 +4775,7 @@ msgid "Filter streams according to the subtitle language."
 msgstr ""
 
 msgctxt "#34034"
-msgid "Automatically play the next episode from the same show or season back while bingeing. If the current episode is part of a pack, the next episode is also played from the same pack without showing the stream window that requires manual selection. If the pack does not contain the next episode, the manual stream window is shown as usual. This feature is similar to [I]Automatic Playback[/I], but it is specifically targeted towards bingeing episodes from a pack."
+msgid "Automatically play the next episode from the same show or season pack while binging. If the current episode is part of a pack, the next episode is also played from the same pack without showing the stream window that requires manual selection. If the pack does not contain the next episode, the manual stream window is shown as usual. This feature is similar to [I]Automatic Playback[/I], but it is specifically targeted towards binging episodes from a pack."
 msgstr ""
 
 msgctxt "#34035"
@@ -5011,47 +5011,47 @@ msgid "Settings related to network requests, geolocation lookups, VPN detection,
 msgstr ""
 
 msgctxt "#34093"
-msgid "Customize the Lightpack host connection and API key."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34094"
-msgid "Control a Lightpack from within the addon. This requires an older version 5 of Prismatik with the server setting enabled under the experimental tab of Prismatik."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34095"
-msgid "Automatically detect the Prismatik executable from the system path or common installation locations, or specify a custom location for the executable."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34096"
-msgid "Specify the custom path of the Prismatik executable."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34097"
-msgid "Automatically launch Prismatik if it is not running already."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34098"
-msgid "Animate the Lightpack when Gaia is launched."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34099"
-msgid "Set the Lightpack to a custom layout profile. The current profile is kept if no custom one is specified."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34100"
-msgid "Set a custom Lightpack profile name as shown in Prismatik."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34101"
-msgid "Adjust the total number of Lightpacks connected to the system. Small screens typically have one set, whereas larger screens have two or more."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34102"
-msgid "Change the IP address of the Lightpack host. Your local device is 127.0.0.1."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34103"
-msgid "Change the port of the Prismatik host. The default port for Prismatik is 3636."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34104"
@@ -5059,7 +5059,7 @@ msgid "Settings related to third party services that unlock premium scraping and
 msgstr ""
 
 msgctxt "#34105"
-msgid "Authorize Prismatik with an API key. The brackets {} and dashes - must be included in the key. To disable authorization, the API key in Gaia and Prismatik must be empty."
+msgid "[GAIAREMOVE]"
 msgstr ""
 
 msgctxt "#34106"
@@ -5087,7 +5087,7 @@ msgid "Scrape the mirror domains of a providers if the main site is down or inac
 msgstr ""
 
 msgctxt "#34112"
-msgid "Play a startup sound when the addon is launched."
+msgid "Play sound effects at various places throughout the addon."
 msgstr ""
 
 msgctxt "#34113"
@@ -5423,7 +5423,7 @@ msgid "Specify an IP address mask for your ISP or VPN which is used to determine
 msgstr ""
 
 msgctxt "#34196"
-msgid "Automatically monitor the VPN status when Kodi or Gaia is launched."
+msgid "Automatically monitor the VPN connection in the background. A background service will be started to regularly check for any changes in the VPN. The service is started when Kodi or Gaia is launched, depending on the [I]Service Launch[/I]  setting under the [I]General[/I]  tab. Kodi must be restarted for this setting to take effect."
 msgstr ""
 
 msgctxt "#34197"
@@ -5687,7 +5687,7 @@ msgid "Automatically update and refresh the local library after new items were a
 msgstr ""
 
 msgctxt "#34262"
-msgid "Automatically update the local library when Kodi or Gaia is launched. This will automatically add recently aired episodes."
+msgid "Automatically update the local library in the background which will add recently aired episodes. A background service will be started to regularly check for any changes in the library. The service is started when Kodi or Gaia is launched, depending on the [I]Service Launch[/I]  setting under the [I]General[/I]  tab. Kodi must be restarted for this setting to take effect."
 msgstr ""
 
 msgctxt "#34263"
@@ -6199,7 +6199,7 @@ msgid "Automatically reload the list of streams under certain circumstances. The
 msgstr ""
 
 msgctxt "#34400"
-msgid "Change the type of interface to show for the rating dialog. The [I]Special[/I]  Gaia window will show a custom rating dialog. The [B]Number[/B]  window will use a standard Kodi number input dialog."
+msgid "Change the type of interface to show for the rating and continue dialog. The [I]Special[/I]  Gaia window will show a custom dialog. The [B]Native[/B]  window will use a standard Kodi dialog."
 msgstr ""
 
 msgctxt "#34401"
@@ -6255,7 +6255,7 @@ msgid "Sorts the Trakt show calendar lists according to a specific attribute."
 msgstr ""
 
 msgctxt "#34414"
-msgid "Wait a number of seconds before continuing with the default action. Set the value to 0 to dynamically adjust the timeout based on the episode duration."
+msgid "Automatically show the binge dialog once the credits start playing. If the video has an outro chapter, the chapter time will be used instead. If no outro chapter is available, the credits are assumed to start at this setting. A value of [I]0[/I]  will dynamically calculate the delay based on the episode duration. An [I]empty[/I]  value will reset to default."
 msgstr ""
 
 msgctxt "#34415"
@@ -6295,11 +6295,11 @@ msgid "Adjust the maximum number of movies or shows to list per page for search 
 msgstr ""
 
 msgctxt "#34424"
-msgid "Settings related to autoplay, playback retries, binge watching, audio and subtitle streams, and buffering."
+msgid "Settings related to autoplay, playback retries, audio and subtitle streams, and buffering."
 msgstr ""
 
 msgctxt "#34425"
-msgid "Select the dialog that shows the next episode. Use no dialog and automatically continue to the next episode, show a full window after playback finished, show an overlay dialog while credits are running, or use the external addon Up Next."
+msgid "Select the dialog that shows the next binge episode. The [I]None[/I]  option will not show any dialog and automatically continue to the next episode. The [I]Window[/I]  option will show a fullscreen window after playback ended. The [I]Overlay[/I]  option will show a partial dialog overlay during playback. The [I]Button[/I]  option will show a small button during playback. The [I]UpNext[/I]  option will delegate the binge process to the external UpNext addon."
 msgstr ""
 
 msgctxt "#34426"
@@ -6391,7 +6391,7 @@ msgid "Choose the type of subtitle dialog to display. The [I]Plain[/I]  option s
 msgstr ""
 
 msgctxt "#34448"
-msgid "Cache regular expressions that are used during scraping. Regular expressions can take a considerable amount of time to compile, which slows down scraping. Reusing cached expressions can be faster than recompiling them on every scrape. The [I]Disabled[/I]  option completely disables expression caching and recompiles them on every scrape. This option requires no additional disk space or memory, but needs more processing power. The [I]Memory[/I]  option caches expressions in Kodi's memory. This option requires slightly more memory, no additional disk space, and should be faster. Caching only lasts until Kodi is restarted. The [I]Full[/I]  option caches expressions to both Kodi's memory and to disk. This option requires slightly more memory and disk space, but caching is faster and continues even if Kodi is restarted. Note that full disk caching is only faster than the other options if you have a fast disk, such as a SSD or fast SD card. Hard drives or slow SD cards might sometimes slow down caching and it might be faster to only use a [I]Memory[/I] cache."
+msgid "Save regular expressions that are used during scraping. Regular expressions can take a considerable amount of time to compile, which slows down scraping. Reusing cached expressions can be faster than recompiling them on every scrape. The [I]Disabled[/I]  option completely disables expression caching and recompiles them on every scrape. This option requires no additional disk space or memory, but needs more processing power. The [I]Memory[/I]  option caches expressions in Kodi's memory. This option requires slightly more memory, no additional disk space, and should be faster. Caching only lasts until Kodi is restarted. The [I]Full[/I]  option caches expressions to both Kodi's memory and to disk. This option requires slightly more memory and disk space, but caching is faster and continues even if Kodi is restarted. Note that full disk caching is only faster than the other options if you have a fast disk, such as a SSD or fast SD card. Hard drives or slow SD cards might sometimes slow down caching and it might be faster to only use a [I]Memory[/I] cache."
 msgstr ""
 
 msgctxt "#34449"
@@ -6491,7 +6491,7 @@ msgid "Show private announcements, such as problems with your device or running 
 msgstr ""
 
 msgctxt "#34473"
-msgid "Limit the size of the cache database. If the cache grows too large, old entries are deleted automatically and the file size is reduced. This is useful for devices with limited storage space. Note that if the limit is too low, cached requests might get deleted too quickly. Requests will then have to be executed again, putting a burden on external servers and your internet connection, and slowing down the addon. An empty value automatically calculates the cache size based on your free storage space. A value of [I]0[/I]  allows an unlimited cache size. The limit should be at least 200 MB if possible. This is only best effort and the cache will always hold entries from the past 24 hours, irrespective of the limit."
+msgid "Limit the size and age of various databases in order to free up local storage space. If databases grow too large, old entries are deleted automatically and the file size is reduced. This is useful for devices with limited storage space. Note that if the limit is too low, data might get deleted too quickly. Requests will then have to be executed again, putting a burden on external servers and your internet connection, and slowing down the addon. This is only a best effort and in certain situations the size and age of databases might exceed the given limit."
 msgstr ""
 
 msgctxt "#34474"
@@ -6719,7 +6719,7 @@ msgid "Show various connection speeds in the notification. There are three diffe
 msgstr ""
 
 msgctxt "#34530"
-msgid "Block the repetition of notifications if buffering starts again. Delay notifications by a certain time period. The [I]Automatic[/I]  option will show the notification every time buffering starts again, but will not reshow it while the buffering is still in progress."
+msgid "Block the repetition of notifications if buffering starts again. Delay notifications by a certain period of time. The [I]Automatic[/I]  option will show the notification every time buffering starts again, but will not reshow it while the buffering is still in progress."
 msgstr ""
 
 msgctxt "#34531"
@@ -6799,7 +6799,7 @@ msgid "Rerate titles that you already rated previously. If disabled, the rating 
 msgstr ""
 
 msgctxt "#34550"
-msgid "Settings related to playback progress, watched status, and ratings."
+msgid "Settings related to playback progress, watched status, ratings, binge watching, and automated observers."
 msgstr ""
 
 msgctxt "#34551"
@@ -6827,7 +6827,7 @@ msgid "Show a list of available Bluetooth devices and manually connect or discon
 msgstr ""
 
 msgctxt "#34557"
-msgid "Enable a monitor that will continuously scan for Bluetooth devices and automatically connect to already paired devices once they are switched on. This option will execute the [I]bluetoothctl[/I]  program in the background every few seconds as long as Kodi is running. The performance implication of this continuous checking is unknown, but is most likely insignificant. Disable this option if you experience any performance issues or notice weird Bluetooth behavior, such as devices automatically reconnecting right after you manually disconnected the device. Please restart Kodi for the settings to take effect."
+msgid "Automatically monitor Bluetooth devices and automatically connect to already paired devices once they are switched on. A background service will be started to regularly check for any changes in Bluetooth connections by execute the [I]bluetoothctl[/I]  program. The service is started when Kodi or Gaia is launched, depending on the [I]Service Launch[/I]  setting under the [I]General[/I]  tab. Kodi must be restarted for this setting to take effect."
 msgstr ""
 
 msgctxt "#34558"
@@ -6867,7 +6867,7 @@ msgid "Show a button during episode playback that allows skipping the intro or r
 msgstr ""
 
 msgctxt "#34567"
-msgid "Specify how long the skip button is shown before being hidden automatically. The button is first shown fully for this period of time, then partially hidden for the same amount of time, before being fully hidden."
+msgid "Specify how long the [I]Skip[/I]  and [I]Continue[/I]  buttons are shown before being hidden automatically. This period of time is split between the different states of the button, from fully and partially visible to hidden. You can always show the button by pressing the [I]Left[/I]  key, and the [I]Right[/I]  key to hide it again. Use the [I]Back[/I]  key to close the button and permanently hide it for the rest of the playback."
 msgstr ""
 
 msgctxt "#34568"
@@ -6931,7 +6931,7 @@ msgid "Display a default thumbnail if the movie or show artwork is not available
 msgstr ""
 
 msgctxt "#34583"
-msgid "Automatically close the rating dialog during binge watching if no rating was cast for a certain time period. This helps with continues playback if you do not want to use a remote to cast the rating before the next episode is binged. The dialog will not automatically close if you interact with it. A value of [I]0[/I]  will never close the dialog automatically and always wait for a rating. An [I]empty[/I]  value will reset to default."
+msgid "Automatically close the rating dialog during binge watching if no rating was cast for a certain period of time. This helps with continues playback if you do not want to use a remote to cast the rating before the next episode is binged. A value of [I]0[/I]  will never close the dialog automatically and always wait for a rating. An [I]empty[/I]  value will reset to default."
 msgstr ""
 
 msgctxt "#34584"
@@ -7119,11 +7119,11 @@ msgid "Force subtitles if the selected language is the tertiary audio language p
 msgstr ""
 
 msgctxt "#34630"
-msgid "Limit the number of providers that can be scraped in parallel during bingeing. On low-end devices or slow internet connections, the background scraping during binge playback can cause Kodi to become temporarily sluggish, since the device's resources are used up by the scraping process. Reduce the number of providers that are executed in parallel during bingeing in order to reduce processor and internet usage. Note that scraping will take longer the fewer providers run concurrently. This option is a percentage of the total providers specified in the [I]Concurrency Limit[/I]  setting. A value of [I]0[/I]  will execute all providers at once. An [I]empty[/I]  value will reset to default."
+msgid "Limit the number of providers that can be scraped in parallel during binging. On low-end devices or slow internet connections, the background scraping during binge playback can cause Kodi to become temporarily sluggish, since the device's resources are used up by the scraping process. Reduce the number of providers that are executed in parallel during binging in order to reduce processor and internet usage. Note that scraping will take longer the fewer providers run concurrently. This option is a percentage of the total providers specified in the [I]Concurrency Limit[/I]  setting. A value of [I]0[/I]  will execute all providers at once. An [I]empty[/I]  value will reset to default."
 msgstr ""
 
 msgctxt "#34631"
-msgid "Start scraping the next episode some time before the current episode playback finishes. Allow enough time for the scraping to finish before the end of the playback. Note that the [I]Concurrency Binge[/I]  setting under the [I]Provider[/I]  tab might reduce the number of providers that run concurrently and will therefore increase the total scraping time. Increase this time if scraping does not finish before the next binged episode starts.  A value of [I]0[/I]  will reset to default."
+msgid "Start scraping the next episode in the background some time before the current episode playback finishes. Allow enough time for the scraping to finish before the end of the playback. Note that the [I]Concurrency Binge[/I]  setting under the [I]Provider[/I]  tab might reduce the number of providers that run concurrently and will therefore increase the total scraping time. Increase this time if scraping does not finish before the next binged episode starts. An [I]empty[/I]  value will reset to default."
 msgstr ""
 
 msgctxt "#34632"
@@ -7131,14 +7131,92 @@ msgid "Pause playback during the initialization phase. Kodi can sometimes take a
 msgstr ""
 
 msgctxt "#34633"
-msgid "Change the default action of the power button in the rating dialog. The [I]Disabled[/I]  option will completely remove the power button. The [I]Powerdown[/I]  option powers down the system. The [I]Shutdown[/I]  option executes the default shutdown action defined in the Kodi system settings. The [I]Reboot[/I]  option restarts the system with a new power cycle. The [I]Suspend[/I]  option suspends the system with S3/S1 depending on the BIOS settings. The [I]Hibernate[/I]  option hibernates the system with S4. The [I]Minimize[/I]  option minimizes the Kodi window. The [I]Quit[/I]  option exits Kodi. The [I]Screensaver[/I]  option activates the screensaver."
+msgid "Change the default action of the power button used in the rating and continue dialogs. The [I]Disabled[/I]  option completely removes the power button. The [I]Selection[/I]  option shows a dialog where the power action can be manually selected. The [I]Powerdown[/I]  option powers down the system. The [I]Shutdown[/I]  option executes the default shutdown action defined in the Kodi system settings. The [I]Reboot[/I]  option restarts the system with a new power cycle. The [I]Suspend[/I]  option suspends the system with S3/S1 depending on the BIOS settings. The [I]Hibernate[/I]  option hibernates the system with S4. The [I]Standby[/I]  option puts the device on standby via a CEC peripheral. The [I]Minimize[/I]  option minimizes the Kodi window. The [I]Quit[/I]  option exits Kodi. The [I]Restart[/I]  option restarts Kodi. The [I]Screensaver[/I]  option activates the screensaver."
 msgstr ""
 
 msgctxt "#34634"
-msgid "Change the default action of the QR button in the rating dialog. The [I]Disabled[/I]  option will completely remove the QR button. The [I]Trakt[/I], [I]IMDb[/I], [I]TMDb[/I], and [I]TVDb[/I]  options will open the title on the corresponding platform. The [I]Special[/I]  option will use [I]TMDb[/I]  for movies and [I]TVDb[/I]  for shows. The [I]Homepage[/I]  option will open the homepage of the title if available. The [I]Google[/I]  option will open a Google search for the title. If a specific option is not available for a title, the next best option will be used instead.
-"
+msgid "Change the default action of the QR function used in the rating and continue dialogs. The [I]Disabled[/I]  option completely removes the QR button. The [I]Selection[/I]  option shows a dialog where the QR code can be manually selected. If a specific option is not available for a title, the next best option will be used instead."
 msgstr ""
 
+msgctxt "#34635"
+msgid "Change the color of the [I]Skip[/I]  and [I]Continue[/I]  buttons. The [I]Transparent[/I]  option will make the button transparent with only a border. The [I]Light[/I]  and [I]Dark[/I]  options will give the button a lighter or darker gray color. The [I]Primary[/I]  and [I]Secondary[/I]  options will use the theme colors for the button."
+msgstr ""
+
+msgctxt "#34636"
+msgid "Adjust the position of the [I]Skip[/I]  and [I]Continue[/I]  buttons. Lower values will show the button towards the top of the screen and lower values will show the button towards the bottom of the screen. A value of 50% will show the button ion the middle of the screen."
+msgstr ""
+
+msgctxt "#34637"
+msgid "Show binge notification during playback."
+msgstr ""
+
+msgctxt "#34638"
+msgid "Change the interface for the [I]Skip[/I]  intro and [I]Continue[/I]  binge button overlays shown during playback."
+msgstr ""
+
+msgctxt "#34639"
+msgid "Change the icon for the [I]Skip[/I]  intro and [I]Continue[/I]  binge buttons. The [I]Logo[/I]  option will display the addon logo. The [I]Icon[/I]  option will display the action icon. The [I]Default[/I]  option will display the addon logo first and then change over to the action icon."
+msgstr ""
+
+msgctxt "#34640"
+msgid "Clear databases to free up local disk space. Note that clearing certain databases will remove saved data and therefore require the data to be retrieved again from their sources. Menus and other features in the addon might temporarily be slow after cleanup while the databases are filled up again."
+msgstr ""
+
+msgctxt "#34641"
+msgid "Change the transparency of colors for certain objects in the interface. Objects like buttons can be semi-transparent. Higher values are more transparent, whereas lower values are more opaque."
+msgstr ""
+
+msgctxt "#34642"
+msgid "Show the binge continue dialog after an episode has finished. This dialog provides some additional metadata for the next episode and allows you to continue or cancel binging, or power down the device."
+msgstr ""
+
+msgctxt "#34643"
+msgid "Show a dialog asking wether or not to reload the streams window. The [I]Disabled[/I]  option will not ask and immediately reload the streams. The [I]Cancel[/I]  option will ask and if no option was selected after a few seconds, cancel the reload. The [I]Continue[/I]  option will ask and if no option was selected after a few seconds, continue the reload."
+msgstr ""
+
+msgctxt "#34644"
+msgid "Change the maximum number of ratings to displayed. A value of [I]0[/I]  will not show any rating, whereas a value of [I]1[/I]  will only show the combined global rating. Values higher than [I]1[/I]  will show ratings from individual services, order by the number of votes."
+msgstr ""
+
+msgctxt "#34645"
+msgid "Change what is displayed in the global rating labels. Either only show the [I]Rating[/I], the [I]Votes[/I], or [I]Both[/I]  the rating and votes. The [I]Short[/I]  options will show the votes as a shortened label in terms of thousands. The [I]Short[/I]  options will show the votes as a full number."
+msgstr ""
+
+msgctxt "#34646"
+msgid "Start necessary background services to manage various internal features. If you use Gaia on a regular basis, it makes more sense to start the services when Kodi launches. If you use Gaia infrequently, services could only be started when Gaia launches, preventing the background processes from consuming resources when you are not using Gaia. Note that the latter option will increase the time to launch Gaia and will make certain features, like VPN monitoring or local library updating, only start when Gaia launches. Kodi must be restarted for this setting to take effect."
+msgstr ""
+
+msgctxt "#34647"
+msgid "Automatically close the rating dialog if there was no manual interaction for a certain period of time. This setting is only used when a rating dialog is shown outside of binging, otherwise the binging rating timeout is used instead. A value of [I]0[/I]  will never close the dialog automatically and always wait for interaction. An [I]empty[/I]  value will reset to default."
+msgstr ""
+
+msgctxt "#34648"
+msgid "Cancel any timeout and default action if the dialog is interacted with in some way. If you do not interact, the timeout will continue and the default action, if one was specified, will be executed once the timer runs out."
+msgstr ""
+
+msgctxt "#34649"
+msgid "Execute an action after the rating was cast. The [I]Disabled[/I]  option will not do anything and leave the dialog open. The [I]Close[/I]  option will close the dialog after the rating was cast. The [I]Default[/I]  option will execute the default action if one was specified."
+msgstr ""
+
+msgctxt "#34650"
+msgid "Change the level of animation detail in the binge and continue dialogs. The [I]Disabled[/I]  option will not animate anything. The [I]Essential[/I]  option will only use minimal animations. The [I]Standard[/I]  option will only use basic animations. The [I]Extended[/I]  option will only use advanced animations. The [I]Complete[/I]  option will fully animate everything."
+msgstr ""
+
+msgctxt "#34651"
+msgid "Automatically close the continue dialog during binge watching if there was no manual interaction for a certain period of time. This helps with continues playback if you do not want to use a remote to selection an option before the next episode is binged. A value of [I]0[/I]  will never close the dialog automatically and always wait for interaction. An [I]empty[/I]  value will reset to default."
+msgstr ""
+
+msgctxt "#34652"
+msgid "Execute a default action if the continue dialog was not interacted with for some time. The [I]Disabled[/I]  option will not use any default action and leave the dialog open until it is manually closed. The [I]Continue[/I]  option will continue binging the next episode. The [I]Stop[/I]  option will stop binging and close the dialog. The remainder of the options will execute a power action."
+msgstr ""
+
+msgctxt "#34653"
+msgid "Automatically propagate the action from the binge playback dialog and use it as the default action in the binge continue dialog. The [I]Disabled[/I]  option will not reuse any action and always show the continue dialog. The [I]Timeout[/I]  option will reuse the action as default when the continue dialog times out, but still allows to manually change the option during that time. The [I]Apply[/I]  option will immediately reuse the action without showing the continue dialog. Note that these options are only utilized if binging was explicitly continued or canceled in the binge playback dialog. If no option was selected, hence letting the binge playback dialog finish without clicking any button, the continue dialog will still show as normal."
+msgstr ""
+
+msgctxt "#34654"
+msgid "Create an automated observer that executes specific actions under certain conditions once playback has finished. This allows custom actions to be executed once a certain number of episodes have been watched, a certain amount of time has elapsed, or you have not interacted with Gaia for a while, probably because you fell asleep."
+msgstr ""
 
 
 # [/GAIACODE]
@@ -7196,7 +7274,7 @@ msgid "Device"
 msgstr ""
 
 msgctxt "#35013"
-msgid "Binge Packs"
+msgid "Automatic Packs"
 msgstr ""
 
 msgctxt "#35014"
@@ -7844,7 +7922,7 @@ msgid "Updates"
 msgstr ""
 
 msgctxt "#35175"
-msgid "Launch Update"
+msgid "Service Launch"
 msgstr ""
 
 msgctxt "#35176"
@@ -8260,7 +8338,7 @@ msgid "Private Announcements"
 msgstr ""
 
 msgctxt "#35279"
-msgid "You only have %s disk space available. Gaia needs approximately %s storage to function correctly. Please free up some space."
+msgid "You only have %s disk space available. Gaia needs approximately %s storage to function correctly. Please free up some space or adjust the database size limits under the [I]General[/I]  settings."
 msgstr ""
 
 msgctxt "#35280"
@@ -9020,7 +9098,7 @@ msgid "Color"
 msgstr ""
 
 msgctxt "#35469"
-msgid "Rating Interface"
+msgid "Dialog Interface"
 msgstr ""
 
 msgctxt "#35470"
@@ -9324,7 +9402,7 @@ msgid "Cache Selected"
 msgstr ""
 
 msgctxt "#35545"
-msgid "List Reload"
+msgid "Reload List"
 msgstr ""
 
 msgctxt "#35546"
@@ -9468,7 +9546,7 @@ msgid "Binge"
 msgstr ""
 
 msgctxt "#35581"
-msgid "Continuation Delay"
+msgid "Continue Delay"
 msgstr ""
 
 msgctxt "#35582"
@@ -9492,7 +9570,7 @@ msgid "Binge Scrape"
 msgstr ""
 
 msgctxt "#35587"
-msgid "No New Episode For Bingeing"
+msgid "No New Episode For Binging"
 msgstr ""
 
 msgctxt "#35588"
@@ -9628,7 +9706,7 @@ msgid "Minutes"
 msgstr ""
 
 msgctxt "#35621"
-msgid "Dialog Type"
+msgid "Binge Dialog"
 msgstr ""
 
 msgctxt "#35622"
@@ -9640,7 +9718,7 @@ msgid "Overlay"
 msgstr ""
 
 msgctxt "#35624"
-msgid "Up Next"
+msgid "UpNext"
 msgstr ""
 
 msgctxt "#35625"
@@ -10816,7 +10894,7 @@ msgid "Search For A Single Title"
 msgstr ""
 
 msgctxt "#36036"
-msgid "Cache Limit"
+msgid "Database Limit"
 msgstr ""
 
 msgctxt "#36037"
@@ -11212,7 +11290,7 @@ msgid "Settings Successfully Optimized"
 msgstr ""
 
 msgctxt "#36135"
-msgid "Cache Expressions"
+msgid "Save Expressions"
 msgstr ""
 
 msgctxt "#36136"
@@ -12325,4 +12403,440 @@ msgstr ""
 
 msgctxt "#36414"
 msgid "Google"
+msgstr ""
+
+msgctxt "#36415"
+msgid "Transparent"
+msgstr ""
+
+msgctxt "#36416"
+msgid "Dark"
+msgstr ""
+
+msgctxt "#36417"
+msgid "Button Color"
+msgstr ""
+
+msgctxt "#36418"
+msgid "Button Position"
+msgstr ""
+
+msgctxt "#36419"
+msgid "Power"
+msgstr ""
+
+msgctxt "#36420"
+msgid "Changing State: %s"
+msgstr ""
+
+msgctxt "#36421"
+msgid "Try to reduce the [I]%s[/I]  setting under the [I]%s[/I]  tab if this problem persists."
+msgstr ""
+
+msgctxt "#36422"
+msgid "Try to reduce the [I]%s[/I]  setting under the [I]%s[/I]  tab or the [I]%s[/I]  setting under the [I]%s[/I]  tab if this problem persists."
+msgstr ""
+
+msgctxt "#36423"
+msgid "Button"
+msgstr ""
+
+msgctxt "#36424"
+msgid "Button Interface"
+msgstr ""
+
+msgctxt "#36425"
+msgid "Button Icon"
+msgstr ""
+
+msgctxt "#36426"
+msgid "Icon"
+msgstr ""
+
+msgctxt "#36427"
+msgid "This will clear the saved streams that were previously scraped. Data about your past scrapes will be lost."
+msgstr ""
+
+msgctxt "#36428"
+msgid "Database Cleanup"
+msgstr ""
+
+msgctxt "#36429"
+msgid "Current Size"
+msgstr ""
+
+msgctxt "#36430"
+msgid "Minimum Limit"
+msgstr ""
+
+msgctxt "#36431"
+msgid "Maximum Limit"
+msgstr ""
+
+msgctxt "#36432"
+msgid "Recommended Limit"
+msgstr ""
+
+msgctxt "#36433"
+msgid "Optimized Limit"
+msgstr ""
+
+msgctxt "#36434"
+msgid "Custom Limit"
+msgstr ""
+
+msgctxt "#36435"
+msgid "Free Space"
+msgstr ""
+
+msgctxt "#36436"
+msgid "Used Space"
+msgstr ""
+
+msgctxt "#36437"
+msgid "Statistics"
+msgstr ""
+
+msgctxt "#36438"
+msgid "Current Limit"
+msgstr ""
+
+msgctxt "#36439"
+msgid "Total Limit"
+msgstr ""
+
+msgctxt "#36440"
+msgid "No Limit"
+msgstr ""
+
+msgctxt "#36441"
+msgid "The limit is smaller than the recommended minimum size. Although everything might work as intended, certain functionality might break over time if this limit is reached. Do you want to [B]adjust[/B]  the limit to the minimum or [B]keep[/B]  the current value?"
+msgstr ""
+
+msgctxt "#36442"
+msgid "The limit is larger than the recommended maximum size. Everything will work as intended, but low-end devices with a slow disk might gradually become sluggish over time when accessing large databases. Do you want to [B]adjust[/B]  the limit to the maximum or [B]keep[/B]  the current value?"
+msgstr ""
+
+msgctxt "#36443"
+msgid "Gaia will not automatically manage the database size if no limit was specified. Everything will work as intended as long as you have enough free disk space. You are responsible for managing your device's disk space and manually clearing databases if needed. Do you want to [B]adjust[/B]  the limit to the maximum or [B]keep[/B]  the current value?"
+msgstr ""
+
+msgctxt "#36444"
+msgid "Your indicated limit is close to or exceeds the current free disk space. If other databases, addons, or your operating system use up the remaining space, certain functionality might break over time. Do you want to [B]adjust[/B]  the limit to the recommended value or [B]keep[/B]  the current value?"
+msgstr ""
+
+msgctxt "#36445"
+msgid "The limit of this database cannot be adjusted, since it does not contain historic entries that are managed automatically. The database size should not increase much over time and should stay below a few MB."
+msgstr ""
+
+msgctxt "#36446"
+msgid "The limit of this database cannot be adjusted, since it contains data manually added by you when using certain features in the addon. It would not make sense to remove these entries automatically, since it might go against your intent. You are responsible for managing your device's disk space and manually clearing this database if needed."
+msgstr ""
+
+msgctxt "#36447"
+msgid "Compress"
+msgstr ""
+
+msgctxt "#36448"
+msgid "Do you want to [B]reduce[/B] the database size by removing old entries or only [B]compress[/B] the database without removing entries?"
+msgstr ""
+
+msgctxt "#36449"
+msgid "Use as total size for all databases which is proportionally divided across the databases. Do you want to specify a [B]custom[/B] size or use a [B]percentage[/B] of the current free disk space?"
+msgstr ""
+
+msgctxt "#36450"
+msgid "You currently have [B]%s[/B] free disk space. Do you want to assign a combined limit of [B]%s[/B] for all databases?"
+msgstr ""
+
+msgctxt "#36451"
+msgid "Color Transparency"
+msgstr ""
+
+msgctxt "#36452"
+msgid "Binge Continue"
+msgstr ""
+
+msgctxt "#36453"
+msgid "Rate Movie"
+msgstr ""
+
+msgctxt "#36454"
+msgid "Rate Show"
+msgstr ""
+
+msgctxt "#36455"
+msgid "Rate Season"
+msgstr ""
+
+msgctxt "#36456"
+msgid "Rate Episode"
+msgstr ""
+
+msgctxt "#36457"
+msgid "Your device will %s in %s."
+msgstr ""
+
+msgctxt "#36458"
+msgid "Reload Mode"
+msgstr ""
+
+msgctxt "#36459"
+msgid "Do you want to reload the stream list? The reloading will automatically go ahead in a few seconds."
+msgstr ""
+
+msgctxt "#36460"
+msgid "Standby"
+msgstr ""
+
+msgctxt "#36461"
+msgid "Common"
+msgstr ""
+
+msgctxt "#36462"
+msgid "Powerdown System"
+msgstr ""
+
+msgctxt "#36463"
+msgid "Shutdown System"
+msgstr ""
+
+msgctxt "#36464"
+msgid "Reboot System"
+msgstr ""
+
+msgctxt "#36465"
+msgid "Reset System"
+msgstr ""
+
+msgctxt "#36466"
+msgid "Suspend System"
+msgstr ""
+
+msgctxt "#36467"
+msgid "Hibernate System"
+msgstr ""
+
+msgctxt "#36468"
+msgid "CEC Standby System"
+msgstr ""
+
+msgctxt "#36469"
+msgid "Restart Kodi"
+msgstr ""
+
+msgctxt "#36470"
+msgid "Minimize Kodi"
+msgstr ""
+
+msgctxt "#36471"
+msgid "Quit Kodi"
+msgstr ""
+
+msgctxt "#36472"
+msgid "Activate Screensaver"
+msgstr ""
+
+msgctxt "#36473"
+msgid "Simkl"
+msgstr ""
+
+msgctxt "#36474"
+msgid "Tomatoes"
+msgstr ""
+
+msgctxt "#36475"
+msgid "CommonSense"
+msgstr ""
+
+msgctxt "#36476"
+msgid "Letterboxd"
+msgstr ""
+
+msgctxt "#36477"
+msgid "Criticker"
+msgstr ""
+
+msgctxt "#36478"
+msgid "Link Unavailable"
+msgstr ""
+
+msgctxt "#36479"
+msgid "Rating Services"
+msgstr ""
+
+msgctxt "#36480"
+msgid "Rating Label"
+msgstr ""
+
+msgctxt "#36481"
+msgid "Media Link"
+msgstr ""
+
+msgctxt "#36482"
+msgid "Show Link"
+msgstr ""
+
+msgctxt "#36483"
+msgid "Season Link"
+msgstr ""
+
+msgctxt "#36484"
+msgid "Episode Link"
+msgstr ""
+
+msgctxt "#36485"
+msgid "Movie Link"
+msgstr ""
+
+msgctxt "#36486"
+msgid "Set Link"
+msgstr ""
+
+msgctxt "#36487"
+msgid "DuckDuckGo"
+msgstr ""
+
+msgctxt "#36488"
+msgid "Both Short"
+msgstr ""
+
+msgctxt "#36489"
+msgid "Both Long"
+msgstr ""
+
+msgctxt "#36490"
+msgid "Votes Short"
+msgstr ""
+
+msgctxt "#36491"
+msgid "Votes Long"
+msgstr ""
+
+msgctxt "#36492"
+msgid "Rating Short"
+msgstr ""
+
+msgctxt "#36493"
+msgid "Default Timeout"
+msgstr ""
+
+msgctxt "#36494"
+msgid "Cancel Timeout"
+msgstr ""
+
+msgctxt "#36495"
+msgid "Scrape Delay"
+msgstr ""
+
+msgctxt "#36496"
+msgid "Animation Level"
+msgstr ""
+
+msgctxt "#36497"
+msgid "Continue Watching"
+msgstr ""
+
+msgctxt "#36498"
+msgid "Automatic Timeout"
+msgstr ""
+
+msgctxt "#36499"
+msgid "Propagate Action"
+msgstr ""
+
+msgctxt "#36500"
+msgid "Automated Observer"
+msgstr ""
+
+msgctxt "#36501"
+msgid "Watched Counter"
+msgstr ""
+
+msgctxt "#36502"
+msgid "Watched Duration"
+msgstr ""
+
+msgctxt "#36503"
+msgid "Inactive Counter"
+msgstr ""
+
+msgctxt "#36504"
+msgid "Inactive Duration"
+msgstr ""
+
+msgctxt "#36505"
+msgid "Action"
+msgstr ""
+
+msgctxt "#36506"
+msgid "Conditions"
+msgstr ""
+
+msgctxt "#36507"
+msgid "Stop Watching"
+msgstr ""
+
+msgctxt "#36508"
+msgid "Asleep"
+msgstr ""
+
+msgctxt "#36509"
+msgid "Exceptions"
+msgstr ""
+
+msgctxt "#36510"
+msgid "Change Reset"
+msgstr ""
+
+msgctxt "#36511"
+msgid "Automation"
+msgstr ""
+
+msgctxt "#36512"
+msgid "Do you want to [B]play[/B] the sound once, [B]apply[/B] the sound permanently, or [B]cancel[/B] the selection?"
+msgstr ""
+
+msgctxt "#36513"
+msgid "Notify"
+msgstr ""
+
+msgctxt "#36514"
+msgid "Sound Effects"
+msgstr ""
+
+msgctxt "#36515"
+msgid "Play Sound"
+msgstr ""
+
+msgctxt "#36516"
+msgid "Show Notification"
+msgstr ""
+
+msgctxt "#36517"
+msgid "Observer"
+msgstr ""
+
+msgctxt "#36518"
+msgid "Action Timeout"
+msgstr ""
+
+msgctxt "#36519"
+msgid "Automated Action"
+msgstr ""
+
+msgctxt "#36520"
+msgid "Discrete Title"
+msgstr ""
+
+msgctxt "#36521"
+msgid "Conditional"
+msgstr ""
+
+msgctxt "#36522"
+msgid "Do you want to continue watching?"
+msgstr ""
+
+msgctxt "#36523"
+msgid "The dialog will automatically %s in %s."
 msgstr ""

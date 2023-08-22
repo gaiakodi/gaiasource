@@ -30,10 +30,6 @@ class Library(object):
 
 	DatabaseName = 'library'
 
-	UpdateFlag = 'GaiaLibrary'
-	UpdateInterval = 21600 # Number of seconds between library updates by the service.
-	UpdateCheck = 120 # Number of seconds between checking if the system was aborted.
-
 	InfoMovie = 'movie'
 	InfoShow = 'tv'
 
@@ -46,6 +42,7 @@ class Library(object):
 
 	DurationUpdate = 60000
 	DurationNoUpdate = 4000
+	DurationMonitor = 10800 # 3 hours. Number of seconds between library updates by the service.
 
 	##############################################################################
 	# CONSTRUCTORS
@@ -539,40 +536,23 @@ class Library(object):
 		except: Logger.error()
 
 	##############################################################################
-	# SERVICE
+	# MONITOR
 	##############################################################################
 
 	@classmethod
-	def service(self, background = True, continues = True, gaia = False):
-		Pool.thread(target = self._service, kwargs = {'background' : background, 'continues' : continues, 'gaia' : gaia}).start()
+	def monitor(self, continues = True):
+		if self.enabled() and Settings.getBoolean('library.update.monitor'):
+			Pool.thread(target = self._monitor, kwargs = {'continues' : continues}, start = True)
 
 	@classmethod
-	def _service(self, background = True, continues = True, gaia = False):
-		setting = Settings.getInteger('library.update.launch')
-		if self.enabled() and setting > 0:
-			if (not gaia and (setting == 1 or setting == 3)) or (gaia and (setting == 2 or setting == 3)):
-				if background:
-					System.executePlugin(action = 'libraryService')
-				else:
-					library = Library(media = Media.TypeShow)
-					if continues:
-						flag = System.windowPropertyGet(Library.UpdateFlag)
-						if not flag == '1':
-							System.windowPropertySet(Library.UpdateFlag, '1')
-							interval = int(Library.UpdateInterval / Library.UpdateCheck)
-
-							stop = False
-							while not stop:
-								library.update(media = Media.TypeShow, wait = True)
-								for i in range(interval):
-									# Important to wait for abort, instead of just sleeping, otherwise Kodi hangs when the user exits the program while this thread is still running.
-									System.abortWait(timeout = Library.UpdateCheck)
-									if System.aborted():
-										stop = True
-										System.exit()
-										break
-					else:
-						library.update(media = Media.TypeShow)
+	def _monitor(self, continues = True):
+		library = Library(media = Media.TypeShow)
+		if continues:
+			while not System.aborted():
+				library.update(media = Media.TypeShow, wait = True)
+				if System.abortWait(timeout = Library.DurationMonitor): break
+		else:
+			library.update(media = Media.TypeShow)
 
 	##############################################################################
 	# UPDATE
@@ -580,15 +560,11 @@ class Library(object):
 
 	@classmethod
 	def refresh(self, notifications = None, wait = True):
-		thread = Pool.thread(target = self._libraryRefresh)
-		thread.start()
-		if wait: thread.join()
+		Pool.thread(target = self._libraryRefresh, start = True, join = wait)
 
 	@classmethod
 	def update(self, notifications = None, force = None, media = None, wait = True): # Must wait, otherwise the script finishes before the thread.
-		thread = Pool.thread(target = Library(media = media)._update, args = (media, notifications, force))
-		thread.start()
-		if wait: thread.join()
+		Pool.thread(target = Library(media = media)._update, args = (media, notifications, force), start = True, join = wait)
 
 	def _update(self, media = None, notifications = None, force = None):
 		try:

@@ -214,6 +214,11 @@
 							<texture>special://home/addons/script.gaia.resources/resources/media/icons/white/large/qualitycam2k.png</texture>
 						</control>
 						<control type="image">
+							<colordiffuse>$INFO[Window(10000).Property(GaiaColorCam1080)]</colordiffuse>
+							<visible>String.IsEqual(Container(52000).ListItem.Property(GaiaQuality),cam1080)</visible>
+							<texture>special://home/addons/script.gaia.resources/resources/media/icons/white/large/qualitycam1080.png</texture>
+						</control>
+						<control type="image">
 							<colordiffuse>$INFO[Window(10000).Property(GaiaColorCam720)]</colordiffuse>
 							<visible>String.IsEqual(Container(52000).ListItem.Property(GaiaQuality),cam720)</visible>
 							<texture>special://home/addons/script.gaia.resources/resources/media/icons/white/large/qualitycam720.png</texture>

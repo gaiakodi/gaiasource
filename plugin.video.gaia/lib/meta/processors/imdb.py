@@ -21,7 +21,7 @@
 from lib.modules.network import Networker
 from lib.modules.cache import Cache
 from lib.modules.parser import Parser
-from lib.modules.tools import Logger, Converter, Tools, Regex
+from lib.modules.tools import Logger, Converter, Tools, Regex, Media
 
 from lib.meta.tools import MetaTools
 
@@ -31,6 +31,8 @@ class MetaImdb(object):
 
 	LinkTitle		= 'https://imdb.com/title/%s'
 	LinkSeason		= 'https://imdb.com/title/%s/episodes?season=%d'
+	LinkAward		= 'https://imdb.com/title/%s/awards'
+	LinkSearch		= 'https://imdb.com/find/?q=%s'
 
 	CacheDetails	= Cache.TimeoutWeek1
 	CacheList		= [Cache.TimeoutRefresh, Cache.TimeoutDay3]
@@ -71,21 +73,44 @@ class MetaImdb(object):
 		return headers
 
 	@classmethod
-	def link(self, id = None, season = None, metadata = None):
-		if metadata:
-			try:
-				id = metadata['id']['episode']['imdb']
-				if id: return MetaImdb.LinkTitle % id
-			except: pass
-			try:
-				id = metadata['id']['imdb']
-				season = metadata['season']
-			except: pass
+	def link(self, media = None, id = None, title = None, year = None, season = None, metadata = None, award = False, search = False):
+		try:
+			if metadata:
+				if not media:
+					if 'tvshowtitle' in metadata:
+						if 'episode' in metadata: media = Media.TypeEpisode
+						elif 'season' in metadata: media = Media.TypeSeason
+						else: media = Media.TypeShow
+					else:
+						media = Media.TypeMovie
+				if id is None and media == Media.TypeEpisode:
+					try: id = metadata['id']['episode']['imdb']
+					except: pass
+				if id is None:
+					try: id = metadata['id']['imdb']
+					except: pass
+				try: title = metadata['tvshowtitle'] if metadata['tvshowtitle'] else metadata['title']
+				except: pass
+				try: year = metadata['year']
+				except: pass
+				try: season = metadata['season']
+				except: pass
 
-		if id:
-			if season: return MetaImdb.LinkSeason % (id, season)
-			else: return MetaImdb.LinkTitle % id
+			if media == Media.TypeShow:
+				episode = None
+				season = None
+			elif media == Media.TypeSeason:
+				episode = None
 
+			if id:
+				if award: return MetaImdb.LinkAward % id
+				elif season and media == Media.TypeSeason: return MetaImdb.LinkSeason % (id, season)
+				else: return MetaImdb.LinkTitle % id
+			elif search and title:
+				query = title
+				if year and Media.typeMovie(media): query += ' ' + str(year)
+				return MetaImdb.LinkSearch % Networker.linkQuote(data = query, plus = False)
+		except: Logger.error()
 		return None
 
 	@classmethod
@@ -150,13 +175,14 @@ class MetaImdb(object):
 	##############################################################################
 
 	@classmethod
-	def _extract(self, result, data, attribute, keys, function = None, id = None, log = True):
+	def _extract(self, data, keys, result = None, attribute = None, function = None, id = None, log = True):
+		if Tools.isDictionary(data): data = [data]
 		for i in data:
 			try:
 				value = Tools.dictionaryGet(dictionary = i, keys = keys)
 				if not value is None:
 					if function: value = function(value)
-					result[attribute] = value
+					if not result is None: result[attribute] = value
 					return value
 			except: pass
 		if log: self._error(id = id, attribute = attribute)
@@ -364,19 +390,35 @@ class MetaImdb(object):
 	# NB: cache = False: do not cache the data by default. Read the comment at retrieve().
 	@classmethod
 	def detailsSeason(self, id = None, season = None, link = None, data = None, cache = False):
-		if data is None:
-			if link is None and id:
-				if season == 0: return None
-				link = self.link(id = id, season = season)
-			if link: data = self.retrieve(link = link, timeout = MetaImdb.CacheDetails if cache else MetaImdb.CacheNone)
-		if not data: return None
+		try:
+			if data is None:
+				if link is None and id:
+					if season == 0: return None
+					link = self.link(media = Media.TypeSeason, id = id, season = season)
+				if link: data = self.retrieve(link = link, timeout = MetaImdb.CacheDetails if cache else MetaImdb.CacheNone)
+			if not data: return None
 
-		result = []
+			# IMDb only sometimes returns the page with JSON. Other times it just returns the pure already formatted HTML.
+			# Especially if many IMDb pages are requested in a short period of time, IMDb more often returns pure HTML than JSON.
+			# When it returns JSON, it is the new styled IMDb episode page.
+			# When it does not return JSON, it is the old styled IMDb episode page.
+
+			# Parser.ParserHtml is faster than Parser.ParserHtml5.
+			parser = Parser(data = data, parser = Parser.ParserHtml)
+
+			result = self._detailsSeasonNew(parser = parser)
+			if not result: result = self._detailsSeasonOld(parser = parser)
+			return result
+		except:
+			Logger.error()
+			return self._fatal(id = id, code = 'details-season-z')
+
+	@classmethod
+	def _detailsSeasonOld(self, parser):
 		try:
 			from lib.modules.convert import ConverterTime
 			months = {'Jan' : '01', 'Feb' : '02', 'Mar' : '03', 'Apr' : '04', 'May' : '05', 'Jun' : '06', 'Jul' : '07', 'Aug' : '8', 'Sep' : '09', 'Oct' : '10', 'Nov' : '11', 'Dec' : '12'}
 
-			parser = Parser(data = data, parser = Parser.ParserHtml)
 			episodes = parser.find('div', {'class' : 'eplist'})
 
 			# Some shows have no listed episodes.
@@ -384,7 +426,7 @@ class MetaImdb(object):
 			if not episodes: return None
 
 			episodes = episodes.find_all('div', {'class' : 'list_item'})
-			if not episodes: return self._fatal(id = id, code = 'details-season-a')
+			if not episodes: return self._fatal(id = id, code = 'details-season-old-a')
 
 			try:
 				show = parser.find('div', {'class' : 'subpage_title_block'}).find('a', {'itemprop' : 'url'})
@@ -394,6 +436,7 @@ class MetaImdb(object):
 				showId = None
 				showTitle = None
 
+			result = []
 			for episode in episodes:
 				resultEpisode = {}
 				resultTemp = {}
@@ -405,7 +448,7 @@ class MetaImdb(object):
 				if name:
 					idEpisode = Regex.extract(data = name['href'], expression = '(tt\d+)[^\d]')
 					if idEpisode:
-						if not resultEpisode['id']: resultEpisode['id'] = {}
+						if not 'id' in resultEpisode or not resultEpisode['id']: resultEpisode['id'] = {}
 						resultEpisode['id']['episode'] = {'imdb' : idEpisode}
 
 					resultEpisode['title'] = Networker.htmlDecode(name.text)
@@ -466,4 +509,267 @@ class MetaImdb(object):
 			return {'episodes' : result}
 		except:
 			Logger.error()
-			return self._fatal(id = id, code = 'details-season-z')
+			return self._fatal(id = id, code = 'details-season-old-z')
+
+	@classmethod
+	def _detailsSeasonNew(self, parser):
+		try:
+			from lib.modules.convert import ConverterTime
+
+			data = None
+			datas = parser.find_all('script', {'type' : 'application/json'})
+			for i in datas:
+				try:
+					i = Converter.jsonFrom(i.string)
+					if 'props' in i:
+						data = i
+						break
+				except: pass
+			if not data: return None
+
+			try: data = data['props']['pageProps']['contentData']
+			except: return self._fatal(id = id, code = 'details-season-new-a')
+
+			try: show = data['entityMetadata']
+			except: return self._fatal(id = id, code = 'details-season-new-b')
+			showId = self._extract(id = id, data = show, keys = ['id'])
+			showTitle = self._extract(id = id, data = show, keys = ['titleText', 'text'])
+
+			try: episodes = data['section']['episodes']['items']
+			except: return self._fatal(id = id, code = 'details-season-new-c')
+
+			result = []
+			for episode in episodes:
+				resultEpisode = {}
+				resultTemp = {}
+
+				if showId: resultEpisode['id'] = {'imdb' : showId}
+				if showTitle: resultEpisode['tvshowtitle'] = showTitle
+
+				idEpisode = self._extract(id = id, data = episode, keys = ['id'])
+				if idEpisode:
+					if not 'id' in resultEpisode or not resultEpisode['id']: resultEpisode['id'] = {}
+					resultEpisode['id']['episode'] = {'imdb' : idEpisode}
+
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'season', keys = ['season'], function = int)
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'episode', keys = ['episode'], function = int)
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'title', keys = ['titleText'])
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'plot', keys = ['plot'])
+
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'year', keys = ['releaseYear'], function = int)
+				premiered = self._extract(id = id, data = episode, keys = ['releaseDate'])
+				if premiered:
+					premiered = ConverterTime(premiered, format = ConverterTime.FormatDateAmerican).string(format = ConverterTime.FormatDate)
+					if premiered:
+						resultEpisode['premiered'] = premiered
+						resultEpisode['aired'] = premiered
+						resultEpisode['year'] = int(Regex.extract(data = premiered, expression = '(\d{4})'))
+
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'rating', keys = ['aggregateRating'], function = float)
+				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'votes', keys = ['voteCount'], function = int)
+				if 'rating' in resultEpisode: resultTemp['rating'] = resultEpisode['rating']
+				if 'votes' in resultEpisode: resultTemp['votes'] = resultEpisode['votes']
+
+				self._extract(id = id, result = resultTemp, data = episode, attribute = 'thumbnail', keys = ['image', 'url'], function = self.image)
+
+				if resultTemp: resultEpisode['temp'] = {'imdb' : resultTemp}
+				if resultEpisode: result.append(resultEpisode)
+
+			return {'episodes' : result}
+		except:
+			Logger.error()
+			return self._fatal(id = id, code = 'details-season-new-z')
+
+	#gaiaremove
+	# Provide either id/link/data
+	# NB: This does not fully work. IMDb hides a lot of awards (including big ones like Academy Awards and Primetime Emmies), which requires additional requests to their Graphql API (eg: GoT).
+	# TMDb wants to add a new feature in the API. Maybe use that: https://trello.com/c/zLTMoZhb/109-add-awards-nominations
+	# Or just extract the the summary award info from the main IMDb page.
+	@classmethod
+	def detailsAward(self, id = None, link = None, data = None, cache = False):
+		if data is None:
+			if link is None and id: link = self.link(id = id, award = True)
+			if link: data = self.retrieve(link = link, timeout = MetaImdb.CacheDetails if cache else MetaImdb.CacheNone)
+		if not data: return None
+
+		try:
+			# Parser.ParserHtml is faster than Parser.ParserHtml5.
+			parser = Parser(data = data, parser = Parser.ParserHtml)
+			datas = parser.find_all('script', {'type' : 'application/json'})
+
+			data = None
+			for i in datas:
+				try:
+					i = Converter.jsonFrom(i.string)
+					if 'props' in i:
+						data = i
+						break
+				except: pass
+
+			try: data = data['props']['pageProps']['contentData']
+			except: return self._fatal(id = id, code = 'details-awards-a')
+
+			countries = {
+				# Academy Awards
+				# Golden Globe Awards
+				# Los Angeles Film Critics' Association
+				# National Board of Review
+				# National Society of Film Critics
+				# New York Film Critics' Circle
+				# Annie Awards
+				# Golden Raspberry Awards
+				# Sundance Film Festival
+				# Screen Actors Guild Awards
+				# Hollywood Film Awards
+				# Directors Guild of America Awards
+				# Tony Awards
+				# Pulitzer Prize
+				# MTV
+				# Satellite Awards
+				# AFI Awards
+				# Critics Choice Awards
+				# Black Reel Awards
+				# AARP Movies for Grownups Awards
+				# North Carolina Film Critics Association
+				# Columbus Film Critics Association
+				# Austin Film Critics Association
+				# Allywood Film Critics Association Awards
+				# Music City Film Critics' Association Awards
+				# San Diego Film Critics Society Awards
+				# Set Decorators Society of America, USA
+				# Critics Association of Central Florida Awards
+				# Hawaii Film Critics Society
+				# Georgia Film Critics Association (GAFCA)
+				# Portland Critics Association Awards
+				# Chicago Indie Critics Awards (CIC)
+				# North Dakota Film Society
+				# Seattle Film Critics Society
+				# Denver Film Critics Society
+				# Motion Picture Sound Editors
+				# Houston Film Critics Society Awards
+				# PGA Awards
+				# Cinema Audio Society
+				# Costume Designers Guild Awards
+				# Casting Society of America
+				# Gold Derby Awards
+				# Visual Effects Society Awards
+				# Kids' Choice Awards
+				# Grammy Awards
+				'us' : '([\s\,\.\-\(\[]+(usa?)[\s\.\)\]]?|united\s*states|america|los\s*angeles|new\s*york|carolina|florida|hawaii|dakota|denver|columbus|austin|san\s*diego|portland|chicago|seattle|houston|hollywood|allywood|academy\s*award|oscar|golden\s*globe|emm(?:y|ie)\s|national\s*board.*review|national\s*society.*critic|annie\s|raspberr|sundance|screen.*actor.*guild|tony\s*award|pulitzer|mtv|satellite\s*ward|afi\s*ward|critics\s*choice|black\s*reel|aarp|music\s*city|gafca|georgia\s*film\s*critics|motion \s*picture\s*sound\s*editors|pga\s*award|cinema\s*audio\s*society|costume\s*designers\s*guild|golden\s*derby|visual\s*effects\s*society|kid.*choice|grammy)',
+
+				# BAFTA Film Awards
+				'uk' : '([\s\,\.\-\(\[]+(uk|gb)[\s\.\)\]]?|great\s*britain|united\s*kingdom|london|liverpool|bafta)',
+
+				# Golden Screen Award
+				'ca' : '(canada|canadian|golden\s*screen\s*award)',
+
+				# AACTA International Awards
+				'au' : '(australia|sydney|perthaacta)',
+
+				# Palme d’Or – The Cannes International Film Festival
+				# César Awards
+				# Méliès d’Or
+				# Cartoon d’Or
+				'fr' : '(france|french|paris|d(?:\'|’)or|palme.*or|cannes|c(?:é|e)sar)',
+
+				# The Golden Bear – The Berlin International Film Festival
+				'de' : '(german|deutsch|golden(?:er)?\s*b(?:ea|ä)r|berlin|m(?:u|ue|ü)nchen)',
+
+				# The Golden Leopard
+				'ch' : '(golden(?:er)?\s*leopard)',
+
+				# National Film Awards
+				# FilmFare Awards
+				'in' : '(india|hindi|national\s*film\s*award|film\s*fare)',
+			}
+
+			result = {
+				'count' : {
+					'total' : None,
+					'wins' : None,
+					'losses' : None,
+					'nominations' : None,
+				},
+				'awards' : [],
+			}
+
+			self._extract(id = id, data = data, keys = ['winsCount'], result = result['count'], attribute = 'wins')
+			self._extract(id = id, data = data, keys = ['nominationsCount'], result = result['count'], attribute = 'nominations')
+
+			try: data = data['categories']
+			except:
+				self._fatal(id = id, code = 'details-awards-b')
+				return result
+
+			for item in data:
+				try:
+					entry = {
+						'name' : None,
+						'country' : None,
+						'awards' : [],
+					}
+
+					name = self._extract(id = id, data = item, keys = ['name'])
+
+					for country, expression in countries.items():
+						if Regex.match(data = name, expression = expression):
+							entry['country'] = country
+							break
+
+					entry['name'] = Regex.remove(data = name, expression = '([\s\,\.\-\(\[]*(usa?|uk|gb|de)[\s\.\)\]]*$)')
+
+					if 'section' in item:
+						item = item['section']
+						if 'items' in item:
+							item = item['items']
+							if item:
+								for subitem in item:
+									subentry = {
+										'award' : None,
+										'type' : None,
+										'year' : None,
+										'category' : None,
+										'subcategory' : None,
+										'people' : [],
+									}
+
+									type = self._extract(id = id, data = subitem, keys = ['rowTitle'])
+
+									year = Regex.extract(data = type, expression = '((?:19|2[01])\d{2})')
+									if year: subentry['year'] = int(year)
+
+									if Regex.match(data = type, expression = '(winner)'): subentry['type'] = 'winner'
+									elif Regex.match(data = type, expression = '(nominee)'): subentry['type'] = 'nominee'
+
+									self._extract(id = id, data = subitem, keys = ['rowSubTitle'], result = subentry, attribute = 'award')
+									if 'listContent' in subitem:
+										content = subitem['listContent']
+										if content:
+											expression = '\s*(?:[\(\[]|[\,\-]\s)\s*(.*?)[\s\)\]]*$'
+											for i in content:
+												if i and 'className' in i and i['className'] == 'awardCategoryName':
+													category = self._extract(id = id, data = i, keys = ['text'])
+													if category:
+														subcategory = Regex.extract(data = category, expression = expression)
+														if subcategory:
+															subentry['category'] = Regex.remove(data = category, expression = expression)
+															subentry['subcategory'] = subcategory
+														else:
+															subentry['category'] = category
+														break
+									if 'subListContent' in subitem:
+										content = subitem['subListContent']
+										if content:
+											for i in content:
+												i = self._extract(id = id, data = i, keys = ['text'])
+												if i: subentry['people'].append(i)
+									entry['awards'].append(subentry)
+					result['awards'].append(entry)
+				except:
+					Logger.error()
+					self._fatal(id = id, code = 'details-awards-c')
+
+			return result
+		except:
+			Logger.error()
+			return self._fatal(id = id, code = 'details-awards-z')

@@ -160,7 +160,7 @@ class Vpn(object):
 
 	@classmethod
 	def settingsMonitor(self):
-		return tools.Settings.getInteger('network.vpn.monitor')
+		return tools.Settings.getBoolean('network.vpn.monitor')
 
 	@classmethod
 	def settingsKill(self):
@@ -889,32 +889,21 @@ class Vpn(object):
 	##############################################################################
 
 	@classmethod
-	def monitor(self, silent = False):
+	def monitor(self, delay = True, silent = False):
 		Vpn.Silent = silent
-		if self.settingsEnabled(): Pool.thread(target = self._monitor).start()
+		if self.settingsEnabled() and self.settingsMonitor(): Pool.thread(target = self._monitor, kwargs = {'delay' : delay}, start = True)
 
 	@classmethod
-	def _monitor(self):
+	def _monitor(self, delay = True):
 		self.statusSet()
 
-		# Wait for Gaia launch.
-		# Do not execute this in a thread inside tools.System.launch(), since it will run forever and will be better inside the service execution.
-		if self.settingsMonitor() == Vpn.MonitorGaia:
-			while not tools.System.launched():
-				tools.Time.sleep(3)
-		else:
-			# If the IP is looked up before VPNManager starts, for some reason everything hangs (the IP lookup and also starting VPNManager).
-			# Wait and allow VPNManager to start.
-			tools.Time.sleep(5)
+		# If the IP is looked up before VPNManager starts, for some reason everything hangs (the IP lookup and also starting VPNManager).
+		# Wait and allow VPNManager to start.
+		if delay: tools.Time.sleep(5)
 
 		interval = self.settingsInterval()
-		while True:
+		while not tools.System.aborted():
 			self.data(refresh = True, detect = True)
 			self.statusNotification()
-
 			if not interval: break
-			for i in range(interval):
-				if tools.System.aborted():
-					tools.System.exit()
-					return
-				tools.Time.sleep(1)
+			if tools.System.abortWait(timeout = interval): break

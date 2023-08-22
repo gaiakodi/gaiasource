@@ -53,6 +53,8 @@ class WindowBase(object):
 		self.mActions = []
 		self.mControls = []
 		self.mClicks = []
+		self.mFocus = []
+		self.mUnfocus = []
 		self.mVisible = False
 
 	def __del__(self):
@@ -78,8 +80,8 @@ class WindowBase(object):
 	def visible(self):
 		return self.mVisible
 
-	def _onAction(self, action, callback):
-		self.mActions.append((action, callback))
+	def _onAction(self, action, callback, propagate = True):
+		self.mActions.append((action, callback, propagate))
 
 	def _onControl(self, x, y, callback):
 		self.mControls.append((x, y, callback))
@@ -89,10 +91,27 @@ class WindowBase(object):
 		except: pass
 		self.mClicks.append((control, callback))
 
+	def _onFocus(self, control, callback, components = None):
+		# Add the entire control here, not just the control ID.
+		# The control ID is 0 at this point.
+		# Only retrieve the ID in onFocus(), since it will have an actual value there.
+		self.mFocus.append((control, callback, components))
+
+	def _onUnfocus(self, control, callback, components = None):
+		self.mUnfocus.append((control, callback, components))
+
 	def onAction(self, action):
 		id = action.getId()
 		if id in WindowBase.ActionsCancel: self.mVisible = False
-		xbmcgui.WindowDialog.onAction(self, action)
+
+		propagate = True
+		for i in self.mActions:
+			if i[0] == WindowBase.ActionAny or i[0] == id:
+				propagate = i[2]
+				break
+
+		if propagate: xbmcgui.WindowDialog.onAction(self, action)
+
 		for i in self.mActions:
 			if i[0] == WindowBase.ActionAny or i[0] == id:
 				try: i[1](action = id)
@@ -132,6 +151,21 @@ class WindowBase(object):
 		# If this is ever removed, make sure that WindowWizardPremium the navigation buttons at the buttom can be invoked/clicked/entered.
 		# Only do this if "not found", otherwise when an authentication dialog (native Kodi dialog) is launched and "Cancel" is clicked in that dialog, the click propagates to underlying WindowWizard, also closing it.
 		if not found: self.onControl(self.getControl(controlId))
+
+	def onFocus(self, controlId):
+		for i in self.mUnfocus:
+			if not i[0].getId() == controlId:
+				try: i[1](control = i[0], components = i[2])
+				except:
+					try: i[1](control = i[0])
+					except: i[1]()
+
+		for i in self.mFocus:
+			if i[0].getId() == controlId:
+				try: i[1](control = i[0], components = i[2])
+				except:
+					try: i[1](control = i[0])
+					except: i[1]()
 
 class WindowCore(WindowBase, xbmcgui.WindowDialog):
 
@@ -264,6 +298,14 @@ class Window(object):
 	ButtonMedium = 'medium'
 	ButtonLarge = 'large'
 
+	# Color
+	ColorTransparent = 0
+	ColorLight = 1
+	ColorDark = 2
+	ColorPrimary = 3
+	ColorSecondary = 4
+	ColorDefault = None
+
 	# Select
 	SelectNone = None
 	SelectYes = True
@@ -277,6 +319,10 @@ class Window(object):
 		self.mLock = Lock()
 		self.mClose = False
 		self.mCloseTimeout = True
+
+		self.mTimeout = None
+		self.mTimeoutElapsed = None
+		self.mTimeoutRemaining = None
 
 		self.mEnd = False
 		self.mControls = []
@@ -304,7 +350,7 @@ class Window(object):
 			pathRatio = tools.File.joinPath(pathWindow, xmlRatio)
 			xml = xmlRatio
 
-			if not tools.File.exists(pathRatio):
+			if not tools.File.exists(pathRatio) or tools.System.developer(code = False, version = True):
 				tools.File.makeDirectory(pathWindow)
 				data = tools.File.readNow(pathXml)
 
@@ -338,6 +384,15 @@ class Window(object):
 					'big' : interface.Font.fontBig(),
 					'massive' : interface.Font.fontMassive(),
 					'colossal' : interface.Font.fontColossal(),
+
+					'tinylight' : interface.Font.fontTiny(bold = False),
+					'smalllight' : interface.Font.fontSmall(bold = False),
+					'mediumlight' : interface.Font.fontMedium(bold = False),
+					'largelight' : interface.Font.fontLarge(bold = False),
+					'hugelight' : interface.Font.fontHuge(bold = False),
+					'biglight' : interface.Font.fontBig(bold = False),
+					'massivelight' : interface.Font.fontMassive(bold = False),
+					'colossallight' : interface.Font.fontColossal(bold = False),
 				}
 				data = self._replace(data = data, category = 'font', single = fonts)
 
@@ -491,14 +546,20 @@ class Window(object):
 	def _initializeEnd2(self):
 		pass
 
-	def _onAction(self, action, callback):
-		if self.mWindow: self.mWindow._onAction(action, callback)
+	def _onAction(self, action, callback, propagate = True):
+		if self.mWindow: self.mWindow._onAction(action, callback, propagate)
 
 	def _onControl(self, x, y, callback):
 		if self.mWindow: self.mWindow._onControl(x, y, callback)
 
 	def _onClick(self, control, callback):
 		if self.mWindow: self.mWindow._onClick(control, callback)
+
+	def _onFocus(self, control, callback, components = None):
+		if self.mWindow: self.mWindow._onFocus(control, callback, components)
+
+	def _onUnfocus(self, control, callback, components = None):
+		if self.mWindow: self.mWindow._onUnfocus(control, callback, components)
 
 	@classmethod
 	def _colorDefault(self):
@@ -542,35 +603,42 @@ class Window(object):
 	@classmethod
 	def _initialize1(self, **arguments):
 		try:
-			timeout = arguments['timeout']
-			del arguments['timeout']
-		except: timeout = None
-
-		try:
-			window = self._instance(self(**arguments))
-		except:
 			try:
-				try: del arguments['retry']
-				except: pass
+				timeout = arguments['timeout']
+				del arguments['timeout']
+			except: timeout = None
+
+			try:
 				window = self._instance(self(**arguments))
 			except:
-				tools.Logger.error()
-				return None
-		window.propertySet(Window.PropertyType, self.__name__)
-		window._initializeStart1()
-		window._initializeStart2()
-		window._initializeControls(labels = False) # Initialize controls needed from the start (important for WindowStreams).
-		window._initializeStart3()
+				try:
+					try: del arguments['retry']
+					except: pass
+					window = self._instance(self(**arguments))
+				except:
+					tools.Logger.error()
+					return None
 
-		# Automatically close the dialog if a timeout was specified.
-		thread = None
-		if timeout: thread = Pool.thread(target = self.closeTimeout, kwargs = {'timeout' : timeout, 'instance' : window}, start = True)
+			window.mTimeout = timeout
+			window.mTimeoutRemaining = timeout
+			window.mTimeoutElapsed = 0
 
-		window.mWindow.doModal()
-		window.close()
+			window.propertySet(Window.PropertyType, self.__name__)
+			window._initializeStart1()
+			window._initializeStart2()
+			window._initializeControls(labels = False) # Initialize controls needed from the start (important for WindowStreams).
+			window._initializeStart3()
 
-		# Important to wait here, otherwise the next rating dialog (season/show ratings after episode rating) might already be launched before the previous dialog is fully closed.
-		if thread: thread.join(timeout = 3)
+			# Automatically close the dialog if a timeout was specified.
+			thread = None
+			if timeout: thread = Pool.thread(target = self.closeTimeout, kwargs = {'timeout' : timeout, 'instance' : window}, start = True)
+
+			window.mWindow.doModal()
+			window.close()
+
+			# Important to wait here, otherwise the next rating dialog (season/show ratings after episode rating) might already be launched before the previous dialog is fully closed.
+			if thread: thread.join(timeout = 3)
+		except: tools.Logger.error()
 
 	@classmethod
 	def _initialize2(self):
@@ -618,7 +686,8 @@ class Window(object):
 		# Hide non-visible controls.
 		# Cannot call setVisible(...) BEFORE the controls was added to the window.
 		for control in hidden:
-			control.setVisible(False)
+			try: control.setVisible(False)
+			except: pass
 
 		# Add animations.
 		for control in animations:
@@ -672,6 +741,7 @@ class Window(object):
 			del arguments['initialize']
 		except:
 			initialize = True
+
 		thread1 = Pool.thread(target = self._initialize1, kwargs = arguments, start = True)
 		thread2 = Pool.thread(target = self._initialize2, start = True)
 		if wait:
@@ -696,8 +766,10 @@ class Window(object):
 			if delay: tools.Time.sleep(delay)
 			# Instance might be lost if accessed in a subsequent execution (eg: applying filters).
 			if id is None and not instance and not self._instanceHas(): id = self._idProperty()
+
 			if id is None:
 				if instance is None: instance = self._instance()
+				if not instance: return False
 				if not instance.mClose: # In case this function is called multiple times.
 					instance.mClose = True
 					# Close the window BEFORE calling _remove().
@@ -712,7 +784,26 @@ class Window(object):
 					except: pass
 					self._instanceDelete()
 			else:
-				interface.Dialog.close(id)
+				# NB: Calling "interface.Dialog.close(id)" closes the window as intended.
+				# However, if a window (eg: WindowBackground) is shown from one Python invoker, but closed from another invoker, the following happens:
+				#	1. The invoker that closes the window calls "interface.Dialog.close(id)" which indeed hides the window.
+				#	2. However, the invoker that showed/started the window, is still stuck on "window.doModal()" and never exits, even though the window is not visible anymore.
+				#	3. This makes the "play" process during binging never finish, and therefore not return resources like threads to the OS.
+				# Other methods like "xbmcgui.Window/WindowDialog(id).close()" have the same problem in that "window.doModal()" never finishes.
+				# There are two solutions:
+				#	1. In the showed/started invoker, make the WindowBackground start a thread that closes the window if it becomes invisible (or maybe use a global property that is set from the closing-invoker that is then read by the starting-invoker's observe thread).
+				#	2. Use "Action(Back,id)" to make the window close it self. This indeed makes "window.doModal()" exit and is more efficient than solution 1.
+				# Also note that Kodi reuses window IDs for custom windows (13000+).
+				# For instance, we open WindowBackground and Kodi assigns ID 13002. We later close WindowBackground and open WindowPlayback. Since WindowBackground was closed, Kodi might reuse ID 13002 for the new WindowPlayback.
+				# Not sure how often this happens. But getting details of the window based on the ID does not seem to be possible. These all return nothing or useless info: : Window.Property(xmlfile) / Window(id).Property(xmlfile) / System.CurrentWindow.
+
+				visible = self.visible(id = id, current = False) # Use "current = False", since it might be a visible window, just not the current or top-most window.
+				if visible:
+					tools.System.execute('Action(Back,%s)' % str(id))
+					tools.Time.sleep(0.05)
+					visible = self.visible(id = id, current = False)
+
+				if visible: interface.Dialog.close(id)
 			self._idPropertyClear()
 			return True
 		except:
@@ -726,8 +817,13 @@ class Window(object):
 		type = self._instanceType(instance = instance)
 		Window.CloseTimeout[type] = False
 
-		for i in range(timeout * 2):
-			tools.Time.sleep(0.5)
+		time = tools.Time(start = True)
+		while True:
+			instance.mTimeoutElapsed = time.elapsed()
+			instance.mTimeoutRemaining = max(0, timeout - instance.mTimeoutElapsed)
+			if instance.mTimeoutElapsed >= timeout: break
+
+			tools.Time.sleep(0.25)
 			if tools.System.aborted(): return
 			elif instance:
 				if instance.mClose: return
@@ -863,10 +959,10 @@ class Window(object):
 		return True
 
 	@classmethod
-	def visible(self, id = None):
+	def visible(self, id = None, current = True):
 		try:
 			if id is None: return self._instance().mWindow.visible()
-			else: return self.visibleWindow(id) or self.visibleDialog(id)
+			else: return self.visibleWindow(id) or self.visibleDialog(id) or (not current and tools.System.visible('Window.IsVisible(%s)' % str(id)))
 		except: return False
 
 	@classmethod
@@ -908,8 +1004,10 @@ class Window(object):
 	@classmethod
 	def focus(self, control = IdListControl, sleep = True):
 		try:
-			if tools.Tools.isInteger(control): result = self._instance().mWindow.setFocusId(control)
-			else: result = self._instance().mWindow.setFocus(control)
+			if not tools.Tools.isInteger(control): control = control.getId()
+			instance = self._instance()
+			result = instance.mWindow.setFocusId(control)
+			instance.mWindow.onFocus(control) # Does not seem to fire automatically when using XML.
 			if sleep: tools.Time.sleep(0.01 if sleep is True else sleep) # Otherwise the control is not yet focused when later code requires the focus somehow (eg: opening the context menu).
 			return result
 		except: pass
@@ -1037,11 +1135,14 @@ class Window(object):
 		return tools.File.joinPath(addon, 'resources', 'media', 'skins', theme)
 
 	@classmethod
-	def _pathImage(self, image, interface = True):
+	def _pathImage(self, image, interface = True, generic = False):
 		if tools.Tools.isArray(image): image = tools.File.joinPath(*image)
 		if not '.' in image: image += '.png'
-		path = tools.File.joinPath(self._pathSkin(), 'interface' if interface else '', image)
-		if not tools.File.exists(path): path = tools.File.joinPath(self._pathInterface(), image)
+		if generic:
+			path = tools.File.joinPath(self._pathInterface(), image)
+		else:
+			path = tools.File.joinPath(self._pathSkin(), 'interface' if interface else '', image)
+			if not tools.File.exists(path): path = tools.File.joinPath(self._pathInterface(), image)
 		return path
 
 	@classmethod
@@ -1087,30 +1188,32 @@ class Window(object):
 			offsetOld = (width - self._scaleWidth(width)) / 2.0
 
 		for id in controls:
-			if tools.Tools.isInteger(id): control = self.control(id)
-			else: control = id
-			widthOld = control.getWidth()
-			widthNew = self._scaleWidth(widthOld)
-			control.setWidth(widthNew)
+			try:
+				if tools.Tools.isInteger(id): control = self.control(id)
+				else: control = id
+				widthOld = control.getWidth()
+				widthNew = self._scaleWidth(widthOld)
+				control.setWidth(widthNew)
 
-			xOld = control.getX()
-			xNew = xOld - int((widthNew - widthOld) / 2.0)
+				xOld = control.getX()
+				xNew = xOld - int((widthNew - widthOld) / 2.0)
 
-			# Reposition controls in scaled windows.
-			# Controls on the left-side of the screen should be pushed towards the middle (in the right direction).
-			# Controls on the right-side of the screen should be pushed towards the middle (in the left direction).
-			offsetNew = offsetOld
-			if width: # NB: This does NOT work perfectly.
-				if xOld > middleOld:
-					offsetNew *= -1 * (((xNew + (1.5 * widthOld)) / middleNew) - 1)
-				else:
-					offsetNew *= 1 - (xNew / middleNew)
-					if xOld + widthOld > middleOld: offsetNew -= (widthOld - widthNew) / 2.5 # Wide items crossing from the left-side over the middle to the right-side.
-					else: offsetNew -= (widthOld - widthNew) / 4.0 # Narrow items not crossing over the middle to the right-side.
+				# Reposition controls in scaled windows.
+				# Controls on the left-side of the screen should be pushed towards the middle (in the right direction).
+				# Controls on the right-side of the screen should be pushed towards the middle (in the left direction).
+				offsetNew = offsetOld
+				if width: # NB: This does NOT work perfectly.
+					if xOld > middleOld:
+						offsetNew *= -1 * (((xNew + (1.5 * widthOld)) / middleNew) - 1)
+					else:
+						offsetNew *= 1 - (xNew / middleNew)
+						if xOld + widthOld > middleOld: offsetNew -= (widthOld - widthNew) / 2.5 # Wide items crossing from the left-side over the middle to the right-side.
+						else: offsetNew -= (widthOld - widthNew) / 4.0 # Narrow items not crossing over the middle to the right-side.
 
-				offsetNew = int(offsetNew + (offsetOld / 2.0))
+					offsetNew = int(offsetNew + (offsetOld / 2.0))
 
-			control.setPosition(xNew + int(offsetNew), control.getY())
+				control.setPosition(xNew + int(offsetNew), control.getY())
+			except: tools.Logger.error(message = 'Control ID: %s' %id)
 
 	def _centerX(self, width = 0):
 		return int((self.mWidth - width) / 2.0)
@@ -1267,7 +1370,13 @@ class Window(object):
 			return self._addImage(path = path, x = 0, y = 0, width = self.mWidth, height = self.mHeight)
 		return None
 
-	def _addButton(self, text = None, x = None, y = None, width = None, height = None, callback = None, icon = None, iconSize = None, iconOffset = None, select = SelectNone, highlight = None, bold = True, uppercase = True, alignment = AlignmentCenter, size = None, visible = True, type = ButtonMedium, animation = None):
+	def _addButton(self, text = None, x = None, y = None, width = None, height = None, callback = None, icon = None, iconSize = None, iconOffset = None, select = SelectNone, progress = None, highlight = None, bold = True, uppercase = True, alignment = AlignmentCenter, size = None, color = ColorDefault, colorNormal = ColorDefault, colorFocus = ColorDefault, visible = True, type = ButtonMedium, animation = None):
+		icons = None
+		if tools.Tools.isArray(icon):
+			icons = icon
+			if tools.Tools.isDictionary(icon[-1]): icon = icon[-1]['path']
+			else: icon = icon[-1]
+
 		dimension = self._dimensionButton(text = text, icon = icon)
 		if width is None: width = dimension[0]
 		if height is None: height = dimension[1]
@@ -1282,28 +1391,101 @@ class Window(object):
 
 		components = {}
 
-		pathNormal = self._pathImage(['button', type, 'unfocused'])
-		pathFocus = self._pathImage(['button', type, 'focused'])
+		colorTransparent = interface.Format.colorTransparent()
+		if colorNormal is Window.ColorDefault: colorNormal = Window.ColorSecondary if color is Window.ColorDefault else color
+		if colorFocus is Window.ColorDefault: colorFocus = Window.ColorPrimary if color is Window.ColorDefault else color
 
-		control = self._add(xbmcgui.ControlButton(x, y, width, height, interface.Format.font(text, bold = bold, uppercase = uppercase), focusTexture = pathFocus, noFocusTexture = pathNormal, alignment = alignment, textColor = Window._colorDefault(), font = size), visible = visible, animation = animation)
+		if colorNormal == Window.ColorPrimary: colorNormal = interface.Format.colorPrimary()
+		elif colorNormal == Window.ColorSecondary: colorNormal = interface.Format.colorSecondary()
+		elif colorNormal == Window.ColorLight: colorNormal = 'FFAAAAAA'
+		elif colorNormal == Window.ColorDark: colorNormal = 'FF333333'
+		elif colorNormal == Window.ColorTransparent:
+			colorNormal = '00FFFFFF'
+			colorTransparent = None
 
-		if not icon is None:
-			sizeIcon = int(height * 0.8 * (iconSize if iconSize else 1))
-			iconX = int(x + (width * (0.1 if iconOffset is None else iconOffset)))
-			iconY = int(y + ((height - sizeIcon) / 2.0))
-			controlIcon = self._addImage(path = self._pathIcon(icon = icon, quality = interface.Icon.QualityMini), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible, animation = animation)
-			components['icon'] = controlIcon
-		else:
-			controlIcon = None
+		if colorFocus == Window.ColorPrimary: colorFocus = interface.Format.colorPrimary()
+		elif colorFocus == Window.ColorSecondary: colorFocus = interface.Format.colorSecondary()
+		elif colorFocus == Window.ColorLight: colorFocus = 'FFCCCCCC'
+		elif colorFocus == Window.ColorDark: colorFocus = 'FF555555'
+		elif colorFocus == Window.ColorTransparent:
+			colorFocus = '33FFFFFF'
+			colorTransparent = None
+
+		if colorTransparent:
+			colorNormal = interface.Format.colorAlpha(colorNormal, alpha = colorTransparent)
+			colorFocus = interface.Format.colorAlpha(colorFocus, alpha = colorTransparent)
+
+		##############################################################################
+
+		# We use custom images for the textures, instead of setting them directly on the button.
+		# This allows for the custom theme colors to be used for buttons.
+		# Not sure if there is any performance implication with focus/unfocus.
+		#control = self._add(xbmcgui.ControlButton(x, y, width, height, interface.Format.font(text, bold = bold, uppercase = uppercase), focusTexture = pathFocus, noFocusTexture = pathNormal, alignment = alignment, textColor = Window._colorDefault(), font = size), visible = visible, animation = animation)
+
+		control = self._add(xbmcgui.ControlButton(x, y, width, height, None, focusTexture = '', noFocusTexture = '', alignment = alignment, font = size), visible = visible, animation = animation)
+		components['color'] = {'normal' : colorNormal, 'focus' : colorFocus}
+
+		components['inner'] = self._addImage(path = self._pathImage(['button', type, 'inner']), x = x, y = y, width = width, height = height, visible = visible, animation = animation, color = components['color']['normal'])
+
+		if progress:
+			progressCondition = progress['condition'] if 'condition' in progress else 'true'
+			progressDelay = progress['delay'] if 'delay' in progress else 0
+			progressDuration = progress['duration'] if 'duration' in progress else 10000
+			progressAdjust1 = int(progressDuration / 10.0)
+			progressAdjust2 = int(progressAdjust1 * 3.0)
+
+			# Add "progress=true", so we can replace those animations later on (eg: WindowButton).
+			animationProgress = tools.Tools.copy(animation) if animation else []
+			animationProgress.append(('Conditional', 'effect=slide start=0,0 end=2,0 time=0 tween=linear condition=%s progress=true' % (progressCondition)))
+			animationProgress.append(('Conditional', 'effect=zoom start=1,100 end=100,100 delay=%s time=%s tween=linear condition=%s progress=true' % (progressDelay, progressDuration, progressCondition))) # Do not start at 0, otherwise the animation freaks out.
+			animationProgress.append(('Conditional', 'effect=fade start=0 end=90 delay=%s time=%s tween=cubic condition=%s progress=true' % (progressDelay, progressAdjust2, progressCondition))) # Further hide the colors outside the border. And keep the color semi transparent.
+			animationProgress.append(('Conditional', 'effect=slide start=0,0 end=-2,0 delay=%s time=%s tween=linear condition=%s progress=true' % (progressDelay, progressAdjust1, progressCondition))) # Combined with the offset and size in _addImage() below, ensures that the progress image does not go out of the borders of the button.
+			components['progress'] = self._addImage(path = self._pathImage(['button', type, 'inner']), x = x, y = y, width = width, height = height, color = colorFocus, visible = visible, animation = animationProgress)
+			components['progressanimation'] = animationProgress
 
 		if highlight:
-			if highlight is True: highlight = self._colorHighlight()
-			controlHighlight = self._addImage(path = self._pathImage(['button', type, 'highlight']), x = x + 2, y = y + 2, width = width - 4, height = height - 4, visible = visible, color = highlight, animation = animation)
+			if highlight is True: highlight = colorFocus
+			controlHighlight = self._addImage(path = self._pathImage(['button', type, 'inner']), x = x, y = y, width = width, height = height, visible = visible, color = highlight, animation = animation)
 			components['highlight'] = controlHighlight
 			if not 'animation' in components: components['animation'] = []
 			components['animation'].append(('Conditional', 'effect=fade start=100 end=0 time=1000 pulse=true tween=linear condition=String.IsEqual(Window.Property(%s),true)' % Window.PropertyAnimation))
 		else:
 			controlHighlight = None
+
+		components['outer'] = self._addImage(path = self._pathImage(['button', type, 'outer']), x = x, y = y, width = width, height = height, visible = visible, animation = animation)
+		components['label'] = self._addLabel(text = text, x = x, y = y, width = width, height = height, color = Window._colorDefault(), size = size, alignment = alignment, bold = bold, uppercase = uppercase, visible = visible, animation = animation)
+
+		if not progress:
+			self._onUnfocus(control, lambda control, components: components['inner'].setColorDiffuse(components['color']['normal']), components)
+			self._onFocus(control, lambda control, components: components['inner'].setColorDiffuse(components['color']['focus']), components)
+
+		##############################################################################
+
+		if not icon is None:
+			sizeIcon = int(height * 0.8 * (iconSize if iconSize else 1))
+			iconX = int(x + (width * (0.1 if iconOffset is None else iconOffset)))
+			iconY = int(y + ((height - sizeIcon) / 2.0))
+
+			if icons:
+				for i in range(len(icons)):
+					if tools.Tools.isDictionary(icons[i]):
+						iconPath = icons[i]['path']
+						try: iconAnimation = icons[i]['animation']
+						except: iconAnimation = None
+					else:
+						iconPath = icons[i]
+						iconAnimation = None
+					iconControl = self._addImage(path = self._pathIcon(icon = iconPath, quality = interface.Icon.QualityMini), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible, animation = iconAnimation)
+					if i == 0:
+						components['icon'] = iconControl
+						controlIcon = iconControl
+					else:
+						components['icon' + str(i)] = iconControl
+			else:
+				controlIcon = self._addImage(path = self._pathIcon(icon = icon, quality = interface.Icon.QualityMini), x = iconX, y = iconY, width = sizeIcon, height = sizeIcon, visible = visible, animation = animation)
+				components['icon'] = controlIcon
+		else:
+			controlIcon = None
 
 		if not select is Window.SelectNone:
 			sizeIcon = 32
@@ -1322,24 +1504,25 @@ class Window(object):
 				except: callback()
 			self.mWindow._onControl(x, y, wrapper)
 
-		return [control, controlIcon, controlSelect, controlHighlight]
+		return [control, controlIcon, controlSelect, controlHighlight, components]
 
-	def _setButton(self, control, text = None, icon = None, highlight = None, bold = True, uppercase = True, size = None, width = None):
+	def _setButton(self, control, text = None, icon = None, iconDummy = None, highlight = None, bold = True, uppercase = True, size = None, width = None):
 		# From _initializeAnimations().
 		if tools.Tools.isDictionary(control):
-			temp = [None, None, None, None]
+			temp = [None, None, None, None, None]
 			if 'control' in control: temp[0] = control['control']
 			if 'components' in control:
 				if 'icon' in control['components']: temp[1] = control['components']['icon']
 				if 'select' in control['components']: temp[2] = control['components']['select']
 				if 'highlight' in control['components']: temp[3] = control['components']['highlight']
+				temp[4] = control['components']
 			control = temp
 
 		if text:
 			if size is None: size = interface.Font.fontLarge()
-			control[0].setLabel(interface.Format.font(self._buttonText(text = text, icon = icon), bold = bold, uppercase = uppercase), font = size)
+			if control[4] and 'label' in control[4]: control[4]['label'].setLabel(interface.Format.font(self._buttonText(text = text, icon = iconDummy or icon), bold = bold, uppercase = uppercase), font = size)
 			if width is None:
-				dimension = self._dimensionButton(text = text, icon = icon)
+				dimension = self._dimensionButton(text = text, icon = iconDummy or icon)
 				width = dimension[0]
 			if width: control[0].setWidth(width)
 		if icon and control[1]: control[1].setImage(self._pathIcon(icon = icon, quality = interface.Icon.QualityMini))
@@ -1358,13 +1541,13 @@ class Window(object):
 		if control: return (image, dimension)
 		else: return dimension
 
-	def _addLabel(self, text, x, y, width, height, color = None, size = None, alignment = AlignmentLeft, bold = False, italic = False, light = False, uppercase = False, lowercase = False, capitalcase = False, animation = None):
+	def _addLabel(self, text, x, y, width, height, color = None, size = None, alignment = AlignmentLeft, bold = False, italic = False, light = False, uppercase = False, lowercase = False, capitalcase = False, visible = True, animation = None):
 		# NB: Fix suggested by NG.
 		# Sometimes when the special window is closed, the text of the lables remain afterwards. The text is then shown in various places of the current Kodi native window and remain there until Kodi is restarted.
 		# Create the label control, but only set the label text AFTER the window has been created.
 		if color is None: color = self._colorDefault()
 		if size is None: size = interface.Font.fontDefault()
-		control = self._add(xbmcgui.ControlLabel(x, y, width, height, '', font = size, textColor = color, alignment = alignment), animation = animation)
+		control = self._add(xbmcgui.ControlLabel(x, y, width, height, '', font = size, textColor = color, alignment = alignment), visible = visible, animation = animation)
 		self.mLabels.append({'control' : control, 'text' : interface.Translation.string(text) if tools.Tools.isInteger(text) else text, 'color' : color, 'size' : size, 'bold' : bold, 'italic' : italic, 'light' : light, 'uppercase' : uppercase, 'lowercase' : lowercase, 'capitalcase' : capitalcase})
 		return control
 
@@ -1376,14 +1559,25 @@ class Window(object):
 
 class WindowBackground(Window):
 
-	def __init__(self, backgroundType, backgroundPath, observeWindow = None, observeDialog = None):
+	def __init__(self, logo, logoAnimation, backgroundType, backgroundPath, observeWindow = None, observeDialog = None):
 		super(WindowBackground, self).__init__(backgroundType = backgroundType, backgroundPath = backgroundPath)
+		self.mLogo = WindowProgress.LogoIcon if logo is True else logo
+		self.mLogoAnimation = logoAnimation
 		if observeWindow or observeDialog: Pool.thread(self._observe, kwargs = {'window' : observeWindow, 'dialog' : observeDialog}, start = True)
+
+	def _initializeStart2(self):
+		super(WindowBackground, self)._initializeStart2()
+		if self.mLogo: self._addLogo(self.mLogo)
 
 	# observeWindow/observeDialog: only show the background while a specific window/dialog is visible.
 	@classmethod
-	def show(self, background = None, backgroundType = None, wait = False, initialize = True, close = False, observeWindow = None, observeDialog = None):
-		return super(WindowBackground, self)._show(backgroundType = tools.Settings.getInteger('interface.stream.interface.background') if backgroundType is None else backgroundType, backgroundPath = background, wait = wait, initialize = initialize, close = close, observeWindow = observeWindow, observeDialog = observeDialog)
+	def show(self, logo = False, logoAnimation = True, background = None, backgroundType = None, metadata = None, wait = False, initialize = True, close = False, observeWindow = None, observeDialog = None):
+		if metadata and background is None:
+			from lib.meta.image import MetaImage
+			if backgroundType is None: backgroundType = tools.Settings.getInteger('interface.dialog.interface.background')
+			background = MetaImage.getFanart(data = metadata, default = None)
+			background = background[0] if background else None
+		return super(WindowBackground, self)._show(logo = logo, logoAnimation = logoAnimation, backgroundType = tools.Settings.getInteger('interface.stream.interface.background') if backgroundType is None else backgroundType, backgroundPath = background, wait = wait, initialize = initialize, close = close, observeWindow = observeWindow, observeDialog = observeDialog)
 
 	@classmethod
 	def _observe(self, window = None, dialog = None):
@@ -1409,6 +1603,26 @@ class WindowBackground(Window):
 			tools.Time.sleep(0.1)
 
 		self.close()
+
+	def _dimensionLogo(self, logo):
+		if logo == WindowProgress.LogoIcon: return [self._scaleWidth(WindowProgress.LogoIconWidth), self._scaleHeight(WindowProgress.LogoIconHeight)]
+		elif logo == WindowProgress.LogoName: return [self._scaleWidth(WindowProgress.LogoNameWidth), self._scaleHeight(WindowProgress.LogoNameHeight)]
+		else: return [0, 0]
+
+	def _addLogo(self, logo):
+		dimension = self._dimensionLogo(logo)
+		if logo == WindowProgress.LogoIcon: path = WindowProgress._logoIcon(force = True, dimension = dimension)
+		elif logo == WindowProgress.LogoName: path = WindowProgress._logoName(force = True, dimension = dimension)
+
+		animation = [
+			('Conditional', 'effect=zoom start=100,100 end=80,80 center=auto delay=100 time=1000 pulse=true tween=Cubic easing=out condition=true'),
+			('Conditional', 'effect=fade start=100 end=50 delay=100 time=1000 pulse=true tween=cubic condition=true'),
+		] if self.mLogoAnimation else None
+
+		self._addImage(path = path, x = self._centerX(dimension[0]), y = self._centerY(dimension[1]), width = dimension[0], height = dimension[1], animation = animation)
+		if logo == WindowProgress.LogoName: dimension[1] += WindowProgress._offsetLogo(dimension[1]) # Add padding below.
+		return dimension
+
 
 class WindowCinema(Window):
 
@@ -1836,7 +2050,10 @@ class WindowQr(Window):
 	def _qrGeneratePlain(self, data, loaderShow = False, loaderHide = False, permanent = False):
 		return self._qrGenerate(data = data, color = 'FF333333', loaderShow = loaderShow, loaderHide = loaderHide, permanent = permanent)
 
-class WindowRating(Window):
+class WindowDialog(Window):
+
+	ModeRating = 'rating'
+	ModeContinue = 'continue'
 
 	IconStar = 'star'
 	IconHeart = 'heart'
@@ -1851,52 +2068,53 @@ class WindowRating(Window):
 	IdImageLogo = 50015
 	IdImagePoster = 51001
 
-	IdButtonClose = 50101
-	IdButtonPower = 50102
-	IdButtonQr = 50103
-	IdButtons = [52001, 52101, 52201, 52301, 52401, 52501, 52601, 52701, 52801, 52901]
+	IdButton = [50110, 50120, 50130, 50140, 50150]
+	IdRating = [52001, 52101, 52201, 52301, 52401, 52501, 52601, 52701, 52801, 52901]
+	IdProgress = 50200
 
+	IdLabelHeading = 50016
+	IdLabelHighlight = 50017
 	IdLabelTitle = 51011
-	IdLabelHighlight = 51012
-	IdLabelDescription1 = 51003
-	IdLabelDescription2 = 51004
-	IdLabelDescription3 = 51005
+	IdLabelSubtitle = 51012
+	IdLabelOverview = 51200
+	IdLabelDescription1 = 51511
+	IdLabelDescription2 = 51512
+	IdLabelDescription3 = 51513
+	IdLabelDescription4 = 51514
+	IdLabelDescription5 = 51521
+	IdLabelDescription6 = 51522
 
-	IdImageGlobal = 51201
-	IdImageTrakt = 51311
-	IdImageImdb = 51321
-	IdImageTmdb = 51331
+	IdImageGlobal = 51301
+	IdImageRating = [51411, 51421, 51431, 51441, 51451]
 
 	IdGroupRater = 51100
-	IdGroupGlobal = 51200
-	IdGroupService = 51300
+	IdGroupGlobal = 51300
+	IdGroupService = 51400
 
-	QrDisabled = 0
-	QrTrakt = 1
-	QrImdb = 2
-	QrTmdb = 3
-	QrTvdb = 4
-	QrSpecial = 5 # TMDb for movies and TVDb for shows.
-	QrHomepage = 6
-	QrGoogle = 7
+	ActionNone			= tools.Observer.ActionNone
+	ActionCancel		= 'cancel'
+	ActionQr			= 'qr'
+	ActionPower			= 'power'
+	ActionStop			= tools.Observer.ActionStop
+	ActionContinue		= tools.Observer.ActionContinue
+	ActionPowerdown		= tools.Observer.ActionPowerdown
+	ActionShutdown		= tools.Observer.ActionShutdown
+	ActionReboot		= tools.Observer.ActionReboot
+	ActionSuspend		= tools.Observer.ActionSuspend
+	ActionHibernate		= tools.Observer.ActionHibernate
+	ActionStandby		= tools.Observer.ActionStandby
+	ActionQuit			= tools.Observer.ActionQuit
+	ActionRestart		= tools.Observer.ActionRestart
+	ActionMinimize		= tools.Observer.ActionMinimize
+	ActionScreensaver	= tools.Observer.ActionScreensaver
 
-	PowerDisabled = 0
-	PowerPowerdown = 1
-	PowerShutdown = 2
-	PowerReboot = 3
-	PowerSuspend = 4
-	PowerHibernate = 5
-	PowerMinimize = 6
-	PowerQuit = 7
-	PowerScreensaver = 8
+	Result = None
 
-	Rating = None
-
-	def __init__(self, metadata, rating, icon, animation, **kwargs):
+	def __init__(self, mode, metadata, rating, icon, indication, decoration, binge, action, focus, interact, power, qr, callback, loader, **kwargs):
 		xmlReplacements = {
 			'valuegap' : lambda: self._scaleWidth(60),
 		}
-		super(WindowRating, self).__init__(xml = 'rating', xmlReplacements = xmlReplacements, **kwargs)
+		super(WindowDialog, self).__init__(xml = 'dialog', xmlReplacements = xmlReplacements, **kwargs)
 
 		self.mMetadata = metadata
 		self.mMedia = tools.Media.TypeMovie
@@ -1905,36 +2123,67 @@ class WindowRating(Window):
 			elif 'season' in self.mMetadata and not self.mMetadata['season'] is None: self.mMedia = tools.Media.TypeSeason
 			else: self.mMedia = tools.Media.TypeShow
 
+		self.mMode = mode
 		self.mRating = rating
 		self.mIcon = icon
-		self.mAnimation = animation
+		self.mIndication = indication
+		self.mDecoration = decoration
+		self.mBinge = binge
+		self.mCallback = callback
+		self.mLoader = loader
+		self.mAnimated = tools.Settings.getInteger('interface.dialog.interface.animation')
 		self.mInteracted = False
 
-		self.mPower = tools.Settings.getInteger('activity.rating.power')
-		self.mQr = tools.Settings.getInteger('activity.rating.qr')
+		self.mButtons = None
+		self.mButtonPower = self._intializePower(power)
+		self.mButtonQr = self._intializeQr(qr)
+		self.mButtonStop = self.mMode == WindowDialog.ModeContinue and self.mBinge
+		self.mButtonContinue = self.mMode == WindowDialog.ModeContinue and self.mBinge
 
-		self.mLabel = self._label()
-		self.mHighlight = self._label(partial = True)
-		self.mLink = self._link()
+		self.mRatingService = tools.Settings.getInteger('interface.dialog.interface.service')
+		self.mRatingLabel = tools.Settings.getInteger('interface.dialog.interface.label')
+
+		self.mActionDefault = self._intializeDefault(mode = mode, action = action)
+		self.mActionFocus = self._intializeFocus(mode = mode, action = focus)
+		self.mActionInteract = interact
+		self.mActionRate = tools.Settings.getInteger('activity.rating.action')
+
+		self.mHeading = self._heading()
+		self.mHighlight = self._heading(partial = True)
+		self.mTitle = self._title()
+		self.mSubtitle = self._subtitle()
 
 	@classmethod
-	def show(self, metadata, rating = None, icon = None, animation = False, wait = True, initialize = True, timeout = None, close = False):
-		interface.Loader.show()
+	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
+		if loader: interface.Loader.show()
 
-		from lib.meta.image import MetaImage
-		backgroundType = tools.Settings.getInteger('interface.rating.interface.background')
-		backgroundPath = MetaImage.getFanart(data = metadata, default = None)
-		backgroundPath = backgroundPath[0] if backgroundPath else None
+		# Do not add a background if WindowBackground is showing, to allow for the logo animation to continue uninterrupted.
+		decoration = not WindowBackground.visible()
+		if decoration:
+			from lib.meta.image import MetaImage
+			backgroundType = tools.Settings.getInteger('interface.dialog.interface.background')
+			backgroundPath = MetaImage.getFanart(data = metadata, default = None)
+			backgroundPath = backgroundPath[0] if backgroundPath else None
+		else:
+			backgroundType = None
+			backgroundPath = None
 
-		if not icon: icon = WindowRating.IconSettings[tools.Settings.getInteger('interface.rating.interface.icon')]
+		if not icon: icon = WindowDialog.IconSettings[tools.Settings.getInteger('interface.dialog.interface.icon')]
 
-		WindowRating.Rating = None
-		super(WindowRating, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, animation = animation, wait = wait, initialize = initialize, timeout = timeout, close = close)
-		return WindowRating.Rating
+		if default:
+			if tools.Tools.isDictionary(default):
+				if 'action' in default: action = focus = default['action']
+				if 'timeout' in default: timeout = default['timeout']
+			else:
+				action = focus = default
+
+		WindowDialog.Result = {'action' : WindowDialog.ActionNone, 'timeout' : False, 'interacted' : False, 'rating' : None}
+		super(WindowDialog, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, indication = indication, decoration = decoration, wait = wait, initialize = initialize, binge = binge, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
+		return WindowDialog.Result
 
 	def _initializeEnd1(self):
-		super(WindowRating, self)._initializeEnd1()
-		interface.Loader.show()
+		super(WindowDialog, self)._initializeEnd1()
+		if self.mLoader: interface.Loader.show()
 
 		from lib.meta.tools import MetaTools
 		from lib.meta.image import MetaImage
@@ -1942,37 +2191,76 @@ class WindowRating(Window):
 
 		playback = Playback.instance()
 
-	 	# Resize for  wide screens.
-		controls = [
-			WindowRating.IdImageBorder,
-			WindowRating.IdImageBackground,
-			WindowRating.IdImageOverlay,
-			WindowRating.IdImageSeparator,
-			WindowRating.IdImageLogo,
-			WindowRating.IdImagePoster,
-
-			WindowRating.IdButtonClose,
-
-			WindowRating.IdLabelTitle,
-			WindowRating.IdLabelHighlight,
-			WindowRating.IdLabelDescription1,
-			WindowRating.IdLabelDescription2,
-			WindowRating.IdLabelDescription3,
-
-			WindowRating.IdGroupRater,
-
-			WindowRating.IdImageGlobal,
-			WindowRating.IdImageTrakt,
-			WindowRating.IdImageImdb,
-			WindowRating.IdImageTmdb,
+		# Buttons
+		index = 0
+		self.mButtons = []
+		buttons = [
+			{'type' : WindowDialog.ActionCancel, 'icon' : 'error', 'action' : lambda : self._interact(self._cancel)},
+			{'type' : WindowDialog.ActionPower, 'icon' : 'on', 'action' : lambda : self._interact(self._power)} if not self.mButtonPower is False else None,
+			{'type' : WindowDialog.ActionQr, 'icon' : 'qr', 'action' : lambda : self._interact(self._qr)} if not self.mButtonQr is False else None,
+			{'type' : WindowDialog.ActionStop, 'icon' : 'stop', 'action' : lambda : self._interact(self._stop)} if self.mButtonStop else None,
+			{'type' : WindowDialog.ActionContinue, 'icon' : 'play', 'action' : lambda : self._interact(self._continue)} if self.mButtonContinue else None,
 		]
-		if self.mPower: controls.append(WindowRating.IdButtonPower)
-		if self.mQr: controls.append(WindowRating.IdButtonQr)
+		for button in buttons:
+			if button:
+				id = WindowDialog.IdButton[index]
+				self.mButtons.append({
+					'type' : button['type'],
+					'id' : id,
+					'index' : index,
+					'controls' : [id, id + 1, id + 2, id + 3, id + 4],
+				})
+				self._onClick(id + 1, button['action'])
+				self.propertySet('GaiaButtonEnabled%d' % (index + 1), True)
+				self.propertySet('GaiaButtonIcon%d' % (index + 1), button['icon'])
+				index += 1
+
+		focus = None
+		if self.mActionFocus:
+			for i in self.mButtons:
+				if i['type'] == self.mActionFocus:
+					focus = i['id']
+					break
+			if focus is None:
+				for i in self.mButtons:
+					if i['type'] == WindowDialog.ActionPower:
+						focus = i['id']
+						break
+
+	 	# Resize for wide screens.
+		controls = [
+			WindowDialog.IdImageBorder,
+			WindowDialog.IdImageBackground,
+			WindowDialog.IdImageOverlay,
+			WindowDialog.IdImageSeparator,
+			WindowDialog.IdImageLogo,
+			WindowDialog.IdImagePoster,
+
+			WindowDialog.IdLabelHeading,
+			WindowDialog.IdLabelHighlight,
+
+			WindowDialog.IdLabelTitle,
+			WindowDialog.IdLabelSubtitle,
+			WindowDialog.IdLabelOverview,
+			WindowDialog.IdLabelDescription1,
+			WindowDialog.IdLabelDescription2,
+			WindowDialog.IdLabelDescription3,
+			WindowDialog.IdLabelDescription4,
+			WindowDialog.IdLabelDescription5,
+			WindowDialog.IdLabelDescription6,
+
+			WindowDialog.IdGroupRater,
+
+			WindowDialog.IdImageGlobal,
+		]
+		controls.extend(WindowDialog.IdImageRating)
+		controls.extend(tools.Tools.listFlatten([i['controls'] for i in self.mButtons]))
 
 		# Rating buttons.
 		for i in range(0, 10):
 			for j in range(0, 5):
 				controls.append(int('52%d0%d' % (i, j)))
+		for button in WindowDialog.IdRating: self._onClick(button, lambda : self._interact(self._rate))
 
 		self._scale(controls)
 
@@ -1986,38 +2274,32 @@ class WindowRating(Window):
 		offset2 = int(offset / 2.0)
 		offset3 = int(offset2 / 4.0)
 		controls = [
-			{'id' : WindowRating.IdImagePoster, 'side' : 0, 'offset' : 20},
-			{'id' : WindowRating.IdImageLogo, 'side' : 0, 'offset' : 20},
+			{'id' : WindowDialog.IdImagePoster, 'side' : 0, 'offset' : 20},
+			{'id' : WindowDialog.IdImageLogo, 'side' : 0, 'offset' : 20},
 
-			{'id' : WindowRating.IdButtonClose, 'side' : 1, 'offset' : 70},
+			{'id' : WindowDialog.IdLabelHeading, 'side' : 0, 'offset' : 100},
+			{'id' : WindowDialog.IdLabelHighlight, 'side' : 0, 'offset' : 100},
 
-			{'id' : WindowRating.IdLabelTitle, 'side' : 0, 'offset' : 186},
-			{'id' : WindowRating.IdLabelHighlight, 'side' : 0, 'offset' : 186},
-			{'id' : WindowRating.IdLabelDescription1, 'side' : 1, 'offset' : 220},
-			{'id' : WindowRating.IdLabelDescription2, 'side' : 1, 'offset' : 220},
-			{'id' : WindowRating.IdLabelDescription3, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelTitle, 'side' : 0, 'offset' : 186},
+			{'id' : WindowDialog.IdLabelSubtitle, 'side' : 0, 'offset' : 186},
+			{'id' : WindowDialog.IdLabelOverview, 'side' : 0, 'offset' : 186},
+			{'id' : WindowDialog.IdLabelDescription1, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelDescription2, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelDescription3, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelDescription4, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelDescription5, 'side' : 1, 'offset' : 220},
+			{'id' : WindowDialog.IdLabelDescription6, 'side' : 1, 'offset' : 220},
 
-			{'id' : WindowRating.IdGroupRater, 'side' : 0, 'offset' : 186 - offset},
-			{'id' : WindowRating.IdGroupGlobal, 'side' : 0, 'offset' : 186 - offset2},
-			{'id' : WindowRating.IdGroupService, 'side' : 0, 'offset' : 192 - offset3},
+			{'id' : WindowDialog.IdGroupRater, 'side' : 0, 'offset' : 186 - offset},
+			{'id' : WindowDialog.IdGroupGlobal, 'side' : 0, 'offset' : 186 - offset2},
+			{'id' : WindowDialog.IdGroupService, 'side' : 0, 'offset' : 192 - offset3},
 		]
-		if self.mPower and self.mQr:
-			self.propertySet('GaiaButtonPower', True)
-			self.propertySet('GaiaButtonQr', True)
-			controls.extend([
-				{'id' : WindowRating.IdButtonPower, 'side' : 1, 'offset' : 124},
-				{'id' : WindowRating.IdButtonQr, 'side' : 1, 'offset' : 178},
-			])
-		elif self.mPower:
-			self.propertySet('GaiaButtonPower', True)
-			controls.extend([
-				{'id' : WindowRating.IdButtonPower, 'side' : 1, 'offset' : 124},
-			])
-		elif self.mQr:
-			self.propertySet('GaiaButtonQr', True)
-			controls.extend([
-				{'id' : WindowRating.IdButtonQr, 'side' : 1, 'offset' : 124},
-			])
+
+		offsetButton = 70 + offset
+		for button in self.mButtons:
+			controls.append({'id' : button['id'], 'side' : 1, 'offset' : offsetButton})
+			offsetButton += 54
+		controls.append({'id' : WindowDialog.IdProgress, 'side' : 1, 'offset' : offsetButton - 10})
 
 		for i in controls:
 			control = self.control(i['id'])
@@ -2026,172 +2308,519 @@ class WindowRating(Window):
 			else: offset = dialogLeft + offset
 			control.setPosition(offset, control.getY())
 
-		self._onClick(WindowRating.IdButtonClose, lambda : self._onInteraction(self._cancel))
-		self._onClick(WindowRating.IdButtonPower, lambda : self._onInteraction(self._power))
-		self._onClick(WindowRating.IdButtonQr, lambda : self._onInteraction(self._qr))
-		for button in WindowRating.IdButtons:
-			self._onClick(button, lambda : self._onInteraction(self._rate))
+		control = self.control(WindowDialog.IdProgress)
+		if self.mAnimated >= 2 and self.mTimeout:
+			# Set the animations here, instead of in the XML.
+			# Because we reposition the control with the code above.
+			# And using center="auto" does not work.
+			# Also use Conditional, since only 1 Hidden animation can be added from Python.
+			offset = 21 # 42 / 2
+			x = control.getX() + offset
+			y = control.getY() + offset
+			control.setAnimations([
+				('Conditional', 'effect=zoom tween=cubic start=0 end=100 center=%d,%d time=1000 condition=!String.IsEqual(Window.Property(GaiaTimeout),-1)' % (x, y)),
+				('Conditional', 'effect=rotate tween=cubic start=0 end=360 center=%d,%d time=1000 condition=!String.IsEqual(Window.Property(GaiaTimeout),-1)' % (x, y)),
+				('Conditional', 'effect=fade tween=cubic start=0 end=100 time=1500 condition=!String.IsEqual(Window.Property(GaiaTimeout),-1)'),
+
+				('Conditional', 'effect=zoom tween=cubic start=100 end=0 center=%d,%d time=1000 condition=String.IsEqual(Window.Property(GaiaTimeout),-1)' % (x, y)),
+				('Conditional', 'effect=rotate tween=cubic start=0 end=360 center=%d,%d time=1000 condition=String.IsEqual(Window.Property(GaiaTimeout),-1)' % (x, y)),
+				('Conditional', 'effect=fade tween=cubic start=100 end=0 time=1500 condition=String.IsEqual(Window.Property(GaiaTimeout),-1)'),
+			])
+		else:
+			control.setAnimations([
+				('Conditional', 'effect=fade tween=cubic start=100 end=0 time=0 condition=String.IsEqual(Window.Property(GaiaTimeout),-1)'),
+			])
+
+		if self.mAnimated >= 3:
+			offset = 32 # 64 / 2
+			for button in self.mButtons:
+				control = self.control(button['id'])
+				x = control.getX() + offset
+				y = control.getY() + offset
+				control.setAnimations([
+					('Conditional', 'effect=zoom tween=cubic start=0 end=100 center=%d,%d time=1000 condition=true' % (x, y)),
+					('Conditional', 'effect=rotate tween=cubic start=0 end=360 center=%d,%d time=1000 condition=true' % (x, y)),
+					('Conditional', 'effect=fade tween=cubic start=0 end=100 time=1500 condition=true'),
+				])
 
 		rated = self.mRating and 'rating' in self.mRating and self.mRating['rating']
 		colorPrimary = interface.Format.colorPrimary()
 		colorSecondary = interface.Format.colorSecondary()
+		colorSpecial = interface.Format.colorSpecial()
 
+		self.propertySet('GaiaMode', self.mMode)
 		self.propertySet('GaiaIcon', self.mIcon)
 		self.propertySet('GaiaLogo', tools.File.joinPath(self._pathLogo(Window.SizeSmall), 'iconcolor.png'))
 		self.propertySet('GaiaBackground', self._pathImage('background.jpg', interface = False))
-		self.propertySet('GaiaColorButton', colorPrimary)
-		self.propertySet('GaiaColorPrimary', colorPrimary)
-		self.propertySet('GaiaColorSecondary', colorSecondary)
-		self.propertySet('GaiaColorRating', interface.Format.colorRating())
-		self.propertySet('GaiaColorRated', interface.Format.colorSpecial())
-		self.propertySet('GaiaColorDefault', interface.Format.colorSpecial() if rated else colorPrimary)
 		self.propertySet('GaiaSeparator', interface.Format.iconSeparator(pad = True, color = True))
-		self.propertySet('GaiaIndicator', int(self.mAnimation)) # Do not use "GaiaAnimation", since the parent Window class already has that attribute.
+		self.propertySet('GaiaIndication', int(self.mIndication)) # Do not use "GaiaAnimation", since the parent Window class already has that attribute.
+		self.propertySet('GaiaDecoration', int(self.mDecoration))
+		self.propertySet('GaiaAnimated', int(self.mAnimated))
+
+		# NB: Set all colors on the home window, not on the current window.
+		# Otherwise if the power button is clicked and the selection or timeout dialogs are shown, the color disappears.
+		# This probably happens because the XML "colordiffuse" attribute gets the variable from the current window shown on top.
+		self.propertySet('GaiaColorButton', colorPrimary, id = Window.IdWindowHome)
+		self.propertySet('GaiaColorPrimary', colorPrimary, id = Window.IdWindowHome)
+		self.propertySet('GaiaColorSecondary', colorSecondary, id = Window.IdWindowHome)
+		self.propertySet('GaiaColorRating', interface.Format.colorRating(), id = Window.IdWindowHome)
+		self.propertySet('GaiaColorRated', interface.Format.colorSpecial(), id = Window.IdWindowHome)
+		self.propertySet('GaiaColorDefault', colorSpecial if rated else colorPrimary, id = Window.IdWindowHome)
+		self.propertySet('GaiaColorTransparent1', interface.Format.colorMix(color1 = colorPrimary, color2 = colorSecondary, ratio = 0.8), id = Window.IdWindowHome)
+		self.propertySet('GaiaColorTransparent2', interface.Format.colorMix(color1 = colorSpecial if rated else colorPrimary, color2 = colorSecondary, ratio = 0.8), id = Window.IdWindowHome)
+
+		timeout = 0 if self.mTimeout else -1
+		self.propertySet('GaiaProgress', 0)
+		self.propertySet('GaiaTimeout', timeout)
 
 		poster = MetaImage.getPoster(data = self.mMetadata)
 		if poster: self.propertySet('GaiaPoster', poster[0])
-		self.propertySet('GaiaLabel', self.mLabel)
+		self.propertySet('GaiaHeading', self.mHeading)
 		self.propertySet('GaiaHighlight', self.mHighlight)
-		self.propertySet('GaiaLink', self.mLink)
+		self.propertySet('GaiaTitle', self.mTitle)
+		self.propertySet('GaiaSubtitle', self.mSubtitle)
 
 		default = 5
 		MetaTools.instance().voting(self.mMetadata)
-		for i in ['global', 'trakt', 'imdb', 'tmdb']:
+		ratings = ['trakt', 'imdb', 'tmdb', 'metacritic', 'rottentomatoes']
+		for i in range(len(ratings)):
+			type = ratings[i]
+			try: valueRating = self.mMetadata['voting']['rating'][type] or 0
+			except: valueRating = 0
+			try: valueVotes = self.mMetadata['voting']['votes'][type] or 0
+			except: valueVotes = 0
+			if valueRating and not valueVotes:
+				valueVotes = 1 # Metacritic/RottenTomatoes
+				self.mMetadata['voting']['votes'][type] = valueVotes
+				self.mMetadata['votes'] = (self.mMetadata['votes'] or 0) + valueVotes
+			ratings[i] = (type, valueVotes)
+		ratings = tools.Tools.listSort(ratings, key = lambda i : i[1], reverse = True)
+		ratings = [i[0] for i in ratings]
+		ratings.insert(0, 'global')
+		for i in range(len(ratings)):
 			rating = ''
 			try:
-				value = self.mMetadata['rating'] if i == 'global' else self.mMetadata['voting']['rating'][i]
-				if value:
-					if i == 'global': default = value
-					rating += interface.Format.fontBold('%.1f' % value)
-					value = self.mMetadata['votes'] if i == 'global' else self.mMetadata['voting']['votes'][i]
-					rating += ' (%s)' % tools.Math.thousand(value if value else 0)
-			except: pass
-			if rating: self.propertySet('GaiaRating' + i.capitalize(), rating + ' ') # Add space, otherwise the last rating (TMDb) is sometimes cut off.
+				type = ratings[i]
+				if not type == 'global' and not type in self.mMetadata['voting']['rating']: continue
 
-		if rated:
-			default = self.mRating['rating']
-			self.propertySet('GaiaPreviousRating', int(default))
-			if 'time' in self.mRating and self.mRating['time']: self.propertySet('GaiaPreviousTime', tools.Time.format(self.mRating['time'], format = tools.Time.FormatDate))
-			self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
+				valueRating = self.mMetadata['rating'] if type == 'global' else self.mMetadata['voting']['rating'][type]
+				valueVotes = (self.mMetadata['votes'] if type == 'global' else self.mMetadata['voting']['votes'][type]) or 0
+				if type == 'global' and valueRating: default = valueRating
+
+				if (self.mRatingLabel == 0 or self.mRatingLabel == 2) and valueVotes >= 1000:
+					if valueVotes < 1000000:
+						devider = 1000.0
+						character = 'K'
+					else:
+						devider = 1000000.0
+						character = 'M'
+					valueVotes = valueVotes / devider
+					valueVotes = (('%%.%df' % (1 if round(valueVotes, 0) < 100 else 0)) % valueVotes) + character # Make sure 9999 is not rounded to 10.0K.
+				else:
+					valueVotes = tools.Math.thousand(valueVotes if valueVotes else 0)
+
+				# Add empty bold string. The small font on Estuary is bold by default, which makes these labels bold. Adding a bold tag to the label somehow makes the other part of the label non-bold.
+				if self.mRatingLabel == 0 or self.mRatingLabel == 1:
+					if valueRating: rating = interface.Format.fontBold('%.1f' % valueRating) + (' (%s)' % valueVotes)
+				elif self.mRatingLabel == 2 or self.mRatingLabel == 3:
+					if valueVotes: rating = interface.Format.fontBold('') + valueVotes
+				elif self.mRatingLabel == 4:
+					if valueRating: rating = interface.Format.fontBold('%.1f' % valueRating)
+			except: tools.Logger.error()
+			if rating:
+				self.propertySet('GaiaRatingLabel' + str(i), rating + ' ') # Add space, otherwise the last rating is sometimes cut off.
+				self.propertySet('GaiaRatingType' + str(i), type)
+
+		self.propertySet('GaiaRatingService', self.mRatingService)
+		if self.mRatingService == 1:
+			control = self.control(WindowDialog.IdGroupGlobal)
+			control.setPosition(control.getX(), control.getY() + 25)
+
+		if self.mMode == WindowDialog.ModeRating:
+			if rated:
+				default = self.mRating['rating']
+				self.propertySet('GaiaPreviousRating', int(default))
+				if 'time' in self.mRating and self.mRating['time']: self.propertySet('GaiaPreviousTime', tools.Time.format(self.mRating['time'], format = tools.Time.FormatDate))
+				self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
+			else:
+				self.propertySet('GaiaUnratedLabel', interface.Translation.string(33447))
+
+			setting = playback.settingsRatingDefault()
+			if setting == 0: default = tools.Math.roundDown(value = default)
+			elif setting == 1: default = tools.Math.roundUp(value = default)
+			elif setting == 2: default = tools.Math.roundClosest(value = default, base = 1)
+			elif setting == 3: default = 10
+			elif setting == 4: default = 1
+			elif setting == 5: default = 5
+			self.propertySet('GaiaRatingDefault', int(default))
+			self.focus(control = WindowDialog.IdRating[default - 1], sleep = False) # Always focus the rating first to intialize the colors and labels.
 		else:
-			self.propertySet('GaiaUnratedLabel', interface.Translation.string(33447))
+			self.propertySet('GaiaOverview', self._overview())
+			self.propertySet('GaiaDescription1', self._description1() if self.mBinge else '')
+			self.propertySet('GaiaDescription2', self._description2() if self.mBinge else '')
 
-		setting = playback.settingsRatingDefault()
-		if setting == 0: default = tools.Math.roundDown(value = default)
-		elif setting == 1: default = tools.Math.roundUp(value = default)
-		elif setting == 2: default = tools.Math.roundClosest(value = default, base = 1)
-		elif setting == 3: default = 10
-		elif setting == 4: default = 1
-		elif setting == 5: default = 5
-		self.propertySet('GaiaRatingDefault', int(default))
-		self.focus(WindowRating.IdButtons[default - 1])
-
+		if focus: self.focus(control = focus, sleep = False)
+		if timeout >= 0: Pool.thread(target = self._progress, start = True)
 		self.propertySet('GaiaInitialized', 1)
 
 	def _initializeEnd2(self):
-		super(WindowRating, self)._initializeEnd2()
+		super(WindowDialog, self)._initializeEnd2()
 		interface.Loader.hide()
 
-	def _onInteraction(self, callback):
+	@classmethod
+	def _intializeRetrieve(self, values, value):
+		if tools.Tools.isInteger(value): return values[value] if value in values else None
+		else: return value if value in values.values() else None
+
+	@classmethod
+	def _intializeQr(self, type = None):
+		types = {
+			0 : False,
+			1 : None,
+			2 : tools.Link.TypeTrakt,
+			3 : tools.Link.TypeImdb,
+			4 : tools.Link.TypeTmdb,
+			5 : tools.Link.TypeTvdb,
+			6 : tools.Link.TypeSimkl,
+			7 : tools.Link.TypeTvmaze,
+			8 : tools.Link.TypeTomatoes,
+			9 : tools.Link.TypeMetacritic,
+			10 : tools.Link.TypeCommonsense,
+			11 : tools.Link.TypeLetterboxd,
+			12 : tools.Link.TypeCriticker,
+			13 : tools.Link.TypeFanart,
+			14 : tools.Link.TypeHome,
+			15 : tools.Link.TypeTrailer,
+			16 : tools.Link.TypeGoogle,
+			17 : tools.Link.TypeDuckduckgo,
+		}
+		type = tools.Settings.getInteger('interface.dialog.interface.qr') if type is True else 0 if not type else type
+		return self._intializeRetrieve(values = types, value = type)
+
+	# Also used by playback.py.
+	@classmethod
+	def _intializePower(self, action = None):
+		actions = {
+			0 : False,
+			1 : None,
+			2 : WindowDialog.ActionPowerdown,
+			3 : WindowDialog.ActionShutdown,
+			4 : WindowDialog.ActionReboot,
+			5 : WindowDialog.ActionSuspend,
+			6 : WindowDialog.ActionHibernate,
+			7 : WindowDialog.ActionStandby,
+			8 : WindowDialog.ActionQuit,
+			9 : WindowDialog.ActionRestart,
+			10 : WindowDialog.ActionMinimize,
+			11 : WindowDialog.ActionScreensaver,
+		}
+		action = tools.Settings.getInteger('interface.dialog.interface.power') if action is True else 0 if not action else action
+		return self._intializeRetrieve(values = actions, value = action)
+
+	@classmethod
+	def _intializeDefault(self, mode = None, action = None):
+		if mode == WindowDialog.ModeRating:
+			actions = {
+				0 : False,
+				1 : WindowDialog.ActionCancel,
+				2 : WindowDialog.ActionPowerdown,
+				3 : WindowDialog.ActionShutdown,
+				4 : WindowDialog.ActionReboot,
+				5 : WindowDialog.ActionSuspend,
+				6 : WindowDialog.ActionHibernate,
+				7 : WindowDialog.ActionStandby,
+				8 : WindowDialog.ActionQuit,
+				9 : WindowDialog.ActionRestart,
+				10 : WindowDialog.ActionMinimize,
+				11 : WindowDialog.ActionScreensaver,
+			}
+		else:
+			actions = {
+				0 : False,
+				1 : WindowDialog.ActionContinue,
+				2 : WindowDialog.ActionStop,
+				3 : WindowDialog.ActionPowerdown,
+				4 : WindowDialog.ActionShutdown,
+				5 : WindowDialog.ActionReboot,
+				6 : WindowDialog.ActionSuspend,
+				7 : WindowDialog.ActionHibernate,
+				8 : WindowDialog.ActionStandby,
+				9 : WindowDialog.ActionQuit,
+				10 : WindowDialog.ActionRestart,
+				11 : WindowDialog.ActionMinimize,
+				12 : WindowDialog.ActionScreensaver,
+
+				# Not part of the settings, but still want to allow focusing on cancel.
+				99 : WindowDialog.ActionCancel,
+			}
+		return self._intializeRetrieve(values = actions, value = action)
+
+	@classmethod
+	def _intializeFocus(self, mode = None, action = None):
+		action = self._intializeDefault(mode = mode, action = action)
+		if action:
+			powers = [
+				WindowDialog.ActionPowerdown,
+				WindowDialog.ActionShutdown,
+				WindowDialog.ActionReboot,
+				WindowDialog.ActionSuspend,
+				WindowDialog.ActionHibernate,
+				WindowDialog.ActionStandby,
+				WindowDialog.ActionQuit,
+				WindowDialog.ActionRestart,
+				WindowDialog.ActionMinimize,
+				WindowDialog.ActionScreensaver,
+			]
+			if action in powers: return WindowDialog.ActionPower
+		return action
+
+	def _progress(self):
+		color = interface.Format.colorPrimary()
+		progress = 0
+		previousProgress = None
+		previousTime = None
+
+		while self.mTimeoutRemaining > 0:
+			if not self.visible() or tools.System.aborted():
+				return
+			elif self.mActionInteract and self._interacted():
+				self.propertySet('GaiaTimeout', -1)
+				return
+			else:
+				progress = tools.Math.roundClosest((self.mTimeoutElapsed / float(self.mTimeout)) * 100, base = 1)
+				if not progress == previousProgress:
+					self.propertySet('GaiaProgress', progress)
+					previousProgress = progress
+				if not self.mTimeoutRemaining == previousTime:
+					self.propertySet('GaiaTimeout', self.mTimeoutRemaining)
+					previousTime = self.mTimeoutRemaining
+			tools.Time.sleep(0.25)
+
+		self.propertySet('GaiaTimeout', 0)
+		tools.Time.sleep(0.5)
+		self.propertySet('GaiaTimeout', -1)
+
+	def _interact(self, callback):
 		self.mInteracted = True
+		self._observation()
 		callback()
 
+	def _interacted(self):
+		return self.mInteracted or tools.Converter.boolean(self.property('GaiaInteracted'))
+
+	def _observation(self):
+		return tools.Observer.updateInteractRating() if self.mMode == WindowDialog.ModeRating else tools.Observer.updateInteractContinue()
+
+	def _heading(self, partial = False):
+		return None
+
+	def _title(self):
+		if 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
+			return self.mMetadata['tvshowtitle']
+		elif 'title' in self.mMetadata and self.mMetadata['title']:
+			return self.mMetadata['title']
+
+	def _subtitle(self):
+		label = []
+
+		if 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
+			if 'title' in self.mMetadata and self.mMetadata['title']:
+				if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None:
+					label.append(tools.Media.number(season = self.mMetadata['season'], episode = self.mMetadata['episode']))
+					label.append(self.mMetadata['title'])
+				elif 'season' in self.mMetadata and not self.mMetadata['season'] is None:
+					label.append(interface.Translation.string(32055) + ' ' + str(self.mMetadata['season']))
+				elif 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
+					label.append(interface.Translation.string(32005))
+		elif 'title' in self.mMetadata and self.mMetadata['title']:
+			label.append(str(self.mMetadata['year']))
+		label = [interface.Format.fontBold(i) for i in label]
+
+		if 'director' in self.mMetadata and self.mMetadata['director']:
+			try:
+				director = self.mMetadata['director']
+				if tools.Tools.isArray(director): director = director[0]
+				if tools.Tools.isDictionary(director): director = director['name']
+				if director: label.append(director)
+			except: tools.Logger.error()
+
+		if 'studio' in self.mMetadata and self.mMetadata['studio']:
+			try:
+				studio = self.mMetadata['studio']
+				if tools.Tools.isArray(studio): studio = studio[0]
+				if tools.Tools.isDictionary(studio): studio = studio['name']
+				if studio: label.append(studio)
+			except: tools.Logger.error()
+
+		return interface.Format.iconJoin(label)
+
+	def _overview(self):
+		if 'plot' in self.mMetadata and self.mMetadata['plot']: return self.mMetadata['plot']
+		return ''
+
+	def _description1(self):
+		if 'duration' in self.mMetadata and self.mMetadata['duration']:
+			duration = self.mMetadata['duration']
+			if duration: return interface.Translation.string(33331) + ' ' + self._highlight(tools.Time.future(seconds = duration, format = tools.Time.FormatTimeShort, local = True).replace(':', interface.Format.fontColor(':', color = self._colorDefault())))
+		return ''
+
+	def _description2(self):
+		if 'duration' in self.mMetadata and self.mMetadata['duration']:
+			duration = self.mMetadata['duration']
+			if duration:
+				duration = int(tools.Math.roundDown(float(duration) / 60.0))
+				hours = int(tools.Math.roundDown(duration / 60.0))
+				minutes = duration % 60
+				duration = []
+				if hours > 0: duration.append('%s %s' % (self._highlight(hours), interface.Translation.string(35617 if hours == 1 else 35618)))
+				if minutes > 0: duration.append('%s %s' % (self._highlight(minutes), interface.Translation.string(35619 if minutes == 1 else 35620)))
+				return ' '.join(duration)
+		return ''
+
 	def _closeTimeout(self):
-		self._cancel()
+		WindowDialog.Result['timeout'] = True
+		WindowDialog.Result['interacted'] = self._interacted()
+
+		if self.mActionDefault is False:
+			return False
+		elif self.mActionDefault == WindowDialog.ActionCancel:
+			self._cancel()
+			return True
+		elif self.mActionDefault == WindowDialog.ActionContinue:
+			self._continue()
+			return True
+		elif self.mActionDefault == WindowDialog.ActionStop:
+			self._stop()
+			return True
+
+		action = tools.System.power(action = self.mActionDefault, proper = True, notification = True)
+		if action:
+			WindowDialog.Result['action'] = action
+			self.close(result = False)
+			return True
+
+		return False
 
 	def _closedTimeout(self):
 		# Called from parent class.
 		# Do not automatically close the dialog if the user interacts with the dialog.
-		if self.mInteracted or bool(self.property('GaiaRatingInteract')): return False
+		if self.mActionInteract and self._interacted(): return False
 		else: return True
 
-	def _label(self, partial = False):
-		label = []
+	def close(self, result = True):
+		super(WindowDialog, self).close()
 
-		if 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
-			label.append(self.mMetadata['tvshowtitle'])
-		elif 'title' in self.mMetadata and self.mMetadata['title']:
-			label.append(self.mMetadata['title'])
-			if 'year' in self.mMetadata and self.mMetadata['year']:
-				label.append(str(self.mMetadata['year']))
+		WindowDialog.Result['interacted'] = self._interacted()
+		if WindowDialog.Result['interacted']: self._observation()
 
-		if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None:
-			label.append(interface.Translation.string(33028) + ' ' + tools.Media.number(season = self.mMetadata['season'], episode = self.mMetadata['episode']))
-		elif 'season' in self.mMetadata and not self.mMetadata['season'] is None:
-			label.append(interface.Translation.string(32055) + ' ' + str(self.mMetadata['season']))
-		elif 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle'] and self.mAnimation:
-			label.append(interface.Translation.string(32005))
+		if result and WindowDialog.Result['action'] is WindowDialog.ActionNone: WindowDialog.Result['action'] = WindowDialog.ActionCancel
 
-		if partial and len(label) > 1:
-			labelBefore = label[1]
-			labelAfter = interface.Format.fontColor(label[1], color = interface.Format.colorPrimary())
-			label = interface.Format.iconJoin(label, color = False)
-			label = label.replace(labelBefore, '')
-			label = interface.Format.fontColor(label, color = '00FFFFFF')
-			label += labelAfter
-			return label
-		else:
-			return interface.Format.iconJoin(label)
-
-	def _link(self):
-		link = None
-		if link is None or self.mQr == WindowRating.QrTrakt:
-			try:
-				slug = self.mMetadata['id']['slug']
-				if slug:
-					from lib.modules import trakt as Trakt
-					try: season = self.mMetadata['season']
-					except: season = None
-					try: episode = self.mMetadata['episode']
-					except: episode = None
-					link = Trakt.link(media = self.mMedia, slug = slug, season = season, episode = episode)
-			except: tools.Logger.error()
-		if link is None or self.mQr == WindowRating.QrImdb:
-			from lib.meta.processors.imdb import MetaImdb
-			link = MetaImdb.link(metadata = self.mMetadata)
-		if link is None or self.mQr == WindowRating.QrTmdb or (self.mQr == WindowRating.QrSpecial and not('tvshowtitle' in self.mMetadata or 'season' in self.mMetadata)):
-			from lib.meta.processors.tmdb import MetaTmdb
-			link = MetaTmdb.link(metadata = self.mMetadata)
-		if link is None or self.mQr == WindowRating.QrTvdb or (self.mQr == WindowRating.QrSpecial and ('tvshowtitle' in self.mMetadata or 'season' in self.mMetadata)):
-			from lib.meta.providers.tvdb import MetaTvdb
-			link = MetaTvdb.link(metadata = self.mMetadata)
-		if link is None or self.mQr == WindowRating.QrHomepage:
-			try: link = self.mMetadata['homepage']
-			except: pass
-		if link is None or self.mQr == WindowRating.QrGoogle:
-			try: link = tools.Google.link(metadata = self.mMetadata)
-			except: pass
-		return link
-
-	def _qr(self):
-		if self.mLink:
-			dialog = self.control(WindowRating.IdDialog)
-			dialog.setVisible(False)
-			WindowQr.show(link = self.mLink, overlay = False, wait = True)
-			dialog.setVisible(True)
-
-	def _rate(self):
-		try: WindowRating.Rating = int(self.property('GaiaRatingValue'))
-		except: pass
-		self.close()
+		action = WindowDialog.Result['action']
+		if not self.mBinge or action in [WindowDialog.ActionStop, WindowDialog.ActionPower] or (self.mMode == WindowDialog.ModeContinue and action == WindowDialog.ActionCancel): WindowBackground.close()
 
 	def _cancel(self):
-		WindowRating.Rating = None
+		WindowDialog.Result['action'] = WindowDialog.ActionCancel
 		self.close()
 
+	def _qr(self):
+		if self.mButtonQr is False: return False
+		dialog = self.control(WindowDialog.IdDialog)
+		dialog.setVisible(False)
+		tools.Link.qr(type = self.mButtonQr, metadata = self.mMetadata, search = True, test = True, fallback = True, loader = True, overlay = False, wait = True)
+		dialog.setVisible(True)
+
+	def _rate(self):
+		tools.Sound.executeRatingFinish()
+		WindowDialog.Result['interacted'] = self._interacted()
+		try: WindowDialog.Result['rating'] = int(self.property('GaiaRatingValue'))
+		except: pass
+
+		if WindowDialog.Result['rating']:
+			self.propertySet('GaiaPreviousRating', int(WindowDialog.Result['rating']))
+			self.propertySet('GaiaPreviousTime', tools.Time.format(tools.Time.timestamp(), format = tools.Time.FormatDate))
+			self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
+			self.focus(control = WindowDialog.IdRating[WindowDialog.Result['rating'] - 1], sleep = False) # Ensures that the rating color is updated.
+
+		if self.mCallback:
+			try: self.mCallback(WindowDialog.Result)
+			except: self.mCallback()
+
+		if self.mActionRate == 1: self.close()
+		elif self.mActionRate == 2: self._closeTimeout()
+
 	def _power(self):
-		actions = {
-			WindowRating.PowerDisabled : tools.System.PowerPowerdown,
-			WindowRating.PowerPowerdown : tools.System.PowerPowerdown,
-			WindowRating.PowerShutdown : tools.System.PowerShutdown,
-			WindowRating.PowerReboot : tools.System.PowerReboot,
-			WindowRating.PowerSuspend : tools.System.PowerSuspend,
-			WindowRating.PowerHibernate : tools.System.PowerHibernate,
-			WindowRating.PowerMinimize : tools.System.PowerMinimize,
-			WindowRating.PowerQuit : tools.System.PowerQuit,
-			WindowRating.PowerScreensaver : tools.System.PowerScreensaver,
-		}
-		if self.mPower in actions: tools.System.power(action = actions[self.mPower])
+		if self.mButtonPower is False: return False
+		action = tools.System.power(action = self.mButtonPower, proper = True, notification = True)
+		if action:
+			WindowDialog.Result['action'] = action
+			self.close()
+
+	def _stop(self):
+		WindowDialog.Result['action'] = WindowDialog.ActionStop
+		self.close()
+
+	def _continue(self):
+		WindowDialog.Result['action'] = WindowDialog.ActionContinue
+		self.close()
+
+
+class WindowRating(WindowDialog):
+
+	def __init__(self, **kwargs):
+		super(WindowRating, self).__init__(mode = WindowDialog.ModeRating, **kwargs)
+
+	@classmethod
+	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
+		if action is None: action = WindowDialog.ActionCancel
+		if timeout is None and action: timeout = tools.Settings.getCustom('activity.rating.timeout')
+		if interact is None: interact = tools.Settings.getBoolean('activity.rating.interact')
+		return super(WindowRating, self).show(metadata = metadata, rating = rating, icon = icon, indication = indication, wait = wait, initialize = initialize, binge = binge, default = default, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
+
+	def _heading(self, partial = False):
+		heading = None
+		if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None:
+			heading = interface.Translation.string(36456)
+		elif 'season' in self.mMetadata and not self.mMetadata['season'] is None:
+			heading = interface.Translation.string(36455)
+		elif 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
+			heading = interface.Translation.string(36454)
+		else:
+			heading = interface.Translation.string(36453)
+
+		if partial and heading:
+			prefix = interface.Translation.string(35501)
+			heading = [prefix, heading.replace(prefix, '')]
+			heading[0] = interface.Format.fontColor(heading[0], color = '00FFFFFF')
+			heading[1] = interface.Format.fontColor(heading[1], color = interface.Format.colorPrimary())
+			heading = ''.join(heading)
+
+		return heading
+
+
+class WindowContinue(WindowDialog):
+
+	def __init__(self, **kwargs):
+		super(WindowContinue, self).__init__(mode = WindowDialog.ModeContinue, **kwargs)
+
+	@classmethod
+	def show(self, metadata, rating = None, icon = None, indication = True, wait = True, initialize = True, binge = True, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, loader = False, close = False):
+		if not binge: action = WindowDialog.ActionCancel
+		if action is None: action = WindowDialog.ActionContinue if timeout else tools.Binge.continueAction()
+		if focus is None: focus = action
+		if timeout is None and action and binge: timeout = tools.Binge.continueTimeout()
+		if interact is None: interact = tools.Binge.continueInteract()
+		return super(WindowContinue, self).show(metadata = metadata, rating = rating, icon = icon, indication = indication, wait = wait, initialize = initialize, binge = binge, default = default, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, loader = loader, close = close)
+
+	def _heading(self, partial = False):
+		heading = interface.Translation.string(36497)
+		if partial and heading:
+			prefix = interface.Translation.string(33821)
+			heading = [prefix, heading.replace(prefix, '')]
+			heading[0] = interface.Format.fontColor(heading[0], color = interface.Format.colorPrimary())
+			heading[1] = interface.Format.fontColor(heading[1], color = '00FFFFFF')
+			heading = ''.join(heading)
+		return heading
+
 
 class WindowProgress(Window):
 
@@ -2346,7 +2975,10 @@ class WindowProgress(Window):
 
 			# Reduce even further. Only update the semi-opaque progress block every 5% instead of every 1%.
 			# Only do this if the new progress is less than 5% from the previous progress, otherwise huge progress jumps are not immediatly shown.
-			elif not instance.mProgressPrevious[0] is None and not progress % 5 == 0 and (instance.mProgressPrevious[0] is None or (progress - instance.mProgressPrevious[0]) < 5): progress = None
+			# UPDATE: This makes the progress bar update (and the % label in WindowScrape) too slow.
+			# UPDATE: Is this really an issue? We reste it to % again.
+			#elif not instance.mProgressPrevious[0] is None and not progress % 5 == 0 and (instance.mProgressPrevious[0] is None or (progress - instance.mProgressPrevious[0]) < 5): progress = None
+			elif not instance.mProgressPrevious[0] is None and not progress % 1 == 0 and (instance.mProgressPrevious[0] is None or (progress - instance.mProgressPrevious[0]) < 1): progress = None
 
 		if not status is None and instance.mProgressPrevious[2] == status: status = None
 
@@ -2389,6 +3021,7 @@ class WindowProgress(Window):
 	def _colorProgressFull(self):
 		return interface.Format.colorPrimary()
 
+	@classmethod
 	def _logoSize(self, dimension):
 		width = dimension[0]
 		height = dimension[1]
@@ -2399,11 +3032,13 @@ class WindowProgress(Window):
 		elif width < 256 and height < 256: return Window.SizeMedium
 		else: return Window.SizeLarge
 
+	@classmethod
 	def _logoName(self, force = False, dimension = None):
 		theme = self._theme()
 		size = self._logoSize(dimension)
 		return tools.File.joinPath(self._pathLogo(size), 'namecolor.png' if force or theme == 'default' or 'gaia' in theme  else 'nameglass.png')
 
+	@classmethod
 	def _logoIcon(self, force = False, dimension = None):
 		theme = self._theme()
 		size = self._logoSize(dimension)
@@ -2444,6 +3079,7 @@ class WindowProgress(Window):
 	def _progressClear(self, controlFill, controlIcon):
 		self._progressUpdate(progressNew = -1, progressCurrent = 0, controlFill = controlFill, controlIcon = controlIcon)
 
+	@classmethod
 	def _offsetLogo(self, y):
 		return int(y * WindowProgress.LogoOffsetY)
 
@@ -2747,11 +3383,11 @@ class WindowScrape(WindowProgress):
 
 		if not instance.mSkip == skip:
 			if skip:
-				[i.setVisible(not skip) for i in instance.mControlCancel if i]
-				[i.setVisible(skip) for i in instance.mControlSkip if i]
+				[self._visibleSet(control = i, visible = not skip) for i in instance.mControlCancel if i]
+				[self._visibleSet(control = i, visible = skip) for i in instance.mControlSkip if i]
 			else:
-				[i.setVisible(skip) for i in instance.mControlSkip if i]
-				[i.setVisible(not skip) for i in instance.mControlCancel if i]
+				[self._visibleSet(control = i, visible = skip) for i in instance.mControlSkip if i]
+				[self._visibleSet(control = i, visible = not skip) for i in instance.mControlCancel if i]
 			instance.mSkip = skip
 
 		size = interface.Font.fontLarge()
@@ -2920,6 +3556,8 @@ class WindowScrape(WindowProgress):
 
 class WindowPlayback(WindowProgress):
 
+	Canceled = None
+
 	def __init__(self, backgroundType, backgroundPath, logo, status, retry, **kwargs):
 		super(WindowPlayback, self).__init__(backgroundType = backgroundType, backgroundPath = backgroundPath, logo = logo, status = status, **kwargs)
 		self.mRetry = retry
@@ -2961,16 +3599,24 @@ class WindowPlayback(WindowProgress):
 	@classmethod
 	def show(self, background = None, status = True, wait = False, initialize = True, close = False, retry = False):
 		if interface.Player.canceled(): return False
+		WindowPlayback.Canceled = False
 		return super(WindowPlayback, self).show(backgroundType = tools.Settings.getInteger('interface.playback.interface.background'), backgroundPath = background, logo = WindowProgress.LogoIcon, status = status, wait = wait, initialize = initialize, close = close, retry = retry)
 
 	@classmethod
+	def canceled(self):
+		return WindowPlayback.Canceled
+
+	@classmethod
 	def close(self, id = None, loader = True, stop = False, cancel = False):
-		if cancel: interface.Player.canceledSet()
+		if cancel:
+			WindowPlayback.Canceled = True
+			interface.Player.canceledSet()
 
 		if stop:
 			# If the playback has started but Kodi cannot connect and/or start streaming (stuck at "Establishing Stream Connection").
 			from lib.modules.interface import Player
 			Player().stop()
+			Player().stop(rpc = True) # Sometimes the direct call to stop the player does not work.
 
 		# Sometimes the loader is visible if canceling playback window. loader parameter True by default.
 		loader = False # This problem seems to be gone, and we do not want to hide the loader when reloading the stream window from player.py, otherwise there is a short time where neither the loader not the stream loading window is visible.
@@ -3064,7 +3710,8 @@ class WindowStreams(WindowProgress):
 
 	IdDummy = 50000
 
-	ProgressThread = None
+	ProgressThreadProgress = None
+	ProgressThreadClose = None
 	ProgressData = {}
 
 	def __init__(self, backgroundType, backgroundPath, logo, status, metadata, items, xmlType, **kwargs):
@@ -3084,7 +3731,8 @@ class WindowStreams(WindowProgress):
 
 	@classmethod
 	def reset(self, settings = True, full = True):
-		WindowStreams.ProgressThread = None
+		WindowStreams.ProgressThreadProgress = None
+		WindowStreams.ProgressThreadClose = None
 		WindowStreams.ProgressData = {}
 
 	##############################################################################
@@ -3123,13 +3771,15 @@ class WindowStreams(WindowProgress):
 			if finished: instance._remove()
 		except: pass'''
 
-		if WindowStreams.ProgressThread is None: WindowStreams.ProgressThread = Pool.thread(target = self._updateObserve, start = True)
+		if WindowStreams.ProgressThreadProgress is None: WindowStreams.ProgressThreadProgress = Pool.thread(target = self._observeProgress, start = True)
+		if WindowStreams.ProgressThreadClose is None: WindowStreams.ProgressThreadClose = Pool.thread(target = self._observeClose, start = True)
+
 		WindowStreams.ProgressData['progress'] = progress
 		WindowStreams.ProgressData['finished'] = finished
 		WindowStreams.ProgressData['status'] = status
 
 	@classmethod
-	def _updateObserve(self):
+	def _observeProgress(self):
 		while not tools.System.aborted():
 			if WindowStreams.ProgressData:
 				if WindowStreams.ProgressData['finished']:
@@ -3144,6 +3794,24 @@ class WindowStreams(WindowProgress):
 			tools.Time.sleep(0.1)
 
 	@classmethod
+	def _observeClose(self):
+		# NB: Manually close the WindowStreams.
+		# When playback is initiated or currently playing, WindowStreams might be hidden from the user, but from Kodi's perspective it is still visible, running with window.doModal() in the background.
+		# This means the Python scrape (and streamsShow) process never finishes if we start playback.
+		#	Stuck at:  EXECUTION FINISHING [Action: scrape]
+		#	Without ever getting to: EXECUTION FINISHED [Action: scrape]
+		# And then memory, open files, threads, etc is never cleared.
+		# This might have caused or contributed to the problem with too many threads created on low-end devices, or the Linux problem on high-end devices "too many open files" cause by subprocess.py,
+		# Only if the user manually closes WindowStreams without initiaiting playback, does it actually close.
+		# Start this thread and wait until playback starts before calling self.close() here in order to finish the Pytyhon process.
+		# Do not close WindowStreams the moment playback is initiated (aka WindowPlayback is showing), otherwise is the playback initiation is canceled or playback fails (eg: connection dropped), WindowStreams should immediately be visible without having to go through the lengthy stream reload process.
+		# We can also not close WindowStreams from player.py, since it is running in its own Python process and does not know about the WindowStreams.instance().
+
+		player = interface.Player()
+		while self.visible() and not tools.System.aborted() and not player.isPlayback(): tools.Time.sleep(1)
+		self.close()
+
+	@classmethod
 	def enabled(self):
 		return tools.Settings.getInteger('interface.stream.interface') == 0
 
@@ -3154,10 +3822,13 @@ class WindowStreams(WindowProgress):
 		if position: self.itemSelect(int(position))
 
 	def _actionSelect(self):
+		tools.Observer.updateInteractStream()
 		path = self.control(Window.IdListControl).getSelectedItem().getProperty('GaiaAction')
 		tools.System.executePlugin(command = path)
 
 	def _actionInformation(self):
+		tools.Observer.updateInteractStream()
+
 		try: item = self.mItems[self.itemSelected()]
 		except: item = None
 
@@ -3176,6 +3847,8 @@ class WindowStreams(WindowProgress):
 			Informer.show(metadata = self.mMetadata)
 
 	def _actionContext(self):
+		tools.Observer.updateInteractStream()
+
 		index = self.control(Window.IdListControl).getSelectedPosition()
 		if index >= 0:
 			# Focus on the dummy control to open the context menu in the center of the screen.
@@ -3193,6 +3866,325 @@ class WindowStreams(WindowProgress):
 			id = self.propertyGlobal('GaiaIndexId')
 			if id: self.propertyGlobalSet('GaiaIndex' + id, self.control(Window.IdListControl).getSelectedPosition())
 		except: pass
+
+
+class WindowButton(Window):
+
+	ActionAccepted = True
+	ActionCanceled = False
+	ActionNone = None
+
+	StateHidden = 0
+	StatePartial = 1
+	StateVisible = 2
+
+	DurationAnimation = 1
+	DurationInitial = 2
+	DurationShort = 0.8
+
+	PropertyAnimationFull = 'GaiaButtonAnimationFull'
+	PropertyAnimationInitial = 'GaiaButtonAnimationInitial'
+	PropertyAnimationStarted = 'GaiaButtonAnimationStarted'
+
+	def __init__(self, label, clock = False, icon = None, duration = None, delay = None, fixed = None, callback = None, **kwargs):
+		super(WindowButton, self).__init__(**kwargs)
+
+		self.mDummy = None
+		self.mButton = None
+		self.mCallback = callback
+
+		self.mState = None
+		self.mPrevious = None
+
+		self.mInteracted = 0
+		self.mClosed = False
+		self.mCanceled = False
+		self.mAccepted = False
+
+		self.mDuration = duration
+		self.mDelay = delay
+		self.mFixed = fixed
+
+		self.mLabel = label
+		self.mIcon = icon
+
+		self.mClock = None
+		if clock: self.mClock = self._clock(duration) if duration else '00:00'
+
+	def _initializeStart2(self):
+		super(WindowButton, self)._initializeStart2()
+		self._addButtons()
+
+		# The mouse click events currently do not work if not directly clicked on the button, since click events are only fired when clicked on a control.
+		# To make this work, an invisible overlay control that covers the entire screen needs to be added, which receives the mouse click events.
+		for action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveRight, WindowBase.ActionMoveUp, WindowBase.ActionMoveDown, WindowBase.ActionItemNext, WindowBase.ActionItemPrevious, WindowBase.ActionSelectItem, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight]:
+			self._onAction(action, self._actionInteract)
+		for action in WindowBase.ActionsCancel:
+			self._onAction(action, self._actionInteract, propagate = False) # Do not propagate, otherwise the window is closed before the hidden animation can finish.
+
+	def _initializeEnd2(self):
+		super(WindowButton, self)._initializeEnd2()
+		self._setButton(control = self.mButton, text = self._label(), iconDummy = self.mIcon or 'change', width = False)
+		self._actionDelay()
+
+	@classmethod
+	def show(self, duration = None, delay = None, fixed = False, callback = None, wait = False, initialize = True, close = False):
+		if tools.Settings.getInteger('interface.button.interface') == 0: return None
+		instance = self.instance()
+		if not instance: super(WindowButton, self)._show(wait = False, initialize = initialize, close = close, duration = duration, delay = delay, fixed = fixed, callback = callback)
+		if wait:
+			instance = self.instance()
+			while not(instance.mAccepted or instance.mCanceled) and instance.visible() and not tools.System.aborted(): tools.Time.sleep(0.2)
+			result = WindowButton.ActionAccepted if instance.mAccepted else WindowButton.ActionCanceled if instance.mCanceled else WindowButton.ActionNone
+			return result
+		return instance
+
+	@classmethod
+	def cancel(self):
+		instance = self.instance()
+		if instance:
+			instance.mCanceled = True
+			instance._actionClose()
+
+	@classmethod
+	def _clock(self, duration):
+		from lib.modules.convert import ConverterDuration
+		return ConverterDuration(value = duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
+
+	def _label(self):
+		label = interface.Translation.string(self.mLabel)
+		if self.mClock: label += ' (+%s)' % self.mClock
+		return label
+
+	def _addButtons(self):
+		label = self._label()
+		duration = int(WindowButton.DurationAnimation * 1000)
+		durationShort = int(duration * WindowButton.DurationShort)
+
+		logo = tools.File.joinPath(self._pathLogo(size = interface.Icon.QualityMini), 'iconcolor.png')
+		icon = tools.Settings.getInteger('interface.button.icon')
+		icons = [
+				{'path' : logo if (icon == 0 or icon == 1) else self.mIcon, 'animation' : None},
+				{'path' : self.mIcon if (icon == 0 or icon == 2) else logo, 'animation' : None},
+			]
+
+		dimension = self._dimensionButton(text = label, icon = icons[1]['path'], adjust = 0.7 if self.mClock else 0.85)
+		self.mDummy = self._addButton(text = label, x = Window.SizeWidth + 10, y = Window.SizeHeight + 10, icon = icons, iconOffset = 0.05, width = dimension[0])
+		width = self.mDummy[0].getWidth()
+		height = self.mDummy[0].getHeight()
+		half = (height / 2.0)
+
+		offset = tools.Settings.getInteger('interface.button.position')
+
+		x = Window.SizeWidth + 1
+		y = (Window.SizeHeight  * (offset / 100.0)) - half
+		y = int(max(0, min(Window.SizeHeight - height, y)))
+		position = width - 7
+
+		color = tools.Settings.getInteger('interface.button.color')
+		if color == 0:
+			colorNormal = Window.ColorTransparent
+			colorFocus = Window.ColorTransparent
+		elif color == 1:
+			colorNormal = Window.ColorLight
+			colorFocus = Window.ColorLight
+		elif color == 2:
+			colorNormal = Window.ColorDark
+			colorFocus = Window.ColorDark
+		elif color == 3:
+			colorNormal = Window.ColorSecondary
+			colorFocus = Window.ColorPrimary
+		elif color == 4:
+			colorNormal = Window.ColorPrimary
+			colorFocus = Window.ColorSecondary
+		else:
+			colorNormal = None
+			colorFocus = None
+
+		self.propertySet(WindowButton.PropertyAnimationFull, '')
+		self.propertySet(WindowButton.PropertyAnimationStarted, '')
+		self.propertySet(WindowButton.PropertyAnimationInitial, WindowButton.StatePartial)
+
+		animation = [
+			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StateHidden)),
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+String.IsEqual(Window.Property(%s),%d)' % (53, duration, WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StatePartial)), # 55 still shows the label pixels on a TV.
+			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StateVisible)),
+		]
+		if icon == 0:
+			icons[0]['animation'] = animation + [
+				('Conditional', 'effect=fade start=100 end=0 time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+[String.IsEqual(Window.Property(%s),%d)|String.IsEqual(Window.Property(%s),%d)]' % (duration, WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StateVisible, WindowButton.PropertyAnimationInitial, WindowButton.StateHidden)),
+			]
+			icons[1]['animation'] = animation + [
+				('Conditional', 'effect=fade start=100 end=0 time=0 tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+[String.IsEqual(Window.Property(%s),%d)|String.IsEqual(Window.Property(%s),%d)]+String.IsEqual(Window.Property(%s),%d)' % (WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StateHidden, WindowButton.PropertyAnimationInitial, WindowButton.StatePartial)),
+				('Conditional', 'effect=fade start=0 end=100 time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)+[String.IsEqual(Window.Property(%s),%d)|String.IsEqual(Window.Property(%s),%d)]' % (durationShort, WindowButton.PropertyAnimationStarted, WindowButton.StatePartial, WindowButton.PropertyAnimationFull, WindowButton.StateVisible, WindowButton.PropertyAnimationInitial, WindowButton.StateHidden)),
+			]
+		else:
+			icons[0]['animation'] = animation
+			icons[1]['animation'] = animation
+
+		progress = {'delay' : WindowButton.DurationInitial * 1000, 'duration' : (self.mDuration - WindowButton.DurationAnimation) * 1000, 'condition' : 'String.IsEqual(Window.Property(%s),%d)' % (WindowButton.PropertyAnimationStarted, WindowButton.StatePartial)}
+		self.mButton = self._addButton(text = label, x = x, y = y, width = dimension[0], icon = icons, iconOffset = 0.045, colorNormal = colorNormal, colorFocus = colorFocus, animation = animation, progress = progress)
+
+	def _actionDelay(self):
+		def __actionDelay():
+			time = tools.Time.timestamp()
+
+			if self.mDelay:
+				for i in range(self.mDelay * 5):
+					if self.mInteracted or not self.visible(): break
+					tools.Time.sleep(0.2)
+
+			if self.visible():
+				# Change the animation duration.
+				# This seems to be the only way of doing it, since the animation "time" attribute seems to not be able to use InfoLabels.
+				if self.mFixed:
+					if self.mFixed: self.mDuration += self.mDelay - (tools.Time.timestamp() - time)
+					duration = str((self.mDuration - WindowButton.DurationAnimation) * 1000)
+					animation = self.mButton[4]['progressanimation']
+					for i in range(len(animation)):
+						if 'progress=true' in animation[i][1]:
+							animation[i] = (animation[i][0], tools.Regex.replace(data = animation[i][1], expression = 'time=(\d+)', replacement = duration, group = 1))
+					self.mButton[4]['progress'].setAnimations(animation)
+
+				if not self.mInteracted: self._actionToggle()
+				self.propertySet(WindowButton.PropertyAnimationStarted, WindowButton.StatePartial)
+				Pool.thread(target = self._threadClose, start = True)
+
+		if self.mDelay: Pool.thread(target = __actionDelay, start = True)
+		else: __actionDelay()
+
+	def _actionInteract(self, action = None):
+		try:
+			self.mInteracted += 1
+			self._actionToggle(action = action)
+		except: tools.Logger.error()
+
+	def _actionToggle(self, action = None):
+		try:
+			if action in WindowBase.ActionsCancel:
+				self.mCanceled = True
+				self._actionClose()
+			elif action in [WindowBase.ActionSelectItem, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight] and not self.mState == WindowButton.StateHidden:
+				if self.focusHas(control = self.mButton[0]):
+					self.mAccepted = True
+					if self.mCallback: self.mCallback()
+					self._actionClose()
+				else:
+					self.focus(control = self.mButton[0])
+			else:
+				previous = self.mState
+				if self.mState is None:
+					self.focus(self.mButton[0])
+					self.mState = WindowButton.StatePartial
+					self.propertySet(WindowButton.PropertyAnimationFull, self.mState)
+					Pool.thread(target = self._threadInitial, start = True)
+				elif self.focusHas(control = self.mButton[0]):
+					if self.mState == WindowButton.StateHidden:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp, WindowBase.ActionItemPrevious, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight, WindowBase.ActionSelectItem]:
+							self.mState = WindowButton.StateVisible
+					elif self.mState == WindowButton.StatePartial:
+						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp, WindowBase.ActionItemPrevious, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight]:
+							self.mState = WindowButton.StateVisible
+						elif action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown, WindowBase.ActionItemNext]:
+							self.propertySet(WindowButton.PropertyAnimationInitial, WindowButton.StateHidden)
+							self.mState = WindowButton.StateHidden
+					elif self.mState == WindowButton.StateVisible:
+						if action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown, WindowBase.ActionItemNext]:
+							self.mState = WindowButton.StatePartial
+
+					# Makes the animation smoother when moving from Partial to Visible, while the previous animation (Hidden to Partial) is still running.
+					# Eg: Go into Hidden state. Press Left and a few ms later press Left again. The button bounces to the right for a short time before going full Visible.
+					time = tools.Time.timestamp(milliseconds = True)
+					if previous == WindowButton.StatePartial and self.mState == WindowButton.StateVisible:
+						duration = time - (self.mPrevious or time)
+						animation = int(WindowButton.DurationAnimation * 1000)
+						if duration < animation: tools.Time.sleep((animation - duration + 10) / 1000.0)
+					self.mPrevious = time
+
+					self.propertySet(WindowButton.PropertyAnimationFull, self.mState)
+
+				else:
+					self.focus(control = self.mButton[0])
+		except: tools.Logger.error()
+
+	def _actionClose(self, sleep = True):
+		try:
+			self.mClosed = True
+			self.mState = WindowButton.StateHidden
+			self.propertySet(WindowButton.PropertyAnimationFull, self.mState)
+			if sleep: tools.Time.sleep(WindowButton.DurationAnimation * 1.05)
+			self.close()
+		except: tools.Logger.error()
+
+	def _threadClose(self):
+		try:
+			# Close the window after being hidden for a few seconds.
+			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowButton.
+			for i in range(self.mDuration * 2):
+				if self.mClosed: return
+				tools.Time.sleep(0.5)
+			if not self.mClosed: self._actionClose()
+		except: tools.Logger.error()
+
+	def _threadInitial(self):
+		try:
+			step = 0.2
+
+			duration = WindowButton.DurationInitial
+			for i in range(int(duration / step)):
+				if self.mClosed: return
+				if self.mInteracted and (not self.mDelay or self.mInteracted > 1): break
+				tools.Time.sleep(step)
+
+			if not self.property(WindowButton.PropertyAnimationInitial) == str(WindowButton.StateHidden):
+				self.mState = WindowButton.StateVisible
+				self.propertySet(WindowButton.PropertyAnimationFull, self.mState)
+				Pool.thread(target = self._threadPartial, start = True)
+
+				duration = WindowButton.DurationAnimation * WindowButton.DurationShort
+				for i in range(int(duration / step)):
+					if self.mClosed or self.mInteracted: break
+					tools.Time.sleep(step)
+				self.propertySet(WindowButton.PropertyAnimationInitial, WindowButton.StateHidden)
+		except: tools.Logger.error()
+
+	def _threadPartial(self):
+		try:
+			time = min(self.mDuration, tools.Settings.getCustom('interface.button.time'))
+			time = int(time / 3.0)
+
+			# Partially hide after a few seconds.
+			for i in range(time * 2):
+				if self.mClosed or self.mInteracted or not self.mState == WindowButton.StateVisible: return
+				tools.Time.sleep(0.5)
+			if not self.mClosed and self.mState == WindowButton.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
+
+			# Fully hide after a few seconds.
+			for i in range(time * 4): # Twice as long as the full visibility.
+				if self.mClosed or self.mInteracted or not self.mState == WindowButton.StatePartial: return
+				tools.Time.sleep(0.5)
+			if not self.mClosed and self.mState == WindowButton.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)
+		except: tools.Logger.error()
+
+
+class WindowButtonSkip(WindowButton):
+
+	def __init__(self, **kwargs):
+		super(WindowButtonSkip, self).__init__(label = 33897, clock = True, icon = 'change', **kwargs)
+
+	def _actionInteract(self, action = None):
+		tools.Observer.updateInteractSkip()
+		super(WindowButtonSkip, self)._actionInteract(action = action)
+
+
+class WindowButtonContinue(WindowButton):
+
+	def __init__(self, **kwargs):
+		super(WindowButtonContinue, self).__init__(label = 33821, clock = False, icon = 'play', **kwargs)
+
+	def _actionInteract(self, action = None):
+		tools.Observer.updateInteractBinge()
+		super(WindowButtonContinue, self)._actionInteract(action = action)
 
 
 class WindowBinge(WindowProgress):
@@ -3215,8 +4207,10 @@ class WindowBinge(WindowProgress):
 		self.mUpdate = True
 		self.mTime = None
 		self.mFocus = None
-		self.mAction = tools.Binge.actionNone()
-		self.mContinue = self.mAction == tools.Binge.ActionContinue
+
+		self.mAction = None
+		self.mContinue = None
+
 		self.mFontSize = interface.Font.fontMedium() if self.mMode == WindowBinge.ModeOverlay else interface.Font.fontLarge()
 
 		for action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveRight, WindowBase.ActionMoveUp, WindowBase.ActionMoveDown, WindowBase.ActionItemNext, WindowBase.ActionItemPrevious, WindowBase.ActionSelectItem, WindowBase.ActionMouseLeft, WindowBase.ActionMouseRight]:
@@ -3278,7 +4272,7 @@ class WindowBinge(WindowProgress):
 				self.update(progress = 100, time = 0, finished = True)
 				next = instance.mContinue
 				instance.close()
-		return result and next
+		return next if result else None
 
 	@classmethod
 	def update(self, progress = None, finished = None, status = None, time = None):
@@ -3326,10 +4320,12 @@ class WindowBinge(WindowProgress):
 		except: pass
 
 	def _actionCancel(self):
+		tools.Observer.updateInteractBinge()
 		self.mContinue = False
 		self.close()
 
 	def _actionContinue(self):
+		tools.Observer.updateInteractBinge()
 		self.mContinue = True
 		self.close()
 
@@ -3542,6 +4538,16 @@ class WindowBingeOverlay(WindowBinge):
 		self.mControlContinue = self._addButton(text = 33821, x = x, y = y, width = width, height = height, callback = self._actionContinue, icon = 'play', size = interface.Font.fontMedium())
 		y += height + WindowBingeOverlay.Padding
 		self.mControlCancel = self._addButton(text = 33743, x = x, y = y, width = width, height = height, callback = self._actionCancel, icon = 'error', size = interface.Font.fontMedium())
+
+
+class WindowBingeButton(WindowButtonContinue):
+
+	def __init__(self, **kwargs):
+		super(WindowBingeButton, self).__init__(**kwargs)
+
+	@classmethod
+	def show(self, wait = True, initialize = True, close = False, duration = None, delay = None):
+		return super(WindowBingeButton, self).show(duration = duration, delay = delay, fixed = True, wait = wait, initialize = initialize, close = close)
 
 
 class WindowStep(WindowProgress):
@@ -4130,170 +5136,6 @@ class WindowDonation(WindowStepQr):
 		])
 
 
-class WindowSkip(Window):
-
-	StateHidden = 0
-	StatePartial = 1
-	StateVisible = 2
-
-	DurationVisible = 7
-	DurationAnimation = 1
-
-	PropertyAnimation = 'GaiaAnimationSkip'
-
-	def __init__(self, **kwargs):
-		super(WindowSkip, self).__init__(**kwargs)
-
-		self.mSkipDummy = None
-		self.mSkipButton = None
-		self.mSkipState = None
-		self.mSkipCanceled = False
-		self.mSkipInteract = False
-		self.mSkipTime = WindowSkip.DurationVisible
-		self.mSkipClock = '00:00'
-		self.mSkipThread = None
-		self.mSkipCallback = None
-
-	def _initializeStart2(self):
-		super(WindowSkip, self)._initializeStart2()
-
-		self._addButtons()
-		self._onAction(WindowBase.ActionMoveLeft, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveRight, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveUp, self._actionInteract)
-		self._onAction(WindowBase.ActionMoveDown, self._actionInteract)
-		self._onAction(WindowBase.ActionSelectItem, self._actionInteract)
-		for action in WindowBase.ActionsCancel: self._onAction(action, self._actionInteract)
-
-	def _initializeEnd1(self):
-		super(WindowSkip, self)._initializeEnd1()
-		self._actionToggle()
-
-	@classmethod
-	def show(self, duration = None, time = None, callback = None, wait = False, initialize = True, close = False):
-		instance = self.instance()
-		if not instance:
-			super(WindowSkip, self)._show(wait = wait, initialize = initialize, close = close)
-			instance = self.instance()
-		if instance:
-			if time: instance.mSkipTime = min(time, int(duration / 3.0)) if duration else time # Divide by 3, since we show the full button for 1/3 of the time and the partial button for 2/3 of the time.
-			instance.mSkipClock = self._clock(duration)
-			instance.mSkipCallback = callback
-			instance.mSkipState = None
-			instance.mSkipCanceled = False
-			instance._setButton(control = instance.mSkipButton, text = '%s (+%s)' % (interface.Translation.string(33897), instance.mSkipClock), icon = 'change', width = False)
-			instance._actionToggle()
-
-	@classmethod
-	def cancel(self):
-		instance = self.instance()
-		if instance: instance._actionClose()
-
-	@classmethod
-	def _clock(self, duration):
-		from lib.modules.convert import ConverterDuration
-		return ConverterDuration(value = duration, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
-
-	def _addButtons(self):
-		text = '%s (+%s)' % (interface.Translation.string(33897), self.mSkipClock)
-		icon = 'change'
-		duration = int(WindowSkip.DurationAnimation * 1000)
-
-		dimension = self._dimensionButton(text = text, icon = icon, adjust = 0.7)
-		self.mSkipDummy = self._addButton(text = text, x = Window.SizeWidth + 10, y = Window.SizeHeight + 10, icon = icon, iconOffset = 0.05, width = dimension[0])
-		width = self.mSkipDummy[0].getWidth()
-
-		x = Window.SizeWidth + 1
-		y = Window.SizeHeight - 150
-		position = width - 7
-
-		self.propertySet(WindowSkip.PropertyAnimation, '')
-		animation = [
-			('Conditional', 'effect=slide start=0 end=%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (0, duration, WindowSkip.PropertyAnimation, WindowSkip.StateHidden)),
-			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (53, duration, WindowSkip.PropertyAnimation, WindowSkip.StatePartial)), # 55 still shows the label pixels on a TV.
-			('Conditional', 'effect=slide start=0 end=-%d time=%d tween=cubic easing=inout condition=String.IsEqual(Window.Property(%s),%d)' % (position, duration, WindowSkip.PropertyAnimation, WindowSkip.StateVisible)),
-		]
-		self.mSkipButton = self._addButton(text = text, x = x, y = y, width = dimension[0], callback = self._actionClick, icon = icon, iconOffset = 0.05, animation = animation)
-
-	def _actionClick(self, control = None):
-		try:
-			self._actionInteract(action = WindowBase.ActionSelectItem)
-		except: tools.Logger.error()
-
-	def _actionInteract(self, action = None):
-		try:
-			self.mSkipInteract = True
-			self._actionToggle(action = action)
-		except: tools.Logger.error()
-
-	def _actionToggle(self, action = None):
-		try:
-			if action in WindowBase.ActionsCancel:
-				self._actionClose()
-			elif action == WindowBase.ActionSelectItem:
-				if self.focusHas(control = self.mSkipButton[0]):
-					if self.mSkipCallback: self.mSkipCallback()
-					self._actionClose()
-				else:
-					self.focus(control = self.mSkipButton[0])
-			else:
-				if self.mSkipState is None:
-					self.focus(self.mSkipButton[0])
-					self.mSkipState = WindowSkip.StateVisible
-					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-					Pool.thread(target = self._threadPartial, start = True)
-				elif self.focusHas(control = self.mSkipButton[0]):
-					if self.mSkipState == WindowSkip.StateHidden:
-						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StatePartial
-					elif self.mSkipState == WindowSkip.StatePartial:
-						if action in [WindowBase.ActionMoveLeft, WindowBase.ActionMoveUp]: self.mSkipState = WindowSkip.StateVisible
-						elif action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StateHidden
-					elif self.mSkipState == WindowSkip.StateVisible:
-						if action in [WindowBase.ActionMoveRight, WindowBase.ActionMoveDown]: self.mSkipState = WindowSkip.StatePartial
-
-					self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-
-					if self.mSkipState == WindowSkip.StateHidden and (not self.mSkipThread or not self.mSkipThread.alive()):
-						self.mSkipThread = Pool.thread(target = self._threadClose, start = True)
-				else:
-					self.focus(control = self.mSkipButton[0])
-		except: tools.Logger.error()
-
-	def _actionClose(self, sleep = True):
-		try:
-			self.mSkipState = WindowSkip.StateHidden
-			self.propertySet(WindowSkip.PropertyAnimation, self.mSkipState)
-			self.mSkipCanceled = True
-			if sleep: tools.Time.sleep(WindowSkip.DurationAnimation * 0.1)
-			self.close()
-		except: tools.Logger.error()
-
-	def _threadClose(self):
-		try:
-			# Close the window after being hidden for a few seconds.
-			# Otherwise the underlying player controls/buttons are not selectable, since the focus is on WindowSkip.
-			for i in range(max(3, min(6, int(self.mSkipTime / 2.0))) * 2):
-				if self.mSkipCanceled or not self.mSkipState == WindowSkip.StateHidden: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateHidden: self.close()
-		except: tools.Logger.error()
-
-	def _threadPartial(self):
-		try:
-			# Partially hide after a few seconds.
-			for i in range(self.mSkipTime * 2):
-				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StateVisible: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StateVisible: self._actionToggle(action = WindowBase.ActionMoveRight)
-
-			# Fully hide after a few seconds.
-			for i in range(self.mSkipTime * 4): # Twice as long as the full visibility.
-				if self.mSkipCanceled or self.mSkipInteract or not self.mSkipState == WindowSkip.StatePartial: return
-				tools.Time.sleep(0.5)
-			if not self.mSkipCanceled and self.mSkipState == WindowSkip.StatePartial: self._actionToggle(action = WindowBase.ActionMoveRight)
-		except: tools.Logger.error()
-
-
 class WindowOptimization(WindowStep):
 
 	SizeIcon = 128
@@ -4418,7 +5260,7 @@ class WindowOptimization(WindowStep):
 		self._toggleDiagnostics(visible = False)
 		self._toggleRating(visible = False)
 		self._togglePreferences(visible = False)
-		self._toggleIntroduction(visible = not bool(WindowOptimization.DiagnoseData))
+		self._toggleIntroduction(visible = False)
 
 	def _initializeEnd2(self):
 		super(WindowOptimization, self)._initializeEnd2()
@@ -4431,6 +5273,10 @@ class WindowOptimization(WindowStep):
 			self._toggleDiagnostics(visible = False)
 			self._toggleRating(visible = False)
 			self._togglePreferences(visible = True)
+		else:
+			# Only do this here and not in _initializeStart2(), since the label is set on the button.
+			# Otherwise the button label is not deleted if the window is closed.
+			self._toggleIntroduction(visible = not bool(WindowOptimization.DiagnoseData))
 
 	def _actionFocus(self, action = None):
 		if self.mStep == WindowOptimization.StepPreferences:
@@ -6169,6 +7015,9 @@ class WindowOracleBusy(WindowStep):
 				if (not loader and WindowOracleBusy.visible()) or (loader and interface.Loader.visible()):
 					if loader: interface.Loader.hide()
 					WindowOracle.Steps['busy']['next']()
+			else:
+				if loader: interface.Loader.hide()
+				self.close()
 
 	@classmethod
 	def _chatProgress(self, progress, status):

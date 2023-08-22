@@ -126,6 +126,7 @@ class Provider(ProviderBase):
 	##############################################################################
 
 	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		lock = None
 		try:
 			# Cannot search the library by IMDb ID for some reason.
 			# The RPC always returns an error: Received value does not match any of the union type definitions.
@@ -172,24 +173,35 @@ class Provider(ProviderBase):
 						result = self.searchJson(method = 'VideoLibrary.GetEpisodes', parameters = {'filter' : filter, 'tvshowid' : result['tvshowid'], 'properties': ['file']})
 						if 'result' in result and 'episodes' in result['result']:
 							result = self.searchFilter(result['result']['episodes'])
-							for res in result:
-								res = self.searchJson(method = 'VideoLibrary.GetEpisodeDetails', parameters = {'episodeid' : res['episodeid'], 'properties': ['streamdetails', 'file']})
-								if 'result' in res and 'episodedetails' in res['result']:
-									res = res['result']['episodedetails']
-									self.searchProcess(match = matchId, result = res, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+
+							chunks = self.priorityChunks(result)
+							for chunk in chunks:
+								lock = self.priorityStart(lock = lock)
+								for res in chunk:
+									res = self.searchJson(method = 'VideoLibrary.GetEpisodeDetails', parameters = {'episodeid' : res['episodeid'], 'properties': ['streamdetails', 'file']})
+									if 'result' in res and 'episodedetails' in res['result']:
+										res = res['result']['episodedetails']
+										self.searchProcess(match = matchId, result = res, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+								self.priorityEnd(lock = lock)
 			else:
 				results = self.searchJson(method = 'VideoLibrary.GetMovies', parameters = {'filter' : filter, 'properties': ['uniqueid', 'imdbnumber', 'title', 'originaltitle', 'file']})
 				if 'result' in results and 'movies' in results['result']:
 					results = self.searchFilter(results['result']['movies'])
-					for result in results:
-						matchId, matchTitle = self.searchMatch(result = result, titles = titles, ids = ids)
-						if not matchId and not matchTitle: continue
-						result = self.searchJson(method = 'VideoLibrary.GetMovieDetails', parameters = {'movieid' : result['movieid'], 'properties': ['streamdetails', 'file']})
-						if 'result' in result and 'moviedetails' in result['result']:
-							result = result['result']['moviedetails']
-							self.searchProcess(match = matchId, result = result, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+
+					chunks = self.priorityChunks(results)
+					for chunk in chunks:
+						lock = self.priorityStart(lock = lock)
+						for result in chunk:
+							matchId, matchTitle = self.searchMatch(result = result, titles = titles, ids = ids)
+							if not matchId and not matchTitle: continue
+							result = self.searchJson(method = 'VideoLibrary.GetMovieDetails', parameters = {'movieid' : result['movieid'], 'properties': ['streamdetails', 'file']})
+							if 'result' in result and 'moviedetails' in result['result']:
+								result = result['result']['moviedetails']
+								self.searchProcess(match = matchId, result = result, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+						self.priorityEnd(lock = lock)
 
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	def searchJson(self, method, parameters):
 		result = System.executeJson(method = method, parameters = parameters)

@@ -408,7 +408,6 @@ class Navigator(object):
 		self.addDirectoryItem(33239, 'supportNavigator', 'help.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(32062, 'logNavigator', 'log.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(33467, 'systemNavigator', 'system.png', 'DefaultAddonProgram.png')
-		self.addDirectoryItem(33311, 'ambilightNavigator', 'ambilight.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(35442, 'promotionsNavigator&force=1', 'promotion.png', 'DefaultAddonProgram.png')
 		self.addDirectoryItem(33344, 'informationNavigator', 'information.png', 'DefaultAddonProgram.png')
 		self.endDirectory()
@@ -1062,19 +1061,6 @@ class Navigator(object):
 		from lib.modules.tools import Extension
 		for extension in Extension.list():
 			if extension['installed']: self.addDirectoryItem(extension['name'], 'extensions&id=%s' % extension['id'], extension['icon'], 'DefaultAddonProgram.png')
-		self.endDirectory()
-
-	def ambilightNavigator(self):
-		self.addDirectoryItem(33406, 'lightpackNavigator', 'lightpack.png', 'DefaultAddonProgram.png')
-		self.endDirectory()
-
-	def lightpackNavigator(self):
-		from lib.modules.tools import Lightpack
-		if Lightpack().enabled():
-			self.addDirectoryItem(33407, 'lightpackSwitchOn', 'lightpackon.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
-			self.addDirectoryItem(33408, 'lightpackSwitchOff', 'lightpackoff.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
-			self.addDirectoryItem(33409, 'lightpackAnimate', 'lightpackanimate.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
-		self.addDirectoryItem(33011, 'lightpackSettings', 'lightpacksettings.png', 'DefaultAddonProgram.png', isAction = True, isFolder = False)
 		self.endDirectory()
 
 	def kidsRedirect(self):

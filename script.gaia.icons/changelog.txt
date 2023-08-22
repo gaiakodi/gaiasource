@@ -1,4 +1,7 @@
 
+[B]6.4.0 (2023.08.22)[/B]
+- Removed Lightpack icons.
+
 [B]6.3.2 (2023.07.02)[/B]
 - Added TMDbHelper icons.
 

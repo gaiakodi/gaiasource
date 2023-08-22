@@ -92,6 +92,7 @@ class ProviderCenter(ProviderBase):
 	##############################################################################
 
 	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		lock = None
 		try:
 			title = titles['search']['main']
 			year = years
@@ -102,10 +103,15 @@ class ProviderCenter(ProviderBase):
 				streams = self.mCore.search(media = media, title = title, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, exact = exact)
 				self.statisticsUpdateSearch(request = len(title), page = len(title))
 				if streams:
-					for stream in streams:
-						stream = self.stream(stream = stream)
-						if stream: self.resultAdd(stream)
+					chunks = self.priorityChunks(streams)
+					for chunk in chunks:
+						lock = self.priorityStart(lock = lock)
+						for stream in chunk:
+							stream = self.stream(stream = stream)
+							if stream: self.resultAdd(stream)
+						self.priorityEnd(lock = lock)
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	##############################################################################
 	# STREAM

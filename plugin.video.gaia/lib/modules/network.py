@@ -2277,12 +2277,25 @@ class Geolocator(object):
 		return self._dataAnonymize(data = result, anonymize = anonymize)
 
 	@classmethod
-	def _detectRequest(self, link, data = None):
+	def _detectRequest(self, link, data = None, retry = True):
 		# Reduce timeout.
 		# If this quick/simple request takes longer that 15 secs, it probably means that the service is down (or some other connection issue, non-connected VPN with kill switrch, no internet connection, etc).
 		# Use GET to add data as GET and not POST parameters.
 		# Do not use the VPN kill switch here, since this function might be called from the VPN code.
-		return Networker().requestJson(link = link, data = data, method = Networker.MethodGet, timeout = 15, vpn = False)
+
+		networker = Networker()
+		result = networker.requestJson(link = link, data = data, method = Networker.MethodGet, timeout = 15, vpn = False)
+
+		# When the VPN is changed/disconnected, it takes a few seconds until the OS can let requests through again.
+		# If the IP is detected during this time, the following error is thrown:
+		# 	Network Error [Error Type: Connection | Link: https://ipwhois.app/json/]: Failed to establish a new connection: [Errno -3] Temporary failure in name resolution
+		if retry and networker.responseErrorType():
+			message = (networker.responseErrorMessage() or '').lower()
+			if 'temporary failure' in message:
+				tools.Time.sleep(3)
+				result = networker.requestJson(link = link, data = data, method = Networker.MethodGet, timeout = 15, vpn = False)
+
+		return result
 
 	@classmethod
 	def _detectIpwhoisapp(self, ip = None):

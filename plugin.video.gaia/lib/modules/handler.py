@@ -1553,8 +1553,7 @@ class HandleYoutube(Handle):
 				interface.Loader.hide()
 
 			# Close the stream window, otherwise YouTube opens the player behind it.
-			if player.isPlaying() and window.WindowStreams.enabled():
-				window.WindowStreams.close()
+			if player.isPlaying() and window.WindowStreams.enabled(): window.WindowStreams.close()
 
 			# Assume that YouTube failed to start/resolve the torrent. YouTube only shows an error in the Kodi log file.
 			if not started:

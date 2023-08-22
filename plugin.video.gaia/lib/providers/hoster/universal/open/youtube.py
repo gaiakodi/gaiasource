@@ -65,18 +65,24 @@ class Provider(ProviderBase):
 	##############################################################################
 
 	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		lock = None
 		try:
-			type = Media.TypeShow if Media.typeTelevision(media) else Media.TypeMovie
+			media = Media.TypeShow if Media.typeTelevision(media) else Media.TypeMovie
 			title = titles['search']['main'][0]
 			year = years['common']
-			if self.queryAllow(type, title, year, numberSeason, numberEpisode):
-				streams = Full(type = type).search(title = title, year = year, season = numberSeason, episode = numberEpisode)
+			if self.queryAllow(media, title, year, numberSeason, numberEpisode):
+				streams = Full(media = media).search(title = title, year = year, season = numberSeason, episode = numberEpisode)
 				self.statisticsUpdateSearch(page = True, request = True)
 				if streams:
-					for stream in streams:
-						stream = self.stream(stream = stream)
-						if stream: self.resultAdd(stream)
+					chunks = self.priorityChunks(streams)
+					for chunk in chunks:
+						lock = self.priorityStart(lock = lock)
+						for stream in chunk:
+							stream = self.stream(stream = stream)
+							if stream: self.resultAdd(stream)
+						self.priorityEnd(lock = lock)
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	##############################################################################
 	# STREAM

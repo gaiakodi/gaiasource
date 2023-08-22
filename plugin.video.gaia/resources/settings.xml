@@ -84,30 +84,32 @@ The label is then added to the action element:
 
 			<!-- ########## GENERAL - LAUNCH ########## -->
 			<group id="general.launch" label="33256">
-				<setting id="general.launch.automatic" type="boolean" label="33257" help="34041">
-					<control type="toggle"/>
-					<default>false</default>
-					<level>2</level>
+				<setting id="general.launch.service" type="integer" label="35175" help="34646">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33805">0</option>
+							<option label="33806">1</option>
+						</options>
+					</constraints>
 				</setting>
-				<setting id="general.launch.acceleration" type="boolean" label="33944" help="34453">
+				<setting id="general.launch.acceleration" type="boolean" label="33944" help="34453" parent="general.launch.service">
 					<control type="toggle"/>
 					<default>true</default>
 					<level>3</level>
+					<dependencies>
+						<dependency type="visible" setting="general.launch.service">0</dependency>
+					</dependencies>
 				</setting>
-				<setting id="general.launch.sound" type="integer" label="33423" help="34112">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="33424">1</option>
-							<option label="33425">2</option>
-							<option label="33426">3</option>
-							<option label="33427">4</option>
-							<option label="33428">5</option>
-						</options>
-					</constraints>
+				<setting id="general.launch.automatic" type="boolean" label="33257" help="34041" parent="general.launch.service">
+					<control type="toggle"/>
+					<default>false</default>
+					<level>3</level>
+					<dependencies>
+						<dependency type="visible" setting="general.launch.service">0</dependency>
+					</dependencies>
 				</setting>
 				<setting id="general.launch.splash" type="integer" label="33258" help="34042">
 					<control type="spinner" format="string"/>
@@ -153,13 +155,29 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## GENERAL - SOUND ########## -->
+			<group id="general.sound" label="33423">
+				<setting id="general.sound.effects" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.sound.effects.label" type="string" label="36514" help="34112">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsSound&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+			</group>
+
 			<!-- ########## GENERAL - KIDS ########## -->
 			<group id="general.kids" label="33429">
 				<setting id="general.kids.locked" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>4</level></setting> <!-- Level 4 to not reset on default -->
 				<setting id="general.kids.enabled" type="boolean" label="33438" help="34124">
 					<control type="toggle"/>
 					<level>2</level>
-					<default>true</default>
+					<default>false</default>
 					<dependencies>
 						<dependency type="visible" setting="general.kids.locked">false</dependency>
 					</dependencies>
@@ -283,7 +301,7 @@ The label is then added to the action element:
 					<level>3</level>
 					<default>true</default>
 				</setting>
-				<setting id="general.settings.backup.time" type="integer"><default>0</default><control type="edit" format="integer"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="general.settings.backup.time" type="integer"><default>0</default><control type="edit" format="integer"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>4</level></setting> <!-- Use level 4 in order not to reset the value if the Default button is clicked in the settings dialog. -->
 				<setting id="general.settings.backup.enabled" type="boolean" label="35208" help="34287">
 					<control type="toggle"/>
 					<level>2</level>
@@ -321,30 +339,29 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## GENERAL - CACHE ########## -->
-			<group id="general.cache" label="33016">
-				<setting id="general.cache.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="general.cache.limit.label" type="string" label="36036" help="34473">
+			<!-- ########## GENERAL - DATABASE ########## -->
+			<group id="general.database" label="33775">
+				<setting id="general.database.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.database.limit.label" type="string" label="36036" help="34473">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.cache.limit&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDatabase&settings=true)</data>
 						<close>true</close>
 					</control>
-					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
 					<level>3</level>
 					<constraints>
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="general.cache.expression" type="integer" label="36135" help="34448">
-					<control type="spinner" format="string"/>
-					<default>1</default>
+				<setting id="general.database.clean" type="string" label="36428" help="34640" parent="general.database.limit.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=clean&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
 					<level>3</level>
 					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="35004">1</option>
-							<option label="35049">2</option>
-						</options>
+						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
 			</group>
@@ -444,7 +461,6 @@ The label is then added to the action element:
 				NB:		https://kodi.wiki/view/List_of_Built_In_Controls#DialogAddonSettings.xml
 				NB: The only solution seems to be to have a MAXIMUM of 20 settings tabs.
 				NB: Hence, the Developers tab was moved to the General tab to reduce the number of tabs/categories..
-				NB: If futher tabs have to be reduced in the future, maybe combine Bluetooth and Ambilight into a single "Utilities" tab.
 			-->
 			<group id="general.developer" label="36041">
 				<setting id="general.developer.help" type="string" label="" help="34485">
@@ -1869,7 +1885,7 @@ The label is then added to the action element:
 					</constraints>
 				</setting>
 				<setting id="scrape.save.cache" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="sscrape.save.cache.label" type="string" label="33888" help="34596" parent="scrape.save.stream.label">
+				<setting id="scrape.save.cache.label" type="string" label="33888" help="34596">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=scrape.save.cache&settings=true)</data>
 						<close>true</close>
@@ -1878,6 +1894,18 @@ The label is then added to the action element:
 					<level>2</level>
 					<constraints>
 						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="scrape.save.expression" type="integer" label="36135" help="34448">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35004">1</option>
+							<option label="35049">2</option>
+						</options>
 					</constraints>
 				</setting>
 			</group>
@@ -3173,6 +3201,11 @@ The label is then added to the action element:
 
 			<!-- ########## PLAYBACK - AUTOPLAY ########## -->
 			<group id="playback.autoplay" label="35848">
+				<setting id="playback.autoplay.sequential" type="boolean" label="35433" help="34354">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>false</default>
+				</setting>
 				<setting id="playback.autoplay.enabled" type="boolean" label="33461" help="34035">
 					<control type="toggle"/>
 					<level>1</level>
@@ -3228,230 +3261,17 @@ The label is then added to the action element:
 						<dependency type="visible" setting="playback.autoplay.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="playback.autoplay.sequential" type="boolean" label="35433" help="34354">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>false</default>
-				</setting>
-			</group>
-
-			<!-- ########## PLAYBACK - RETRY ########## -->
-			<group id="playback.retry" label="35678">
-				<setting id="playback.retry.enabled" type="boolean" label="35290" help="34297">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="playback.retry.limit" type="integer" label="35291" help="34298" parent="playback.retry.enabled">
-					<control type="slider" format="integer">
-						<heading>35291</heading>
-						<popup>true</popup>
-					</control>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="playback.retry.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.retry.delay" type="integer" label="35292" help="34299" parent="playback.retry.enabled">
-					<control type="slider" format="integer">
-						<heading>35292</heading>
-						<popup>true</popup>
-					</control>
-					<default>3</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>180</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="playback.retry.enabled">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## PLAYBACK - SKIP ########## -->
-			<group id="playback.skip" label="33897">
-				<setting id="playback.skip.enabled" type="boolean" label="33462" help="34566">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="playback.skip.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="playback.skip.time.label" type="string" label="32312" help="34567" parent="playback.skip.enabled">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=playback.skip.time&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>1</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="playback.skip.enabled">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## PLAYBACK - BINGE ########## -->
-			<group id="playback.binge" label="35580">
-				<setting id="playback.binge.enabled" type="boolean" label="35579" help="34407">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="playback.binge.dialog" type="integer" label="35621" help="34425" parent="playback.binge.enabled">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35622">1</option>
-							<option label="35623">2</option>
-							<option label="35624">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="playback.binge.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.suppress" type="integer" label="35583" help="34415" parent="playback.binge.enabled">
-					<control type="spinner" format="string"/>
-					<control type="toggle"/>
-					<level>3</level>
-					<default>1</default>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33387">1</option>
-							<option label="33029">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.delay" type="integer" label="35581" help="34414" parent="playback.binge.enabled">
-					<control type="slider" format="integer">
-						<heading>35581</heading>
-						<popup>true</popup>
-					</control>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>180</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">0</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.action.none" type="integer" label="35625" help="34426" parent="playback.binge.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="33821">0</option>
-							<option label="33743">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">0</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.action.continue" type="integer" label="35626" help="34427" parent="playback.binge.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35628">0</option>
-							<option label="35627">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">0</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.action.cancel" type="integer" label="35105" help="34428" parent="playback.binge.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35628">0</option>
-							<option label="35627">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">0</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.pack" type="boolean" label="35013" help="34034" parent="playback.binge.enabled">
+				<setting id="playback.autoplay.binge" type="boolean" label="35013" help="34034">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 					<dependencies>
-						<dependency type="visible">
+						<dependency type="enable">
 							<and>
-								<condition setting="playback.binge.enabled">true</condition>
-								<condition setting="playback.binge.dialog" operator="!is">3</condition>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
 							</and>
 						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="playback.binge.scrape" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="playback.binge.scrape.label" type="string" label="35586" help="34631" parent="playback.binge.enabled">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=playback.binge.scrape&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="playback.binge.enabled">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -3943,6 +3763,47 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## PLAYBACK - RETRY ########## -->
+			<group id="playback.retry" label="35678">
+				<setting id="playback.retry.enabled" type="boolean" label="35290" help="34297">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="playback.retry.limit" type="integer" label="35291" help="34298" parent="playback.retry.enabled">
+					<control type="slider" format="integer">
+						<heading>35291</heading>
+						<popup>true</popup>
+					</control>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<minimum>1</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.retry.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.retry.delay" type="integer" label="35292" help="34299" parent="playback.retry.enabled">
+					<control type="slider" format="integer">
+						<heading>35292</heading>
+						<popup>true</popup>
+					</control>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>180</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.retry.enabled">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
 			<!-- ########## PLAYBACK - PLAYLIST ########## -->
 			<group id="playback.playlist" label="35515">
 				<setting id="playback.playlist.error" type="string" label="35532" help="34463">
@@ -3960,6 +3821,15 @@ The label is then added to the action element:
 
 		<!-- ########## ACTIVITY ########## -->
 		<category id="activity" label="35051" help="34550">
+
+			<!-- ########## ACTIVITY - SKIP ########## -->
+			<group id="activity.skip" label="33897">
+				<setting id="activity.skip.enabled" type="boolean" label="33462" help="34566">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+			</group>
 
 			<!-- ########## ACTIVITY - HISTORY ########## -->
 			<group id="activity.history" label="32036">
@@ -4100,8 +3970,250 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## ACTIVITY - BINGE ########## -->
+			<group id="activity.binge" label="35580">
+				<setting id="activity.binge.enabled" type="boolean" label="35579" help="34407">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="activity.binge.scrape" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.binge.scrape.label" type="string" label="36495" help="34631" parent="activity.binge.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.binge.scrape&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.binge.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.dialog" type="integer" label="35621" help="34425">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35622">1</option>
+							<option label="35623">2</option>
+							<option label="36423">3</option>
+							<option label="35624">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="activity.binge.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.suppress" type="integer" label="35583" help="34415" parent="activity.binge.dialog">
+					<control type="spinner" format="string"/>
+					<control type="toggle"/>
+					<level>3</level>
+					<default>1</default>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33387">1</option>
+							<option label="33029">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.notification" type="boolean" label="35876" help="34637" parent="activity.binge.dialog">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="activity.binge.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.delay" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.binge.delay.label" type="string" label="35581" help="34414" parent="activity.binge.dialog">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.binge.delay&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">0</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.action.none" type="integer" label="35625" help="34426" parent="activity.binge.dialog">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33821">0</option>
+							<option label="33743">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">0</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.action.continue" type="integer" label="35626" help="34427" parent="activity.binge.dialog">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35628">0</option>
+							<option label="35627">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">0</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.action.cancel" type="integer" label="35105" help="34428" parent="activity.binge.dialog">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35628">0</option>
+							<option label="35627">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.dialog" operator="!is">0</condition>
+								<condition setting="activity.binge.dialog" operator="!is">4</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.continue" type="boolean" label="36452" help="34642">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="activity.binge.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.continue.timeout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.binge.continue.timeout.label" type="string" label="36498" help="34651" parent="activity.binge.continue">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.binge.continue.timeout&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.continue">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.continue.interact" type="boolean" label="36494" help="34648" parent="activity.binge.continue">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.continue">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.continue.action" type="integer" label="35625" help="34652" parent="activity.binge.continue">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33821">1</option>
+							<option label="36174">2</option>
+							<option label="36404">3</option>
+							<option label="36405">4</option>
+							<option label="36406">5</option>
+							<option label="36407">6</option>
+							<option label="36408">7</option>
+							<option label="36460">8</option>
+							<option label="36410">9</option>
+							<option label="32501">10</option>
+							<option label="36409">11</option>
+							<option label="36411">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.continue">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.binge.continue.propagate" type="integer" label="36499" help="34653" parent="activity.binge.continue">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33273">1</option>
+							<option label="35478">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<condition setting="activity.binge.continue">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
 			<!-- ########## ACTIVITY - RATING ########## -->
-			<group id="activity.rate" label="35187">
+			<group id="activity.rating" label="35187">
 				<setting id="activity.rating.enabled" type="boolean" label="35041" help="34543">
 					<control type="toggle"/>
 					<level>1</level>
@@ -4166,41 +4278,38 @@ The label is then added to the action element:
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.power" type="integer" label="36403" help="34633" parent="activity.rating.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>3</level>
+				<setting id="activity.rating.timeout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="activity.rating.timeout.label" type="string" label="36498" help="34647" parent="activity.rating.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=activity.rating.timeout&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
 					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="36404">1</option>
-							<option label="36405">2</option>
-							<option label="36406">3</option>
-							<option label="36407">4</option>
-							<option label="36408">5</option>
-							<option label="36409">6</option>
-							<option label="36410">7</option>
-							<option label="36411">8</option>
-						</options>
+						<allowempty>true</allowempty>
 					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="activity.rating.qr" type="integer" label="36412" help="34634" parent="activity.rating.enabled">
+				<setting id="activity.rating.interact" type="boolean" label="36494" help="34648" parent="activity.rating.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="activity.rating.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="activity.rating.action" type="integer" label="35625" help="34649" parent="activity.rating.enabled">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
 					<constraints>
 						<options>
-							<option label="32302">0</option>
-							<option label="32315">1</option>
-							<option label="32034">2</option>
-							<option label="33508">3</option>
-							<option label="35668">4</option>
-							<option label="33105">5</option>
-							<option label="36413">6</option>
-							<option label="36414">7</option>
+							<option label="33022">0</option>
+							<option label="33486">1</option>
+							<option label="33564">2</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -4225,11 +4334,14 @@ The label is then added to the action element:
 							</and>
 						</dependency>
 						<dependency type="enable">
-							<or>
-								<condition setting="activity.rating.rate.show" operator="gt">0</condition>
-								<condition setting="activity.rating.rate.season" operator="gt">0</condition>
-								<condition setting="activity.rating.rate.episode" operator="gt">0</condition>
-							</or>
+							<and>
+								<condition setting="activity.binge.enabled">true</condition>
+								<or>
+									<condition setting="activity.rating.rate.show" operator="gt">0</condition>
+									<condition setting="activity.rating.rate.season" operator="gt">0</condition>
+									<condition setting="activity.rating.rate.episode" operator="gt">0</condition>
+								</or>
+							</and>
 						</dependency>
 					</dependencies>
 				</setting>
@@ -4240,7 +4352,7 @@ The label is then added to the action element:
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
+					<level>2</level>
 					<constraints>
 						<allowempty>true</allowempty>
 					</constraints>
@@ -4251,6 +4363,7 @@ The label is then added to the action element:
 								<condition setting="activity.rating.binge" operator="gt">0</condition>
 							</and>
 						</dependency>
+						<dependency type="enable" setting="activity.binge.enabled">true</dependency>
 					</dependencies>
 				</setting>
 				<setting id="activity.rating.rate" type="boolean" label="36375" help="34617">
@@ -4454,6 +4567,33 @@ The label is then added to the action element:
 								<condition setting="activity.rating.rate">true</condition>
 								<condition setting="activity.rating.rate.episode" operator="gt">0</condition>
 							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## ACTIVITY - AUTOMATION ########## -->
+			<group id="activity.automation" label="36511">
+				<setting id="activity.automation.observer" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="activity.automation.observer.label" type="string" label="36500" help="34654">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsObserver&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 32302]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable">
+							<or>
+								<condition setting="activity.rating.enabled">true</condition>
+								<and>
+									<condition setting="activity.binge.enabled">true</condition>
+									<condition setting="activity.binge.enabled.continue">true</condition>
+								</and>
+							</or>
 						</dependency>
 					</dependencies>
 				</setting>
@@ -6731,6 +6871,26 @@ The label is then added to the action element:
 						<dependency type="visible" setting="interface.stream.interface">0</dependency>
 					</dependencies>
 				</setting>
+				<setting id="interface.stream.interface.reload.mode" type="integer" label="36458" help="34643" parent="interface.stream.interface">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33743">1</option>
+							<option label="33821">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="interface.stream.interface">0</condition>
+								<condition setting="interface.stream.interface.reload" operator="gt">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
 				<setting id="interface.stream.interface.background" type="integer" label="35842" help="34373" parent="interface.stream.interface">
 					<control type="spinner" format="string"/>
 					<default>1</default>
@@ -6896,20 +7056,20 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## INTERFACE - RATING ########## -->
-			<group id="interface.rating" label="35187">
-				<setting id="interface.rating.interface" type="integer" label="35469" help="34400">
+			<!-- ########## INTERFACE - DIALOG ########## -->
+			<group id="interface.dialog" label="32332">
+				<setting id="interface.dialog.interface" type="integer" label="35469" help="34400">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>1</level>
 					<constraints>
 						<options>
 							<option label="33105">0</option>
-							<option label="33194">1</option>
+							<option label="35022">1</option>
 						</options>
 					</constraints>
 				</setting>
-				<setting id="interface.rating.interface.background" type="integer" label="35842" help="34373" parent="interface.rating.interface">
+				<setting id="interface.dialog.interface.background" type="integer" label="35842" help="34373" parent="interface.dialog.interface">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>2</level>
@@ -6922,10 +7082,10 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="interface.rating.interface">0</dependency>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
 					</dependencies>
 				</setting>
-				<setting id="interface.rating.interface.icon" type="integer" label="33268" help="34524" parent="interface.rating.interface">
+				<setting id="interface.dialog.interface.icon" type="integer" label="33268" help="34524" parent="interface.dialog.interface">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -6936,7 +7096,189 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="interface.rating.interface">0</dependency>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.dialog.interface.service" type="integer" label="36479" help="34644" parent="interface.dialog.interface">
+					<control type="slider" format="integer">
+						<heading>36479</heading>
+						<popup>true</popup>
+					</control>
+					<default>6</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>6</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.dialog.interface.label" type="integer" label="36480" help="34645" parent="interface.dialog.interface">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="36488">0</option>
+							<option label="36489">1</option>
+							<option label="36490">2</option>
+							<option label="36491">3</option>
+							<option label="36492">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.dialog.interface.power" type="integer" label="36403" help="34633" parent="interface.dialog.interface">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35143">1</option>
+							<option label="36404">2</option>
+							<option label="36405">3</option>
+							<option label="36406">4</option>
+							<option label="36407">5</option>
+							<option label="36408">6</option>
+							<option label="36460">7</option>
+							<option label="36410">8</option>
+							<option label="32501">9</option>
+							<option label="36409">10</option>
+							<option label="36411">11</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.dialog.interface.qr" type="integer" label="36412" help="34634" parent="interface.dialog.interface">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35143">1</option>
+							<option label="32315">2</option>
+							<option label="32034">3</option>
+							<option label="33508">4</option>
+							<option label="35668">5</option>
+							<option label="36473">6</option>
+							<option label="35669">7</option>
+							<option label="36474">8</option>
+							<option label="35719">9</option>
+							<option label="36475">10</option>
+							<option label="36476">11</option>
+							<option label="36477">12</option>
+							<option label="35260">13</option>
+							<option label="36413">14</option>
+							<option label="35536">15</option>
+							<option label="36414">16</option>
+							<option label="36487">17</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.dialog.interface.animation" type="integer" label="36496" help="34650" parent="interface.dialog.interface">
+					<control type="spinner" format="string"/>
+					<default>4</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="36092">3</option>
+							<option label="33166">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## INTERFACE - BUTTON ########## -->
+			<group id="interface.button" label="36423">
+				<setting id="interface.button.interface" type="integer" label="36424" help="34638">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="33022">0</option>
+							<option label="33105">1</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="interface.button.time" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="interface.button.time.label" type="string" label="32312" help="34567" parent="interface.button.interface">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=interface.button.time&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.button.interface">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.button.position" type="integer" label="36418" help="34636" parent="interface.button.interface">
+					<control type="slider" format="percentage">
+						<heading>36418</heading>
+						<popup>true</popup>
+					</control>
+					<default>80</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.button.interface">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.button.color" type="integer" label="36417" help="34635" parent="interface.button.interface">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="36415">0</option>
+							<option label="36028">1</option>
+							<option label="36416">2</option>
+							<option label="35486">3</option>
+							<option label="35487">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.button.interface">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.button.icon" type="integer" label="36425" help="34639" parent="interface.button.interface">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35300">1</option>
+							<option label="36426">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="interface.button.interface">1</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -7479,6 +7821,19 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible" setting="theme.color.enabled">true</dependency>
 					</dependencies>
+				</setting>
+				<setting id="theme.color.transparent" type="integer" label="36451" help="34641" parent="oracle.chatgpt.model">
+					<control type="slider" format="percentage">
+						<heading>36451</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
 				</setting>
 			</group>
 
@@ -8682,23 +9037,15 @@ The label is then added to the action element:
 						<dependency type="visible" setting="library.general.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="library.update.launch" type="integer" label="35175" help="34262">
-					<control type="spinner" format="string"/>
-					<default>3</default>
+				<setting id="library.update.monitor" type="boolean" label="33311" help="34262">
+					<control type="toggle"/>
 					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33805">1</option>
-							<option label="33806">2</option>
-							<option label="33807">3</option>
-						</options>
-					</constraints>
+					<default>true</default>
 					<dependencies>
 						<dependency type="visible" setting="library.general.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="library.update.notifications" type="integer" label="33396" help="34263" parent="library.update.launch">
+				<setting id="library.update.notifications" type="integer" label="33396" help="34263" parent="library.update.monitor">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>2</level>
@@ -8713,7 +9060,7 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="library.general.enabled">true</condition>
-								<condition setting="library.update.launch" operator="!is">0</condition>
+								<condition setting="library.update.monitor">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -9513,16 +9860,10 @@ The label is then added to the action element:
 						<dependency type="visible" setting="network.vpn.detection">1</dependency>
 					</dependencies>
 				</setting>
-				<setting id="network.vpn.monitor" type="integer" label="33803" help="34196">
-					<control type="spinner" format="string"/>
-					<default>0</default>
+				<setting id="network.vpn.monitor" type="boolean" label="33803" help="34196">
+					<control type="toggle"/>
+					<default>true</default>
 					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33805">0</option>
-							<option label="33806">1</option>
-						</options>
-					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="network.vpn.detection" operator="gt">0</dependency>
 					</dependencies>
@@ -9556,7 +9897,7 @@ The label is then added to the action element:
 									</or>
 								</and>
 								<condition setting="network.vpn.detection">1</condition>
-								<condition setting="network.vpn.monitor" operator="gt">0</condition>
+								<condition setting="network.vpn.monitor">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -9590,7 +9931,7 @@ The label is then added to the action element:
 									</and>
 								</or>
 								<condition setting="network.vpn.detection">1</condition>
-								<condition setting="network.vpn.monitor" operator="gt">0</condition>
+								<condition setting="network.vpn.monitor">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -9751,7 +10092,7 @@ The label is then added to the action element:
 						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
 					</dependencies>
 				</setting>
-				<setting id="utility.bluetooth.monitor.enabled" type="boolean" label="33537" help="34557">
+				<setting id="utility.bluetooth.monitor" type="boolean" label="33803" help="34557">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>false</default>
@@ -9761,7 +10102,7 @@ The label is then added to the action element:
 					</dependencies>
 				</setting>
 				<setting id="utility.bluetooth.monitor.interval" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="utility.bluetooth.monitor.interval.label" type="string" label="33538" help="34558" parent="utility.bluetooth.monitor.enabled">
+				<setting id="utility.bluetooth.monitor.interval.label" type="string" label="33804" help="34558" parent="utility.bluetooth.monitor">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=utility.bluetooth.monitor.interval&settings=true)</data>
 						<close>true</close>
@@ -9775,187 +10116,10 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="utility.bluetooth.enabled">true</condition>
-								<condition setting="utility.bluetooth.monitor.enabled">true</condition>
+								<condition setting="utility.bluetooth.monitor">true</condition>
 							</and>
 						</dependency>
 						<dependency type="enable" on="property" name="infobool">String.IsEqual(Window(Home).Property(GaiaBluetoothSupport),1)</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## UTILITY - LIGHTPACK ########## -->
-			<group id="utility.lightpack" label="33406">
-				<setting id="utility.lightpack.enabled" type="boolean" label="33312" help="34094">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-				</setting>
-				<setting id="utility.lightpack.count" type="integer" label="33405" help="34101">
-					<control type="slider" format="integer">
-						<heading>33405</heading>
-						<popup>true</popup>
-					</control>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.prismatik" type="integer" label="33400" help="34095">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="33401">0</option>
-							<option label="33402">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.prismatik.location" type="path" label="33403" help="34096" parent="utility.lightpack.prismatik">
-					<control type="button" format="file">
-						<heading>33403</heading>
-					</control>
-					<default></default>
-					<level>3</level>
-					<constraints>
-						<writable>false</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.prismatik">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.launch" type="integer" label="33257" help="34097">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33805">1</option>
-							<option label="33806">2</option>
-							<option label="33807">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.launch.animation" type="boolean" label="33397" help="34098" parent="utility.lightpack.launch">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.launch" operator="!is">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.profile" type="boolean" label="33398" help="34099">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.profile.name" type="string" label="33399" help="34100" parent="utility.lightpack.profile">
-					<control type="edit" format="string">
-						<heading>33399</heading>
-					</control>
-					<default/>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.profile">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.connection" type="boolean" label="33360" help="34093">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="utility.lightpack.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.connection.address" type="string" label="33394" help="34102" parent="utility.lightpack.connection">
-					<control type="edit" format="ip">
-						<heading>33394</heading>
-					</control>
-					<default>127.0.0.1</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.connection">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.connection.port" type="integer" label="33395" help="34103" parent="utility.lightpack.connection">
-					<control type="edit" format="integer">
-						<heading>33395</heading>
-					</control>
-					<default>3636</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<maximum>65535</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.connection">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="utility.lightpack.connection.key" type="string" label="33100" help="34105" parent="utility.lightpack.connection">
-					<control type="edit" format="string">
-						<heading>33100</heading>
-						<hidden>true</hidden>
-					</control>
-					<default/>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="utility.lightpack.enabled">true</condition>
-								<condition setting="utility.lightpack.connection">true</condition>
-							</and>
-						</dependency>
 					</dependencies>
 				</setting>
 			</group>

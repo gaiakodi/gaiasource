@@ -32,13 +32,14 @@ ProviderAddon = None
 class Manager(object):
 
 	# Database
-	Database					= None
+	Database					= {}
 	DatabaseLock				= Lock()
-	DatabaseName				= 'providers'
 	DatabaseProviders			= 'providers'
-	DatabaseLinks				= 'links'
 	DatabaseStreams				= 'streams'
-	DatabaseFailures			= 'failures'
+	TableProviders				= 'providers'
+	TableLinks					= 'links'
+	TableStreams				= 'streams'
+	TableFailures				= 'failures'
 
 	# Settings
 	SettingsOptimization		= 'internal.initial.optimization'
@@ -76,6 +77,7 @@ class Manager(object):
 		from lib.providers.core.external import ProviderExternal
 		from lib.providers.core.debrid import ProviderDebrid
 
+		Manager.Database = {}
 		Manager.Create = {}
 		Manager.ProvidersData = None
 		Manager.ProvidersCache = None
@@ -126,17 +128,21 @@ class Manager(object):
 	##############################################################################
 
 	@classmethod
-	def databaseInitialize(self, wait = False):
+	def databaseInitialize(self, clear = True, quick = False, wait = False):
 		self._databaseInitialize()
-		self.databaseClearOld(wait)
+		if clear: self.databaseClearOld(quick = quick, wait = wait)
 
 	@classmethod
-	def databaseSize(self):
-		return self._database()._size()
+	def databaseSize(self, providers = True, streams = True):
+		size = 0
+		if providers: size += self._database(database = Manager.DatabaseProviders)._size()
+		if streams: size += self._database(database = Manager.DatabaseStreams)._size()
+		return size
 
 	@classmethod
 	def databaseClear(self, providers = True, links = True, failures = True, streams = True, compress = True):
-		base = self._database()
+		baseProviders = None
+		baseStreams = None
 
 		# This should only be used for streams.
 		# Check _databaseChanged() for more details.
@@ -147,58 +153,77 @@ class Manager(object):
 		if streams is None: streams = changed
 
 		if providers:
-			base._drop(table = Manager.DatabaseProviders, compress = compress)
-			try: del Manager.Create[Manager.DatabaseProviders]
+			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+			baseProviders._drop(table = Manager.TableProviders, compress = compress)
+			try: del Manager.Create[Manager.TableProviders]
 			except: pass
+
 		if links:
-			base._drop(table = Manager.DatabaseLinks, compress = compress)
-			try: del Manager.Create[Manager.DatabaseLinks]
+			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+			baseProviders._drop(table = Manager.TableLinks, compress = compress)
+			try: del Manager.Create[Manager.TableLinks]
 			except: pass
+
 		if failures:
-			base._drop(table = Manager.DatabaseFailures, compress = compress)
-			try: del Manager.Create[Manager.DatabaseFailures]
+			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+			baseProviders._drop(table = Manager.TableFailures, compress = compress)
+			try: del Manager.Create[Manager.TableFailures]
 			except: pass
+
 		if streams:
-			base._drop(table = Manager.DatabaseStreams, compress = compress)
-			try: del Manager.Create[Manager.DatabaseStreams]
+			if not baseStreams: baseStreams = self._database(database = Manager.DatabaseStreams)
+			baseStreams._drop(table = Manager.TableStreams, compress = compress)
+			try: del Manager.Create[Manager.TableStreams]
 			except: pass
 
 	@classmethod
-	def databaseClearOld(self, wait = False):
-		def _databaseClearOld():
-			self.streamsDatabaseClearOld()
+	def databaseClearOld(self, quick = False, wait = False):
+		def _databaseClearOld(quick):
+			if not quick: self.streamsDatabaseClearOld()
 			self.linksDatabaseClearOld()
 		if wait: _databaseClearOld()
-		else: Pool.thread(target = _databaseClearOld, start = True)
+		else: Pool.thread(target = _databaseClearOld, kwargs = {'quick' : quick}, start = True)
 
 	@classmethod
-	def _database(self):
-		if Manager.Database is None:
+	def _database(self, database = None):
+		if database is None: database = Manager.DatabaseProviders
+		if not database in Manager.Database:
 			Manager.DatabaseLock.acquire()
-			if Manager.Database is None: Manager.Database = Database(name = Manager.DatabaseName)
+			if not database in Manager.Database: Manager.Database[database] = Database(name = database)
 			Manager.DatabaseLock.release()
-		return Manager.Database
+		return Manager.Database[database]
 
 	@classmethod
-	def _databaseInitialize(self, providers = True, links = True, streams = True, failures = True, force = False):
-		base = self._database()
+	def _databaseInitialize(self, providers = True, links = True, streams = True, failures = True, force = False, database = None):
+		baseProviders = None
+		baseStreams = None
+
 		if providers:
-			if not Manager.DatabaseProviders in Manager.Create or force:
-				Manager.Create[Manager.DatabaseProviders] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (version TEXT PRIMARY KEY, data TEXT);' % Manager.DatabaseProviders)
+			if not Manager.TableProviders in Manager.Create or force:
+				if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+				Manager.Create[Manager.TableProviders] = True
+				baseProviders._create('CREATE TABLE IF NOT EXISTS %s (version TEXT PRIMARY KEY, data TEXT);' % Manager.TableProviders)
+
 		if links:
-			if not Manager.DatabaseLinks in Manager.Create or force:
-				Manager.Create[Manager.DatabaseLinks] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.DatabaseLinks)
-		if streams:
-			if not Manager.DatabaseStreams in Manager.Create or force:
-				Manager.Create[Manager.DatabaseStreams] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.DatabaseStreams)
+			if not Manager.TableLinks in Manager.Create or force:
+				if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+				Manager.Create[Manager.TableLinks] = True
+				baseProviders._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.TableLinks)
+
 		if failures:
-			if not Manager.DatabaseFailures in Manager.Create or force:
-				Manager.Create[Manager.DatabaseFailures] = True
-				base._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, count INTEGER, time INTEGER);' % Manager.DatabaseFailures)
-		return base
+			if not Manager.TableFailures in Manager.Create or force:
+				if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
+				Manager.Create[Manager.TableFailures] = True
+				baseProviders._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, count INTEGER, time INTEGER);' % Manager.TableFailures)
+
+		if streams:
+			if not Manager.TableStreams in Manager.Create or force:
+				if not baseStreams: baseStreams = self._database(database = Manager.DatabaseStreams)
+				Manager.Create[Manager.TableStreams] = True
+				baseStreams._create('CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, provider TEXT, time INTEGER, data TEXT);' % Manager.TableStreams)
+
+		if database == Manager.DatabaseStreams: return baseStreams if baseStreams else self._database(database = Manager.DatabaseStreams)
+		return baseProviders if baseProviders else self._database(database = Manager.DatabaseProviders)
 
 	@classmethod
 	def _databaseId(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
@@ -243,7 +268,7 @@ class Manager(object):
 	def _providersDatabaseRetrieve(self, full = True, id = None, addon = None, enabled = None, media = None, type = None, mode = None, access = None, preset = None, settings = True):
 		try:
 			base = self._providersDatabaseInitialize()
-			result = base._selectSingle('SELECT version, data FROM %s;' % (Manager.DatabaseProviders))
+			result = base._selectSingle('SELECT version, data FROM %s;' % (Manager.TableProviders))
 			if result and result[0] == System.version():
 				if full:
 					from lib.modules import handler
@@ -333,7 +358,7 @@ class Manager(object):
 		try:
 			if not providers and provider:
 				id = provider.id()
-				providers = Converter.jsonFrom(self._providersDatabaseInitialize()._selectValue('SELECT data FROM %s;' % (Manager.DatabaseProviders)))
+				providers = Converter.jsonFrom(self._providersDatabaseInitialize()._selectValue('SELECT data FROM %s;' % (Manager.TableProviders)))
 				for i in range(len(providers)):
 					if providers[i]['id'] == id:
 						providers[i] = provider
@@ -341,7 +366,7 @@ class Manager(object):
 
 			self.databaseClear(streams = None)
 			data = '"%s"' % Converter.jsonTo(providers).replace('"', '""').replace("'", "''")
-			self._providersDatabaseInitialize()._insert('INSERT INTO %s (version, data) VALUES ("%s", %s);' % (Manager.DatabaseProviders, System.version(), data))
+			self._providersDatabaseInitialize()._insert('INSERT INTO %s (version, data) VALUES ("%s", %s);' % (Manager.TableProviders, System.version(), data))
 		except: Logger.error()
 
 	@classmethod
@@ -580,6 +605,21 @@ class Manager(object):
 			except: pass
 
 		return languages
+
+	@classmethod
+	def providersPrioritize(self, providers, flatten = False, shuffle = True):
+		if shuffle: providers = Tools.listShuffle(providers)
+
+		providers = Tools.listSort(providers, key = lambda i : i.priority())
+		priorities = {}
+		for provider in providers:
+			priority = provider.priority(type = False, order = False)
+			if not priority in priorities: priorities[priority] = []
+			priorities[priority].append(provider)
+		providers = [priorities[i] for i in Tools.listSort(priorities.keys())]
+
+		if flatten: providers = Tools.listFlatten(providers)
+		return providers
 
 	##############################################################################
 	# HELP
@@ -2039,7 +2079,7 @@ class Manager(object):
 			if thresholdTime > 0: thresholdTime = Time.timestamp() - thresholdTime
 
 			data = self._failureInitialize()
-			result = data._selectValues('SELECT id FROM %s WHERE NOT (count < %d OR time < %d);' % (Manager.DatabaseFailures, thresholdLimit, thresholdTime))
+			result = data._selectValues('SELECT id FROM %s WHERE NOT (count < %d OR time < %d);' % (Manager.TableFailures, thresholdLimit, thresholdTime))
 		return result
 
 	@classmethod
@@ -2048,18 +2088,18 @@ class Manager(object):
 			from lib.modules import orionoid
 
 			data = self._failureInitialize()
-			current = data._selectValues('SELECT id FROM %s;' % Manager.DatabaseFailures)
+			current = data._selectValues('SELECT id FROM %s;' % Manager.TableFailures)
 			timestamp = Time.timestamp()
 
 			for id in finished:
 				if not orionoid.Orionoid.Scraper in id:
-					if id in current: data._update('UPDATE %s SET count = 0, time = %d WHERE id = "%s";' % (Manager.DatabaseFailures, timestamp, id), commit = False)
-					else: data._insert('INSERT INTO %s (id, count, time) VALUES ("%s", 0, %d);' % (Manager.DatabaseFailures, id, timestamp), commit = False)
+					if id in current: data._update('UPDATE %s SET count = 0, time = %d WHERE id = "%s";' % (Manager.TableFailures, timestamp, id), commit = False)
+					else: data._insert('INSERT INTO %s (id, count, time) VALUES ("%s", 0, %d);' % (Manager.TableFailures, id, timestamp), commit = False)
 
 			for id in unfinished:
 				if not orionoid.Orionoid.Scraper in id:
-					if id in current: data._update('UPDATE %s SET count = count + 1, time = %d WHERE id = "%s";' % (Manager.DatabaseFailures, timestamp, id), commit = False)
-					else: data._insert('INSERT INTO %s (id, count, time) VALUES ("%s", 1, %d);' % (Manager.DatabaseFailures, id, timestamp), commit = False)
+					if id in current: data._update('UPDATE %s SET count = count + 1, time = %d WHERE id = "%s";' % (Manager.TableFailures, timestamp, id), commit = False)
+					else: data._insert('INSERT INTO %s (id, count, time) VALUES ("%s", 1, %d);' % (Manager.TableFailures, id, timestamp), commit = False)
 
 			data._commit()
 
@@ -2114,27 +2154,9 @@ class Manager(object):
 						connectionSpeed = data['connection']['value']['speed']
 						connectionLatency = data['connection']['value']['latency']
 
-				#gaiaremove
-				data0 = Tools.copy(data)
-
 				data = Hardware.performance(processorTotal = processorTotal, processorSingle = processorSingle, memory = memory, storageRead = storageRead, storageWrite = storageWrite, connectionSpeed = connectionSpeed, connectionLatency = connectionLatency)
 				performance = data['performance']
 				base = data['rating']
-
-				#gaiaremove
-				try:
-					if not data['processor']['label']['rating'] or data['processor']['label']['rating'] == '0%':
-						Logger.log('Hardware Data 0: ' + str(processor) + ' * ' + str(processorTotal) + ' * ' + str(processorSingle))
-						Logger.log('Hardware Data 1: ' + Converter.jsonTo(data0))
-						Logger.log('Hardware Data 2: ' + Converter.jsonTo(data))
-						Logger.log('Hardware Data 3: ' + Converter.jsonTo(Hardware.data()))
-
-						from lib.modules.tools import Platform
-						p1 = Platform.data(refresh = True)
-						p2 = Hardware.data(full = True, refresh = True)
-						Logger.log('Hardware Data 4: ' + Converter.jsonTo(p1))
-						Logger.log('Hardware Data 5: ' + Converter.jsonTo(p2))
-				except: Logger.error()
 
 				label = [[36049, data['label']['description']]]
 				if processor: label.append([36046, data['processor']['label']['description']])
@@ -2937,7 +2959,7 @@ class Manager(object):
 	@classmethod
 	def linksDatabaseClear(self, all = True, compress = True):
 		if all: self.databaseClear(providers = False, links = True, failures = False, streams = False)
-		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.DatabaseLinks, parameters = [self.linksTime(time = True)], compress = compress)
+		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.TableLinks, parameters = [self.linksTime(time = True)], compress = compress)
 
 	@classmethod
 	def linksDatabaseClearOld(self):
@@ -2949,7 +2971,7 @@ class Manager(object):
 
 	@classmethod
 	def _linksDatabaseQuery(self, query, parameters = None):
-		return self._linksDatabaseInitialize()._select(query = query % Manager.DatabaseLinks, parameters = parameters)
+		return self._linksDatabaseInitialize()._select(query = query % Manager.TableLinks, parameters = parameters)
 
 	@classmethod
 	def linksRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, time = None):
@@ -2958,7 +2980,8 @@ class Manager(object):
 		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
 		if time is None: time = self.linksTime(time = True)
 
-		links = self._linksDatabaseInitialize()._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ?;' % Manager.DatabaseLinks, parameters = [id, time])
+		# LIMIT 1: To further improve query speed, since we only need to retrieve one row.
+		links = self._linksDatabaseInitialize()._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ? LIMIT 1;' % Manager.TableLinks, parameters = [id, time])
 		try: return Converter.jsonFrom(links[0])['data']
 		except: return None
 
@@ -2968,8 +2991,8 @@ class Manager(object):
 		base = self._linksDatabaseInitialize()
 		data = Converter.jsonTo({'data' : data}) # Some external providers return a dictionary.
 
-		base._delete(query = 'DELETE FROM %s WHERE id = ?;' % Manager.DatabaseLinks, parameters = [id])
-		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.DatabaseLinks, parameters = [id, provider.id(), Time.timestamp(), data])
+		base._delete(query = 'DELETE FROM %s WHERE id = ?;' % Manager.TableLinks, parameters = [id])
+		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.TableLinks, parameters = [id, provider.id(), Time.timestamp(), data])
 
 	##############################################################################
 	# STREAMS
@@ -2982,21 +3005,55 @@ class Manager(object):
 		return result
 
 	@classmethod
-	def streamsDatabaseClear(self, all = True, compress = True):
-		if all: self.databaseClear(providers = False, links = False, failures = False, streams = True)
-		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.DatabaseStreams, parameters = [self.streamsTime(time = True)], compress = compress)
+	def streamsDatabaseSize(self):
+		return self.databaseSize(providers = False, streams = True)
 
 	@classmethod
-	def streamsDatabaseClearOld(self):
-		self.streamsDatabaseClear(all = False)
+	def streamsDatabaseClear(self, all = True, compress = True, wait = True):
+		def _streamsDatabaseClear(all, compress):
+			if all:
+				self.databaseClear(providers = False, links = False, failures = False, streams = True)
+			else:
+				database = self._databaseInitialize(database = Manager.DatabaseStreams)
+				if database._delete('DELETE FROM %s WHERE time < ?' % Manager.TableStreams, parameters = [self.streamsTime(time = True)], compress = False):
+					database._compress(commit = True)
+		if wait: _streamsDatabaseClear(all = all, compress = compress)
+		else: Pool.thread(target = _streamsDatabaseClear, kwargs = {'all' : all, 'compress' : compress}, start = True)
+
+	@classmethod
+	def streamsDatabaseClearOld(self, wait = True):
+		self.streamsDatabaseClear(all = False, wait = wait)
+
+	@classmethod
+	def streamsDatabaseClass(self):
+		class Streams(Database):
+
+			def __init__(self):
+				Database.__init__(self, name = Manager.DatabaseStreams)
+
+			def _clean(self, time, commit = True, compress = True):
+				if time: return self._delete(query = 'DELETE FROM `%s` WHERE time <= ?;' % Manager.TableStreams, parameters = [time], commit = commit, compress = compress)
+				return False
+
+			def _cleanTime(self, count):
+				if count:
+					times = self._selectValues(query = 'SELECT time FROM `%s` ORDER BY time ASC LIMIT ?;' % Manager.TableStreams, parameters = [count])
+					if times: return Tools.listSort(times)[:count][-1]
+				return None
+
+		return Streams
+
+	@classmethod
+	def streamsDatabaseInstance(self):
+		return self.streamsDatabaseClass()()
 
 	@classmethod
 	def _streamsDatabaseInitialize(self):
-		return self._databaseInitialize(providers = False, links = False, streams = True, failures = False)
+		return self._databaseInitialize(providers = False, links = False, streams = True, failures = False, database = Manager.DatabaseStreams)
 
 	@classmethod
 	def _streamsDatabaseQuery(self, query, parameters = None):
-		return self._streamsDatabaseInitialize()._select(query = query % Manager.DatabaseStreams, parameters = parameters)
+		return self._streamsDatabaseInitialize()._select(query = query % Manager.TableStreams, parameters = parameters)
 
 	@classmethod
 	def streamsRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, time = None):
@@ -3009,7 +3066,8 @@ class Manager(object):
 		if time is None: time = self.streamsTime(time = True)
 		else: time = Time.timestamp() - time
 
-		streams = self._streamsDatabaseInitialize()._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ?;' % Manager.DatabaseStreams, parameters = [id, time])
+		# LIMIT 1: To further improve query speed, since we only need to retrieve one row.
+		streams = self._streamsDatabaseInitialize()._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ? LIMIT 1;' % Manager.TableStreams, parameters = [id, time])
 		try:
 			streams = Converter.jsonFrom(streams[0])
 			streams = [Stream.load(data = stream) for stream in streams]
@@ -3022,5 +3080,5 @@ class Manager(object):
 		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
 		base = self._streamsDatabaseInitialize()
 
-		base._delete(query = 'DELETE FROM %s WHERE id = ?;' % Manager.DatabaseStreams, parameters = [id])
-		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.DatabaseStreams, parameters = [id, provider.id(), Time.timestamp(), Converter.jsonTo(data)])
+		base._delete(query = 'DELETE FROM %s WHERE id = ?;' % Manager.TableStreams, parameters = [id])
+		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.TableStreams, parameters = [id, provider.id(), Time.timestamp(), Converter.jsonTo(data)])

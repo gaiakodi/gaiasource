@@ -501,104 +501,108 @@ class ProviderExternal(ProviderBase):
 	##############################################################################
 
 	def searchProcess(self, items):
+		lock = None
 		try:
 			if items:
-				for item in items:
-					if self.stopped(): break
+				chunks = self.priorityChunks(items)
+				for chunk in chunks:
+					lock = self.priorityStart(lock = lock)
+					for item in chunk:
+						if self.stopped(): break
 
-					try:
-						try: link = item['url'].replace('http:http:', 'http:').replace('https:https:', 'https:').replace('http:https:', 'https:').replace('https:http:', 'http:') # Some of the links start with a double http.
-						except: continue
-
-						# External providers (eg: "Get Out"), sometimes has weird characters in the URL.
-						# Ignore the links that have non-printable ASCII or UTF8 characters.
-						#try: link = link.decode('utf-8')
-						#except: continue
 						try:
-							try: link = bytes(link, 'utf-8') # If link is already a str, then calling str(link, 'utf-8') throws an exception. Convert too bytes first.
-							except: pass
-							link = str(link, 'utf-8')
-						except:
-							try: self.log('Link has encoding errors: ' + link)
-							except: self.log('Link has encoding errors.')
-							continue
-
-						# Some links do not have a protocol.
-						if link.startswith('//'): link = 'http:' + link
-
-						# Some external addons return an addon URL instead of the actual URL.
-						if not Networker.linkIs(link, magnet = True):
-							try: link = Networker.linkParameters(link)['url']
+							try: link = item['url'].replace('http:http:', 'http:').replace('https:https:', 'https:').replace('http:https:', 'https:').replace('https:http:', 'http:') # Some of the links start with a double http.
 							except: continue
 
-						# NB: Do not check for gcloud, gdrive, etc, since these are separate website not owned by Google.
-						source = Converter.unicode(item['source']).lower().replace(' ', '')
-						if 'torrent' in source: continue
-						if Networker.linkIsIp(source): source = 'Anonymous'
-						elif Regex.match(data = source, expression = '(google.*?(vid|link))'): source = 'GoogleVideo'
-						elif Regex.match(data = source, expression = '(google.*?(cloud|user|content))'): source = 'GoogleCloud'
-						elif Regex.match(data = source, expression = '(google.*?doc)'): source = 'GoogleDocs'
-						elif Regex.match(data = source, expression = '(google.*?drive)'): source = 'GoogleDrive'
-						elif '.' in source: source = Networker.linkDomain(link = source, subdomain = False, topdomain = True, ip = True)
+							# External providers (eg: "Get Out"), sometimes has weird characters in the URL.
+							# Ignore the links that have non-printable ASCII or UTF8 characters.
+							#try: link = link.decode('utf-8')
+							#except: continue
+							try:
+								try: link = bytes(link, 'utf-8') # If link is already a str, then calling str(link, 'utf-8') throws an exception. Convert too bytes first.
+								except: pass
+								link = str(link, 'utf-8')
+							except:
+								try: self.log('Link has encoding errors: ' + link)
+								except: self.log('Link has encoding errors.')
+								continue
 
-						try: videoQuality = item['quality']
-						except: videoQuality = None
+							# Some links do not have a protocol.
+							if link.startswith('//'): link = 'http:' + link
 
-						try: audioLanguage = item['language']
-						except: audioLanguage = None
+							# Some external addons return an addon URL instead of the actual URL.
+							if not Networker.linkIs(link, magnet = True):
+								try: link = Networker.linkParameters(link)['url']
+								except: continue
 
-						try: fileExtra = item['info']
-						except: fileExtra = None
+							# NB: Do not check for gcloud, gdrive, etc, since these are separate website not owned by Google.
+							source = Converter.unicode(item['source']).lower().replace(' ', '')
+							if 'torrent' in source: continue
+							if Networker.linkIsIp(source): source = 'Anonymous'
+							elif Regex.match(data = source, expression = '(google.*?(vid|link))'): source = 'GoogleVideo'
+							elif Regex.match(data = source, expression = '(google.*?(cloud|user|content))'): source = 'GoogleCloud'
+							elif Regex.match(data = source, expression = '(google.*?doc)'): source = 'GoogleDocs'
+							elif Regex.match(data = source, expression = '(google.*?drive)'): source = 'GoogleDrive'
+							elif '.' in source: source = Networker.linkDomain(link = source, subdomain = False, topdomain = True, ip = True)
 
-						try: fileSize = item['size'] * 1073741824
-						except: fileSize = None
+							try: videoQuality = item['quality']
+							except: videoQuality = None
 
-						try: accessDirect = item['direct']
-						except: accessDirect = None
+							try: audioLanguage = item['language']
+							except: audioLanguage = None
 
-						try: accessMember = item['memberonly']
-						except: accessMember = None
+							try: fileExtra = item['info']
+							except: fileExtra = None
 
-						# Do not just set the source as sourceHoster, since eg GVideo has files pointing to other hosters like YouTube.
-						sourcePublisher = None
-						sourceHoster = None
-						if not source == 'direct':
-							domain = Stream.sourceHosterExtract(link)
-							if not self.linkDomain() == domain: sourceHoster = source
-							elif not domain == source: sourcePublisher = source
+							try: fileSize = item['size'] * 1073741824
+							except: fileSize = None
 
-						stream = self.resultStream(
-							validate = Stream.ValidateLenient,
-							validateSize = False,
-							validatePeers = False,
+							try: accessDirect = item['direct']
+							except: accessDirect = None
 
-							link = link,
+							try: accessMember = item['memberonly']
+							except: accessMember = None
 
-							videoQuality = videoQuality,
+							# Do not just set the source as sourceHoster, since eg GVideo has files pointing to other hosters like YouTube.
+							sourcePublisher = None
+							sourceHoster = None
+							if not source == 'direct':
+								domain = Stream.sourceHosterExtract(link)
+								if not self.linkDomain() == domain: sourceHoster = source
+								elif not domain == source: sourcePublisher = source
 
-							fileExtra = fileExtra,
-							fileSize = fileSize,
+							stream = self.resultStream(
+								validate = Stream.ValidateLenient,
+								validateSize = False,
+								validatePeers = False,
 
-							sourceType = Stream.SourceTypeHoster,
-							sourcePublisher = sourcePublisher,
-							sourceHoster = sourceHoster,
+								link = link,
 
-							accessDirect = accessDirect,
-							accessMember = accessMember,
+								videoQuality = videoQuality,
 
-							thresholdSize = self.customSize(),
-							thresholdTime = self.customTime(),
-							thresholdPeers = self.customPeers(),
-							thresholdSeeds = self.customSeeds(),
-							thresholdLeeches = self.customLeeches(),
-						)
-						if stream:
-							if not stream.audioLanguage(): stream.audioLanguageSet(audioLanguage)
-							self.resultAdd(stream)
-					except:
-						self.logError(self.addonName() + '-' + self.name())
-		except:
-			self.logError(self.addonName() + '-' + self.name())
+								fileExtra = fileExtra,
+								fileSize = fileSize,
+
+								sourceType = Stream.SourceTypeHoster,
+								sourcePublisher = sourcePublisher,
+								sourceHoster = sourceHoster,
+
+								accessDirect = accessDirect,
+								accessMember = accessMember,
+
+								thresholdSize = self.customSize(),
+								thresholdTime = self.customTime(),
+								thresholdPeers = self.customPeers(),
+								thresholdSeeds = self.customSeeds(),
+								thresholdLeeches = self.customLeeches(),
+							)
+							if stream:
+								if not stream.audioLanguage(): stream.audioLanguageSet(audioLanguage)
+								self.resultAdd(stream)
+						except: self.logError(self.addonName() + '-' + self.name())
+				self.priorityEnd(lock = lock)
+		except: self.logError(self.addonName() + '-' + self.name())
+		finally: self.priorityEnd(lock = lock)
 
 	##############################################################################
 	# RESOLVE

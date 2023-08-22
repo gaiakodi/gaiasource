@@ -142,10 +142,18 @@ class ProviderLocal(ProviderBase):
 			directories, files = File.listDirectory(path)
 			self.statisticsUpdateSearch(request = True)
 
-			for file in files:
-				if self.stopped(): break
-				if self.searchMatch(name = file, parents = parents, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode):
-					self.searchProcess(path = File.joinPath(path, file), parents = parents)
+			lock = None
+			try:
+				chunks = self.priorityChunks(files)
+				for chunk in chunks:
+					lock = self.priorityStart(lock = lock)
+					for file in chunk:
+						if self.stopped(): break
+						if self.searchMatch(name = file, parents = parents, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode):
+							self.searchProcess(path = File.joinPath(path, file), parents = parents)
+					self.priorityEnd(lock = lock)
+			except: self.logError()
+			finally: self.priorityEnd(lock = lock)
 
 			for directory in directories:
 				if self.stopped(): break

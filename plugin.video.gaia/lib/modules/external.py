@@ -454,14 +454,6 @@ class Importer(object):
 		return self.module(module = 'externals.speedtest.speedtest', submodule = 'Speedtest', error = error)
 
 	###################################################################
-	# LIGHTPACK
-	###################################################################
-
-	@classmethod
-	def moduleLightPack(self, error = True):
-		return self.module(module = 'externals.lightpack.lightpack', error = error)
-
-	###################################################################
 	# HARDWARE
 	###################################################################
 

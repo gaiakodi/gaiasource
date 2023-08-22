@@ -23,7 +23,7 @@
 from lib.meta.data import MetaData
 from lib.meta.provider import MetaProvider
 
-from lib.modules.tools import Converter, Settings, System, Language, Country, Tools, Regex, Logger
+from lib.modules.tools import Converter, Settings, System, Language, Country, Tools, Regex, Logger, Media
 from lib.modules.network import Networker
 from lib.modules.account import Tvdb as Account
 from lib.modules.cache import Cache
@@ -39,11 +39,16 @@ class MetaTvdb(MetaProvider):
 
 	LinkApi					= 'https://api4.thetvdb.com/v4'
 	LinkImage				= 'https://artworks.thetvdb.com'
+	LinkSearch				= 'https://thetvdb.com/search?query=%s'
 
-	LinkMovie				= 'https://thetvdb.com/dereferrer/movie/%s'
-	LinkShow				= 'https://thetvdb.com/dereferrer/series/%s'
-	LinkSeason				= 'https://thetvdb.com/dereferrer/season/%s'
-	LinkEpisode				= 'https://thetvdb.com/dereferrer/episode/%s'
+	LinkMovieId				= 'https://thetvdb.com/dereferrer/movie/%s'
+	LinkMovieTitle			= 'https://thetvdb.com/movies/%s'
+	LinkShowId				= 'https://thetvdb.com/dereferrer/series/%s'
+	LinkShowTitle			= 'https://thetvdb.com/series/%s'
+	LinkSeasonId			= 'https://thetvdb.com/dereferrer/season/%s'
+	LinkSeasonTitle			= 'https://thetvdb.com/series/%s/seasons/official/%s'
+	LinkEpisodeId			= 'https://thetvdb.com/dereferrer/episode/%s'
+	LinkEpisodeTitle		= 'https://thetvdb.com/series/%s/episodes/%s'
 
 	# Cache
 
@@ -1603,25 +1608,84 @@ class MetaTvdb(MetaProvider):
 	###################################################################
 
 	@classmethod
-	def link(self, media = None, id = None, metadata = None):
-		if metadata:
-			media = MetaData.MediaShow if 'tvshowtitle' in metadata else MetaData.MediaMovie
-			if 'id' in metadata and 'episode' in metadata['id'] and 'tvdb' in metadata['id']['episode']:
-				id = metadata['id']['episode']['tvdb']
-				if id: media = MetaData.MediaEpisode
-			elif 'id' in metadata and 'season' in metadata['id'] and 'tvdb' in metadata['id']['season']:
-				id = metadata['id']['season']['tvdb']
-				if id: media = MetaData.MediaSeason
-			elif 'id' in metadata and 'tvdb' in metadata['id']:
-				id = metadata['id']['tvdb']
+	def link(self, media = None, id = None, slug = None, title = None, year = None, season = None, metadata = None, search = False, test = False):
+		link = None
+		try:
+			if metadata:
+				if not media:
+					if 'tvshowtitle' in metadata:
+						if 'episode' in metadata: media = Media.TypeEpisode
+						elif 'season' in metadata: media = Media.TypeSeason
+						else: media = Media.TypeShow
+					else:
+						media = Media.TypeMovie
+				if media == Media.TypeEpisode and 'id' in metadata and 'episode' in metadata['id'] and 'tvdb' in metadata['id']['episode']: id = metadata['id']['episode']['tvdb']
+				elif media == Media.TypeSeason and 'id' in metadata and 'season' in metadata['id'] and 'tvdb' in metadata['id']['season']: id = metadata['id']['season']['tvdb']
+				elif 'id' in metadata and 'tvdb' in metadata['id']: id = metadata['id']['tvdb']
+				try: title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
+				except: pass
+				try: year = metadata['year']
+				except: pass
+				try: season = metadata['season']
+				except: pass
+				try: episode = metadata['episode']
+				except: pass
 
-		if id:
-			if media == MetaData.MediaMovie: return MetaTvdb.LinkMovie % id
-			elif media == MetaData.MediaShow: return MetaTvdb.LinkShow % id
-			elif media == MetaData.MediaSeason: return MetaTvdb.LinkSeason % id
-			elif media == MetaData.MediaEpisode: return MetaTvdb.LinkEpisode % id
+			if media == Media.TypeShow:
+				episode = None
+				season = None
+			elif media == Media.TypeSeason:
+				episode = None
 
-		return None
+			if id:
+				if media == MetaData.MediaMovie: return MetaTvdb.LinkMovieId % id
+				elif media == MetaData.MediaShow: return MetaTvdb.LinkShowId % id
+				elif media == MetaData.MediaSeason: return MetaTvdb.LinkSeasonId % id
+				elif media == MetaData.MediaEpisode: return MetaTvdb.LinkEpisodeId % id
+			elif title:
+				from lib.meta.tools import MetaTools
+				link = None
+
+				slug1 = MetaTools.slug(title = title, year = year, separator = '-', symbol = None, lower = True)
+				slug2 = MetaTools.slug(title = title, separator = '-', symbol = None, lower = True)
+
+				if test:
+					slugged = slug if slug else slug1
+					if media == MetaData.MediaMovie: link = MetaTvdb.LinkMovieTitle % slugged
+					elif media == MetaData.MediaShow: link = MetaTvdb.LinkShowTitle % slugged
+					elif media == MetaData.MediaSeason and not season is None: link = MetaTvdb.LinkSeasonTitle % (slugged, season)
+					elif media == MetaData.MediaEpisode and not id is None: link = MetaTvdb.LinkEpisodeTitle % (slugged, id)
+					else: link = None
+					if link:
+						if not Networker().requestSuccess(link = link):
+							if year:
+								slugged = slug2 if not slug2 == slugged else slug1 if not slug1 == slugged else None
+								if slugged:
+									if media == MetaData.MediaMovie: link = MetaTvdb.LinkMovieTitle % slugged
+									elif media == MetaData.MediaShow: link = MetaTvdb.LinkShowTitle % slugged
+									elif media == MetaData.MediaSeason and not season is None: link = MetaTvdb.LinkSeasonTitle % (slugged, season)
+									elif media == MetaData.MediaEpisode and not id is None: link = MetaTvdb.LinkEpisodeTitle % (slugged, id)
+									else: link = None
+									if link and not Networker().requestSuccess(link = link): link = None
+								else:
+									link = None
+							else:
+								link = None
+				else:
+					slugged = slug if slug else slug2 # Without the year - more likley to be the correct one.
+					if media == MetaData.MediaMovie: link = MetaTvdb.LinkMovieTitle % slugged
+					elif media == MetaData.MediaShow: link = MetaTvdb.LinkShowTitle % slugged
+					elif media == MetaData.MediaSeason and not season is None: link = MetaTvdb.LinkSeasonTitle % (slugged, season)
+					elif media == MetaData.MediaEpisode and not id is None: link = MetaTvdb.LinkEpisodeTitle % (slugged, id)
+
+			if not link and title:
+				link = MetaTvdb.LinkSearch % Networker.linkQuote(data = title, plus = False) + '&menu%5Btype%5D='
+				if Media.typeTelevision(media): link += 'series'
+				else: link += 'movie'
+				if year: link += '&menu%5Byear%5D=' + str(year)
+		except: Logger.error()
+
+		return link
 
 	@classmethod
 	def _link(self, link, domain):

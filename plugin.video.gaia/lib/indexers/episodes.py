@@ -45,6 +45,7 @@ class Episodes(object):
 		self.mCache = Cache.instance()
 
 		self.mDeveloper = System.developerVersion()
+		self.mDeveloperExtra = False
 		self.mDetail = self.mMetatools.settingsDetail()
 		self.mLimit = self.mMetatools.settingsPageEpisode()
 		self.mInterleave = self.mMetatools.settingsShowInterleave()
@@ -224,9 +225,9 @@ class Episodes(object):
 	# duplicate: Filter out duplicates.
 	# release: Filter out unreleased items. If True, return any items released before 3 hours. If date-string,return items before the date. If integer, return items older than the given number of hours.
 	# limit: Limit the number of items. If True, use the setting's limit. If integer, limit up to the given number.
-	def process(self, items, menu = True, kids = True, search = False, duplicate = False, release = False, limit = False, refresh = False, next = True):
+	def process(self, items, menu = True, kids = True, search = False, duplicate = True, release = False, limit = False, refresh = False, next = True):
 		if items:
-			if duplicate: items = self.mMetatools.filterDuplicate(items = items)
+			if duplicate: items = self.mMetatools.filterDuplicate(items = items, number = True)
 
 			if kids: items = self.mMetatools.filterKids(items = items, kids = self.mKids)
 
@@ -2370,7 +2371,7 @@ class Episodes(object):
 				Memory.set(id = id, value = data, local = True, kodi = False)
 				if item: item.update(data)
 
-				if developer: Logger.log('NO NEXT EPISODE: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
+				if developer and self.mDeveloperExtra: Logger.log('NO NEXT EPISODE: ' + developer + (' [%s]' % Media.numberUniversal(season = season, episode = episode)))
 				return None
 			else:
 				if found == 1: data = {'season' : season, 'episode' : episodeNext}
@@ -2379,7 +2380,7 @@ class Episodes(object):
 				Memory.set(id = id, value = data, local = True, kodi = False)
 				if item: item.update(data)
 
-				if developer: Logger.log('NEXT EPISODE FOUND: ' + developer + (' [%s -> %s]' % (Media.numberUniversal(season = season, episode = episode), Media.numberUniversal(season = data['season'], episode = data['episode']))))
+				if developer and self.mDeveloperExtra: Logger.log('NEXT EPISODE FOUND: ' + developer + (' [%s -> %s]' % (Media.numberUniversal(season = season, episode = episode), Media.numberUniversal(season = data['season'], episode = data['episode']))))
 				return data
 		except:
 			Logger.error()

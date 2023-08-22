@@ -18,8 +18,8 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Settings, Time, Hash, Media, System, File, Tools, Logger, Converter, Regex
-from lib.modules.interface import Translation, Loader, Dialog, Directory
+from lib.modules.tools import Settings, Time, Hash, Media, System, File, Tools, Logger, Converter, Regex, Sound, Binge
+from lib.modules.interface import Translation, Format, Loader, Dialog, Directory
 from lib.modules.database import Database
 from lib.modules.concurrency import Pool, Lock
 from lib.modules import trakt as Trakt
@@ -67,7 +67,6 @@ class Playback(Database):
 	AdjustSettings		= 'settings'
 
 	# Other
-	Autoclosed			= 'autoclosed'
 	Instance			= None
 	Lock				= Lock()
 
@@ -88,7 +87,6 @@ class Playback(Database):
 
 		self.mSettingsRatingEnabled = self.settingsRatingEnabled()
 		self.mSettingsRatingMode = self.settingsRatingMode()
-		self.mSettingsRatingDialog = self.settingsRatingDialog()
 		self.mSettingsRatingBinge = self.settingsRatingBinge()
 		self.mSettingsRatingBingeTimeout = self.settingsRatingBingeTimeout()
 		self.mSettingsRatingRate = self.settingsRatingRate()
@@ -102,6 +100,8 @@ class Playback(Database):
 		self.mSettingsRatingRerateShow = self.settingsRatingRerateShow() if self.mSettingsRatingRerate else False
 		self.mSettingsRatingRerateSeason = self.settingsRatingRerateSeason() if self.mSettingsRatingRerate else False
 		self.mSettingsRatingRerateEpisode = self.settingsRatingRerateEpisode() if self.mSettingsRatingRerate else False
+
+		self.mSettingsDialogType = self.settingsDialogType()
 
 		self.mSettingsTrakt = self._traktEnabled() and self.mSettingsHistoryEnabled
 		self.mSettingsTraktStatus = self.mSettingsTrakt and self.mSettingsHistoryCount == 1
@@ -350,10 +350,6 @@ class Playback(Database):
 		return Settings.getInteger('activity.rating.default')
 
 	@classmethod
-	def settingsRatingDialog(self):
-		return Settings.getBoolean('interface.rating.interface')
-
-	@classmethod
 	def settingsRatingBinge(self):
 		return Settings.getInteger('activity.rating.binge')
 
@@ -400,6 +396,14 @@ class Playback(Database):
 	@classmethod
 	def settingsRatingRerateEpisode(self):
 		return Settings.getCustom('activity.rating.rerate.episode')
+
+	@classmethod
+	def settingsDialogType(self):
+		return Settings.getInteger('interface.dialog.interface')
+
+	@classmethod
+	def settingsDialogTypeSpecial(self):
+		return self.settingsDialogType() == 0
 
 	##############################################################################
 	# METADATA
@@ -599,7 +603,7 @@ class Playback(Database):
 		if media == Media.TypeShow or media == Media.TypeSeason:
 			Loader.hide()
 			choice = Dialog.options(title = title, message = 35802, labelConfirm = 33029, labelDeny = 33367, labelCustom = 35233)
-			if choice == Dialog.ChoiceCancelled: return result
+			if choice == Dialog.ChoiceCanceled: return result
 			elif choice == Dialog.ChoiceYes: selection = None
 			elif choice == Dialog.ChoiceNo:
 				Loader.show()
@@ -630,7 +634,7 @@ class Playback(Database):
 		# Ask the user if specials should also be marked when marking an entire show.
 		if Media.typeTelevision(media) and season is None and not ranged:
 			choice = Dialog.options(title = title, message = 33790, labelConfirm = 33029, labelDeny = 33112, labelCustom = 33111)
-			if choice == Dialog.ChoiceCancelled:
+			if choice == Dialog.ChoiceCanceled:
 				Loader.hide()
 				return result
 			elif choice == Dialog.ChoiceYes: specials = Playback.SpecialsAll
@@ -640,7 +644,7 @@ class Playback(Database):
 		# Ask which date to use to mark as watched.
 		Loader.hide()
 		choice = Dialog.options(title = title, message = 33764, labelConfirm = 33766, labelDeny = 33765, labelCustom = 35233)
-		if choice == Dialog.ChoiceCancelled:
+		if choice == Dialog.ChoiceCanceled:
 			Loader.hide()
 			return result
 		elif choice == Dialog.ChoiceYes:
@@ -695,7 +699,7 @@ class Playback(Database):
 
 			Loader.hide()
 			choice = Dialog.options(title = title, message = message, labelConfirm = 33029, labelDeny = 35061, labelCustom = 35233)
-			if choice == Dialog.ChoiceCancelled:
+			if choice == Dialog.ChoiceCanceled:
 				return result
 			elif choice == Dialog.ChoiceCustom:
 				if hierarchy:
@@ -735,10 +739,11 @@ class Playback(Database):
 
 		return result
 
-	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, animation = False, refresh = True, timeout = None):
+	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, binge = False, internal = None, external = None, indication = False, refresh = True, timeout = False, power = False, qr = True):
 		Loader.show()
+		Sound.executeRatingStart()
 
-		result = None
+		result = {}
 		title = 35041
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
@@ -746,35 +751,50 @@ class Playback(Database):
 		rating = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, full = True)
 		metadata = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
-		if timeout:
-			from lib.modules.convert import ConverterDuration
-			duration = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordFixed, unit = ConverterDuration.UnitSecond, years = False, months = False, days = False, hours = False, minutes = False, seconds = True)
-			Dialog.notification(title = 35579, message = Translation.string(35057) % duration, icon = Dialog.IconInformation)
+		# This allows us to cast ratings if the rating dialog does not auto-close (according to the settings).
+		def _dialogRate(rating, current = None, result = None, loader = False, refresh = False):
+			if rating:
+				sound = not Sound.enabledRatingFinish()
+				try: rating = rating['rating']
+				except: pass
+				if rating:
+					rating = max(1, min(10, int(rating)))
+					if loader: Loader.show()
+					rated = self.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, wait = True)
+					if loader: Loader.hide()
+					if rated:
+						Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, rating), icon = Dialog.IconSuccess, sound = sound)
+						if refresh: Directory.refresh(wait = False)
+					elif rated is None:
+						Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation, sound = sound)
+					else:
+						Dialog.notification(title = title, message = Translation.string(35347 if alternative else 35044) % label, icon = Dialog.IconWarning, sound = sound)
+					if not result is None: result['result'] = rated
+					return rated
+			return None
 
 		autoclosed = False
-		if self.mSettingsRatingDialog == 1:
+		if self.mSettingsDialogType == 1:
+			if timeout:
+				from lib.modules.convert import ConverterDuration
+				duration = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordFixed, unit = ConverterDuration.UnitSecond, years = False, months = False, days = False, hours = False, minutes = False, seconds = True)
+				Dialog.notification(title = 35579, message = Translation.string(35057) % duration, icon = Dialog.IconInformation)
 			rating = Dialog.input(type = Dialog.InputNumeric, title = title, default = rating['rating'] if rating else None, timeout = timeout)
+			Sound.executeRatingFinish()
 		else:
 			from lib.modules.window import WindowRating
-			rating = WindowRating.show(metadata = metadata, rating = rating, animation = animation, timeout = timeout, wait = True)
-			autoclosed = WindowRating.closedTimeout()
+			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, timeout = timeout, power = power, qr = qr, callback = lambda input : _dialogRate(rating = input, current = rating, result = result), wait = True)
+			if rating:
+				if 'timeout' in rating and rating['timeout'] and 'interacted' in rating and not rating['interacted']: autoclosed = True
+				elif 'action' in rating and rating['action'] == WindowRating.ActionPower: return False
+				elif 'rating' in rating: rating = rating['rating']
+				else: rating = None
+			else: rating = None
 
-		if rating is None: return Playback.Autoclosed if autoclosed else result
-		else: rating = max(1, min(10, int(rating)))
-
-		Loader.show()
-		result = self.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, wait = True)
-		Loader.hide()
-
-		if result:
-			Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, rating), icon = Dialog.IconSuccess)
-			if refresh: Directory.refresh(wait = False)
-		elif result is None:
-			Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation)
-		else:
-			Dialog.notification(title = title, message = Translation.string(35347 if alternative else 35044) % label, icon = Dialog.IconWarning)
-
-		return Playback.Autoclosed if autoclosed else result
+		if rating is None: return True if autoclosed else None
+		if result: result = result['result']
+		if not result: result = _dialogRate(rating = rating, refresh = True)
+		return True if autoclosed else (result or None)
 
 	def dialogUnrate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, refresh = True):
 		Loader.show()
@@ -782,6 +802,7 @@ class Playback(Database):
 		title = 35041
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
+		Sound.executeRatingStart()
 
 		rating = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, full = True)
 
@@ -790,18 +811,20 @@ class Playback(Database):
 		if choice: return result
 
 		Loader.show()
+		Sound.executeRatingFinish()
+		sound = not Sound.enabledRatingFinish()
 		result = self.ratingRemove(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, internal = internal, external = external, wait = True)
 		Loader.hide()
 
 		if result:
-			Dialog.notification(title = title, message = Translation.string(35346 if alternative else 35043) % label, icon = Dialog.IconSuccess)
+			Dialog.notification(title = title, message = Translation.string(35346 if alternative else 35043) % label, icon = Dialog.IconSuccess, sound = sound)
 			if refresh: Directory.refresh(wait = False)
 		else:
-			Dialog.notification(title = title, message = Translation.string(35348 if alternative else 35045) % label, icon = Dialog.IconWarning)
+			Dialog.notification(title = title, message = Translation.string(35348 if alternative else 35045) % label, icon = Dialog.IconWarning, sound = sound)
 
 		return result
 
-	def dialogAutorate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, binge = False, automatic = False, internal = None, external = None, refresh = True):
+	def dialogAutorate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, binge = False, automatic = False, internal = None, external = None, refresh = True, power = True, qr = True):
 		if self.mSettingsRatingEnabled:
 			rate = []
 			if Media.typeMovie(media):
@@ -855,15 +878,27 @@ class Playback(Database):
 
 			multiple = len(rate) > 1
 			for i in rate:
-				if multiple: i['animation'] = True
-				if binge and self.mSettingsRatingBingeTimeout: i['timeout'] = self.mSettingsRatingBingeTimeout
+				i['power'] = power
+				i['qr'] = qr
+				if multiple: i['indication'] = True
+				if binge:
+					i['binge'] = binge
+					if self.mSettingsRatingBingeTimeout: i['timeout'] = self.mSettingsRatingBingeTimeout
 
+			results = []
+			change = False
 			for i in rate:
+				# Autoclose on timeout without any interaction, or a power action was executed.
 				# If one dialog timed out and auto closed, do not show the remainder of the dialogs.
-				if self.dialogRate(**i) == Playback.Autoclosed: break
+				# Returns True (autoclosed on timeout without interaction), False (power or some other cancellation action), None (not rated or some other failuire), Integer (rating cast).
+				result = self.dialogRate(**i)
+				results.append(result)
+				if result is False or result is True: break
+				elif not result is None: change = True
 
-			if refresh: Directory.refresh(wait = False)
-			return True
+			if refresh and change: Directory.refresh(wait = False)
+			return False if False in results else True
+		return None
 
 	def dialogReset(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, internal = None, external = None, refresh = True):
 		Loader.show()
@@ -882,6 +917,69 @@ class Playback(Database):
 		Loader.hide()
 		Dialog.notification(title = 35006, message = 35037, icon = Dialog.IconSuccess)
 		Directory.refresh(wait = False)
+
+	def dialogContinue(self, metadata, binge = False, default = None):
+		from lib.modules.tools import Observer
+		from lib.modules.window import WindowContinue
+		from lib.modules.convert import ConverterDuration
+
+		if self.mSettingsDialogType == 0:
+			return WindowContinue.show(metadata = metadata, binge = binge, default = default)
+		else:
+			result = {'action' : WindowContinue.ActionNone, 'timeout' : False, 'interacted' : False}
+
+			action = Binge.continueAction()
+			timeout = Binge.continueTimeout()
+			if default:
+				if Tools.isDictionary(default):
+					action = default['action']
+					timeout = default['timeout']
+				else:
+					action = default
+			action = WindowContinue._intializeDefault(mode = WindowContinue.ModeContinue, action = action)
+
+			choiceCustom = {'label' : 36419, 'action' : WindowContinue.ActionPower}
+			choiceCancel = {'label' : 33743, 'action' : WindowContinue.ActionCancel}
+			if action == WindowContinue.ActionContinue:
+				choiceDefault = {'label' : 33821, 'action' : WindowContinue.ActionContinue}
+				choiceAlternative = {'label' : 36174, 'action' : WindowContinue.ActionStop}
+			elif action == WindowContinue.ActionStop:
+				choiceDefault = {'label' : 36174, 'action' : WindowContinue.ActionStop}
+				choiceAlternative = {'label' : 33821, 'action' : WindowContinue.ActionContinue}
+			elif action == WindowContinue.ActionCancel:
+				choiceDefault = {'label' : 33743, 'action' : WindowContinue.ActionCancel}
+				choiceAlternative = {'label' : 33821, 'action' : WindowContinue.ActionContinue}
+			elif action:
+				choiceDefault = {'label' : 36419, 'action' : WindowContinue.ActionPower}
+				choiceAlternative = {'label' : 33821, 'action' : WindowContinue.ActionContinue}
+				choiceCustom = {'label' : 36174, 'action' : WindowContinue.ActionStop}
+
+			message = Translation.string(36522)
+			if timeout:
+				label = choiceDefault['label']
+				actions = Observer.settingsActions()
+				for i in actions:
+					if action == i['action']:
+						label = i['label']
+						break
+
+				duration = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort)
+				duration = Regex.replace(data = duration, expression = '(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
+
+				message += ' ' + Translation.string(36523) % (Format.fontBold(label), duration)
+
+			choice = Dialog.options(title = 36497, message = message, labelConfirm = choiceAlternative['label'], labelDeny = choiceDefault['label'], labelCustom = choiceCustom['label'], timeout = timeout * 1000)
+			if choice == Dialog.ChoiceYes: choice = choiceAlternative
+			elif choice == Dialog.ChoiceNo: choice = choiceDefault
+			elif choice == Dialog.ChoiceCustom: choice = choiceCustom
+			else: choice = choiceCancel
+
+			if choice['action'] == WindowContinue.ActionPower:
+				action = action or WindowContinue._intializePower(action = True)
+				if not action is False: result['action'] = System.power(action = action, proper = True, notification = True)
+			else:
+				result['action'] = choice['action']
+			return result
 
 	##############################################################################
 	# COMBINED
@@ -1578,3 +1676,17 @@ class Playback(Database):
 		except:
 			Logger.error()
 			return True
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	def _clean(self, time, commit = True, compress = True):
+		if time: return self._delete(query = 'DELETE FROM `%s` WHERE timeUpdated <= ?;' % Playback.Table, parameters = [time], commit = commit, compress = compress)
+		return False
+
+	def _cleanTime(self, count):
+		if count:
+			times = self._selectValues(query = 'SELECT timeUpdated FROM `%s` ORDER BY timeUpdated ASC LIMIT ?;' % Playback.Table, parameters = [count])
+			if times: return Tools.listSort(times)[:count][-1]
+		return None

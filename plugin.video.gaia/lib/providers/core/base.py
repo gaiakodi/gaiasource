@@ -288,6 +288,7 @@ class ProviderBase(object):
 
 	SettingsGlobalSaveStream			= 'scrape.save.stream'
 	SettingsGlobalSaveCache				= 'scrape.save.cache'
+	SettingsGlobalSaveExpression		= 'scrape.save.expression'
 
 	SettingsGlobalConcurrencyMode		= 'provider.concurrency.mode'
 	SettingsGlobalConcurrencyLimit		= 'provider.concurrency.limit'
@@ -468,6 +469,7 @@ class ProviderBase(object):
 											'save' : {
 												'stream' : None,
 												'cache' : None,
+												'expression' : None,
 											},
 											'pack' : {
 												'enabled' : None,
@@ -508,6 +510,14 @@ class ProviderBase(object):
 											},
 										}
 	SettingsData						= Tools.copy(SettingsDataBase)
+
+	# Priority
+	PriorityEnabled						= True
+	PriorityLocks						= {}
+	PriorityLock						= Lock()
+	PriorityDelay						= 0.1
+	PriorityChunk						= 250 # More details in priorityChunks().
+	PriorityTimeout						= 60 # 1 minute.
 
 	# Query
 	QueryId								= {}
@@ -617,7 +627,7 @@ class ProviderBase(object):
 		scrapePriority			= None,			# The default priority that determines the order in which providers are scraped.
 		scrapeTermination		= None,			# The default number of links after which the scraping process is terminated.
 		scrapeTime				= None,			# The default scraping timeout. If None, the global scraping timeout is used.
-		scrapeQuery				= False,			# The default maximum number of queries to scrape. If False, the provider does not support query limits. If None, the global query limit is used.
+		scrapeQuery				= False,		# The default maximum number of queries to scrape. If False, the provider does not support query limits. If None, the global query limit is used.
 		scrapePage				= False,		# The default maximum number of pages to scrape. If False, the provider does not support page limits. If None, the global page limit is used.
 		scrapeRequest			= False,		# The default maximum number of requests/queries to execute during scraping. If False, the provider does not support request limits. If None, the global request limit is used.
 
@@ -831,6 +841,8 @@ class ProviderBase(object):
 		ProviderBase.ScrapeCountQuery = {}
 		ProviderBase.ScrapeCountPages = {}
 		ProviderBase.ScrapeCountRequests = {}
+
+		ProviderBase.PriorityLocks = {}
 
 		ProviderBase.QueryId = {}
 		ProviderBase.QueryDone = {}
@@ -1247,17 +1259,20 @@ class ProviderBase(object):
 	# ORDER
 	##############################################################################
 
-	def order(self):
-		order = self.performance() + (self.rank() / float(ProviderBase.RankLimit))
+	def order(self, inverse = False):
+		order = 1 + self.performance() + (self.rank() / float(ProviderBase.RankLimit))
 
-		if self.typeSpecial(): order += 0.10
-		elif self.typeLocal(): order += 0.15
+		if self.typeLocal(): order += 0.20
+		elif self.typeSpecial(): order += 0.15
+		elif self.typeCenter(): order += 0.10
 		elif self.typePremium(): order += 0.05
 
 		if self.statusImpaired(): order -= 0.25
 		elif self.statusDead(): order -= 0.60
 		elif self.statusHidden(): order -= 0.50
 
+		order = Math.scale(value = order, fromMinimum = 0, fromMaximum = 4.0, toMinimum = 0, toMaximum = 1)
+		if inverse: order = 1 - order
 		return order
 
 	##############################################################################
@@ -2539,6 +2554,17 @@ class ProviderBase(object):
 	def settingsGlobalSaveCacheLabel(self, value = None):
 		if value is None: value = self.settingsGlobalSaveCache()
 		return Settings.customLabel(id = ProviderBase.SettingsGlobalSaveCache, value = value)
+
+	@classmethod
+	def settingsGlobalSaveExpression(self):
+		result = ProviderBase.SettingsData['save']['expression']
+		if result is None: result = ProviderBase.SettingsData['save']['expression'] = Settings.getInteger(ProviderBase.SettingsGlobalSaveExpression)
+		return result
+
+	@classmethod
+	def settingsGlobalSaveExpressionSet(self, value):
+		Settings.set(ProviderBase.SettingsGlobalSaveExpression, value)
+		ProviderBase.SettingsData['save']['expression'] = None
 
 	@classmethod
 	def settingsGlobalConcurrencyMode(self):
@@ -4028,11 +4054,14 @@ class ProviderBase(object):
 		return False
 
 	def resultContains(self, type = None, link = None, hash = None):
-		idLink = self.resultId(type = type, link = link)
-		if idLink: return idLink in ProviderBase.ResultFound[self.id()]
+		id = self.id()
 
-		idHash = self.resultId(type = type, hash = hash)
-		if idHash: return idHash in ProviderBase.ResultFound[self.id()]
+		if id in ProviderBase.ResultFound:
+			idLink = self.resultId(type = type, link = link)
+			if idLink: return idLink in ProviderBase.ResultFound[id]
+
+			idHash = self.resultId(type = type, hash = hash)
+			if idHash: return idHash in ProviderBase.ResultFound[id]
 
 		return False
 
@@ -4216,7 +4245,7 @@ class ProviderBase(object):
 		limit = self.settingsGlobalConcurrencyLimit()
 		if binge:
 			binged = self.settingsGlobalConcurrencyBinge()
-			if binged: limit = int(max(2, limit * binged))
+			if binged: limit = int(max(3, (limit or tasks) * binged)) # If "Unlimited", then "limit == 0".
 		Logger.log('Maximum Concurrent Providers: %s (%s Scrape)' % (str(limit) if limit else 'Unlimited', 'Binge' if binge else 'Normal'))
 
 		if tasks: tasks = [tasks]
@@ -4385,6 +4414,136 @@ class ProviderBase(object):
 	#	2. Or add the headers/cookies to the link that is returned.
 	def resolveLink(self, link, data = None, headers = None, cookies = None, renew = False):
 		return link
+
+	##############################################################################
+	# PRIORITY
+	##############################################################################
+
+	def priority(self, settings = True, type = True, order = True):
+		priority = [0, 0, 0]
+
+		if settings:
+			scrape = self.scrapePriority()
+			if not scrape: priority[0] = 99999
+			else: priority[0] = scrape
+
+		if type:
+			if self.typeLocal(): priority[1] = 1
+			elif self.typeSpecial(): priority[1] = 2
+			elif self.typeCenter(): priority[1] = 3
+			elif self.typePremium(): priority[1] = 4
+			else: priority[1] = 5
+
+		if order:
+			priority[2] = int(self.order(inverse = True) * 10000)
+
+		return int(''.join([str(i).zfill(5) for i in priority]))
+
+	# In modules/core.py we start the provider threads in order of priority.
+	# However, if many providers all have the same scrapePriority(), they will be executing in parallel.
+	# During execution, there is no more priority and Python can interleave/schedule the threads in any order.
+	# The main part of each provider is the Stream creation/validation, which takes by far the longest.
+	# Providers that retrieve a lot of links (eg Orion) might end up finishing last, although they were started first, since they need a lot of time for the Streams.
+	# Alow these providers, and providers with a custom set priority, to execute their Stream code before others.
+	# This will allow providers that started first to also finish earlier (depending on how many streams they have), since their threads gets priority and are interleaved more often.
+	# These extra lockings should not increase scraping time too much, maybe 1-2 secs for 25 providers (this might just be some deviation and not actually increase the time).
+	# This might actually save some time, since threads are interleaved less frequently, avoiding some overhead?
+
+	def priorityStart(self, lock = None):
+		if not ProviderBase.PriorityEnabled: return None
+
+		id = self.id()
+		priority = self.priority()
+		locked = None
+		locker = lock['lock'] if lock else None
+
+		# Create a shallow copy to ignore new providers that enter here after the current provider has already started.
+		locks = Tools.copy(ProviderBase.PriorityLocks, deep = False)
+
+		# Get all providers with a lower (better) or same priority.
+		# If the priority is the same, only use those locks that were added BEFORE the current lock, otherwise there seems to be a deadlock (but maybe only when using PriorityChunk == 100).
+		temp = []
+		for i in Tools.listSort(locks.keys()):
+			if i < priority: temp.append(locks[i])
+			elif i == priority:
+				if locker:
+					index = -1
+					for j in range(len(locks[i])):
+						if locks[i][j]['lock'] == locker:
+							index = j
+							break
+					if index > 0: temp.append(locks[i][:j])
+				else:
+					temp.append(locks[i])
+			else: break
+		locks = Tools.listFlatten(temp)
+
+		# Do not wait for locks by the same provider, such as multiple threads or searchConcurrency().
+		# Otherwise sub-threads of the same provider might deadlock, because they wait for their parent thread to finish, and the parent thread does not finish, because the child threads are not done yet.
+		locks = [i for i in locks if not i['id'] == id]
+
+		# If we already created the lock in a previous iteration, sleep a little bit.
+		# This forces Python to schedule another thread.
+		# Without this, the same provider might regain the lock after each iteration of the outer chunk loop.
+		# This will then process each of the chunks one after the other, without giving other providers a chance to execute.
+		# When sleeping, we can allow another provider to finish its stream processing, so it can continue with the network request of the next page, or if finished, allow another provider to start.
+		# Do not sleep if there are only a few providers left, otherwise we just waste time.
+		if locker and len(locks) > 3: Time.sleep(ProviderBase.PriorityDelay)
+
+		# Use own lock.
+		# Must happen after the shallow copy, otherwise me wait for our own lock.
+		if locker is None: locker = Lock()
+		locker.acquire()
+		if not priority in ProviderBase.PriorityLocks: ProviderBase.PriorityLocks[priority] = []
+		ProviderBase.PriorityLocks[priority].append({'id' : id, 'lock' : locker})
+
+		# Wait for all other prioviders with a lower (better) priority to finish.
+		# Use a timeout, in case there is a catastrophic failure in a provider that never unlocks (should not really happen).
+		# Using a timeout: in the best case we avoid deadlock. In the worst case, we just skip the locks and are back to more-or-less no priority, as if ProviderBase.PriorityEnabled=False.
+		for i in locks:
+			valid = i['lock'].acquire(timeout = ProviderBase.PriorityTimeout)
+			if valid: i['lock'].release()
+			else: locked = i['id']
+
+		if locked:
+			self.log('A provider (%s) priority lock timed out. This should not happen!' % locked)
+			locked = False
+		else:
+			locked = True
+
+		# In case multiple providers with the same priority all exit the loop above at the same time.
+		# Only use this inner lock if we did not get a timeout from a lock above.
+		# Since that catastrophic provider probably also holds this lock.
+		if locked: ProviderBase.PriorityLock.acquire()
+
+		return {'lock' : locker, 'locked' : locked}
+
+	def priorityEnd(self, lock):
+		if not ProviderBase.PriorityEnabled: return None
+
+		# This function could be called multiple times, once for normal unlocking, once at the end of the try-catch statement.
+		# Only unlock if the lock was found, that is, it was not unlocked previously.
+		if lock:
+			found = False
+			priority = self.priority()
+			if priority in ProviderBase.PriorityLocks:
+				for i in ProviderBase.PriorityLocks[priority]:
+					if i['lock'] == lock['lock']:
+						ProviderBase.PriorityLocks[priority].remove(i)
+						found = True
+						break
+
+			if found:
+				if lock['locked']: ProviderBase.PriorityLock.release()
+				lock['lock'].release()
+
+	def priorityChunks(self, items):
+		if not ProviderBase.PriorityEnabled: return [items]
+
+		# Divide into chunks, to let other providers continue in between the chunks.
+		# Otherwise if, eg Orion, returns 2000 links, it will block all other providers while it processed all 2000 streams, which can take a long time.
+		# Use 250 asd not 200 as chunk size. Some providers retrieve 250 items per page, and we want to process them all in a single chunk.
+		return [items[i : i + ProviderBase.PriorityChunk] for i in range(0, len(items), ProviderBase.PriorityChunk)]
 
 	##############################################################################
 	# STATISTICS

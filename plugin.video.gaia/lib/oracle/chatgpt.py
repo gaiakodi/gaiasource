@@ -963,11 +963,12 @@ class Chatgpt(Oracle):
 
 		result = None
 		if self.accountAuthenticated(): result = self._requestChatgpt(message = message, context = context, conversation = conversation, refine = refine, model = model, limit = limit, randomness = randomness, creativity = creativity)
-
+		
 		try: last = result['chat']['history'][-1]['data']
 		except: last = None
 		if not result or (result['error'] and (not last or (Tools.isDictionary(last) and 'error' in last))):
-			result = self._requestPlayground(message = message, context = context, conversation = conversation, refine = refine, model = model, limit = limit, randomness = randomness, creativity = creativity)
+			result2 = self._requestPlayground(message = message, context = context, conversation = conversation, refine = refine, model = model, limit = limit, randomness = randomness, creativity = creativity)
+			if result2: result = result2
 
 		return result
 

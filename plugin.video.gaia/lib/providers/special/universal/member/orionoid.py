@@ -135,6 +135,7 @@ class Provider(ProviderBase):
 	##############################################################################
 
 	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		lock = None
 		try:
 			type = Orionoid.TypeShow if Media.typeTelevision(media) else Orionoid.TypeMovie
 			title = titles['search']['main'][0]
@@ -150,10 +151,16 @@ class Provider(ProviderBase):
 					data = streams
 					streams = streams['streams']
 					extract = self.extract(streams = streams)
-					for stream in streams:
-						stream = self.stream(data = data, stream = stream, extract = extract, media = media, titles = titles, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
-						if stream: self.resultAdd(stream)
+
+					chunks = self.priorityChunks(streams)
+					for chunk in chunks:
+						lock = self.priorityStart(lock = lock)
+						for stream in chunk:
+							stream = self.stream(data = data, stream = stream, extract = extract, media = media, titles = titles, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+							if stream: self.resultAdd(stream)
+						self.priorityEnd(lock = lock)
 		except: self.logError()
+		finally: self.priorityEnd(lock = lock)
 
 	##############################################################################
 	# EXTRACT

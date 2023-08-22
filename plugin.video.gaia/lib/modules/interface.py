@@ -536,6 +536,7 @@ class Font(object):
 						if file: style += ' ' + file
 
 						bold = tools.Regex.match(data = style, expression = 'bold')
+						black = tools.Regex.match(data = style, expression = 'black')
 						italic = tools.Regex.match(data = style, expression = 'italic')
 						light = tools.Regex.match(data = style, expression = 'light')
 						mono = tools.Regex.match(data = style, expression = 'mono')
@@ -553,6 +554,7 @@ class Font(object):
 							'spacing' : spacing,
 
 							'bold' : bold,
+							'black' : black,
 							'italic' : italic,
 							'light' : light,
 							'mono' : mono,
@@ -562,7 +564,7 @@ class Font(object):
 							'symbol' : symbol,
 						})
 
-				# If nothing found, att the default font (seems to be avilable in most skins).
+				# If nothing found, add the default font (seems to be avilable in most skins).
 				if not Font.FontData:
 					Font.FontData.append({
 						'name' : 'font13',
@@ -693,40 +695,40 @@ class Font(object):
 		return font if full else font['name']
 
 	@classmethod
-	def fontDefault(self, full = False):
-		return self.fontMedium(full = full)
+	def fontDefault(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.fontMedium(aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontTiny(self, full = False):
-		return self.font(size = Font.SizeTiny, full = full)
+	def fontTiny(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeTiny, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontSmall(self, full = False):
-		return self.font(size = Font.SizeSmall, full = full)
+	def fontSmall(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeSmall, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontMedium(self, full = False):
-		return self.font(size = Font.SizeMedium, full = full)
+	def fontMedium(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeMedium, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontLarge(self, full = False):
-		return self.font(size = Font.SizeLarge, full = full)
+	def fontLarge(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeLarge, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontBig(self, full = False):
-		return self.font(size = Font.SizeBig, full = full)
+	def fontBig(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeBig, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontHuge(self, full = False):
-		return self.font(size = Font.SizeHuge, full = full)
+	def fontHuge(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeHuge, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontMassive(self, full = False):
-		return self.font(size = Font.SizeMassive, full = full)
+	def fontMassive(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeMassive, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 	@classmethod
-	def fontColossal(self, full = False):
-		return self.font(size = Font.SizeColossal, full = full)
+	def fontColossal(self, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, full = False):
+		return self.font(size = Font.SizeColossal, aspect = aspect, spacing = spacing, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, full = full)
 
 class Icon(object):
 
@@ -952,6 +954,7 @@ class Format(object):
 	ColorWhite = 'FFFFFFFF'
 	ColorBlack = 'FF000000'
 	ColorDisabled = 'FF888888'
+	ColorTransparent = '88'
 
 	Gradients = {}
 
@@ -1038,6 +1041,19 @@ class Format(object):
 		return gradient[max(0, min(len(gradient) - 1, int(value)))]
 
 	@classmethod
+	def colorMix(self, color1, color2, ratio = 0.5):
+		ratio1 = ratio
+		ratio2 = 1.0 - ratio
+		color = []
+		rgb = tools.Tools.isArray(color1)
+		if not rgb:
+			color1 = self.colorToRgb(color1, alpha = True)
+			color2 = self.colorToRgb(color2, alpha = True)
+		for i in range(len(color1)):
+			color.append(min(255, max(0, int((color1[i] * ratio1) + (color2[i] * ratio2)))))
+		return color if rgb else self.colorToHex(color)
+
+	@classmethod
 	def colorChange(self, color, change = 10):
 		if color:
 			if change > -1 and change < 1: change = int(round(255 * change))
@@ -1093,6 +1109,9 @@ class Format(object):
 			Format.ColorMedium = self._colorSettings(Format.ColorCustom, 'medium', Format.ColorMedium)
 			Format.ColorPoor = self._colorSettings(Format.ColorCustom, 'poor', Format.ColorPoor)
 			Format.ColorBad = self._colorSettings(Format.ColorCustom, 'bad', Format.ColorBad)
+
+			try: Format.ColorTransparent = self.colorToHex([((100.0 - tools.Settings.getInteger('theme.color.transparent')) / 100.0) * 255.0])[2:]
+			except: tools.Logger.error()
 
 	@classmethod
 	def colorQuality(self, quality):
@@ -1236,6 +1255,11 @@ class Format(object):
 	@classmethod
 	def colorDisabled(self):
 		return Format.ColorDisabled
+
+	@classmethod
+	def colorTransparent(self):
+		self._colorIninitialize()
+		return Format.ColorTransparent
 
 	@classmethod
 	def _iconFormat(self, icon, color = False, bold = False, pad = True, padLeft = False, padRight = False, padding = ' '):
@@ -1677,7 +1701,7 @@ class Dialog(object):
 	ReselectNo = False
 	ReselectMenu = 'menu' # Keep track of submenu selection and reselect on a submenu basis.
 
-	ChoiceCancelled = -1
+	ChoiceCanceled = -1
 	ChoiceNo = 0
 	ChoiceYes = 1
 	ChoiceCustom = 2
@@ -1991,7 +2015,7 @@ class Dialog(object):
 				else: default = None
 			else: default = None
 
-		if not default is None and not timeout is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout, defaultbutton = default)
+		if not default is None and not timeout is None:	return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout, defaultbutton = default)
 		elif not default is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, defaultbutton = default)
 		elif not timeout is None: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny, autoclose = timeout)
 		else: return xbmcgui.Dialog().yesno(self.title(title), self.__translate(message), yeslabel = labelConfirm, nolabel = labelDeny)
@@ -2020,7 +2044,7 @@ class Dialog(object):
 	# wait: wait if other notifications to finish before showing this one. Otherwise Kodi preempts the previous notification and immediately shows the next one.
 	# titleless: Without Gaia at the front of the title.
 	@classmethod
-	def notification(self, message, icon = None, time = 4000, sound = False, wait = True, duplicates = False, title = None, titleless = False):
+	def notification(self, message, icon = None, time = 4000, sound = None, wait = True, duplicates = False, title = None, titleless = False):
 		if icon and not (icon.startswith('http') or icon.startswith('ftp') or tools.File.exists(icon)):
 			icon = icon.lower()
 			if icon == Dialog.IconNativeInformation: icon = xbmcgui.NOTIFICATION_INFO
@@ -2061,16 +2085,24 @@ class Dialog(object):
 			if id and id in Dialog.Notifications and timeNow - Dialog.Notifications[id] < 60: return # Allow duplicates if older than 60 seconds.
 			Dialog.Notifications[id] = timeNow
 
+		if sound is None and tools.Sound.nativeNotify(): sound = True
+		def _sound(time):
+			tools.Sound.executeNotifyStart()
+			if tools.Sound.enabledNotifyFinish(): Pool.thread(target = _soundFinish, kwargs = {'time' : time}, start = True)
+		def _soundFinish(time):
+			tools.Time.sleep(time / 1000.0)
+			tools.Sound.executeNotifyFinish()
+
 		window.Window.propertyGlobalSet(propertyTime, max(timeNow, timeWait) + (time / 1000.0))
 		if waiting:
 			def _notification(title, message, icon, time, sound):
 				tools.Time.sleep(timeWait - timeNow)
-				xbmcgui.Dialog().notification(title, message, icon, time, sound = sound)
-
-			thread = Pool.thread(target = _notification, args = (title, message, icon, time, sound))
-			thread.start()
+				if sound is None: _sound(time = time)
+				xbmcgui.Dialog().notification(title, message, icon, time, sound = sound is True)
+			Pool.thread(target = _notification, args = (title, message, icon, time, sound), start = True)
 		else:
-			xbmcgui.Dialog().notification(title, message, icon, time, sound = sound)
+			if sound is None: _sound(time = time)
+			xbmcgui.Dialog().notification(title, message, icon, time, sound = sound is True)
 
 	# items = [(label1,callback1),(label2,callback2),...]
 	# or labels = [label1,label2,...]
@@ -2137,8 +2169,8 @@ class Dialog(object):
 
 	@classmethod
 	def browse(self, type = BrowseDefault, default = None, multiple = False, mask = [], title = None):
-		if default == None: default = tools.File.joinPath(tools.System.pathHome(), '') # Needs to end with a slash
-		if mask == None: mask = []
+		if default is None: default = tools.File.joinPath(tools.System.pathHome(), '') # Needs to end with a slash
+		if mask is None: mask = []
 		elif tools.Tools.isString(mask): mask = [mask]
 		for i in range(len(mask)):
 			mask[i] = mask[i].lower()
@@ -2175,7 +2207,9 @@ class Dialog(object):
 
 		def decorate(item):
 			label = item['title'] if 'title' in item else ''
-			if 'prefix' in item: label = item['prefix'] + Translation.string(label)
+			if 'prefix' in item:
+				if item['prefix'] is True: label = self.prefixNext(Translation.string(label))
+				else: label = item['prefix'] + Translation.string(label)
 
 			value = item['value'] if 'value' in item else None
 			bold = item['bold'] if 'bold' in item else True
@@ -2320,6 +2354,8 @@ class Dialog(object):
 					elif refresh:
 						items = refresh()
 						labels, copies, actions, parameters, closes, returns, selected = create(items)
+
+				return choice
 			elif any(i for i in returns):
 				choice = self.select(labels, title = title, selection = selection, details = details)
 				if copy:
@@ -2701,13 +2737,7 @@ class Splash(xbmcgui.WindowDialog):
 		return (width, height)
 
 	def __button(self, buttonLabel, buttonX, buttonY, buttonWidth, buttonHeight, iconPath = None, iconX = None, iconY = None, iconWidth = None, iconHeight = None, infoLabel = None, infoX = None, infoY = None, infoWidth = None, infoHeight = None):
-		pathNormal = tools.File.joinPath(self.__skin(), 'interface', 'button', 'medium', 'unfocused.png')
-		if not tools.File.exists(pathNormal):
-			pathNormal = tools.File.joinPath(self.__interface(), 'button', 'medium', 'unfocused.png')
-
-		pathFocus = tools.File.joinPath(self.__skin(), 'interface', 'button', 'medium', 'focused.png')
-		if not tools.File.exists(pathFocus):
-			pathFocus = tools.File.joinPath(self.__interface(), 'button', 'medium', 'focused.png')
+		pathNormal = pathFocus = tools.File.joinPath(self.__interface(), 'button', 'medium', 'outer.png')
 
 		buttonLabel = Format.fontBold(buttonLabel)
 		self.addControl(xbmcgui.ControlButton(buttonX, buttonY, buttonWidth, buttonHeight, buttonLabel, focusTexture = pathFocus, noFocusTexture = pathNormal, alignment = Splash.FormatCenter, textColor = Splash.FormatWhite, font = Font.fontLarge()))
@@ -2807,7 +2837,7 @@ class Splash(xbmcgui.WindowDialog):
 
 	def close(self):
 		super(Splash, self).close()
-		self.popupClose()
+		#self.popupClose()
 
 	@classmethod
 	def visible(self):
@@ -3769,13 +3799,16 @@ class Context(object):
 			tools.Logger.error()
 
 	@classmethod
-	def initialize(self, force = False):
+	def initialize(self, force = False, wait = True):
+		if wait: self._initialize(force = force)
+		else: Pool.thread(target = self._initialize, kwargs = {'force' : force}, start = True)
+
+	@classmethod
+	def _initialize(self, force = False):
 		if Context.LabelMenu is None or force:
 			from lib.modules.cache import Memory
 
-			thread = Pool.thread(target = self._initializeRefresh)
-			thread.start()
-
+			thread = Pool.thread(target = self._initializeRefresh, start = True)
 			data = Memory.get(id = Context.Id, local = True, kodi = True)
 			if not data or force:
 				thread.join()
@@ -4283,27 +4316,8 @@ class Context(object):
 	def commandFileHash(self):
 		return self._commandPlugin(action = 'fileHash', parameters = {'hash' : self.mHash})
 
-	def commandLinkCopy(self, mode):
-		link = None
-		if mode == 'trakt':
-			from lib.modules import trakt as Trakt
-			link = Trakt.link(media = self.mMedia, slug = self.mSlug, season = self.mSeason, episode = self.mEpisode)
-		elif mode == 'imdb':
-			from lib.meta.processors.imdb import MetaImdb
-			link = MetaImdb.link(metadata = self.mMetadata)
-		elif mode == 'tmdb':
-			from lib.meta.processors.tmdb import MetaTmdb
-			link = MetaTmdb.link(metadata = self.mMetadata)
-		elif mode == 'tvdb':
-			from lib.meta.providers.tvdb import MetaTvdb
-			link = MetaTvdb.link(metadata = self.mMetadata)
-		elif mode == 'homepage':
-			link = self.mMetadata['homepage']
-		elif mode == 'trailer':
-			link = self.mMetadata['trailer']
-		elif mode == 'google':
-			 link = tools.Google.link(metadata = self.mMetadata)
-		return self._commandPlugin(action = 'copy', parameters = {'link' : link})
+	def commandLink(self, media = None):
+		return self._commandPlugin(action = 'qr', parameters = {'media' : media, 'metadata' : self.mMetadata})
 
 	def commandShortcutCreate(self):
 		return self._commandPlugin(action = 'shortcutsShow', parameters = {'link' : self.mLink, 'name' : self.mShortcutLabel, 'create' : True})
@@ -4414,8 +4428,8 @@ class Context(object):
 	def commandSystemManager(self):
 		return self._commandPlugin(action = 'systemManager')
 
-	def commandSystemTools(self):
-		return self._commandPlugin(action = 'systemTools')
+	def commandSystemPower(self):
+		return self._commandPlugin(action = 'systemPower')
 
 	def commandSystemCleanup(self):
 		return self._commandPlugin(action = 'clean')
@@ -4463,6 +4477,12 @@ class Context(object):
 				if icon:
 					for i in item['items']:
 						if not 'icon' in i: i['icon'] = icon
+						if 'items' in i:
+							for j in i['items']:
+								if not 'icon' in j: j['icon'] = icon
+								if 'items' in j:
+									for k in j['items']:
+										if not 'icon' in k: k['icon'] = icon
 			self.mItems.append(item)
 		except:
 			tools.Logger.error()
@@ -4479,7 +4499,9 @@ class Context(object):
 	def addItem(self):
 		try:
 			self.addInformation()
-			if not self.mMedia == tools.Media.TypeSet:
+			if self.mMedia == tools.Media.TypeSet:
+				self.addLink()
+			else:
 				self.addVideos()
 				self.addBrowse()
 				self.addBinge()
@@ -4697,28 +4719,44 @@ class Context(object):
 		])
 
 	def addFile(self):
+		links = [
+			{'label' : 35332, 'command' : 'commandFileLink', 'parameters' : 'original', 'loader' : True},
+			{'label' : 35688, 'command' : 'commandFileLink', 'parameters' : 'resolved', 'loader' : True},
+			{'label' : 35460, 'command' : 'commandFileLink', 'parameters' : 'stream', 'loader' : True},
+		]
+		if tools.Media.typeTelevision(self.mMedia) and not self.mSeason is None:
+			sublinks = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.TypeShow, 'loader' : True}]
+			if not self.mSeason is None: sublinks.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSeason, 'loader' : True})
+			if not self.mEpisode is None: sublinks.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.TypeEpisode, 'loader' : True})
+			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True, 'items' : sublinks})
+		elif 'collection' in self.mMetadata and 'id' in self.mMetadata['collection'] and self.mMetadata['collection']['id']:
+			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True, 'items' : [
+				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.TypeMovie, 'loader' : True},
+				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSet, 'loader' : True}
+			]})
+		else:
+			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True})
+
 		self.add(label = 33380, icon = Font.IconFile, items = [
 			{'label' : 35434, 'command' : 'commandFileAdd', 'close' : True},
-			{'label' : 33031, 'items' : [
-				{'label' : 35332, 'command' : 'commandFileLink', 'parameters' : 'original'},
-				{'label' : 35688, 'command' : 'commandFileLink', 'parameters' : 'resolved'},
-				{'label' : 35460, 'command' : 'commandFileLink', 'parameters' : 'stream'},
-			]},
-			{'label' : 33036, 'command' : 'commandFileName'} if self.mName else None,
-			{'label' : 33494, 'command' : 'commandFileHash'} if self.mHash else None,
+			{'label' : 33031, 'items' : links},
+			{'label' : 33036, 'command' : 'commandFileName', 'loader' : True} if self.mName else None,
+			{'label' : 33494, 'command' : 'commandFileHash', 'loader' : True} if self.mHash else None,
 		])
 
 	def addLink(self):
-		label = Translation.string(33058)
-		self.add(label = 33381, icon = Font.IconLink, items = [
-			{'label' : label % 'Trakt', 'command' : 'commandLinkCopy', 'parameters' : 'trakt'} if self.mSlug else None,
-			{'label' : label % 'IMDb', 'command' : 'commandLinkCopy', 'parameters' : 'imdb'} if self.mImdb else None,
-			{'label' : label % 'TMDb', 'command' : 'commandLinkCopy', 'parameters' : 'tmdb'} if self.mTmdb else None,
-			{'label' : label % 'TVDb', 'command' : 'commandLinkCopy', 'parameters' : 'tvdb'} if self.mTvdb else None,
-			{'label' : label % 'Homepage', 'command' : 'commandLinkCopy', 'parameters' : 'homepage'} if 'homepage' in self.mMetadata and self.mMetadata['homepage'] else None,
-			{'label' : label % 'Trailer', 'command' : 'commandLinkCopy', 'parameters' : 'trailer'} if 'trailer' in self.mMetadata and self.mMetadata['trailer'] else None,
-			{'label' : label % 'Google', 'command' : 'commandLinkCopy', 'parameters' : 'google'} if self.mTitle else None,
-		])
+		if tools.Media.typeTelevision(self.mMedia) and not self.mSeason is None:
+			links = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.TypeShow, 'loader' : True}]
+			if not self.mSeason is None: links.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSeason, 'loader' : True})
+			if not self.mEpisode is None: links.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.TypeEpisode, 'loader' : True})
+			self.add(label = 33381, icon = Font.IconLink, items = links)
+		elif 'collection' in self.mMetadata and 'id' in self.mMetadata['collection'] and self.mMetadata['collection']['id']:
+			self.add(label = 33381, icon = Font.IconLink, items = [
+				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.TypeMovie, 'loader' : True},
+				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSet, 'loader' : True}
+			])
+		else:
+			self.add(label = 33381, icon = Font.IconLink, command = 'commandLink', loader = True)
 
 	def addShortcut(self):
 		from lib.modules.shortcuts import Shortcuts
@@ -4777,7 +4815,7 @@ class Context(object):
 			{'label' : 33467, 'icon' : Font.IconSettings, 'items' : [
 				{'label' : 33478, 'icon' : Font.IconSettings, 'command' : 'commandSystemInformation'},
 				{'label' : 33479, 'icon' : Font.IconSettings, 'command' : 'commandSystemManager'},
-				{'label' : 33476, 'icon' : Font.IconSettings, 'command' : 'commandSystemTools'},
+				{'label' : 33476, 'icon' : Font.IconSettings, 'command' : 'commandSystemPower'},
 				{'label' : 33495, 'icon' : Font.IconSettings, 'command' : 'commandSystemCleanup'},
 			]},
 			{'label' : 32062, 'icon' : Font.IconSettings, 'items' : [

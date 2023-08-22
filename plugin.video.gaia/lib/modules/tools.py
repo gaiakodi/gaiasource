@@ -367,6 +367,10 @@ class Tools(object):
 		return type(variable)
 
 	@classmethod
+	def id(self, variable):
+		return id(variable)
+
+	@classmethod
 	def replaceInsensitive(self, data, value, replacement = ''):
 		index1 = 0
 		while index1 < len(data):
@@ -503,6 +507,16 @@ class Tools(object):
 		if none: result.update((key, value) for key, value in dictionary2.items() if not value is None)
 		else: result.update(dictionary2)
 		return result
+
+	@classmethod
+	def dictionaryEqual(self, dictionary1, dictionary2, keys = None):
+		if not keys: keys = self.listUnique(list(dictionary1.keys()) + list(dictionary2.keys()))
+		equal = True
+		for key in keys:
+			if not dictionary1[key] == dictionary2[key]:
+				equal = False
+				break
+		return equal
 
 	@classmethod
 	def listUnique(self, data, attribute = None, update = False, none = True, lists = False, unique = True):
@@ -2570,34 +2584,482 @@ class Video(object):
 		if not extension and unknown: return True
 		return extension.lower() in Video.Extensions
 
-class Audio(object):
 
-	# Values must correspond to settings.
-	StartupNone = 0
-	Startup1 = 1
-	Startup2 = 2
-	Startup3 = 3
-	Startup4 = 4
-	Startup5 = 5
+class Sound(object):
+
+	ModeLaunch		= 'launch'
+	ModeScrape		= 'scrape'
+	ModeStream		= 'stream'
+	ModeRating		= 'rating'
+	ModePower		= 'power'
+	ModeNotify		= 'notify'
+
+	TimeStart		= 'start'
+	TimeFinish		= 'finish'
+
+	TypeDisabled	= None
+	TypeNative		= 'native'
+	TypeCustom		= 'custom'
+	TypeDefault		= 'default'
+
+	CategoryAlert	= 'alert'
+	CategoryDing	= 'ding'
+	CategoryNotify	= 'notify'
+	CategoryStartup	= 'startup'
+	Categories		= [CategoryStartup, CategoryNotify, CategoryAlert, CategoryDing] # Order in which displayed.
+
+	MoodSwirling	= 'swirling'	# Sound swirling going upward/downward in a circular fashion.
+	MoodSwooshing	= 'swooshing'	# Sound swooshing from one side to the other, like a sword.
+	MoodBouncing	= 'bouncing'	# Sound bouncing from one side to the other, almost like a ping-pong ball.
+	MoodStepping	= 'stepping'	# Sound that increases/decreases notes like steps.
+	MoodBleeping	= 'bleeping'	# Sound that is bleeping and cannot be considered bouncing.
+	MoodResonating	= 'resonating'	# Sound that last long and fades out.
+	MoodClinking 	= 'clinking'	# Sound with a single tone.
+	MoodDelighted	= 'delighted'	# Sound that is happy or positive.
+
+	StyleElectro	= 'electro'		# Sound that is digital, electronic, cyber, or robotic.
+	StyleMetal		= 'metal'		# Sound with hard metalic noises.
+	StyleBell		= 'bell'		# Sound with soft metalic noises, like a concierge's bell.
+	StyleBeat		= 'beat'		# Sound with a beat.
+	StyleRoll		= 'roll'		# Sound with drum rolls.
+	StyleRing		= 'ring'		# Sound with some kind of short ring.
+	StyleTone		= 'tone'		# Any other sound that is short.
+	StyleMelody		= 'melody'		# Any other sound that is long.
+
+	Files			= None
+	Extension		= '.wav'
+	Settings		= 'general.sound.effects'
 
 	@classmethod
-	def startup(self, type = None):
-		if type is None:
-			type = Settings.getInteger('general.launch.sound')
-		if type == 0 or type is None:
-			return False
-		else:
-			path = os.path.join(System.pathResources(), 'resources', 'media', 'audio', 'startup', 'startup%d' % type, 'Gaia')
-			return self.play(path = path, notPlaying = True)
+	def play(self, path, cached = True, stop = False):
+		if stop: self.stop()
+		if path: xbmc.playSFX(path, cached)
+		return bool(path)
 
 	@classmethod
-	def play(self, path, notPlaying = True):
-		player = xbmc.Player()
-		if not notPlaying or not player.isPlaying():
-			player.play(path, windowed = True)
+	def stop(self):
+		xbmc.stopSFX()
+
+	@classmethod
+	def execute(self, mode, time):
+		try:
+			path = self. file(mode = mode, time = time)
+			if not path: return False
+			self.play(path = path)
 			return True
+		except: Logger.error()
+		return False
+
+	@classmethod
+	def executeLaunch(self, time):
+		return self.execute(mode = Sound.ModeLaunch, time = time)
+
+	@classmethod
+	def executeLaunchStart(self):
+		return self.executeLaunch(time = Sound.TimeStart)
+
+	@classmethod
+	def executeLaunchFinish(self):
+		return self.executeLaunch(time = Sound.TimeFinish)
+
+	@classmethod
+	def executeScrape(self, time):
+		return self.execute(mode = Sound.ModeScrape, time = time)
+
+	@classmethod
+	def executeScrapeStart(self):
+		return self.executeScrape(time = Sound.TimeStart)
+
+	@classmethod
+	def executeScrapeFinish(self):
+		return self.executeScrape(time = Sound.TimeFinish)
+
+	@classmethod
+	def executeStream(self, time):
+		return self.execute(mode = Sound.ModeStream, time = time)
+
+	@classmethod
+	def executeStreamStart(self):
+		return self.executeStream(time = Sound.TimeStart)
+
+	@classmethod
+	def executeStreamFinish(self):
+		return self.executeStream(time = Sound.TimeFinish)
+
+	@classmethod
+	def executeRating(self, time):
+		return self.execute(mode = Sound.ModeRating, time = time)
+
+	@classmethod
+	def executeRatingStart(self):
+		return self.executeRating(time = Sound.TimeStart)
+
+	@classmethod
+	def executeRatingFinish(self):
+		return self.executeRating(time = Sound.TimeFinish)
+
+	@classmethod
+	def executePower(self, time):
+		return self.execute(mode = Sound.ModePower, time = time)
+
+	@classmethod
+	def executePowerStart(self):
+		return self.executePower(time = Sound.TimeStart)
+
+	@classmethod
+	def executePowerFinish(self):
+		return self.executePower(time = Sound.TimeFinish)
+
+	@classmethod
+	def executeNotify(self, time):
+		return self.execute(mode = Sound.ModeNotify, time = time)
+
+	@classmethod
+	def executeNotifyStart(self):
+		return self.executeNotify(time = Sound.TimeStart)
+
+	@classmethod
+	def executeNotifyFinish(self):
+		return self.executeNotify(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabled(self, mode, time):
+		return bool(self.file(mode = mode, time = time))
+
+	@classmethod
+	def enabledLaunch(self, time):
+		return self.enabled(mode = Sound.ModeLaunch, time = time)
+
+	@classmethod
+	def enabledLaunchStart(self):
+		return self.enabledLaunch(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledLaunchFinish(self):
+		return self.enabledLaunch(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabledScrape(self, time):
+		return self.enabled(mode = Sound.ModeScrape, time = time)
+
+	@classmethod
+	def enabledScrapeStart(self):
+		return self.enabledScrape(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledScrapeFinish(self):
+		return self.enabledScrape(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabledStream(self, time):
+		return self.enabled(mode = Sound.ModeStream, time = time)
+
+	@classmethod
+	def enabledStreamStart(self):
+		return self.enabledStream(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledStreamFinish(self):
+		return self.enabledStream(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabledRating(self, time):
+		return self.enabled(mode = Sound.ModeRating, time = time)
+
+	@classmethod
+	def enabledRatingStart(self):
+		return self.enabledRating(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledRatingFinish(self):
+		return self.enabledRating(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabledPower(self, time):
+		return self.enabled(mode = Sound.ModePower, time = time)
+
+	@classmethod
+	def enabledPowerStart(self):
+		return self.enabledPower(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledPowerFinish(self):
+		return self.enabledPower(time = Sound.TimeFinish)
+
+	@classmethod
+	def enabledNotify(self, time):
+		return self.enabled(mode = Sound.ModeNotify, time = time)
+
+	@classmethod
+	def enabledNotifyStart(self):
+		return self.enabledNotify(time = Sound.TimeStart)
+
+	@classmethod
+	def enabledNotifyFinish(self):
+		return self.enabledNotify(time = Sound.TimeFinish)
+
+	@classmethod
+	def native(self, mode, time):
+		try: return self.settings()[mode][time] == Sound.TypeNative
+		except: return False
+
+	@classmethod
+	def nativeNotify(self):
+		return self.native(mode = Sound.ModeNotify, time = Sound.TimeStart)
+
+	@classmethod
+	def id(self, category = None, mood = None, style = None, name = None, id = None):
+		if id:
+			split = id.split('-')
+			return {'category' : split[0], 'mood' : split[1], 'style' : split[2], 'name' : ('-'.join(split[1:])) + Sound.Extension}
 		else:
-			return False
+			id = [category]
+			if name: id.append(name.replace(Sound.Extension, ''))
+			else: id.extend([mood, style])
+			return '-'.join(id)
+
+	@classmethod
+	def path(self, id = None, category = None, name = None):
+		path = File.joinPath(System.pathResources(), 'resources', 'media', 'sound')
+		if id:
+			value = self.id(id = id)
+			category = value['category']
+			name = value['name']
+		if category: path = File.joinPath(path, category)
+		if name: path = File.joinPath(path, name)
+		return path
+
+	@classmethod
+	def files(self):
+		if Sound.Files is None:
+			files = []
+			path = self.path()
+			directories, _ = File.listDirectory(path = path, absolute = False)
+			for category in directories:
+				_, clips = File.listDirectory(path = File.joinPath(path, category), absolute = True)
+				if clips:
+					file = []
+					for clip in clips:
+						name = File.name(path = clip, extension = False)
+						split = name.split('-')
+						files.append({
+							'id' : category + '-' + name,
+							'category' : category,
+							'mood' : split[0],
+							'style' : split[1],
+							'label' : ' '.join(split).title(),
+							'path' : clip,
+						})
+			Sound.Files = files
+		return Sound.Files
+
+	@classmethod
+	def file(self, mode, time):
+		settings = self.settings()
+
+		# If clips were deleted or renamed from a previous version, rather use the default values instead of none.
+		try: clip = settings[mode][time]
+		except: clip = self.settingsDefault()[mode][time]
+
+		if clip is Sound.TypeDisabled: return None
+		elif clip == Sound.TypeNative: return None
+		elif File.pathIs(clip): path = clip
+		else: path = self.path(id = clip)
+
+		return path
+
+	@classmethod
+	def settings(self):
+		return Settings.getData(id = Sound.Settings)
+
+	@classmethod
+	def settingsDefault(self):
+		disabled = Sound.TypeDisabled
+		launch = self.id(category = Sound.CategoryStartup, mood = Sound.MoodSwirling, style = Sound.StyleRing)
+		scrape = self.id(category = Sound.CategoryStartup, mood = Sound.MoodStepping, style = Sound.StyleMelody)
+		stream = self.id(category = Sound.CategoryAlert, mood = Sound.MoodSwooshing, style = Sound.StyleTone)
+		rating = self.id(category = Sound.CategoryDing, mood = Sound.MoodSwooshing, style = Sound.StyleBell)
+		power = self.id(category = Sound.CategoryAlert, mood = Sound.MoodBouncing, style = Sound.StyleMelody)
+		notify = Sound.TypeNative
+
+		return {
+			Sound.ModeLaunch	: {'label' : 33256,	Sound.TimeStart : disabled,	Sound.TimeFinish : launch},
+			Sound.ModeScrape	: {'label' : 35514,	Sound.TimeStart : stream,	Sound.TimeFinish : scrape},
+			Sound.ModeStream	: {'label' : 33071,	Sound.TimeStart : stream,	Sound.TimeFinish : disabled},
+			Sound.ModeRating	: {'label' : 35187,	Sound.TimeStart : disabled,	Sound.TimeFinish : rating},
+			Sound.ModePower		: {'label' : 36419,	Sound.TimeStart : power,	Sound.TimeFinish : disabled},
+			Sound.ModeNotify	: {'label' : 36513,	Sound.TimeStart : notify,	Sound.TimeFinish : notify},
+		}
+
+	@classmethod
+	def settingsUpdate(self, settings = False):
+		from lib.modules.interface import Dialog, Translation
+
+		title = Translation.string(33423)
+		start = Translation.string(33424)
+		finish = Translation.string(33425)
+		disabled = Translation.string(32302)
+		native = Translation.string(35022)
+		custom = Translation.string(35233)
+		default = Translation.string(33564)
+
+		self.tCanceled = False
+		self.tApplied = False
+		self.tSettings = self.settings()
+		if not self.tSettings: self.tSettings = self.settingsDefault()
+		self.tDefault = self.settingsDefault()
+		self.tFiles = self.files()
+
+		def _settingsHelp():
+			Dialog.details(title = title, items = [
+				{'type' : 'title', 'value' : 'Overview', 'break' : 2},
+				{'type' : 'text', 'value' : 'Sound effects can be played in the background at various places in the addon to make it livelier. ', 'break' : 2},
+				{'type' : 'title', 'value' : 'Processes', 'break' : 2},
+				{'type' : 'text', 'value' : 'Sound can be added to the following processes:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 'Launch', 'value' : 'When the addon is launched and the intro window is showing.'},
+					{'title' : 'Scrape', 'value' : 'When a new scrape is manually initiated.'},
+					{'title' : 'Stream', 'value' : 'When a new stream is being played.'},
+					{'title' : 'Rating', 'value' : 'When a rating is cast for a title.'},
+					{'title' : 'Power', 'value' : 'When a power action is executed, like powering down the device.'},
+					{'title' : 'Notify', 'value' : 'When a popup notification is shown.'},
+				], 'number' : False},
+				{'type' : 'text', 'value' : 'Note that depending on the duration of the sound effect, is does not always make sense to play both at the start and at the end. For instance, playing a sound at the end of the [I]Stream[/I]  process might interfere with the sound of the playback that has just started.', 'break' : 2},
+				{'type' : 'title', 'value' : 'Time', 'break' : 2},
+				{'type' : 'text', 'value' : 'For each of these processes, sound can be added at two places:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 'Started', 'value' : 'When the process has just started.'},
+					{'title' : 'Finished', 'value' : 'When the process has just finished.'},
+				], 'number' : False},
+				{'type' : 'title', 'value' : 'Sound', 'break' : 2},
+				{'type' : 'text', 'value' : 'The following options are available when selection a sound effect:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 'Disable', 'value' : 'Disables the sound for the given process.'},
+					{'title' : 'Default', 'value' : 'Use the default sound for the given process.'},
+					{'title' : 'Native', 'value' : 'Use a native Kodi sound for notifications.'},
+					{'title' : 'Custom', 'value' : 'Select a custom file for the sound effects. Note that all files must be WAV and other compressed formats will not play.'},
+					{'title' : 'Predefined', 'value' : 'Otherwise select from a range of built-in sound effects.'},
+				], 'number' : False},
+			])
+
+		def _settingsSave():
+			label = None
+			if self.tSettings == self.tDefault: label = default
+			elif _settingsDisabled(): label = disabled
+			else: label = custom
+			Settings.setData(id = Sound.Settings, value = self.tSettings, label = label)
+
+		def _settingsDefault():
+			self.tSettings = Tools.copy(self.tDefault)
+
+		def _settingsDisable():
+			for v in self.tSettings.values():
+				for k in v.keys():
+					v[k] = None
+
+		def _settingsDisabled():
+			if self.tSettings:
+				for k, v in self.tSettings.items():
+					for value in v.values():
+						if value: return False
+			return True
+
+		def _settingsLabel(value):
+			if value is Sound.TypeDisabled: return disabled
+			elif value == Sound.TypeNative: return native
+			elif value == Sound.TypeCustom or File.pathIs(value): return custom
+			else: return ' '.join(value.split('-')[1:]).title()
+
+		def _settingsUpdate(mode, time):
+			choice = Dialog.information(title = title, refresh = lambda : _settingsClips(mode = mode, time = time), reselect = Dialog.ReselectYes)
+			if choice == -1: self.tCanceled = True
+
+		def _settingsNotification(message = None, sound = False):
+			Dialog.notification(title = title, message = message if message else 33428, icon = Dialog.IconInformation, time = 5000, duplicates = True, wait = False, sound = sound)
+
+		def _settingsSelect(mode = None, time = None, type = None, file = None):
+			if not type is Sound.TypeDisabled or file:
+				path = None
+				function = None
+				if type is Sound.TypeNative:
+					function = lambda : _settingsNotification(message = 33426, sound = True)
+				elif type is Sound.TypeDefault:
+					path = self.path(id = self.tDefault[mode][time])
+				elif type is Sound.TypeCustom:
+					default = self.tSettings[mode][time] if File.exists(self.tSettings[mode][time], file = True) else None
+					path = Dialog.browse(title = title, type = Dialog.BrowseFile, default = default, mask = Sound.Extension)
+					if not path or not File.exists(path, file = True): return
+				elif file:
+					path = file['path']
+
+				while True:
+					if function:
+						function()
+					else:
+						_settingsNotification()
+						self.play(path = path, stop = True)
+					choice = Dialog.options(title = title, message = 36512, labelConfirm = 35478, labelDeny = 33743, labelCustom = 35470, default = Dialog.ChoiceNo)
+					if choice is None or choice < 0: return
+					elif choice == Dialog.ChoiceYes: break
+					elif choice == Dialog.ChoiceNo: return
+
+			if file: self.tSettings[mode][time] = file['id']
+			elif type is Sound.TypeDefault: self.tSettings[mode][time] = self.tDefault[mode][time]
+			elif type is Sound.TypeCustom: self.tSettings[mode][time] = path
+			else: self.tSettings[mode][time] = type
+
+			self.tApplied = True
+
+		def _settingsClips(mode, time):
+			if self.tCanceled: return None
+			if self.tApplied:
+				self.tApplied = False
+				return None
+
+			current = self.tSettings[mode][time]
+			items = [
+				{'title' : Dialog.prefixBack(35374), 'close' : True},
+				{'title' : Dialog.prefixNext(33239), 'action' : _settingsHelp},
+				{'title' : 32310, 'items' : [
+					{'title' : 33737, 'selection' : current is Sound.TypeDisabled, 'action' : _settingsSelect, 'parameters' : {'mode' : mode, 'time' : time, 'type' : Sound.TypeDisabled}},
+					{'title' : default, 'selection' : current == Sound.TypeDefault, 'action' : _settingsSelect, 'parameters' : {'mode' : mode, 'time' : time, 'type' : Sound.TypeDefault}},
+					{'title' : native, 'selection' : current == Sound.TypeNative, 'action' : _settingsSelect, 'parameters' : {'mode' : mode, 'time' : time, 'type' : Sound.TypeNative}} if mode == Sound.ModeNotify else None,
+					{'title' : custom, 'selection' : File.pathIs(current), 'action' : _settingsSelect, 'parameters' : {'mode' : mode, 'time' : time, 'type' : Sound.TypeCustom}},
+				]}
+			]
+
+			files = Tools.listSort(self.tFiles, key = lambda i : i['id'])
+			files = Tools.listSort(files, key = lambda i : Sound.Categories.index(i['category']) if i['category'] in Sound.Categories else 999)
+			categories = {}
+			for file in files:
+				if not file['category'] in categories: categories[file['category']] = []
+				categories[file['category']].append(file)
+			for category, files in categories.items():
+				items.append({'title' : category.title(), 'items' : [{'title' : file['label'], 'selection' : current == file['id'], 'action' : _settingsSelect, 'parameters' : {'mode' : mode, 'time' : time, 'file' : file}} for file in files]})
+
+			return items
+
+		def _settingsItems():
+			if self.tCanceled: return None
+
+			items = [
+				{'title' : Dialog.prefixBack(33486), 'close' : True},
+				{'title' : Dialog.prefixNext(33239), 'action' : _settingsHelp},
+				{'title' : Dialog.prefixNext(33564), 'action' : _settingsDefault},
+				{'title' : Dialog.prefixNext(33737), 'action' : _settingsDisable},
+			]
+
+			for mode, value in self.tDefault.items():
+				items.append({'title' : value['label'], 'items' : [
+					{'title' : start, 'value' : _settingsLabel(self.tSettings[mode][Sound.TimeStart]), 'action' : _settingsUpdate, 'parameters' : {'mode' : mode, 'time' : Sound.TimeStart}},
+					{'title' : finish, 'value' : _settingsLabel(self.tSettings[mode][Sound.TimeFinish]), 'action' : _settingsUpdate, 'parameters' : {'mode' : mode, 'time' : Sound.TimeFinish}},
+				]})
+
+			return items
+
+		Dialog.information(title = title, refresh = _settingsItems, reselect = Dialog.ReselectYes)
+		_settingsSave()
+		if settings: Settings.launchData(id = Sound.Settings)
 
 # Kodi's thumbnail cache
 class Thumbnail(object):
@@ -3379,12 +3841,25 @@ class File(object):
 		return os.path.abspath(os.path.realpath(path))
 
 	@classmethod
-	def exists(self, path): # Directory must end with slash
-		# Do not use xbmcvfs.exists, since it returns true for http links.
-		if path.startswith('http:') or path.startswith('https:') or path.startswith('ftp:') or path.startswith('ftps:'):
-			return os.path.exists(path)
-		else:
-			return xbmcvfs.exists(path)
+	def pathSeparator(self):
+		return os.sep
+
+	@classmethod
+	def pathIs(self, path):
+		if not path: return False
+		return self.pathSeparator() in path
+
+	# Directory must end with slash
+	@classmethod
+	def exists(self, path, file = None):
+		if path:
+			# Do not use xbmcvfs.exists, since it returns true for http links.
+			if path.startswith('http:') or path.startswith('https:') or path.startswith('ftp:') or path.startswith('ftps:'):
+				return os.path.exists(path)
+			else:
+				if file and path.endswith(self.pathSeparator()): return False
+				return xbmcvfs.exists(path)
+		return False
 
 	@classmethod
 	def existsDirectory(self, path):
@@ -3728,9 +4203,13 @@ class System(object):
 	PowerRestart = 'restart'			# Restart Kodi (only implemented under Windows and Linux).
 	PowerSuspend = 'suspend'			# Suspend the system (S3/S1 depending on bios setting).
 	PowerHibernate = 'hibernate'		# Hibernate the system (S4).
+	PowerStandby = 'standby'			# Put playing device on standby via a CEC peripheral.
 	PowerMinimize = 'minimize'			# Minimize Kodi.
 	PowerQuit = 'quit'					# Quit Kodi.
 	PowerScreensaver = 'screensaver'	# Start the screensaver.
+	PowerReload = 'reload'				# Reload the Kodi user profile (reloads profile, addons, addon.xml, settings, and restarts services).
+	PowerRefresh = 'refresh'			# Refresh the Kodi skin (reloads changes to the skin XML).
+	PowerRelaunch = 'relaunch'			# Relaunch the Gaia addon.
 
 	Monitor = None
 	Arguments = None
@@ -3813,11 +4292,18 @@ class System(object):
 
 	# Simulated restart of the addon.
 	@classmethod
-	def restart(self, sleep = True):
+	def restart(self, reset = False, sleep = True):
+		from lib.modules.interface import Loader
+
 		self.restartStart()
-		self.quit()
+		Loader.hide() # Very important. Otherwise the ActivateWindow() calls do not work, since probably the loader window interferes somehow.
+
+		self.quit(reset = reset)
 		if sleep: Time.sleep(0.2)
-		System.execute('RunAddon(%s)' % System.GaiaAddon)
+
+		# RunAddon does not seem to reload the container (that will execute _launch()) if executed from Gaia's root menu.
+		#System.execute('RunAddon(%s)' % System.GaiaAddon)
+		System.execute('ActivateWindow(videos,%s)' % System.command(action = None, optimize = False))
 
 	@classmethod
 	def restartBusy(self):
@@ -3833,10 +4319,13 @@ class System(object):
 		self.windowPropertySet(property = System.PropertyRestart, value = 0)
 
 	@classmethod
-	def quit(self):
-		System.execute('Container.Update(path,replace)')
-		System.execute('ActivateWindow(Home)')
-		System.execute('Container.Update(path,replace)')
+	def quit(self, reset = False):
+		if reset:
+			self.launchDataClear(full = True)
+			Settings.interpreterReset()
+		System.execute('Continer.Update(invalid,replace)')
+		self.home()
+		System.execute('Continer.Update(invalid,replace)')
 
 	@classmethod
 	def exit(self, log = True):
@@ -3854,14 +4343,16 @@ class System(object):
 			return System.Monitor.abortRequested()
 
 	@classmethod
-	def abortWait(self, timeout = None):
+	def abortWait(self, timeout = None, exit = True):
 		try:
-			return System.Monitor.waitForAbort(timeout)
+			aborted = System.Monitor.waitForAbort(timeout)
 		except:
 			System.Monitor = xbmc.Monitor()
-			return System.Monitor.waitForAbort(timeout)
+			aborted = System.Monitor.waitForAbort(timeout)
+		if aborted and exit: self.exit()
+		return aborted
 
-	# This function reloads the Kodi user profile, reloadimg addons, addon.xml, settings, and restarting services.
+	# This function reloads the Kodi user profile, reloading addons, addon.xml, settings, and restarting services.
 	@classmethod
 	def reload(self, message = False, loader = None):
 		reload = True
@@ -4113,45 +4604,128 @@ class System(object):
 					if query:
 						query = self.query(parse = True).get(System.OriginParameter)
 						if not query is None: System.OriginGaia = Converter.boolean(query)
-				if System.OriginGaia is None: System.OriginGaia = self.origin() == System.GaiaAddon
+				if System.OriginGaia is None: System.OriginGaia = self.originIs(origin = self.origin(), plugin = System.GaiaAddon)
 			return System.OriginGaia
 		else:
-			return self.origin() == System.GaiaAddon
+			return self.originIs(origin = self.origin(), plugin = System.GaiaAddon)
 
 	@classmethod
 	def originPlugin(self, gaia = True):
 		origin = self.origin()
-		if not gaia and origin == System.GaiaAddon: return False
+		if not gaia and self.originIs(origin = origin, plugin = System.GaiaAddon): return False
 		else: return origin and origin.startswith('plugin.')
 
 	@classmethod
 	def originExternal(self):
 		origin = self.origin()
 		if not origin: return True # Widgets return None.
-		else: return not origin == System.GaiaAddon
+		else: return not self.originIs(origin = origin, plugin = System.GaiaAddon)
 
 	@classmethod
 	def originWidget(self):
 		return not self.origin()
 
 	@classmethod
-	def power(self, action):
-		actions = {
-			System.PowerPowerdown : 'Powerdown',
-			System.PowerShutdown : 'ShutDown',
-			System.PowerReboot : 'Reboot',
-			System.PowerReset : 'Reset',
-			System.PowerRestart : 'RestartApp',
-			System.PowerSuspend : 'Suspend',
-			System.PowerHibernate : 'Hibernate',
-			System.PowerMinimize : 'Minimize',
-			System.PowerQuit : 'Quit',
-			System.PowerScreensaver : 'ActivateScreensaver',
-		}
-		if action in actions:
-			self.execute(command = actions[action])
-			return True
-		return False
+	def originIs(self, origin, plugin):
+		if origin: return origin.replace(System.PluginPrefix, '') == plugin
+		else: return origin == plugin
+
+	# action: None = selection from dialog, Specific = execute a specific action.
+	@classmethod
+	def power(self, action = True, proper = True, level = 1, execute = True, warning = True, notification = True, sound = True, wait = False):
+		from lib.modules.interface import Translation, Format, Dialog, Loader
+		from lib.modules.convert import ConverterDuration
+		from lib.modules.interface import Player
+		from lib.modules.concurrency import Pool
+
+		actions = [
+			{'action' : System.PowerPowerdown,		'name' : 36404,	'label' : 36462,	'level' : 0,	'command' : 'Powerdown'},
+			{'action' : System.PowerShutdown,		'name' : 36405,	'label' : 36463,	'level' : 1,	'command' : 'ShutDown'},
+			{'action' : System.PowerReboot,			'name' : 36406,	'label' : 36464,	'level' : 0,	'command' : 'Reboot'},
+			{'action' : System.PowerReset,			'name' : 35479,	'label' : 36465,	'level' : 3,	'command' : 'Reset'},
+			{'action' : System.PowerSuspend,		'name' : 36407,	'label' : 36466,	'level' : 0,	'command' : 'Suspend'},
+			{'action' : System.PowerHibernate,		'name' : 36408,	'label' : 36467,	'level' : 0,	'command' : 'Hibernate'},
+			{'action' : System.PowerStandby,		'name' : 36460,	'label' : 36468,	'level' : 0,	'command' : 'CECStandby'},
+			{'action' : System.PowerQuit,			'name' : 36410,	'label' : 36471,	'level' : 0,	'command' : 'Quit'},
+			{'action' : System.PowerRestart,		'name' : 32501,	'label' : 36469,	'level' : 1,	'command' : 'RestartApp'},
+			{'action' : System.PowerMinimize,		'name' : 36409,	'label' : 36470,	'level' : 0,	'command' : 'Minimize'},
+			{'action' : System.PowerScreensaver,	'name' : 36411,	'label' : 36472,	'level' : 0,	'command' : 'ActivateScreensaver'},
+			{'action' : System.PowerReload,			'name' : 33149,	'label' : 32067,	'level' : 2,	'command' : self.reload},
+			{'action' : System.PowerRefresh,		'name' : 32072,	'label' : 32066,	'level' : 2,	'command' : 'ReloadSkin()'},
+			{'action' : System.PowerRelaunch,		'name' : 32068,	'label' : 32069,	'level' : 2,	'command' : lambda : self.restart(reset = True)},
+		]
+
+		# Format label.
+		for i in actions:
+			format = Translation.string(i['label']).split(' ')
+			i['format'] = Format.fontBold(' '.join(format[:-1])) + ' ' + format[-1]
+
+		# Return only data without executing the action.
+		if not execute: return [i for i in actions if i['level'] <= level]
+
+		# Show a selection dialog.
+		if not action:
+			items = [i for i in actions if i['level'] <= level]
+			choice = Dialog.select(title = 36419, items = [i['format'] for i in items])
+			if choice is None or choice < 0: return False
+			action = items[choice]['action']
+
+		# Retrieve the action data.
+		data = None
+		for i in actions:
+			if i['action'] == action:
+				data = i
+				break
+		if not data: return False
+		action = data
+
+		def _exit(delay):
+			# Stop playback and let Trakt history and progress sync first.
+			player = Player()
+			playback = player.isPlayback()
+			if playback:
+				player.stop()
+				Time.sleep(delay)
+			else:
+				Time.sleep(delay / 4.0)
+
+		def _power(action, warning, notification, sound):
+			timeout = 30
+			delay = 15
+			choice = True
+			thread = None
+			label = action['label']
+
+			thread = Pool.thread(target = _exit, kwargs = {'delay' : delay}, start = True)
+			if warning:
+				message = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordOptimal)
+				message = Regex.replace(data = message, expression = '(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
+				message = Translation.string(36457) % (Format.fontBold(label), message)
+				choice = not Dialog.option(title = 36419, message = message, labelConfirm = 33743, labelDeny = action['name'], default = Dialog.ChoiceYes, timeout = timeout * 1000)
+
+			if choice:
+				Loader.show()
+				if sound: Sound.executePowerStart()
+				if notification: Dialog.notification(title = 36419, message = Translation.string(36420) % Format.fontBold(label), icon = Dialog.IconWarning, time = delay * 1000, sound = False) # Play its own sound here.
+				thread.join()
+				Time.sleep(1)
+				_execute(action = action, sound = sound, direct = False)
+
+		def _execute(action, sound, direct):
+			if sound:
+				if direct and Sound.executePowerStart(): sound = False
+				if sound and Sound.executePowerFinish(): Time.sleep(2)
+			command = action['command']
+			if Tools.isString(command): self.execute(command = command)
+			else: command()
+			Loader.show() # Closed by self.restart().
+			Time.sleep(0.5)
+			Dialog.closeNotification()
+			Loader.hide()
+
+		if not proper or action['action'] in [System.PowerMinimize, System.PowerScreensaver]: _execute(action = action, sound = sound, direct = True)
+		else: Pool.thread(target = _power, kwargs = {'action' : action, 'warning' : warning, 'notification' : notification, 'sound' : sound}, start = True, join = wait)
+		return action['action']
 
 	@classmethod
 	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, gaia = True, optimize = True):
@@ -4504,12 +5078,12 @@ class System(object):
 		return self.execute('StopScript(%s)' % script)
 
 	@classmethod
-	def executePlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, wait = False):
-		return self.execute(self.commandPlugin(id = id, action = action, parameters = parameters, command = command, call = True), wait = wait)
+	def executePlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, wait = False):
+		return self.execute(self.commandPlugin(id = id, action = action, parameters = parameters, command = command, optimize = optimize, call = True), wait = wait)
 
 	@classmethod
-	def executeContainer(self, action = None, parameters = None, command = None, replace = False, wait = False):
-		return self.execute(self.commandContainer(action = action, parameters = parameters, command = command, replace = replace, call = True), wait = wait)
+	def executeContainer(self, action = None, parameters = None, command = None, replace = False, id = GaiaAddon, optimize = True, wait = False):
+		return self.execute(self.commandContainer(id = id, action = action, parameters = parameters, command = command, replace = replace, optimize = optimize, call = True), wait = wait)
 
 	# Either query OR all the other parameters.
 	@classmethod
@@ -4625,18 +5199,32 @@ class System(object):
 		if full: self.windowPropertyClear(System.PropertyInitial)
 
 	@classmethod
-	def launched(self):
+	def launched(self, default = None):
 		try: return int(self.windowPropertyGet(System.PropertyInitial))
-		except: return None
+		except: return default
 
 	@classmethod
 	def launch(self, hidden = None):
+		if self.launched(default = 0) >= 5: return False # More efficient than always calling self.launchDataGet().
 		observe = False
 		if hidden is None: hidden = not self.originGaia() # Do not show the launch window if requests come from widgets or any other addon that is not Gaia.
 
 		data = self.launchDataGet()
+		if not data and not hidden:
+			Time.sleep(0.2) # Give some time for the hidden process to set self.launchDataSet() below.
+			data = self.launchDataGet()
+
 		if data:
-			if self.launched(): return False
+			launched = self.launched(default = 0)
+			if launched == 3: self.windowPropertySet(System.PropertyInitial, '4')
+
+			if self.originExternal():
+				# If launched from an external plugin or widget, do not show the intro window if initialization was already completed.
+				if launched: return False
+			else:
+				# This makes sure to always show the intro window when Gaia is opened for the first time, even if the initialization was already completed.
+				if launched >= 5: return False
+				elif launched >= 3: self.windowPropertySet(System.PropertyInitial, '5')
 			observe = True
 		else:
 			# When using widgets, the call from the widget might execute before service.py has a chance to call this function.
@@ -4651,7 +5239,7 @@ class System(object):
 
 	@classmethod
 	def _launch(self, hidden = False, observe = False):
-		if not hidden: self.windowPropertySet(System.PropertyInitial, '1')
+		if not hidden and self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '1')
 
 		# Sequential non-threaded and parallel threaded execution seems to take more or less the same time.
 		# Sometimes sequential execution is actually faster.
@@ -4666,17 +5254,19 @@ class System(object):
 		self.tInitial = False
 
 		def _launchObserve():
-			try: self.tSplash.update(progress = 0, status = self.tStatus[0]) # Make sure to intialize to 0, otherwise (due to optimization), the progress is not initially updated in _launchObserve.
-			except: pass
+			if not hidden:
+				try: self.tSplash.update(progress = 0, status = self.tStatus[0]) # Make sure to intialize to 0, otherwise (due to optimization), the progress is not initially updated in _launchObserve.
+				except: pass
 			while True:
 				data = self.launchDataGet()
 				if not data: break
 				progress = data['progress']
-				try: self.tSplash.update(progress = progress, status = data['status'])
-				except:
-					try: self.tSplash.update(progress = progress)
-					except: pass
-				if progress >= 100: break
+				if not hidden:
+					try: self.tSplash.update(progress = progress, status = data['status'])
+					except:
+						try: self.tSplash.update(progress = progress)
+						except: pass
+				if progress >= 98: break # 98, not 100.
 				Time.sleep(0.5)
 			_launchFinalize()
 
@@ -4693,10 +5283,11 @@ class System(object):
 				except: status = self.tStatus[0]
 			self.tProgress += increase
 			self.launchDataSet({'progress' : self.tProgress, 'status' : status})
-			try: self.tSplash.update(progress = self.tProgress, status = status)
-			except:
-				try: self.tSplash.update(progress = self.tProgress)
-				except: pass
+			if not hidden:
+				try: self.tSplash.update(progress = self.tProgress, status = status)
+				except:
+					try: self.tSplash.update(progress = self.tProgress)
+					except: pass
 
 		def _launchExecute(_progress, _function, **kwargs):
 			_launchProgress(_progress)
@@ -4714,15 +5305,18 @@ class System(object):
 		def _launchFinalize():
 			from lib.modules.interface import Splash, Loader
 
+			if not hidden: Sound.executeLaunchFinish()
+
 			version = self.versionDataGet()
 			changed = False
 
-			self.tProgress = 99
+			self.tProgress = max(99 if observe else 97, self.tProgress)
 			self.tStatus = ['Launching Gaia']
 			Settings.set('internal.initial.launch', True)
-			try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
-			except: pass
-			if not hidden: self.windowPropertySet(System.PropertyInitial, '2')
+			if not hidden:
+				try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
+				except: pass
+			if not hidden and self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '2')
 
 			Loader.enable()
 
@@ -4732,10 +5326,11 @@ class System(object):
 				Time.sleep(1.5)
 				if WindowWizard.show(initial = True, wait = True): changed = True
 
-			self.tProgress = 100
+			self.tProgress = max(100 if observe else 98, self.tProgress)
 			self.tStatus = ['Launching Gaia']
-			try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
-			except: pass
+			if not hidden:
+				try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
+				except: pass
 
 			_launchProgress() # Make sure 100% is written to the global variable for the observer.
 
@@ -4772,7 +5367,7 @@ class System(object):
 					Backup.automaticExport()
 				Pool.thread(target = _launchBackup, start = True)
 
-			self.windowPropertySet(System.PropertyInitial, '3')
+			if self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '3' if hidden else '5')
 
 		self.tInitial = not Settings.getBoolean('internal.initial.launch')
 		update = System.windowPropertyGet(System.PropertyUpdate)
@@ -4787,6 +5382,7 @@ class System(object):
 		if not hidden:
 			if not Splash.loader(): Loader.disable()
 			self.tSplash = Splash.popup(time = None, wait = False, slogan = (self.tInitial or update), alternative = not(self.tInitial or update))
+			Sound.executeLaunchStart()
 
 		# Only observe progress if the actually code execution happens from service.py.
 		if observe: return Pool.thread(target = _launchObserve, start = True)
@@ -4801,27 +5397,38 @@ class System(object):
 			from lib.modules.cloudflare import Cloudflare
 			Cloudflare.prepare()
 
+		# Service
+		self.tStatus = ['Initializing Launch Service']
+		_launchProgress() # Update status label.
+		from lib.modules.service import Service
+		Service.launchGaia(process = True)
+		_launchProgress(2) # 4%
+
 		self.tStatus = ['Initializing Settings Cache']
+		_launchProgress() # Update status label.
 		Settings.cacheInitialize() # Load into cache in order to not get delays when calling functions below.
-		_launchProgress(8) # 10%
+		_launchProgress(5) # 9%
 
 		# Backup - Import
 		self.tStatus = ['Initializing Settings Backup']
+		_launchProgress() # Update status label.
 		if Backup.automaticImport():
 			Settings.cacheClear()
 			Settings.cacheInitialize()
-		_launchProgress(5) # 15%
+		_launchProgress(5) # 14%
 
 		# Force Kodi to load the settings into memory.
 		self.tStatus = ['Initializing Settings Cache']
+		_launchProgress() # Update status label.
 		Settings.set('internal.dummy', True)
-		_launchProgress(5) # 20%
+		_launchProgress(5) # 19%
 
 		# Version
 		self.tStatus = ['Initializing Settings Version']
+		_launchProgress() # Update status label.
 		version = self.versionInfo(update = True)
 		self.versionDataSet(version)
-		_launchProgress(1) # 21%
+		_launchProgress(1) # 20%
 
 		# Initial
 		self.tInitial = not Settings.getBoolean('internal.initial.launch')
@@ -4839,36 +5446,6 @@ class System(object):
 
 		# Do not do this if Gaia was installed from scratch without having and old version.
 		if version['old']['number'] and version['old']['number'] >= 50000009.0:
-			#gaiaremove - since pack and episode numbering changed.
-			if version['old']['number'] < 60010009.0 and version['new']['number'] >= 60010009.0:
-				try:
-					from lib.modules.cache import Cache
-					Cache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.meta.cache import MetaCache
-					MetaCache.instance()._deleteFile()
-				except: Logger.error()
-
-				try:
-					from lib.providers.core.manager import Manager
-					Manager.streamsDatabaseClear()
-				except: Logger.error()
-
-				from lib.modules.window import WindowMetaExternal
-				WindowMetaExternal.show()
-
-			#gaiaremove
-			if version['old']['number'] == 60010009.0 and version['new']['number'] > 60010009.0:
-				from lib.modules.window import WindowMetaExternal
-				WindowMetaExternal.show()
-
-			#gaiaremove
-			if version['old']['number'] <= 60010019.0 and version['new']['number'] > 60010019.0:
-				Settings.default(id = 'navigation.page.episode')
-				Settings.default(id = 'general.cache.expression')
-
 			#gaiaremove
 			if version['old']['number'] <= self.versionNumber(version = '6.2.0') and version['new']['number'] >= self.versionNumber(version = '6.3.0'):
 				Settings.default(id = 'navigation.show.interleave.unofficial')
@@ -4912,16 +5489,16 @@ class System(object):
 					Manager.streamsDatabaseClear()
 				except: Logger.error()
 
+			#gaiaremove
+			if version['old']['number'] <= self.versionNumber(version = '6.3.11') and version['new']['number'] >= self.versionNumber(version = '6.3.12'):
+				from lib.providers.core.manager import Manager
+				database = Manager._database(database = Manager.DatabaseProviders)
+				database._close()
+				database._deleteFile()
+
 		_launchProgress(4) # 25%
 
 		self.tStatus = []
-
-		# Providers
-		def _launchProviders():
-			from lib.providers.core.manager import Manager
-			Manager.check(progress = False, load = True, wait = True) # load = True: Load them here already. Should decrease the provider initializtion time on first scrape.
-			if self.tInitial: Manager.optimizeInternal()
-		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 41%
 
 		# General Settings
 		def _launchSettings():
@@ -4933,92 +5510,22 @@ class System(object):
 			YouTube.qualityUpdate()
 			View.settingsInitialize()
 			MetaTools.settingsInitialize()
-		_launchAdd(1, 'Initializing Settings Data', _launchSettings) # 43%
+		_launchAdd(1, 'Initializing Settings Data', _launchSettings) # 26%
 
 		# Context Menu
 		def _launchContext():
 			from lib.modules.interface import Context
 			Context.initialize()
-		_launchAdd(1, 'Initializing Context Menu', _launchContext) # 44%
-
-		# Audio
-		_launchAdd(1, 'Initializing Startup Audio', Audio.startup) # 45%
-
-		# Ambient Lights
-		_launchAdd(1, 'Initializing Ambient Lights', Lightpack().launch, execution = Lightpack.ExecutionGaia) # 46%
-
-		# Cache
-		def _launchCache():
-			from lib.modules.cache import Cache
-			Cache.instance().expressionClean()
-		_launchAdd(1, 'Initializing Expression Cache', _launchCache) # 47%
-
-		# Clear Temporary
-		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 48%
-
-		# History
-		def _launchHistory():
-			from lib.modules.history import History
-			History().clean()
-		_launchAdd(1, 'Initializing Stream History', _launchHistory) # 49%
-
-		# Externals
-		def _launchExternals():
-			from lib.modules.external import Psutil, Ujson
-			threads = [
-				Pool.thread(target = Psutil().moduleDetect, start = True),
-				Pool.thread(target = Ujson().moduleDetect, start = True),
-			]
-			[thread.join() for thread in threads]
-		_launchAdd(3, 'Initializing External Modules', _launchExternals) # 52%
-
-		# Local Library Update
-		def _launchLibrary(hidden):
-			# Only do this if Gaia is actually launched, since the function is already called in service.py.
-			if not hidden:
-				from lib.modules.library import Library
-				Library.service(gaia = True)
-		_launchAdd(3, 'Initializing Library Update', _launchLibrary, hidden = hidden) # 55%
+		_launchAdd(3, 'Initializing Context Menu', _launchContext) # 29%
 
 		# Promotions
-		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 56%
+		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 30%
 
 		# Window
 		if version['change']['full']:
 			from lib.modules.window import Window
-			_launchAdd(2, 'Initializing Custom Windows', Window.clean) # 58%
-		else: _launchProgress(2)
-
-		# Trakt
-		# Update playback history and progress, in case the user changed values on  Trakt's website or from another addon.
-		def _launchTrakt():
-			from lib.modules import trakt
-			trakt.refresh(wait = True)
-		_launchAdd(5, 'Initializing Trakt History', _launchTrakt) # 63%
-
-		# Cloudflare
-		def _launchCloudflare():
-			from lib.modules.cloudflare import Cloudflare
-			Cloudflare.initialize()
-		_launchAdd(5, 'Initializing Cloudflare Bypasser', _launchCloudflare) # 68%
-
-		# Elementum & Quasar
-		_launchAdd(3, 'Initializing Elementum Handler', Elementum.connect, install = False, background = True, wait = False) # 71%
-		_launchAdd(3, 'Initializing Quasar Handler', Quasar.connect, install = False, background = True, wait = False) # 74%
-
-		# Premium
-		from lib import debrid
-		from lib.modules.orionoid import Orionoid
-		_launchAdd(3, 'Initializing Orion Service', Orionoid().initialize) # 77%
-		_launchAdd(3, 'Initializing Premiumize Service', debrid.premiumize.Core().initialize) # 80%
-		_launchAdd(3, 'Initializing Premiumize Service', debrid.premiumize.Core().deleteLaunch) # 83%
-		_launchAdd(3, 'Initializing OffCloud Service', debrid.offcloud.Core().deleteLaunch) # 86%
-		_launchAdd(3, 'Initializing RealDebrid Service', debrid.realdebrid.Core().deleteLaunch) # 89%
-
-		# External
-		def _launchExternal():
-			Resolver.authenticationCheck()
-		_launchAdd(5, 'Initializing External Resolvers', _launchExternal) # 94%
+			_launchAdd(4, 'Initializing Custom Windows', Window.clean) # 34%
+		else: _launchProgress(4)
 
 		# Copy the select theme background as fanart to the root folder.
 		# Ensures that the selected theme also shows outside the addon.
@@ -5031,24 +5538,80 @@ class System(object):
 				File.delete(fanartTo) # Delete old fanart.
 				fanartFrom = Theme.fanart()
 				if fanartFrom: File.copy(fanartFrom, fanartTo, overwrite = True)
-		_launchAdd(4, 'Initializing Image Files', _launchImage) # 98%
+		_launchAdd(1, 'Initializing Image Files', _launchImage) # 35%
+
+		# Clear Temporary
+		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 36%
+
+		# Cache
+		def _launchCache():
+			from lib.modules.cache import Cache
+			Cache.instance().expressionClean()
+		_launchAdd(2, 'Initializing Expression Cache', _launchCache) # 38%
+
+		# Externals
+		def _launchExternals():
+			from lib.modules.external import Psutil, Ujson
+			threads = [
+				Pool.thread(target = Psutil().moduleDetect, start = True),
+				Pool.thread(target = Ujson().moduleDetect, start = True),
+			]
+			[thread.join() for thread in threads]
+		_launchAdd(3, 'Initializing External Modules', _launchExternals) # 41%
+
+		# Cloudflare
+		def _launchCloudflare():
+			from lib.modules.cloudflare import Cloudflare
+			Cloudflare.initialize()
+		_launchAdd(3, 'Initializing Cloudflare Bypasser', _launchCloudflare) # 44%
+
+		# Elementum & Quasar
+		_launchAdd(2, 'Initializing Elementum Handler', Elementum.connect, install = False, background = True, wait = False) # 46%
+		_launchAdd(2, 'Initializing Quasar Handler', Quasar.connect, install = False, background = True, wait = False) # 48%
+
+		# Premium
+		from lib import debrid
+		from lib.modules.orionoid import Orionoid
+		_launchAdd(3, 'Initializing Orion Service', Orionoid().initialize) # 51%
+		_launchAdd(2, 'Initializing Premiumize Service', debrid.premiumize.Core().initialize) # 53%
+		_launchAdd(2, 'Initializing Premiumize Service', debrid.premiumize.Core().deleteLaunch) # 55%
+		_launchAdd(2, 'Initializing OffCloud Service', debrid.offcloud.Core().deleteLaunch) # 57%
+		_launchAdd(2, 'Initializing RealDebrid Service', debrid.realdebrid.Core().deleteLaunch) # 59%
+
+		# External
+		def _launchExternal():
+			Resolver.authenticationCheck()
+		_launchAdd(3, 'Initializing External Resolvers', _launchExternal) # 62%
+
+		# Trakt
+		# Update playback history and progress, in case the user changed values on  Trakt's website or from another addon.
+		def _launchTrakt():
+			from lib.modules import trakt
+			trakt.refresh(wait = True)
+		_launchAdd(15, 'Initializing Trakt History', _launchTrakt) # 77%
+
+		# Providers
+		def _launchProviders():
+			from lib.providers.core.manager import Manager
+			Manager.check(progress = False, load = True, wait = True) # load = True: Load them here already. Should decrease the provider initializtion time on first scrape.
+			if self.tInitial: Manager.optimizeInternal()
+		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 94%
 
 		# Clean Old Settings
 		# Place this last, since it can take very long, and we do not want to show this status from the start until close to the end of the progress.
 		# Do not do this here, but rather in service.py, since there is less file I/O interference than here.
-		#_launchAdd(12, 'Cleaning Old Settings', Settings.clean) # 99%
+		#_launchAdd(12, 'Cleaning Old Settings', Settings.clean) # 94%
 
 		def _launchFinish():
 			pass
-		_launchAdd(1, 'Launching Gaia', _launchFinish) # 99%
+		_launchAdd(1, 'Launching Gaia', _launchFinish) # 95%
 
 		[thread.join() for thread in self.tThreads]
 		_launchFinalize()
 
 	@classmethod
 	def launchAutomatic(self):
-		if Settings.getBoolean('general.launch.automatic'):
-			self.execute('RunAddon(plugin.video.gaia)')
+		self.execute('RunAddon(plugin.video.gaia)')
 
 	@classmethod
 	def _automaticIdentifier(self, identifier):
@@ -5204,15 +5767,6 @@ class System(object):
 	def manager(self):
 		self.execute('ActivateWindow(systeminfo)')
 
-	@classmethod
-	def tools(self):
-		from lib.modules.interface import Dialog, Format
-		items = [32066, 32067, 32068, 32069]
-		choice = Dialog.select(title = 32008, items = [Format.bold(i) for i in items])
-		if choice == 0: self.execute('ReloadSkin()')
-		elif choice == 1: self.reload(loader = True)
-		elif choice == 2: self.execute('RestartApp')
-		elif choice == 3: self.execute('Reboot')
 
 class Eminence(object):
 
@@ -5300,20 +5854,25 @@ class Settings(object):
 	PropertyCacheDataMain = 'GaiaSettingsCacheDataMain'
 
 	CategoryGeneral = 'general'
-	CategoryInterface = 'interface'
-	CategoryNavigation = 'navigation'
-	CategoryMetadata = 'metadata'
 	CategoryAccount = 'account'
 	CategoryPremium = 'premium'
 	CategoryProvider = 'provider'
 	CategoryScrape = 'scrape'
 	CategoryStream = 'stream'
 	CategoryPlayback = 'playback'
-	CategorySubtitle = 'subtitle'
+	CategoryActivity = 'activity'
+	CategoryMetadata = 'metadata'
+	CategoryImage = 'image'
+	CategoryMenu = 'menu'
+	CategoryNavigation = 'navigation'
+	CategoryInterface = 'interface'
+	CategoryTheme = 'theme'
+	CategoryView = 'view'
+	CategoryOracle = 'oracle'
 	CategoryLibrary = 'library'
 	CategoryDownload = 'download'
 	CategoryNetwork = 'network'
-	CategoryAmbilight = 'ambilight'
+	CategoryUtility = 'utility'
 
 	UnitByte = 'b'
 	UnitByteKilo = 'kb'
@@ -5455,19 +6014,6 @@ class Settings(object):
 			'title' : 35244,
 			'value' : {
 				'default' : 'FF922B21',
-			},
-		},
-		'general.cache.limit' : {
-			'type' : CustomSize,
-			'title' : 36036,
-			'value' : {
-				'unit' : UnitByteMega,
-				'minimum' : 50,
-				'maximum' : 102400,
-			},
-			'special' : {
-				'zero' : SpecialUnlimited,
-				'none' : SpecialAutomatic,
 			},
 		},
 		'general.concurrency.task' : {
@@ -5631,7 +6177,7 @@ class Settings(object):
 			'title' : 33887,
 			'value' : {
 				'unit' : UnitHour,
-				'default' : 168,
+				'default' : 192,
 				'minimum' : 0,
 				'maximum' : 2190,
 			},
@@ -5699,6 +6245,48 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
+		'activity.binge.scrape' : {
+			'type' : CustomDuration,
+			'title' : 36495,
+			'value' : {
+				'unit' : UnitMinute,
+				'default' : 10,
+				'minimum' : 1,
+				'maximum' : 120,
+			},
+			'special' : {
+				'zero' : SpecialDefault,
+				'none' : SpecialDefault,
+			},
+		},
+		'activity.binge.delay' : {
+			'type' : CustomDuration,
+			'title' : 35581,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 0,
+				'minimum' : 5,
+				'maximum' : 600,
+			},
+			'special' : {
+				'zero' : SpecialDefault,
+				'none' : SpecialDefault,
+			},
+		},
+		'activity.binge.continue.timeout' : {
+			'type' : CustomDuration,
+			'title' : 36498,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 30,
+				'minimum' : 5,
+				'maximum' : 600,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
 		'activity.history.count.rewatch' : {
 			'type' : CustomDuration,
 			'title' : 35405,
@@ -5719,6 +6307,20 @@ class Settings(object):
 			'value' : {
 				'unit' : UnitSecond,
 				'default' : 30,
+				'minimum' : 5,
+				'maximum' : 600,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
+		'activity.rating.timeout' : {
+			'type' : CustomDuration,
+			'title' : 36498,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 0,
 				'minimum' : 5,
 				'maximum' : 600,
 			},
@@ -5764,8 +6366,7 @@ class Settings(object):
 				'unit' : UnitDay,
 				'default' :180,
 				'minimum' : 1,
-				'none' : SpecialDefault,
-				'maximum' : SpecialNever,
+				'maximum' : 3650,
 			},
 			'special' : {
 				'zero' : SpecialAlways,
@@ -5801,20 +6402,6 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'playback.skip.time' : {
-			'type' : CustomDuration,
-			'title' : 32312,
-			'value' : {
-				'unit' : UnitSecond,
-				'default' : 7,
-				'minimum' : 1,
-				'maximum' : 180,
-			},
-			'special' : {
-				'zero' : SpecialDefault,
-				'none' : SpecialDefault,
-			},
-		},
 		'playback.buffer.monitor.delay' : {
 			'type' : CustomDuration,
 			'title' : 33020,
@@ -5829,14 +6416,14 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
-		'playback.binge.scrape' : {
+		'interface.button.time' : {
 			'type' : CustomDuration,
-			'title' : 35586,
+			'title' : 32312,
 			'value' : {
-				'unit' : UnitMinute,
-				'default' : 10,
+				'unit' : UnitSecond,
+				'default' : 25,
 				'minimum' : 1,
-				'maximum' : 120,
+				'maximum' : 180,
 			},
 			'special' : {
 				'zero' : SpecialDefault,
@@ -5887,12 +6474,12 @@ class Settings(object):
 		},
 		'utility.bluetooth.monitor.interval' : {
 			'type' : CustomDuration,
-			'title' : 33538,
+			'title' : 33804,
 			'value' : {
 				'unit' : UnitSecond,
-				'default' : 15,
+				'default' : 45,
 				'minimum' : 10,
-				'maximum' : 180,
+				'maximum' : 300,
 			},
 			'special' : {
 				'zero' : SpecialDefault,
@@ -6140,7 +6727,12 @@ class Settings(object):
 	# We try to write multiple times in a thread, sleeping in between, until the file size has changed or 2.5 seconds have passed.
 	# Hence, if this function was not able to write to file during this time, the old settings will remain in the file. On the next launch this will be retried.
 	@classmethod
-	def clean(self, reload = False, retry = True):
+	def clean(self, reload = False, retry = True, background = True):
+		if background: Pool.thread(target = self._clean, kwargs = {'reload' : reload, 'retry' : retry}, start = True)
+		else: self._clean(reload = reload, retry = retry)
+
+	@classmethod
+	def _clean(self, reload = False, retry = True):
 		dataMain = self.cacheDataMain()
 		idsMain = Regex.extract(data = dataMain, expression = '<setting\s*id\s*=\s*"(.*?)"', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
@@ -6183,7 +6775,7 @@ class Settings(object):
 			# File does not change in Kodi 19 if writeNow() is used, probably due to caching.
 			# Sometimes writeNow() seems to work? But just stick with writeNative() to be sure.
 			if retry:
-				Pool.thread(target = _write, args = (dataUser, reload), start = True)
+				_write(data = dataUser, reload = reload)
 			else:
 				File.writeNow(self.pathProfile(), dataUser)
 				if reload: self.cacheClear()
@@ -6326,7 +6918,7 @@ class Settings(object):
 		return Settings.CacheEnabled
 
 	@classmethod
-	def cacheGet(self, id, raw, database = False):
+	def cacheGet(self, id, raw, database = False, retry = True):
 		try:
 			self.cache()
 			if raw:
@@ -6337,6 +6929,11 @@ class Settings(object):
 				data = self.cacheDataUser()
 				values = Settings.CacheValuesUser
 				parameter = Settings.ParameterValue
+
+			# Sometimes during first launch, "values" can be None if the setting's cache was cleared between the "self.cache()" and "self.cacheDataUser()" statements.
+			# In such a case, just retry.
+			if values is None and retry: return self.cacheGet(id = id, raw = raw, database = database, retry = False)
+
 			if id in values: # Already looked-up previously.
 				return values[id]
 			elif database:
@@ -6960,6 +7557,7 @@ class Cleanup(object):
 		subitems.append({'title' : 33029, 'size' : self.databaseSize, 'clean' : self.databaseClean, 'message' : 33903})
 		subitems.append({'title' : 33016, 'size' : self.databaseCacheSize, 'clean' : self.databaseCacheClean, 'message' : 33904})
 		subitems.append({'title' : 33015, 'size' : self.databaseMetadataSize, 'clean' : self.databaseMetadataClean, 'message' : 33905})
+		subitems.append({'title' : 33481, 'size' : self.databaseStreamSize, 'clean' : self.databaseStreamClean, 'message' : 36427})
 		subitems.append({'title' : 32036, 'size' : self.databaseHistorySize, 'clean' : self.databaseHistoryClean, 'message' : 33906})
 		subitems.append({'title' : 33041, 'size' : self.databaseSearchSize, 'clean' : self.databaseSearchClean, 'message' : 33907})
 		subitems.append({'title' : 32330, 'size' : self.databasePlaybackSize, 'clean' : self.databasePlaybackClean, 'message' : 33908})
@@ -7016,9 +7614,10 @@ class Cleanup(object):
 		return items
 
 	@classmethod
-	def clean(self):
+	def clean(self, settings = False):
 		from lib.modules.interface import Dialog
 		Dialog.information(title = 33989, refresh = self._items, reselect = Dialog.ReselectYes)
+		if settings: Settings.launch(id = 'general.database.clean')
 
 	@classmethod
 	def addonSize(self):
@@ -7045,6 +7644,7 @@ class Cleanup(object):
 		total = 0
 		total += self.databaseCacheSize()
 		total += self.databaseMetadataSize()
+		total += self.databaseStreamSize()
 		total += self.databaseHistorySize()
 		total += self.databaseSearchSize()
 		total += self.databasePlaybackSize()
@@ -7056,6 +7656,7 @@ class Cleanup(object):
 	def databaseClean(self):
 		self.databaseCacheClean()
 		self.databaseMetadataClean()
+		self.databaseStreamClean()
 		self.databaseHistoryClean()
 		self.databaseSearchClean()
 		self.databasePlaybackClean()
@@ -7081,6 +7682,16 @@ class Cleanup(object):
 	def databaseMetadataClean(self):
 		from lib.meta.cache import MetaCache
 		MetaCache.instance().clear(confirm = False)
+
+	@classmethod
+	def databaseStreamSize(self):
+		from lib.providers.core.manager import Manager
+		return Manager.streamsDatabaseSize()
+
+	@classmethod
+	def databaseStreamClean(self):
+		from lib.providers.core.manager import Manager
+		Manager.streamsDatabaseClear()
 
 	@classmethod
 	def databaseHistorySize(self):
@@ -7169,12 +7780,12 @@ class Cleanup(object):
 	@classmethod
 	def providerDatabaseSize(self):
 		from lib.providers.core.manager import Manager
-		return Manager.databaseSize()
+		return Manager.databaseSize(streams = False)
 
 	@classmethod
 	def providerDatabaseClean(self):
 		from lib.providers.core.manager import Manager
-		Manager.databaseClear()
+		Manager.databaseClear(streams = False)
 
 	@classmethod
 	def providerFileSize(self):
@@ -7618,295 +8229,6 @@ class Media(object):
 	@classmethod
 	def typeTelevision(self, type):
 		return type == Media.TypeShow or type == Media.TypeSeason or type == Media.TypeEpisode or type == Media.TypeSpecialSeason or type == Media.TypeSpecialEpisode or type == Media.TypeSpecialRecap or type == Media.TypeSpecialExtra
-
-###################################################################
-# LIGHTPACK
-###################################################################
-
-class Lightpack(object):
-
-	ExecutionKodi = 'kodi'
-	ExecutionGaia = 'gaia'
-
-	StatusUnknown = None
-	StatusOn = 'on'
-	StatusOff = 'off'
-
-	# Number of LEDs in a Lightpack.
-	MapSize = 10
-
-	PathWindows = ['C:\\Program Files (x86)\\Prismatik\\Prismatik.exe', 'C:\\Program Files\\Prismatik\\Prismatik.exe']
-	PathLinux = ['/usr/bin/prismatik', '/usr/local/bin/prismatik']
-
-	DefaultAddress = '127.0.0.1'
-	DefaultPort = 3636
-
-	def __init__(self):
-		self.mError = False
-
-		self.mEnabled = Settings.getBoolean('utility.lightpack.enabled')
-
-		self.mPrismatikMode = Settings.getInteger('utility.lightpack.prismatik')
-		self.mPrismatikLocation = Settings.getString('utility.lightpack.prismatik.location')
-
-		self.mLaunchAutomatic = Settings.getInteger('utility.lightpack.launch')
-		self.mLaunchAnimation = Settings.getBoolean('utility.lightpack.launch.animation')
-
-		self.mProfileCustom = Settings.getBoolean('utility.lightpack.profile')
-		self.mProfileName = Settings.getString('utility.lightpack.profile.name')
-
-		self.mCount = Settings.getInteger('utility.lightpack.count')
-		self.mMap = self._map()
-
-		if Settings.getBoolean('utility.lightpack.connection'):
-			self.mHost = Settings.getString('utility.lightpack.connection.host')
-			self.mPort = Settings.getInteger('utility.lightpack.connection.port')
-			self.mKey = Settings.getString('utility.lightpack.connection.key').strip()
-		else:
-			self.mHost = Lightpack.DefaultAddress
-			self.mPort = Lightpack.DefaultPort
-			self.mKey = ''
-
-		self.mLightpack = None
-		self._initialize()
-
-	def __del__(self):
-		try: self._unlock()
-		except: pass
-		try: self._disconnect()
-		except: pass
-
-	def _map(self):
-		result = []
-		set = 10
-		for i in range(self.mCount):
-			start = Lightpack.MapSize * i
-			for j in range(1, Lightpack.MapSize + 1):
-				result.append(start + j)
-		return result
-
-	def _initialize(self):
-		if not self.mEnabled: return
-		from lib.modules.external import Importer
-		self.mLightpack = Importer.moduleLightPack().lightpack(self.mHost, self.mPort, self.mKey, self.mMap)
-		self.mLightpack.connect()
-
-	def _error(self):
-		return self.mError
-
-	def _errorSuccess(self):
-		return not self.mError
-
-	def _errorSet(self):
-		self.mError = True
-
-	def _errorClear(self):
-		self.mError = False
-
-	def _connect(self):
-		return self.mLightpack.connect() >= 0
-
-	def _disconnect(self):
-		self.mLightpack.disconnect()
-
-	def _lock(self):
-		self.mLightpack.lock()
-
-	def _unlock(self):
-		self.mLightpack.unlock()
-
-	# Color is RGB array or hex. If index is None, uses all LEDs.
-	def _colorSet(self, color, index = None, lock = False):
-		if lock: self.mLightpack.lock()
-
-		if Tools.isString(color):
-			color = color.replace('#', '')
-			if len(color) == 6:
-				color = 'FF' + color
-			color = [int(color[i : i + 2], 16) for i in range(2, 8, 2)]
-
-		if index == None:
-			self.mLightpack.setColorToAll(color[0], color[1], color[2])
-		else:
-			self.mLightpack.setColor(index, color[0], color[1], color[2])
-
-		if lock: self.mLightpack.unlock()
-
-	def _profileSet(self, profile):
-		try:
-			self._errorClear()
-			self._lock()
-			self.mLightpack.setProfile(profile)
-			self._unlock()
-		except:
-			self._errorSet()
-		return self._errorSuccess()
-
-	def _message(self):
-		from lib.modules import interface
-		interface.Dialog.confirm(title = 33406, message = 33410)
-
-	def _launchEnabled(self, execution):
-		if self.mEnabled:
-			if execution == Lightpack.ExecutionKodi and (self.mLaunchAutomatic == 1 or self.mLaunchAutomatic == 3):
-				return True
-			if execution == Lightpack.ExecutionGaia and (self.mLaunchAutomatic == 2 or self.mLaunchAutomatic == 3):
-				return True
-		return False
-
-	def _launch(self):
-		try:
-			if not self._connect():
-				raise Exception()
-		except:
-			try:
-				if self.mLaunchAutomatic > 0:
-					automatic = self.mPrismatikMode == 0 or not self.mPrismatikLocation
-
-					if 'win' in sys.platform or 'nt' in sys.platform:
-						command = 'start "Prismatik" /B /MIN "%s"'
-						if automatic:
-							executed = False
-							for path in Lightpack.PathWindows:
-								if os.path.exists(path):
-									os.system(command % path)
-									executed = True
-									break
-							if not executed:
-								os.system('prismatik') # Global path
-						else:
-							os.system(command % self.mPrismatikLocation)
-					elif 'darwin' in sys.platform or 'mac' in sys.platform:
-						os.system('open "' + self.mPrismatikLocation + '"')
-					else:
-						command = '"%s" &'
-						if automatic:
-							executed = False
-							for path in Lightpack.PathLinux:
-								if os.path.exists(path):
-									os.system(command % path)
-									executed = True
-									break
-							if not executed:
-								os.system('prismatik') # Global path
-						else:
-							os.system(command % self.mPrismatikLocation)
-
-					Time.sleep(3)
-					self._connect()
-					self.switchOn()
-			except:
-				self._errorSet()
-
-		try:
-			if self.status() == Lightpack.StatusUnknown:
-				self.mLightpack = None
-			else:
-				try:
-					if self.mProfileCustom and self.mProfileName and not self.mProfileName == '':
-						self._profileSet(self.mProfileName)
-				except:
-					self._errorSet()
-		except:
-			self.mLightpack = None
-
-		self.animate(force = False)
-
-	def launchAutomatic(self):
-		self.launch(Lightpack.ExecutionKodi)
-
-	def launch(self, execution):
-		if self._launchEnabled(execution = execution):
-			thread = Pool.thread(target = self._launch)
-			thread.start()
-
-	@classmethod
-	def settings(self):
-		Settings.launch(Settings.CategoryAmbilight)
-
-	def enabled(self):
-		return self.mEnabled
-
-	def status(self):
-		if not self.mEnabled: return Lightpack.StatusUnknown
-		try:
-			self._errorClear()
-			self._lock()
-			status = self.mLightpack.getStatus()
-			self._unlock()
-			return status.strip()
-		except:
-			self._errorSet()
-		return Lightpack.StatusUnknown
-
-	def statusUnknown(self):
-		return self.status() == Lightpack.StatusUnknown
-
-	def statusOn(self):
-		return self.status() == Lightpack.StatusOn
-
-	def statusOff(self):
-		return self.status() == Lightpack.StatusOff
-
-	def switchOn(self, message = False):
-		if not self.mEnabled: return False
-		try:
-			self._errorClear()
-			self._lock()
-			self.mLightpack.turnOn()
-			self._unlock()
-		except:
-			self._errorSet()
-		success = self._errorSuccess()
-		if not success and message: self._message()
-		return success
-
-	def switchOff(self, message = False):
-		if not self.mEnabled: return False
-		try:
-			self._errorClear()
-			self._lock()
-			self.mLightpack.turnOff()
-			self._unlock()
-		except:
-			self._errorSet()
-		success = self._errorSuccess()
-		if not success and message: self._message()
-		return success
-
-	def _animateSpin(self, color):
-		for i in range(len(self.mMap)):
-			self._colorSet(color = color, index = i)
-			Time.sleep(0.1)
-
-	def animate(self, force = True, message = False, delay = False):
-		if not self.mEnabled:
-			return False
-
-		if force or self.mLaunchAnimation:
-			try:
-				self.switchOn()
-				self._errorClear()
-				if delay: # The Lightpack sometimes gets stuck on the red light on startup animation. Maybe this delay will solve that?
-					Time.sleep(1)
-				self._lock()
-
-				for i in range(2):
-					self._animateSpin('FFFF0000')
-					self._animateSpin('FFFF00FF')
-					self._animateSpin('FF0000FF')
-					self._animateSpin('FF00FFFF')
-					self._animateSpin('FF00FF00')
-					self._animateSpin('FFFFFF00')
-
-				self._unlock()
-			except:
-				self._errorSet()
-		else:
-			return False
-		success = self._errorSuccess()
-		if not success and message: self._message()
-		return success
 
 ########################################
 # SUBPROCESS
@@ -13244,7 +13566,8 @@ class Binge(object):
 	DialogNone = 0
 	DialogFull = 1
 	DialogOverlay = 2
-	DialogUpNext = 3
+	DialogButton = 3
+	DialogUpNext = 4
 
 	ActionContinue = 0
 	ActionCancel = 1
@@ -13254,15 +13577,15 @@ class Binge(object):
 
 	@classmethod
 	def enabled(self):
-		return Settings.getBoolean('playback.binge.enabled')
+		return Settings.getBoolean('activity.binge.enabled')
 
 	@classmethod
 	def pack(self):
-		return Settings.getBoolean('playback.binge.pack')
+		return Settings.getBoolean('playback.autoplay.binge')
 
 	@classmethod
 	def dialog(self):
-		return Settings.getInteger('playback.binge.dialog')
+		return Settings.getInteger('activity.binge.dialog')
 
 	@classmethod
 	def dialogNone(self):
@@ -13277,33 +13600,576 @@ class Binge(object):
 		return self.dialog() == Binge.DialogOverlay
 
 	@classmethod
+	def dialogButton(self):
+		return self.dialog() == Binge.DialogButton
+
+	@classmethod
 	def dialogUpNext(self):
 		return self.dialog() == Binge.DialogUpNext
 
 	@classmethod
 	def scrape(self):
-		return Settings.getCustom('playback.binge.scrape')
+		return Settings.getCustom('activity.binge.scrape')
 
 	@classmethod
 	def delay(self):
-		return Settings.getInteger('playback.binge.delay')
+		return Settings.getCustom('activity.binge.delay')
 
 	@classmethod
 	def suppress(self):
-		return Settings.getInteger('playback.binge.suppress')
+		return Settings.getInteger('activity.binge.suppress')
 
 	@classmethod
 	def actionNone(self):
-		return Settings.getInteger('playback.binge.action.none')
+		return Settings.getInteger('activity.binge.action.none')
 
 	@classmethod
 	def actionContinue(self):
-		return Settings.getInteger('playback.binge.action.continue')
+		return Settings.getInteger('activity.binge.action.continue')
 
 	@classmethod
 	def actionCancel(self):
-		return Settings.getInteger('playback.binge.action.cancel')
+		return Settings.getInteger('activity.binge.action.cancel')
 
+	@classmethod
+	def continueEnabled(self):
+		return Settings.getBoolean('activity.binge.continue')
+
+	@classmethod
+	def continueTimeout(self):
+		return Settings.getCustom('activity.binge.continue.timeout')
+
+	@classmethod
+	def continueAction(self):
+		return Settings.getInteger('activity.binge.continue.action')
+
+	@classmethod
+	def continueInteract(self):
+		return Settings.getBoolean('activity.binge.continue.interact')
+
+	@classmethod
+	def continuePropagate(self):
+		return Settings.getInteger('activity.binge.continue.propagate')
+
+###################################################################
+# OBSERVER
+###################################################################
+
+class Observer(object):
+
+	ModePlayback		= 'playback'
+	ModeInteract		= 'interact'
+
+	TypeStart			= 'start'		# Playback started.
+	TypeStop			= 'stop'		# Playback stopped/finihsed.
+	TypeRating			= 'rating'		# Interacted with the rating dialog.
+	TypeContinue		= 'continue'	# Interacted with the continue dialog.
+	TypeSkip			= 'skip'		# Interacted with the skip intro button.
+	TypeBinge			= 'binge'		# Interacted with the continue button or binge dialog.
+	TypeScrape			= 'scrape'		# Manually started a new scrape.
+	TypeStream			= 'stream'		# Manually interacted with the stream window.
+
+	ActionNone			= None
+	ActionContinue		= 'continue'
+	ActionStop			= 'stop'
+	ActionPowerdown		= System.PowerPowerdown
+	ActionShutdown		= System.PowerShutdown
+	ActionReboot		= System.PowerReboot
+	ActionRestart		= System.PowerRestart
+	ActionSuspend		= System.PowerSuspend
+	ActionHibernate		= System.PowerHibernate
+	ActionStandby		= System.PowerStandby
+	ActionMinimize		= System.PowerMinimize
+	ActionQuit			= System.PowerQuit
+	ActionScreensaver	= System.PowerScreensaver
+
+	Setting				= 'activity.automation.observer'
+	Property			= 'GaiaObserver'
+
+	@classmethod
+	def evaluate(self, binge = None, notify = None):
+		try:
+			observations = self.settings()
+			if observations:
+				entries = Converter.jsonFrom(System.windowPropertyGet(property = Observer.Property))
+				if entries:
+					old = Time.past(hours = 24)
+					keys = ['imdb', 'tmdb', 'tvdb', 'trakt', 'set', 'season', 'episode']
+
+					for observation in observations:
+						items = list(reversed(Tools.copy(entries)))
+						current = {
+							'watched' : {'counter' : [], 'duration' : 0},
+							'inactive' : {'counter' : [], 'duration' : 0},
+						}
+
+						# Allow exception for the last episode.
+						if binge is False:
+							value = observation['exception']['last']
+							if value is True: return observation['activity']
+							elif value is False: return False
+
+						# Allow exception movies or other standalone titles.
+						if binge is None:
+							value = observation['exception']['discrete']
+							if value is True: return observation['activity']
+							elif value is False: return False
+
+						# Ignore all older entries before the last item from a different show.
+						if observation['exception']['reset']:
+							last = None
+							for item in items:
+								if item['mode'] == Observer.ModePlayback:
+									last = item
+									break
+							if last:
+								for i in range(len(items)):
+									item = items[i]
+									if item['mode'] == Observer.ModePlayback:
+										if not Tools.dictionaryEqual(item, last, keys = keys):
+											items = items[:i]
+											break
+
+						# Calculate the total duration.
+						# Note that there could be multiple entries for the same episode, if we stop playback to select another working stream.
+						start = 0
+						end = 0
+						interact = False
+						for item in items:
+							if item['time'] < old:
+								break # Ignore old stuff.
+							elif item['mode'] == Observer.ModePlayback:
+								if item['type'] == Observer.TypeStop:
+									end = item['time']
+								elif item['type'] == Observer.TypeStart:
+									if end:
+										duration = end - item['time']
+										end = 0
+										current['watched']['duration'] += duration
+										current['watched']['counter'].append(item)
+										if not interact:
+											current['inactive']['duration'] += duration
+											current['inactive']['counter'].append(item)
+							elif item['mode'] == Observer.ModeInteract:
+								interact = True
+
+						# Do not count duplicates.
+						temp = []
+						for item in current['watched']['counter']:
+							contains = False
+							for item2 in temp:
+								if Tools.dictionaryEqual(item, item2, keys = keys):
+									contains = True
+									break
+							if not contains: temp.append(item)
+						current['watched']['counter'] = len(temp)
+
+						# Do not count duplicates.
+						temp = []
+						for item in current['inactive']['counter']:
+							contains = False
+							for item2 in temp:
+								if Tools.dictionaryEqual(item, item2, keys = keys):
+									contains = True
+									break
+							if not contains: temp.append(item)
+						current['inactive']['counter'] = len(temp)
+
+						valid = 0
+						for i in ['inactive', 'watched']:
+							for j in ['counter', 'duration']:
+								if observation['condition'][i][j]:
+									if current[i][j] and current[i][j] >= observation['condition'][i][j]: valid += 1
+									else: break
+								else: valid += 1
+
+						if valid == 4 and observation['activity']['action']:
+							if notify: self.notify(observation = observation)
+							return observation['activity']
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def notify(self, observation, notification = None, sound = None):
+		from lib.modules.interface import Dialog, Translation, Format
+
+		if not observation: return False
+		if 'activity' in observation: observation = observation['activity']
+
+		label = 33387
+		for i in self.settingsActions():
+			if i['action'] == observation['action']:
+				label = i['label']
+				break
+		label = Translation.string(label)
+
+		Logger.log('Observer Action: %s' % label)
+		if sound or observation['sound']: Sound.executePowerStart()
+		if notification or observation['notification']: Dialog.notification(title = 36517, message = '%s: %s' % (Format.fontBold(36519), label), time = 8000, icon = Dialog.IconWarning)
+		return True
+
+	@classmethod
+	def update(self, mode, type, imdb = None, tmdb = None, tvdb = None, trakt = None, set = None, season = None, episode = None):
+		try:
+			items = Converter.jsonFrom(System.windowPropertyGet(property = Observer.Property))
+			if not items: items = []
+
+			value = {'mode' : mode, 'type' : type, 'time' : Time.timestamp()}
+			if mode == Observer.ModeInteract:
+				# Delete old entry if we are doing the same thing again.
+				if items and items[-1]['mode'] == mode and items[-1]['type'] == type: del items[-1]
+			else:
+				value.update({
+					'imdb' : imdb,
+					'tmdb' : tmdb,
+					'tvdb' : tvdb,
+					'trakt' : trakt,
+					'set' : set,
+					'season' : season,
+					'episode' : episode,
+				})
+
+			items.append(value)
+			items = items[:200]
+			System.windowPropertySet(property = Observer.Property, value = Converter.jsonTo(items))
+			return True
+		except: Logger.error()
+		return False
+
+	@classmethod
+	def updatePlayback(self, type, imdb = None, tmdb = None, tvdb = None, trakt = None, set = None, season = None, episode = None):
+		return self.update(mode = Observer.ModePlayback, type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, set = set, season = season, episode = episode)
+
+	@classmethod
+	def updatePlaybackStart(self, imdb = None, tmdb = None, tvdb = None, trakt = None, set = None, season = None, episode = None):
+		return self.updatePlayback(type = Observer.TypeStart, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, set = set, season = season, episode = episode)
+
+	@classmethod
+	def updatePlaybackStop(self, imdb = None, tmdb = None, tvdb = None, trakt = None, set = None, season = None, episode = None):
+		return self.updatePlayback(type = Observer.TypeStop, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, set = set, season = season, episode = episode)
+
+	@classmethod
+	def updateInteract(self, type):
+		return self.update(mode = Observer.ModeInteract, type = type)
+
+	@classmethod
+	def updateInteractRating(self):
+		return self.updateInteract(type = Observer.TypeRating)
+
+	@classmethod
+	def updateInteractContinue(self):
+		return self.updateInteract(type = Observer.TypeContinue)
+
+	@classmethod
+	def updateInteractSkip(self):
+		return self.updateInteract(type = Observer.TypeSkip)
+
+	@classmethod
+	def updateInteractBinge(self):
+		return self.updateInteract(type = Observer.TypeBinge)
+
+	@classmethod
+	def updateInteractScrape(self):
+		return self.updateInteract(type = Observer.TypeScrape)
+
+	@classmethod
+	def updateInteractStream(self):
+		return self.updateInteract(type = Observer.TypeStream)
+
+	@classmethod
+	def clear(self):
+		System.windowPropertyClear(property = Observer.Property)
+
+	@classmethod
+	def settings(self):
+		# Use the default settings as base, in case new attributes were added or old ones removed in a later version.
+		result = []
+		data = Settings.getDataList(id = Observer.Setting)
+		if data:
+			default = self.settingsDefault()
+			for i in data: result.append(Tools.update(Tools.copy(default), i))
+		return result
+
+	@classmethod
+	def settingsDefault(self):
+		return {
+			'condition' : {
+				'watched' : {'counter' : None, 'duration' : None},
+				'inactive' : {'counter' : None, 'duration' : None},
+			},
+			'exception' : {
+				'reset' : True,
+				'last' : False,
+				'discrete' : False,
+			},
+			'activity' : {
+				'action' : Observer.ActionStop,
+				'timeout' : 60,
+				'notification' : True,
+				'sound' : True,
+			},
+		}
+
+	@classmethod
+	def settingsActions(self):
+		from lib.modules.interface import Translation, Format
+
+		actions = [
+			{'action' : Observer.ActionContinue,	'label' : Translation.string(36497)},
+			{'action' : Observer.ActionStop,		'label' : Translation.string(36507)},
+		]
+		for i in actions:
+			format = i['label'].split(' ')
+			i['format'] = Format.fontBold(' '.join(format[:-1])) + ' ' + format[-1]
+
+		power = System.power(level = 1, execute = False)
+		for i in power:
+			i['label'] = Translation.string(i['label'])
+		actions.extend(power)
+
+		return actions
+
+	@classmethod
+	def settingsUpdate(self, settings = False):
+		from lib.modules.interface import Dialog, Translation
+		from lib.modules.convert import ConverterDuration
+
+		self.tCanceled = False
+		self.tChanged = False
+		self.tOffset = 0
+		self.tObservations = self.settings()
+		self.tActions = self.settingsActions()
+
+		def _settingsHelp():
+			Dialog.details(title = 36517, items = [
+				{'type' : 'title', 'value' : 'Overview', 'break' : 2},
+				{'type' : 'text', 'value' : 'The [I]Observer[/I]  allows you to created observations that automatically execute specified actions after playback has finished if certain conditions have been met. Note that these automations run on a timeout, so you will still have some time to change your mind in the rating and continue dialogs. These automations are only used once playback has finished and between binging episodes, but it will not interrupt any current playback. Multiple observations can be specified which are sequentially evaluated until the first one that holds true.', 'break' : 2},
+				{'type' : 'title', 'value' : 'Asleep', 'break' : 2},
+				{'type' : 'text', 'value' : 'Observers are useful if, for instance, you want to automatically power down your device if you fall asleep. The [I]Asleep[/I]  option is just a predefined observation which will shut down your device during binging if you did not interact with Gaia for more than 2 hours.', 'break' : 2},
+				{'type' : 'title', 'value' : 'Conditions', 'break' : 2},
+				{'type' : 'text', 'value' : 'Each observation can have multiple conditions. A given observation is only executed if [B]all[/B] its conditions are met. The [I]Inactive[/I]  options are based on wether or not you interacted with Gaia. If you fall asleep and do not press any remote button while letting binging continue automatically, the inactive conditions will be triggered. If at some point in the process you press any button, the inactive conditions are reset. The following actions are considered interactions and will reset the inactive counter and duration:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 'Skip Intro', 'value' : 'Pressing the skip intro button during playback.'},
+					{'title' : 'Binge Dialog', 'value' : 'Pressing any button in the binge dialog or button during playback.'},
+					{'title' : 'Rating Dialog', 'value' : 'Pressing any button in the rating dialog after playback.'},
+					{'title' : 'Continue Dialog', 'value' : 'Pressing any button in the continue dialog after playback.'},
+					{'title' : 'Start Scrape', 'value' : 'Manually starting a new scrape.'},
+					{'title' : 'Select Stream', 'value' : 'Manually selecting or otherwise interacting with the stream list.'},
+				], 'number' : False},
+				{'type' : 'text', 'value' : 'On the other hand, the [I]Watched[/I]  options do not consider interactions and will triggered irrespective of any button being pressed. The following conditions are available:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 36501, 'value' : 'The minimum number of episodes that have to be watched. This condition is not subject to inactivity and will be triggered whether you interact with Gaia or not.'},
+					{'title' : 36502, 'value' : 'The minimum total playback duration that has to be watched. This condition is not subject to inactivity and will be triggered whether you interact with Gaia or not.'},
+					{'title' : 36503, 'value' : 'The minimum number of episodes that have to be watched. This condition is only triggered if you do not interact with Gaia.'},
+					{'title' : 36504, 'value' : 'The minimum total playback duration that has to be watched. This condition is only triggered if you do not interact with Gaia.'},
+				], 'number' : False},
+				{'type' : 'text', 'value' : 'Note that the duration is calculated as the time between starting and finishing playback, and not the actual duration of the video. For instance, if a video is 1 hour long, but you resume playback from the middle, only 30 minutes will be added to the observed duration and not the entire 1 hour.', 'break' : 2},
+				{'type' : 'title', 'value' : 'Exceptions', 'break' : 2},
+				{'type' : 'text', 'value' : 'Certain exception can be specified which allows the observer to execute, even if not all of the conditions are met. The following exceptions are available:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 36510, 'value' : 'Resets any previous observer info if a new show or movie is played. If [I]Disabled[/I], all episodes are evaluated for the conditions, even if they come from different shows. If [I]Enabled[/I], the conditions only apply to the binging process of the current show. If you start playing episodes from a different show, all internal counters are reset and the conditions will not take the episodes from the previous show into account.'},
+					{'title' : 33316, 'value' : 'Makes an exception if it is the last available episode for binging. If [I]Disabled[/I], the action is never applied for the last episode, even if the conditions are met. If [I]Enabled[/I], the action is always applied, even if the conditions are not met. If [I]Conditional[/I], the action is only applied if the conditions are met.'},
+					{'title' : 36520, 'value' : 'Also uses the observer for single standalone titles that are not part of a binging process. This can be used to also apply an observer to movies. If [I]Disabled[/I], the action is never applied for standalone titles, even if the conditions are met. If [I]Enabled[/I], the action is always applied, even if the conditions are not met. If [I]Conditional[/I], the action is only applied if the conditions are met.'},
+				], 'number' : False},
+				{'type' : 'title', 'value' : 'Activity', 'break' : 2},
+				{'type' : 'text', 'value' : 'If all the conditions are met, or if an exception applies, certain actions can be executed. The action and timeout of an observer will overwrite any default action or timeout in the continue dialog. The following actions are available:', 'break' : 2},
+				{'type' : 'list', 'value' : [
+					{'title' : 35625, 'value' : 'The action that is executed if all the above conditions are met.'},
+					{'title' : 36518, 'value' : 'The amount of time to wait before executing the default action.'},
+					{'title' : 36516, 'value' : 'A notification is shown before the action is executed.'},
+					{'title' : 36515, 'value' : 'A sound effect is played before the action is executed.'},
+				], 'number' : False},
+			])
+
+		def _settingsActions():
+			if self.tCanceled: return None
+
+			items = []
+			for i in range(len(self.tObservations)):
+				observation = self.tObservations[i]
+				count = sum([1 if j else 0 for j in [observation['condition']['watched']['counter'], observation['condition']['watched']['duration'], observation['condition']['inactive']['counter'], observation['condition']['inactive']['duration']]])
+				title = '%s %s' % (Translation.string(36505), i + 1)
+				value = '%s %s' % (count, Translation.string(33197 if count == 1 else 36506))
+				items.append({'title' : title, 'value' : value, 'action' : _settingsUpdate, 'parameters' : {'observation' : observation}})
+
+			return [
+				{'title' : Dialog.prefixBack(33486), 'close' : True},
+				{'title' : Dialog.prefixNext(33239), 'action' : _settingsHelp},
+				{'title' : Dialog.prefixNext(35069), 'action' : _settingsAdd},
+				{'title' : Dialog.prefixNext(36508), 'action' : _settingsAsleep},
+				{'title' : Dialog.prefixNext(33013), 'action' : _settingsClear},
+				{'title' : 33371, 'items' : items} if items else None,
+			]
+
+		def _settingsAction(observation):
+			if self.tChanged:
+				self.tChanged = False
+				return None
+			return [
+				{'title' : Dialog.prefixBack(35374), 'close' : True},
+				{'title' : Dialog.prefixNext(35406), 'action' : _settingsRemove, 'parameters' : {'observation' : observation}},
+				{'title' : Dialog.prefixNext(35403), 'action' : _settingsMoveUp, 'parameters' : {'observation' : observation}},
+				{'title' : Dialog.prefixNext(35404), 'action' : _settingsMoveDown, 'parameters' : {'observation' : observation}},
+				{'title' : 36506, 'items' : [
+					{'title' : 36501, 'value' : _settingsLabelCounter(observation['condition']['watched']), 'action' : _settingsUpdateCounter, 'parameters' : {'condition' : observation['condition']['watched'], 'title' : 36501}},
+					{'title' : 36502, 'value' : _settingsLabelDuration(observation['condition']['watched']), 'action' : _settingsUpdateDuration, 'parameters' : {'condition' : observation['condition']['watched'], 'title' : 36502}},
+					{'title' : 36503, 'value' : _settingsLabelCounter(observation['condition']['inactive']), 'action' : _settingsUpdateCounter, 'parameters' : {'condition' : observation['condition']['inactive'], 'title' : 36503}},
+					{'title' : 36504, 'value' : _settingsLabelDuration(observation['condition']['inactive']), 'action' : _settingsUpdateDuration, 'parameters' : {'condition' : observation['condition']['inactive'], 'title' : 36504}},
+				]},
+				{'title' : 36509, 'items' : [
+					{'title' : 36510, 'value' : _settingsLabelReset(observation), 'action' : _settingsUpdateReset, 'parameters' : {'observation' : observation}},
+					{'title' : 33316, 'value' : _settingsLabelLast(observation), 'action' : _settingsUpdateLast, 'parameters' : {'observation' : observation}},
+					{'title' : 36520, 'value' : _settingsLabelDiscrete(observation), 'action' : _settingsUpdateDiscrete, 'parameters' : {'observation' : observation}},
+				]},
+				{'title' : 36505, 'items' : [
+					{'title' : 35625, 'value' : _settingsLabelAction(observation), 'action' : _settingsUpdateAction, 'parameters' : {'observation' : observation}},
+					{'title' : 36518, 'value' : _settingsLabelTimeout(observation), 'action' : _settingsUpdateTimeout, 'parameters' : {'observation' : observation, 'title' : 36518}},
+					{'title' : 36516, 'value' : _settingsLabelNotification(observation), 'action' : _settingsUpdateNotification, 'parameters' : {'observation' : observation}},
+					{'title' : 36515, 'value' : _settingsLabelSound(observation), 'action' : _settingsUpdateSound, 'parameters' : {'observation' : observation}},
+				]},
+			]
+
+		def _settingsLabelCounter(condition):
+			if not condition['counter']: return Translation.string(32302)
+			return str(int(condition['counter']))
+
+		def _settingsLabelDuration(condition):
+			if not condition['duration']: return Translation.string(32302)
+			return ConverterDuration(value = int(condition['duration']), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort, capitalize = True)
+
+		def _settingsLabelReset(observation):
+			return Translation.string(32301 if observation['exception']['reset'] else 32302)
+
+		def _settingsLabelLast(observation):
+			current = observation['exception']['last']
+			return Translation.string(32301 if current is True else 36521 if current is None else 32302)
+
+		def _settingsLabelDiscrete(observation):
+			current = observation['exception']['discrete']
+			return Translation.string(32301 if current is True else 36521 if current is None else 32302)
+
+		def _settingsLabelAction(observation):
+			if observation['activity']['action']:
+				for i in self.tActions:
+					if i['action'] == observation['activity']['action']:
+						return Translation.string(i['label'])
+			return Translation.string(32302)
+
+		def _settingsLabelTimeout(condition):
+			if not condition['activity']['timeout']: return Translation.string(32302)
+			return ConverterDuration(value = int(condition['activity']['timeout']), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort, capitalize = True)
+
+		def _settingsLabelNotification(observation):
+			return Translation.string(32301 if observation['activity']['notification'] else 32302)
+
+		def _settingsLabelSound(observation):
+			return Translation.string(32301 if observation['activity']['sound'] else 32302)
+
+		def _settingsSave():
+			label = None
+			if self.tObservations:
+				count = len(self.tObservations)
+				label = '%d %s' % (count, Translation.string(36505 if count == 1 else 33371))
+			else:
+				label = Translation.string(32302)
+			Settings.setData(id = Observer.Setting, value = self.tObservations, label = label)
+
+		def _settingsOffset():
+			offset = self.tOffset
+			self.tOffset = 0
+			return offset
+
+		def _settingsAdd():
+			observation = self.settingsDefault()
+			self.tObservations.append(observation)
+			_settingsUpdate(observation = observation)
+
+		def _settingsAsleep():
+			observation = self.settingsDefault()
+			observation['condition']['inactive']['duration'] = 120
+			observation['exception']['last'] = True
+			observation['activity']['action'] = System.PowerShutdown
+			self.tObservations.append(observation)
+
+		def _settingsClear():
+			self.tObservations = []
+
+		def _settingsRemove(observation):
+			self.tObservations.remove(observation)
+			self.tChanged = True
+
+		def _settingsMoveUp(observation):
+			index = self.tObservations.index(observation)
+			index -= 1
+			self.tChanged = True
+			if index >= 0:
+				self.tObservations.remove(observation)
+				self.tObservations.insert(index, observation)
+				self.tOffset = -1
+
+		def _settingsMoveDown(observation):
+			index = self.tObservations.index(observation)
+			index += 1
+			self.tChanged = True
+			if index < len(self.tObservations):
+				self.tObservations.remove(observation)
+				self.tObservations.insert(index, observation)
+				self.tOffset = +1
+
+		def _settingsUpdate(observation):
+			choice = Dialog.information(title = 36517, refresh = lambda : _settingsAction(observation), reselect = Dialog.ReselectYes)
+			if choice == -1: self.tCanceled = True
+
+		def _settingsUpdateCounter(condition, title):
+			value = Dialog.input(type = Dialog.InputNumeric, title = title, default = condition['counter'])
+			condition['counter'] = int(value) if value else None
+
+		def _settingsUpdateDuration(condition, title):
+			value = Dialog.input(type = Dialog.InputNumeric, title = title, default = int(condition['duration'] / 60.0) if condition['duration'] else None)
+			condition['duration'] = int(value * 60) if value else None
+
+		def _settingsUpdateReset(observation):
+			observation['exception']['reset'] = not observation['exception']['reset']
+
+		def _settingsUpdateLast(observation):
+			current = new = observation['exception']['last']
+			if current is False: new = None
+			elif current is None: new = True
+			else: new = False
+			observation['exception']['last'] = new
+
+		def _settingsUpdateDiscrete(observation):
+			current = new = observation['exception']['discrete']
+			if current is False: new = None
+			elif current is None: new = True
+			else: new = False
+			observation['exception']['discrete'] = new
+
+		def _settingsUpdateAction(observation):
+			selection = None
+			if observation['activity']['action']:
+				for i in self.tActions:
+					if i['action'] == observation['activity']['action']:
+						selection = i['format']
+						break
+			choice = Dialog.select(title = 36505, items = [i['format'] for i in self.tActions], selection = selection)
+			if choice is None or choice < 0: return None
+			observation['activity']['action'] = self.tActions[choice]['action']
+
+		def _settingsUpdateTimeout(observation, title):
+			value = Dialog.input(type = Dialog.InputNumeric, title = title, default = int(observation['activity']['timeout']) if observation['activity']['timeout'] else None)
+			observation['activity']['timeout'] = int(value) if value else None
+
+		def _settingsUpdateNotification(observation):
+			observation['activity']['notification'] = not observation['activity']['notification']
+
+		def _settingsUpdateSound(observation):
+			observation['activity']['sound'] = not observation['activity']['sound']
+
+		Dialog.information(title = 36517, refresh = _settingsActions, reselect = Dialog.ReselectYes, offset = _settingsOffset)
+		_settingsSave()
+
+		if settings: Settings.launchData(id = Observer.Setting)
 
 ###################################################################
 # ANNOUNCEMENT
@@ -13316,7 +14182,8 @@ class Announcements(object):
 	# Do not make this value too large (eg: 200MB), since it is only the current free disk space required, and already includes the sizes of the current files.
 	# This value should only represent the maximum space required for the next session until Gaia/Kodi restarts (eg: the additional space required for an increse in size of cache.db, or temporary torrent or NZB container downloads).
 	# Do not make this value too small, since other addons/Kodi/OS might also fill up the space during the session.
-	Storage = 104857600 # 100 MB
+	StorageMinimum = 104857600 # 100 MB. After which a notification is shown.
+	StorageRecommended = 262144000 # 250 MB. After using Gaia for a few months, databases are around 500-600MB in total. Around 250MB is about the minimum these databases should have available for the addon to function correctly.
 
 	@classmethod
 	def enabled(self):
@@ -13400,10 +14267,10 @@ class Announcements(object):
 	def _storage(self, sleep = False):
 		if sleep: Time.sleep(2) # Wait a bit so that everything has been loaded.
 		free = Hardware.storageUsageFreeBytes()
-		if free < Announcements.Storage:
+		if free < Announcements.StorageMinimum:
 			from lib.modules.interface import Translation, Dialog
 			from lib.modules.convert import ConverterSize
-			message = Translation.string(35279) % (ConverterSize(free).stringOptimal(), ConverterSize(Announcements.Storage).stringOptimal())
+			message = Translation.string(35279) % (ConverterSize(free).stringOptimal(), ConverterSize(Announcements.StorageRecommended).stringOptimal())
 			Dialog.confirm(title = 35280, message = message)
 		else:
 			from lib.modules.database import Dummy
@@ -13655,7 +14522,7 @@ class Buffer(object):
 		if cache:
 			message = Translation.string(36187) % (ConverterSize(currentBuffer).stringOptimal(), ConverterSize(currentMemory).stringOptimal(), int(currentPercent * 100), memory['usage']['free']['label'], memory['usage']['total']['label'])
 			choice = Dialog.options(title = 33262, message = message, labelConfirm = 33743, labelDeny = 33925, labelCustom = 35479)
-			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
+			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
 				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
@@ -13674,7 +14541,7 @@ class Buffer(object):
 			newBuffer = None
 
 			choice = Dialog.options(title = 33262, message = 36180, labelConfirm = 33743, labelDeny = 33348, labelCustom = 33383)
-			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
+			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceNo:
 				newPercent = Dialog.input(title = 33262, type = Dialog.InputNumeric, default = int(currentPercent * 100))
@@ -13702,7 +14569,7 @@ class Buffer(object):
 			message = Translation.string(36181) % (ConverterSize(newBuffer).stringOptimal(), ConverterSize(newMemory).stringOptimal(), int(newPercent * 100), memory['usage']['free']['label'], memory['usage']['total']['label'], Translation.string(message))
 
 			choice = Dialog.options(title = 33262, message = message, labelConfirm = 33743, labelDeny = 33926, labelCustom = 33925)
-			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
+			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceNo:
 				cache = '\n\t<cache>\n\t\t<buffermode>1</buffermode>%s\n\t\t<memorysize>%d</memorysize>%s\n\t\t<readfactor>%d</readfactor>%s\n\t</cache>\n' % (comment, newBuffer, comment, factor, comment)
@@ -13782,7 +14649,7 @@ class Timeout(object):
 		if found:
 			message = Translation.string(32020) % ConverterDuration(current, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort)
 			choice = Dialog.options(title = 35003, message = message, labelConfirm = 33743, labelDeny = 33925, labelCustom = 35479)
-			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
+			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
 				data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
@@ -13799,7 +14666,7 @@ class Timeout(object):
 			new = Dialog.input(title = 35003, type = Dialog.InputNumeric, default = current)
 			message = Translation.string(32023) % ConverterDuration(new, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort)
 			choice = Dialog.options(title = 35003, message = message, labelConfirm = 33743, labelDeny = 33926, labelCustom = 33925)
-			if choice == Dialog.ChoiceCancelled or choice == Dialog.ChoiceYes:
+			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceNo:
 				if not new:
@@ -13859,39 +14726,428 @@ class Timeout(object):
 		return self._settingsResult(result)
 
 ###################################################################
-# GOOGLE
+# LINK
 ###################################################################
 
-class Google(object):
+class Link(object):
 
-	Link = 'https://google.com/search?q=%s'
+	TypeImdb			= 'imdb'
+	TypeTmdb			= 'tmdb'
+	TypeTvdb			= 'tvdb'
+	TypeTrakt			= 'trakt'
+
+	TypeSimkl			= 'simkl'
+	TypeTvmaze			= 'tvmaze'
+	TypeTomatoes		= 'tomatoes'
+	TypeMetacritic		= 'metacritic'
+	TypeCommonsense		= 'commonsense'
+	TypeLetterboxd		= 'letterboxd'
+	TypeCriticker		= 'criticker'
+
+	TypeFanart			= 'fanart'
+	TypeHome			= 'home'
+	TypeTrailer			= 'trailer'
+	TypeGoogle			= 'google'
+	TypeDuckduckgo		= 'duckduckgo'
 
 	@classmethod
-	def link(self, query = None, media = None, title = None, year = None, season = None, episode = None, metadata = None):
-		if not query:
-			if metadata:
-				try: media = Media.TypeShow if 'tvshowtitle' in metadata or 'season' in metadata else Media.TypeMovie
-				except: pass
-				try: title = metadata['tvshowtitle'] if Media.typeTelevision(media) else metadata['title']
-				except: pass
-				try: year = metadata['year']
-				except: pass
-				try: season = metadata['season']
-				except: pass
-				try: episode = metadata['episode']
-				except: pass
+	def _slug(self, title, year = None, separator = '-', symbol = None, lower = True):
+		from lib.meta.tools import MetaTools
+		return MetaTools.slug(title = title, year = year, separator = separator, symbol = symbol, lower = lower)
 
-			if not title: return None
-			query = [title]
-			if Media.typeTelevision(media):
-				if not season is None: query.extend(['Season', season])
-				if not episode is None: query.extend(['Episode', episode])
-			elif tools.Media.typeMovie(media):
-				if year: query.append(year)
-			query = [Converter.unicode(i) for i in query if not i is None]
+	@classmethod
+	def _test(self, link):
+		from lib.modules.network import Networker
+		return Networker().requestSuccess(link = link)
+
+	@classmethod
+	def _query(self, query, plus = False):
+		from lib.modules.network import Networker
+		return Networker.linkQuote(data = query, plus = plus)
+
+	@classmethod
+	def _extract(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None):
+		if metadata:
+			if not media:
+				if 'tvshowtitle' in metadata:
+					if 'episode' in metadata: media = Media.TypeEpisode
+					elif 'season' in metadata: media = Media.TypeSeason
+					else: media = Media.TypeShow
+				elif 'set' in metadata and not 'collection' in metadata:
+					media = Media.TypeSet
+				else:
+					media = Media.TypeMovie
+
+			if not imdb and 'id' in metadata and 'imdb' in metadata['id']: imdb = metadata['id']['imdb']
+			if not tmdb and 'id' in metadata and 'tmdb' in metadata['id']: tmdb = metadata['id']['tmdb']
+			if not tvdb and 'id' in metadata and 'tvdb' in metadata['id']: tvdb = metadata['id']['tvdb']
+			if not trakt and 'id' in metadata and 'trakt' in metadata['id']: trakt = metadata['id']['trakt']
+			if not slug and 'id' in metadata and 'slug' in metadata['id']: slug = metadata['id']['slug']
+
+			if not title and media == Media.TypeSet and 'collection' in metadata and 'title' in metadata['collection']: title = metadata['collection']['title']
+			if not title and 'tvshowtitle' in metadata: title = metadata['tvshowtitle']
+			if not title and 'title' in metadata: title = metadata['title']
+			if not year and 'year' in metadata: year = metadata['year']
+
+			if season is None and 'season' in metadata: season = metadata['season']
+			if episode is None and 'episode' in metadata: episode = metadata['episode']
+
+		if media == Media.TypeShow:
+			episode = None
+			season = None
+		elif media == Media.TypeSeason:
+			episode = None
+
+		return {
+			'media' : media,
+			'imdb' : imdb,
+			'tmdb' : tmdb,
+			'tvdb' : tvdb,
+			'trakt' : trakt,
+			'slug' : slug,
+			'title' : title,
+			'year' : year,
+			'season' : season,
+			'episode' : episode,
+		}
+
+	@classmethod
+	def qr(self, type = None, media = None, id = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, query = None, search = False, test = False, fallback = False, loader = True, notification = True, overlay = True, wait = False):
+		from lib.modules.interface import Dialog, Translation, Format, Loader
+		from lib.modules.window import WindowQr
+		if loader: Loader.show()
+
+		data = self._extract(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata)
+
+		if data['media'] == Media.TypeSet:
+			types = [
+				{'type' : Link.TypeTmdb,		'name' : 33508,	'condition' : bool(data['tmdb'])},
+				{'type' : Link.TypeGoogle,		'name' : 36414,	'condition' : bool(data['title'])},
+				{'type' : Link.TypeDuckduckgo,	'name' : 36487,	'condition' : bool(data['title'])},
+			]
+		else:
+			types = [
+				{'type' : Link.TypeTrakt,		'name' : 32315,	'condition' : bool(data['trakt'] or data['slug'] or data['title'])},
+				{'type' : Link.TypeImdb,		'name' : 32034,	'condition' : bool(data['imdb'] or data['title'])},
+				{'type' : Link.TypeTmdb,		'name' : 33508,	'condition' : bool(data['tmdb'] or data['title'])},
+				{'type' : Link.TypeTvdb,		'name' : 35668,	'condition' : bool(data['tvdb'] or data['title'])},
+
+				{'type' : Link.TypeSimkl,		'name' : 36473,	'condition' : bool(data['imdb'] or data['tmdb'] or data['tvdb'] or data['title'])},
+				{'type' : Link.TypeTvmaze,		'name' : 35669,	'condition' : bool(Media.typeTelevision(data['media']) and data['title'])},
+				{'type' : Link.TypeTomatoes,	'name' : 36474,	'condition' : bool(data['title'])},
+				{'type' : Link.TypeMetacritic,	'name' : 35719,	'condition' : bool(data['title'])},
+				{'type' : Link.TypeCommonsense,	'name' : 36475,	'condition' : bool(data['title'])},
+				{'type' : Link.TypeLetterboxd,	'name' : 36476,	'condition' : bool(Media.typeMovie(data['media']) and data['title'])},
+				{'type' : Link.TypeCriticker,	'name' : 36477,	'condition' : bool(data['title'])},
+
+				{'type' : Link.TypeFanart,		'name' : 35260,	'condition' : bool(data['tmdb'] or data['tvdb'] or data['title'])},
+				{'type' : Link.TypeHome,		'name' : 36413,	'condition' : bool((metadata and 'homepage' in metadata and metadata['homepage']) or data['title'])},
+				{'type' : Link.TypeTrailer,		'name' : 35536,	'condition' : bool((metadata and 'trailer' in metadata and metadata['trailer']) or data['title'])},
+				{'type' : Link.TypeGoogle,		'name' : 36414,	'condition' : bool(data['title'])},
+				{'type' : Link.TypeDuckduckgo,	'name' : 36487,	'condition' : bool(data['title'])},
+			]
+		display = [i for i in types if i['condition']]
+
+		if type is None:
+			label = Translation.string(33058)
+			choice = Dialog.select(title = 33381, items = [label % Format.fontBold(i['name']) for i in display])
+			if not(choice is None or choice is False or choice < 0): type = display[choice]['type']
+
+		if type:
+			link = self.link(type = type, media = media, id = id, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+			if link:
+				WindowQr.show(link = link, overlay = overlay, wait = wait)
+				return True
+			else:
+				if notification:
+					message = Translation.string(36478)
+					name = None
+					for i in types:
+						if i['type'] == type:
+							name = i['name']
+							break
+					if name: message = Format.fontBold(name) + ' ' + message
+					Dialog.notification(title = 33381, message = message, icon = Dialog.IconWarning)
+				if fallback:
+					link = self.link(type = Link.TypeGoogle if fallback is True else fallback, media = media, id = id, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+					if link:
+						WindowQr.show(link = link, overlay = overlay, wait = wait)
+						return True
+
+		if loader: Loader.hide()
+		return False
+
+	@classmethod
+	def link(self, type, media = None, id = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, query = None, search = False, test = False):
+		if type == Link.TypeImdb: return self.linkImdb(media = media, id = id, imdb = imdb, title = title, year = year, season = season, metadata = metadata, search = search)
+		elif type == Link.TypeTmdb: return self.linkTmdb(media = media, id = id, tmdb = tmdb, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search)
+		elif type == Link.TypeTvdb: return self.linkTvdb(media = media, id = id, tvdb = tvdb, slug = slug, title = title, year = year, season = season, metadata = metadata, search = search, test = test)
+		elif type == Link.TypeTrakt: return self.linkTrakt(media = media, id = id, imdb = imdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+
+		elif type == Link.TypeSimkl: return self.linkSimkl(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search)
+		elif type == Link.TypeTvmaze: return self.linkTvmaze(media = media, title = title, metadata = metadata, search = search)
+		elif type == Link.TypeTomatoes: return self.linkTomatoes(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+		elif type == Link.TypeMetacritic: return self.linkMetacritic(media = media, title = title, season = season, metadata = metadata, search = search, test = test)
+		elif type == Link.TypeCommonsense: return self.linkCommonsense(media = media, title = title, metadata = metadata, search = search, test = test)
+		elif type == Link.TypeLetterboxd: return self.linkLetterboxd(media = media, title = title, year = year, metadata = metadata, search = search, test = test)
+		elif type == Link.TypeCriticker: return self.linkCriticker(media = media, title = title, year = year, season = season, metadata = metadata, search = search, test = test)
+
+		elif type == Link.TypeFanart: return self.linkFanart(media = media, tmdb = tmdb, tvdb = tvdb, title = title, metadata = metadata, search = search)
+		elif type == Link.TypeHome: return self.linkHome(media = media, title = title, year = year, metadata = metadata, search = search)
+		elif type == Link.TypeTrailer: return self.linkTrailer(media = media, title = title, year = year, metadata = metadata, search = search)
+		elif type == Link.TypeGoogle: return self.linkGoogle(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata, query = query, search = search)
+		elif type == Link.TypeDuckduckgo: return self.linkDuckduckgo(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata, query = query, search = search)
+
+	@classmethod
+	def linkImdb(self, media = None, id = None, imdb = None, title = None, year = None, season = None, metadata = None, search = False):
+		from lib.meta.processors.imdb import MetaImdb
+		return MetaImdb.link(media = media, id = imdb or id, title = title, year = year, season = season, metadata = metadata, search = search)
+
+	@classmethod
+	def linkTmdb(self, media = None, id = None, tmdb = None, title = None, year = None, season = None, episode = None, metadata = None, search = False):
+		from lib.meta.processors.tmdb import MetaTmdb
+		return MetaTmdb.link(media = media, id = tmdb or id, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search)
+
+	@classmethod
+	def linkTvdb(self, media = None, id = None, tvdb = None, slug = None, title = None, year = None, season = None, metadata = None, search = False, test = False):
+		from lib.meta.providers.tvdb import MetaTvdb
+		return MetaTvdb.link(media = media, id = tvdb or id, slug = slug, title = title, year = year, season = season, metadata = metadata, search = search, test = test)
+
+	@classmethod
+	def linkTrakt(self, media = None, id = None, imdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, search = False, test = False):
+		from lib.modules import trakt as Trakt
+		return Trakt.link(media = media, id = trakt or imdb or id, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+
+	@classmethod
+	def linkSimkl(self, media = None, imdb = None, tmdb = None, tvdb = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, search = False):
+		data = self._extract(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata)
+		if data:
+			link = 'https://api.simkl.com/redirect?to=Simkl'
+			if data['media']: link += '&type=' + ('show' if Media.typeTelevision(data['media']) else 'movie')
+			if data['imdb']: link += '&imdb=' + data['imdb']
+			elif data['tmdb']: link += '&tmdb=' + data['tmdb']
+			elif data['tvdb']: link += '&tvdb=' + data['tvdb']
+			elif data['slug']: link += '&traktslug=' + data['slug']
+			else:
+				if data['title']: link += '&title=' + data['title']
+				else: return None
+				if data['year']: link += '&year=' + str(data['year'])
+			if not data['season'] is None: link += '&season=' + str(data['season'])
+			if not data['episode'] is None: link += '&episode=' + str(data['episode'])
+			return link
+		return None
+
+	@classmethod
+	def linkTvmaze(self, media = None, title = None, metadata = None, search = True):
+		data = self._extract(media = media, title = title, metadata = metadata)
+		if data and data['title'] and search: return 'https://tvmaze.com/search?q=' + self._query(query = data['title'], plus = True)
+		return None
+
+	@classmethod
+	def linkTomatoes(self, media = None, title = None, year = None, season = None, episode = None, metadata = None, search = False, test = False):
+		data = self._extract(media = media, title = title, year = year, season = season, metadata = metadata)
+		if data and data['title']:
+			base = 'https://rottentomatoes.com'
+			search = (base + '/search?search=' + self._query(query = data['title'], plus = False)) if search else None
+			slug1 = self._slug(title = data['title'], year = data['year'], separator = '_', symbol = None, lower = True)
+			slug2 = self._slug(title = data['title'], separator = '_', symbol = None, lower = True)
+			if Media.typeTelevision(data['media']):
+				base += '/tv/'
+				if test:
+					link = base + slug1
+					if data['season']: link += '/s%02d' % data['season']
+					if data['episode']: link += '/e%02d' % data['episode']
+					if self._test(link = link): return link
+					elif not slug1 == slug2:
+						link = base + slug2
+						if data['season']: link += '/s%02d' % data['season']
+						if data['episode']: link += '/e%02d' % data['episode']
+						if self._test(link = link): return link
+				else: return base + slug2
+			else:
+				base += '/m/'
+				if test:
+					link = base + slug1
+					if self._test(link = link): return link
+					elif not slug1 == slug2:
+						link = base + slug2
+						if self._test(link = link): return link
+				else: return base + slug2
+			return search
+		return None
+
+	@classmethod
+	def linkMetacritic(self, media = None, title = None, season = None, metadata = None, search = False, test = False):
+		data = self._extract(media = media, title = title, season = season, metadata = metadata)
+		if data and data['title']:
+			link = 'https://metacritic.com'
+			search = (link + '/search/%s/%s/results') if search else None
+			slug = self._slug(title = data['title'], separator = '-', symbol = None, lower = True) # Does not seem to use year.
+			if Media.typeTelevision(data['media']):
+				link += '/tv/' + slug
+				if data['season']: link += '/season-' + str(data['season'])
+				# The episode part contains the episode number + episode title. But even with the title, sometimes Metacritic adds some random number at the end (GoT S08). Not not add the episode number.
+				if not test or self._test(link = link): return link
+				elif search: return search % ('tv', self._query(query = data['title'], plus = False))
+			else:
+				link += '/movie/' + slug
+				if not test or self._test(link = link): return link
+				elif search: return search % ('movie', self._query(query = data['title'], plus = False))
+		return None
+
+	@classmethod
+	def linkCommonsense(self, media = None, title = None, metadata = None, search = False, test = False):
+		data = self._extract(media = media, title = title, metadata = metadata)
+		if data and data['title']:
+			base = 'https://commonsensemedia.org'
+			search = (base + '/search/category/%s/' + self._query(query = data['title'], plus = True)) if search else None
+			slug = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
+			if Media.typeTelevision(data['media']):
+				link = base + '/tv-reviews/' + slug
+				if test:
+					if self._test(link = link): return link
+					elif search: return search % 'tv'
+				else: return link
+			else:
+				link = base + '/movie-reviews/' + slug
+				if test:
+					if self._test(link = link): return link
+					elif search: return search % 'movie'
+				else: return link
+		return None
+
+	@classmethod
+	def linkLetterboxd(self, media = None, title = None, year = None, metadata = None, search = False, test = False):
+		data = self._extract(media = media, title = title, year = year, metadata = metadata)
+		if data and data['title']:
+			base = 'https://letterboxd.com'
+			search = (base + '/search/' + self._query(query = data['title'], plus = True)) if search else None
+			slug1 = self._slug(title = data['title'], year = data['year'], separator = '-', symbol = None, lower = True)
+			slug2 = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
+			if Media.typeTelevision(data['media']):
+				return None # Does not contain shows.
+			else:
+				base += '/film/'
+				if test:
+					link = base + slug1
+					if self._test(link = link): return link
+					elif not slug1 == slug2:
+						link = base + slug2
+						if self._test(link = link): return link
+				else: return base + slug2
+			return search
+		return None
+
+	@classmethod
+	def linkCriticker(self, media = None, title = None, year = None, season = None, metadata = None, search = False, test = False):
+		data = self._extract(media = media, title = title, year = year, season = season, metadata = metadata)
+		if data and data['title']:
+			base = 'https://criticker.com'
+			search = (base + '/?type=films&search=%s' + self._query(query = data['title'], plus = False)) if search else None
+			slug1 = self._slug(title = data['title'], year = data['year'], separator = '-', symbol = None, lower = True)
+			slug2 = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
+			if Media.typeTelevision(data['media']):
+				base += '/tv/'
+				if test:
+					link = base + slug1
+					if data['season']: link += '/episodes/?season=%s' % data['season']
+					if self._test(link = link): return link
+					elif not slug1 == slug2:
+						link = base + slug2
+						if data['season']: link += '/episodes/?season=%s' % data['season']
+						if self._test(link = link): return link
+				else: return base + slug2
+			else:
+				base += '/film/'
+				if test:
+					link = base + slug1
+					if self._test(link = link): return link
+					elif not slug1 == slug2:
+						link = base + slug2
+						if self._test(link = link): return link
+				else: return base + slug2
+			return search
+		return None
+
+	@classmethod
+	def linkFanart(self, media = None, tmdb = None, tvdb = None, title = None, metadata = None, search = False):
+		data = self._extract(media = media, tmdb = tmdb, tvdb = tvdb, title = title, metadata = metadata)
+		if data:
+			link = 'https://fanart.tv'
+			if Media.typeTelevision(data['media']):
+				if data['tvdb']: return link + '/series/' + data['tvdb']
+				elif data['title'] and search: return link + '/?sect=1&s=' + self._query(query = data['title'], plus = False)
+			else:
+				if data['tmdb']: return link + '/movie/' + data['tmdb']
+				elif data['title'] and search: return link + '/?sect=3&s=' + self._query(query = data['title'], plus = False)
+		return None
+
+	@classmethod
+	def linkHome(self, media = None, title = None, year = None, metadata = None, search = False):
+		try: link =  metadata['homepage']
+		except: link = None
+		if not link and search:
+			data = self._extract(media = media, title = title, year = year, metadata = metadata)
+			if data and data['title']:
+				query = data['title']
+				if Media.typeMovie(data['media']) and data['year']: query += ' ' + str(data['year'])
+				query += ' homepage'
+				link = self.linkGoogle(media = data['media'], title = data['title'], year = data['year'], metadata = metadata, query = query, search = search)
+		return link
+
+	@classmethod
+	def linkTrailer(self, media = None, title = None, year = None, metadata = None, search = False):
+		try: link = metadata['trailer']
+		except: link = None
+		if not link and search:
+			data = self._extract(media = media, title = title, year = year, metadata = metadata)
+			if data and data['title']:
+				query = data['title']
+				if Media.typeMovie(data['media']) and data['year']: query += ' ' + str(data['year'])
+				query += ' trailer'
+				link = 'https://youtube.com/results?search_query=' + self._query(query = query, plus = True)
+		return link
+
+	@classmethod
+	def linkGoogle(self, media = None, title = None, year = None, season = None, episode = None, metadata = None, query = None, search = False):
+		if not query:
+			data = self._extract(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata)
+			if data and data['title']:
+				query = [data['title']]
+				if Media.typeTelevision(data['media']):
+					if not data['season'] is None: query.extend(['Season', data['season']])
+					if not data['episode'] is None: query.extend(['Episode', data['episode']])
+				elif data['media'] == Media.TypeSet:
+					if not 'collection' in data['title'].lower(): query.append('Collection')
+				elif Media.typeMovie(data['media']):
+					if data['year']: query.append(data['year'])
+				query = [Converter.unicode(i) for i in query if not i is None]
+			else:
+				return None
 
 		if query:
-			from lib.modules.network import Networker
 			if Tools.isArray(query): query = ' '.join(query)
-			return Google.Link % Networker.linkQuote(data = query, plus = True)
+			return 'https://google.com/search?q=%s' % self._query(query = query, plus = True)
+		return None
+
+	@classmethod
+	def linkDuckduckgo(self, media = None, title = None, year = None, season = None, episode = None, metadata = None, query = None, search = False):
+		if not query:
+			data = self._extract(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata)
+			if data and data['title']:
+				query = [data['title']]
+				if Media.typeTelevision(data['media']):
+					if not data['season'] is None: query.extend(['Season', data['season']])
+					if not data['episode'] is None: query.extend(['Episode', data['episode']])
+				elif data['media'] == Media.TypeSet:
+					if not 'collection' in data['title'].lower(): query.append('Collection')
+				elif Media.typeMovie(data['media']):
+					if data['year']: query.append(data['year'])
+				query = [Converter.unicode(i) for i in query if not i is None]
+			else:
+				return None
+
+		if query:
+			if Tools.isArray(query): query = ' '.join(query)
+			return 'https://duckduckgo.com/?q=%s' % self._query(query = query, plus = True)
 		return None
