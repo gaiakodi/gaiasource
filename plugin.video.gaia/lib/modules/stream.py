@@ -13816,6 +13816,7 @@ class Stream(Serializer):
 	##############################################################################
 
 	ExclusionDuplicate	= 'duplicate'
+	ExclusionRelease	= 'release'
 	ExclusionKeyword	= 'keyword'
 	ExclusionMetadata	= 'metadata'
 	ExclusionFormat		= 'format'
@@ -13838,6 +13839,7 @@ class Stream(Serializer):
 		},
 
 		ExclusionDuplicate	: { LabelShort : 'DUP',	LabelMedium : 'DUPLICATE',		LabelLong : 'Duplicate Link' },
+		ExclusionRelease	: { LabelShort : 'REL',	LabelMedium : 'RELEASE',		LabelLong : 'Invalid Release' },
 		ExclusionKeyword	: { LabelShort : 'KEY',	LabelMedium : 'KEYWORD',		LabelLong : 'Prohibited Keyword' },
 		ExclusionMetadata	: { LabelShort : 'INV',	LabelMedium : 'INVALID',		LabelLong : 'Invalid Metadata' },
 		ExclusionFormat		: { LabelShort : 'FMT',	LabelMedium : 'FORMAT',			LabelLong : 'Incorrect Format' },
@@ -14163,6 +14165,7 @@ class Stream(Serializer):
 				'handle' : None,
 			},
 			'validation' : {
+				'release' : None,
 				'keyword' : None,
 				'format' : None,
 				'fake' : None,
@@ -14174,6 +14177,7 @@ class Stream(Serializer):
 			},
 			'exclusion' : {
 				'duplicate' : None,
+				'release' : None,
 				'keyword' : None,
 				'metadata' : None,
 				'format' : None,
@@ -14343,6 +14347,7 @@ class Stream(Serializer):
 		validateSeason = True,
 		validateEpisode = True,
 		validateLink = True,
+		validateRelease = True,
 		validateKeyword = True,
 		validateFormat = True,
 		validateFake = True,
@@ -14482,6 +14487,7 @@ class Stream(Serializer):
 		segmentList = None,
 
 		exclusionDuplicate = None,
+		exclusionRelease = None,
 		exclusionKeyword = None,
 		exclusionMetadata = None,
 		exclusionFormat = None,
@@ -14642,6 +14648,7 @@ class Stream(Serializer):
 					validateShow = False
 					validateSeason = False
 					validateEpisode = False
+			self.validationReleaseSet(value = validate and validateRelease)
 			self.validationKeywordSet(value = validate and validateKeyword)
 			self.validationFormatSet(value = validate and validateFormat)
 			self.validationFakeSet(value = validate and validateFake)
@@ -14928,6 +14935,7 @@ class Stream(Serializer):
 					if not segmentList is None: self.segmentListSet(segmentList)
 
 					if not exclusionDuplicate is None: self.exclusionDuplicateSet(exclusionDuplicate)
+					if not exclusionRelease is None: self.exclusionReleaseSet(exclusionRelease)
 					if not exclusionKeyword is None: self.exclusionKeywordSet(exclusionKeyword)
 					if not exclusionMetadata is None: self.exclusionMetadataSet(exclusionMetadata)
 					if not exclusionFormat is None: self.exclusionFormatSet(exclusionFormat)
@@ -15471,11 +15479,6 @@ class Stream(Serializer):
 			if not sourcePopularity is None: self.sourcePopularitySet(sourcePopularity)
 			else: self.sourcePopularityCalculate(approval = sourceApproval)
 
-			# Testing if the pack was uploaded after the release of the movie/episode.
-			if self.__releaseValid(data = fileName, media = metaMedia, title = metaTitle, year = metaYear, time = metaTime, pack = metaPack, numberCollection = self.numberCollection(), filePack = self.filePack(), sourceTime = self.sourceTime(time = Stream.TimeNone)) is False:
-				self.debug(reason = 'Invalid Release', link = link, name = fileNameExtra, extra = sourceProvider)
-				return cacheInvalid(id, cache, lock)
-
 			# NB: Check (fileName or not fileNameInexact is True) for file names that are generate below with self.fileNameSet(fileNameInexact, exact = Stream.ExactNo)
 			# Eg: Popcorntime
 			if validate and validateTitle and (fileName or not fileNameInexact is True) and (
@@ -15491,6 +15494,7 @@ class Stream(Serializer):
 			if not segmentList is None: self.segmentListSet(segmentList)
 
 			if not exclusionDuplicate is None: self.exclusionDuplicateSet(exclusionDuplicate)
+			if not exclusionRelease is None: self.exclusionReleaseSet(exclusionRelease)
 			if not exclusionKeyword is None: self.exclusionKeywordSet(exclusionKeyword)
 			if not exclusionMetadata is None: self.exclusionMetadataSet(exclusionMetadata)
 			if not exclusionFormat is None: self.exclusionFormatSet(exclusionFormat)
@@ -16273,11 +16277,11 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
-		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
 		validateEpisode = True,
+		validateRelease = True,
 		validateKeyword = True,
 		validateFormat = True,
 		validateSize = True,
@@ -16326,11 +16330,11 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
-			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
 			validateEpisode = validateEpisode,
+			validateRelease = validateRelease,
 			validateKeyword = validateKeyword,
 			validateFormat = validateFormat,
 			validateSize = validateSize,
@@ -16368,11 +16372,11 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
-		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
 		validateEpisode = True,
+		validateRelease = None,
 		validateKeyword = None,
 		validateFormat = None,
 		validateSize = None,
@@ -16424,11 +16428,11 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
-			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
 			validateEpisode = validateEpisode,
+			validateRelease = self.validationRelease() if validateRelease is None else validateRelease,
 			validateKeyword = self.validationKeyword() if validateKeyword is None else validateKeyword,
 			validateFormat = self.validationFormat() if validateFormat is None else validateFormat,
 			validateSize = self.validationSize() if validateSize is None else validateSize,
@@ -16477,11 +16481,11 @@ class Stream(Serializer):
 
 		validateAdjust,
 		validateTitle,
-		validateRelease,
 		validateYear,
 		validateShow,
 		validateSeason,
 		validateEpisode,
+		validateRelease,
 		validateKeyword,
 		validateFormat,
 		validateSize,
@@ -16529,6 +16533,12 @@ class Stream(Serializer):
 				self.unlock(lock)
 				return False
 
+		# Invalid Release
+		if validateRelease:
+			if not self.__releaseValid(data = data, media = media, title = title, year = year, time = time, pack = pack, numberCollection = numberCollection, filePack = filePack, sourceTime = sourceTime):
+				self.unlock(lock)
+				return False
+
 		# Title Keywords
 		if validateKeyword and self.__titleProhibited(data = data, title = title, special = self.metaSpecial(season = season, episode = episode)):
 			self.unlock(lock)
@@ -16549,12 +16559,6 @@ class Stream(Serializer):
 		# Year
 		if validateYear:
 			if self.__yearValid(year = year, data = data, pack = filePack, deviation = deviation) is False:
-				self.unlock(lock)
-				return False
-
-		# Release
-		if validateRelease:
-			if not self.__releaseValid(data = data, media = media, title = title, year = year, time = time, pack = pack, numberCollection = numberCollection, filePack = filePack, sourceTime = sourceTime):
 				self.unlock(lock)
 				return False
 
@@ -16587,7 +16591,6 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
-		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16611,11 +16614,11 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
-			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
 			validateEpisode = validateEpisode,
+			validateRelease = False,
 			validateKeyword = False,
 			validateFormat = False,
 			validateSize = False,
@@ -16641,7 +16644,6 @@ class Stream(Serializer):
 
 		validateAdjust = None,
 		validateTitle = True,
-		validateRelease = True,
 		validateYear = True,
 		validateShow = True,
 		validateSeason = True,
@@ -16664,11 +16666,11 @@ class Stream(Serializer):
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
-			validateRelease = validateRelease,
 			validateYear = validateYear,
 			validateShow = validateShow,
 			validateSeason = validateSeason,
 			validateEpisode = validateEpisode,
+			validateRelease = False,
 			validateKeyword = False,
 			validateFormat = False,
 			validateSize = False,
@@ -26906,6 +26908,28 @@ class Stream(Serializer):
 		self.mData['stream']['link'] = value
 
 	##############################################################################
+	# VALIDATION RELEASE
+	##############################################################################
+
+	'''
+		FUNCTION:
+			Whether or not the release should be validated.
+		RETURNS:
+			The validation (boolean).
+	'''
+	def validationRelease(self):
+		return self.mData['validation']['release']
+
+	'''
+		FUNCTION:
+			Sets whether or not the release should be validated.
+		PARAMETERS:
+			value (boolean): The validation.
+	'''
+	def validationReleaseSet(self, value = True):
+		self.mData['validation']['release'] = value
+
+	##############################################################################
 	# VALIDATION KEYWORD
 	##############################################################################
 
@@ -27092,7 +27116,7 @@ class Stream(Serializer):
 			The exclusion (boolean).
 	'''
 	def exclusion(self):
-		return self.exclusionDuplicate() or self.exclusionKeyword() or self.exclusionMetadata() or self.exclusionFormat() or self.exclusionFake() or self.exclusionSupport() or self.exclusionBlocked() or self.exclusionCaptcha() or self.exclusionPrecheckInaccessible()
+		return self.exclusionDuplicate() or self.exclusionRelease() or self.exclusionKeyword() or self.exclusionMetadata() or self.exclusionFormat() or self.exclusionFake() or self.exclusionSupport() or self.exclusionBlocked() or self.exclusionCaptcha() or self.exclusionPrecheckInaccessible()
 
 	'''
 		FUNCTION:
@@ -27124,6 +27148,7 @@ class Stream(Serializer):
 			Update exclusion values, except duplicates and precheck (which have to be done manually at the end).
 	'''
 	def exclusionUpdate(self):
+		self.exclusionReleaseUpdate()
 		self.exclusionKeywordUpdate()
 		self.exclusionMetadataUpdate()
 		self.exclusionFormatUpdate()
@@ -27193,6 +27218,79 @@ class Stream(Serializer):
 	'''
 	@classmethod
 	def exclusionDuplicateColor(self):
+		return interface.Format.colorPoor()
+
+	##############################################################################
+	# EXCLUSION RELEASE
+	##############################################################################
+
+	'''
+		FUNCTION:
+			Checks if the stream is excluded because it has invalid release attributes.
+		PARAMETERS:
+			format (string): The format of the returned value.
+			label (string): The type or unit label to use.
+			default (various): The default value to return if the attribute is not set.
+		RETURNS:
+			The release exclusion (boolean/string).
+	'''
+	def exclusionRelease(self, format = FormatNone, label = LabelNone, default = None):
+		value = self.mData['exclusion']['release']
+		if value is None: return default
+		if not format == Stream.FormatNone or not label == Stream.LabelNone:
+			if not value: return default
+			if self.settingsFilters('exclusion', 'release') == Manager.ExclusionInclude: return default
+			label = self.settingsLayout(label, 'exclusion', 'release')
+			value = self._label(value = Stream.ExclusionRelease, values = Stream.LabelExclusion, format = format, label = label)
+			value = self._decorate(value = value, format = format, bold = True, color = self.exclusionReleaseColor)
+		return value
+
+	'''
+		FUNCTION:
+			Sets whether or not this stream is release excluded.
+		PARAMETERS:
+			value (boolean): The release status.
+	'''
+	def exclusionReleaseSet(self, value = True):
+		self.mData['exclusion']['release'] = value
+
+	'''
+		FUNCTION:
+			Checks whether or not the release exclusion has been set yet.
+		RETURNS:
+			If the release exclusion has been set (boolean).
+	'''
+	def exclusionReleaseHas(self):
+		return not self.mData['exclusion']['release'] is None
+
+	'''
+		FUNCTION:
+			Calculate if the stream is release excluded.
+	'''
+	def exclusionReleaseUpdate(self):
+		try:
+			# NB: Check the release as an exclusion.
+			# Do not check the release in load() already.
+			# Because many providers do not have a sourceTime.
+			# Only during duplicate filtering, are the attributes from different providers combined.
+			# Only then will the sourceTime be available to check.
+
+			release = False
+
+			if self.validationRelease() and not self.releaseValid(): release = True
+
+			self.exclusionReleaseSet(value = release)
+			if release: self.debug(reason = 'Invalid Release', link = self.linkPrimary(), name = self.fileName(), extra = self.sourceTime())
+		except: tools.Logger.error()
+
+	'''
+		FUNCTION:
+			Retrieve the color for the release exclusion.
+		RETURNS:
+			The release color (string).
+	'''
+	@classmethod
+	def exclusionReleaseColor(self):
 		return interface.Format.colorPoor()
 
 	##############################################################################
@@ -28769,6 +28867,7 @@ class Stream(Serializer):
 			self.exclusionMetadata(label = label, format = format),
 			self.exclusionBlocked(label = label, format = format),
 			self.exclusionFake(label = label, format = format),
+			self.exclusionRelease(label = label, format = format),
 			self.exclusionKeyword(label = label, format = format),
 			self.exclusionDuplicate(label = label, format = format),
 			self.exclusionCaptcha(label = label, format = format),
@@ -28818,6 +28917,7 @@ class Stream(Serializer):
 			self.exclusionMetadata(label = label, format = format),
 			self.exclusionBlocked(label = label, format = format),
 			self.exclusionFake(label = label, format = format),
+			self.exclusionRelease(label = label, format = format),
 			self.exclusionKeyword(label = label, format = format),
 			self.exclusionDuplicate(label = label, format = format),
 			self.exclusionCaptcha(label = label, format = format),
@@ -28864,20 +28964,21 @@ class Stream(Serializer):
 			self.fileContainer(label = label, format = format)
 		], format = format, fill = False)
 
-	def labelExclusion(self, format_ = True, support = True, metadata = True, blocked = True, fake = True, keyword = True, duplicate = True, captcha = True, precheck = True, format = FormatDecorate, label = LabelSettings):
+	def labelExclusion(self, format_ = True, support = True, metadata = True, blocked = True, fake = True, release = True, keyword = True, duplicate = True, captcha = True, precheck = True, format = FormatDecorate, label = LabelSettings):
 		return self._labelProcess([
 			self.exclusionFormat(label = label, format = format) if format_ else None,
 			self.exclusionSupport(label = label, format = format) if support else None,
 			self.exclusionMetadata(label = label, format = format) if valid else None,
 			self.exclusionBlocked(label = label, format = format) if blocked else None,
 			self.exclusionFake(label = label, format = format) if fake else None,
+			self.exclusionRelease(label = label, format = format) if release else None,
 			self.exclusionKeyword(label = label, format = format) if keyword else None,
 			self.exclusionDuplicate(label = label, format = format) if duplicate else None,
 			self.exclusionCaptcha(label = label, format = format) if captcha else None,
 			self.exclusionPrecheck(label = label, format = format) if precheck else None,
 		], format = format)
 
-	def labelSource(self, origin = True, provider = True, publisher = True, hoster = True, exclusion = True, format_ = True, support = True, metadata = True, blocked = True, fake = True, keyword = True, duplicate = True, captcha = True, precheck = True, extra = None, format = FormatDecorate, label = LabelSettings):
+	def labelSource(self, origin = True, provider = True, publisher = True, hoster = True, exclusion = True, format_ = True, support = True, metadata = True, blocked = True, fake = True, release = True, keyword = True, duplicate = True, captcha = True, precheck = True, extra = None, format = FormatDecorate, label = LabelSettings):
 		return self._labelProcess([
 			extra if extra else None,
 			self.sourceOrigin(label = label, format = format, orion = True),
@@ -28890,6 +28991,7 @@ class Stream(Serializer):
 			self.exclusionMetadata(label = label, format = format) if not extra is None and exclusion and metadata else None,
 			self.exclusionBlocked(label = label, format = format) if not extra is None and exclusion and blocked else None,
 			self.exclusionFake(label = label, format = format) if not extra is None and exclusion and fake else None,
+			self.exclusionRelease(label = label, format = format) if not extra is None and exclusion and release else None,
 			self.exclusionKeyword(label = label, format = format) if not extra is None and exclusion and keyword else None,
 			self.exclusionDuplicate(label = label, format = format) if not extra is None and exclusion and duplicate else None,
 			self.exclusionCaptcha(label = label, format = format) if not extra is None and exclusion and captcha else None,
@@ -29672,6 +29774,7 @@ class Manager(object):
 	AttributeCost		= 'cost'
 	AttributeUsage		= 'usage'
 	AttributeDuplicate	= 'duplicate'
+	AttributeRelease	= 'release'
 	AttributeKeyword	= 'keyword'
 	AttributeMetadata	= 'metadata'
 	AttributeFormat		= 'format'
@@ -29738,6 +29841,7 @@ class Manager(object):
 			},
 			Manager.CategoryExclusion : {
 				Manager.AttributeDuplicate : enabledExclusion,
+				Manager.AttributeRelease : enabledExclusion,
 				Manager.AttributeKeyword : enabledExclusion,
 				Manager.AttributeMetadata : enabledExclusion,
 				Manager.AttributeFormat : enabledExclusion,
@@ -30099,6 +30203,23 @@ class Manager(object):
 						Manager.AttributeDuplicate : {
 							'title' : 35450,
 							'help' : 34362,
+							'level' : 3,
+							'filter' : {
+								'enabled'	: True,
+								'type'		: Manager.OptionExclusion,
+								'default'	: {'value' : Manager.ExclusionExclude},
+							},
+							'sort' : {
+								'enabled'	: False,
+							},
+							'layout' : {
+								'enabled'	: True,
+								'default'	: {'value' : Stream.LabelMedium},
+							},
+						},
+						Manager.AttributeRelease : {
+							'title' : 33312,
+							'help' : 34105,
 							'level' : 3,
 							'filter' : {
 								'enabled'	: True,
@@ -31680,6 +31801,7 @@ class Manager(object):
 			'final' : None,
 
 			Manager.AttributeDuplicate : None,
+			Manager.AttributeRelease : None,
 			Manager.AttributeKeyword : None,
 			Manager.AttributeMetadata : None,
 			Manager.AttributeFormat : None,
@@ -31700,6 +31822,10 @@ class Manager(object):
 			if self.excludeDuplicate():
 				items = [item for item in items if not item['stream'].exclusionDuplicate()]
 				count[Manager.AttributeDuplicate] = len(items)
+
+			if self.excludeRelease(): # NB: Must be after duplicate filtering, since it uses the combined stream metadata.
+				items = [item for item in items if not item['stream'].exclusionRelease()]
+				count[Manager.AttributeRelease] = len(items)
 
 			if self.excludeKeyword():
 				items = [item for item in items if not item['stream'].exclusionKeyword()]
@@ -32343,6 +32469,9 @@ class Manager(object):
 
 	def excludeDuplicate(self):
 		return self.data(category = Settings.CategoryExclusion, attribute = Settings.AttributeDuplicate) == Settings.ExclusionExclude
+
+	def excludeRelease(self):
+		return self.data(category = Settings.CategoryExclusion, attribute = Settings.AttributeRelease) == Settings.ExclusionExclude
 
 	def excludeKeyword(self):
 		return self.data(category = Settings.CategoryExclusion, attribute = Settings.AttributeKeyword) == Settings.ExclusionExclude

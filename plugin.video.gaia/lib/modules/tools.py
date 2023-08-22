@@ -5504,10 +5504,19 @@ class System(object):
 
 			#gaiaremove
 			if version['old']['number'] <= self.versionNumber(version = '6.3.11') and version['new']['number'] >= self.versionNumber(version = '6.3.12'):
-				from lib.providers.core.manager import Manager
-				database = Manager._database(database = Manager.DatabaseProviders)
-				database._close()
-				database._deleteFile()
+				try:
+					from lib.providers.core.manager import Manager
+					database = Manager._database(database = Manager.DatabaseProviders)
+					database._close()
+					database._deleteFile()
+				except: Logger.error()
+
+			#gaiaremove
+			if version['old']['number'] <= self.versionNumber(version = '6.4.2') and version['new']['number'] >= self.versionNumber(version = '6.4.3'):
+				try:
+					from lib.providers.core.manager import Manager
+					Manager.streamsDatabaseClear()
+				except: Logger.error()
 
 		_launchProgress(4) # 25%
 

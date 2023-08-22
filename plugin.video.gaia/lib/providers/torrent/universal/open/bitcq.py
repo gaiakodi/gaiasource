@@ -46,7 +46,6 @@ class Provider(ProviderHtml):
 			description				= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has some missing trivial metadata.',
 			rank					= 3,
 			performance				= ProviderHtml.PerformanceGood,
-			status					= ProviderHtml.StatusDead, # Domain unreachable.
 
 			link					= Provider._Link,
 

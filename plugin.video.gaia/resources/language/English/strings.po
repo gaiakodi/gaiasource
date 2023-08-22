@@ -1887,7 +1887,7 @@ msgid "Update Monitor"
 msgstr ""
 
 msgctxt "#33312"
-msgid "[GAIAREMOVE]"
+msgid "Invalid Release"
 msgstr ""
 
 msgctxt "#33313"
@@ -5059,7 +5059,7 @@ msgid "Settings related to third party services that unlock premium scraping and
 msgstr ""
 
 msgctxt "#34105"
-msgid "[GAIAREMOVE]"
+msgid "Filter out invalid releases based on the publication date, file pack status, and other attributes. [I]Include[/I]  or [I]Exclude[/I]  the streams from the results, or include them and add an identifying [I]Label[/I]."
 msgstr ""
 
 msgctxt "#34106"

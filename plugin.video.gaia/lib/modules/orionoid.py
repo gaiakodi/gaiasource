@@ -669,6 +669,10 @@ try:
 				if not stream.exclusionDuplicateHas(): return True # The stream was not completely processed (eg: scrape cancled).
 				if stream.exclusionDuplicate() is True: return True
 
+				# Release exclusions
+				if not stream.exclusionReleaseHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if stream.exclusionRelease(): return True
+
 				# Keyword exclusions
 				if not stream.exclusionKeywordHas(): return True # The stream was not completely processed (eg: scrape cancled).
 				if stream.exclusionKeyword(): return True

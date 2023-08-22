@@ -1,4 +1,8 @@
 
+[B]6.4.3 (2023.08.22)[/B]
+- Re-enabled BitCQ torrent provider.
+- Moved release validation to exclusions.
+
 [B]6.4.2 (2023.08.22)[/B]
 - Fixed color mixing.
 - Added sound effect delay.
