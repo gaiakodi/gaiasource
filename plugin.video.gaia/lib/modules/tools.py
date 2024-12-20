@@ -698,8 +698,8 @@ class Tools(object):
 				return data.pop(random.randint(0, len(data) - 1))
 		else:
 			# If the weight total is 0, choices() throws an exception.
-			# ValueError: Total of weights must be greater than zero
-			if not weights or sum(weights) == 0: weights = None
+			# ValueError: Total of weights must be greater than zero.
+			if not weights is None and sum(weights) == 0: return random.choices(data, k = count)
 
 			if count > 1 or weights: return random.choices(data, k = count, weights = weights)
 			else: return random.choice(data)
@@ -6848,11 +6848,14 @@ class Settings(object):
 			data = File.readNow(File.joinPath(System.path(), 'addon.xml'))
 			check = Regex.extract(data = data, expression = '<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', group = 1) == 'true'
 
-		interpreter = Settings.InterpreterDisabled
+		interpreter = Settings.InterpreterStandard
 		if check:
 			setting = self.getString(id = 'general.performance.interpreter')
-			if setting == Translation.string(36091): interpreter = Settings.InterpreterStandard
-			elif setting == Translation.string(36170): interpreter = Settings.InterpreterExtreme
+			# When default, returns "$ADDON[plugin.video.gaia 36091]".
+			if setting:
+				if '36091' in setting or Translation.string(36091) in setting: interpreter = Settings.InterpreterStandard
+				elif '36170' in setting or Translation.string(36170) in setting: interpreter = Settings.InterpreterExtreme
+				else: interpreter = Settings.InterpreterDisabled
 
 		if label:
 			if interpreter == Settings.InterpreterStandard: label = Translation.string(36091)

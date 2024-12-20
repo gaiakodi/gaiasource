@@ -633,37 +633,43 @@ class MetaCache(Database):
 		return ids
 
 	def _memoryCopy(self, type, item):
-		# Important to copy here when called from select(), since the returned dict can be updated.
+		# NB: If item is None, it probably means the compression algorithm used for the local metadata.db is different to the one currently used for decompression.
+		# Eg: the user imported and old database, but the new system uses different compression algorithm, or has differnt benchmarks for the algorithms.
+		# This should not happen.
+		#if not item is None:
+		if True:
 
-		# NB: This DEEP copy can be very slow, and ends up defeating the purpose of "faster" memory access.
-		# This can take 100-200 ms for an episode list with 20+ episodes, and even longer if there are 100s of episodes in the season.
-		# When loading the episode Progress menu, mutiple episode lists have to be loaded for each entry, and if many have 20+ episodes, it can cause a multiple-second delay in the menu loading.
-		# Not sure if a deep copy is really necessary for some code?
-		# Instead, do a semi-deep-shallow copy. Aka only copy the outer dict structure, the seasons/episodes outer list structure and the outer dict for each of the season/episode in the list.
-		# Also deep-copy the "number" dict which is edited later on, and if not copied, causes issues when the same episode is retrieved during the same execution with different number types, eg: Core._scrapeNumber().
-		# The semi-deep-shallow copy only takes 2-5ms, even for 20+ episodes.
-		# NB: We might need to add additional nested attributes to deep-copy if we at some point discover bugs with edited dicts.
-		#item = Tools.copy(item)
+			# Important to copy here when called from select(), since the returned dict can be updated.
 
-		# Do not do this for packs, since they should not change between calls, and can take very long to copy (eg: One Piece 150-250ms).
-		if not type == MetaCache.TypePack:
-			item = Tools.copy(item, deep = False)
+			# NB: This DEEP copy can be very slow, and ends up defeating the purpose of "faster" memory access.
+			# This can take 100-200 ms for an episode list with 20+ episodes, and even longer if there are 100s of episodes in the season.
+			# When loading the episode Progress menu, mutiple episode lists have to be loaded for each entry, and if many have 20+ episodes, it can cause a multiple-second delay in the menu loading.
+			# Not sure if a deep copy is really necessary for some code?
+			# Instead, do a semi-deep-shallow copy. Aka only copy the outer dict structure, the seasons/episodes outer list structure and the outer dict for each of the season/episode in the list.
+			# Also deep-copy the "number" dict which is edited later on, and if not copied, causes issues when the same episode is retrieved during the same execution with different number types, eg: Core._scrapeNumber().
+			# The semi-deep-shallow copy only takes 2-5ms, even for 20+ episodes.
+			# NB: We might need to add additional nested attributes to deep-copy if we at some point discover bugs with edited dicts.
+			#item = Tools.copy(item)
 
-			if type == MetaCache.TypeSeason or type == MetaCache.TypeEpisode:
-				lookup = 'seasons' if type == MetaCache.TypeSeason else 'episodes'
-				values = item.get(lookup)
-				if values:
-					temp = []
-					for i in values:
-						value = Tools.copy(i, deep = False)
+			# Do not do this for packs, since they should not change between calls, and can take very long to copy (eg: One Piece 150-250ms).
+			if not type == MetaCache.TypePack:
+				item = Tools.copy(item, deep = False)
 
-						# Important to copy, since we update the dictionary, and its internal lists.
-						# Otherwise the same episode lookup, but with different number types might cause inconsistencies with the nested "number" dictionary.
-						number = i.get('number')
-						if number: value['number'] = Tools.copy(number, deep = True) # Deep copy.
+				if type == MetaCache.TypeSeason or type == MetaCache.TypeEpisode:
+					lookup = 'seasons' if type == MetaCache.TypeSeason else 'episodes'
+					values = item.get(lookup)
+					if values:
+						temp = []
+						for i in values:
+							value = Tools.copy(i, deep = False)
 
-						temp.append(value)
-					item[lookup] = temp
+							# Important to copy, since we update the dictionary, and its internal lists.
+							# Otherwise the same episode lookup, but with different number types might cause inconsistencies with the nested "number" dictionary.
+							number = i.get('number')
+							if number: value['number'] = Tools.copy(number, deep = True) # Deep copy.
+
+							temp.append(value)
+						item[lookup] = temp
 
 		return item
 

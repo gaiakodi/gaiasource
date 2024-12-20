@@ -863,7 +863,11 @@ class MetaMenu(object):
 
 			if load == MetaMenu.LoadSilent:
 				Loader.hide()
-			elif not items and not items is False and not exception: # Check False for cancelled search dialog, season extras, or history streams.
+			elif not items and (not items is False or parameters.get(MetaMenu.ParameterContent) == MetaMenu.ContentSearch) and not exception:
+				# Important if there are no items and reuselanguageinvoker is enabled.
+				# Otherwise if an empty menu is opened, not subsequent menu loads anymore.
+				# Check False for cancelled search dialog, season extras, or history streams.
+				# Update: Also do if search dialog is cancelled.
 				self._empty(content = parameters.get(MetaMenu.ParameterContent))
 			elif load == MetaMenu.LoadRefresh:
 				# Check Context commandRefreshList() for more info.
