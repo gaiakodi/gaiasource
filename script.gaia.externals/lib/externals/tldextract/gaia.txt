@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://pypi.org/project/tldextract/#files
-Current Version:	3.1.0 (2021-02-23)
+Current Version:		5.1.2 (2024-11-29)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -17,5 +17,11 @@ Change cache.py -> get_cache_dir() to use the temp Kodi directory.
 The default .cache directory works fine on Linux and Windows, but throws the error below with Android (Nvidia Shield), probably because lacking write permissions.
 
 (ERROR) [.kodi/addons/plugin.video.gaia/lib/modules/network.py, 411, linkDomain]: Timeout -> ['Traceback (most recent call last):\n', '  File ".kodi/addons/plugin.video.gaia/lib/modules/network.py", line 411, in linkDomain\n    parts = self.moduleTldExtract().extract(link)\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/tldextract/tldextract.py", line 296, in extract\n    return TLD_EXTRACTOR(url, include_psl_private_domains=include_psl_private_domains)\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/tldextract/tldextract.py", line 229, in __call__\n    suffix_index = self._get_tld_extractor().suffix_index(\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/tldextract/tldextract.py", line 270, in _get_tld_extractor\n    public_tlds, private_tlds = get_suffix_lists(\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/tldextract/suffix_list.py", line 55, in get_suffix_lists\n    return cache.run_and_cache(\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/tldextract/cache.py", line 182, in run_and_cache\n    with FileLock(lock_path, timeout=self.lock_timeout):\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/filelock/__init__.py", line 323, in __enter__\n    self.acquire()\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/filelock/__init__.py", line 278, in acquire\n    raise Timeout(self._lock_file)\n', "externals.filelock.Timeout: The file lock '.cache/python-tldextract/3.8.5.final__python3.8__4680be__tldextract-dev/publicsuffix.org-tlds/de84b5ca2167d4c83e38fb162f2e8738.tldextract.json.lock' could not be acquired.\n"]
+
+#########################################################################################################################
+
+Add "update" to the import in __init__.py to allow manual updates of the cache from Gaia.
+
+In cache.py -> def clear() -> update, since there is a bug where it does not scan subfolders.
 
 #########################################################################################################################

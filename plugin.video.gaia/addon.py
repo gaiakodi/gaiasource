@@ -18,6 +18,534 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+'''
+	###################################################################################################################
+	# FOR THIRD-PARTY DEVELOPERS
+	###################################################################################################################
+
+		If you want to call Gaia from your addon or widget, use one of the following endpoints:
+			1. menu:	Load a variety of different menus.
+			2. search:	Search for a title using a query.
+			3. scrape:	Scrape a specific title for links.
+			4. play:	Play a link from a scraped title.
+
+		COMMAND URI:
+
+			plugin://plugin.video.gaia/?action=...&param1=...&param2=...&param3=...
+
+		PYTHON:
+
+			import xbmc
+			xbmc.executebuiltin("RunPlugin(plugin://plugin.video.gaia/?action=...&param1=...&param2=...&param3=...)")
+
+	###################################################################################################################
+	# MENU
+	###################################################################################################################
+
+		Open any of the menus or submenus in Gaia.
+		This can also be used to load menus and lists inside Kodi skin widgets.
+
+		PARAMETERS:
+
+			- action:		Specify the action, in this case loading a menu.
+				Required:	Yes
+				Type:		String
+				Example:	action=menu
+				Values:		menu
+			- menu:			Specify the menu type.
+				Required:	Yes
+				Type:		String
+				Example:	menu=media
+				Values:		media (movie and show menus)
+							folder (directory menus)
+							person (people menus)
+							extra (season extra menus)
+							tool (tools menus)
+			- content:		Specify the content loaded into the menu.
+				Required:	Yes (media menus), No (other menus)
+				Type:		String
+				Example:	content=discover
+				Values:		discover (discover content based on parameters)
+							search (search for content using a query)
+							quick (the Quick menu)
+							progress (the Progress menu)
+							history (the History menu)
+							arrival (the Arrivals menu)
+							set (the Sets menu)
+							list (the Lists menu)
+							person (the People menu)
+							season (the season menus under shows)
+							episode (the episode menus under seasons)
+			- media:		Specify the media type if "menu=media". If no media is provided, "mixed" is assumed.
+				Required:	Yes (media menus), No (other menus)
+				Type:		String
+				Example:	media=movie
+				Values:		movie (movie menus)
+							show (show menus)
+							season (season menus)
+							episode (episode menus)
+							mixed (mixed movie and show menus, where supported)
+			- niche:		Specify the niche to narrow down the content.
+				Required:	No
+				Type:		String, List
+				Example:	niche=mini | niche=anime-best
+				Values:		feature (full-length feature movies)
+							short (short films or shows)
+							special (TV specials)
+							multi (muti-season shows)
+							mini (single-season mini-series)
+							anima (animation of all types)
+							anime (Japanese animation)
+							donghua (Chinese animation)
+							docu (documentaries)
+							family (family and children)
+							all (all releases)
+							new (new releases, typically sorted descending by release date)
+							home (home releases, typically sorted descending by release date)
+							best (best rated titles, typically sorted descending by rating)
+							worst (worst rated titles, typically sorted ascending by rating)
+							prestige (high quality releases, typically filtered by a minimum rating and minimum number of votes)
+							popular (most popular titles, typically sorted descending by number of watches or votes)
+							unpopular (least popular titles, typically sorted ascending by number of watches or votes)
+							viewed (widely viewed titles, typically filtered by a minimum number of votes)
+							gross (highest grossing box office hits, typically sorted descending by gross income)
+							award (award winners)
+							trend (currently trending titles, typically filtered/sorted by current temporary trendiness or popularity)
+							- A full list of values is available under lib/modules/tools.py/class Media
+			- page:			Specify the page number.
+				Required:	No
+				Type:		Integer
+				Example:	page=2
+				Values:		[1,infinity]
+			- limit:		Specify the number of titles to list per page. This should generally not be used, as the value is determined by the addon settings and the capability of the provider. Stick to a limit of 100 or lower.
+				Required:	No
+				Type:		Integer
+				Example:	limit=20
+				Values:		[1,250]
+			- provider:		Specify the metadata provider to use for the menu. This should generally not be used, as the best possible provider is determined based on the other parameters.
+				Required:	No
+				Type:		String
+				Example:	provider=trakt
+				Values:		trakt (load the menu using Trakt)
+							imdb (load the menu using IMDb)
+							tmdb (load the menu using TMDb)
+			- id:			Specify a provider ID to load season and episode menus. One or more IDs can be passed.
+				Required:	Yes (season and episode menus), No (other menus)
+				Type:		String
+				Example:	trakt=123456 | imdb=tt123456 | trakt=123456&imdb=tt123456
+				Values:		trakt=<id> (using a Trakt ID)
+							imdb=<id> (using an IMDb ID)
+							tmdb=<id> (using a TMDb ID)
+							tvdb=<id> (using a TVDb ID)
+			- title:		Specify the title. It is highly recommended to use one of the Trakt/IMDb/TMDb/TVDb IDs, since they are faster and more accurate. If the ID is not known, a title, and preferably a year, can be used instead.
+				Required:	No
+				Type:		String
+				Example:	title=Some%20Title
+				Values:		Any title.
+			- year:			Specify the year. This narrows down a search or discovery to a specific year.
+				Required:	No
+				Type:		Integer, Range
+				Example:	year=2010 | year=2015,2018
+				Values:		Any year.
+			- season:		Specify the season number for episode menus.
+				Required:	Yes (episode menus), No (other menus)
+				Type:		Integer
+				Example:	season=2
+				Values:		[0,infinity]
+			- query:		Specify the search query when "content=search". If no query is provided, an input dialog will be shown.
+				Required:	No
+				Type:		String
+				Example:	query=some%20title
+				Values:		Any search string
+			- keyword:		Specify additional keywords to narrow down the discovery or search. Only supported by some providers.
+				Required:	No
+				Type:		String, List
+				Example:	keyword=happy
+				Values:		Any keywords
+			- keyword:		Specify additional keywords to narrow down the discovery or search. Only supported by some providers.
+				Required:	No
+				Type:		String, List
+				Example:	keyword=happy
+				Values:		Any keywords
+			- release:		Specify the release type.
+				Required:	No
+				Type:		String
+				Example:	release=home
+				Values:		new (new releases for movies and shows)
+							home (home, digital, and physical releases for movies)
+							future (future releases for movies and shows)
+			- date:			Specify a date to narrow down the results.
+				Required:	No
+				Type:		Integer (timestamp), String (YYYY-MM-DD), Range
+				Example:	date=1732540312 | date=2010-05-20 | date=1732040312,1732540312 | date=2010-05-20,2010-06-10
+				Values:		Any timestamp or date string.
+			- duration:		Specify the runtime to narrow down the results.
+				Required:	No
+				Type:		Integer (minimum seconds), Range (minimum to maximum)
+				Example:	duration=1800 | duration=1500,3000
+				Values:		Any duration in seconds
+			- genre:		Specify the genre to narrow down the results.
+				Required:	No
+				Type:		String, List
+				Example:	genre=action | genre=action,thriller
+				Values:		Any support genre. Values are ANDed or ORed together, depending on the provider.
+							- A full list of values is available under lib/meta/tools.py/class MetaTools
+			- language:		Specify the language to narrow down the results.
+				Required:	No
+				Type:		String, List
+				Example:	genre=en | genre=en,fr
+				Values:		Any support language in as ISO-639-1 codes. Values are ANDed or ORed together, depending on the provider.
+							- A full list of values is available under lib/modules/tools.py/class Language
+			- country:		Specify the country to narrow down the results.
+				Required:	No
+				Type:		String, List
+				Example:	genre=us | genre=us,fr
+				Values:		Any support language in as ISO Alpha-2 codes. Values are ANDed or ORed together, depending on the provider.
+							- A full list of values is available under lib/modules/tools.py/class Country
+			- certificate:	Specify the audience certificate to narrow down the results.
+				Required:	No
+				Type:		String
+				Example:	certificate=pg13 | certificate=tvpg
+				Values:		Any support certificate. Currently only MPAA certificates are fully supported
+							nr, g, pg, pg13, r, nc17 (movies)
+							nr, tvg, tvy, tvy7, tvpg, tv13, tv14, tvma (shows)
+							- A full list of values is available under lib/modules/tools.py/class Audience
+			- company:		Specify the company (studio or network) to narrow down the results. This uses one of the main supported company identifiers.
+				Required:	No
+				Type:		String
+				Example:	company=netflix
+				Values:		Any support company.
+							- A full list of values is available under lib/meta/tools.py/class MetaTools
+			- studio:		Specify the studio to narrow down the results. This is similar to "company", but instead uses a Trakt or IMDb studio ID.
+				Required:	No
+				Type:		String
+				Example:	studio=co123456 (IMDb) | studio=123 (Trakt)
+				Values:		Any support studio.
+							- A full list of values is available under lib/meta/providers/imdb.py|trakt.py
+			- network:		Specify the network to narrow down the results. This is similar to "company", but instead uses a Trakt or IMDb network ID.
+				Required:	No
+				Type:		String
+				Example:	network=co123456 (IMDb) | network=123 (Trakt)
+				Values:		Any support network.
+							- A full list of values is available under lib/meta/providers/imdb.py|trakt.py
+			- award:		Specify the won awards to narrow down the results. This only works for IMDb.
+				Required:	No
+				Type:		String
+				Example:	award=academywinner | award=top250
+				Values:		Any support award.
+							- A full list of values is available under lib/meta/tools.py/class MetaTools
+			- gender:		Specify the person's gender for people menus. This only works for IMDb.
+				Required:	No
+				Type:		String
+				Example:	gender=male
+				Values:		male, female, nonbinary, other
+			- rating:		Specify the rating to narrow down the results. Note that the ratings are different between Trakt and IMDb.
+				Required:	No
+				Type:		Decimal, Range
+				Example:	rating=6.5 (minimum) | rating=7.0,8.5 (minimum to maximum)
+				Values:		[0.0, 10.0]
+			- votes:		Specify the number of votes to narrow down the results. Note that the votes are different between Trakt and IMDb.
+				Required:	No
+				Type:		Integer, Range
+				Example:	votes=1000 (minimum) | rating=2000,5000 (minimum to maximum)
+				Values:		[0, infinity]
+
+		EXAMPLES:
+
+			- Main movie menu:
+				plugin://plugin.video.gaia/?action=menu&menu=folder&media=movie
+			- Niche anime show menu:
+				plugin://plugin.video.gaia/?action=menu&menu=folder&media=show&niche=anime
+			- Movie explore menu for best rated:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=discover&media=movie&niche=best
+			- Show genre menu for action:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=discover&media=show&genre=action
+			- Movie arrivals menu:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=arrival&media=movie
+			- Show progress menu:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=progress&media=show
+			- Mixed quick menu:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=quick
+			- Mixed search menu:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=search
+			- Season menu using a title (rather use an ID):
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=season&media=season&title=Silo
+			- Episode menu using IDs:
+				plugin://plugin.video.gaia/?action=menu&menu=media&content=episode&trakt=180770&season=2
+
+	###################################################################################################################
+	# SEARCH
+	###################################################################################################################
+
+		Search for titles using a search query.
+		This is a shorthand version of the menu endpoint "action=menu&menu=media&content=search".
+
+		PARAMETERS:
+
+			- action:		Specify the action, in this case searching.
+				Required:	Yes
+				Type:		String
+				Example:	action=search
+				Values:		search
+			- media:		Specify the media type to search. If no media is provided, "mixed" is assumed.
+				Required:	No
+				Type:		String
+				Example:	media=movie
+				Values:		movie (movie searches)
+							show (show searches)
+							set (set searches)
+							list (list searches)
+							person (people searches)
+							mixed (mixed movie and show searches)
+			- niche:		Specify the niche to narrow down the search. This will return fewer results.
+				Required:	No
+				Type:		String, List
+				Example:	niche=anime
+				Values:		feature (full-length feature movies)
+							short (short films or shows)
+							special (TV specials)
+							multi (muti-season shows)
+							mini (single-season mini-series)
+							anima (animation of all types)
+							anime (Japanese animation)
+							donghua (Chinese animation)
+							docu (documentaries)
+							family (family and children)
+							- A full list of values is available under lib/modules/tools.py/class Media
+			- query:		Specify the search query. If no query is provided, an input dialog will be shown.
+				Required:	No
+				Type:		String
+				Example:	query=some%20title
+				Values:		Any search string
+			- page:			Specify the page number.
+				Required:	No
+				Type:		Integer
+				Example:	page=2
+				Values:		[1,infinity]
+			- limit:		Specify the number of titles to list per page. This should generally not be used, as the value is determined by the addon settings and the capability of the provider. Stick to a limit of 50 or lower.
+				Required:	No
+				Type:		Integer
+				Example:	limit=10
+				Values:		[1,250]
+			- provider:		Specify the metadata provider to use for the search. This should generally not be used, as the best possible provider is automatically determined.
+				Required:	No
+				Type:		String
+				Example:	provider=trakt
+				Values:		trakt (search with Trakt)
+							imdb (search with IMDb)
+							tmdb (search with TMDb)
+			- other:		Any of the other parameters listed under the "menu" endpoint can be used (genre, year, language, etc). This will reduce the search results and should generally not be used.
+
+		EXAMPLES:
+
+			- Search movies:
+				plugin://plugin.video.gaia/?action=search&media=movie
+			- Search anime movies and shows:
+				plugin://plugin.video.gaia/?action=search&niche=anime
+			- Search sets:
+				plugin://plugin.video.gaia/?action=search&media=set
+			- Search people using a fixed query:
+				plugin://plugin.video.gaia/?action=search&media=person&query=james
+
+	###################################################################################################################
+	# SCRAPE
+	###################################################################################################################
+
+		Scrape a specific title for links.
+
+		PARAMETERS:
+
+			- action:		Specify the action, in this case scraping.
+				Required:	Yes
+				Type:		String
+				Example:	action=scrape
+				Values:		scrape
+			- media:		Specify the media type to search.
+				Required:	Yes
+				Type:		String
+				Example:	media=movie
+				Values:		movie (movie scrapes), show (episode scrapes)
+			- trakt:		Specify the Trakt ID.
+				Required:	No
+				Type:		String
+				Example:	trakt=123456
+				Values:		Any valid Trakt ID
+			- imdb:			Specify the IMDb ID.
+				Required:	No
+				Type:		String
+				Example:	imdb=tt123456
+				Values:		Any valid IMDb ID
+			- tmdb:			Specify the TMDb ID.
+				Required:	No
+				Type:		String
+				Example:	tmdb=123456
+				Values:		Any valid TMDb ID
+			- tvdb:			Specify the TVDb ID.
+				Required:	No
+				Type:		String
+				Example:	tvdb=123456
+				Values:		Any valid TVDb ID
+			- title:		Specify a title instead of an ID.
+				Required:	No
+				Type:		String
+				Example:	title=Some%20Title
+				Values:		Any valid title
+			- year:			Specify a year together with the title.
+				Required:	No
+				Type:		Integer
+				Example:	year=2010
+				Values:		Any valid year
+			- season:		Specify the season number.
+				Required:	Yes (shows), No (movies)
+				Type:		Integer
+				Example:	season=1
+				Values:		Any valid season number
+			- episode:		Specify the episode number.
+				Required:	Yes (shows), No (movies)
+				Type:		Integer
+				Example:	episode=1
+				Values:		Any valid episode number
+
+		LOOKUP:
+
+			- You can scrape by using a single or multiple IDs, by providing a title and year, or both.
+			- Scraping by ID is always better, faster, and more reliable than scraping by title and year.
+			- If IDs are provided, no title or year is required.
+			- If a title is provided, a year is not required. However, a year will substantially improve the chances of picking
+			  the correct title, especially if there are multiple movies/shows with the same title, but released in different years.
+
+		IDS:
+
+			The best way to scrape is by using an ID. You can pass in IDs from multiple providers and let Gaia figure out which
+			one to use. The reliability and accuracy of IDs is as follows (from most reliable to least reliable):
+
+			- Movies: Trakt, IMDb, TMDb, (TVDb)
+			- Shows: Trakt, IMDb, TVDb, (TMDb)
+
+			You should avoid searching movies by TVDb ID and shows by TMDb ID. Although it might work in some cases, most of the time
+			nothing will be found. If you have IDs from multiple providers, just pass all of them in.
+
+		EXAMPLES:
+
+			- Movies:
+				- Search by single ID:
+					plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190
+					plugin://plugin.video.gaia/?action=scrape&media=movie&tmdb=76341
+					plugin://plugin.video.gaia/?action=scrape&media=movie&trakt=56360
+				- Search by multiple IDs:
+					plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360
+				- Search by title and year:
+					plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road&year=2015
+				- Search by title:
+					plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road
+				- Search by anything:
+					plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360&title=Mad%20Max%3A%20Fury%20Road&year=2015
+
+			- Shows:
+				- Search by single ID:
+					plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&season=8&episode=2
+					plugin://plugin.video.gaia/?action=scrape&media=show&tvdb=121361&season=8&episode=2
+					plugin://plugin.video.gaia/?action=scrape&media=show&trakt=1390&season=8&episode=2
+				- Search by multiple IDs:
+					plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&season=8&episode=2
+				- Search by title and year:
+					plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&year=2011&season=8&episode=2
+				- Search by title:
+					plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&season=8&episode=2
+				- Search by anything:
+					plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&title=Game%20of%20Thrones&year=2011&season=8&episode=2
+
+	###################################################################################################################
+	# PLAY
+	###################################################################################################################
+
+		Play a specific link from a previous scrape.
+
+		PARAMETERS:
+
+			- action:		Specify the action, in this case playing.
+				Required:	Yes
+				Type:		String
+				Example:	action=play
+				Values:		play
+			- media:		Specify the media type to play.
+				Required:	Yes
+				Type:		String
+				Example:	media=movie
+				Values:		movie (movie plays), show (episode plays)
+			- source:		One of the source JSON objects returned by a previous scrape. This is not very user-friendly at the moment and will be updated int he future to take in a source ID, instead of a full object.
+				Required:	Yes
+				Type:		Dictionary
+				Example:	source={...}
+				Values:		Any valid source dictionary
+			- trakt:		Specify the Trakt ID.
+				Required:	No
+				Type:		String
+				Example:	trakt=123456
+				Values:		Any valid Trakt ID
+			- imdb:			Specify the IMDb ID.
+				Required:	No
+				Type:		String
+				Example:	imdb=tt123456
+				Values:		Any valid IMDb ID
+			- tmdb:			Specify the TMDb ID.
+				Required:	No
+				Type:		String
+				Example:	tmdb=123456
+				Values:		Any valid TMDb ID
+			- tvdb:			Specify the TVDb ID.
+				Required:	No
+				Type:		String
+				Example:	tvdb=123456
+				Values:		Any valid TVDb ID
+			- title:		Specify a title instead of an ID.
+				Required:	No
+				Type:		String
+				Example:	title=Some%20Title
+				Values:		Any valid title
+			- year:			Specify a year together with the title.
+				Required:	No
+				Type:		Integer
+				Example:	year=2010
+				Values:		Any valid year
+			- season:		Specify the season number.
+				Required:	Yes (shows), No (movies)
+				Type:		Integer
+				Example:	season=1
+				Values:		Any valid season number
+			- episode:		Specify the episode number.
+				Required:	Yes (shows), No (movies)
+				Type:		Integer
+				Example:	episode=1
+				Values:		Any valid episode number
+
+		LOOKUP:
+
+			- You can scrape by using a single or multiple IDs, by providing a title and year, or both.
+			- Scraping by ID is always better, faster, and more reliable than scraping by title and year.
+			- If IDs are provided, no title or year is required.
+			- If a title is provided, a year is not required. However, a year will substantially improve the chances of picking
+			  the correct title, especially if there are multiple movies/shows with the same title, but released in different years.
+
+		IDS:
+
+			The best way to scrape is by using an ID. You can pass in IDs from multiple providers and let Gaia figure out which
+			one to use. The reliability and accuracy of IDs is as follows (from most reliable to least reliable):
+
+			- Movies: Trakt, IMDb, TMDb, (TVDb)
+			- Shows: Trakt, IMDb, TVDb, (TMDb)
+
+			You should avoid searching movies by TVDb ID and shows by TMDb ID. Although it might work in some cases, most of the time
+			nothing will be found. If you have IDs from multiple providers, just pass all of them in.
+
+		EXAMPLES:
+
+			- Play a movie link:
+				plugin://plugin.video.gaia/?action=play&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360&source=<JSON-encoded-source-dictionary>
+
+	###################################################################################################################
+'''
+
 import xbmcaddon
 developer = xbmcaddon.Addon().getAddonInfo('version') == '999.999.999'
 if developer:
@@ -37,544 +565,329 @@ if developer: tools.Logger.log('EXECUTION STARTED [Action: %s]' % str(action))
 
 # Execute on first launch.
 # Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
-if action is None or action == 'home' or action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode') or action.startswith('documentar') or action.startswith('short') or action.startswith('search') or action.startswith('scrape') or action.startswith('oracle'): tools.System.launch()
+if action is None or action == 'home' or action == 'menu' or action == 'search' or action == 'scrape' or action == 'play' or action.startswith('oracle'): tools.System.launch()
 
-# For Gaia Eminence.
-tools.System.menuResolve(action = action, menu = parameters.get('menu'))
+quick = False
 
-# Otherwise importing modules in sub-threads might cause the execution to deadlock.
-# Check the modulePrepare() function for more info.
-# The deadlock can happen from various places in the indexers (navigator/movies/shows/season/episodes).
-#	Eg: navigator -> History -> Seasons (sporadic - sometimes it works).
-#	Eg: movies/shows/season/episodes -> metadata().
-# There are too many sporadic deadlocks at various places, so it seems better to just place it here.
-# Although it takes about 250-300ms, most plugin calls will probably use some of the Networker features anyways, and will then have to import the modules at a later stage.
-from lib.modules.network import Networker
-Networker.modulePrepare()
+# Reduce processing time for menus that are in any case loaded in a new Python process, because they were launched as an "action" instead of a "folder" and therefore do not have a Kodi handle.
+# Importing and doing all the advanced initialization below is not needed for a "wrapper" process like this.
+# This can save around 100ms.
+# Use when opening show/season and other series submenus.
+# More info in MetaTools._items().
+if action == 'menu':
+	from lib.meta.menu import MetaMenu
+	quick = MetaMenu.menuExternal(**parameters)
 
-media = parameters.get('media')
-kids = parameters.get('kids')
-kids = int(kids) if kids else 0
+if not quick:
+	# For Gaia Eminence.
+	tools.System.navigationResolve(action = action, parameters = parameters)
 
-source = parameters.get('source')
-if not source is None:
-	source = tools.Converter.dictionary(source)
-	if tools.Tools.isArray(source): source = source[0]
+	# Otherwise importing modules in sub-threads might cause the execution to deadlock.
+	# Check the modulePrepare() function for more info.
+	# The deadlock can happen from various places in the indexers (navigator/movies/shows/season/episodes).
+	#	Eg: navigator -> History -> Seasons (sporadic - sometimes it works).
+	#	Eg: movies/shows/season/episodes -> metadata().
+	# There are too many sporadic deadlocks at various places, so it seems better to just place it here.
+	# Although it takes about 250-300ms, most plugin calls will probably use some of the Networker features anyways, and will then have to import the modules at a later stage.
+	# UPDATE (2024-11): This is probably not needed anymore. Everything seems to run smoothly without the import here.
+	# The deadlock might have been caused by too many threads being used during scraping to process the streams (fixed now).
+	# Maybe one thread started to import the modules, then gets paused and another thread is started, which now deadlocks, because the previous thread has not finished the import yet.
+	#from lib.modules.network import Networker
+	#Networker.modulePrepare()
 
-metadata = parameters.get('metadata')
-if not metadata is None: metadata = tools.Converter.dictionary(metadata)
+	#gaiaremove - too much data passed via command-line. Maybe use a Stream ID as parameter. Then lookup the stream from streams.db or global var. Similar to how the metadata is handled now.
+	source = parameters.get('source')
+	if not source is None:
+		source = tools.Converter.dictionary(source)
+		if tools.Tools.isArray(source): source = source[0]
 
-from lib.modules import shortcuts
-shortcuts.Shortcuts.process(parameters)
+	from lib.modules.shortcut import Shortcut
+	Shortcut.process(parameters)
 
 ####################################################
 # HOME
 ####################################################
 
 if action is None or action == 'home':
-	from lib.indexers.navigator import Navigator
-	Navigator(media = media, kids = kids).root()
+	from lib.modules.menu import Menu
+	Menu.instance().menu()
 
 	# Reset the restart flag here, since an addon restart will end up in this function.
 	tools.System.restartFinish()
 
 	# Launch the donations dialog.
-	# Only show if System.launched(), since the donations dialog is also shown after the intial launch process and we do not want to show it twice.
+	# Only show if System.launchStatus(), since the donations dialog is also shown after the intial launch process and we do not want to show it twice.
 	# Also call it here, for users who do not shut down their devices and keep it running for a long time.
-	if tools.System.launched() == 3: tools.Donations.popup(wait = True)
+	if tools.System.launchStatus() == 3: tools.Donations.popup(wait = True)
 
 ####################################################
-# MOVIE
+# MENU
 ####################################################
 
-elif action.startswith('movies'):
+elif action == 'menu':
+	from lib.modules.menu import Menu
+	Menu.instance().menu(**parameters)
 
-	if action == 'movies':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).movies(lite = lite)
+elif action == 'search':
+	from lib.modules.menu import Menu
+	Menu.instance().menu(menu = Menu.MenuSearch, **parameters)
 
-	elif action == 'moviesFavourites':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).moviesFavourites(lite = lite)
+####################################################
+# SCRAPE
+####################################################
 
-	elif action == 'moviesRetrieve':
-		from lib.indexers.movies import Movies
+elif action.startswith('scrape'):
+
+	if action == 'scrape':
+		# Sometimes when using the Kore remote app and clicking on a movie/episode to start a scrape, the user might accidentally click twice, which starts the scraping process twice.
+		# This is not a huge issue for other endpoints, but the scrape endpoint starts many threads and uses many resources, and should be avoided.
+		# This is not a perfect solution, since both processes might call windowPropertyGet() before the other process is able to call windowPropertySet().
+		# If the double scrape still happens in the future, we need a more advanced solution.
+		# One way would be to rename this endpoint to “scrapeNow” and create another endpoint “scrape”.
+		# “scrape” checks and sets the global property, and if not set, initiates the actual endpoint “scrapeNow” which clears the global property after scraping is done.
+		# “scrapeNow” also checks the global property again, just as a second safety.
+		# This would create a greater time gap between processes and would reduce the chance of both processes executing at the same time. However, it also requires two Python invokers, which slows down the starting of the scrape process.
+		# Update: Hitting the ENTER key twice shortly after each other calls this endpoint twice, but in all cases only one scrape was done. So it seems to work.
+
+		property = 'GaiaScrapeBusy'
+		id = tools.System.windowPropertyGet(property)
+		time = tools.Time.timestamp()
+
+		# In case a previous scrape did not clear the property, allow a new scrape after 10 seconds.
+		if not id or (time - int(id) > 10):
+			try:
+				tools.System.windowPropertySet(property, str(time))
+
+				try: silent = bool(parameters.get('silent'))
+				except: silent = False
+				try: binge = int(parameters.get('binge'))
+				except: binge = None
+
+				from lib.modules import interface
+				if not silent and not binge: interface.Loader.show()
+
+				from lib.modules import core
+				from lib.modules import video
+
+				# Already show here, since getConstants can take long when retrieving debrid service list.
+				if (not video.Trailer.cinemaEnabled() or tools.Settings.getBoolean('playback.autoplay.enabled')) and (not binge == tools.Binge.ModeBackground or binge == tools.Binge.ModeContinue): interface.Loader.show()
+
+				media = parameters.get('media')
+
+				imdb = parameters.get('imdb')
+				tmdb = parameters.get('tmdb')
+				tvdb = parameters.get('tvdb')
+				trakt = parameters.get('trakt')
+
+				title = parameters.get('title')
+				tvshowtitle = parameters.get('tvshowtitle')
+
+				year = parameters.get('year')
+				premiered = parameters.get('premiered')
+
+				season = parameters.get('season')
+				episode = parameters.get('episode')
+				number = parameters.get('number')
+
+				autoplay = tools.Converter.boolean(parameters.get('autoplay'), none = True)
+				autopack = parameters.get('autopack')
+				preset = parameters.get('preset')
+				cache = tools.Converter.boolean(parameters.get('cache'), none = True)
+				items = parameters.get('items')
+
+				# When called by TmdbHelper.
+				if imdb == 'None': imdb = None
+				if tmdb == 'None': tmdb = None
+				if tvdb == 'None': tvdb = None
+				if trakt == 'None': trakt = None
+				if title == 'None': title = None
+				if tvshowtitle == 'None': tvshowtitle = None
+				if year == 'None': year = None
+				if premiered == 'None': premiered = None
+				if season == 'None': season = None
+				if episode == 'None': episode = None
+
+				if year: year = int(year)
+				if not season is None: season = int(season)
+				if not episode is None: episode = int(episode)
+
+				core.Core(media = media, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, premiered = premiered, autopack = autopack, autoplay = autoplay, preset = preset, binge = binge, cache = cache, items = items)
+			except: tools.Logger.error()
+			tools.System.windowPropertyClear(property)
+
+	elif action == 'scrapeAgain':
+		from lib.modules import core
+		media = parameters.get('media')
 		link = parameters.get('link')
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Movies(media = media, kids = kids).retrieve(link = link, refresh = refresh, next = next)
+		core.Core(media = media).scrapeAgain(link = link)
 
-	elif action == 'moviesSearch':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).search(parameters.get('query'))
-
-	elif action == 'moviesSearches':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).moviesSearches()
-
-	elif action == 'moviesPerson':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).person(parameters.get('query'))
-
-	elif action == 'moviesPersons':
-		from lib.indexers.movies import Movies
+	elif action == 'scrapeManual':
+		from lib.modules import core
+		media = parameters.get('media')
 		link = parameters.get('link')
-		Movies(media = media, kids = kids).persons(link)
+		core.Core(media = media).scrapeManual(link = link)
 
-	elif action == 'moviesQuick':
-		from lib.indexers.movies import Movies
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Movies(media = media, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh, next = next)
+	elif action == 'scrapeAutomatic':
+		from lib.modules import core
+		media = parameters.get('media')
+		link = parameters.get('link')
+		core.Core(media = media).scrapeAutomatic(link = link)
 
-	elif action == 'moviesHome':
-		from lib.indexers.movies import Movies
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Movies(media = media, kids = kids).home(refresh = refresh, next = next)
+	elif action == 'scrapePresetManual':
+		from lib.modules import core
+		link = parameters.get('link')
+		core.Core(media = media).scrapePresetManual(link = link)
 
-	elif action == 'moviesArrivals':
-		from lib.indexers.movies import Movies
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Movies(media = media, kids = kids).arrivals(refresh = refresh, next = next)
+	elif action == 'scrapePresetAutomatic':
+		from lib.modules import core
+		media = parameters.get('media')
+		link = parameters.get('link')
+		core.Core(media = media).scrapePresetAutomatic(link = link)
 
-	elif action == 'moviesGenres':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).genres()
+	elif action == 'scrapeSingle':
+		from lib.modules import core
+		media = parameters.get('media')
+		link = parameters.get('link')
+		core.Core(media = media).scrapeSingle(link = link)
 
-	elif action == 'moviesLanguages':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).languages()
+	elif action == 'scrapeBinge':
+		from lib.modules import core
+		media = parameters.get('media')
+		link = parameters.get('link')
+		core.Core(media = media).scrapeBinge(link = link)
 
-	elif action == 'moviesCertificates':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).certifications()
+	elif action == 'scrapeExact':
+		from lib.modules import core
+		media = parameters.get('media')
+		query = parameters.get('query')
+		core.Core(media = media).scrapeExact(query)
 
-	elif action == 'moviesAge':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).age()
-
-	elif action == 'moviesYears':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).years()
-
-	elif action == 'moviesAwards':
-		from lib.indexers.movies import Movies
-		type = parameters.get('type')
-		category = parameters.get('category')
-		subcategory = parameters.get('subcategory')
-		generic = tools.Converter.boolean(parameters.get('generic'))
-		Movies(media = media, kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
-
-	elif action == 'moviesRated':
-		from lib.indexers.movies import Movies
-		type = parameters.get('type')
-		Movies(media = media, kids = kids).rated(type = type)
-
-	elif action == 'moviesNetworks':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).networks()
-
-	elif action == 'moviesStreamers':
-		from lib.indexers.movies import Movies
-		service = parameters.get('service')
-		country = parameters.get('country')
-		Movies(media = media, kids = kids).networksStreamers(service = service, country = country)
-
-	elif action == 'moviesBroadcasters':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).networksBroadcasters()
-
-	elif action == 'moviesUserlists':
-		from lib.indexers.movies import Movies
-		mode = parameters.get('mode')
-		watchlist = tools.Converter.boolean(parameters.get('watchlist'))
-		Movies(media = media, kids = kids).listUser(mode = mode, watchlist = watchlist)
-
-	elif action == 'moviesDrugs':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).moviesDrugs()
-
-	elif action == 'moviesRandom':
-		from lib.indexers.movies import Movies
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Movies(media = media, kids = kids).random(next = next)
-
-	elif action == 'moviesCategories':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).moviesCategories()
-
-	elif action == 'moviesLists':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).moviesLists()
-
-	elif action == 'moviesPeople':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).moviesPeople()
-
-	elif action == 'moviesFamous':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).famous()
-
-	elif action == 'moviesGenders':
-		from lib.indexers.movies import Movies
-		Movies(media = media, kids = kids).genders()
+	elif action == 'scrapeOptimize':
+		from lib.providers.core.manager import Manager
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Manager.optimizeScrape(settings = settings)
 
 ####################################################
-# SETS
+# STREAMS
 ####################################################
 
-elif action.startswith('sets'):
+elif action.startswith('streams'):
 
-	if action == 'sets':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).sets()
+	if action == 'streamsShow':
+		from lib.modules import core
+		from lib.modules import interface
+		media = parameters.get('media')
+		autoplay = tools.Converter.boolean(parameters.get('autoplay'))
+		if autoplay: interface.Loader.show() # Only for autoplay, since showing the directory has its own loader.
+		direct = tools.Converter.boolean(parameters.get('direct'))
+		filter = tools.Converter.boolean(parameters.get('filterx'))
+		library = tools.Converter.boolean(parameters.get('library'))
+		initial = tools.Converter.boolean(parameters.get('initial'))
+		new = tools.Converter.boolean(parameters.get('new'))
+		add = tools.Converter.boolean(parameters.get('add'))
+		process = tools.Converter.boolean(parameters.get('process'))
+		try: binge = int(parameters.get('binge'))
+		except: binge = None
+		core.Core(media = media).showStreams(direct = direct, filter = filter, autoplay = autoplay, library = library, initial = initial, new = new, add = add, process = process, binge = binge)
 
-	elif action == 'setsRetrieve':
-		from lib.indexers.sets import Sets
+	elif action == 'streamsFilters':
+		from lib.modules.core import Core
+		media = parameters.get('media')
+		Core(media = media).filterStreams()
+
+	elif action == 'streamsInformation':
+		from lib.modules.stream import Stream
+		Stream(data = source['stream']).dialog()
+
+	elif action == 'streamsVideo':
+		from lib.modules import video
+
+		media = parameters.get('media')
+
 		link = parameters.get('link')
-		tmdb = parameters.get('tmdb')
-		character = parameters.get('character')
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Sets(kids = kids).retrieve(link = link, idTmdb = tmdb, character = character, refresh = refresh, next = next)
 
-	elif action == 'setsAlphabetic':
-		from lib.indexers.sets import Sets
-		Sets(kids = kids).alphabetic()
-
-	elif action == 'setsSearch':
-		from lib.indexers.sets import Sets
-		Sets(kids = kids).search(parameters.get('query'))
-
-####################################################
-# SHOW
-####################################################
-
-elif action.startswith('shows'):
-
-	if action == 'shows':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).shows(lite = lite)
-
-	elif action == 'showsFavourites':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).showsFavourites(lite = lite)
-
-	elif action == 'showsRetrieve':
-		from lib.indexers.shows import Shows
-		link = parameters.get('link')
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Shows(kids = kids).retrieve(link, refresh = refresh, next = next)
-
-	elif action == 'showsSearch':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).search(parameters.get('query'))
-
-	elif action == 'showsSearches':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).showsSearches()
-
-	elif action == 'showsGenres':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).genres()
-
-	elif action == 'showsNetworks':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).networks()
-
-	elif action == 'showsStreamers':
-		from lib.indexers.shows import Shows
-		service = parameters.get('service')
-		country = parameters.get('country')
-		Shows(kids = kids).networksStreamers(service = service, country = country)
-
-	elif action == 'showsBroadcasters':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).networksBroadcasters()
-
-	elif action == 'showsCertificates':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).certifications()
-
-	elif action == 'showsAge':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).age()
-
-	elif action == 'showsPerson':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).person(parameters.get('query'))
-
-	elif action == 'showsPersons':
-		from lib.indexers.shows import Shows
-		link = parameters.get('link')
-		Shows(kids = kids).persons(link)
-
-	elif action == 'showsUserlists':
-		from lib.indexers.shows import Shows
-		mode = parameters.get('mode')
-		watchlist = tools.Converter.boolean(parameters.get('watchlist'))
-		Shows(kids = kids).listUser(mode = mode, watchlist = watchlist)
-
-	elif action == 'showsRandom':
-		from lib.indexers.shows import Shows
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Shows(kids = kids).random(next = next)
-
-	elif action == 'showsQuick':
-		from lib.indexers.episodes import Episodes
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Episodes(kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh, next = next)
-
-	elif action == 'showsHome':
-		from lib.indexers.episodes import Episodes
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Episodes(kids = kids).home(refresh = refresh, next = next)
-
-	elif action == 'showsArrivals':
-		from lib.indexers.episodes import Episodes
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Episodes(kids = kids).arrivals(refresh = refresh, next = next)
-
-	elif action == 'showsCalendars':
-		from lib.indexers.episodes import Episodes
-		Episodes(kids = kids).calendar()
-
-	elif action == 'showsCategories':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).showsCategories()
-
-	elif action == 'showsLists':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).showsLists()
-
-	elif action == 'showsPeople':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).showsPeople()
-
-	elif action == 'showsFamous':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).famous()
-
-	elif action == 'showsGenders':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).genders()
-
-	elif action == 'showsYears':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).years()
-
-	elif action == 'showsAwards':
-		from lib.indexers.shows import Shows
-		type = parameters.get('type')
-		category = parameters.get('category')
-		subcategory = parameters.get('subcategory')
-		generic = tools.Converter.boolean(parameters.get('generic'))
-		Shows(kids = kids).awards(type = type, category = category, subcategory = subcategory, generic = generic)
-
-	elif action == 'showsRated':
-		from lib.indexers.shows import Shows
-		type = parameters.get('type')
-		Shows(kids = kids).rated(type = type)
-
-	elif action == 'showsLanguages':
-		from lib.indexers.shows import Shows
-		Shows(kids = kids).languages()
-
-	elif action == 'showsBinge':
-		from lib.indexers.episodes import Episodes
 		imdb = parameters.get('imdb')
 		tmdb = parameters.get('tmdb')
 		tvdb = parameters.get('tvdb')
 		trakt = parameters.get('trakt')
+
+		title = parameters.get('title')
+		year = parameters.get('year')
+		if year: year = int(year)
 		season = parameters.get('season')
 		if not season is None: season = int(season)
-		episode = parameters.get('episode')
-		if not episode is None: episode = int(episode)
-		Episodes(kids = kids).binge(scrape = True, idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, season = season, episode = episode)
+
+		mode = parameters.get('video')
+		selection = parameters.get('selection')
+		if not selection is None: selection = int(selection)
+
+		getattr(video, mode.capitalize())(media = media).play(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, selection = selection)
+
 
 ####################################################
-# SEASON
+# PLAY
 ####################################################
 
-elif action.startswith('seasons'):
+elif action.startswith('play') and not action.startswith('playback') and not action.startswith('playlist'):
 
-	if action == 'seasonsRetrieve':
-		from lib.indexers.seasons import Seasons
-		link = parameters.get('link')
-		imdb = parameters.get('imdb')
-		tvdb = parameters.get('tvdb')
-		title = parameters.get('tvshowtitle')
-		if not title: title = parameters.get('title')
-		year = parameters.get('year')
-		if year: year = int(year)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		Seasons(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, refresh = refresh, next = next)
+	if action == 'play':
+		if not tools.System.globalLocked(id = 'play'): # Check playcount.py for more details.
+			from lib.modules.interface import Loader
+			from lib.modules.core import Core
+			Loader.show() # Immediately show the loader, since slow system will take long to show it in play().
 
-	elif action == 'seasonsUserlists':
-		from lib.indexers.seasons import Seasons
-		mode = parameters.get('mode')
-		watchlist = tools.Converter.boolean(parameters.get('watchlist'))
-		Seasons(kids = kids).listUser(mode = mode, watchlist = watchlist)
+			media = parameters.get('media')
+			imdb = parameters.get('imdb')
+			tmdb = parameters.get('tmdb')
+			tvdb = parameters.get('tvdb')
+			trakt = parameters.get('trakt')
+			title = parameters.get('title')
+			year = parameters.get('year')
+			if year: year = int(year)
+			season = parameters.get('season')
+			if not season is None: season = int(season)
+			episode = parameters.get('episode')
+			if not episode is None: episode = int(episode)
 
-	elif action == 'seasonsExtras':
-		from lib.indexers.seasons import Seasons
-		Seasons(kids = kids).extras(metadata = metadata)
+			try: binge = int(parameters.get('binge'))
+			except: binge = None
+			try: resume = int(parameters.get('resume'))
+			except: resume = None
+			try: autoplay = tools.Converter.boolean(parameters.get('autoplay'))
+			except: autoplay = False
+			try: library = tools.Converter.boolean(parameters.get('library'))
+			except: library = False
+			try: new = tools.Converter.boolean(parameters.get('new'))
+			except: new = False
+			try: add = tools.Converter.boolean(parameters.get('add'))
+			except: add = False
+			try: reload = tools.Converter.boolean(parameters.get('reload'))
+			except: reload = True
+			downloadType = parameters.get('downloadType')
+			downloadId = parameters.get('downloadId')
+			handleMode = parameters.get('handleMode')
 
-####################################################
-# EPISODE
-####################################################
+			Core(media = media).play(source = source, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, downloadType = downloadType, downloadId = downloadId, handleMode = handleMode, autoplay = autoplay, library = library, new = new, add = add, binge = binge, reload = reload, resume = resume)
 
-elif action.startswith('episodes'):
+	if action == 'playCache':
+		from lib.modules.core import Core
+		media = parameters.get('media')
+		try: binge = int(parameters.get('binge'))
+		except: binge = None
+		try: reload = tools.Converter.boolean(parameters.get('reload'))
+		except: reload = True
+		handleMode = parameters.get('handleMode')
+		Core(media = media).playCache(source = source, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, handleMode = handleMode, binge = binge, reload = reload)
 
-	if action == 'episodesRetrieve':
-		# There is a problem with opening the context menu on an episode in the Arrivals/Quick submenu.
-		# For some reason Kodi executes the command of the item the context was opened on, and all its submenu items.
-		# This causes "episodesRetrieve" (and sometimes "seasonsRetrieve") to be called many times, causing the context menu to take very long to open.
-		# Especially if S00 or other extras are in the submenu, Kodi can take minutes to load the context, sometimes hanging so long that a restart is required.
-		# UPDATE: The problem is the "Next Page" menu entry in the submenus. If Kodi encounters the next item in a page, it loads that submenu.
-		# UPDATE: That submenu also has a next page. So Kodi continues to sequentially load all submenus from the next entry, one after the other, which can take a long time for shows with a lot of unwatched episodes.
-		# This only happens with episode submenus that have a folder underneath it.
-		# This does not happen with any other show/season/episode/movie/generic menu.
-		# Also, if the "Direct Scraping" setting is enabled, this also does not happen, since the Arrivals menu entries are not folders anymore, but initiate the scrape process directly.
-		# This is also not caused by the custom Gaia context menu. Even if no context menu is added at all, this problem persists.
-		# Only if the link/command attribute is removed from items passed to xbmcplugin.addDirectoryItems(), is this problem gone.
-		# This inidcates that this is a Kodi bug. Maybe if Kodi sees an episode folder menu, it scans all subitems to determine which labels to add to the context.
-		# There is no way to differentiate this endpoint being executed by Kodi when the context is opened, vs if the user just manually clicks on it to open the submenu (handle, plugin origin, etc is all the same).
-		# There also does not seem any way to prevent this from happening by calling functions on xbmcplugin, listitem, etc.
-		# So the only way is a dirty hack. We simply check if this endpoint is called with the same title within a few seconds of each other using global variables.
-		# Any subsequent "duplicate" requests are blocked, making the context load faster.
-		# There is still one minor problem: if the user manually opens the submenu within this time period, it might be detected as a "dupliacte" request and the menu is not loaded.
-		# The user will have to wait a few seconds and then reopen the submenu.
-		# Same happens if the user opens a submenu, quickly navigates back and tries to reopen the same menu.
-		# UPDATE: We changed the global property code and now detect the context menu using "Container.HasFiles". This will still call "episodesRetrieve" once, but not subsequent times.
-		# UPDATE: And the problem with quickly manually opening submenus is also gone with this alternative.
-		'''
-		submenu = parameters.get('submenu')
-		context = submenu == 'next' and not tools.System.visible('Container.HasFiles')
-
-		link = parameters.get('link')
-		imdb = parameters.get('imdb')
-		tvdb = parameters.get('tvdb')
-		title = parameters.get('tvshowtitle')
-		if not title: title = parameters.get('title')
-		year = parameters.get('year')
-		if year: year = int(year)
-		season = parameters.get('season')
-		if not season is None: season = float(season) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
-		episode = parameters.get('episode')
-		if not episode is None: episode = float(episode) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		reduce = tools.Converter.boolean(parameters.get('reduce'))
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		submenu = parameters.get('submenu')
-
-		if context:
-			tools.Logger.log('Blocking episode retrieval during context menu opening of episode submenus.', type = tools.Logger.TypeError)
-		else:
-			from lib.indexers.episodes import Episodes
-			Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next, submenu = submenu)
-		'''
-
-		# UPDATE 2: Even with the solution above, opening the context menu of submenus on low-end devices is still very slow.
-		# We now use a better solution. Submenus are not marked as directories/folders anymore, but instead an action that calls the "episodesSubmenu" endpoint.
-		# "episodesSubmenu" then manually updates the container.
-		# If the "episodesSubmenu" endpoint is ever removed again, make sure to update the following:
-		#	1. Uncomment the code above in this endpoint.
-		#	2. In meta/tools.py, revert all statements marked as "gaiasubmenu".
-
-		link = parameters.get('link')
-		imdb = parameters.get('imdb')
-		tvdb = parameters.get('tvdb')
-		title = parameters.get('tvshowtitle')
-		if not title: title = parameters.get('title')
-		year = parameters.get('year')
-		if year: year = int(year)
-		season = parameters.get('season')
-		if not season is None: season = float(season) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
-		episode = parameters.get('episode')
-		if not episode is None: episode = float(episode) # NB: Make float so we can have a negative zero offset (-0.0) for the specials season.
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		reduce = tools.Converter.boolean(parameters.get('reduce'))
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		next = tools.Converter.boolean(parameters.get('next', True))
-		submenu = parameters.get('submenu')
-
-		from lib.indexers.episodes import Episodes
-		Episodes(kids = kids).retrieve(link = link, idImdb = imdb, idTvdb = tvdb, title = title, year = year, season = season, episode = episode, limit = limit, reduce = reduce, refresh = refresh, next = next, submenu = submenu)
-
-	elif action == 'episodesSubmenu':
-		if tools.System.originGaia(strict = True):
-			tools.System.executeContainer(action = 'episodesRetrieve', parameters = parameters)
-		else: # Widgets
-			tools.System.pluginResolvedSet(success = True, dummy = False)
-			parameters[tools.System.OriginParameter] = True # Allows selecting the next unwatched episodes from view.py.
-			command = tools.System.commandContainer(action = 'episodesRetrieve', parameters = parameters, replace = True, call = False)
-			tools.System.window(command = command, activate = True, update = False, refresh = False)
-
-	elif action == 'episodesUserlists':
-		from lib.indexers.episodes import Episodes
-		mode = parameters.get('mode')
-		watchlist = tools.Converter.boolean(parameters.get('watchlist'))
-		Episodes(kids = kids).listUser(mode = mode, watchlist = watchlist)
-
-####################################################
-# QUICK
-####################################################
-
-elif action.startswith('quick'):
-
-	if action == 'quick':
-		from lib.indexers.navigator import Navigator
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Navigator(media = media, kids = kids).quick(limit = limit, refresh = refresh)
-
-	elif action == 'quickMovies':
-		from lib.indexers.movies import Movies
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = media, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
-
-	elif action == 'quickShows':
-		from lib.indexers.episodes import Episodes
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Episodes(kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
-
-	elif action == 'quickDocus':
-		from lib.indexers.movies import Movies
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = tools.Media.TypeDocumentary, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
-
-	elif action == 'quickShorts':
-		from lib.indexers.movies import Movies
-		limit = parameters.get('limit')
-		if not limit is None: limit = int(limit)
-		refresh = tools.Converter.boolean(parameters.get('refresh'))
-		Movies(media = tools.Media.TypeShort, kids = kids).retrieve(link = 'quick', limit = limit, refresh = refresh)
+	elif action == 'playLocal':
+		from lib.modules.core import Core
+		media = parameters.get('media')
+		try: binge = int(parameters.get('binge'))
+		except: binge = None
+		path = parameters.get('path')
+		downloadType = parameters.get('downloadType')
+		downloadId = parameters.get('downloadId')
+		Core(media = media).playLocal(path = path, source = source, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, downloadType = downloadType, downloadId = downloadId, binge = binge)
 
 ####################################################
 # REFRESH
@@ -589,10 +902,12 @@ elif action.startswith('refresh'):
 		if tools.Converter.boolean(parameters.get('playback')):
 			from lib.modules.playback import Playback
 			media = parameters.get('media')
-			Playback.instance().refresh(media = media, wait = True)
+			Playback.instance().refresh(media = media, history = True, progress = True, rating = True, reload = False, wait = True)
 
 		interface.Loader.hide() # Hide before, since Kodi will show its own laoder when refreshing the directory.
-		interface.Directory.refresh()
+
+		container = parameters.get('container') # Refresh a specific container by ID. This does currently not work. Check Directory.refresh() for more info.
+		interface.Directory.refresh(id = container)
 
 	elif action == 'refreshMetadata':
 		from lib.modules import interface
@@ -608,21 +923,36 @@ elif action.startswith('refresh'):
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
 
-		if tools.Media.typeMovie(media):
-			from lib.indexers.movies import Movies
-			Movies(media = media, kids = kids).metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, refresh = True)
-		elif media == tools.Media.TypeShow:
-			from lib.indexers.shows import Shows
-			Shows(kids = kids).metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, refresh = True)
-		elif media == tools.Media.TypeSeason:
-			from lib.indexers.seasons import Seasons
-			Seasons(kids = kids).metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, season = season, refresh = True)
-		elif media == tools.Media.TypeEpisode:
-			from lib.indexers.episodes import Episodes
-			Episodes(kids = kids).metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, season = season, episode = episode, refresh = True)
+		from lib.meta.manager import MetaManager
+		MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, refresh = True)
 
 		interface.Loader.hide() # Hide before, since Kodi will show its own laoder when refreshing the directory.
-		interface.Directory.refresh()
+
+		container = parameters.get('container') # Refresh a specific container by ID. This does currently not work. Check Directory.refresh() for more info.
+		interface.Directory.refresh(id = container)
+
+####################################################
+# BINGE
+####################################################
+
+elif action.startswith('binge'):
+
+	if action == 'binge':
+		from lib.modules.core import Core
+		media = parameters.get('media')
+		imdb = parameters.get('imdb')
+		tmdb = parameters.get('tmdb')
+		tvdb = parameters.get('tvdb')
+		trakt = parameters.get('trakt')
+		season = parameters.get('season')
+		if not season is None: season = int(season)
+		episode = parameters.get('episode')
+		if not episode is None: episode = int(episode)
+		number = parameters.get('number')
+		scrape = parameters.get('scrape')
+		if scrape is None: scrape = True
+		else: scrape = tools.Converter.boolean(scrape)
+		Core(media = media).bingeStart(scrape = scrape, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number)
 
 ####################################################
 # SYSTEM
@@ -630,11 +960,7 @@ elif action.startswith('refresh'):
 
 elif action.startswith('system'):
 
-	if action == 'systemNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).systemNavigator()
-
-	elif action == 'systemInformation':
+	if action == 'systemInformation':
 		tools.System.information()
 
 	elif action == 'systemManager':
@@ -659,30 +985,28 @@ elif action.startswith('external'):
 		Loader.instance(module = module).moduleLoad()
 
 ####################################################
+# COMPRESSION
+####################################################
+
+elif action.startswith('compression'):
+
+	if action == 'compressionBenchmark':
+		from lib.modules.compression import Compressor
+		delay = parameters.get('delay')
+		if delay: delay = int(delay) if tools.Tools.isNumeric(delay) else tools.Converter.boolean(delay)
+		Compressor.benchmark(delay = delay, settings = True, background = False)
+
+####################################################
 # LOG
 ####################################################
 
 elif action.startswith('log'):
 
-	if action == 'logNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).logNavigator()
+	if action == 'log' or action == 'logKodi':
+		tools.Logger.dialog()
 
 	elif action == 'logScrape':
 		tools.Logger.dialogScrape()
-
-	elif action == 'logKodi':
-		tools.Logger.dialog()
-
-####################################################
-# UTILITY
-####################################################
-
-elif action.startswith('utility'):
-
-	if action == 'utilityNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).utilityNavigator()
 
 ####################################################
 # NFORMATION
@@ -690,15 +1014,7 @@ elif action.startswith('utility'):
 
 elif action.startswith('information'):
 
-	if action == 'informationNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).informationNavigator()
-
-	elif action == 'informationPremium':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).informationPremium()
-
-	elif action == 'informationChangelog':
+	if action == 'informationChangelog':
 		tools.Changelog.show()
 
 	elif action == 'informationDisclaimer':
@@ -721,8 +1037,8 @@ elif action.startswith('information'):
 
 elif action.startswith('promotions'):
 
-	if action == 'promotionsNavigator':
-		tools.Promotions.navigator(force = tools.Converter.boolean(parameters.get('force')))
+	if action == 'promotions' or action == 'promotionsMenu':
+		tools.Promotions.menu(force = tools.Converter.boolean(parameters.get('force')))
 
 	elif action == 'promotionsSelect':
 		tools.Promotions.select(provider = parameters.get('provider'))
@@ -731,7 +1047,7 @@ elif action.startswith('promotions'):
 # PLAYLIST
 ####################################################
 
-elif action.startswith('playlist'): # Must be before the 'play' section.
+elif action.startswith('playlist'):
 
 	if action == 'playlistShow':
 		tools.Playlist.show()
@@ -740,10 +1056,21 @@ elif action.startswith('playlist'): # Must be before the 'play' section.
 		tools.Playlist.clear()
 
 	elif action == 'playlistAdd':
+		media = parameters.get('media')
+		imdb = parameters.get('imdb')
+		tmdb = parameters.get('tmdb')
+		tvdb = parameters.get('tvdb')
+		trakt = parameters.get('trakt')
+		season = parameters.get('season')
+		if not season is None: season = int(season)
+		episode = parameters.get('episode')
+		if not episode is None: episode = int(episode)
+
 		label = parameters.get('label')
 		link = parameters.get('link')
 		context = parameters.get('context')
-		tools.Playlist.add(link = link, label = label, metadata = metadata, context = context)
+
+		tools.Playlist.add(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, link = link, label = label, context = context)
 
 	elif action == 'playlistRemove':
 		label = parameters.get('label')
@@ -753,7 +1080,7 @@ elif action.startswith('playlist'): # Must be before the 'play' section.
 # PLAYBACK
 ####################################################
 
-elif action.startswith('playback'): # Must be before the 'play' section.
+elif action.startswith('playback'):
 
 	if action == 'playbackWatch':
 		from lib.modules.playback import Playback
@@ -825,53 +1152,16 @@ elif action.startswith('playback'): # Must be before the 'play' section.
 		if not episode is None: episode = int(episode)
 		Playback.instance().dialogReset(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
-####################################################
-# PLAY
-####################################################
-
-elif action.startswith('play'):
-
-	if action == 'play':
-		if not tools.System.globalLocked(id = 'play'): # Check playcount.py for more details.
-			from lib.modules import interface
-			from lib.modules import core
-			interface.Loader.show() # Immediately show the loader, since slow system will take long to show it in play().
-			try: binge = int(parameters.get('binge'))
-			except: binge = None
-			try: resume = int(parameters.get('resume'))
-			except: resume = None
-			try: autoplay = tools.Converter.boolean(parameters.get('autoplay'))
-			except: autoplay = False
-			try: library = tools.Converter.boolean(parameters.get('library'))
-			except: library = False
-			try: new = tools.Converter.boolean(parameters.get('new'))
-			except: new = False
-			try: add = tools.Converter.boolean(parameters.get('add'))
-			except: add = False
-			try: reload = tools.Converter.boolean(parameters.get('reload'))
-			except: reload = True
-			downloadType = parameters.get('downloadType')
-			downloadId = parameters.get('downloadId')
-			handleMode = parameters.get('handleMode')
-			core.Core(media = media, kids = kids).play(source = source, metadata = metadata, downloadType = downloadType, downloadId = downloadId, handleMode = handleMode, autoplay = autoplay, library = library, new = new, add = add, binge = binge, reload = reload, resume = resume)
-
-	if action == 'playCache':
-		from lib.modules import core
-		try: binge = int(parameters.get('binge'))
-		except: binge = None
-		try: reload = tools.Converter.boolean(parameters.get('reload'))
-		except: reload = True
-		handleMode = parameters.get('handleMode')
-		core.Core(media = media, kids = kids).playCache(source = source, metadata = metadata, handleMode = handleMode, binge = binge, reload = reload)
-
-	elif action == 'playLocal':
-		from lib.modules import core
-		try: binge = int(parameters.get('binge'))
-		except: binge = None
-		path = parameters.get('path')
-		downloadType = parameters.get('downloadType')
-		downloadId = parameters.get('downloadId')
-		core.Core(media = media, kids = kids).playLocal(path = path, source = source, metadata = metadata, downloadType = downloadType, downloadId = downloadId, binge = binge)
+	elif action == 'playbackReload':
+		from lib.modules.playback import Playback
+		media = parameters.get('media')
+		history = tools.Converter.boolean(parameters.get('history'))
+		progress = tools.Converter.boolean(parameters.get('progress'))
+		rating = tools.Converter.boolean(parameters.get('rating'))
+		arrival = tools.Converter.boolean(parameters.get('arrival'))
+		accelerate = tools.Converter.boolean(parameters.get('accelerate'))
+		force = tools.Converter.boolean(parameters.get('force'))
+		Playback.instance().reload(media = media, history = history, progress = progress, rating = rating, arrival = arrival, accelerate = accelerate, force = force, wait = True)
 
 ####################################################
 # CLEAN
@@ -884,54 +1174,14 @@ elif action.startswith('clean'):
 		tools.Cleanup.clean(settings = settings)
 
 ####################################################
-# VERIFICATION
+# ACCOUNTS
 ####################################################
 
-elif action.startswith('verification'):
+elif action.startswith('accounts'):
 
-	if action == 'verificationNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).verificationNavigator()
-
-	elif action == 'verificationAccounts':
+	if action == 'accountsVerify':
 		from lib.modules.account import Account
 		Account.verifyDialog()
-
-####################################################
-# SEARCH
-####################################################
-
-elif action.startswith('search'):
-
-	if action == 'search':
-		query = parameters.get('query')
-		if query: # Called from TmdbHelper.
-			media = parameters.get('media')
-			if tools.Media.typeTelevision(media):
-				from lib.indexers.shows import Shows
-				Shows(kids = kids).search(query = query, direct = True)
-			else:
-				from lib.indexers.movies import Movies
-				Movies(media = media, kids = kids).search(query = query, direct = True)
-		else:
-			from lib.indexers.navigator import Navigator
-			Navigator(media = media, kids = kids).search()
-
-	elif action == 'searchExact':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).searchExact()
-
-	elif action == 'searchHistory':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).searchHistory()
-
-	elif action == 'searchHistoryMovies':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).searchHistoryMovies()
-
-	elif action == 'searchHistoryShows':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).searchHistoryShows()
 
 ####################################################
 # PROVIDERS
@@ -976,22 +1226,39 @@ elif action.startswith('download'):
 		try:
 			interface.Loader.show()
 
-			from lib.modules import core
-			from lib.modules import downloader
+			from lib.modules.core import Core
+			from lib.modules.downloader import Downloader
 
+			media = parameters.get('media')
 			downloadType = parameters.get('downloadType')
 			downloadId = parameters.get('downloadId')
 			refresh = tools.Converter.boolean(parameters.get('refresh'))
-			downer = downloader.Downloader(downloadType)
+			downer = Downloader(downloadType)
 			if downloadId is None:
-				image = parameters.get('image')
 				handleMode = parameters.get('handleMode')
-				link = core.Core(media = media, kids = kids).sourceResolve(source, info = True, internal = False, download = True, handleMode = handleMode)['link']
+				link = Core(media = media).sourceResolve(source, info = True, internal = False, download = True, handleMode = handleMode)['link']
 				if link is None:
 					interface.Loader.hide()
 				else:
-					title = tools.Media.title(type = media, metadata = metadata)
-					downer.download(media = media, title = title, link = link, image = image, metadata = metadata, source = tools.Converter.jsonTo(source), refresh = refresh)
+					from lib.meta.manager import MetaManager
+					from lib.meta.image import MetaImage
+
+					imdb = parameters.get('imdb')
+					tmdb = parameters.get('tmdb')
+					tvdb = parameters.get('tvdb')
+					trakt = parameters.get('trakt')
+					season = parameters.get('season')
+					if not season is None: season = int(season)
+					episode = parameters.get('episode')
+					if not episode is None: episode = int(episode)
+
+					metadata = MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
+					if metadata:
+						image = MetaImage.getPoster(data = metadata)
+						image = image[0] if image else None
+
+						title = tools.Title.title(media = media, metadata = metadata)
+						downer.download(media = Downloader.MediaShow if tools.Media.isSerie(media) else Downloader.MediaMovie if tools.Media.isFilm(media) else Downloader.MediaOther, title = title, link = link, image = image, metadata = metadata, source = tools.Converter.jsonTo(source), refresh = refresh)
 			else:
 				downer.download(id = downloadId, forceAction = True, refresh = refresh)
 		except:
@@ -1000,63 +1267,48 @@ elif action.startswith('download'):
 
 	if action == 'downloadExecute':
 		import sys
-		from lib.modules import downloader
-		downloader.Downloader.execute(action = tools.System.arguments(3), type = tools.System.arguments(4), id = tools.System.arguments(5), observation = tools.System.arguments(6))
+		from lib.modules.downloader import Downloader
+		Downloader.execute(action = tools.System.arguments(3), type = tools.System.arguments(4), id = tools.System.arguments(5), observation = tools.System.arguments(6))
 
 	elif action == 'downloadDetails':
-		from lib.modules import downloader
+		from lib.modules.downloader import Downloader
 		downloadType = parameters.get('downloadType')
 		downloadId = parameters.get('downloadId')
-		downloader.Downloader(type = downloadType, id = downloadId).details()
-
-	elif action == 'downloads':
-		from lib.indexers.navigator import Navigator
-		downloadType = parameters.get('downloadType')
-		Navigator(media = media, kids = kids).downloads(downloadType)
+		Downloader(type = downloadType, id = downloadId).details()
 
 	elif action == 'downloadsManager':
-		from lib.modules import downloader
+		from lib.modules.downloader import Downloader
 		downloadType = parameters.get('downloadType')
-		if downloadType is None: downloadType = downloader.Downloader.TypeManual
-		downer = downloader.Downloader(type = downloadType)
-		downer.items(status = downloader.Downloader.StatusAll, refresh = False)
-
-	elif action == 'downloadsBrowse':
-		from lib.indexers.navigator import Navigator
-		downloadType = parameters.get('downloadType')
-		downloadError = parameters.get('downloadError')
-		Navigator(media = media, kids = kids).downloadsBrowse(downloadType, downloadError)
+		if downloadType is None: downloadType = Downloader.TypeManual
+		downer = Downloader(type = downloadType)
+		downer.items(status = Downloader.StatusAll, refresh = False)
 
 	elif action == 'downloadsList':
+		media = parameters.get('media')
 		downloadType = parameters.get('downloadType')
 		downloadStatus = parameters.get('downloadStatus')
-		if downloadStatus is None:
-			from lib.indexers.navigator import Navigator
-			Navigator(media = media, kids = kids).downloadsList(downloadType)
-		else:
-			from lib.modules import downloader
-			downer = downloader.Downloader(downloadType)
-			# Do not refresh the list using a thread. Seems like the thread is not always stopped and then it ends with multiple threads updating the list.
-			# During the update duration multiple refreshes sometimes happen due to this. Hence, you will see the loader flash multiple times during the 10 secs.
-			# Also, with a fresh the front progress dialog also flashes and reset it's focus.
-			#downer.items(status = status, refresh = True)
-			downer.items(status = downloadStatus, refresh = False)
+
+		from lib.modules.downloader import Downloader
+		downer = Downloader(downloadType)
+		# Do not refresh the list using a thread. Seems like the thread is not always stopped and then it ends with multiple threads updating the list.
+		# During the update duration multiple refreshes sometimes happen due to this. Hence, you will see the loader flash multiple times during the 10 secs.
+		# Also, with a fresh the front progress dialog also flashes and reset it's focus.
+		#downer.items(status = status, refresh = True)
+		downer.items(status = downloadStatus, refresh = False)
 
 	elif action == 'downloadsClear':
+		media = parameters.get('media')
 		downloadType = parameters.get('downloadType')
 		downloadStatus = parameters.get('downloadStatus')
-		if downloadStatus is None:
-			from lib.indexers.navigator import Navigator
-			Navigator(media = media, kids = kids).downloadsClear(downloadType)
-		else:
-			from lib.modules import downloader
-			downer = downloader.Downloader(downloadType)
-			downer.clear(status = downloadStatus)
+
+		from lib.modules.downloader import Downloader
+		downer = Downloader(downloadType)
+		downer.clear(status = downloadStatus)
 
 	elif action == 'downloadsRefresh':
-		from lib.modules import downloader
+		from lib.modules.downloader import Downloader
 		downloadType = parameters.get('downloadType')
-		downer = downloader.Downloader(downloadType)
+		downer = Downloader(downloadType)
 		downer.itemsRefresh()
 
 	elif action == 'downloadsSettings':
@@ -1064,96 +1316,8 @@ elif action.startswith('download'):
 
 	elif action == 'downloadCloud':
 		from lib.modules import core
-		core.Core(media = media, kids = kids).sourceCloud(source)
-
-####################################################
-# KIDS
-####################################################
-
-elif action.startswith('kids'):
-
-	if action == 'kids':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).kids()
-
-	elif action == 'kidsLock':
-		tools.Kids.lock()
-
-	elif action == 'kidsUnlock':
-		tools.Kids.unlock()
-
-####################################################
-# DOCUMENTARIES
-####################################################
-
-elif action.startswith('documentaries'):
-
-	if action == 'documentaries':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = tools.Media.TypeDocumentary, kids = kids).movies()
-
-####################################################
-# SHORTS
-####################################################
-
-elif action.startswith('shorts'):
-
-	if action == 'shorts':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = tools.Media.TypeShort, kids = kids).movies()
-
-####################################################
-# SHORTS
-####################################################
-
-elif action.startswith('channels'):
-
-	if action == 'channels':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).channels()
-
-	elif action == 'channelsIndividuals':
-		from lib.indexers.channels import Channels
-		Channels(media = media, kids = kids).channels()
-
-	elif action == 'channelsBroadcasters':
-		from lib.indexers.channels import Channels
-		Channels(media = media, kids = kids).broadcasters()
-
-	elif action == 'channelsRetrieve':
-		from lib.indexers.channels import Channels
-		link = parameters.get('link')
-		Channels(media = media, kids = kids).retrieve(link = link)
-
-####################################################
-# SERVICES
-####################################################
-
-elif action.startswith('services'):
-
-	if action == 'servicesNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesNavigator()
-
-	elif action == 'servicesPremiumNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesPremiumNavigator()
-
-	elif action == 'servicesScraperNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesScraperNavigator()
-
-	elif action == 'servicesResolverNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesResolverNavigator()
-
-	elif action == 'servicesDownloaderNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesDownloaderNavigator()
-
-	elif action == 'servicesUtilityNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).servicesUtilityNavigator()
+		media = parameters.get('media')
+		core.Core(media = media).sourceCloud(source)
 
 ####################################################
 # SERVICE
@@ -1176,23 +1340,11 @@ elif action.startswith('service'):
 elif action.startswith('oracle'):
 
 	if action == 'oracle':
-		# Hitting the ENTER key twice shortly after each other calls this endpoint twice.
-		property = 'GaiaOracleBusy'
-		id = tools.System.windowPropertyGet(property)
-		time = tools.Time.timestamp()
-
-		# In case a previous search did not clear the property, allow a new scrape after 2 seconds.
-		if not id or (time - int(id) > 2):
-			try:
-				tools.System.windowPropertySet(property, str(time))
-				from lib.oracle import Oracle
-				media = parameters.get('media')
-				full = tools.Converter.boolean(parameters.get('full'))
-				history = parameters.get('history')
-				if history: history = tools.System.commandDecode(history)
-				Oracle.show(media = media, full = full, history = history)
-			except: tools.Logger.error()
-			tools.System.windowPropertyClear(property)
+		from lib.oracle import Oracle
+		media = parameters.get('media')
+		full = tools.Converter.boolean(parameters.get('full'))
+		history = parameters.get('history')
+		Oracle.execute(media = media, full = full, history = history)
 
 	elif action == 'oracleMenu':
 		from lib.oracle import Oracle
@@ -1235,15 +1387,6 @@ elif action.startswith('premiumize'):
 		from lib.debrid import premiumize
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		premiumize.Interface().accountAuthentication(settings = settings)
-
-	elif action == 'premiumizeNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).premiumizeNavigator()
-
-	elif action == 'premiumizeDownloadsNavigator':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).premiumizeDownloadsNavigator(lite = lite)
 
 	elif action == 'premiumizeList':
 		from lib.debrid import premiumize
@@ -1302,16 +1445,6 @@ elif action.startswith('offcloud'):
 		from lib.debrid import offcloud
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		offcloud.Interface().accountAuthentication(settings = settings)
-
-	elif action == 'offcloudNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).offcloudNavigator()
-
-	elif action == 'offcloudDownloadsNavigator':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		category = parameters.get('category')
-		Navigator(media = media, kids = kids).offcloudDownloadsNavigator(lite = lite, category = category)
 
 	elif action == 'offcloudList':
 		from lib.debrid import offcloud
@@ -1379,15 +1512,6 @@ elif action.startswith('realdebrid'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		realdebrid.Interface().accountAuthentication(settings = settings)
 
-	elif action == 'realdebridNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).realdebridNavigator()
-
-	elif action == 'realdebridDownloadsNavigator':
-		from lib.indexers.navigator import Navigator
-		lite = tools.Converter.boolean(parameters.get('lite'))
-		Navigator(media = media, kids = kids).realdebridDownloadsNavigator(lite = lite)
-
 	elif action == 'realdebridList':
 		from lib.debrid import realdebrid
 		realdebrid.Interface().directoryList()
@@ -1431,10 +1555,6 @@ elif action.startswith('easynews'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		easynews.Interface().accountAuthentication(settings = settings)
 
-	elif action == 'easynewsNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).easynewsNavigator()
-
 	elif action == 'easynewsAccount':
 		from lib.debrid import easynews
 		easynews.Interface().account()
@@ -1448,7 +1568,7 @@ elif action.startswith('easynews'):
 		easynews.Core().vpn(open = True)
 
 	elif action == 'easynewsSettings':
-		tools.Settings.launch(id = 'premium.realdebrid.easynews')
+		tools.Settings.launch(id = 'premium.easynews.enabled')
 
 ####################################################
 # EMBY
@@ -1456,11 +1576,7 @@ elif action.startswith('easynews'):
 
 elif action.startswith('emby'):
 
-	if action == 'embyNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).embyNavigator()
-
-	elif action == 'embySettings':
+	if action == 'embySettings':
 		from lib.modules.center import Emby
 		Emby().settings()
 
@@ -1474,11 +1590,7 @@ elif action.startswith('emby'):
 
 elif action.startswith('jellyfin'):
 
-	if action == 'jellyfinNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).jellyfinNavigator()
-
-	elif action == 'jellyfinSettings':
+	if action == 'jellyfinSettings':
 		from lib.modules.center import Jellyfin
 		Jellyfin().settings()
 
@@ -1492,11 +1604,7 @@ elif action.startswith('jellyfin'):
 
 elif action.startswith('elementum'):
 
-	if action == 'elementumNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).elementumNavigator()
-
-	elif action == 'elementumConnect':
+	if action == 'elementumConnect':
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.Elementum.connect(install = False, settings = settings)
 
@@ -1520,11 +1628,7 @@ elif action.startswith('elementum'):
 
 elif action.startswith('quasar'):
 
-	if action == 'quasarNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).quasarNavigator()
-
-	elif action == 'quasarConnect':
+	if action == 'quasarConnect':
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.Quasar.connect(install = False, settings = settings)
 
@@ -1570,11 +1674,7 @@ elif action.startswith('resolver'):
 
 elif action.startswith('resolveurl'):
 
-	if action == 'resolveurlNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).resolveurlNavigator()
-
-	elif action == 'resolveurlSettings':
+	if action == 'resolveurlSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.ResolveUrl.settings(settings = settings)
 
@@ -1593,11 +1693,7 @@ elif action.startswith('resolveurl'):
 
 elif action.startswith('urlresolver'):
 
-	if action == 'urlresolverNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).urlresolverNavigator()
-
-	elif action == 'urlresolverSettings':
+	if action == 'urlresolverSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.UrlResolver.settings(settings = settings)
 
@@ -1616,11 +1712,7 @@ elif action.startswith('urlresolver'):
 
 elif action.startswith('opescrapers'):
 
-	if action == 'opescrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).opescrapersNavigator()
-
-	elif action == 'opescrapersSettings':
+	if action == 'opescrapersSettings':
 		tools.OpeScrapers.settings()
 
 	elif action == 'opescrapersProviders':
@@ -1636,11 +1728,7 @@ elif action.startswith('opescrapers'):
 
 elif action.startswith('fenscrapers'):
 
-	if action == 'fenscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).fenscrapersNavigator()
-
-	elif action == 'fenscrapersSettings':
+	if action == 'fenscrapersSettings':
 		tools.FenScrapers.settings()
 
 	elif action == 'fenscrapersProviders':
@@ -1656,11 +1744,7 @@ elif action.startswith('fenscrapers'):
 
 elif action.startswith('oatscrapers'):
 
-	if action == 'oatscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).oatscrapersNavigator()
-
-	elif action == 'oatscrapersSettings':
+	if action == 'oatscrapersSettings':
 		tools.OatScrapers.settings()
 
 	elif action == 'oatscrapersProviders':
@@ -1677,11 +1761,7 @@ elif action.startswith('oatscrapers'):
 
 elif action.startswith('crescrapers'):
 
-	if action == 'crescrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).crescrapersNavigator()
-
-	elif action == 'crescrapersSettings':
+	if action == 'crescrapersSettings':
 		tools.CreScrapers.settings()
 
 	elif action == 'crescrapersProviders':
@@ -1697,11 +1777,7 @@ elif action.startswith('crescrapers'):
 
 elif action.startswith('lamscrapers'):
 
-	if action == 'lamscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).lamscrapersNavigator()
-
-	elif action == 'lamscrapersSettings':
+	if action == 'lamscrapersSettings':
 		tools.LamScrapers.settings()
 
 	elif action == 'lamscrapersProviders':
@@ -1717,11 +1793,7 @@ elif action.startswith('lamscrapers'):
 
 elif action.startswith('civscrapers'):
 
-	if action == 'civscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).civscrapersNavigator()
-
-	elif action == 'civscrapersSettings':
+	if action == 'civscrapersSettings':
 		tools.CivScrapers.settings()
 
 	elif action == 'civscrapersProviders':
@@ -1737,11 +1809,7 @@ elif action.startswith('civscrapers'):
 
 elif action.startswith('gloscrapers'):
 
-	if action == 'gloscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).gloscrapersNavigator()
-
-	elif action == 'gloscrapersSettings':
+	if action == 'gloscrapersSettings':
 		tools.GloScrapers.settings()
 
 	elif action == 'gloscrapersProviders':
@@ -1757,11 +1825,7 @@ elif action.startswith('gloscrapers'):
 
 elif action.startswith('uniscrapers'):
 
-	if action == 'uniscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).uniscrapersNavigator()
-
-	elif action == 'uniscrapersSettings':
+	if action == 'uniscrapersSettings':
 		tools.UniScrapers.settings()
 
 	elif action == 'uniscrapersProviders':
@@ -1777,11 +1841,7 @@ elif action.startswith('uniscrapers'):
 
 elif action.startswith('nanscrapers'):
 
-	if action == 'nanscrapersNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).nanscrapersNavigator()
-
-	elif action == 'nanscrapersSettings':
+	if action == 'nanscrapersSettings':
 		tools.NanScrapers.settings()
 
 	elif action == 'nanscrapersProviders':
@@ -1800,10 +1860,6 @@ elif action.startswith('youtube'):
 		from lib.modules import video
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		video.Video.authentication(settings = settings)
-
-	elif action == 'youtubeNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).youtubeNavigator()
 
 	elif action == 'youtubeSettings':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -1829,11 +1885,7 @@ elif action.startswith('youtube'):
 
 elif action.startswith('upnext'):
 
-	if action == 'upnextNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).upnextNavigator()
-
-	elif action == 'upnextSettings':
+	if action == 'upnextSettings':
 		tools.UpNext.settings()
 
 	elif action == 'upnextInstall':
@@ -1845,11 +1897,7 @@ elif action.startswith('upnext'):
 
 elif action.startswith('tmdbhelper'):
 
-	if action == 'tmdbhelperNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).tmdbhelperNavigator()
-
-	elif action == 'tmdbhelperLaunch':
+	if action == 'tmdbhelperLaunch':
 		tools.TmdbHelper.launch()
 
 	elif action == 'tmdbhelperSettings':
@@ -1867,11 +1915,7 @@ elif action.startswith('tmdbhelper'):
 
 elif action.startswith('vpnmanager'): # Make sure this is placed BEFORE the 'vpn' category.
 
-	if action == 'vpnmanagerNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).vpnmanagerNavigator()
-
-	elif action == 'vpnmanagerLaunch':
+	if action == 'vpnmanagerLaunch':
 		tools.VpnManager.launch()
 
 	elif action == 'vpnmanagerSettings':
@@ -1906,12 +1950,7 @@ elif action.startswith('bluetooth'):
 
 elif action.startswith('speedtest'):
 
-	if action == 'speedtestNavigator':
-		from lib.indexers.navigator import Navigator
-		from lib.modules import speedtest
-		Navigator().speedtestNavigator()
-
-	elif action == 'speedtest':
+	if action == 'speedtest':
 		from lib.modules import speedtest
 		speedtest.SpeedTester.select(parameters.get('update'))
 
@@ -1945,7 +1984,7 @@ elif action.startswith('speedtest'):
 
 elif action.startswith('lottery'):
 
-	if action == 'lotteryVoucher':
+	if action == 'lottery' or action == 'lotteryVoucher':
 		from lib.modules import api
 		api.Api.lotteryVoucher()
 
@@ -1957,9 +1996,11 @@ elif action.startswith('informer'):
 
 	if action == 'informerDialog':
 		from lib.informers import Informer
+		media = parameters.get('media')
 		imdb = parameters.get('imdb')
 		tmdb = parameters.get('tmdb')
 		tvdb = parameters.get('tvdb')
+		trakt = parameters.get('trakt')
 		title = parameters.get('title')
 		year = parameters.get('year')
 		if year: year = int(year)
@@ -1967,13 +2008,7 @@ elif action.startswith('informer'):
 		if not season is None: season = int(season)
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
-		Informer.show(type = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, metadata = metadata)
-
-	elif action == 'informerNavigator':
-		from lib.informers import Informer
-		id = parameters.get('id')
-		if id: Informer.instance(id).navigator()
-		else: Informer.navigators()
+		Informer.show(type = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode)
 
 	elif action == 'informerSettings':
 		from lib.informers import Informer
@@ -1992,24 +2027,6 @@ elif action.startswith('informer'):
 		Informer.instance(id).launch()
 
 ####################################################
-# HISTORY
-####################################################
-
-elif action.startswith('history'):
-
-	if action == 'history':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).history()
-
-	elif action == 'historyType':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).historyType()
-
-	elif action == 'historyStream':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).historyStream()
-
-####################################################
 # FANART
 ####################################################
 
@@ -2026,19 +2043,7 @@ elif action.startswith('fanart'):
 
 elif action.startswith('imdb'):
 
-	if action == 'imdbMovies':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).imdbMovies()
-
-	elif action == 'imdbTv':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).imdbTv()
-
-	elif action == 'imdbExport':
-		from lib.modules import trakt as Trakt
-		Trakt.imdbImport()
-
-	elif action == 'imdbAuthentication':
+	if action == 'imdbAuthentication':
 		from lib.modules.account import Imdb
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		Imdb().authenticate(settings = settings)
@@ -2071,24 +2076,9 @@ elif action.startswith('tmdb'):
 
 elif action.startswith('trakt'):
 
-	if action == 'traktMovies':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).traktMovies()
-
-	elif action == 'traktMoviesLists':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).traktMoviesLists()
-
-	elif action == 'traktTv':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).traktTv()
-
-	elif action == 'traktTvLists':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).traktTvLists()
-
-	elif action == 'traktManager':
+	if action == 'traktManager':
 		from lib.modules import trakt as Trakt
+		media = parameters.get('media')
 		imdb = parameters.get('imdb')
 		tmdb = parameters.get('tmdb')
 		tvdb = parameters.get('tvdb')
@@ -2097,7 +2087,7 @@ elif action.startswith('trakt'):
 		if not season is None: season = int(season)
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
-		Trakt.manager(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
+		Trakt.manager(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
 	elif action == 'traktAuthentication':
 		from lib.modules import trakt as Trakt
@@ -2107,10 +2097,6 @@ elif action.startswith('trakt'):
 	elif action == 'traktListAdd':
 		from lib.modules import trakt as Trakt
 		Trakt.listAdd()
-
-	elif action == 'traktImport':
-		from lib.modules import trakt as Trakt
-		Trakt.imdbImport()
 
 ####################################################
 # OPENSUBTITLES
@@ -2129,11 +2115,7 @@ elif action.startswith('opensubtitles'):
 
 elif action.startswith('network'):
 
-	if action == 'networkNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).networkNavigator()
-
-	elif action == 'networkInformation':
+	if action == 'networkInformation':
 		from lib.modules.network import Geolocator
 		Geolocator.dialog()
 
@@ -2149,11 +2131,7 @@ elif action.startswith('network'):
 
 elif action.startswith('vpn'):
 
-	if action == 'vpnNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).vpnNavigator()
-
-	elif action == 'vpnVerify':
+	if action == 'vpnVerify':
 		from lib.modules import vpn
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		vpn.Vpn.verification(settings = settings)
@@ -2195,18 +2173,6 @@ elif action.startswith('extensions'):
 	elif action == 'extensionsHelp':
 		tools.Extension.help(full = True)
 
-	elif action == 'extensionsNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).extensionsNavigator()
-
-	elif action == 'extensionsAvailableNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).extensionsAvailableNavigator()
-
-	elif action == 'extensionsInstalledNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).extensionsInstalledNavigator()
-
 ####################################################
 # THEME
 ####################################################
@@ -2227,11 +2193,7 @@ elif action.startswith('theme'):
 
 elif action.startswith('backup'):
 
-	if action == 'backupNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).backupNavigator()
-
-	elif action == 'backupAutomatic':
+	if action == 'backup' or action == 'backupAutomatic':
 		tools.Backup.automatic()
 
 	elif action == 'backupImport':
@@ -2246,11 +2208,7 @@ elif action.startswith('backup'):
 
 elif action.startswith('settings'):
 
-	if action == 'settingsNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).settingsNavigator()
-
-	elif action == 'settingsAdvanced':
+	if action == 'settings' or action == 'settingsAdvanced':
 		id = parameters.get('id')
 		tools.Settings.launch(id = id)
 
@@ -2290,7 +2248,8 @@ elif action.startswith('settings'):
 			except: pass
 		none = tools.Converter.boolean(parameters.get('none'))
 		automatic = tools.Converter.boolean(parameters.get('automatic'))
-		tools.Country.settingsSelect(id = id, title = title, none = none, automatic = automatic)
+		frequency = tools.Converter.boolean(parameters.get('frequency'))
+		tools.Country.settingsSelect(id = id, title = title, none = none, automatic = automatic, frequency = frequency)
 
 	elif action == 'settingsLayout':
 		from lib.modules.interface import Loader
@@ -2376,6 +2335,11 @@ elif action.startswith('settings'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.Sound.settingsUpdate(settings = settings)
 
+	elif action == 'settingsEnvironment':
+		from lib.modules.environment import Environment
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Environment.test(settings = settings)
+
 ####################################################
 # DONATIONS
 ####################################################
@@ -2388,31 +2352,23 @@ elif action.startswith('donations'):
 		tools.Donations.show(type = type)
 
 ####################################################
-# SHORTCUTS
+# SHORTCUT
 ####################################################
 
-elif action.startswith('shortcuts'):
+elif action.startswith('shortcut'):
 
-	if action == 'shortcutsShow':
-		from lib.modules import shortcuts
-		location = parameters.get('location')
+	if action == 'shortcutShow':
 		id = parameters.get('id')
-		link = parameters.get('link')
-		name = parameters.get('name')
+		label = parameters.get('label')
+		command = parameters.get('command')
+		folder = tools.Converter.boolean(parameters.get('folder'))
 		create = tools.Converter.boolean(parameters.get('create'))
 		delete = tools.Converter.boolean(parameters.get('delete'))
-		shortcuts.Shortcuts().show(location = location, id = id, link = link, name = name, create = create, delete = delete)
+		Shortcut.instance().show(id = id, label = label, command = command, folder = folder, create = create, delete = delete)
 
-	elif action == 'shortcutsNavigator':
-		from lib.indexers.navigator import Navigator
-		location = parameters.get('location')
-		Navigator(media = media, kids = kids).shortcutsNavigator(location = location)
-
-	elif action == 'shortcutsOpen':
-		from lib.modules import shortcuts
-		location = parameters.get('location')
+	elif action == 'shortcutOpen':
 		id = parameters.get('id')
-		shortcuts.Shortcuts().open(location = location, id = id)
+		Shortcut.instance().open(id = id)
 
 ####################################################
 # LIBRARY
@@ -2420,40 +2376,24 @@ elif action.startswith('shortcuts'):
 
 elif action.startswith('library'):
 
-	if action == 'libraryNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).libraryNavigator()
-
-	elif action == 'libraryLocalNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).libraryLocalNavigator()
-
-	elif action == 'libraryBrowseNavigator':
-		from lib.indexers.navigator import Navigator
-		error = tools.Converter.boolean(parameters.get('error'))
-		Navigator(media = media, kids = kids).libraryBrowseNavigator(error = error)
-
-	elif action == 'libraryAdd':
-		from lib.modules import library
+	if action == 'libraryAdd':
+		from lib.modules.library import Library
 		precheck = tools.Converter.boolean(parameters.get('precheck'))
-		metadata = parameters.get('metadata')
 		link = parameters.get('link')
+		media = parameters.get('media')
 		imdb = parameters.get('imdb')
 		tmdb = parameters.get('tmdb')
 		tvdb = parameters.get('tvdb')
-		title = parameters.get('title')
-		if title: title = tools.Converter.quoteFrom(title)
-		year = parameters.get('year')
-		if year: year = int(year)
+		trakt = parameters.get('trakt')
 		season = parameters.get('season')
 		if not season is None: season = int(season)
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
-		library.Library(media = media, kids = kids).add(link = link, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, precheck = precheck)
+		Library(media = media).add(link = link, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, precheck = precheck)
 
 	elif action == 'libraryResolve':
-		from lib.modules import library
-		metadata = parameters.get('location')
+		from lib.modules.library import Library
+		media = parameters.get('media')
 		title = parameters.get('title')
 		if title: title = tools.Converter.quoteFrom(title)
 		year = parameters.get('year')
@@ -2462,28 +2402,32 @@ elif action.startswith('library'):
 		if not season is None: season = int(season)
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
-		library.Library(media = media, kids = kids).resolve(title = title, year = year, season = season, episode = episode)
+		Library(media = media).resolve(title = title, year = year, season = season, episode = episode)
 
 	elif action == 'libraryRefresh':
-		from lib.modules import library
-		library.Library(media = media).refresh()
+		from lib.modules.library import Library
+		media = parameters.get('media')
+		Library(media = media).refresh()
 
 	elif action == 'libraryUpdate':
-		from lib.modules import library
+		from lib.modules.library import Library
+		media = parameters.get('media')
 		force = tools.Converter.boolean(parameters.get('force'))
-		library.Library.update(force = force, media = media)
+		Library.update(force = force, media = media)
 
 	elif action == 'libraryClean':
-		from lib.modules import library
-		library.Library(media = media).clean()
+		from lib.modules.library import Library
+		media = parameters.get('media')
+		Library(media = media).clean()
 
 	elif action == 'libraryLocal':
-		from lib.modules import library
-		library.Library(media = media).local()
+		from lib.modules.library import Library
+		media = parameters.get('media')
+		Library(media = media).local()
 
 	elif action == 'librarySettings':
-		from lib.modules import library
-		library.Library.settings()
+		from lib.modules.library import Library
+		Library.settings()
 
 ####################################################
 # SUPPORT
@@ -2491,13 +2435,13 @@ elif action.startswith('library'):
 
 elif action.startswith('support'):
 
-	if action == 'supportBugs':
+	if action == 'supportMenu':
+		from lib.modules import support
+		support.Support.menu()
+
+	elif action == 'supportBugs':
 		from lib.modules import support
 		support.Support.bugs()
-
-	elif action == 'supportNavigator':
-		from lib.modules import support
-		support.Support.navigator()
 
 	elif action == 'supportCategories':
 		from lib.modules import support
@@ -2521,11 +2465,7 @@ elif action.startswith('support'):
 
 elif action.startswith('orion'):
 
-	if action == 'orionNavigator':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).orionNavigator()
-
-	elif action == 'orionInitialize':
+	if action == 'orionInitialize':
 		try:
 			from lib.modules import orionoid
 			settings = parameters.get('settings')
@@ -2597,285 +2537,22 @@ elif action.startswith('orion'):
 		try:
 			from lib.modules import orionoid
 			notification = tools.Converter.boolean(parameters.get('notification'), none = True)
-			orionoid.Orionoid().streamVote(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), vote = orionoid.Orionoid.VoteUp, notification = True if notification is None else notification)
+			orionoid.Orionoid().streamVote(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), vote = orionoid.Orionoid.VoteUp, automatic = False, notification = True if notification is None else notification)
 		except: pass
 
 	elif action == 'orionVoteDown':
 		try:
 			from lib.modules import orionoid
 			notification = tools.Converter.boolean(parameters.get('notification'), none = True)
-			orionoid.Orionoid().streamVote(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), vote = orionoid.Orionoid.VoteDown, notification = True if notification is None else notification)
+			orionoid.Orionoid().streamVote(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), vote = orionoid.Orionoid.VoteDown, automatic = False, notification = True if notification is None else notification)
 		except: pass
 
 	elif action == 'orionRemove':
 		try:
 			from lib.modules import orionoid
 			notification = tools.Converter.boolean(parameters.get('notification'), none = True)
-			orionoid.Orionoid().streamRemove(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), notification = True if notification is None else notification)
+			orionoid.Orionoid().streamRemove(idItem = parameters.get('idItem'), idStream = parameters.get('idStream'), automatic = False, notification = True if notification is None else notification)
 		except: pass
-
-####################################################
-# SCRAPE
-####################################################
-
-elif action.startswith('scrape'):
-
-	if action == 'scrape':
-		'''
-			#################################################################################################################################################################
-			# FOR 3RD-PARTY DEVELOPERS                                                                                                                                      #
-			#################################################################################################################################################################
-
-			If you want to initiate a Gaia scrape from an external addon or widget, use the following command.
-
-			COMMAND:
-
-				plugin://plugin.video.gaia/?action=...&media=...&imdb=...&tmdb=...&tvdb=...&trakt=...&title=...&year=...&season=...&episode=...
-
-			PYTHON:
-
-				import xbmc
-				xbmc.executebuiltin("RunPlugin(plugin://plugin.video.gaia/?action=scrape&<other parameters here>)")
-
-			PARAMETERS:
-
-				- action (required): scrape
-				- media (required): movie|show
-				- imdb (optional): IMDb ID.
-				- tmdb (optional): TMDb ID.
-				- tvdb (optional): TVDb ID.
-				- trakt (optional): Trakt ID.
-				- title (optional): URL-encoded title. For shows this is the show title, not the episode title.
-				- year (optional): Year of release. For shows this is the year the 1st season/episode was released.
-				- season (optional): The season number. Only required for shows. Specials have 0 as season number.
-				- episode (optional): The episode number. Only required for shows.
-
-				All other parameters used by this endpoint are not required. Gaia will automatically fill in these parameters based
-				on the user's settings and the metadata retrieved from the above parameters.
-
-			LOOKUP:
-
-				- You can scrape by using a single or multiple IDs, by providing a title and year, or both.
-				- Scraping by ID is always better, faster, and more reliable than scraping by title and year.
-				- If IDs are provided, no title or year is required.
-				- If a title is provided, a year is not required. However, a year will substantially improve the chances of picking
-				  the correct title, especially if there are multiple movies/shows with the same title, but released in different years.
-
-			IDS:
-
-				The best way to scrape is by using an ID. You can pass in IDs from multiple providers and let Gaia figure out which
-				one to use. The reliability and accuracy of IDs is as follows (from most reliable to least reliable):
-
-				- Movies: IMDb, TMDb, Trakt, (TVDb)
-				- Shows: IMDb, TVDb, Trakt, (TMDb)
-
-				You should avoid searching movies by TVDb ID and shows by TMDb ID. Although it might work in some cases, most of the time
-				nothing will be found. If you have IDs from multiple providers, just pass all of them in.
-
-			EXAMPLES:
-
-				- Movies:
-					- Search by single ID:
-						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190
-						plugin://plugin.video.gaia/?action=scrape&media=movie&tmdb=76341
-						plugin://plugin.video.gaia/?action=scrape&media=movie&trakt=56360
-					- Search by multiple IDs:
-						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360
-					- Search by title and year:
-						plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road&year=2015
-					- Search by title:
-						plugin://plugin.video.gaia/?action=scrape&media=movie&title=Mad%20Max%3A%20Fury%20Road
-					- Search by anything:
-						plugin://plugin.video.gaia/?action=scrape&media=movie&imdb=tt1392190&tmdb=76341&trakt=56360&title=Mad%20Max%3A%20Fury%20Road&year=2015
-
-				- Shows:
-					- Search by single ID:
-						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&season=8&episode=2
-						plugin://plugin.video.gaia/?action=scrape&media=show&tvdb=121361&season=8&episode=2
-						plugin://plugin.video.gaia/?action=scrape&media=show&trakt=1390&season=8&episode=2
-					- Search by multiple IDs:
-						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&season=8&episode=2
-					- Search by title and year:
-						plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&year=2011&season=8&episode=2
-					- Search by title:
-						plugin://plugin.video.gaia/?action=scrape&media=show&title=Game%20of%20Thrones&season=8&episode=2
-					- Search by anything:
-						plugin://plugin.video.gaia/?action=scrape&media=show&imdb=tt0944947&tvdb=121361&trakt=1390&title=Game%20of%20Thrones&year=2011&season=8&episode=2
-
-			#################################################################################################################################################################
-		'''
-
-		# Sometimes when using the Kore remote app and clicking on a movie/episode to start a scrape, the user might accidentally click twice, which starts the scraping process twice.
-		# This is not a huge issue for other endpoints, but the scrape endpoint starts many threads and uses many resources, and should be avoided.
-		# This is not a perfect solution, since both processes might call windowPropertyGet() before the other process is able to call windowPropertySet().
-		# If the double scrape still happens in the future, we need a more advanced solution.
-		# One way would be to rename this endpoint to “scrapeNow” and create another endpoint “scrape”.
-		# “scrape” checks and sets the global property, and if not set, initiates the actual endpoint “scrapeNow” which clears the global property after scraping is done.
-		# “scrapeNow” also checks the global property again, just as a second safety.
-		# This would create a greater time gap between processes and would reduce the chance of both processes executing at the same time. However, it also requires two Python invokers, which slows down the starting of the scrape process.
-		# Update: Hitting the ENTER key twice shortly after each other calls this endpoint twice, but in all cases only one scrape was done. So it seems to work.
-
-		property = 'GaiaScrapeBusy'
-		id = tools.System.windowPropertyGet(property)
-		time = tools.Time.timestamp()
-
-		# In case a previous scrape did not clear the property, allow a new scrape after 10 seconds.
-		if not id or (time - int(id) > 10):
-			try:
-				tools.System.windowPropertySet(property, str(time))
-
-				try: silent = bool(parameters.get('silent'))
-				except: silent = False
-				try: binge = int(parameters.get('binge'))
-				except: binge = None
-
-				from lib.modules import interface
-				if not silent and not binge: interface.Loader.show()
-
-				from lib.modules import core
-				from lib.modules import video
-
-				# Already show here, since getConstants can take long when retrieving debrid service list.
-				if (not video.Trailer.cinemaEnabled() or tools.Settings.getBoolean('playback.autoplay.enabled')) and (not binge == tools.Binge.ModeBackground or binge == tools.Binge.ModeContinue): interface.Loader.show()
-
-				imdb = parameters.get('imdb')
-				tmdb = parameters.get('tmdb')
-				tvdb = parameters.get('tvdb')
-				trakt = parameters.get('trakt')
-
-				title = parameters.get('title')
-				tvshowtitle = parameters.get('tvshowtitle')
-
-				year = parameters.get('year')
-				premiered = parameters.get('premiered')
-
-				season = parameters.get('season')
-				episode = parameters.get('episode')
-
-				library = tools.Converter.boolean(parameters.get('library'))
-				autoplay = tools.Converter.boolean(parameters.get('autoplay'), none = True)
-				autopack = parameters.get('autopack')
-				preset = parameters.get('preset')
-				cache = tools.Converter.boolean(parameters.get('cache'), none = True)
-				try: pack = tools.Converter.dictionary(parameters.get('pack'))
-				except: pack = None
-				items = parameters.get('items')
-
-				# When called by TmdbHelper.
-				if imdb == 'None': imdb = None
-				if tmdb == 'None': tmdb = None
-				if tvdb == 'None': tvdb = None
-				if trakt == 'None': trakt = None
-				if title == 'None': title = None
-				if tvshowtitle == 'None': tvshowtitle = None
-				if year == 'None': year = None
-				if premiered == 'None': premiered = None
-				if season == 'None': season = None
-				if episode == 'None': episode = None
-
-				if year: year = int(year)
-				if not season is None: season = int(season)
-				if not episode is None: episode = int(episode)
-
-				core.Core(media = media, kids = kids, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, premiered = premiered, metadata = metadata, autopack = autopack, autoplay = autoplay, library = library, preset = preset, binge = binge, cache = cache, pack = pack, items = items)
-			except: tools.Logger.error()
-			tools.System.windowPropertyClear(property)
-
-	elif action == 'scrapeAgain':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapeAgain(link = link)
-
-	elif action == 'scrapeManual':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapeManual(link = link)
-
-	elif action == 'scrapeAutomatic':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapeAutomatic(link = link)
-
-	elif action == 'scrapePresetManual':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapePresetManual(link = link)
-
-	elif action == 'scrapePresetAutomatic':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapePresetAutomatic(link = link)
-
-	elif action == 'scrapeSingle':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapeSingle(link = link)
-
-	elif action == 'scrapeBinge':
-		from lib.modules import core
-		link = parameters.get('link')
-		core.Core(media = media, kids = kids).scrapeBinge(link = link)
-
-	elif action == 'scrapeExact':
-		from lib.modules import core
-		query = parameters.get('query')
-		core.Core(media = media, kids = kids).scrapeExact(query)
-
-	elif action == 'scrapeOptimize':
-		from lib.providers.core.manager import Manager
-		settings = tools.Converter.boolean(parameters.get('settings'))
-		Manager.optimizeScrape(settings = settings)
-
-####################################################
-# STREAMS
-####################################################
-
-elif action.startswith('streams'):
-
-	if action == 'streamsShow':
-		from lib.modules import core
-		from lib.modules import interface
-		autoplay = tools.Converter.boolean(parameters.get('autoplay'))
-		if autoplay: interface.Loader.show() # Only for autoplay, since showing the directory has its own loader.
-		direct = tools.Converter.boolean(parameters.get('direct'))
-		filter = tools.Converter.boolean(parameters.get('filterx'))
-		library = tools.Converter.boolean(parameters.get('library'))
-		initial = tools.Converter.boolean(parameters.get('initial'))
-		new = tools.Converter.boolean(parameters.get('new'))
-		add = tools.Converter.boolean(parameters.get('add'))
-		process = tools.Converter.boolean(parameters.get('process'))
-		try: binge = int(parameters.get('binge'))
-		except: binge = None
-		core.Core(media = media, kids = kids).showStreams(direct = direct, filter = filter, autoplay = autoplay, library = library, initial = initial, new = new, add = add, process = process, binge = binge)
-
-	elif action == 'streamsFilters':
-		from lib.modules.core import Core
-		Core(media = media, kids = kids).filterStreams()
-
-	elif action == 'streamsInformation':
-		from lib.modules.stream import Stream
-		Stream(data = source['stream']).dialog()
-
-	elif action == 'streamsVideo':
-		from lib.modules import video
-
-		link = parameters.get('link')
-
-		imdb = parameters.get('imdb')
-		tmdb = parameters.get('tmdb')
-		tvdb = parameters.get('tvdb')
-
-		title = parameters.get('title')
-		year = parameters.get('year')
-		if year: year = int(year)
-		season = parameters.get('season')
-		if not season is None: season = int(season)
-
-		mode = parameters.get('video')
-		selection = parameters.get('selection')
-		if not selection is None: selection = int(selection)
-
-		getattr(video, mode.capitalize())(media = media, kids = kids).play(imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, link = link, selection = selection)
 
 ####################################################
 # CONTEXT
@@ -2902,13 +2579,21 @@ elif action.startswith('qr'):
 			from lib.modules.interface import Loader
 			Loader.show() # Needs some time to load. Show busy.
 
-			if metadata:
-				media = parameters.get('media')
+			media = parameters.get('media')
+			if media:
+				imdb = parameters.get('imdb')
+				tmdb = parameters.get('tmdb')
+				tvdb = parameters.get('tvdb')
+				trakt = parameters.get('trakt')
+				season = parameters.get('season')
+				if not season is None: season = int(season)
+				episode = parameters.get('episode')
+				if not episode is None: episode = int(episode)
 				type = parameters.get('type')
 				search = parameters.get('search', True)
 				test = parameters.get('test', True)
 				fallback = parameters.get('fallback', True)
-				tools.Link.qr(type = type, media = media, metadata = metadata, search = search, test = test, fallback = fallback, loader = True)
+				tools.Link.qr(type = type, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, search = search, test = test, fallback = fallback, loader = True)
 			else:
 				link = parameters.get('link')
 				name = parameters.get('name')
@@ -2984,9 +2669,12 @@ elif action.startswith('file'):
 	elif action == 'fileAdd':
 		from lib.modules.interface import Loader
 		Loader.show()
-		from lib.modules import core
+		from lib.modules.core import Core
+		media = parameters.get('media')
 		link = parameters.get('link')
-		core.Core(media = media, kids = kids).addLink(link = link, metadata = metadata)
+		metadata = parameters.get('metadata')
+		if metadata: metadata = tools.Converter.dictionary(metadata)
+		Core(media = media).addLink(link = link, metadata = metadata)
 
 ####################################################
 # CLOUDFLARE
@@ -3005,36 +2693,14 @@ elif action.startswith('cloudflare'):
 		Cloudflare().verify(settings = settings, notification = True)
 
 ####################################################
-# NAVIGATOR
-####################################################
-
-elif action.startswith('navigator'):
-
-	if action == 'navigatorTools':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).tools()
-
-	elif action == 'navigatorFavourites':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).favourites()
-
-	elif action == 'navigatorArrivals':
-		from lib.indexers.navigator import Navigator
-		Navigator(media = media, kids = kids).arrivals()
-
-####################################################
 # METADATA
 ####################################################
 
 elif action.startswith('metadata'):
 
-	if action == 'metadataPreload':
-		from lib.meta.tools import MetaTools
-		MetaTools.batchPreload()
-
-	elif action == 'metadataGenerate':
-		from lib.meta.tools import MetaTools
-		MetaTools.batchGenerate()
+	if action == 'metadataGenerate':
+		from lib.meta.manager import MetaManager
+		MetaManager.generate()
 
 ####################################################
 # DUMMY
@@ -3067,8 +2733,9 @@ try:
 
 	# Process all Trakt requests that were stored in the cache, since they could not be executed previously due to trakt being down.
 	# Do not call this function after each Trakt request, since it will start too many threads.
+	# Check trakt.cacheRetry() for more information.
 	from lib.modules import trakt
-	trakt.cacheUpdate(wait = True)
+	trakt.cacheRetry(force = False, probability = True, wait = True)
 
 	from lib.modules.concurrency import Pool
 	Pool.join()

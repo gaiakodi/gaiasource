@@ -104,7 +104,7 @@ class View(object):
 			return False
 
 	@classmethod
-	def _wait(self, id, container, layout):
+	def _wait(self, id, path, container, layout):
 		'''
 			The goal is to wait for the container to finish loading before setting the view and/or position.
 			Setting the view/position before the container has finished loading does not work and the container remains unchanged afterwards.
@@ -122,7 +122,7 @@ class View(object):
 				2. The only reliable way to determine if the container finished loading is to check if the ListItems in ther container have been initialized/loaded.
 				   As already mentioned, trying to access the ControlList/ListItem from Python does not work, since the list is always returned empty.
 				   The only possiblity is to use the InfoLabels to get the values from the container/list.
-				   	a. Using Container.FolderPath sometimes works, but in most cases this value has changed before the container finished loading.
+				   	a. Using Container.FolderPath sometimes works, but in most cases this value has changed before the container finished loading. Plus Container.FolderPath does not work when navigating back on cached menus, since they do not update this value.
 				   	b. The best option seems to be to set a custom property on the first ListItem. The problem is that it is impossible to access custom properties using InfoLabels.
 					   It is only possible by skins and custom XML that have direct access to the ListItem.Property(...). Custom properties cannot be accessed through Container(id).ListItem(offset).Property.
 					c. Another option is to use an unused info label set in Python by ListItem.setInfo() which is accessible from Container(id).ListItem(offset).Info.
@@ -136,7 +136,7 @@ class View(object):
 					   It is however possible for the first submenu item to have the same icon, and in a few cases maybe the same label, but not both.
 					   So if the label+icon of the first item changed, we can assume that the list finished loading.
 
-			Update:
+			Update 1:
 				It seems that setting an custom property on ListItem is accessible from the InfoLabels.
 				Note that there are different ways of getting the ListItem:
 					Container(...).ListItem(...)
@@ -156,13 +156,20 @@ class View(object):
 				However, since this function was initiated from the first Backspace hit, the loop below is still running while Kodi waits for the Python interpreter to stop.
 				After 5 seconds of Kodi waiting, Kodi kills the interpreter (while the loop below is still running):
 					ERROR <general>: CPythonInvoker(289, .kodi/addons/plugin.video.gaia/addon.py): script didn't stop in 5 seconds - let's kill it
-					ERROR <general>: GetDirectory - Error getting plugin://plugin.video.gaia/?action=moviesLists&kids=0&type=movie
-					ERROR <general>: CGUIMediaWindow::GetDirectory(plugin://plugin.video.gaia/?action=moviesLists&kids=0&type=movie) failed
+					ERROR <general>: GetDirectory - Error getting plugin://plugin.video.gaia/?action=moviesLists&type=movie
+					ERROR <general>: CGUIMediaWindow::GetDirectory(plugin://plugin.video.gaia/?action=moviesLists&type=movie) failed
 				System.aborted() is False during this, which is probably a bug in Kodi.
 				Trying to retrieve any value with System.infoLabel(InfoLabel) or System.visible(BooleanCondition) does not help, since nothing indicates we are exiting the addon.
 				It seems the only way is to let Kodi kill the addon after 5 secs, which will then causes a "System Exit" exception with current xbmc calls, mostly in Time.sleep().
 				That is why the sleep() call is wrapped in its own try-catch, with the catch part returning False.
 				Also note that hitting Backspace twice is not the same as hitting Esc.
+
+			Update 3 (2024-09-01):
+				Using the following InfoLabel:
+					System.infoLabel('Container.ListItemAbsolute(0).Property(%s)' % Directory.PropertyId)
+				causes occasional sporadic crashes, at least for Kodi 21.
+				Maybe this is a bug in Kodi, that if the items are not finished loading and one calls an InfoLabel on it, Kodi has some internal error and crashes.
+				Next attempt is to try using boolean conditions, xbmc.getCondVisibility(...), instead of InfoLabels. Update: no useful conditions that could help.
 		'''
 
 		# When background processes load a Gaia menu, do not wait here (eg: Widgets).
@@ -172,7 +179,7 @@ class View(object):
 			# Do not wait more than 10 secs, in order not to hold up any processes.
 			# In most cases (at least on a fast device), basic menus (parent menus with basic icons) are ready in 0.05 secs, and movie/show menus (with posters, fanart, etc) are ready in 0.2-0.5 secs.
 			# Even if it times out, None is returned, which will still attempt to set the view/position.
-			interations = 200
+			interations = 60 # 200 is probably overkill. 60 = 3secs.
 			interval = 0.05
 
 			# Wait for the Oracle window to close, otherwise the 1st item is not selected, since getting the ListItem will get the list from Oracle window and not the menu.
@@ -185,14 +192,33 @@ class View(object):
 					Time.sleep(interval)
 
 			if id:
+				# NB: Kodi (v21, but probably ealier versions as well, altough this was not noticed in earlier development versions), sometimes randomly crashes when executing the following statement:
+				#	System.infoLabel(command1, wait = False)
+				# This is a very sporadic crash that only happens once in a while when navigating through the menus.
+				# The first thought was that maybe the command itself caused the problem (eg: ListItemAbsolute or Property), but changing that to other InfoLabels either did not return the wanted results, or also crashed.
+				# The problem probably is trying to get an item or property from a Kodi container that is still busy loading, and Kodi does not handle the InfoLabel very well, resulting in the crash.
+				# Adding a sleep-delay or trying to use a different InfoLabel does not fix the issue.
+				# Update: Using the JSON RPC instead of System.infoLabel() seems to have fixed th eissue. There is probably some bug in Kodi's Python code, which is present in the RPC.
+
 				# NB: When the Back entry (..) is hidden, the 1st item has an index of 0 instead of 1.
 				# Gaia Eminence hides the back button on first install.
 				# Check 1st and 2nd item.
 				command1 = 'Container.ListItemAbsolute(0).Property(%s)' % Directory.PropertyId
 				command2 = 'Container.ListItemAbsolute(1).Property(%s)' % Directory.PropertyId
+
+				method = 'XBMC.GetInfoLabels'
+				parameters1 = {'labels' : [command1]}
+				parameters2 = {'labels' : [command2]}
+
 				for i in range(0, interations):
-					if id == System.infoLabel(command1, wait = False): return True
-					if id == System.infoLabel(command2, wait = False): return True
+					# This causes sporadic Kodi crashes. Do not use!!
+					#if id == System.infoLabel(command1, wait = False): return True
+					#if id == System.infoLabel(command2, wait = False): return True
+
+					# Use the RPC instead, which does not seem to cause the crashes.
+					if id == System.executeJson(method = method, parameters = parameters1).get('result', {}).get(command1): return True
+					if id == System.executeJson(method = method, parameters = parameters2).get('result', {}).get(command2): return True
+
 					if System.aborted(): return False
 					try: Time.sleep(interval)
 					except: return False # Read Update 2 above.
@@ -209,12 +235,12 @@ class View(object):
 		return None
 
 	@classmethod
-	def set(self, media, content = None, id = None, views = None, select = None, thread = True):
-		if thread: Pool.thread(target = self._setView, kwargs = {'media' : media, 'content' : content, 'id' : id, 'views' : views, 'select' : select}, start = True)
-		else: self._setView(media = media, content = content, id = id, views = views)
+	def set(self, media, content = None, id = None, path = None, views = None, select = None, thread = True):
+		if thread: Pool.thread(target = self._setView, kwargs = {'media' : media, 'content' : content, 'id' : id, 'path' : path, 'views' : views, 'select' : select}, start = True)
+		else: self._setView(media = media, content = content, id = id, path = path, views = views)
 
 	@classmethod
-	def _setView(self, media, content = None, id = None, views = None, select = None):
+	def _setView(self, media, content = None, id = None, path = None, views = None, select = None):
 		try:
 			skin = Skin.id()
 			if not content: content = self.convert(media)
@@ -253,14 +279,14 @@ class View(object):
 				# Wait here, because the if-statement in the loop will immediately set loaded = True.
 				if not id and not layout: Time.sleep(0.5)
 
-				if self._wait(id = id, container = container, layout = layout) is False:
+				if self._wait(id = id, path = path, container = container, layout = layout) is False:
 					return False
 				else:
 					System.execute(command)
 					self._setSelection(index = select)
 					return True
 			elif not self.settingsSelection() == View.SelectionNone: # Avoid waiting if the setting was disabled.
-				if self._wait(id = id, container = container, layout = layout) is False:
+				if self._wait(id = id, path = path, container = container, layout = layout) is False:
 					return False
 				else:
 					self._setSelection(index = select)
@@ -292,12 +318,11 @@ class View(object):
 				if selection == View.SelectionAlways or (not current is None and currentValue == 0):
 					import xbmcgui
 					try: id = int(System.infoLabel('System.CurrentControlID')) # Sometimes this returns nothing.
-					except: id = None					
+					except: id = None
 					if not id is None:
 						window = xbmcgui.Window(xbmcgui.getCurrentWindowId())
 						try: list = window.getControl(id)
 						except: list = None # Sometimes cannot get the control.
-
 						if list:
 							if index is None: index = 1
 							else: index += 1 # Index 0 is the back navigation.
@@ -362,7 +387,7 @@ class View(object):
 	@classmethod
 	def settingsInitialize(self):
 		# In case the skin was changed, change the view name/label in the settings.
-		for media in [Directory.ContentGeneral, Media.TypeMovie, Media.TypeSet, Media.TypeShow, Media.TypeSeason, Media.TypeEpisode]:
+		for media in [Directory.ContentGeneral, Media.Movie, Media.Set, Media.Show, Media.Season, Media.Episode]:
 			settings = self.settingsTypeGet(media = media)
 			try:
 				view = settings[Skin.id()][self.settingsLayoutGet(media = media)]['name']

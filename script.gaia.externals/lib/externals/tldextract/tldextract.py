@@ -1,63 +1,53 @@
-# -*- coding: utf-8 -*-
-"""`tldextract` accurately separates the gTLD or ccTLD (generic or country code
-top-level domain) from the registered domain and subdomains of a URL.
+"""`tldextract` accurately separates a URL's subdomain, domain, and public suffix.
+
+It does this via the Public Suffix List (PSL).
 
     >>> import tldextract
 
     >>> tldextract.extract('http://forums.news.cnn.com/')
-    ExtractResult(subdomain='forums.news', domain='cnn', suffix='com')
+    ExtractResult(subdomain='forums.news', domain='cnn', suffix='com', is_private=False)
 
     >>> tldextract.extract('http://forums.bbc.co.uk/') # United Kingdom
-    ExtractResult(subdomain='forums', domain='bbc', suffix='co.uk')
+    ExtractResult(subdomain='forums', domain='bbc', suffix='co.uk', is_private=False)
 
     >>> tldextract.extract('http://www.worldbank.org.kg/') # Kyrgyzstan
-    ExtractResult(subdomain='www', domain='worldbank', suffix='org.kg')
-
-`ExtractResult` is a namedtuple, so it's simple to access the parts you want.
-
-    >>> ext = tldextract.extract('http://forums.bbc.co.uk')
-    >>> (ext.subdomain, ext.domain, ext.suffix)
-    ('forums', 'bbc', 'co.uk')
-    >>> # rejoin subdomain and domain
-    >>> '.'.join(ext[:2])
-    'forums.bbc'
-    >>> # a common alias
-    >>> ext.registered_domain
-    'bbc.co.uk'
+    ExtractResult(subdomain='www', domain='worldbank', suffix='org.kg', is_private=False)
 
 Note subdomain and suffix are _optional_. Not all URL-like inputs have a
 subdomain or a valid suffix.
 
     >>> tldextract.extract('google.com')
-    ExtractResult(subdomain='', domain='google', suffix='com')
+    ExtractResult(subdomain='', domain='google', suffix='com', is_private=False)
 
     >>> tldextract.extract('google.notavalidsuffix')
-    ExtractResult(subdomain='google', domain='notavalidsuffix', suffix='')
+    ExtractResult(subdomain='google', domain='notavalidsuffix', suffix='', is_private=False)
 
     >>> tldextract.extract('http://127.0.0.1:8080/deployed/')
-    ExtractResult(subdomain='', domain='127.0.0.1', suffix='')
+    ExtractResult(subdomain='', domain='127.0.0.1', suffix='', is_private=False)
 
-If you want to rejoin the whole namedtuple, regardless of whether a subdomain
-or suffix were found:
+To rejoin the original hostname, if it was indeed a valid, registered hostname:
 
-    >>> ext = tldextract.extract('http://127.0.0.1:8080/deployed/')
-    >>> # this has unwanted dots
-    >>> '.'.join(ext)
-    '.127.0.0.1.'
-    >>> # join part only if truthy
-    >>> '.'.join(part for part in ext if part)
-    '127.0.0.1'
+    >>> ext = tldextract.extract('http://forums.bbc.co.uk')
+    >>> ext.registered_domain
+    'bbc.co.uk'
+    >>> ext.fqdn
+    'forums.bbc.co.uk'
 """
 
-import collections
+from __future__ import annotations
+
 import logging
 import os
+import urllib.parse
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 from functools import wraps
 
 from externals import idna
+from externals import requests
 
 from .cache import DiskCache, get_cache_dir
-from .remote import IP_RE, SCHEME_RE, looks_like_ip
+from .remote import lenient_netloc, looks_like_ip, looks_like_ipv6
 from .suffix_list import get_suffix_lists
 
 LOG = logging.getLogger("tldextract")
@@ -71,45 +61,47 @@ PUBLIC_SUFFIX_LIST_URLS = (
 )
 
 
-class ExtractResult(collections.namedtuple("ExtractResult", "subdomain domain suffix")):
-    """namedtuple of a URL's subdomain, domain, and suffix."""
+@dataclass(order=True)
+class ExtractResult:
+    """A URL's extracted subdomain, domain, and suffix.
 
-    # Necessary for __dict__ member to get populated in Python 3+
-    __slots__ = ()
+    Also contains metadata, like a flag that indicates if the URL has a private suffix.
+    """
+
+    subdomain: str
+    domain: str
+    suffix: str
+    is_private: bool
 
     @property
-    def registered_domain(self):
-        """
-        Joins the domain and suffix fields with a dot, if they're both set.
+    def registered_domain(self) -> str:
+        """Joins the domain and suffix fields with a dot, if they're both set.
 
         >>> extract('http://forums.bbc.co.uk').registered_domain
         'bbc.co.uk'
         >>> extract('http://localhost:8080').registered_domain
         ''
         """
-        if self.domain and self.suffix:
-            return self.domain + "." + self.suffix
+        if self.suffix and self.domain:
+            return f"{self.domain}.{self.suffix}"
         return ""
 
     @property
-    def fqdn(self):
-        """
-        Returns a Fully Qualified Domain Name, if there is a proper domain/suffix.
+    def fqdn(self) -> str:
+        """Returns a Fully Qualified Domain Name, if there is a proper domain/suffix.
 
         >>> extract('http://forums.bbc.co.uk/path/to/file').fqdn
         'forums.bbc.co.uk'
         >>> extract('http://localhost:8080').fqdn
         ''
         """
-        if self.domain and self.suffix:
-            # self is the namedtuple (subdomain domain suffix)
-            return ".".join(i for i in self if i)
+        if self.suffix and (self.domain or self.is_private):
+            return ".".join(i for i in (self.subdomain, self.domain, self.suffix) if i)
         return ""
 
     @property
-    def ipv4(self):
-        """
-        Returns the ipv4 if that is what the presented domain/url is
+    def ipv4(self) -> str:
+        """Returns the ipv4 if that is what the presented domain/url is.
 
         >>> extract('http://127.0.0.1/path/to/file').ipv4
         '127.0.0.1'
@@ -118,37 +110,60 @@ class ExtractResult(collections.namedtuple("ExtractResult", "subdomain domain su
         >>> extract('http://256.1.1.1').ipv4
         ''
         """
-        if not (self.suffix or self.subdomain) and IP_RE.match(self.domain):
+        if (
+            self.domain
+            and not (self.suffix or self.subdomain)
+            and looks_like_ip(self.domain)
+        ):
             return self.domain
+        return ""
+
+    @property
+    def ipv6(self) -> str:
+        """Returns the ipv6 if that is what the presented domain/url is.
+
+        >>> extract('http://[aBcD:ef01:2345:6789:aBcD:ef01:127.0.0.1]/path/to/file').ipv6
+        'aBcD:ef01:2345:6789:aBcD:ef01:127.0.0.1'
+        >>> extract('http://[aBcD:ef01:2345:6789:aBcD:ef01:127.0.0.1.1]/path/to/file').ipv6
+        ''
+        >>> extract('http://[aBcD:ef01:2345:6789:aBcD:ef01:256.0.0.1]').ipv6
+        ''
+        """
+        min_num_ipv6_chars = 4
+        if (
+            len(self.domain) >= min_num_ipv6_chars
+            and self.domain[0] == "["
+            and self.domain[-1] == "]"
+            and not (self.suffix or self.subdomain)
+        ):
+            debracketed = self.domain[1:-1]
+            if looks_like_ipv6(debracketed):
+                return debracketed
         return ""
 
 
 class TLDExtract:
-    """A callable for extracting, subdomain, domain, and suffix components from
-    a URL."""
+    """A callable for extracting, subdomain, domain, and suffix components from a URL."""
 
-    # TODO: Agreed with Pylint: too-many-arguments
-    def __init__(  # pylint: disable=too-many-arguments
+    # TODO: too-many-arguments
+    def __init__(
         self,
-        cache_dir=get_cache_dir(),
-        suffix_list_urls=PUBLIC_SUFFIX_LIST_URLS,
-        fallback_to_snapshot=True,
-        include_psl_private_domains=False,
-        extra_suffixes=(),
-        cache_fetch_timeout=CACHE_TIMEOUT,
-    ):
-        """
-        Constructs a callable for extracting subdomain, domain, and suffix
-        components from a URL.
+        cache_dir: str | None = get_cache_dir(),
+        suffix_list_urls: Sequence[str] = PUBLIC_SUFFIX_LIST_URLS,
+        fallback_to_snapshot: bool = True,
+        include_psl_private_domains: bool = False,
+        extra_suffixes: Sequence[str] = (),
+        cache_fetch_timeout: str | float | None = CACHE_TIMEOUT,
+    ) -> None:
+        """Construct a callable for extracting subdomain, domain, and suffix components from a URL.
 
-        Upon calling it, it first checks for a JSON in `cache_dir`.
-        By default, the `cache_dir` will live in the tldextract directory.
-
-        You can disable the caching functionality of this module  by setting `cache_dir` to False.
+        Upon calling it, it first checks for a JSON in `cache_dir`. By default,
+        the `cache_dir` will live in the tldextract directory. You can disable
+        the caching functionality of this module by setting `cache_dir` to `None`.
 
         If the cached version does not exist (such as on the first run), HTTP request the URLs in
         `suffix_list_urls` in order, until one returns public suffix list data. To disable HTTP
-        requests, set this to something falsy.
+        requests, set this to an empty sequence.
 
         The default list of URLs point to the latest version of the Mozilla Public Suffix List and
         its mirror, but any similar document could be specified. Local files can be specified by
@@ -193,77 +208,147 @@ class TLDExtract:
 
         self.include_psl_private_domains = include_psl_private_domains
         self.extra_suffixes = extra_suffixes
-        self._extractor = None
+        self._extractor: _PublicSuffixListTLDExtractor | None = None
 
-        self.cache_fetch_timeout = cache_fetch_timeout
+        self.cache_fetch_timeout = (
+            float(cache_fetch_timeout)
+            if isinstance(cache_fetch_timeout, str)
+            else cache_fetch_timeout
+        )
         self._cache = DiskCache(cache_dir)
-        if isinstance(self.cache_fetch_timeout, str):
-            self.cache_fetch_timeout = float(self.cache_fetch_timeout)
 
-    def __call__(self, url, include_psl_private_domains=None):
+    def __call__(
+        self,
+        url: str,
+        include_psl_private_domains: bool | None = None,
+        session: requests.Session | None = None,
+    ) -> ExtractResult:
+        """Alias for `extract_str`."""
+        return self.extract_str(url, include_psl_private_domains, session=session)
+
+    def extract_str(
+        self,
+        url: str,
+        include_psl_private_domains: bool | None = None,
+        session: requests.Session | None = None,
+    ) -> ExtractResult:
+        """Take a string URL and splits it into its subdomain, domain, and suffix components.
+
+        I.e. its effective TLD, gTLD, ccTLD, etc. components.
+
+        >>> extractor = TLDExtract()
+        >>> extractor.extract_str('http://forums.news.cnn.com/')
+        ExtractResult(subdomain='forums.news', domain='cnn', suffix='com', is_private=False)
+        >>> extractor.extract_str('http://forums.bbc.co.uk/')
+        ExtractResult(subdomain='forums', domain='bbc', suffix='co.uk', is_private=False)
+
+        Allows configuring the HTTP request via the optional `session`
+        parameter. For example, if you need to use a HTTP proxy. See also
+        `requests.Session`.
+
+        >>> from externals import requests
+        >>> session = requests.Session()
+        >>> # customize your session here
+        >>> with session:
+        ...     extractor.extract_str("http://forums.news.cnn.com/", session=session)
+        ExtractResult(subdomain='forums.news', domain='cnn', suffix='com', is_private=False)
         """
-        Takes a string URL and splits it into its subdomain, domain, and
-        suffix (effective TLD, gTLD, ccTLD, etc.) component.
-
-        >>> extract = TLDExtract()
-        >>> extract('http://forums.news.cnn.com/')
-        ExtractResult(subdomain='forums.news', domain='cnn', suffix='com')
-        >>> extract('http://forums.bbc.co.uk/')
-        ExtractResult(subdomain='forums', domain='bbc', suffix='co.uk')
-        """
-
-        netloc = (
-            SCHEME_RE.sub("", url)
-            .partition("/")[0]
-            .partition("?")[0]
-            .partition("#")[0]
-            .split("@")[-1]
-            .partition(":")[0]
-            .strip()
-            .rstrip(".")
+        return self._extract_netloc(
+            lenient_netloc(url), include_psl_private_domains, session=session
         )
 
-        labels = netloc.split(".")
+    def extract_urllib(
+        self,
+        url: urllib.parse.ParseResult | urllib.parse.SplitResult,
+        include_psl_private_domains: bool | None = None,
+        session: requests.Session | None = None,
+    ) -> ExtractResult:
+        """Take the output of urllib.parse URL parsing methods and further splits the parsed URL.
 
-        translations = [_decode_punycode(label) for label in labels]
-        suffix_index = self._get_tld_extractor().suffix_index(
-            translations, include_psl_private_domains=include_psl_private_domains
+        Splits the parsed URL into its subdomain, domain, and suffix
+        components, i.e. its effective TLD, gTLD, ccTLD, etc. components.
+
+        This method is like `extract_str` but faster, as the string's domain
+        name has already been parsed.
+
+        >>> extractor = TLDExtract()
+        >>> extractor.extract_urllib(urllib.parse.urlsplit('http://forums.news.cnn.com/'))
+        ExtractResult(subdomain='forums.news', domain='cnn', suffix='com', is_private=False)
+        >>> extractor.extract_urllib(urllib.parse.urlsplit('http://forums.bbc.co.uk/'))
+        ExtractResult(subdomain='forums', domain='bbc', suffix='co.uk', is_private=False)
+        """
+        return self._extract_netloc(
+            url.netloc, include_psl_private_domains, session=session
         )
 
-        suffix = ".".join(labels[suffix_index:])
-        if not suffix and netloc and looks_like_ip(netloc):
-            return ExtractResult("", netloc, "")
+    def _extract_netloc(
+        self,
+        netloc: str,
+        include_psl_private_domains: bool | None,
+        session: requests.Session | None = None,
+    ) -> ExtractResult:
+        netloc_with_ascii_dots = (
+            netloc.replace("\u3002", "\u002e")
+            .replace("\uff0e", "\u002e")
+            .replace("\uff61", "\u002e")
+        )
 
-        subdomain = ".".join(labels[: suffix_index - 1]) if suffix_index else ""
+        min_num_ipv6_chars = 4
+        if (
+            len(netloc_with_ascii_dots) >= min_num_ipv6_chars
+            and netloc_with_ascii_dots[0] == "["
+            and netloc_with_ascii_dots[-1] == "]"
+        ):
+            if looks_like_ipv6(netloc_with_ascii_dots[1:-1]):
+                return ExtractResult("", netloc_with_ascii_dots, "", is_private=False)
+
+        labels = netloc_with_ascii_dots.split(".")
+
+        suffix_index, is_private = self._get_tld_extractor(
+            session=session
+        ).suffix_index(labels, include_psl_private_domains=include_psl_private_domains)
+
+        num_ipv4_labels = 4
+        if suffix_index == len(labels) == num_ipv4_labels and looks_like_ip(
+            netloc_with_ascii_dots
+        ):
+            return ExtractResult("", netloc_with_ascii_dots, "", is_private)
+
+        suffix = ".".join(labels[suffix_index:]) if suffix_index != len(labels) else ""
+        subdomain = ".".join(labels[: suffix_index - 1]) if suffix_index >= 2 else ""
         domain = labels[suffix_index - 1] if suffix_index else ""
-        return ExtractResult(subdomain, domain, suffix)
+        return ExtractResult(subdomain, domain, suffix, is_private)
 
-    def update(self, fetch_now=False):
+    def update(
+        self, fetch_now: bool = False, session: requests.Session | None = None
+    ) -> None:
         """Force fetch the latest suffix list definitions."""
         self._extractor = None
         self._cache.clear()
         if fetch_now:
-            self._get_tld_extractor()
+            self._get_tld_extractor(session=session)
 
     @property
-    def tlds(self):
-        """
-        Returns the list of tld's used by default
+    def tlds(self, session: requests.Session | None = None) -> list[str]:
+        """Returns the list of tld's used by default.
 
         This will vary based on `include_psl_private_domains` and `extra_suffixes`
         """
-        return list(self._get_tld_extractor().tlds())
+        return list(self._get_tld_extractor(session=session).tlds())
 
-    def _get_tld_extractor(self):
-        """Get or compute this object's TLDExtractor. Looks up the TLDExtractor
-        in roughly the following order, based on the settings passed to
-        __init__:
+    def _get_tld_extractor(
+        self, session: requests.Session | None = None
+    ) -> _PublicSuffixListTLDExtractor:
+        """Get or compute this object's TLDExtractor.
+
+        Looks up the TLDExtractor in roughly the following order, based on the
+        settings passed to __init__:
 
         1. Memoized on `self`
         2. Local system _cache file
         3. Remote PSL, over HTTP
-        4. Bundled PSL snapshot file"""
-
+        4. Bundled PSL snapshot file
+        """
         if self._extractor:
             return self._extractor
 
@@ -272,6 +357,7 @@ class TLDExtract:
             urls=self.suffix_list_urls,
             cache_fetch_timeout=self.cache_fetch_timeout,
             fallback_to_snapshot=self.fallback_to_snapshot,
+            session=session,
         )
 
         if not any([public_tlds, private_tlds, self.extra_suffixes]):
@@ -289,25 +375,80 @@ class TLDExtract:
 TLD_EXTRACTOR = TLDExtract()
 
 
+class Trie:
+    """Trie for storing eTLDs with their labels in reverse-order."""
+
+    def __init__(
+        self,
+        matches: dict[str, Trie] | None = None,
+        end: bool = False,
+        is_private: bool = False,
+    ) -> None:
+        """TODO."""
+        self.matches = matches if matches else {}
+        self.end = end
+        self.is_private = is_private
+
+    @staticmethod
+    def create(
+        public_suffixes: Collection[str],
+        private_suffixes: Collection[str] | None = None,
+    ) -> Trie:
+        """Create a Trie from a list of suffixes and return its root node."""
+        root_node = Trie()
+
+        for suffix in public_suffixes:
+            root_node.add_suffix(suffix)
+
+        if private_suffixes is None:
+            private_suffixes = []
+
+        for suffix in private_suffixes:
+            root_node.add_suffix(suffix, True)
+
+        return root_node
+
+    def add_suffix(self, suffix: str, is_private: bool = False) -> None:
+        """Append a suffix's labels to this Trie node."""
+        node = self
+
+        labels = suffix.split(".")
+        labels.reverse()
+
+        for label in labels:
+            if label not in node.matches:
+                node.matches[label] = Trie()
+            node = node.matches[label]
+
+        node.end = True
+        node.is_private = is_private
+
+
 @wraps(TLD_EXTRACTOR.__call__)
-def extract(
-    url, include_psl_private_domains=False
-):  # pylint: disable=missing-function-docstring
-    return TLD_EXTRACTOR(url, include_psl_private_domains=include_psl_private_domains)
+def extract(  # noqa: D103
+    url: str,
+    include_psl_private_domains: bool | None = False,
+    session: requests.Session | None = None,
+) -> ExtractResult:
+    return TLD_EXTRACTOR(
+        url, include_psl_private_domains=include_psl_private_domains, session=session
+    )
 
 
 @wraps(TLD_EXTRACTOR.update)
-def update(*args, **kwargs):  # pylint: disable=missing-function-docstring
+def update(*args, **kwargs):  # type: ignore[no-untyped-def]  # noqa: D103
     return TLD_EXTRACTOR.update(*args, **kwargs)
 
 
 class _PublicSuffixListTLDExtractor:
-    """Wrapper around this project's main algo for PSL
-    lookups.
-    """
+    """Wrapper around this project's main algo for PSL lookups."""
 
     def __init__(
-        self, public_tlds, private_tlds, extra_tlds, include_psl_private_domains=False
+        self,
+        public_tlds: list[str],
+        private_tlds: list[str],
+        extra_tlds: list[str],
+        include_psl_private_domains: bool = False,
     ):
         # set the default value
         self.include_psl_private_domains = include_psl_private_domains
@@ -315,8 +456,12 @@ class _PublicSuffixListTLDExtractor:
         self.private_tlds = private_tlds
         self.tlds_incl_private = frozenset(public_tlds + private_tlds + extra_tlds)
         self.tlds_excl_private = frozenset(public_tlds + extra_tlds)
+        self.tlds_incl_private_trie = Trie.create(
+            self.tlds_excl_private, frozenset(private_tlds)
+        )
+        self.tlds_excl_private_trie = Trie.create(self.tlds_excl_private)
 
-    def tlds(self, include_psl_private_domains=None):
+    def tlds(self, include_psl_private_domains: bool | None = None) -> frozenset[str]:
         """Get the currently filtered list of suffixes."""
         if include_psl_private_domains is None:
             include_psl_private_domains = self.include_psl_private_domains
@@ -327,34 +472,50 @@ class _PublicSuffixListTLDExtractor:
             else self.tlds_excl_private
         )
 
-    def suffix_index(self, lower_spl, include_psl_private_domains=None):
-        """Returns the index of the first suffix label.
-        Returns len(spl) if no suffix is found
+    def suffix_index(
+        self, spl: list[str], include_psl_private_domains: bool | None = None
+    ) -> tuple[int, bool]:
+        """Return the index of the first suffix label, and whether it is private.
+
+        Returns len(spl) if no suffix is found.
         """
-        tlds = self.tlds(include_psl_private_domains)
-        length = len(lower_spl)
-        for i in range(length):
-            maybe_tld = ".".join(lower_spl[i:])
-            exception_tld = "!" + maybe_tld
-            if exception_tld in tlds:
-                return i + 1
+        if include_psl_private_domains is None:
+            include_psl_private_domains = self.include_psl_private_domains
 
-            if maybe_tld in tlds:
-                return i
+        node = (
+            self.tlds_incl_private_trie
+            if include_psl_private_domains
+            else self.tlds_excl_private_trie
+        )
+        i = len(spl)
+        j = i
+        for label in reversed(spl):
+            decoded_label = _decode_punycode(label)
+            if decoded_label in node.matches:
+                j -= 1
+                node = node.matches[decoded_label]
+                if node.end:
+                    i = j
+                continue
 
-            wildcard_tld = "*." + ".".join(lower_spl[i + 1 :])
-            if wildcard_tld in tlds:
-                return i
+            is_wildcard = "*" in node.matches
+            if is_wildcard:
+                is_wildcard_exception = "!" + decoded_label in node.matches
+                if is_wildcard_exception:
+                    return j, node.matches["*"].is_private
+                return j - 1, node.matches["*"].is_private
 
-        return length
+            break
+
+        return i, node.is_private
 
 
-def _decode_punycode(label):
+def _decode_punycode(label: str) -> str:
     lowered = label.lower()
     looks_like_puny = lowered.startswith("xn--")
     if looks_like_puny:
         try:
-            return idna.decode(label.encode("ascii")).lower()
+            return idna.decode(lowered)
         except (UnicodeError, IndexError):
             pass
     return lowered

@@ -125,7 +125,7 @@ class Provider(ProviderBase):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		lock = None
 		try:
 			# Cannot search the library by IMDb ID for some reason.
@@ -158,7 +158,7 @@ class Provider(ProviderBase):
 			filter = {'or': filter}
 
 			self.statisticsUpdateSearch(page = True)
-			if Media.typeTelevision(media):
+			if Media.isSerie(media):
 				results = self.searchJson(method = 'VideoLibrary.GetTVShows', parameters = {'filter' : filter, 'properties': ['uniqueid', 'imdbnumber', 'title', 'originaltitle']})
 				if 'result' in results and 'tvshows' in results['result']:
 					results = results['result']['tvshows']
@@ -181,7 +181,7 @@ class Provider(ProviderBase):
 									res = self.searchJson(method = 'VideoLibrary.GetEpisodeDetails', parameters = {'episodeid' : res['episodeid'], 'properties': ['streamdetails', 'file']})
 									if 'result' in res and 'episodedetails' in res['result']:
 										res = res['result']['episodedetails']
-										self.searchProcess(match = matchId, result = res, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+										self.searchProcess(match = matchId, result = res, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack)
 								self.priorityEnd(lock = lock)
 			else:
 				results = self.searchJson(method = 'VideoLibrary.GetMovies', parameters = {'filter' : filter, 'properties': ['uniqueid', 'imdbnumber', 'title', 'originaltitle', 'file']})
@@ -197,7 +197,7 @@ class Provider(ProviderBase):
 							result = self.searchJson(method = 'VideoLibrary.GetMovieDetails', parameters = {'movieid' : result['movieid'], 'properties': ['streamdetails', 'file']})
 							if 'result' in result and 'moviedetails' in result['result']:
 								result = result['result']['moviedetails']
-								self.searchProcess(match = matchId, result = result, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+								self.searchProcess(match = matchId, result = result, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack)
 						self.priorityEnd(lock = lock)
 
 		except: self.logError()
@@ -309,7 +309,7 @@ class Provider(ProviderBase):
 			if self.searchValid(value): result = value
 		return result
 
-	def searchProcess(self, match, result, media, titles, years = None, numberSeason = None, numberEpisode = None, language = None, pack = None):
+	def searchProcess(self, match, result, media, titles, years = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None):
 		videoWidth = None
 		videoHeight = None
 		videoAspect = None

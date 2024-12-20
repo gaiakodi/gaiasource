@@ -23,7 +23,8 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://torlock2.com', 'https://torlock.com'] # Main domain is down. torlock2 is still working.
+	# Update (2024-12): Important to add the www subdomain, otherwise without it, the main domain throws an SSL error. The SSL certificate is probably only valid for the www subdomain.
+	_Link					= ['https://www.torlock.com', 'https://www.torlock2.com'] # Main domain is down. torlock2 is still working. Update (2024-12): main domain works again, but not torlock2, due to an expired SSL.
 	_Mirror					= ['https://torrents-proxy.com/torlock/']
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'torlock', ProviderHtml.UnblockFormat3 : 'torlock'}
 
@@ -42,6 +43,8 @@ class Provider(ProviderHtml):
 	_AttributeTable			= 'table'
 	_AttributePages			= 'pagination'
 
+
+	_ExpressionHash			= '(?:info\s*)?hash\s*' + ProviderHtml.ExpressionSha
 	_ExpressionVerified		= '(verified)'
 	_ExpressionNext			= '(next)'
 	_ExpressionApproval		= '(\-?\d+)\s*(?:good|bad)?\s*vote'
@@ -89,7 +92,12 @@ class Provider(ProviderHtml):
 			extractOptimizeDetails	= HtmlArticle(),
 			extractList				= [HtmlResults(class_ = Provider._AttributeTable, index = -1)],
 			extractDetails			= [HtmlResult(index = 0), HtmlLink(extract = Html.AttributeHref)],
+
+			# Update (2024-12): There do not seem to be magnets links anymore, only links to .torrent files.
+			# But the hash is still listed.
 			extractLink				= [ProviderHtml.Details, HtmlTable(class_ = Provider._AttributeTable), HtmlLink(href_ = ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)],
+			extractHash				= [ProviderHtml.Details, Html(extract = [Html.ParseTextNested, Provider._ExpressionHash])],
+
 			extractFileName			= [HtmlResult(index = 0), HtmlLink()],
 			extractFileSize			= [HtmlResult(index = 2)],
 			extractSourceApproval	= [ProviderHtml.Details, Html(extract = [Html.ParseText, Provider._ExpressionApproval])],

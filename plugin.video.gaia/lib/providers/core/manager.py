@@ -24,7 +24,7 @@ import pkgutil
 
 from lib.providers.core.base import ProviderBase
 from lib.modules.database import Database
-from lib.modules.tools import Logger, Tools, Hash, Time, File, System, Converter, Settings, Language, Math, Regex, Hardware, Platform
+from lib.modules.tools import Logger, Tools, Media, Hash, Time, File, System, Converter, Settings, Language, Math, Regex, Hardware, Platform
 from lib.modules.concurrency import Pool, Lock
 
 ProviderAddon = None
@@ -55,7 +55,8 @@ class Manager(object):
 	# Tradeoff
 	TradeoffSpeed				= 'speed' # Prefer faster scraping over more links.
 	TradeoffResult				= 'result' # Prefer more links over faster scraping.
-	TradeoffMix					= 'mix' # Prefer a good combination of speed and links.
+	TradeoffMixed				= 'mixed' # Prefer a good combination of speed and links.
+	TradeoffCrazy				= 'crazy' # Prefer the craziest best scraping.
 	TradeoffFactor				= 0.3 # How much to increase/decrease the rating by if a tradeoff is used. Should be large enough to move from one group to another, and groups are 0.2 apart from each other.
 
 	# Providers
@@ -140,7 +141,7 @@ class Manager(object):
 		return size
 
 	@classmethod
-	def databaseClear(self, providers = True, links = True, failures = True, streams = True, compress = True):
+	def databaseClear(self, providers = True, links = True, failures = True, streams = True, compact = True):
 		baseProviders = None
 		baseStreams = None
 
@@ -154,25 +155,25 @@ class Manager(object):
 
 		if providers:
 			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
-			baseProviders._drop(table = Manager.TableProviders, compress = compress)
+			baseProviders._drop(table = Manager.TableProviders, compact = compact)
 			try: del Manager.Create[Manager.TableProviders]
 			except: pass
 
 		if links:
 			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
-			baseProviders._drop(table = Manager.TableLinks, compress = compress)
+			baseProviders._drop(table = Manager.TableLinks, compact = compact)
 			try: del Manager.Create[Manager.TableLinks]
 			except: pass
 
 		if failures:
 			if not baseProviders: baseProviders = self._database(database = Manager.DatabaseProviders)
-			baseProviders._drop(table = Manager.TableFailures, compress = compress)
+			baseProviders._drop(table = Manager.TableFailures, compact = compact)
 			try: del Manager.Create[Manager.TableFailures]
 			except: pass
 
 		if streams:
 			if not baseStreams: baseStreams = self._database(database = Manager.DatabaseStreams)
-			baseStreams._drop(table = Manager.TableStreams, compress = compress)
+			baseStreams._drop(table = Manager.TableStreams, compact = compact)
 			try: del Manager.Create[Manager.TableStreams]
 			except: pass
 
@@ -226,11 +227,12 @@ class Manager(object):
 		return baseProviders if baseProviders else self._database(database = Manager.DatabaseProviders)
 
 	@classmethod
-	def _databaseId(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
+	def _databaseId(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None):
 		values = []
 		if provider: values.append(provider.id())
 		if query: values.append(query)
 		if idImdb: values.append('imdb' + str(idImdb))
+		elif idTrakt: values.append('trakt' + str(idTrakt))
 		elif idTmdb: values.append('tmdb' + str(idTmdb))
 		elif idTvdb: values.append('tvdb' + str(idTvdb))
 		if not numberSeason is None: values.append(str(numberSeason))
@@ -2189,8 +2191,8 @@ class Manager(object):
 				except:
 					self.providers()
 					countReal = len(self.providers(enabled = True))
-					countMovie = len(self.providers(media = Media.TypeMovie, enabled = True, local = False))
-					countShow = len(self.providers(media = Media.TypeShow, enabled = True, local = False))
+					countMovie = len(self.providers(media = Media.Movie, enabled = True, local = False))
+					countShow = len(self.providers(media = Media.Show, enabled = True, local = False))
 					count = max(countMovie, countShow)
 
 				if count == 0: label = 33112
@@ -2343,6 +2345,7 @@ class Manager(object):
 
 	@classmethod
 	def _optimizeEvaluate(self, data, tradeoff):
+		from lib.meta.tools import MetaTools
 		from lib.modules.interface import Translation
 
 		def scale(rating, minimum, maximum, base = None):
@@ -2354,6 +2357,7 @@ class Manager(object):
 		performance = data['performance']
 		multiplier = data['multiplier']
 		default = data['default']
+		crazy = tradeoff == Manager.TradeoffCrazy
 
 		# Label
 		labelFew = Translation.string(35000)
@@ -2384,7 +2388,8 @@ class Manager(object):
 
 		tradeoffMultiplier = 0
 		if tradeoff == Manager.TradeoffSpeed: tradeoffMultiplier = -Manager.TradeoffFactor
-		elif tradeoff == Manager.TradeoffResult: tradeoffMultiplier = +Manager.TradeoffFactor
+		elif tradeoff == Manager.TradeoffResult: tradeoffMultiplier = +(1.2 * Manager.TradeoffFactor)
+		elif crazy: tradeoffMultiplier = +(2 * Manager.TradeoffFactor)
 		rating = rating * (1 + tradeoffMultiplier)
 		rating = Math.round(min(1, max(0, rating)), places = 2)
 
@@ -2393,52 +2398,21 @@ class Manager(object):
 		limitTime = scale(rating = 1 - ratingOriginal, minimum = 150, maximum = 400) # Use 90 instead of 60 as the minimum, since scrapes, even on a good device, mostly take more than 60 secs. Use 120 instead of 90, since show scraping can take longer than 90 (with packs etc). Use 150 instead of 120, since otherwise the timeout on high-end devices are too low.
 		limitTime = Math.roundClosest(value = limitTime * (1 + (tradeoffMultiplier * 1.5)), base = 5)
 		limitTime = min(max(limitTime, 90), 420)
+		if crazy: limitTime = 600
 		limitTimeLabel = ProviderBase.settingsGlobalLimitTimeLabel(value = limitTime)
 
 		limitQuery = scale(rating = rating, minimum = 3, maximum = 10)
+		if crazy: limitQuery = 13
 		limitQueryLabel = str(limitQuery)
 
 		limitPage = scale(rating = rating, minimum = 1, maximum = 8)
 		if tradeoff == Manager.TradeoffSpeed: limitPage -= 2
 		elif tradeoff == Manager.TradeoffResult: limitPage += 2
 		limitPage = min(max(limitPage, 2), 10)
+		if crazy: limitPage = 13
 		limitPageLabel = str(limitPage)
 
 		limitRequest = scale(rating = rating, minimum = 250, maximum = 10000, base = 250)
-
-		# Concurrency
-		# On an Intel iX there is not significant difference in scraping time with different limits.
-		# Anything below 1x core-count slows down scraping.
-		# Test runs:
-		# 	20 providers with slowest ones disabled.
-		# 	Default scrape settings (packs, titles, keywords), except the page limit set to 5.
-		#	Scraping episode and returning 1000+ links.
-		threads = Hardware.processorCountThread() or 0
-		if Platform.pythonConcurrencyProcess() and threads >= 4 and performance['processor']['rating'] >= ProviderBase.Performance7:
-			# 0.5x core-count (3): 100 seconds | 51% CPU load
-			# 1x core-count + 1 (7): 68 seconds | 72% CPU load
-			# 2x core-count + 1 (13): 58 seconds | 83% CPU load
-			# Unlimited: 60 seconds | 81% CPU load
-			concurrencyMode = ProviderBase.ConcurrencyProcess
-			concurrencyLimit = scale(rating = rating, minimum = max(2, threads + 1), maximum = max(2, (threads * 2) + 1))
-		else:
-			# 0.5x core-count (3): 96 seconds | 38% CPU load
-			# 1x core-count + 1 (7): 88 seconds | 42% CPU load
-			# 2x core-count + 1 (13): 87 seconds | 42% CPU load
-			# Unlimited: 84 seconds | 42% CPU load
-			concurrencyMode = ProviderBase.ConcurrencyThread
-
-			# Add a concurrency limit, since medium and low-end devices often have a maximum number of threads that can be created and run in parallel.
-			#concurrencyLimit = 0
-			if performance['processor']['rating'] >= ProviderBase.Performance7:
-				concurrencyLimit = 0
-			else:
-				threads = min(max(threads, 3), 5)
-				concurrencyLimit = scale(rating = rating, minimum = max(2, threads * 1.5), maximum = max(8, threads * 4) + 1)
-
-		concurrencyBinge = scale(rating = rating, minimum = 50, maximum = 100) / 100.0
-		concurrencyConnection = 0
-		concurrencyLabel = Translation.string(36039 if concurrencyMode == ProviderBase.ConcurrencyThread else 36040)
 
 		# Pack
 
@@ -2452,10 +2426,10 @@ class Manager(object):
 		# Title
 
 		titleCharacters = (languageForeignOnly and rating >= ProviderBase.Performance6) or (languageForeignPrimary and rating >= ProviderBase.Performance7) or (languageForeign and rating >= ProviderBase.Performance8)
-		titleOriginal = (languageForeignOnly and rating >= ProviderBase.Performance0) or (languageForeignPrimary and rating >= (ProviderBase.Performance1 - ProviderBase.PerformanceHalf)) or (languageForeign and rating >= ProviderBase.Performance1) or (rating >= ProviderBase.Performance4)
-		titleNative = (languageForeignOnly and rating >= ProviderBase.Performance0) or (languageForeignPrimary and rating >= (ProviderBase.Performance1 - ProviderBase.PerformanceHalf)) or (languageForeign and rating >= ProviderBase.Performance1) or (rating >= ProviderBase.Performance4)
+		titleOriginal = (languageForeignOnly and rating >= ProviderBase.Performance0) or (languageForeignPrimary and rating >= (ProviderBase.Performance1 - ProviderBase.PerformanceHalf)) or (languageForeign and rating >= ProviderBase.Performance1) or (rating >= ProviderBase.Performance4) or (crazy and rating >= ProviderBase.Performance2)
+		titleNative = (languageForeignOnly and rating >= ProviderBase.Performance0) or (languageForeignPrimary and rating >= (ProviderBase.Performance1 - ProviderBase.PerformanceHalf)) or (languageForeign and rating >= ProviderBase.Performance1) or (rating >= ProviderBase.Performance4) or (crazy and rating >= ProviderBase.Performance3)
 		titleLocal = (languageForeignOnly and rating >= ProviderBase.Performance4) or (languageForeignPrimary and rating >= ProviderBase.Performance5) or (languageForeign and rating >= ProviderBase.Performance8)
-		titleAlias = (languageForeignOnly and rating >= ProviderBase.Performance5) or (languageForeignPrimary and rating >= ProviderBase.Performance6) or (languageForeign and rating >= ProviderBase.Performance8)
+		titleAlias = (languageForeignOnly and rating >= ProviderBase.Performance5) or (languageForeignPrimary and rating >= ProviderBase.Performance6) or (languageForeign and rating >= ProviderBase.Performance8) or (crazy and rating >= ProviderBase.Performance8)
 		titleCount = int(2 if titleCharacters else 0) + int(titleOriginal) + int(titleNative) + int(titleLocal) + (3 if titleAlias else 0)
 		titleEnabled = titleCount > 0
 		titleLabel = labelMany if titleCount >= 5 else labelSeveral if titleCount >= 3 else labelFew if titleCount >= 1 else labelDisabled
@@ -2464,20 +2438,20 @@ class Manager(object):
 
 		keywordEnabled = rating >= ProviderBase.Performance2
 		keywordEnglish = ProviderBase.KeywordNone
-		if rating >= ProviderBase.Performance5 or (languageEnglish and rating >= ProviderBase.Performance4): keywordEnglish = ProviderBase.KeywordFull
-		elif rating >= ProviderBase.Performance2 or (languageEnglish and rating >= ProviderBase.Performance1): keywordEnglish = ProviderBase.KeywordQuick
+		if rating >= ProviderBase.Performance5 or (languageEnglish and rating >= ProviderBase.Performance4) or (crazy and rating >= ProviderBase.Performance3): keywordEnglish = ProviderBase.KeywordFull
+		elif rating >= ProviderBase.Performance2 or (languageEnglish and rating >= ProviderBase.Performance1) or carzy: keywordEnglish = ProviderBase.KeywordQuick
 		keywordOriginal = ProviderBase.KeywordNone
 		if rating >= ProviderBase.Performance4: keywordOriginal = ProviderBase.KeywordFull
 		elif rating >= ProviderBase.Performance1: keywordOriginal = ProviderBase.KeywordQuick
 		keywordNative = ProviderBase.KeywordNone
-		if rating >= ProviderBase.Performance8 or (languageForeign and rating >= ProviderBase.Performance7): keywordNative = ProviderBase.KeywordFull
-		elif rating >= ProviderBase.Performance2 or (languageForeign and rating >= ProviderBase.Performance1): keywordNative = ProviderBase.KeywordQuick
+		if rating >= ProviderBase.Performance8 or (languageForeign and rating >= ProviderBase.Performance7) or (crazy and rating >= ProviderBase.Performance6): keywordNative = ProviderBase.KeywordFull
+		elif rating >= ProviderBase.Performance2 or (languageForeign and rating >= ProviderBase.Performance1) or carzy: keywordNative = ProviderBase.KeywordQuick
 		keywordCustom = ProviderBase.KeywordNone
-		if languageForeign and rating >= ProviderBase.Performance9: keywordCustom = ProviderBase.KeywordFull
-		elif languageForeign and rating >= ProviderBase.Performance8: keywordCustom = ProviderBase.KeywordQuick
+		if languageForeign and rating >= ProviderBase.Performance9 or (crazy and rating >= ProviderBase.Performance8): keywordCustom = ProviderBase.KeywordFull
+		elif languageForeign and rating >= ProviderBase.Performance8 or (crazy and rating >= ProviderBase.Performance7): keywordCustom = ProviderBase.KeywordQuick
 		keywordCount = (2 if keywordEnglish == ProviderBase.KeywordFull else 1 if keywordEnglish == ProviderBase.KeywordQuick else 0) + (2 if keywordOriginal == ProviderBase.KeywordFull else 1 if keywordOriginal == ProviderBase.KeywordQuick else 0) + (2 if keywordNative == ProviderBase.KeywordFull else 1 if keywordNative == ProviderBase.KeywordQuick else 0) + (2 if keywordCustom == ProviderBase.KeywordFull else 1 if keywordCustom == ProviderBase.KeywordQuick else 0)
 		keywordEnabled = keywordCount > 0
-		keywordLabel = labelMany if keywordCount >= 10 else labelSeveral if keywordCount >= 5 else labelFew if keywordCount >= 1 else labelDisabled
+		keywordLabel = labelMany if keywordCount >= 7 else labelSeveral if keywordCount >= 5 else labelFew if keywordCount >= 1 else labelDisabled
 
 		# Year
 
@@ -2496,31 +2470,98 @@ class Manager(object):
 		providers = self.providers(reload = True)
 		self.settingsRetrieve(providers = providers)
 
+		niche = []
+		tools = MetaTools.instance()
+		if tools.settingsContentDocu(level = MetaTools.ContentRegular): niche.append(Media.Docu)
+		if tools.settingsContentShort(level = MetaTools.ContentRegular): niche.append(Media.Short)
+		if tools.settingsContentAnima(level = MetaTools.ContentRegular): niche.append(Media.Anima)
+		if tools.settingsContentAnime(level = MetaTools.ContentRegular): niche.append(Media.Anime)
+		if tools.settingsContentDonghua(level = MetaTools.ContentRegular): niche.append(Media.Donghua)
+
+		# High-range device: 17 Essential, 29 Standard, 41 Extended, 102 Crazy.
+		# Mid-range device: 10 Essential, 18 Standard, 30 Extended, 73 Crazy.
+		providerMinimum = 5
+		providerMaximum = 38
+		providerRating = Math.power(1.65, rating + ((rating * 0.15) if rating < 0.6 else 0.0)) - 1
+
+		providerLimit = providerMinimum + scale(rating = providerRating, minimum = 0, maximum = providerMaximum)
+		providerLimit = max(providerMinimum, int(providerLimit))
+		if tradeoff == Manager.TradeoffSpeed: providerLimit = providerLimit - max(5, int(providerLimit * 0.1))
+		elif tradeoff == Manager.TradeoffResult: providerLimit = providerLimit + max(8, int(providerLimit * 0.15))
+		elif crazy: providerLimit = int(providerLimit * 4)
+		providerLimit = max(providerMinimum, providerLimit)
+
 		providersAll = []
 		for i in range(len(providers)):
-			providersAll.append((providers[i].optimize(language = languages), providers[i]))
+			providersAll.append((providers[i].optimize(niche = niche, language = languages, optimization = False if tradeoff == Manager.TradeoffCrazy else True), providers[i]))
 
 		providersEnabled = [i[1] for i in providersAll if i[0] is True]
 		providersDisabled = [i[1] for i in providersAll if i[0] is False]
 		providersAll = [i for i in providersAll if not i[0] is True and not i[0] is False]
+		providersAll = Tools.listShuffle(providersAll) # Shuffle to create some randomness between providers with the same rank, before we sort them.
 		providersAll = Tools.listSort(data = providersAll, key = lambda i : i[0], reverse = True)
-		providersAll = [i[1] for i in providersAll]
 
-		providerMinimum = 5
-		providerMaximum = 35 # 50 upper limit is too much for show scraping, even for high-end devices. 40 is still too much.
-		providerRating = Math.power(1.5, rating) - 1
-		providerLimit = providerMinimum + scale(rating = providerRating, minimum = 0, maximum = providerMaximum)
-		providerLimit = max(providerMinimum, int(providerLimit))
-		if tradeoff == Manager.TradeoffSpeed: providerLimit = providerLimit - max(5, int(providerLimit * 0.1))
-		elif tradeoff == Manager.TradeoffResult: providerLimit = providerLimit + max(5, int(providerLimit * 0.1))
-		providerLimit = max(providerMinimum, providerLimit)
+		# The first +-90% providers are selected based on rank, performance, etc.
+		# The last few providers are randomized, by randomly picking a few from the better ones, and a few from the worse ones.
+		# This ensures there is some randomization when scraping links.
+		# Plus this distributes the load over different sites, especially smaller sites that have less server capacity.
+		# Otherwise all users will always use exactly the same providers, while the last few lower-ranked providers are never used.
+		if providerLimit >= 45: providersExtra = [4, 4]
+		elif providerLimit >= 35: providersExtra = [4, 3]
+		elif providerLimit >= 25: providersExtra = [4, 2]
+		elif providerLimit >= 20: providersExtra = [3, 2]
+		elif providerLimit >= 15: providersExtra = [2, 1]
+		elif providerLimit >= 10: providersExtra = [1, 0]
+		else: providersExtra = None
 
-		providersEnabled.extend(providersAll[:providerLimit])
-		providersDisabled.extend(providersAll[providerLimit:])
+		if providersExtra:
+			providersTotal = sum(providersExtra)
+			providersEnabling = providersAll[:providerLimit - providersTotal]
+			providersDisabling = providersAll[providerLimit - providersTotal:]
 
-		for i in providersEnabled: i.enableSettingsProvider()
+			half = int(len(providersDisabling) / 2.0)
+			providersRandom = []
+			providersRandom1 = [i for i in providersDisabling if i[0] > 0.4]
+			providersRandom2 = [i for i in providersDisabling if i[0] <= 0.4]
+
+			if providersRandom1:
+				for i in range(providersExtra[0]):
+					provider = Tools.listPick(data = providersRandom1, weights = [i[0] for i in providersRandom1], count = 1)
+					if provider:
+						provider = provider[0]
+						providersRandom.append(provider)
+						providersRandom1.remove(provider)
+						if not providersRandom1: break
+					else:
+						break
+
+			if providersRandom2:
+				for i in range(providersExtra[1] + (providersExtra[0] - len(providersRandom))):
+					provider = Tools.listPick(data = providersRandom2, weights = [i[0] for i in providersRandom2], count = 1)
+					if provider:
+						provider = provider[0]
+						providersRandom.append(provider)
+						providersRandom2.remove(provider)
+						if not providersRandom2: break
+					else:
+						break
+
+			for i in providersRandom:
+				providersEnabling.append(i)
+				providersDisabling.remove(i)
+		else:
+			providersEnabling = providersAll[:providerLimit]
+			providersDisabling = providersAll[providerLimit:]
+
+		providersEnabled.extend([i[1] for i in providersEnabling])
+		providersDisabled.extend([i[1] for i in providersDisabling])
+
+		# NB: Disable before Enable. Since there can be the same providers in both lists if providerLimit is large enough, making both lists overlap.
 		for i in providersDisabled: i.disableSettingsProvider()
+		for i in providersEnabled: i.enableSettingsProvider()
+
 		providers = providersEnabled + providersDisabled
+		providers = Tools.listUnique(providers)
 
 		# Result
 
@@ -2535,12 +2576,6 @@ class Manager(object):
 					'query' : limitQuery,
 					'page' : limitPage,
 					'request' : limitRequest,
-				},
-				'concurrency' : {
-					'mode' : concurrencyMode,
-					'limit' : concurrencyLimit,
-					'binge' : concurrencyBinge,
-					'connection' : concurrencyConnection,
 				},
 				'pack' : {
 					'enabled' : packEnabled,
@@ -2577,7 +2612,6 @@ class Manager(object):
 				'time' : limitTimeLabel,
 				'query' : limitQueryLabel,
 				'page' : limitPageLabel,
-				'concurrency' : concurrencyLabel,
 				'pack' : packLabel,
 				'title' : titleLabel,
 				'keyword' : keywordLabel,
@@ -2648,7 +2682,6 @@ class Manager(object):
 			description = 'The scraping settings do the following:',
 			items = [
 				{'label' : 'Limits', 'description' : 'Limit the scraping time, number of pages and requests that each provider can make. These settings reduce scraping time and server load.'},
-				{'label' : 'Concurrency', 'description' : 'Change the manner in which providers are executed in parallel. These settings are dependent on your device\'s processor capabilities and can either increase or decrease scraping time slightly.'},
 				{'label' : 'Packs', 'description' : 'Search file packs in addition to individual movies or episodes. Additional queries are made which increases scraping time.'},
 				{'label' : 'Titles', 'description' : 'Search alternative titles besides the regular English title. These settings improve the chances of finding non-English titles. Additional queries are made which increases scraping time.'},
 				{'label' : 'Keywords', 'description' : 'Search alternative keywords, mostly used for pack scraping. Keywords, such as "pack", "complete", or "trilogy" improve the probability of finding file packs. Additional queries are made which increases scraping time.'},
@@ -2689,11 +2722,6 @@ class Manager(object):
 				ProviderBase.settingsGlobalLimitQuerySet(data['limit']['query'])
 				ProviderBase.settingsGlobalLimitPageSet(data['limit']['page'])
 				ProviderBase.settingsGlobalLimitRequestSet(data['limit']['request'])
-
-				ProviderBase.settingsGlobalConcurrencyModeSet(data['concurrency']['mode'])
-				ProviderBase.settingsGlobalConcurrencyLimitSet(data['concurrency']['limit'])
-				ProviderBase.settingsGlobalConcurrencyBingeSet(data['concurrency']['binge'])
-				ProviderBase.settingsGlobalConcurrencyConnectionSet(data['concurrency']['connection'])
 
 				ProviderBase.settingsGlobalPackEnabledSet(data['pack']['enabled'])
 				ProviderBase.settingsGlobalPackMovieSet(data['pack']['movie'])
@@ -2761,7 +2789,7 @@ class Manager(object):
 		settings = False, # Launch settings dialog afterwards.
 		internal = False, # Internal or hidden optimization without any interface component.
 		stepper = False, # Show the window as part of a step-by-step wizard.
-		tradeoff = TradeoffMix, # Default tradeoff.
+		tradeoff = TradeoffMixed, # Default tradeoff.
 	):
 		from lib.modules.interface import Translation
 		from lib.modules.window import WindowOptimization
@@ -2895,6 +2923,8 @@ class Manager(object):
 			wait = wait,
 			stepper = True if stepper else False,
 			progress = stepper if Tools.isNumber(stepper) else None,
+			updateScrape = updateScrape,
+			updateProvider = updateProvider,
 			navigationNext = navigationNext,
 			navigationCategory = category,
 			callbackHelp = 	self._optimizeHelp,
@@ -2957,9 +2987,9 @@ class Manager(object):
 		return result
 
 	@classmethod
-	def linksDatabaseClear(self, all = True, compress = True):
+	def linksDatabaseClear(self, all = True, compact = True):
 		if all: self.databaseClear(providers = False, links = True, failures = False, streams = False)
-		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.TableLinks, parameters = [self.linksTime(time = True)], compress = compress)
+		else: self._databaseInitialize()._delete('DELETE FROM %s WHERE time < ?' % Manager.TableLinks, parameters = [self.linksTime(time = True)], compact = compact)
 
 	@classmethod
 	def linksDatabaseClearOld(self):
@@ -2974,10 +3004,10 @@ class Manager(object):
 		return self._linksDatabaseInitialize()._select(query = query % Manager.TableLinks, parameters = parameters)
 
 	@classmethod
-	def linksRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, time = None):
+	def linksRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, time = None):
 		if provider.typeLocal(): return None # always rescrape local providers.
 
-		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 		if time is None: time = self.linksTime(time = True)
 
 		# LIMIT 1: To further improve query speed, since we only need to retrieve one row.
@@ -2986,8 +3016,8 @@ class Manager(object):
 		except: return None
 
 	@classmethod
-	def linksInsert(self, data, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
-		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+	def linksInsert(self, data, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None):
+		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 		base = self._linksDatabaseInitialize()
 		data = Converter.jsonTo({'data' : data}) # Some external providers return a dictionary.
 
@@ -3009,20 +3039,22 @@ class Manager(object):
 		return self.databaseSize(providers = False, streams = True)
 
 	@classmethod
-	def streamsDatabaseClear(self, all = True, compress = True, wait = True):
-		def _streamsDatabaseClear(all, compress):
+	def streamsDatabaseClear(self, all = True, compact = True, notification = False, wait = True):
+		def _streamsDatabaseClear(all, compact, notification):
+			if notification: self.streamsDatabaseClass()().cleanNotification(finished = False)
 			if all:
 				self.databaseClear(providers = False, links = False, failures = False, streams = True)
 			else:
 				database = self._databaseInitialize(database = Manager.DatabaseStreams)
-				if database._delete('DELETE FROM %s WHERE time < ?' % Manager.TableStreams, parameters = [self.streamsTime(time = True)], compress = False):
-					database._compress(commit = True)
-		if wait: _streamsDatabaseClear(all = all, compress = compress)
-		else: Pool.thread(target = _streamsDatabaseClear, kwargs = {'all' : all, 'compress' : compress}, start = True)
+				if database._delete('DELETE FROM %s WHERE time < ?' % Manager.TableStreams, parameters = [self.streamsTime(time = True)], compact = False):
+					database._compact(commit = True)
+			if notification: self.streamsDatabaseClass()().cleanNotification(finished = True)
+		if wait: _streamsDatabaseClear(all = all, compact = compact, notification = notification)
+		else: Pool.thread(target = _streamsDatabaseClear, kwargs = {'all' : all, 'compact' : compact, 'notification' : notification}, start = True)
 
 	@classmethod
-	def streamsDatabaseClearOld(self, wait = True):
-		self.streamsDatabaseClear(all = False, wait = wait)
+	def streamsDatabaseClearOld(self, notification = False, wait = True):
+		self.streamsDatabaseClear(all = False, notification = notification, wait = wait)
 
 	@classmethod
 	def streamsDatabaseClass(self):
@@ -3031,8 +3063,8 @@ class Manager(object):
 			def __init__(self):
 				Database.__init__(self, name = Manager.DatabaseStreams)
 
-			def _clean(self, time, commit = True, compress = True):
-				if time: return self._delete(query = 'DELETE FROM `%s` WHERE time <= ?;' % Manager.TableStreams, parameters = [time], commit = commit, compress = compress)
+			def _clean(self, time, commit = True, compact = True):
+				if time: return self._delete(query = 'DELETE FROM `%s` WHERE time <= ?;' % Manager.TableStreams, parameters = [time], commit = commit, compact = compact)
 				return False
 
 			def _cleanTime(self, count):
@@ -3056,29 +3088,29 @@ class Manager(object):
 		return self._streamsDatabaseInitialize()._select(query = query % Manager.TableStreams, parameters = parameters)
 
 	@classmethod
-	def streamsRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, time = None):
+	def streamsRetrieve(self, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, time = None):
 		from lib.modules.stream import Stream
 
 		if provider.typeLocal(): return None # Always rescrape local providers.
 
-		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
+		base = self._streamsDatabaseInitialize()
 
 		if time is None: time = self.streamsTime(time = True)
 		else: time = Time.timestamp() - time
 
 		# LIMIT 1: To further improve query speed, since we only need to retrieve one row.
-		streams = self._streamsDatabaseInitialize()._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ? LIMIT 1;' % Manager.TableStreams, parameters = [id, time])
+		streams = base._selectSingle(query = 'SELECT data FROM %s WHERE id = ? AND time >= ? LIMIT 1;' % Manager.TableStreams, parameters = [id, time])
 		try:
-			streams = Converter.jsonFrom(streams[0])
+			streams = Converter.jsonFrom(base._decompress(streams[0]))
 			streams = [Stream.load(data = stream) for stream in streams]
 			[stream.infoCacheSet(True) for stream in streams]
 			return streams
 		except: return None
 
 	@classmethod
-	def streamsInsert(self, data, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
-		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+	def streamsInsert(self, data, provider = None, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None):
+		id = self._databaseId(provider = provider, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 		base = self._streamsDatabaseInitialize()
-
 		base._delete(query = 'DELETE FROM %s WHERE id = ?;' % Manager.TableStreams, parameters = [id])
-		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.TableStreams, parameters = [id, provider.id(), Time.timestamp(), Converter.jsonTo(data)])
+		base._insert(query = 'INSERT INTO %s VALUES (?, ?, ?, ?);' % Manager.TableStreams, parameters = [id, provider.id(), Time.timestamp(), base._compress(Converter.jsonTo(data))])

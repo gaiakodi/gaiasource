@@ -79,7 +79,7 @@ class Bard(Oracle):
 			linkAccount		= 'https://accounts.google.com',
 
 			querySupport	= {
-				Media.TypeMixed				: {
+				Media.Mixed					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -91,7 +91,7 @@ class Bard(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeMovie				: {
+				Media.Movie					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -103,7 +103,7 @@ class Bard(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeSet				: {
+				Media.Set					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -115,31 +115,7 @@ class Bard(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeDocumentary		: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: True,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: True,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShort				: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: True,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: True,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShow				: {
+				Media.Show					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -219,7 +195,7 @@ class Bard(Oracle):
 	##############################################################################
 
 	def account(self):
-		return Account()
+		return Account.instance()
 
 	def accountCookie(self):
 		return self.account().dataCookie()

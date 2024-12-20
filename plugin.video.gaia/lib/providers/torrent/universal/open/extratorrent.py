@@ -25,42 +25,47 @@ from lib.modules.tools import Regex, Time
 class Provider(ProviderJson, ProviderHtml):
 
 	_Link					= {
-								ProviderHtml.Version1 : ['https://extratorrent.cyou'], # Must have the wwX subdomain, otherwise it will fail. But the subdomain always changes (ww5, ww7, etc). Retrieve the subdomain through the authentication process.
-								ProviderHtml.Version2 : ['https://extratorrent.cyou'], # Does not require the wwX subdomain.
-								ProviderHtml.Version3 : ['https://extratorrent.st'],
-								ProviderHtml.Version4 : ['https://extratorrent.si'],
-								ProviderHtml.Version5 : ['https://extratorrents.it', 'https://extratorrent.ag'],
+								# Update (2024-12): .st domain is the only one still working.
+								ProviderHtml.Version1 : ['https://extratorrent.st'],
+								ProviderHtml.Version2 : ['https://extratorrent.si'],
+								ProviderHtml.Version3 : ['https://extratorrents.it', 'https://extratorrent.ag'],
+								ProviderHtml.Version4 : ['https://extratorrent.cyou'], # Must have the wwX subdomain, otherwise it will fail. But the subdomain always changes (ww5, ww7, etc). Retrieve the subdomain through the authentication process.
+								ProviderHtml.Version5 : ['https://extratorrent.cyou'], # Does not require the wwX subdomain.
 							}
-	_Mirror					= ['https://www.elitetricks.net/extratorrent-proxy/', 'https://traqq.com/blog/2020-top-proxies-for-extratorrent-absolutely-working/']
+
+	# Both down.
+	#_Mirror				= ['https://www.elitetricks.net/extratorrent-proxy/', 'https://traqq.com/blog/2020-top-proxies-for-extratorrent-absolutely-working/']
+	_Mirror					= None
+
 	_Unblock				= {
 								ProviderHtml.Version1 : None,
 								ProviderHtml.Version2 : None,
-								ProviderHtml.Version3 : None,
+								ProviderHtml.Version3 : {ProviderHtml.UnblockFormat1 : 'extratorrent2', ProviderHtml.UnblockFormat2 : 'extratorrent', ProviderHtml.UnblockFormat3 : 'extratorrent', ProviderHtml.UnblockFormat4 : 'extratorrent'},
 								ProviderHtml.Version4 : None,
-								ProviderHtml.Version5 : {ProviderHtml.UnblockFormat1 : 'extratorrent2', ProviderHtml.UnblockFormat2 : 'extratorrent', ProviderHtml.UnblockFormat3 : 'extratorrent', ProviderHtml.UnblockFormat4 : 'extratorrent'}
+								ProviderHtml.Version5 : None,
 							}
 
 	_Path					= {
-								ProviderHtml.Version1 : 'find/%s/page/%s', # Just "find" can be used for the first page, but subsequent pages require the full path.
-								ProviderHtml.Version2 : 'api.php?url=/q.php',
+								ProviderHtml.Version1 : 'search/', # Must end with a slash.
+								ProviderHtml.Version2 : 'search/', # Must end with a slash.
 								ProviderHtml.Version3 : 'search/', # Must end with a slash.
-								ProviderHtml.Version4 : 'search/', # Must end with a slash.
-								ProviderHtml.Version5 : 'search/', # Must end with a slash.
+								ProviderHtml.Version4 : 'find/%s/page/%s', # Just "find" can be used for the first page, but subsequent pages require the full path.
+								ProviderHtml.Version5 : 'api.php?url=/q.php',
 							}
 
 	_CategoryMovie			= {
-								ProviderHtml.Version1 : ['movies', 'anime'],
-								ProviderHtml.Version2 : ['201', '202', '207', '209'], # 201 = Movies, 202 = Movies DVDR, 207 = HD Movies, 209 = 3D
-								ProviderHtml.Version3 : '1',
-								ProviderHtml.Version4 : '4',
-								ProviderHtml.Version5 : '4',
+								ProviderHtml.Version1 : '1',
+								ProviderHtml.Version2 : '4',
+								ProviderHtml.Version3 : '4',
+								ProviderHtml.Version4 : ['movies', 'anime'],
+								ProviderHtml.Version5 : ['201', '202', '207', '209'], # 201 = Movies, 202 = Movies DVDR, 207 = HD Movies, 209 = 3D
 							}
 	_CategoryShow			= {
-								ProviderHtml.Version1 : ['tv', 'anime'],
-								ProviderHtml.Version2 : ['205', '208'], # 205 = TV Shows, 208 = HD TV Shows
-								ProviderHtml.Version3 : '2',
-								ProviderHtml.Version4 : '8',
-								ProviderHtml.Version5 : '8',
+								ProviderHtml.Version1 : '2',
+								ProviderHtml.Version2 : '8',
+								ProviderHtml.Version3 : '8',
+								ProviderHtml.Version4 : ['tv', 'anime'],
+								ProviderHtml.Version5 : ['205', '208'], # 205 = TV Shows, 208 = HD TV Shows
 							}
 
 	_Query					= '%s?%s=%s%%26%s=%s' # URL-encode "&", since the URL is passed as a parameter, otherwise the category is ignored.
@@ -125,10 +130,10 @@ class Provider(ProviderJson, ProviderHtml):
 		category = self.customCategory()
 
 		name			= 'ExtraTorrent'
-		description		= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. There are different versions of {name} with version %s having some missing metadata.'  % ProviderHtml.Version5
+		description		= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. There are different versions of {name} with version %s having some missing metadata. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.'  % ProviderHtml.Version3
 		rank			= 4
 		performance		= ProviderHtml.PerformancePoor
-		status			= ProviderHtml.StatusOperational
+		status			= ProviderHtml.StatusImpaired # Update (2024-12): The only working .st domain has heavy Cloudflare protection.
 		link			= Provider._Link[version]
 		mirror			= Provider._Mirror
 		unblock			= Provider._Unblock
@@ -137,7 +142,7 @@ class Provider(ProviderJson, ProviderHtml):
 		supportShow		= True
 		supportPack		= True
 
-		if version == ProviderHtml.Version1:
+		if version == ProviderHtml.Version4:
 			ProviderHtml.initialize(self,
 				name						= name,
 				description					= description,
@@ -190,7 +195,7 @@ class Provider(ProviderJson, ProviderHtml):
 				extractSourceSeeds			= [HtmlResult(index = 5)],
 				extractSourceLeeches		= [HtmlResult(index = 6)],
 			)
-		elif version == ProviderHtml.Version2:
+		elif version == ProviderHtml.Version5:
 			ProviderJson.initialize(self,
 				name					= name,
 				description				= description,
@@ -242,7 +247,7 @@ class Provider(ProviderJson, ProviderHtml):
 				extractSourceLeeches	= Provider._AttributeLeeches,
 			)
 		else:
-			if version == ProviderHtml.Version3:
+			if version == ProviderHtml.Version1:
 				extractFileName				= [HtmlResult(index = 1), HtmlLink()]
 				extractFileSize				= [HtmlResult(index = 3)]
 				extractReleaseUploader		= [HtmlResult(index = 1), HtmlDiv(class_ = Provider._AttributeUploader2)]
@@ -250,7 +255,7 @@ class Provider(ProviderJson, ProviderHtml):
 				extractSourceTimeInexact	= [HtmlResult(index = 2)]
 				extractSourceSeeds			= [HtmlResult(index = 4)]
 				extractSourceLeeches		= [HtmlResult(index = 5)]
-			elif version == ProviderHtml.Version4:
+			elif version == ProviderHtml.Version2:
 				extractFileName				= [HtmlResult(index = 2), HtmlLink()]
 				extractFileSize				= [HtmlResult(index = 4)]
 				extractReleaseUploader		= [HtmlResult(index = 2), HtmlDiv(class_ = Provider._AttributeUploader2)]
@@ -258,7 +263,7 @@ class Provider(ProviderJson, ProviderHtml):
 				extractSourceTimeInexact	= None
 				extractSourceSeeds			= [HtmlResult(index = 6)]
 				extractSourceLeeches		= [HtmlResult(index = 7)]
-			elif version == ProviderHtml.Version5:
+			elif version == ProviderHtml.Version3:
 				extractFileName				= [HtmlResult(index = 2), HtmlLink()]
 				extractFileSize				= [HtmlResult(index = 4)]
 				extractReleaseUploader		= [HtmlResult(index = 2), HtmlDiv(class_ = Provider._AttributeUploader2)]
@@ -321,10 +326,22 @@ class Provider(ProviderJson, ProviderHtml):
 	# PROCESS
 	##############################################################################
 
+	def processData(self, data):
+		version = self.customVersion()
+		if version == ProviderHtml.Version1:
+			# There is somewhere a huge HTML syntax error in the code, preventing Beautifulsoup from extracting it in:
+			#	extractList = [HtmlResults(class_ = Provider._AttributeTable)]
+			# Even this does not work:
+			#	extractParser = ProviderHtml.ParserHtml5
+			# Use regex to extract and then parse.
+			data = Regex.extract(data = str(data), expression = '(<table\s*class="tl".*?<\/table>)', flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
+			if data: data = self.parseHtml(data = data)
+		return data
+
 	def processOffset(self, data, items):
 		try:
 			version = self.customVersion()
-			if version == ProviderHtml.Version1:
+			if version == ProviderHtml.Version4:
 				next = False
 				buttons = self.extractHtml(data, [HtmlButton()])
 				if buttons:
@@ -333,7 +350,7 @@ class Provider(ProviderJson, ProviderHtml):
 							next = True
 							break
 				if not next: return ProviderHtml.Skip
-			elif version == ProviderHtml.Version4:
+			elif version == ProviderHtml.Version2:
 				last = self.extractHtml(data, [HtmlTable(), Html(class_ = Provider._AttributePage, index = -1, extract = Html.ParseText)])
 				if last:
 					last = int(last)
@@ -341,7 +358,7 @@ class Provider(ProviderJson, ProviderHtml):
 					if next:
 						next = int(next)
 						if next > last: return ProviderHtml.Skip
-			elif version == ProviderHtml.Version3 or version == ProviderHtml.Version5:
+			elif version == ProviderHtml.Version1 or version == ProviderHtml.Version3:
 				# Seems that subsequent pages contain the same results as page 1.
 				last = self.extractHtml(data, [HtmlTable(), Html(class_ = Provider._AttributePage, index = -1, extract = Html.ParseText)])
 				if last and not Regex.match(data = last, expression = Provider._ExpressionNext2):
@@ -350,42 +367,42 @@ class Provider(ProviderJson, ProviderHtml):
 
 	def processBefore(self, item):
 		version = self.customVersion()
-		if version == ProviderHtml.Version1:
+		if version == ProviderHtml.Version4:
 			category = self.extractHtml(item, [HtmlResult(index = 0, extract = Html.ParseTextNested)])
 			if category:
 				category = category.lower().strip()
 				categories = Provider._CategoryShow[version] if self.parameterMediaShow() else Provider._CategoryMovie[version]
 				if not category in categories: return ProviderJson.Skip
 			else: return ProviderJson.Skip
-		elif version == ProviderHtml.Version2:
+		elif version == ProviderHtml.Version5:
 			expectedImdb = self.parameterIdImdb()
 			if expectedImdb:
 				try: currentImdb = item[Provider._AttributeImdb]
 				except: currentImdb = None
 				if currentImdb and not currentImdb == expectedImdb: return ProviderJson.Skip
-		elif version == ProviderHtml.Version3 or version == ProviderHtml.Version4 or version == ProviderHtml.Version5:
+		elif version == ProviderHtml.Version1 or version == ProviderHtml.Version2 or version == ProviderHtml.Version3:
 			# Seems that the category query parameter does not have an affect.
 			# Filter the category manually.
 			category = self.extractHtml(item, [HtmlResult(index = 1), HtmlLink(extract = Html.AttributeTitle)])
 			if category:
-				if version == ProviderHtml.Version4:
+				if version == ProviderHtml.Version2:
 					target = Provider._ExpressionMovie if self.parameterMediaMovie() else Provider._ExpressionShow
 					if not (Regex.match(data = category, expression = target) or Regex.match(data = category, expression = Provider._ExpressionVideo)):
 						return ProviderHtml.Skip
-				elif version == ProviderHtml.Version3 or version == ProviderHtml.Version5:
+				elif version == ProviderHtml.Version1 or version == ProviderHtml.Version3:
 					# There can be too many subcategories to check. Rather just check some exclude categories.
 					# https://extratorrents.it/category/4/Movies+Torrents.html
 					if Regex.match(data = category, expression = Provider._ExpressionExclude):
 						return ProviderHtml.Skip
 
 	def processHash(self, value, item, details = None, entry = None):
-		if self.customVersion2():
+		if self.customVersion5():
 			# If no results are found, a single link with a 0s hash is returned. Skip it.
 			if value  == '0000000000000000000000000000000000000000': return ProviderJson.Skip
 		return value
 
 	def processFileName(self, value, item, details = None, entry = None):
-		if self.customVersion1():
+		if self.customVersion4():
 			if value:
 				# Remove prefix.
 				#	Original Name: Luca 2021 2160p UHD BluRay x265-B0MBARDiERS
@@ -399,7 +416,7 @@ class Provider(ProviderJson, ProviderHtml):
 
 	def processSourceTime(self, value, item, details = None, entry = None):
 		version = self.customVersion()
-		if version == ProviderHtml.Version4:
+		if version == ProviderHtml.Version2:
 			# Y-day-2021
 			# Today-13:10
 			# 03-29-2019
@@ -410,7 +427,7 @@ class Provider(ProviderJson, ProviderHtml):
 		return value
 
 	def processSourceTimeInexact(self, value, item, details = None, entry = None):
-		if self.customVersion1():
+		if self.customVersion4():
 			if value:
 				# 3 Hrs
 				# 1 Day / 2 Days
@@ -422,7 +439,7 @@ class Provider(ProviderJson, ProviderHtml):
 		return value
 
 	def processSourceApproval(self, value, item, details = None, entry = None):
-		if self.customVersion2():
+		if self.customVersion5():
 			if self.customVerified():
 				if not value == Provider._AttributeVip and not value == Provider._AttributeTrusted: return ProviderJson.Skip
 			if value == Provider._AttributeVip: return ProviderJson.ApprovalExcellent

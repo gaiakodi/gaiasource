@@ -19,6 +19,8 @@
 '''
 
 # https://torrends.to/proxy/
+# https://myds.cloud/%E8%B5%84%E6%96%99/%E7%A3%81%E5%8A%9B%E6%90%9C%E7%B4%A2
+# https://github.com/fmhy/FMHY/wiki/%F0%9F%8C%80-Torrenting
 
 import os
 import sys
@@ -27,7 +29,7 @@ from lib.modules.tools import Tools, Logger, System, Media, Time, Language, Conv
 from lib.modules.interface import Format, Translation
 from lib.modules.stream import Stream
 from lib.modules.network import Networker, Container
-from lib.modules.concurrency import Pool, Lock, Semaphore
+from lib.modules.concurrency import Pool, Lock, Semaphore, Premaphore
 
 class ProviderBase(object):
 
@@ -112,8 +114,8 @@ class ProviderBase(object):
 
 	# Media
 	MediaUnknown						= None
-	MediaMovie							= Media.TypeMovie
-	MediaShow							= Media.TypeShow
+	MediaMovie							= Media.Movie
+	MediaShow							= Media.Show
 
 	# Container
 	ContainerSingular					= 'link'
@@ -157,14 +159,14 @@ class ProviderBase(object):
 	TimeFactorFull						= 1.00
 	TimeFactorScrape					= 0.95			# Timeout factor for main outer scrape function.
 	TimeFactorInternal					= 0.90			# Timeout factor for internal functions.
-	TimeRequest							= 45			# The timeout of network requests. This is NOT the total time requests can take, but instead the time it takes for the server to respond on the intital request. Do not make this too high, otherwise requests might hang.
+	TimeRequest							= 30			# The timeout of network requests. This is NOT the total time requests can take, but instead the time it takes for the server to respond on the intital request. Do not make this too high, otherwise requests might hang.
 
 	# Concurrency
-	ConcurrencyAutomatic				= 0				# Should correspond with settings.xml.
-	ConcurrencyThread					= 1				# Should correspond with settings.xml.
-	ConcurrencyProcess					= 2				# Should correspond with settings.xml.
+	ConcurrencyTotal					= 0				# How many providers are enabled.
+	ConcurrencyTasks					= 0				# How many providers are allowed to run concurrently.
+	ConcurrencyBinge					= None
 	ConcurrencyLock						= None
-	ConcurrencyTasks					= 0				# How many providers are running concurrently.
+	ConcurrencyData						= {}
 
 	# Rank
 	RankLimit							= 5
@@ -195,6 +197,13 @@ class ProviderBase(object):
 	RequestMethod						= 'method'
 	RequestMethodGet					= Networker.MethodGet
 	RequestMethodPost					= Networker.MethodPost
+
+	RequestType							= 'type'
+	RequestTypeNone						= Networker.DataNone
+	RequestTypePost						= Networker.DataPost
+	RequestTypeJson						= Networker.DataJson
+	RequestTypeForm						= Networker.DataForm
+	RequestTypeMulti					= Networker.DataMulti
 
 	RequestHeaderUserAgent				= Networker.HeaderUserAgent
 	RequestHeaderRequestToken			= Networker.HeaderRequestToken
@@ -289,11 +298,6 @@ class ProviderBase(object):
 	SettingsGlobalSaveStream			= 'scrape.save.stream'
 	SettingsGlobalSaveCache				= 'scrape.save.cache'
 	SettingsGlobalSaveExpression		= 'scrape.save.expression'
-
-	SettingsGlobalConcurrencyMode		= 'provider.concurrency.mode'
-	SettingsGlobalConcurrencyLimit		= 'provider.concurrency.limit'
-	SettingsGlobalConcurrencyBinge		= 'provider.concurrency.binge'
-	SettingsGlobalConcurrencyConnection	= 'provider.concurrency.connection'
 
 	SettingsGlobalPackEnabled			= 'scrape.pack.enabled'
 	SettingsGlobalPackMovie				= 'scrape.pack.movie'
@@ -454,12 +458,6 @@ class ProviderBase(object):
 
 	# Settings
 	SettingsDataBase 					= {
-											'concurrency' : {
-												'mode' : None,
-												'limit' : None,
-												'binge' : None,
-												'connection' : None,
-											},
 											'limit' : {
 												ScrapeTime : None,
 												ScrapeQuery : None,
@@ -516,7 +514,8 @@ class ProviderBase(object):
 	PriorityLocks						= {}
 	PriorityLock						= Lock()
 	PriorityDelay						= 0.1
-	PriorityChunk						= 250 # More details in priorityChunks().
+	PriorityChunk						= [250, 100] # More details in priorityChunks().
+	PriorityChunked						= None
 	PriorityTimeout						= 60 # 1 minute.
 
 	# Query
@@ -604,6 +603,7 @@ class ProviderBase(object):
 		addonModuleParent		= None,			# The Kodi module ID of the parent addon the provider originates from. A script.module.xxx addon might have a parent plugin.video.xxx addon and might read settings from the parent addon (eg Oath).
 		addonModuleSettings		= None,			# The Kodi module ID of the addon the has the settings dialog.
 
+		supportNiche			= None,			# A list of niches supported by the provider. Eg: Media.Anime
 		supportMovie			= None,			# Whether or not movie searches are supported.
 		supportShow				= None,			# Whether or not show searches are supported.
 		supportSpecial			= None,			# Whether or not special episode searches are supported.
@@ -693,6 +693,7 @@ class ProviderBase(object):
 			if status == ProviderBase.StatusDead: enabled = False
 			if developer is None: developer = False
 
+			if supportNiche and Tools.isString(supportNiche): supportNiche = [supportNiche]
 			if supportMovie is None: supportMovie = True
 			if supportShow is None: supportShow = True
 			if supportSpecial is None: supportSpecial = True
@@ -774,6 +775,7 @@ class ProviderBase(object):
 				},
 
 				'support' : {
+					'niche' : supportNiche,
 					'movie' : supportMovie,
 					'show' : supportShow,
 					'special' : supportSpecial,
@@ -1318,12 +1320,20 @@ class ProviderBase(object):
 				if not found and languages and len([i for i in languages if not i in exclude]) > 0:
 					rating -= changeUnmatch
 
+		if self.typeExternal(): rating *= 0.7
+
 		return Math.round(min(1, max(0, rating)), places = 2)
 
-	def optimize(self, performance = True, rank = True, language = None, account = True, dead = True, default = True, support = True, internal = True):
+	def optimize(self, performance = True, rank = True, niche = None, language = None, account = True, dead = True, default = True, support = True, optimization = True, internal = True):
 		# If optimization is True, enable the provider. If set to False, disable the provider.
-		optimization = self.optimization()
-		if not optimization is None: return optimization
+		if optimization:
+			optimization = self.optimization()
+			if not optimization is None: return optimization
+
+		# Do not enable premium debrid scrapers, since most people will not use them in any case.
+		# Plus they are often a bit slower, since they have to make a lot of API requests for subfolders.
+		# And Premiumize links expire, so the scraper is executed again when the streams are reloaded a day later.
+		if self.typePremium(): return False
 
 		# Enable providers which have an active account.
 		if account and self.accountHas(): return self.accountEnabled()
@@ -1348,6 +1358,15 @@ class ProviderBase(object):
 			try: handler = ProviderBase.Handlers[type]
 			except: handler = ProviderBase.Handlers[type] = Handler(type = type)
 			if not handler.supportedType(type = type): return False
+
+		# Enable niche providers.
+		# If there are too many niche (eg: anime) providers in the future, we might need to do this in optimizationRating() to not enable all of them.
+		if niche:
+			support = self.supportNiche()
+			if support:
+				if not Tools.isArray(niche): niche = [niche]
+				if not Tools.isArray(support): support = [support]
+				if any(i in niche for i in support): return True
 
 		# Otherwise calculate a rating.
 		return self.optimizationRating(performance = performance, rank = rank, language = language)
@@ -1579,6 +1598,7 @@ class ProviderBase(object):
 
 		if unblock: self.linksUnblock(result, toggle = False)
 		if flat: result = [link['link'] for link in result]
+
 		return result
 
 	def linksClean(self):
@@ -1935,9 +1955,12 @@ class ProviderBase(object):
 
 	def supportMedia(self):
 		result = []
-		if self.mData['support']['movie']: result.append(Media.TypeMovie)
-		if self.mData['support']['show']: result.append(Media.TypeShow)
+		if self.mData['support']['movie']: result.append(Media.Movie)
+		if self.mData['support']['show']: result.append(Media.Show)
 		return result
+
+	def supportNiche(self):
+		return self.mData['support']['niche']
 
 	def supportMovie(self):
 		return self.mData['support']['movie']
@@ -2565,70 +2588,6 @@ class ProviderBase(object):
 	def settingsGlobalSaveExpressionSet(self, value):
 		Settings.set(ProviderBase.SettingsGlobalSaveExpression, value)
 		ProviderBase.SettingsData['save']['expression'] = None
-
-	@classmethod
-	def settingsGlobalConcurrencyMode(self):
-		result = ProviderBase.SettingsData['concurrency']['mode']
-		if result is None: result = ProviderBase.SettingsData['concurrency']['mode'] = Settings.getInteger(ProviderBase.SettingsGlobalConcurrencyMode)
-		return result
-
-	@classmethod
-	def settingsGlobalConcurrencyModeSet(self, value):
-		Settings.set(ProviderBase.SettingsGlobalConcurrencyMode, value)
-		ProviderBase.SettingsData['concurrency']['mode'] = None
-
-	@classmethod
-	def settingsGlobalConcurrencyModeLabel(self, value = None):
-		if value is None: value = self.settingsGlobalConcurrencyMode()
-		return Translation.string(36039 if value == ProviderBase.ConcurrencyThread else 36040 if value == ProviderBase.ConcurrencyProcess else 33800)
-
-	@classmethod
-	def settingsGlobalConcurrencyLimit(self):
-		result = ProviderBase.SettingsData['concurrency']['limit']
-		if result is None: result = ProviderBase.SettingsData['concurrency']['limit'] = Settings.getCustom(ProviderBase.SettingsGlobalConcurrencyLimit)
-		return result
-
-	@classmethod
-	def settingsGlobalConcurrencyLimitSet(self, value):
-		Settings.setCustom(ProviderBase.SettingsGlobalConcurrencyLimit, value)
-		ProviderBase.SettingsData['concurrency']['limit'] = None
-
-	@classmethod
-	def settingsGlobalConcurrencyLimitLabel(self, value = None):
-		if value is None: value = self.settingsGlobalConcurrencyLimit()
-		return Settings.customLabel(id = ProviderBase.SettingsGlobalConcurrencyLimit, value = value)
-
-	@classmethod
-	def settingsGlobalConcurrencyBinge(self):
-		result = ProviderBase.SettingsData['concurrency']['binge']
-		if result is None: result = ProviderBase.SettingsData['concurrency']['binge'] = Settings.getCustom(ProviderBase.SettingsGlobalConcurrencyBinge)
-		return result
-
-	@classmethod
-	def settingsGlobalConcurrencyBingeSet(self, value):
-		Settings.setCustom(ProviderBase.SettingsGlobalConcurrencyBinge, value)
-		ProviderBase.SettingsData['concurrency']['binge'] = None
-
-	@classmethod
-	def settingsGlobalConcurrencyBingeLabel(self, value = None):
-		if value is None: value = self.settingsGlobalConcurrencyBinge()
-		return Settings.customLabel(id = ProviderBase.SettingsGlobalConcurrencyBinge, value = value)
-
-	@classmethod
-	def settingsGlobalConcurrencyConnection(self):
-		result = ProviderBase.SettingsData['concurrency']['connection']
-		if result is None: result = ProviderBase.SettingsData['concurrency']['connection'] = Settings.getCustom(ProviderBase.SettingsGlobalConcurrencyConnection)
-		return result
-
-	@classmethod
-	def settingsGlobalConcurrencyConnectionSet(self, value):
-		Settings.setCustom(ProviderBase.SettingsGlobalConcurrencyConnection, value)
-		ProviderBase.SettingsData['concurrency']['connection'] = None
-
-	@classmethod
-	def settingsGlobalConcurrencyConnectionLabel(self, value = None):
-		if value is None: value = self.settingsGlobalConcurrencyConnection()
-		return Settings.customLabel(id = ProviderBase.SettingsGlobalConcurrencyConnection, value = value)
 
 	@classmethod
 	def settingsGlobalPackEnabled(self):
@@ -3418,7 +3377,7 @@ class ProviderBase(object):
 			ProviderBase.SettingsLabel			: 'Search Mode',
 			ProviderBase.SettingsDefault		: ProviderBase.CustomSearchId,
 			ProviderBase.SettingsType			: [{ProviderBase.CustomSearchId : 'Search By ID'}, {ProviderBase.CustomSearchTitle : 'Search By Title'}],
-			ProviderBase.SettingsDescription	: 'Search {name} using either title or the IMDb, TMDb, or TVDB ID. Not all files have an associated ID and searching by title might therefore return more results. Searching by title is slower and can return incorrect results. The title will be used if no ID is available.',
+			ProviderBase.SettingsDescription	: 'Search {name} using either title or the IMDb, TMDb, TVDB or Trakt ID. Not all files have an associated ID and searching by title might therefore return more results. Searching by title is slower and can return incorrect results. The title will be used if no ID is available.',
 		})
 
 	def customSearchId(self, settings = True):
@@ -3770,10 +3729,10 @@ class ProviderBase(object):
 		hostersPremium = core.hostersPremium()
 
 		if self.supportMovie() and not result == ProviderBase.VerifySuccess:
-			result, reason = _verifyScrape(Media.TypeMovie, movie, hostersAll, hostersPremium)
+			result, reason = _verifyScrape(Media.Movie, movie, hostersAll, hostersPremium)
 
 		if self.supportShow() and not result == ProviderBase.VerifySuccess:
-			result, reason = _verifyScrape(Media.TypeShow, show, hostersAll, hostersPremium)
+			result, reason = _verifyScrape(Media.Show, show, hostersAll, hostersPremium)
 
 		self.mVerify = False
 		return result, reason
@@ -3795,7 +3754,9 @@ class ProviderBase(object):
 		#return Pool.thread(target = function, args = tuple(args))
 		return {'target' : function, 'args' : tuple(args)}
 
-	def threadExecute(self, threads, wait = True, factor = TimeFactorInternal, limit = None, optimize = True):
+	def threadExecute(self, threads, factor = TimeFactorInternal, limit = None, wait = True, optimize = True):
+		if not threads: return False
+
 		# If there is only 1 thread or multiple threads, but only 1 thread should be executed at a time.
 		# Execute the target function directly without launching a new thread.
 		# Saves the overhead of creating a thread and reduces the overall threads created.
@@ -3806,18 +3767,27 @@ class ProviderBase(object):
 		else:
 			synchronizer = None
 			if limit:
-				if Tools.isInteger(limit): synchronizer = Semaphore(limit)
+				if Tools.isInteger(limit): synchronizer = Premaphore(limit) # Only create the thread object once it is ready to execute, but not before while it is waiting.
 				else: synchronizer = limit
 
-			for i in range(len(threads)):
-				thread = threads[i]
-				if Tools.isDictionary(thread): threads[i] = thread = Pool.thread(target = thread['target'], args = thread['args'], synchronizer = synchronizer)
+			# NB: Do not store the thread object permanently, like in the "threads" list passed into this function.
+			# Otherwise a reference to the thread object is kept until the end of execution, preventing the thread from being deleted the moment it is done, and only getting deleted by the garbage collector at the end of the process.
+			# When not storing the thread object, it gets deleted immediately after it finishes, freeing up threads.
+			# This is especially important for low-end devices which have a maximum thread-creation limit imposed by the system (often linked to the RAM available, and other OS factors).
+			instances = [] # Gets cleared when this function runs out-of-scope.
+
+			for thread in threads:
+				if Tools.isDictionary(thread): thread = Pool.thread(target = thread['target'], args = thread['args'], synchronizer = synchronizer)
+				instances.append(thread)
 				thread.start()
 
-			if wait: self.threadWait(threads = threads, factor = factor)
+			if wait: self.threadWait(threads = instances, factor = factor)
+
+		return True
 
 	def threadWait(self, threads, factor = TimeFactorInternal):
-		[thread.join(self.timerRemaining(factor = factor)) for thread in threads]
+		if Tools.isList(threads): [thread.join(self.timerRemaining(factor = factor)) for thread in threads]
+		else: threads.join(self.timerRemaining(factor = factor))
 
 	##############################################################################
 	# TIMER
@@ -3860,9 +3830,14 @@ class ProviderBase(object):
 	def parameters(self):
 		return self.mParameters
 
-	def parametersSet(self, query = None, media = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = None, silent = None):
+	def parametersSet(self, query = None, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = None, silent = None):
 		# Copy the years, since the dictionary gets edited.
-		self.mParameters = {'query' : query, 'media' : media, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
+		if language: language = Tools.copy(language) if Tools.isArray(language) else [language]
+		if country: country = Tools.copy(country) if Tools.isArray(country) else [country]
+		if network: network = Tools.copy(network) if Tools.isArray(network) else [network]
+		if studio: studio = Tools.copy(studio) if Tools.isArray(studio) else [studio]
+
+		self.mParameters = {'query' : query, 'media' : media, 'niche' : niche, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'idTrakt' : idTrakt, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'numberPack' : numberPack, 'language' : language, 'country' : country, 'network' : network, 'studio' : studio, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
 
 	def parametersImport(self, data):
 		if Tools.isString(data): data = Converter.jsonFrom(data)
@@ -3920,6 +3895,10 @@ class ProviderBase(object):
 		try: return self.parameterQueryId()['tvdb']
 		except: return None
 
+	def parameterQueryIdTrakt(self):
+		try: return self.parameterQueryId()['trakt']
+		except: return None
+
 	def parameterQueryNumber(self):
 		try: return self.parameterQuery()['number']
 		except: return None
@@ -3932,14 +3911,27 @@ class ProviderBase(object):
 		try: return self.parameterQueryNumber()['episode']
 		except: return None
 
+	def parameterQueryNumberPack(self):
+		try: return self.parameterQueryNumber()['pack']
+		except: return None
+
 	def parameterMedia(self):
 		return self.mParameters['media']
 
 	def parameterMediaMovie(self):
-		return Media.typeMovie(self.mParameters['media'])
+		return Media.isFilm(self.mParameters['media'])
 
 	def parameterMediaShow(self):
-		return Media.typeTelevision(self.mParameters['media'])
+		return Media.isSerie(self.mParameters['media'])
+
+	def parameterNiche(self):
+		return self.mParameters['niche']
+
+	def parameterNicheAnime(self):
+		return Media.isAnime(self.mParameters['niche'])
+
+	def parameterNicheDonghua(self):
+		return Media.isDonghua(self.mParameters['niche'])
 
 	def parameterTitles(self):
 		return self.mParameters['titles']
@@ -3959,14 +3951,29 @@ class ProviderBase(object):
 	def parameterIdTvdb(self):
 		return self.mParameters['idTvdb']
 
+	def parameterIdTrakt(self):
+		return self.mParameters['idTrakt']
+
 	def parameterNumberSeason(self):
 		return self.mParameters['numberSeason']
 
 	def parameterNumberEpisode(self):
 		return self.mParameters['numberEpisode']
 
+	def parameterNumberPack(self):
+		return self.mParameters['numberPack']
+
 	def parameterLanguage(self):
 		return self.mParameters['language']
+
+	def parameterCountry(self):
+		return self.mParameters['country']
+
+	def parameterNetwork(self):
+		return self.mParameters['network']
+
+	def parameterStudio(self):
+		return self.mParameters['studio']
 
 	def parameterPack(self):
 		return self.mParameters['pack']
@@ -4033,20 +4040,23 @@ class ProviderBase(object):
 				idLink = self.resultId(type = type, link = link)
 				idHash = self.resultId(type = type, hash = hash)
 
-				ProviderBase.ResultLock[id].acquire()
-				if stream.accessTypeOrion() or ((not idLink or not idLink in ProviderBase.ResultFound[id]) and (not idHash or not idHash in ProviderBase.ResultFound[id])):
-					self.statisticsUpdateSearch(stream = True)
+				# The ID will not be in the lock list if the scraping was aborted, but some provider threads are still running.
+				if id in ProviderBase.ResultLock:
+					ProviderBase.ResultLock[id].acquire()
+					if stream.accessTypeOrion() or ((not idLink or not idLink in ProviderBase.ResultFound[id]) and (not idHash or not idHash in ProviderBase.ResultFound[id])):
+						self.statisticsUpdateSearch(stream = True)
 
-					if idLink: ProviderBase.ResultFound[id][idLink] = True
-					if idHash: ProviderBase.ResultFound[id][idHash] = True
+						if idLink: ProviderBase.ResultFound[id][idLink] = True
+						if idHash: ProviderBase.ResultFound[id][idHash] = True
 
-					idGaia = stream.idGaiaGenerate()
-					if idGaia and not idGaia in ProviderBase.ResultFound[id]:
-						ProviderBase.ResultFound[id][idGaia] = True
-						ProviderBase.ResultStreams[id].append({'stream' : stream}) # If this key is ever changed, make sure to update the local library provider.
+						stream.idGaiaGenerate()
+						idGaia = stream.idGaiaStream()
+						if idGaia and not idGaia in ProviderBase.ResultFound[id]:
+							ProviderBase.ResultFound[id][idGaia] = True
+							ProviderBase.ResultStreams[id].append({'stream' : stream}) # If this key is ever changed, make sure to update the local library provider.
 
-						ProviderBase.ResultLock[id].release()
-						return True
+							ProviderBase.ResultLock[id].release()
+							return True
 		except: Logger.error()
 
 		try: ProviderBase.ResultLock[id].release()
@@ -4086,14 +4096,20 @@ class ProviderBase(object):
 				idImdb = self.parameterIdImdb(),
 				idTmdb = self.parameterIdTmdb(),
 				idTvdb = self.parameterIdTvdb(),
+				idTrakt = self.parameterIdTrakt(),
 
 				metaMedia = self.parameterMedia(),
+				metaNiche = self.parameterNiche(),
 				metaTitle = self.parameterTitles(),
 				metaYear = self.parameterYears()['median'] if self.parameterYears() else None,
 				metaTime = self.parameterTime(),
 				metaSeason = self.parameterNumberSeason(),
 				metaEpisode = self.parameterNumberEpisode(),
+				metaNumber = self.parameterNumberPack(),
 				metaLanguage = self.parameterLanguage(),
+				metaCountry = self.parameterCountry(),
+				metaNetwork = self.parameterNetwork(),
+				metaStudio = self.parameterStudio(),
 				metaDuration = self.parameterDuration(),
 				metaPack = self.parameterPack(),
 
@@ -4154,14 +4170,14 @@ class ProviderBase(object):
 	# CACHE
 	##############################################################################
 
-	def cacheInitialize(self, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
+	def cacheInitialize(self, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None):
 		from lib.providers.core.manager import Manager
-		Manager.streamsInsert(data = [], provider = self, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+		Manager.streamsInsert(data = [], provider = self, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
-	def cacheRetrieve(self, cache = True, query = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None):
+	def cacheRetrieve(self, cache = True, query = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None):
 		if cache:
 			from lib.providers.core.manager import Manager
-			return Manager.streamsRetrieve(provider = self, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, time = self.cacheTime())
+			return Manager.streamsRetrieve(provider = self, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, time = self.cacheTime())
 		else:
 			return None
 
@@ -4197,41 +4213,71 @@ class ProviderBase(object):
 	##############################################################################
 
 	@classmethod
-	def concurrency(self):
-		# If "Automatic" is selected, always use threading, even if the system supports multi-processing.
-		# Multi-processing has many potential problems and is mostly not even faster (1-5 secs slower = 10%).
-		if self.settingsGlobalConcurrencyMode() == ProviderBase.ConcurrencyProcess and Platform.pythonConcurrencyProcess(): return ProviderBase.ConcurrencyProcess
-		else: return ProviderBase.ConcurrencyThread
+	def concurrencyMode(self):
+		return Pool.settingMode()
 
 	@classmethod
 	def concurrencyThread(self):
-		return self.concurrency() == ProviderBase.ConcurrencyThread
+		return self.concurrencyMode() == Pool.ModeThread
 
 	@classmethod
 	def concurrencyProcess(self):
-		return self.concurrency() == ProviderBase.ConcurrencyProcess
+		return self.concurrencyMode() == Pool.ModeProcess
 
 	# minimum/maximum should not be changed, except in rare cases, like with debrid providers.
 	@classmethod
 	def concurrencyTasks(self, level = None, minimum = 1, maximum = 10):
 		if level is None or not ProviderBase.ConcurrencyTasks: return ProviderBase.ConcurrencyTasks
 
-		tasks = 1
+		id = str(level) + '_' + str(minimum) + '_' + str(maximum)
+		if not id in ProviderBase.ConcurrencyData:
+			tasks = 1
 
-		# Number of queries running concurrently for the same provider.
-		if level <= 1: tasks = (30.0 / ProviderBase.ConcurrencyTasks) * 10
+			concurrency = None
+			if ProviderBase.ConcurrencyTasks <= 4: concurrency = Pool.LevelLow
+			elif ProviderBase.ConcurrencyTasks <= 8: concurrency = Pool.LevelMedium
+			elif ProviderBase.ConcurrencyTasks <= 12: concurrency = Pool.LevelHigh
 
-		# Number of streams to process concurrently from the results of a single query from a single provider.
-		elif level == 2: tasks = max(3, (10.0 / ProviderBase.ConcurrencyTasks) * 10)
+			# If fewer providers are enabled, we can use higher tasks limits.
+			# Otherwise scraping with very few providers is unnecessarily slow, because we restrict the concurrency too much, which is not needed by other providers.
+			multipliers = [1.0, 1.0, 1.0]
+			if ProviderBase.ConcurrencyTotal <= 5: multipliers = [2.0, 1.5, 1.2]
+			elif ProviderBase.ConcurrencyTotal <= 10: multipliers = [1.7, 1.4, 1.1]
+			elif ProviderBase.ConcurrencyTotal <= 15: multipliers = [1.5, 1.3, 1.0]
 
-		# Number of sub-queries for each entry of a details page running concurrently.
-		elif level == 3: tasks = max(3, (10.0 / ProviderBase.ConcurrencyTasks) * 10)
+			# Number of queries running concurrently for the same provider.
+			if level <= 1:
+				if concurrency == Pool.LevelLow: tasks = 1
+				elif concurrency == Pool.LevelMedium: tasks = 2
+				elif concurrency == Pool.LevelHigh: tasks = 3
+				else: tasks = 5
+				tasks *= multipliers[0]
 
-		return max(minimum, min(maximum, int(tasks)))
+			# Number of streams to process concurrently from the results of a single query from a single provider.
+			elif level == 2:
+				if concurrency == Pool.LevelLow: tasks = 1
+				elif concurrency == Pool.LevelMedium: tasks = 2
+				elif concurrency == Pool.LevelHigh: tasks = 3
+				else: tasks = 6
+				tasks *= multipliers[1]
+
+			# Number of sub-queries for each entry of a details page running concurrently.
+			elif level == 3:
+				if concurrency == Pool.LevelLow: tasks = 2
+				elif concurrency == Pool.LevelMedium: tasks = 3
+				elif concurrency == Pool.LevelHigh: tasks = 4
+				else: tasks = 7
+				tasks *= multipliers[2]
+
+			ProviderBase.ConcurrencyData[id] = max(minimum, min(maximum, int(tasks)))
+
+		return ProviderBase.ConcurrencyData[id]
 
 	@classmethod
-	def concurrencyTasksSet(self, tasks):
+	def concurrencyTasksSet(self, total, tasks, binge = None):
+		ProviderBase.ConcurrencyTotal = total
 		ProviderBase.ConcurrencyTasks = tasks
+		ProviderBase.ConcurrencyBinge = binge
 
 	def concurrencyLock(self):
 		ProviderBase.ConcurrencyLock.acquire()
@@ -4242,16 +4288,20 @@ class ProviderBase(object):
 
 	@classmethod
 	def concurrencyInitialize(self, tasks = None, binge = False):
-		limit = self.settingsGlobalConcurrencyLimit()
-		if binge:
-			binged = self.settingsGlobalConcurrencyBinge()
-			if binged: limit = int(max(3, (limit or tasks) * binged)) # If "Unlimited", then "limit == 0".
-		Logger.log('Maximum Concurrent Providers: %s (%s Scrape)' % (str(limit) if limit else 'Unlimited', 'Binge' if binge else 'Normal'))
+		limit = Pool.settingScrape(binge = binge)
 
+		total = tasks or 1 # 1: When an invidual provider is verified.
 		if tasks: tasks = [tasks]
 		else: tasks = []
 		if limit: tasks.append(limit)
-		if tasks: self.concurrencyTasksSet(min(tasks))
+		if tasks: self.concurrencyTasksSet(total = total, tasks = min(tasks), binge = binge)
+
+		level1 = self.concurrencyTasks(level = 1) or 'Unlimited'
+		level2 = self.concurrencyTasks(level = 2) or 'Unlimited'
+		level3 = self.concurrencyTasks(level = 3) or 'Unlimited'
+		Logger.log('Scraping Concurrency Limits: %s Scrape' % ('Binge' if binge else 'Normal'))
+		Logger.log('   Maximum Concurrent Providers: %s' % (str(limit) if limit else 'Unlimited'))
+		Logger.log('   Maximum Concurrent Tasks: %s (Level 1) | %s (Level 2) | %s (Level 3)' % (str(level1), str(level2), str(level3)))
 
 		if ProviderBase.ConcurrencyLock is None: ProviderBase.ConcurrencyLock = Semaphore(limit if limit else 9999999)
 
@@ -4285,26 +4335,26 @@ class ProviderBase(object):
 	# EXECUTE
 	##############################################################################
 
-	def execute(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def execute(self, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		result = []
 
 		self.clear()
 		self.concurrencyLock()
 		timer = self.statisticsTimer()
 		if self.timerAllow() and not self.stopped():
-			if self.concurrencyProcess(): self.executeProcess(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
-			else: self.executeThread(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			if self.concurrencyProcess(): self.executeProcess(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			else: self.executeThread(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 		self.statisticsUpdate(duration = timer)
 		self.concurrencyUnlock()
 
 		return self.result()
 
-	def executeThread(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
-		self.executeSearch(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+	def executeThread(self, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+		self.executeSearch(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 
-	def executeProcess(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeProcess(self, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		result = Pool.processData()
-		parameters = {'result' : result, 'media' : media, 'titles' : titles, 'years' : years, 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'language' : language, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent, 'cacheLoad' : cacheLoad, 'cacheSave' : cacheSave, 'hostersAll' : hostersAll, 'hostersPremium' : hostersPremium}
+		parameters = {'result' : result, 'media' : media, 'niche' : niche, 'titles' : titles, 'years' : years, 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'idTrakt' : idTrakt, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'numberPack' : numberPack, 'language' : language, 'country' : country, 'network' : network, 'studio' : studio, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent, 'cacheLoad' : cacheLoad, 'cacheSave' : cacheSave, 'hostersAll' : hostersAll, 'hostersPremium' : hostersPremium}
 
 		process = Pool.process(target = self._executeProcess, kwargs = parameters)
 		ProviderBase.Execution.append(process)
@@ -4320,7 +4370,7 @@ class ProviderBase(object):
 				self.resultSet([Stream.load(data = stream['stream']) for stream in streams])
 			except: pass
 
-	def _executeProcess(self, result, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def _executeProcess(self, result, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		# If the process is terminated (when calling stop() or when the timeout is reached with process.join(self.timerRemaining())), the "result" dictionary might be destroyed while the process is still running.
 		# Updating the dictionary in such a case throws a broken pipe error which is written to the Kodi log: BrokenPipeError: [Errno 32] Broken pipe
 		# Catch these errors to avoid filling up the log.
@@ -4335,23 +4385,23 @@ class ProviderBase(object):
 
 			result['result'] = None
 			result['statistics'] = None
-			self.executeSearch(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
+			self.executeSearch(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent, cacheLoad = cacheLoad, cacheSave = cacheSave, hostersAll = hostersAll, hostersPremium = hostersPremium)
 			result['result'] = self.resultJson()
 			result['statistics'] = self.statistics()
 		except BrokenPipeError: pass
 		except: self.logError()
 
 	# NB: This function is overwritten in ProviderWeb. Make sure to add any future updates in this function to ProviderWeb as well.
-	def executeSearch(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeSearch(self, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			timer = self.statisticsTimer()
-			streams = self.cacheRetrieve(cache = cacheLoad, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+			streams = self.cacheRetrieve(cache = cacheLoad, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 			if streams is None:
-				if cacheSave: self.cacheInitialize(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
-				self.parametersSet(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+				if cacheSave: self.cacheInitialize(idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
+				self.parametersSet(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent)
 				self.statisticsUpdateSearch(query = True)
-				threads = [self.thread(self.search, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack, exact, silent, cacheLoad, cacheSave, hostersAll, hostersPremium)]
-				self.threadExecute(threads = threads, factor = ProviderBase.TimeFactorScrape)
+				threads = [self.thread(self.search, media, niche, titles, years, time, idImdb, idTmdb, idTvdb, idTrakt, numberSeason, numberEpisode, numberPack, language, country, network, studio, pack, exact, silent, cacheLoad, cacheSave, hostersAll, hostersPremium)]
+				self.threadExecute(threads = threads, factor = ProviderBase.TimeFactorScrape, limit = 1) # Outer code in core.py already started a thread per provider. Execute directly without threading.
 			else:
 				self.statisticsUpdateSearch(cache = True)
 				self.resultSet(streams)
@@ -4363,7 +4413,7 @@ class ProviderBase(object):
 	##############################################################################
 
 	# Can be implemented by subclasses.
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		pass
 
 	def searchValid(self, data, validateTitle = True, validateYear = True, validateShow = True, validateSeason = True, validateEpisode = True, validateAdjust = None, deviation = True, title = None, titleCollection = None):
@@ -4371,12 +4421,15 @@ class ProviderBase(object):
 			data = data,
 
 			media = self.parameterMedia(),
+			niche = self.parameterNiche(),
+
 			title = self.parameterTitles()['processed']['all'] if title is None else title,
 			titleCollection = self.parameterTitles()['processed']['collection'] if titleCollection else titleCollection,
 			year = self.parameterYears()['median'],
 
 			season = self.parameterNumberSeason(),
 			episode = self.parameterNumberEpisode(),
+			number = self.parameterNumberPack(),
 
 			validateAdjust = validateAdjust,
 			validateTitle = validateTitle,
@@ -4542,8 +4595,18 @@ class ProviderBase(object):
 
 		# Divide into chunks, to let other providers continue in between the chunks.
 		# Otherwise if, eg Orion, returns 2000 links, it will block all other providers while it processed all 2000 streams, which can take a long time.
-		# Use 250 asd not 200 as chunk size. Some providers retrieve 250 items per page, and we want to process them all in a single chunk.
-		return [items[i : i + ProviderBase.PriorityChunk] for i in range(0, len(items), ProviderBase.PriorityChunk)]
+		# Use 250 and not 200 as chunk size. Some providers retrieve 250 items per page, and we want to process them all in a single chunk.
+
+		# On slower devices, use a lower chunk size.
+		# Processing a few 100 links from Orion on a slow device can take very long, causing these errors:
+		#	A provider (orionoid) priority lock timed out. This should not happen!
+		# Although these errors are not a big problem, still reduce the chunk size.
+		# If 20 or 250, the chunk size does not seem to have a huge difference on the scraping time.
+
+		if ProviderBase.PriorityChunked is None: # Only do once, since Hardware.performanceRating() can take 100ms.
+			ProviderBase.PriorityChunked = ProviderBase.PriorityChunk[0 if Hardware.performanceRating() > 0.7 else 1]
+
+		return [items[i : i + ProviderBase.PriorityChunked] for i in range(0, len(items), ProviderBase.PriorityChunked)]
 
 	##############################################################################
 	# STATISTICS

@@ -22,6 +22,15 @@
 # https://github.com/popcorn-official/popcorn-api
 # https://github.com/popcorn-official/popcorn-desktop/wiki/FAQ (listed new domain).
 
+# Update (2024-07-08):
+#	https://www.reddit.com/r/PopCornTimeApp/comments/1av93n6/current_api/
+#	https://github.com/popcorn-time-ru/popcorn-ru/
+#	https://i.postimg.cc/761c424n/new-API-domains.png
+#		https://yrkde.link
+#		https://jfper.link
+#		https://uxert.link
+#		https://fusme.link
+
 from lib.providers.core.json import ProviderJson
 from lib.modules.stream import Stream
 from lib.modules.network import Container
@@ -32,8 +41,13 @@ class Provider(ProviderJson):
 	# Only .tk domain works, but keep the other ones in case they come up again.
 	# Although movies/shows/anime have different subdomains, it seems all of them can be used to search anything.
 	_Link				= [
-							'https://shows.cf',
-							'https://popcorn-time.ga',
+							'https://yrkde.link',
+							'https://jfper.link',
+							'https://uxert.link',
+							'https://fusme.link',
+
+							#'https://shows.cf',
+							#'https://popcorn-time.ga',
 							#'https://popcorn-ru.tk', # Not reachable by some VPNs. Seems to be down.
 							#'https://tv-v2.api-fetch.sh',
 							#'https://tv-v2.api-fetch.am',
@@ -107,14 +121,15 @@ class Provider(ProviderJson):
 		else:
 			season = self.parameterNumberSeason()
 			episode = self.parameterNumberEpisode()
-			for item in data[Provider._AttributeEpisodes]:
-				if item and Provider._AttributeSeason in item and Provider._AttributeEpisode in item and Provider._AttributeTorrents in item:
-					if item[Provider._AttributeSeason] == season and item[Provider._AttributeEpisode] == episode:
-						if item[Provider._AttributeTorrents]:
-							for quality, item in item[Provider._AttributeTorrents].items():
-								item[Provider._AttributeQuality] = quality
-								items.append(self._extractQuality(item))
-						break
+			if data and Provider._AttributeEpisodes in data and data[Provider._AttributeEpisodes]:
+				for item in data[Provider._AttributeEpisodes]:
+					if item and Provider._AttributeSeason in item and Provider._AttributeEpisode in item and Provider._AttributeTorrents in item:
+						if item[Provider._AttributeSeason] == season and item[Provider._AttributeEpisode] == episode:
+							if item[Provider._AttributeTorrents]:
+								for quality, item in item[Provider._AttributeTorrents].items():
+									item[Provider._AttributeQuality] = quality
+									items.append(self._extractQuality(item))
+							break
 
 		for i in range(len(items)):
 			try: items[i][Provider._AttributeSeeds] = items[i][Provider._AttributeSeed]

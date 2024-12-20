@@ -251,11 +251,12 @@ class Window(object):
 	TypeWizardLarge = 'large'
 	TypeWizardScroll = 'scroll'
 	TypeWizardStatic = 'static'
+	TypeWizardFixed = 'fixed' # Same as TypeWizardStatic, but can be used in combination with TypeWizardSmall.
 	TypeWizardQr = 'qr'
 	TypeOracleChat = 'chat'
 	TypeOracleResults = 'results'
 	TypeDefault = TypeNone
-	Types = [TypeStreamPlain, TypeStreamBasic, TypeStreamIcons, TypeWizardSmall, TypeWizardLarge, TypeWizardScroll, TypeWizardStatic, TypeWizardQr, TypeOracleChat, TypeOracleResults]
+	Types = [TypeStreamPlain, TypeStreamBasic, TypeStreamIcons, TypeWizardSmall, TypeWizardLarge, TypeWizardScroll, TypeWizardStatic, TypeWizardFixed, TypeWizardQr, TypeOracleChat, TypeOracleResults]
 	TypesOracle = [TypeOracleChat, TypeOracleResults]
 
 	# Background
@@ -342,7 +343,7 @@ class Window(object):
 		if xml:
 			if xmlType and not tools.Tools.isArray(xmlType): xmlType = [xmlType]
 			ratio = tools.Screen.ratio(closest = True)[0]
-			xmlRatio = xml.replace('.xml', '') + (('.' + ('.'.join(xmlType))) if xmlType else '') + '.' + ratio + '.' + interface.Skin.id().lstrip('skin.').replace('.', '') + '.xml'
+			xmlRatio = xml.replace('.xml', '') + (('.' + ('.'.join(xmlType))) if xmlType else '') + '.' + ratio + '.' + tools.Tools.stringRemovePrefix(interface.Skin.id(), 'skin.').replace('.', '') + '.xml'
 			if not '.' in xml: xml += '.xml'
 			pathTemplate = self._pathTemplate()
 			pathWindow = self._pathWindow(kodi = True)
@@ -426,6 +427,7 @@ class Window(object):
 			WindowStreams.reset(settings = settings)
 			WindowOptimization.reset(settings = settings)
 			WindowWizard.reset(settings = settings)
+			WindowMetaPreload.reset(settings = settings)
 			WindowOracle.reset(settings = settings)
 
 	##############################################################################
@@ -1693,21 +1695,29 @@ class WindowQr(Window):
 	IdQrIcon2 = 51005
 	IdQrButton = 51006
 
-	def __init__(self, qr, thread, data, link = None, code = None, name = None, hash = None, wallet = None, payment = None, symbol = None, description = None, donations = None, icon = None, color = None, permanent = False, overlay = True, **kwargs):
+	def __init__(self, qr, thread, data, link = None, linked = None, code = None, name = None, hash = None, wallet = None, payment = None, symbol = None, description = None, donations = None, icon = None, color = None, permanent = False, overlay = True, **kwargs):
 		super(WindowQr, self).__init__(xml = 'qr', **kwargs)
-		self.mQrColor = qr['path']
+		self.mQrColor = None
 		self.mQrPlain = None
 		self.mQrMode = True
 		self.mQrChanged = False
 		self.mQrThread = thread
-		self.mQrTruncated = qr['truncated']
+		self.mQrTruncated = None
 		self.mQrPermanent = permanent
+
+		# Only set this if the QR could be generated.
+		# Make sure the window with the link/code still shows, even if the QR image failed to generate.
+		if qr:
+			self.mQrColor = qr['path']
+			self.mQrTruncated = qr['truncated']
 
 		self.mData = data
 		self.mDataPlain = wallet if wallet else data
 
 		self.mLink = link
+		self.mLinked = linked # The link with extra parameter to generate the QR image with, but self.mLink is still used for the label.
 		self.mCode = code
+
 		self.mName = name
 		self.mHash = hash
 		self.mWallet = wallet
@@ -1724,7 +1734,9 @@ class WindowQr(Window):
 				else: self.mIcon = {'icon' : icon}
 			elif tools.Tools.isDictionary(icon):
 				self.mIcon = icon
-			if 'icon' in self.mIcon and not 'path' in self.mIcon: self.mIcon['path'] = self._pathIcon(icon = self.mIcon['icon'], quality = interface.Icon.QualitySmall, special = interface.Icon.SpecialServices)
+			if 'icon' in self.mIcon and not 'path' in self.mIcon:
+				self.mIcon['path'] = self._pathIcon(icon = self.mIcon['icon'], quality = interface.Icon.QualitySmall, special = interface.Icon.SpecialServices)
+				self.mIcon['path'] = self.mIcon['path'].replace('trakt', 'trakt2')
 
 		from lib.modules.network import Networker
 		if self.mLink and Networker.linkIs(link = self.mLink, magnet = False): self.mLabel = 33381
@@ -1756,7 +1768,7 @@ class WindowQr(Window):
 		self.mNavigationButtons = []
 
 	@classmethod
-	def show(self, data = None, link = None, code = None, name = None, hash = None, wallet = None, payment = None, symbol = None, description = None, donations = None, icon = None, color = None, copy = True, permanent = False, overlay = True, wait = False, **kwargs):
+	def show(self, data = None, link = None, linked = None, code = None, name = None, hash = None, wallet = None, payment = None, symbol = None, description = None, donations = None, icon = None, color = None, copy = True, permanent = False, overlay = True, wait = False, **kwargs):
 		interface.Loader.show()
 		colorQr = color
 
@@ -1806,10 +1818,10 @@ class WindowQr(Window):
 			Clipboard.copy(value = copy, notify = False)
 
 		colorQr = colorQr if colorQr is True else [interface.Format.colorDarker(color = colorQr, change = 70), colorQr] if colorQr else None
-		qr = self._qrGenerate(data = data, color = colorQr, loaderHide = False, permanent = permanent)
+		qr = self._qrGenerate(data = linked or data, color = colorQr, loaderHide = False, permanent = permanent)
 		thread = Pool.thread(target = self._qrGeneratePlain, kwargs = {'data' : data, 'loaderShow' : False, 'loaderHide' : False, 'permanent' : permanent}, start = True)
 
-		super(WindowQr, self)._show(qr = qr, thread = thread, data = data, link = link, code = code, name = name, hash = hash, wallet = wallet, payment = payment, symbol = symbol, description = description, donations = donations, icon = icon, color = color, permanent = permanent, overlay = overlay, wait = wait, **kwargs)
+		super(WindowQr, self)._show(qr = qr, thread = thread, data = data, link = link, linked = linked, code = code, name = name, hash = hash, wallet = wallet, payment = payment, symbol = symbol, description = description, donations = donations, icon = icon, color = color, permanent = permanent, overlay = overlay, wait = wait, **kwargs)
 		return self._instance()
 
 	def _initializeEnd1(self):
@@ -1966,7 +1978,7 @@ class WindowQr(Window):
 		else:
 			try: self.mQrThread.join()
 			except: pass
-			self.mQrPlain = self._qrGeneratePlain(data = self.mData, permanent = self.mQrPermanent)['path']
+			self.mQrPlain = self._qrGeneratePlain(data = self.mLinked or self.mData, permanent = self.mQrPermanent)['path']
 			path = self.mQrPlain
 			plain = 1
 
@@ -2110,18 +2122,18 @@ class WindowDialog(Window):
 
 	Result = None
 
-	def __init__(self, mode, metadata, rating, icon, indication, decoration, binge, action, focus, interact, power, qr, callback, loader, **kwargs):
+	def __init__(self, mode, metadata, rating, icon, indication, decoration, binge, continues, action, focus, interact, power, qr, callback, loader, **kwargs):
 		xmlReplacements = {
 			'valuegap' : lambda: self._scaleWidth(60),
 		}
 		super(WindowDialog, self).__init__(xml = 'dialog', xmlReplacements = xmlReplacements, **kwargs)
 
 		self.mMetadata = metadata
-		self.mMedia = tools.Media.TypeMovie
+		self.mMedia = tools.Media.Movie
 		if 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
-			if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None: self.mMedia = tools.Media.TypeEpisode
-			elif 'season' in self.mMetadata and not self.mMetadata['season'] is None: self.mMedia = tools.Media.TypeSeason
-			else: self.mMedia = tools.Media.TypeShow
+			if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None: self.mMedia = tools.Media.Episode
+			elif 'season' in self.mMetadata and not self.mMetadata['season'] is None: self.mMedia = tools.Media.Season
+			else: self.mMedia = tools.Media.Show
 
 		self.mMode = mode
 		self.mRating = rating
@@ -2129,6 +2141,7 @@ class WindowDialog(Window):
 		self.mIndication = indication
 		self.mDecoration = decoration
 		self.mBinge = binge
+		self.mContinues = continues
 		self.mCallback = callback
 		self.mLoader = loader
 		self.mAnimated = tools.Settings.getInteger('interface.dialog.interface.animation')
@@ -2154,7 +2167,7 @@ class WindowDialog(Window):
 		self.mSubtitle = self._subtitle()
 
 	@classmethod
-	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
+	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, continues = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
 		if loader: interface.Loader.show()
 
 		# Do not add a background if WindowBackground is showing, to allow for the logo animation to continue uninterrupted.
@@ -2178,7 +2191,7 @@ class WindowDialog(Window):
 				action = focus = default
 
 		WindowDialog.Result = {'action' : WindowDialog.ActionNone, 'timeout' : False, 'interacted' : False, 'rating' : None}
-		super(WindowDialog, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, indication = indication, decoration = decoration, wait = wait, initialize = initialize, binge = binge, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
+		super(WindowDialog, self)._show(metadata = metadata, rating = rating, backgroundType = backgroundType, backgroundPath = backgroundPath, icon = icon, indication = indication, decoration = decoration, wait = wait, initialize = initialize, binge = binge, continues = continues, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
 		return WindowDialog.Result
 
 	def _initializeEnd1(self):
@@ -2390,7 +2403,7 @@ class WindowDialog(Window):
 			try: valueVotes = self.mMetadata['voting']['votes'][type] or 0
 			except: valueVotes = 0
 			if valueRating and not valueVotes:
-				valueVotes = 1 # Metacritic/RottenTomatoes
+				valueVotes = MetaTools.RatingVotes # Metacritic/RottenTomatoes
 				self.mMetadata['voting']['votes'][type] = valueVotes
 				self.mMetadata['votes'] = (self.mMetadata['votes'] or 0) + valueVotes
 			ratings[i] = (type, valueVotes)
@@ -2403,8 +2416,10 @@ class WindowDialog(Window):
 				type = ratings[i]
 				if not type == 'global' and not type in self.mMetadata['voting']['rating']: continue
 
-				valueRating = self.mMetadata['rating'] if type == 'global' else self.mMetadata['voting']['rating'][type]
-				valueVotes = (self.mMetadata['votes'] if type == 'global' else self.mMetadata['voting']['votes'][type]) or 0
+				try: valueRating = self.mMetadata['rating'] if type == 'global' else self.mMetadata['voting']['rating'][type]
+				except: valueRating = 0 # No rating available, such as TVDb-only seasons. Eg: Dragon Ball Super S02+.
+				try: valueVotes = (self.mMetadata['votes'] if type == 'global' else self.mMetadata['voting']['votes'][type]) or 0
+				except: valueVotes = 0
 				if type == 'global' and valueRating: default = valueRating
 
 				if (self.mRatingLabel == 0 or self.mRatingLabel == 2) and valueVotes >= 1000:
@@ -2634,7 +2649,7 @@ class WindowDialog(Window):
 		if 'tvshowtitle' in self.mMetadata and self.mMetadata['tvshowtitle']:
 			if 'title' in self.mMetadata and self.mMetadata['title']:
 				if 'episode' in self.mMetadata and not self.mMetadata['episode'] is None:
-					label.append(tools.Media.number(season = self.mMetadata['season'], episode = self.mMetadata['episode']))
+					label.append(tools.Title.number(season = self.mMetadata['season'], episode = self.mMetadata['episode']))
 					label.append(self.mMetadata['title'])
 				elif 'season' in self.mMetadata and not self.mMetadata['season'] is None:
 					label.append(interface.Translation.string(32055) + ' ' + str(self.mMetadata['season']))
@@ -2721,10 +2736,11 @@ class WindowDialog(Window):
 		WindowDialog.Result['interacted'] = self._interacted()
 		if WindowDialog.Result['interacted']: self._observation()
 
-		if result and WindowDialog.Result['action'] is WindowDialog.ActionNone: WindowDialog.Result['action'] = WindowDialog.ActionCancel
+		if result and WindowDialog.Result['action'] is WindowDialog.ActionNone and not WindowDialog.Result['rating']: WindowDialog.Result['action'] = WindowDialog.ActionCancel
 
+		# If self.mContinues, close in playback.py.
 		action = WindowDialog.Result['action']
-		if not self.mBinge or action in [WindowDialog.ActionStop, WindowDialog.ActionPower] or (self.mMode == WindowDialog.ModeContinue and action == WindowDialog.ActionCancel): WindowBackground.close()
+		if (not self.mBinge and not self.mContinues) or action in [WindowDialog.ActionStop, WindowDialog.ActionPower] or (self.mMode == WindowDialog.ModeContinue and action == WindowDialog.ActionCancel): WindowBackground.close()
 
 	def _cancel(self):
 		WindowDialog.Result['action'] = WindowDialog.ActionCancel
@@ -2743,24 +2759,25 @@ class WindowDialog(Window):
 		try: WindowDialog.Result['rating'] = int(self.property('GaiaRatingValue'))
 		except: pass
 
-		if WindowDialog.Result['rating']:
+		if WindowDialog.Result['rating'] and not self.mActionRate == 1:
 			self.propertySet('GaiaPreviousRating', int(WindowDialog.Result['rating']))
 			self.propertySet('GaiaPreviousTime', tools.Time.format(tools.Time.timestamp(), format = tools.Time.FormatDate))
 			self.propertySet('GaiaPreviousLabel', interface.Translation.string(33168))
 			self.focus(control = WindowDialog.IdRating[WindowDialog.Result['rating'] - 1], sleep = False) # Ensures that the rating color is updated.
 
+		if self.mActionRate == 1: self.close()
+		elif self.mActionRate == 2: self._closeTimeout()
+
+		# Do last, since it can take some time to execute the callback.
 		if self.mCallback:
 			try: self.mCallback(WindowDialog.Result)
 			except: self.mCallback()
-
-		if self.mActionRate == 1: self.close()
-		elif self.mActionRate == 2: self._closeTimeout()
 
 	def _power(self):
 		if self.mButtonPower is False: return False
 		action = tools.System.power(action = self.mButtonPower, proper = True, notification = True)
 		if action:
-			WindowDialog.Result['action'] = action
+			WindowDialog.Result['action'] = WindowDialog.ActionPower # Do not add a specific power action, since it is checked in playback.py.
 			self.close()
 
 	def _stop(self):
@@ -2778,11 +2795,11 @@ class WindowRating(WindowDialog):
 		super(WindowRating, self).__init__(mode = WindowDialog.ModeRating, **kwargs)
 
 	@classmethod
-	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
+	def show(self, metadata, rating = None, icon = None, indication = False, wait = True, initialize = True, binge = False, continues = False, default = None, action = None, focus = None, timeout = None, interact = None, power = True, qr = True, callback = None, loader = False, close = False):
 		if action is None: action = WindowDialog.ActionCancel
 		if timeout is None and action: timeout = tools.Settings.getCustom('activity.rating.timeout')
 		if interact is None: interact = tools.Settings.getBoolean('activity.rating.interact')
-		return super(WindowRating, self).show(metadata = metadata, rating = rating, icon = icon, indication = indication, wait = wait, initialize = initialize, binge = binge, default = default, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
+		return super(WindowRating, self).show(metadata = metadata, rating = rating, icon = icon, indication = indication, wait = wait, initialize = initialize, binge = binge, continues = continues, default = default, action = action, focus = focus, timeout = timeout, interact = interact, power = power, qr = qr, callback = callback, loader = loader, close = close)
 
 	def _heading(self, partial = False):
 		heading = None
@@ -3167,8 +3184,13 @@ class WindowIntro(WindowProgress):
 	TimeAnimation = 1000
 	TimeDelay = 200
 
+	# Old version.
+	#LogoWidth = 700
+	#LogoHeight = 303
+
+	# New version.
 	LogoWidth = 700
-	LogoHeight = 303
+	LogoHeight = 297
 
 	AnimationType = 'WindowOpen'
 	AnimationValues = 'effect=fade start=0 end=100 time=%d delay=%d'
@@ -3244,7 +3266,8 @@ class WindowIntro(WindowProgress):
 		extra = 0
 		if offset:
 			extra -= 20
-			if not self.mSlogan: extra += 80
+			#if not self.mSlogan: extra += 80 # Old slogan.
+			if not self.mSlogan: extra += 60 # New slogan.
 		return [self._scaleWidth(WindowIntro.LogoWidth), self._scaleHeight(WindowIntro.LogoHeight) + extra]
 
 	def _addLogo(self):
@@ -3254,7 +3277,8 @@ class WindowIntro(WindowProgress):
 		x = self._centerX(width)
 		y = self._offsetY()
 
-		if not self.mSlogan: y += 80
+		#if not self.mSlogan: y += 80 # Old slogan.
+		if not self.mSlogan: y += 60 # New slogan.
 
 		delay = WindowIntro.TimeDelay
 		for i in range(1, WindowIntro.Parts + (1 if self.mSlogan else 0)):
@@ -3814,6 +3838,7 @@ class WindowStreams(WindowProgress):
 		# Start this thread and wait until playback starts before calling self.close() here in order to finish the Pytyhon process.
 		# Do not close WindowStreams the moment playback is initiated (aka WindowPlayback is showing), otherwise is the playback initiation is canceled or playback fails (eg: connection dropped), WindowStreams should immediately be visible without having to go through the lengthy stream reload process.
 		# We can also not close WindowStreams from player.py, since it is running in its own Python process and does not know about the WindowStreams.instance().
+		# Update: We can technically now move this over to player.py, since we can close by window ID, even from a different Python process. Check window.close() for the comments on the changes if we have an ID.
 
 		player = interface.Player()
 		while self.visible() and not tools.System.aborted() and not player.isPlayback(): tools.Time.sleep(1)
@@ -4568,7 +4593,7 @@ class WindowStep(WindowProgress):
 	OrientationVertical = 'vertical'
 	OrientationDefault = OrientationHorizontal
 
-	def __init__(self, backgroundType, backgroundPath, logo, stepper = True, helper = False, refocus = False, title = None, description = None, orientation = OrientationDefault, navigationRow = None, navigationIndex = None, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, xml = False, xmlType = None, xmlOffset = None, **kwargs):
+	def __init__(self, backgroundType, backgroundPath, logo, stepper = True, helper = False, refocus = False, title = None, description = None, tip = None, orientation = OrientationDefault, navigationRow = None, navigationIndex = None, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, xml = False, xmlType = None, xmlOffset = None, **kwargs):
 		if xml is True: xml = 'oracle' if any(i in xmlType for i in WindowStep.TypesOracle) else 'wizard'
 		super(WindowStep, self).__init__(backgroundType = backgroundType, backgroundPath = backgroundPath, logo = logo, xml = xml, xmlType = xmlType, xmlOffset = xmlOffset, **kwargs)
 
@@ -4579,6 +4604,7 @@ class WindowStep(WindowProgress):
 		self.mRefocus = refocus
 		self.mTitle = title
 		self.mDescription = description
+		self.mTip = tip
 		self.mOrientation = orientation
 
 		self.mSeparator1 = None
@@ -4631,7 +4657,7 @@ class WindowStep(WindowProgress):
 		if content: self._dimensionUpdate(content)
 		self._dimensionUpdate(self._addSeparator2())
 		self._dimensionUpdate(self._addNavigation())
-		self._updateLabel(title = self.mTitle, description = self.mDescription)
+		self._updateLabel(title = self.mTitle, description = self.mDescription, tip = self.mTip)
 
 	def _initializeEnd1(self):
 		super(WindowStep, self)._initializeEnd1()
@@ -4646,7 +4672,7 @@ class WindowStep(WindowProgress):
 		return super(WindowStep, self).show(backgroundType = tools.Settings.getInteger('interface.playback.interface.background'), logo = WindowProgress.LogoIcon, stepper = stepper, helper = helper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
 
 	@classmethod
-	def _updateLabel(self, title = None, description = None):
+	def _updateLabel(self, title = None, description = None, tip = None):
 		if title:
 			self.propertySet(property = 'GaiaTitle', value = interface.Format.font(title, color = interface.Format.colorSecondary(), bold = True, uppercase = True))
 		if description:
@@ -4655,6 +4681,8 @@ class WindowStep(WindowProgress):
 					self.propertySet(property = 'GaiaDescription%d' % (i + 1), value = interface.Format.font(description[i], bold = True))
 			else:
 				self.propertySet(property = 'GaiaDescription%d' % (1 if len(interface.Translation.string(description)) < 100 else 2), value = interface.Format.font(description, bold = True))
+		if tip:
+			self.propertySet(property = 'GaiaTip', value = interface.Format.font('%s: ' % interface.Translation.string(32320), bold = True, color = interface.Format.colorPrimary()) + interface.Translation.string(tip))
 
 	def _actionDefault(self, focus = True):
 		self.mNavigation = []
@@ -4688,7 +4716,6 @@ class WindowStep(WindowProgress):
 
 		count = self.mNavigationCount
 		if not count: count = 0
-
 		try: navigation = [i for i in self.mNavigation if self._visible(i)]
 		except: navigation = None
 		if not navigation: return None
@@ -4860,12 +4887,13 @@ class WindowStep(WindowProgress):
 
 		return dimension
 
-	def _addItem(self, label = None, label1 = None, label2 = None, label3 = None, label4 = None, icon = None, selected = None, offset = None, callback = None):
+	def _addItem(self, label = None, label1 = None, label2 = None, label3 = None, label4 = None, icon = None, special = None, selected = None, level = None, offset = None, callback = None):
 		label = interface.Translation.string(label)
 		item = self.mDirectory.item(label = label, label2 = label) if not label is None else None
 		item.setProperties({
-			'GaiaIcon' : self._pathIcon(icon = icon, quality = interface.Icon.QualityLarge, special = interface.Icon.SpecialServices) if icon and not '.' in icon else icon,
+			'GaiaIcon' : self._pathIcon(icon = icon, quality = interface.Icon.QualityLarge, special = special or interface.Icon.SpecialServices) if icon and not '.' in icon else icon,
 			'GaiaSelected' : '' if selected is None else int(selected),
+			'GaiaLevel' : '' if level is None else int(level),
 			'GaiaOffset' : offset if offset else 0,
 			'GaiaLabel' : label,
 			'GaiaLabel1' : interface.Translation.string(label1) if label1 else None,
@@ -4878,6 +4906,16 @@ class WindowStep(WindowProgress):
 	def _selectItem(self, index = None, item = None, selected = True):
 		if item is None: item = self.mItems[index]['item']
 		item.setProperty('GaiaSelected', '' if selected is None else str(int(selected)))
+
+	def _levelItem(self, index = None, item = None, level = None):
+		if item is None: item = self.mItems[index]['item']
+		item.setProperty('GaiaLevel', '' if level is None else str(level))
+
+	def _hideItems(self, hide = True):
+		self.propertySet('GaiaHidden', str(int(hide)))
+
+	def _showItems(self, show = True):
+		self._hideItems(hide = not show)
 
 
 class WindowStepScroll(WindowStep):
@@ -5057,7 +5095,7 @@ class WindowStepQr(WindowStepScroll):
 		cache = Qr.CachePermanent if permanent else Qr.CacheTemporary
 		if tools.Tools.isArray(data):
 			data = [{'data' : i['payment'] if 'payment' in i else i['link'], 'colorFront' : [interface.Format.colorDarker(color = i['color'], change = 70), i['color']], 'truncate' : False, 'cache' : cache} for i in data]
-			Qr.generate(*data)
+			Qr.generate(slow = True, *data) # Slow to sleep in between QR code generation, allowing the wizard to be more responsive.
 		else:
 			if color: color = [interface.Format.colorDarker(color = color, change = 70), color]
 			else: color = Qr.ColorGaia
@@ -5074,13 +5112,13 @@ class WindowAttribution(WindowStepQr):
 	def _prepareRetrieve(self, data = None):
 		if data is None:
 			data = [
+				{'symbol' : 'trakt', 'name' : 32315, 'link' : 'https://trakt.tv', 'color' : 'FFED1C24'},
 				{'symbol' : 'tvdb', 'name' : 35668, 'link' : 'https://thetvdb.com', 'color' : 'FF1C7E3E'},
 				{'symbol' : 'tmdb', 'name' : 33508, 'link' : 'https://themoviedb.org', 'color' : 'FF44C0C5'},
-				{'symbol' : 'trakt', 'name' : 32315, 'link' : 'https://trakt.tv', 'color' : 'FFED1C24'},
 				{'symbol' : 'imdb', 'name' : 32034, 'link' : 'https://imdb.com', 'color' : 'FFF6C700'},
-				{'symbol' : 'tvmaze', 'name' : 35669, 'link' : 'https://tvmaze.com', 'color' : 'FF3D948B'},
+				#{'symbol' : 'tvmaze', 'name' : 35669, 'link' : 'https://tvmaze.com', 'color' : 'FF3D948B'}, # Not using TVmaze anymore.
 				{'symbol' : 'fanart', 'name' : 35260, 'link' : 'https://fanart.tv', 'color' : 'FF21B6E1'},
-				{'symbol' : 'opensubtitles', 'name' : 35683, 'link' : 'https://opensubtitles.org', 'color' : 'FFC1DC14'},
+				{'symbol' : 'opensubtitles', 'name' : 35683, 'link' : 'https://opensubtitles.com', 'color' : 'FF231F20'},
 			]
 		return data
 
@@ -5088,7 +5126,8 @@ class WindowAttribution(WindowStepQr):
 		self._help(items = [
 			{'type' : 'title', 'value' : 'Attributions', 'break' : 2},
 			{'type' : 'text', 'value' : 'Gaia uses metadata, images, and subtitles from a variety of projects which offer their services for free. Consider supporting these projects by donating to them, getting a premium subscription, or by helping to add new information to their databases.', 'break' : 2},
-			{'type' : 'text', 'value' : 'Certain services, including TMDb, TVDb, TVmaze, and Fanart, can be used in Gaia without an account. However, you can still authenticate a custom account for these services in the settings.', 'break' : 2},
+			#{'type' : 'text', 'value' : 'Certain services, including TMDb, TVDb, TVmaze, and Fanart, can be used in Gaia without an account. However, you can still authenticate a custom account for these services in the settings.', 'break' : 2}, # Not using TVmaze anymore.
+			{'type' : 'text', 'value' : 'Certain services, including TMDb, TVDb, and Fanart, can be used in Gaia without an account. However, you can still authenticate a custom account for these services in the settings.', 'break' : 2},
 		])
 
 
@@ -5156,6 +5195,7 @@ class WindowOptimization(WindowStep):
 	TradeoffSpeed = 'speed'
 	TradeoffResult = 'result'
 	TradeoffMixed = 'mixed'
+	TradeoffCrazy = 'crazy'
 
 	StepIntroduction = 'introduction'
 	StepDiagnostics = 'diagnostics'
@@ -5166,11 +5206,24 @@ class WindowOptimization(WindowStep):
 	DiagnoseData = None
 	DiagnoseScrape = None
 	DiagnoseProvider = None
+	DiagnoseTradeoff = None
 
-	def __init__(self, navigationCategory, callbackDiagnose, callbackTradeoff, **kwargs):
+	def __init__(self, navigationCategory, callbackDiagnose, callbackTradeoff, updateScrape = True, updateProvider = True, plain = True, **kwargs):
+		if plain:
+			kwargs['title'] = 36720
+			kwargs['tip'] = 34574
+			kwargs['xml'] = True
+			kwargs['xmlType'] = Window.TypeWizardStatic
+			kwargs['xmlOffset'] = None
 		super(WindowOptimization, self).__init__(**kwargs)
 
-		self.mIntroduction = None
+		self.mPlain = plain
+
+		self.mUpdateScrape = updateScrape
+		self.mUpdateProvider = updateProvider
+
+		self.mIntroTitle = None
+		self.mIntroDescription = None
 
 		self.mDiagnoseProgress = 0
 		self.mDiagnoseProgressInner = None
@@ -5212,7 +5265,7 @@ class WindowOptimization(WindowStep):
 		self.mCallbackDiagnose = callbackDiagnose
 		self.mCallbackTradeoff = callbackTradeoff
 
-		self.mDataDiagnose = None
+		self.mDataDiagnose = WindowOptimization.DiagnoseData
 		self.mDataSettings = None
 
 	##############################################################################
@@ -5224,6 +5277,7 @@ class WindowOptimization(WindowStep):
 		WindowOptimization.DiagnoseData = None
 		WindowOptimization.DiagnoseScrape = None
 		WindowOptimization.DiagnoseProvider = None
+		WindowOptimization.DiagnoseTradeoff = None
 
 	##############################################################################
 	# GENERAL
@@ -5244,10 +5298,13 @@ class WindowOptimization(WindowStep):
 		if diagnoseData:
 			instance.mDataDiagnose = diagnoseData
 			instance._actionDiagnostics(internal = internal)
-			instance.mCategory = [] # Important for navigating back and redoing the diagnostics. Otherwise the settings labels are not populated.
-			if diagnoseScrape: instance._actionCategory(control = instance.mCategoryScrape)
-			if diagnoseProvider: instance._actionCategory(control = instance.mCategoryProvider)
-			instance._actionTradeoff(control = instance.mTradeoffMixed)
+			if instance.mPlain:
+				instance._selectTradeoff(tradeoff = WindowOptimization.DiagnoseTradeoff)
+			else:
+				instance.mCategory = [] # Important for navigating back and redoing the diagnostics. Otherwise the settings labels are not populated.
+				if diagnoseScrape: instance._actionCategory(control = instance.mCategoryScrape)
+				if diagnoseProvider: instance._actionCategory(control = instance.mCategoryProvider)
+				instance._actionTradeoff(control = instance.mTradeoffMixed)
 
 			WindowOptimization.DiagnoseData = diagnoseData
 			WindowOptimization.DiagnoseScrape = diagnoseScrape
@@ -5272,22 +5329,34 @@ class WindowOptimization(WindowStep):
 
 	def _initializeEnd2(self):
 		super(WindowOptimization, self)._initializeEnd2()
+		self._addPlain()
+
 		self.mCategoryOptions = [self.mCategoryScrape, self.mCategoryProvider]
 		self.mTradeoffOptions = [self.mTradeoffSpeed, self.mTradeoffMixed, self.mTradeoffResult]
-		if WindowOptimization.DiagnoseData:
-			self.update(diagnoseData = WindowOptimization.DiagnoseData, diagnoseScrape = WindowOptimization.DiagnoseScrape, diagnoseProvider = WindowOptimization.DiagnoseProvider, internal = True)
-			self.mStep = WindowOptimization.StepPreferences
-			self._toggleIntroduction(visible = False)
-			self._toggleDiagnostics(visible = False)
+
+		if self.mPlain:
+			self._toggleIntroduction(visible = True)
 			self._toggleRating(visible = False)
-			self._togglePreferences(visible = True)
+			self._toggleDiagnostics(visible = False)
+			self._togglePreferences(visible = False)
+
+			self.mNavigationRow = 1
+			self._actionFocus()
 		else:
-			# Only do this here and not in _initializeStart2(), since the label is set on the button.
-			# Otherwise the button label is not deleted if the window is closed.
-			self._toggleIntroduction(visible = not bool(WindowOptimization.DiagnoseData))
+			if WindowOptimization.DiagnoseData:
+				self.update(diagnoseData = WindowOptimization.DiagnoseData, diagnoseScrape = WindowOptimization.DiagnoseScrape, diagnoseProvider = WindowOptimization.DiagnoseProvider, internal = True)
+				self.mStep = WindowOptimization.StepPreferences
+				self._togglePreferences(visible = True)
+				self._toggleRating(visible = False)
+				self._toggleDiagnostics(visible = False)
+				self._toggleIntroduction(visible = False)
+			else:
+				# Only do this here and not in _initializeStart2(), since the label is set on the button.
+				# Otherwise the button label is not deleted if the window is closed.
+				self._toggleIntroduction(visible = not bool(WindowOptimization.DiagnoseData))
 
 	def _actionFocus(self, action = None):
-		if self.mStep == WindowOptimization.StepPreferences:
+		if not self.mPlain and self.mStep == WindowOptimization.StepPreferences:
 			if self.mNavigationRow is None: self.mNavigationRow = 2
 
 			if action == WindowBase.ActionMoveUp: self.mNavigationRow -= 1
@@ -5354,6 +5423,12 @@ class WindowOptimization(WindowStep):
 		if not self.mStep in [WindowOptimization.StepDiagnostics, WindowOptimization.StepPreferences]: self._actionRefocus()
 
 	def _actionNext(self):
+		# Do not redo the diagnostics if we navigate back.
+		if WindowOptimization.DiagnoseData and self.mStep == WindowOptimization.StepIntroduction:
+			self._toggleIntroduction(visible = False)
+			self._actionDiagnostics()
+			return
+
 		if self.mStep == WindowOptimization.StepIntroduction:
 			self.mStep = WindowOptimization.StepDiagnostics
 			self._toggleIntroduction(visible = False)
@@ -5362,9 +5437,18 @@ class WindowOptimization(WindowStep):
 			self.mCallbackDiagnose()
 		elif self.mStep == WindowOptimization.StepRating:
 			self.mStep = WindowOptimization.StepPreferences
-			self._toggleRating(visible = False)
 			self._togglePreferences(visible = True)
+			self._toggleRating(visible = False)
+
+			self.mNavigationRow = 0
+			self._actionFocus()
 		elif self.mStep == WindowOptimization.StepPreferences:
+			if self.mPlain and WindowOptimization.DiagnoseTradeoff == WindowOptimization.TradeoffCrazy:
+				reduce = interface.Dialog.option(title = 35539, message = 34248, labelConfirm = 32532, labelDeny = 33821)
+				if reduce:
+					self._selectTradeoff(tradeoff = WindowOptimization.TradeoffResult)
+					return
+
 			if self.mCallbackNext:
 				updateScrape = WindowOptimization.CategoryScrape in self.mCategory
 				updateProvider =  WindowOptimization.CategoryProvider in self.mCategory
@@ -5433,6 +5517,7 @@ class WindowOptimization(WindowStep):
 				self._setLabel(control = self.mTradeoffLabel, text = interface.Translation.string(label), bold = True)
 
 				if not tradeoff: tradeoff = WindowOptimization.TradeoffMixed
+				WindowOptimization.DiagnoseTradeoff = tradeoff
 				self.mDataSettings = self.mCallbackTradeoff(data = self.mDataDiagnose, tradeoff = tradeoff)
 
 			if self.mDataSettings:
@@ -5484,7 +5569,8 @@ class WindowOptimization(WindowStep):
 			self._toggleRating(visible = True)
 
 	def _toggleIntroduction(self, visible):
-		self._visibleSet(control = self.mIntroduction, visible = visible)
+		self._visibleSet(control = self.mIntroTitle, visible = visible)
+		self._visibleSet(control = self.mIntroDescription, visible = visible)
 		self._visibleSet(control = self.mNavigationBack, visible = self.mStepper)
 		if visible:
 			if self.mStepper: self._updateProgress(progress = WindowWizard.ProgressOptimization['introduction'], force = True)
@@ -5511,23 +5597,26 @@ class WindowOptimization(WindowStep):
 			else: self._setButton(control = self.mNavigationNext, text = 33821, icon = 'next')
 
 	def _togglePreferences(self, visible):
-		visibleCategory = visible and self.mCategoryEnabled
+		if self.mPlain:
+			self._togglePlain(visible = visible)
+		else:
+			visibleCategory = visible and self.mCategoryEnabled
 
-		self._visibleSet(control = self.mPreferencesSeparator1, visible = visibleCategory)
-		self._visibleSet(control = self.mPreferencesSeparator2, visible = visible)
-		self._visibleSet(control = self.mPreferencesHeading, visible = visible)
-		self._visibleSet(control = self.mPreferencesLabel, visible = visible)
+			self._visibleSet(control = self.mPreferencesSeparator1, visible = visibleCategory)
+			self._visibleSet(control = self.mPreferencesSeparator2, visible = visible)
+			self._visibleSet(control = self.mPreferencesHeading, visible = visible)
+			self._visibleSet(control = self.mPreferencesLabel, visible = visible)
 
-		self._visibleSet(control = self.mCategoryScrape, visible = visibleCategory)
-		self._visibleSet(control = self.mCategoryProvider, visible = visibleCategory)
-		self._visibleSet(control = self.mCategoryHeading, visible = visibleCategory)
-		self._visibleSet(control = self.mCategoryLabel, visible = visibleCategory)
+			self._visibleSet(control = self.mCategoryScrape, visible = visibleCategory)
+			self._visibleSet(control = self.mCategoryProvider, visible = visibleCategory)
+			self._visibleSet(control = self.mCategoryHeading, visible = visibleCategory)
+			self._visibleSet(control = self.mCategoryLabel, visible = visibleCategory)
 
-		self._visibleSet(control = self.mTradeoffSpeed, visible = visible)
-		self._visibleSet(control = self.mTradeoffMixed, visible = visible)
-		self._visibleSet(control = self.mTradeoffResult, visible = visible)
-		self._visibleSet(control = self.mTradeoffHeading, visible = visible)
-		self._visibleSet(control = self.mTradeoffLabel, visible = visible)
+			self._visibleSet(control = self.mTradeoffSpeed, visible = visible)
+			self._visibleSet(control = self.mTradeoffMixed, visible = visible)
+			self._visibleSet(control = self.mTradeoffResult, visible = visible)
+			self._visibleSet(control = self.mTradeoffHeading, visible = visible)
+			self._visibleSet(control = self.mTradeoffLabel, visible = visible)
 
 		if visible:
 			if self.mStepper: self._updateProgress(progress = WindowWizard.ProgressOptimization['preferences'], force = True)
@@ -5550,13 +5639,20 @@ class WindowOptimization(WindowStep):
 		self._addIntroduction(dimension = dimension)
 		self._addDiagnostics(dimension = dimension)
 		self._addRating(dimension = dimension)
-		self._addPreferences(dimension = dimension)
+		if not self.mPlain: self._addPreferences(dimension = dimension)
 		return dimension
 
 	def _addIntroduction(self, dimension):
-		height = 200
+		dimension = super(WindowOptimization, self)._addContent()
+		height = 350
 		x, y = self._center()
-		self.mIntroduction = self._addLabel(text = interface.Translation.string(35005), x = x, y = y - int(height / 2.0) + 10, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), bold = True)
+
+		if self.mUpdateScrape and self.mUpdateProvider: title = 35539
+		elif self.mUpdateScrape: title = 33996
+		elif self.mUpdateProvider: title = 35412
+
+		self.mIntroTitle = self._addLabel(text = interface.Translation.string(title), x = x, y = y - 260, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontBig(), bold = True, uppercase = True, color = self._colorHighlight())
+		self.mIntroDescription = self._addLabel(text = interface.Translation.string(35005), x = x, y = y - 130, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), bold = True)
 
 	def _addDiagnostics(self, dimension):
 		height = 20
@@ -5674,6 +5770,99 @@ class WindowOptimization(WindowStep):
 		if not self.mCategoryEnabled: y += 25
 		self.mPreferencesLabel = self._addLabel(text = '', x = x, y = y, width = dimension[0], height = 50, alignment = Window.AlignmentCenter, size = interface.Font.fontMedium(), bold = True)
 
+	def _addPlain(self):
+		if self.mPlain:
+			self.itemAdd(item = self._addItem(label = 35539, callback = self._selectTradeoff))
+			if self.mUpdateProvider: self.mCategory.append(WindowOptimization.CategoryProvider)
+			if self.mUpdateScrape: self.mCategory.append(WindowOptimization.CategoryScrape)
+
+	def _togglePlain(self, visible):
+		if self.mPlain:
+			self._showItems(visible)
+			if visible: self._selectTradeoff(tradeoff = WindowOptimization.DiagnoseTradeoff)
+
+	def _setTradeoff(self, tradeoff):
+		if tradeoff == WindowOptimization.TradeoffSpeed:
+			label = 36090
+			level = 0
+			color = interface.Format.colorExcellent()
+			user = (
+				interface.Format.fontColor('%s %s' % (interface.Translation.string(33048), interface.Translation.string(33997)), color = interface.Format.colorBad()),
+				interface.Format.fontColor('%s %s' % (interface.Translation.string(33048), interface.Translation.string(36717)), color = interface.Format.colorBad()),
+			)
+		elif tradeoff == WindowOptimization.TradeoffMixed:
+			label = 36091
+			level = 1
+			color = interface.Format.colorGood()
+			user = (
+				interface.Format.fontColor(35670, color = interface.Format.colorGood()),
+				interface.Format.fontColor(35670, color = interface.Format.colorGood()),
+			)
+		elif tradeoff == WindowOptimization.TradeoffResult:
+			label = 36092
+			level = 2
+			color = interface.Format.colorPoor()
+			user = (
+				interface.Format.fontColor(33998, color = interface.Format.colorExcellent()),
+				interface.Format.fontColor(36716, color = interface.Format.colorExcellent()),
+			)
+		elif tradeoff == WindowOptimization.TradeoffCrazy:
+			label = 36719
+			level = 3
+			color = interface.Format.colorBad()
+			user = (
+				interface.Format.fontColor('%s %s' % (interface.Translation.string(33048), interface.Translation.string(33998)), color = interface.Format.colorSpecial()),
+				interface.Format.fontColor('%s %s' % (interface.Translation.string(33048), interface.Translation.string(36716)), color = interface.Format.colorSpecial()),
+			)
+
+		self.mItems[0]['item'].setProperty('GaiaIcon', self._pathImage(['level', 'level%d' % level]))
+		self.mItems[0]['item'].setProperty('GaiaLabel', '%s %s' % (interface.Translation.string(label), interface.Translation.string(35539)))
+
+		time = tools.Math.roundUpClosest(self.mDataSettings['settings']['limit']['time'], base = 60)
+		time = str(int(time / 60))
+
+		self.mItems[0]['item'].setProperty('GaiaLabel1', interface.Format.iconJoin([
+			interface.Translation.string(36715) % (user[0], interface.Translation.string(33536)),
+			interface.Translation.string(36715) % (user[1], interface.Translation.string(32013)),
+		]))
+		self.mItems[0]['item'].setProperty('GaiaLabel2', interface.Format.iconJoin([
+			interface.Translation.string(36718) % interface.Format.fontColor(time, color = color),
+		]))
+
+		if self.mUpdateProvider and self.mUpdateScrape:
+			self.mItems[0]['item'].setProperty('GaiaLabel3', interface.Format.iconJoin([
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['providers'], color = color), interface.Translation.string(32345)),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['query'], color = color), interface.Translation.string(32035)),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['page'], color = color), interface.Translation.string(35810)),
+			]))
+		elif self.mUpdateProvider:
+			self.mItems[0]['item'].setProperty('GaiaLabel3', interface.Format.iconJoin([
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['providers'], color = color), interface.Translation.string(32345)),
+			]))
+		elif self.mUpdateScrape:
+			self.mItems[0]['item'].setProperty('GaiaLabel2', interface.Format.iconJoin([
+				interface.Translation.string(36718) % interface.Format.fontColor(time, color = color),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['query'], color = color), interface.Translation.string(32035)),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['page'], color = color), interface.Translation.string(35810)),
+			]))
+			self.mItems[0]['item'].setProperty('GaiaLabel3', interface.Format.iconJoin([
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['pack'], color = self._colorHighlight()), interface.Translation.string(33167)),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['title'], color = self._colorHighlight()), interface.Translation.string(33881)),
+				'%s %s' % (interface.Format.fontColor(self.mDataSettings['label']['keyword'], color = self._colorHighlight()), interface.Translation.string(35484)),
+			]))
+
+	def _selectTradeoff(self, tradeoff = None):
+		if not tradeoff:
+			tradeoff = WindowOptimization.DiagnoseTradeoff
+			if not tradeoff: tradeoff = WindowOptimization.TradeoffMixed
+			elif tradeoff == WindowOptimization.TradeoffSpeed: tradeoff = WindowOptimization.TradeoffMixed
+			elif tradeoff == WindowOptimization.TradeoffMixed: tradeoff = WindowOptimization.TradeoffResult
+			elif tradeoff == WindowOptimization.TradeoffResult: tradeoff = WindowOptimization.TradeoffCrazy
+			elif tradeoff == WindowOptimization.TradeoffCrazy: tradeoff = WindowOptimization.TradeoffSpeed
+		self.mDataSettings = self.mCallbackTradeoff(data = self.mDataDiagnose, tradeoff = tradeoff)
+		WindowOptimization.DiagnoseTradeoff = tradeoff
+		self._setTradeoff(tradeoff = tradeoff)
+
 
 class WindowMetaDetail(WindowStep):
 
@@ -5682,18 +5871,18 @@ class WindowMetaDetail(WindowStep):
 	DetailComplete	= 2
 
 	def __init__(self, stepper = False, **kwargs):
-		super(WindowMetaDetail, self).__init__(title = 33161, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
+		super(WindowMetaDetail, self).__init__(title = 33161, tip = 34572, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
 
 		from lib.meta.tools import MetaTools
-		self.mDetail = MetaTools.instance().settingsDetail()
+		self.mDetail = MetaTools.instance().settingsDetail(reload = True) # Reload get the new settings in case we navigate back and want to change it again.
 
 		self.mSources = {
-			tools.Media.TypeMovie : {},
-			tools.Media.TypeShow : {},
+			tools.Media.Movie : {},
+			tools.Media.Show : {},
 		}
 
 		self.mLevels = {
-			tools.Media.TypeMovie : {
+			tools.Media.Movie : {
 				MetaTools.DetailEssential : {
 					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
 					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailPartial,
@@ -5716,7 +5905,7 @@ class WindowMetaDetail(WindowStep):
 					MetaTools.ProviderFanart	: WindowMetaDetail.DetailComplete,
 				},
 			},
-			tools.Media.TypeShow : {
+			tools.Media.Show : {
 				MetaTools.DetailEssential : {
 					MetaTools.ProviderImdb		: WindowMetaDetail.DetailPartial,
 					MetaTools.ProviderTrakt		: WindowMetaDetail.DetailPartial,
@@ -5743,7 +5932,7 @@ class WindowMetaDetail(WindowStep):
 
 	def _initializeEnd2(self):
 		super(WindowMetaDetail, self)._initializeEnd2()
-		self._setMetadata()
+		self._selectMetadata(detail = True)
 
 	@classmethod
 	def show(self, wait = False, stepper = False, helper = False, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, **kwargs):
@@ -5841,7 +6030,7 @@ class WindowMetaDetail(WindowStep):
 			if callback: callback()
 
 		if instance.mDetail == MetaTools.DetailExtended:
-			apply = interface.Dialog.option(title = 33161, message = 33839, labelConfirm = 33821, labelDeny = 32532)
+			apply = not interface.Dialog.option(title = 33161, message = 33839, labelConfirm = 32532, labelDeny = 33821)
 			if not apply: instance._selectMetadata(detail = MetaTools.DetailStandard)
 		if apply: _apply()
 
@@ -5851,7 +6040,7 @@ class WindowMetaDetail(WindowStep):
 
 	def _addSources(self):
 		x = 155
-		y = 530
+		y = 510
 		offsetX = 200
 		for item in [('tmdb', 33508), ('tvdb', 35668), ('trakt', 32315), ('imdb', 32034), ('fanart', 35260)]:
 			self._addSource(x = x, y = y, type = item[0], label = item[1])
@@ -5869,8 +6058,8 @@ class WindowMetaDetail(WindowStep):
 
 		self._addLabel(text = label, x = x + offsetX, y = y - 7, width = width, height = height, size = interface.Font.fontLarge(), bold = True)
 
-		self.mSources[tools.Media.TypeMovie][type] = self._addLabel(text = '', x = x + offsetX, y = y + 18, width = width, height = height, size = font)
-		self.mSources[tools.Media.TypeShow][type] = self._addLabel(text = '', x = x + offsetX, y = y + 33, width = width, height = height, size = font)
+		self.mSources[tools.Media.Movie][type] = self._addLabel(text = '', x = x + offsetX, y = y + 18, width = width, height = height, size = font)
+		self.mSources[tools.Media.Show][type] = self._addLabel(text = '', x = x + offsetX, y = y + 33, width = width, height = height, size = font)
 
 	def _setMetadata(self):
 		from lib.meta.tools import MetaTools
@@ -5893,14 +6082,15 @@ class WindowMetaDetail(WindowStep):
 		}
 		for media in self.mSources.keys():
 			for provider in self.mSources[media].keys():
-				label = interface.Translation.string(32001 if media == tools.Media.TypeMovie else 32002)
+				label = interface.Translation.string(32001 if media == tools.Media.Movie else 32002)
 				label = interface.Format.font(label + ': ', bold = True) + lables[self.mLevels[media][self.mDetail][provider]]
 				self._setLabel(control = self.mSources[media][provider], text = label)
 
 	def _selectMetadata(self, detail = None):
 		from lib.meta.tools import MetaTools
 
-		if detail is None: index = MetaTools.Details.index(self.mDetail) + 1
+		if detail is True: index = MetaTools.Details.index(self.mDetail)
+		elif detail is None: index = MetaTools.Details.index(self.mDetail) + 1
 		else: index = MetaTools.Details.index(detail)
 
 		if index >= len(MetaTools.Details): index = 0
@@ -5914,12 +6104,13 @@ class WindowMetaExternal(WindowStep):
 	Statistics = None
 
 	SizeDownload = 104857600 # 100 MB
-	SizeStorage = 629145600 # 600 MB
+	#SizeStorage = 629145600 # 600 MB # Database now comes compressed.
+	SizeStorage = 104857600 # 100 MB
 	SizeMinimum = 262144000 # 250 MB
 	SizeRecommended = 524288000 # 500 MB
 
 	def __init__(self, stepper = False, **kwargs):
-		super(WindowMetaExternal, self).__init__(title = 33301, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
+		super(WindowMetaExternal, self).__init__(title = 33301, tip = 34573, xml = True, xmlType = Window.TypeWizardStatic, xmlOffset = None, stepper = stepper, **kwargs)
 
 		self.mControlDescription = None
 
@@ -6038,6 +6229,19 @@ class WindowMetaExternal(WindowStep):
 		# If the user has not enabled/disabled this setting yet, use the free disk space value to determine the default value.
 		if self.mEnabled is None and storageRemaining > 0: self.mEnabled = storageRemaining > WindowMetaExternal.SizeRecommended
 
+		# Cluttered layout.
+		'''
+		33541	Use %s And %s Metadata
+		33542	%s Menu Loading
+		33543	Requires %s Download
+		33544	Requires %s Free Storage
+		33545	Addon Already Installed
+		33546	%s Storage Used
+		33549	Only Use %s Metadata
+		33550	%s Additional Metadata
+		33551	%s Additional Download
+		33552	%s Additional Storage
+
 		if self.mEnabled:
 			from lib.modules.convert import ConverterSize
 
@@ -6064,7 +6268,7 @@ class WindowMetaExternal(WindowStep):
 				labels[2].append(interface.Translation.string(33543) % self._highlight(sizeDownload))
 				labels[2].append(interface.Translation.string(33544) % self._highlight(sizeStorage))
 
-			for i in [(tools.Media.TypeMovie, 32001), (tools.Media.TypeSet, 33527), (tools.Media.TypeShow, 32002), (tools.Media.TypeSeason, 32054), (tools.Media.TypeEpisode, 32326)]:
+			for i in [(tools.Media.Movie, 32001), (tools.Media.Set, 33527), (tools.Media.Show, 32002), (tools.Media.Season, 32054), (tools.Media.Episode, 32326)]:
 				try:
 					if WindowMetaExternal.Statistics['data']['count'][i[0]] > 0:
 						labels[1].append('%s %s' % (self._highlight(tools.Math.thousand(WindowMetaExternal.Statistics['data']['count'][i[0]])), interface.Translation.string(i[1])))
@@ -6082,8 +6286,8 @@ class WindowMetaExternal(WindowStep):
 				else: storageFree = self._highlight(storageFree)
 
 				labels[3] = (interface.Translation.string(33555).replace('%s', '*').title().replace('*', '%s') % (storageFree, storageTotal)) + ' ' + interface.Translation.string(33350)
-			except:
-				tools.Logger.error()
+			except: tools.Logger.error()
+
 		else:
 			icon = 'unchecked'
 			label = 32302
@@ -6093,6 +6297,52 @@ class WindowMetaExternal(WindowStep):
 				[interface.Translation.string(33551) % self._highlight(interface.Translation.string(33342))],
 				[interface.Translation.string(33552) % self._highlight(interface.Translation.string(33342))],
 			]
+		'''
+
+		labels = [
+			[],
+			[],
+			[],
+			[],
+		]
+		if self.mInstalled: labels[3].append(interface.Translation.string(33545) % self._highlight(interface.Translation.string(33543)))
+		else: labels[3].append(interface.Translation.string(33546) % self._highlight(interface.Translation.string(33544)))
+
+		if self.mEnabled:
+			from lib.modules.convert import ConverterSize
+
+			icon = 'checked'
+			label = 32301
+			labels[0].append(interface.Translation.string(33541) % (self._highlight(interface.Translation.string(33553)), self._highlight(interface.Translation.string(33547))))
+
+			try: sizeDownload = WindowMetaExternal.Statistics['size']['compressed']
+			except: sizeDownload = WindowMetaExternal.SizeDownload
+			try: sizeStorage = WindowMetaExternal.Statistics['size']['uncompressed']
+			except: sizeStorage = WindowMetaExternal.SizeStorage
+			sizeMaximum = max(sizeDownload, sizeStorage)
+			sizeMinimum = min(sizeDownload, sizeStorage)
+			if sizeMaximum / sizeMinimum <= 1.25:
+				# Round closest 10MB.
+				labels[1].append(interface.Translation.string(33542) % (
+					self._highlight(ConverterSize(tools.Math.roundClosest(sizeMinimum + 5242880, base = 10485760)).stringOptimal()) + ' ',
+					'',
+				))
+			else:
+				labels[1].append(interface.Translation.string(33542) % (
+					self._highlight(ConverterSize(tools.Math.roundClosest(sizeDownload + 5242880, base = 10485760)).stringOptimal()) + ' ',
+					self._highlight(ConverterSize(tools.Math.roundClosest(sizeStorage + 5242880, base = 10485760)).stringOptimal()) + ' ',
+				))
+
+			items = [(WindowMetaExternal.Statistics['data']['count'].get(i) or 0) for i in [tools.Media.Movie, tools.Media.Set, tools.Media.Show, tools.Media.Season, tools.Media.Episode, tools.Media.Pack]]
+			count = sum(items) if items else 0
+			labels[2].append(interface.Translation.string(33421) % self._highlight(tools.Math.thousand(tools.Math.roundClosest(count, base = 500))))
+
+		else:
+			icon = 'unchecked'
+			label = 32302
+			labels[0].append(interface.Translation.string(33541) % (self._highlight(interface.Translation.string(33554)), self._highlight(interface.Translation.string(33548))))
+			labels[1].append(interface.Translation.string(33542) % (self._highlight(interface.Translation.string(33342)) + ' ', self._highlight(interface.Translation.string(33342)) + ' '))
+			labels[2].append(interface.Translation.string(33421) % self._highlight(interface.Translation.string(33342)))
 
 		item = self.mItems[0]['item']
 		item.setProperty('GaiaIcon', self._pathImage(['check', icon]))
@@ -6110,6 +6360,193 @@ class WindowMetaExternal(WindowStep):
 		if change: self.mEnabled = not self.mEnabled
 		MetaTools.settingsExternalSet(self.mEnabled)
 		if change: self._setMetadata()
+
+
+class WindowMetaPreload(WindowStep):
+
+	StepIntroduction = 'introduction'
+	StepPreload = 'preload'
+
+	# This allows us to go back a single step in the setup wizard to the tradoff, instead of going back to the introduction and having to redo the diagnosis.
+	PreloadData = {}
+
+	def __init__(self, **kwargs):
+		super(WindowMetaPreload, self).__init__(**kwargs)
+
+		self.mIntroTitle = None
+		self.mIntroDescription = None
+
+		self.mLoadProgress = 0
+		self.mLoadProgressInner = None
+		self.mLoadProgressOuter = None
+		self.mLoadProgressFill = None
+		self.mLoadProgressLabel1 = None
+		self.mLoadProgressLabel2 = None
+		self.mLoadProgressLabel3 = None
+		self.mLoadProgressLabel4 = None
+		self.mLoadThread = None
+
+		self.mStep = WindowMetaPreload.StepIntroduction
+
+	##############################################################################
+	# RESET
+	##############################################################################
+
+	@classmethod
+	def reset(self, settings = True):
+		WindowMetaPreload.PreloadData = {}
+
+	##############################################################################
+	# GENERAL
+	##############################################################################
+
+	@classmethod
+	def show(self, wait = False, stepper = False, navigationCancel = True, navigationHelp = True, navigationBack = True, navigationNext = True, callbackClose = None, callbackCancel = None, callbackHelp = None, callbackBack = None, callbackNext = None, **kwargs):
+		return super(WindowMetaPreload, self).show(wait = wait, stepper = stepper, navigationCancel = navigationCancel, navigationHelp = navigationHelp, navigationBack = navigationBack, navigationNext = navigationNext, callbackClose = callbackClose, callbackCancel = callbackCancel, callbackHelp = callbackHelp, callbackBack = callbackBack, callbackNext = callbackNext, **kwargs)
+
+	@classmethod
+	def update(self, data = None, progress = None, finished = None, status = None):
+		instance = self._updateProgress(progress = progress, finished = finished, status = status)
+		if instance and data:
+			WindowMetaPreload.PreloadData = data
+			percent = int(data['progress']['percent'] * 100)
+
+			from lib.modules.convert import ConverterDuration
+			color = interface.Format.colorSecondary()
+			label = [
+				'%s: %s' % (interface.Translation.string(32037), interface.Format.font('%d%%' % percent, color = color)),
+				'%s: %s' % (interface.Translation.string(33881), interface.Format.font(str(tools.Math.thousand(data['count']['total'])), color = color)),
+				'%s: %s' % (interface.Translation.string(36714), interface.Format.font(ConverterDuration(value = data['progress']['time'], unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini), color = color)),
+			]
+			instance._setLabel(control = instance.mLoadProgressLabel2, text = interface.Format.iconJoin(label), bold = True)
+
+			instance._setLabel(control = instance.mLoadProgressLabel3, text = data['progress']['status'], bold = True)
+			instance._setLabel(control = instance.mLoadProgressLabel4, text = data['progress']['detail'], bold = True)
+
+			instance._progressUpdate(progressNew = percent, progressCurrent = instance.mLoadProgress, controlFill = instance.mLoadProgressFill, controlIcon = instance.mLoadProgressInner)
+			instance.mLoadProgress = percent
+
+			if percent >= 100:
+				instance._visibleSet(control = instance.mNavigationBack, visible = True)
+				instance._visibleSet(control = instance.mNavigationNext, visible = True)
+
+	@classmethod
+	def _updateProgress(self, preload = None, progress = None, finished = None, status = None, force = False):
+		return super(WindowMetaPreload, self).update(progress = progress, finished = finished, status = status, force = force)
+
+	def _initializeStart2(self):
+		super(WindowMetaPreload, self)._initializeStart2()
+		self._toggleIntroduction(visible = False)
+		self._togglePreload(visible = False)
+
+	def _initializeEnd2(self):
+		super(WindowMetaPreload, self)._initializeEnd2()
+		self.update(data = WindowMetaPreload.PreloadData)
+		self.mStep = WindowMetaPreload.StepIntroduction
+		self._toggleIntroduction(visible = True)
+		self._togglePreload(visible = False)
+
+	def _actionHelp(self):
+		self._help(items = [
+			{'type' : 'title', 'value' : 'Preloading Menus', 'break' : 2},
+			{'type' : 'text', 'value' : 'Loading a menu for the first time can take some time. Multiple pieces of metadata have to be retrieved for each title in the menu. Once this metadata is cached locally, menus load a lot faster, since no external API requests are needed anymore.', 'break' : 2},
+			{'type' : 'text', 'value' : 'Most metadata APIs, like Trakt, TMDb, and IMDb, have rate limits. The limits restrict how many API requests can be made per minute. Hence, importing a large Trakt history or assembling a large arrivals menu, requires too much metadata to retrieve it all in one go. Instead, metadata has to be retrieved systematically in smaller chunks. Preloading menus allows one to retrieve a large amount of metadata by pausing in between requests, ensuring the API limits are not reached.', 'break' : 2},
+			{'type' : 'text', 'value' : 'During preloading, the most used smart menus, including [B]Quick[/B], [B]Progress[/B], and [B]Arrivals[/B], are populated with metadata so they can be loaded faster afterwards. Only some of the metadata is preloaded now. Smart menus will systematically retrieve more metadata over time as you use these menus. ', 'break' : 2},
+		])
+
+	def _actionCancel(self):
+		from lib.meta.manager import MetaManager
+		MetaManager.preloadCancel()
+		super(WindowMetaPreload, self)._actionCancel()
+
+	def actionBack(self):
+		WindowStep.ActionBack = True
+		if self.mStep == WindowMetaPreload.StepIntroduction:
+			if self.mCallbackBack: return  self.mCallbackBack()
+		elif self.mStep == WindowMetaPreload.StepPreload:
+			self.mStep = WindowMetaPreload.StepIntroduction
+			self._togglePreload(visible = False)
+			self._toggleIntroduction(visible = True)
+		self._actionRefocus()
+
+	def actionNext(self):
+		self._actionNext()
+		if not self.mStep == WindowMetaPreload.StepPreload: self._actionRefocus()
+
+	def _actionNext(self):
+		if self.mStep == WindowMetaPreload.StepIntroduction:
+			self.mStep = WindowMetaPreload.StepPreload
+			self._toggleIntroduction(visible = False)
+			self._togglePreload(visible = True)
+			self._progressClear(controlFill = self.mLoadProgressFill, controlIcon = self.mLoadProgressInner)
+			self._actionPreload()
+		elif self.mStep == WindowMetaPreload.StepPreload:
+			if self.mCallbackNext:
+				self.mCallbackNext()
+			self.close()
+
+	def _actionPreload(self):
+		if WindowMetaPreload.PreloadData: # Already preloaded. Do not do again if the user navigates back and forth.
+			self.update(data = WindowMetaPreload.PreloadData)
+			return True
+		elif not self.mLoadThread or not self.mLoadThread.alive():
+			from lib.meta.manager import MetaManager
+			self.mLoadThread = Pool.thread(target = MetaManager.preload, kwargs = {'callback' : self.update}, start = True)
+			return True
+		return False
+
+	def _actionCancel(self):
+		from lib.meta.manager import MetaManager
+		MetaManager._batchStop()
+		self.close()
+
+	def _toggleIntroduction(self, visible):
+		self._visibleSet(control = self.mIntroTitle, visible = visible)
+		self._visibleSet(control = self.mIntroDescription, visible = visible)
+		self._visibleSet(control = self.mNavigationBack, visible = self.mStepper)
+		if visible:
+			if self.mStepper: self._updateProgress(progress = WindowWizard.ProgressPreload['introduction'], force = True)
+			else: self._setButton(control = self.mNavigationNext, text = 33552, icon = 'diagram')
+
+	def _togglePreload(self, visible):
+		self._visibleSet(control = self.mNavigationBack, visible = not visible)
+		self._visibleSet(control = self.mNavigationNext, visible = not visible)
+		self._visibleSet(control = self.mLoadProgressInner, visible = visible)
+		self._visibleSet(control = self.mLoadProgressOuter, visible = visible)
+		self._visibleSet(control = self.mLoadProgressLabel1, visible = visible)
+		self._visibleSet(control = self.mLoadProgressLabel2, visible = visible)
+		self._visibleSet(control = self.mLoadProgressLabel3, visible = visible)
+		self._visibleSet(control = self.mLoadProgressLabel4, visible = visible)
+		if visible and self.mStepper: self._updateProgress(progress = WindowWizard.ProgressPreload['preload'], force = True)
+
+	def _toggleOutro(self, visible):
+		self._visibleSet(control = self.mOutro, visible = visible)
+		self._visibleSet(control = self.mNavigationBack, visible = self.mStepper)
+
+	def _addContent(self):
+		dimension = super(WindowMetaPreload, self)._addContent()
+		self._addIntroduction(dimension = dimension)
+		self._addPreload(dimension = dimension)
+		return dimension
+
+	def _addIntroduction(self, dimension):
+		dimension = super(WindowMetaPreload, self)._addContent()
+		height = 350
+		x, y = self._center()
+		self.mIntroTitle = self._addLabel(text = interface.Translation.string(33552), x = x, y = y - 260, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontBig(), bold = True, uppercase = True, color = self._colorHighlight())
+		self.mIntroDescription = self._addLabel(text = interface.Translation.string(34093), x = x, y = y - 130, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), bold = True)
+		return dimension
+
+	def _addPreload(self, dimension):
+		height = 20
+		x, y = self._center()
+		_, self.mLoadProgressInner, self.mLoadProgressOuter, self.mLoadProgressFill = self._addProgressBar(y = y)
+
+		self.mLoadProgressLabel1 = self._addLabel(text = interface.Translation.string(36713), x = x, y = y - int(4 * height), width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), color = self._colorHighlight(), uppercase = True, bold = True)
+		self.mLoadProgressLabel2 = self._addLabel(text = '', x = x, y = y - int(2.5 * height), width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontMedium(), bold = True)
+
+		self.mLoadProgressLabel3 = self._addLabel(text = '', x = x, y = y + int(2.5 * height), width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), color = self._colorHighlight(), uppercase = True, bold = True)
+		self.mLoadProgressLabel4 = self._addLabel(text = '', x = x, y = y + int(4 * height), width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontMedium(), bold = True)
 
 
 class WindowWizardIntro(WindowStep):
@@ -6139,6 +6576,28 @@ class WindowWizardIntro(WindowStep):
 		]
 		items.extend(WindowWizard._helpMenu())
 		self._help(items = items)
+
+	def _actionNext(self):
+		tools.Disclaimer.agree()
+		return True
+
+
+class WindowWizardInfo(WindowStep):
+
+	def __init__(self, **kwargs):
+		super(WindowWizardInfo, self).__init__(**kwargs)
+
+	@classmethod
+	def show(self, navigationHelp = False, navigationBack = True, **kwargs):
+		return super(WindowWizardInfo, self).show(navigationHelp = navigationHelp, navigationBack = navigationBack, **kwargs)
+
+	def _addContent(self):
+		dimension = super(WindowWizardInfo, self)._addContent()
+		height = 350
+		x, y = self._center()
+		self._addLabel(text = interface.Translation.string(self.mTitle), x = x, y = y - 260, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontBig(), bold = True, uppercase = True, color = self._colorHighlight())
+		self._addLabel(text = interface.Translation.string(self.mDescription), x = x, y = y - 130, width = dimension[0], height = height, alignment = Window.AlignmentCenter, size = interface.Font.fontLarge(), bold = True)
+		return dimension
 
 
 class WindowWizardOutro(WindowStep):
@@ -6171,7 +6630,7 @@ class WindowWizardOutro(WindowStep):
 class WindowWizardLanguage(WindowStep):
 
 	def __init__(self, **kwargs):
-		super(WindowWizardLanguage, self).__init__(title = 36207, xml = True, xmlType = Window.TypeWizardSmall, **kwargs)
+		super(WindowWizardLanguage, self).__init__(title = 36207, tip = "The primary language is used for metadata and images in menus and for various other features throughout Gaia.[CR]Stick to [I]English[/I]  as the primary language for the best experience and add other proficient languages as alternatives.", xml = True, xmlType = Window.TypeWizardSmall, **kwargs)
 
 	def _initializeEnd2(self):
 		super(WindowWizardLanguage, self)._initializeEnd2()
@@ -6207,7 +6666,9 @@ class WindowWizardLanguage(WindowStep):
 		self.itemAdd(item = items)
 
 	def _addLanguage(self, label, callback):
-		return self._addItem(label = label, callback = callback)
+		item = self._addItem(label = label, callback = callback)
+		item['item'].setProperty('GaiaFrame', '1')
+		return item
 
 	def _setLanguage(self, index):
 		color = interface.Format.colorPrimary()
@@ -6245,10 +6706,239 @@ class WindowWizardLanguage(WindowStep):
 		self._setLanguageTertiary()
 
 
+class WindowWizardContent(WindowStepScroll):
+
+	def __init__(self, **kwargs):
+		super(WindowWizardContent, self).__init__(title = 32325, tip = 34569, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
+
+	@classmethod
+	def show(self, helper = False, **kwargs):
+		return super(WindowWizardContent, self).show(helper = helper, **kwargs)
+
+	def _actionHelp(self):
+		self._help(items = [
+			{'type' : 'title', 'value' : 'Niche Content', 'break' : 2},
+			{'type' : 'text', 'value' : 'The content level determines how prominent a specific niche is in Gaia. A higher level will integrate more niche content into the main menus and add shortcuts were applicable. All niches, with their own smart menus and categories, are always accessible from the submenus, irrespective of the level you choose.', 'break' : 2},
+			{'type' : 'text', 'value' : 'For most people [B]Occasional[/B] viewing is therefore recommended, since it will keep the default content without making specific accommodation for the niche. [B]Regular[/B], and especially [B]Frequent[/B] viewing, add considerably more niche content. This might clutter the menus too much for most people’s taste. Even if you are a regular viewer of the niche, sticking to [B]Occasional[/B] viewing still allows full access to the niche from the submenus, it will just not push it aggressively in the top-level menus.', 'break' : 2},
+		])
+
+	def _addItems(self):
+		items = []
+
+		items.append(self._addNiche(
+			niche = tools.Media.Anime,
+			label = 36556, description = 36709,
+			index = 0,
+		))
+		items.append(self._addNiche(
+			niche = tools.Media.Docu,
+			label = 33470, description = 36022,
+			index = 1,
+		))
+		items.append(self._addNiche(
+			niche = tools.Media.Short,
+			label = 33471, description = 36023,
+			index = 2,
+		))
+		items.append(self._addNiche(
+			niche = tools.Media.Family,
+			label = 36558, description = 33551,
+			index = 3,
+		))
+		items.append(self._addNiche(
+			niche = tools.Media.Anima,
+			label = 36555, description = 36711,
+			index = 4,
+		))
+		items.append(self._addNiche(
+			niche = tools.Media.Donghua,
+			label = 36557, description = 36710,
+			index = 5,
+		))
+
+		self.itemAdd(item = items)
+
+	def _addNiche(self, niche, label, description, index, offset = 0):
+		label = interface.Translation.string(label)
+		description = self._description(niche = niche, description = [description])
+		return self._addItem(label = label, label1 = description[0], label2 = description[1], label3 = description[2], icon = niche, special = interface.Icon.SpecialContent, offset = offset, callback = lambda : self._change(niche = niche, index = index), level = self._level(niche = niche))
+
+	@classmethod
+	def _level(self, niche, level = None):
+		id = 'general.content.' + niche
+		if not level is None: tools.Settings.set(id, level)
+		return tools.Settings.getInteger(id)
+
+	@classmethod
+	def _description(self, niche, description = None):
+		if description is None: description = []
+		level = self._level(niche = niche)
+
+		if level == 0:
+			label3 = 36043
+			label4 = 33342
+			color = interface.Format.colorBad()
+		elif level == 1:
+			label3 = 36700
+			label4 = 35575
+			color = interface.Format.colorMedium()
+		elif level == 2:
+			label3 = 36701
+			label4 = 33432
+			color = interface.Format.colorGood()
+		elif level == 3:
+			label3 = 36702
+			label4 = 35653
+			color = interface.Format.colorExcellent()
+
+		description.extend([
+			'%s %s' % (interface.Format.font(label3, color = color), interface.Translation.string(33993)),
+			'%s %s' % (interface.Format.font(label4, color = color), interface.Translation.string(35390)),
+		])
+
+		return description
+
+	@classmethod
+	def _change(self, niche, index):
+		level = self._level(niche = niche)
+
+		level += 1
+		if level > 3: level = 0
+		self._level(niche = niche, level = level)
+
+		instance = self.instance()
+		instance._levelItem(index = index, level = level)
+
+		description = self._description(niche = niche)
+		for i, label in enumerate(description): instance.mItems[index]['item'].setProperty('GaiaLabel' + str(i + 2), label)
+
+		return level
+
+
+class WindowWizardExtension(WindowStepScroll):
+
+	def __init__(self, **kwargs):
+		super(WindowWizardExtension, self).__init__(title = 36723, tip = 34575, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
+
+	@classmethod
+	def prepare(self, wait = True):
+		if wait: self._prepare()
+		else: Pool.thread(target = self._prepare, start = True)
+
+	@classmethod
+	def _prepare(self):
+		functions = [self._installYoutube, self._installStudioIcons, self._installVpnManager]
+		for function in functions:
+			function(install = None)
+
+	@classmethod
+	def show(self, helper = False, **kwargs):
+		return super(WindowWizardExtension, self).show(helper = helper, **kwargs)
+
+	def _actionHelp(self):
+		self._help(items = [
+			{'type' : 'title', 'value' : 'Extension Addons', 'break' : 2},
+			{'type' : 'text', 'value' : 'The addons can be installed from Gaia\'s [B]Full[/B] repository. Alternatively, some of the addons can also be installed from Kodi’s official repository, or otherwise from the addon developer\'s Github repository.', 'break' : 2},
+			{'type' : 'text', 'value' : 'Additional third-party addons can be installed to enhance features or aesthetics in Gaia. These addons are not required for Gaia\'s main features to works, it is just for extra functionality.', 'break' : 2},
+			{'type' : 'text', 'value' : 'The extensions are used for the following:', 'break' : 2},
+			{'type' : 'list', 'value' : [
+				{'title' : 'YouTube', 'value' : 'Any additional videos, like trailers, season recaps, extras, and other videos are pulled from YouTube. Install this addon if you want to watch any of these videos. The YouTube addon works without an account. However, if you want to search for content on YouTube, you have to authenticate an account for it.'},
+				{'title' : 'StudioIcons', 'value' : 'This addon adds studio and network icons to menus for improved aesthetics. Although most Kodi skins support studio icons, some custom skins might not. The official Kodi repo has been stuck on v0.0.30 for a while, which does the job. But Gaia\'s repository has v0.0.32 with a few additional icons.'},
+				{'title' : 'ResolveURL', 'value' : 'This addon handles link resolving through debrid services. Premiumize, OffCloud, and RealDebrid are natively supported in Gaia and do not need this addon. However, other debrid services like DebridLink, AllDebrid, TorBox, RapidPremium, LinkSnappy, MegaDebrid, SimplyDebrid, and Smoozed require this addon.'},
+				{'title' : 'VpnManager', 'value' : 'This addon allows you to stream anonymously through an encrypted VPN, adding an additional layer of privacy. VpnManager supports a huge range of premium VPN services. VpnManager uses OpenVPN which must be installed on your system. If you do not use a VPN or have a different VPN program installed, this addon is not needed.'},
+			]},
+		])
+
+	def _addItems(self):
+		items = []
+
+		items.append(self._addExtension(
+			callback = self._installYoutube,
+			icon = 'youtube', label = 35296,
+			recommend = True,
+			size = 4194304,
+			support = [36725],
+		))
+		items.append(self._addExtension(
+			callback = self._installStudioIcons,
+			icon = 'studioicons', label = 36724,
+			recommend = True,
+			size = 24117248,
+			support = [36726],
+		))
+		items.append(self._addExtension(
+			callback = self._installResolveUrl,
+			icon = 'resolveurl', label = 35310,
+			recommend = False,
+			size = 2097152,
+			support = [36728],
+		))
+		items.append(self._addExtension(
+			callback = self._installVpnManager,
+			icon = 'vpnmanager', label = 33333,
+			recommend = False,
+			size = 1048576,
+			support = [36727],
+		))
+
+		self.itemAdd(item = items)
+
+	def _addExtension(self, callback, icon, label, recommend = False, size = False, support = None, offset = 0):
+		label = interface.Translation.string(label)
+
+		label1 = []
+		if recommend: recommend = interface.Format.font(33662, color = interface.Format.colorExcellent())
+		else: recommend = interface.Format.font(35323, color = interface.Format.colorPoor())
+		label1.append('%s %s' % (recommend, interface.Translation.string(35614)))
+		label1 = interface.Format.iconJoin(label1)
+
+		label2 = interface.Format.iconJoin([interface.Translation.string(i) for i in support])
+
+		label3 = []
+		installed = callback(install = None)
+		if installed: label3.append(interface.Translation.string(33545) % self._highlight(interface.Translation.string(33543)))
+		else: label3.append(interface.Translation.string(33546) % self._highlight(interface.Translation.string(33544)))
+		if size and not installed:
+			from lib.modules.convert import ConverterSize
+			size = interface.Format.fontColor(ConverterSize(size).stringOptimal(), color = self._colorHighlight())
+			label3.append('%s %s' % (size, interface.Translation.string(32403)))
+		label3 = interface.Format.iconJoin(label3)
+
+		return self._addItem(label = label, label1 = label1, label2 = label2, label3 = label3, icon = icon, special = interface.Icon.SpecialExtensions, offset = offset, callback = callback, selected = installed)
+
+	def _install(self, index, extension, install = True):
+		before = tools.Extension.installed(id = extension, enabled = True)
+		if install: tools.Extension.dialog(id = extension)
+		after = tools.Extension.installed(id = extension, enabled = True)
+
+		if self.mItems and not before == after:
+			item = self.mItems[index]['item']
+
+			item.setProperty('GaiaSelected', str(int(after)))
+
+			if after: label3 = interface.Translation.string(33545) % self._highlight(interface.Translation.string(33543))
+			else: label3 = interface.Translation.string(33546) % self._highlight(interface.Translation.string(33544))
+			item.setProperty('GaiaLabel3', label3)
+
+		return after
+
+	def _installYoutube(self, install = True):
+		return self._install(index = 0, extension = tools.Extension.IdYouTube, install = install)
+
+	def _installStudioIcons(self, install = True):
+		return self._install(index = 1, extension = tools.Extension.IdStudioIcons, install = install)
+
+	def _installResolveUrl(self, install = True):
+		return self._install(index = 2, extension = tools.Extension.IdResolveUrl, install = install)
+
+	def _installVpnManager(self, install = True):
+		return self._install(index = 3, extension = tools.Extension.IdVpnManager, install = install)
+
+
 class WindowWizardAccount(WindowStepScroll):
 
 	def __init__(self, **kwargs):
-		super(WindowWizardAccount, self).__init__(title = 36227, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
+		super(WindowWizardAccount, self).__init__(title = 36227, tip = 34570, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
 
 	@classmethod
 	def prepare(self, wait = True):
@@ -6284,8 +6974,12 @@ class WindowWizardAccount(WindowStepScroll):
 
 	def _actionNext(self):
 		from lib.modules.account import Trakt, Youtube
-		if not Trakt().authenticated() or not Youtube().authenticated():
-			return interface.Dialog.option(title = 36227, message = 36233, labelConfirm = 33821, labelDeny = 32512)
+		validTrakt = Trakt().authenticated()
+		validYoutube = Youtube().authenticated()
+		if not validTrakt or not validYoutube:
+			if not validTrakt and not validYoutube: message = interface.Translation.string(36233) % (Trakt().name(), Youtube().name())
+			else: message = interface.Translation.string(36721) % (Trakt().name() if not validTrakt else Youtube().name())
+			return interface.Dialog.option(title = 36227, message = message, labelConfirm = 33821, labelDeny = 32512)
 		return True
 
 	def _addItems(self):
@@ -6333,7 +7027,7 @@ class WindowWizardAccount(WindowStepScroll):
 		items.append(self._addAccount(
 			callback = self._authenticateOpensubtitles,
 			icon = 'opensubtitles', label = 35683,
-			recommend = False, free = True, paid = 1.00,
+			recommend = False, free = True, paid = 2.00,
 			support = [36210],
 		))
 		items.append(self._addAccount(
@@ -6414,7 +7108,7 @@ class WindowWizardAccount(WindowStepScroll):
 class WindowWizardPremium(WindowStepScroll):
 
 	def __init__(self, **kwargs):
-		super(WindowWizardPremium, self).__init__(title = 36239, xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
+		super(WindowWizardPremium, self).__init__(title = 36239, tip = '[I]Premiumize[/I]  currently provides the best experience, followed by [I]OffCloud[/I], although with a smaller cache.[CR][I]RealDebrid[/I], [I]AllDebrid[/I], and [I]DebridLink[/I] all work, but do not allow cache lookups anymore and are otherwise limited.', xml = True, xmlType = Window.TypeWizardLarge, **kwargs)
 
 	@classmethod
 	def prepare(self, wait = True):
@@ -6473,22 +7167,21 @@ class WindowWizardPremium(WindowStepScroll):
 			label2 = interface.Format.iconJoin(label2)
 
 			label3 = []
-			if item['network']['support']['torrent']: label3.append(36242)
+			if item['network']['support']['torrent']: label3.append(33199)
 			if item['network']['support']['usenet']: label3.append(33200)
-			if item['network']['support']['hoster']: label3.append(36243)
-			label3 = interface.Format.iconJoin(['%s %s' % (interface.Translation.string(i), interface.Translation.string(33921)) for i in label3])
+			if item['network']['support']['hoster']: label3.append(33198)
+			label3 = ['/'.join([interface.Translation.string(i) for i in label3])]
 
-			label4 = []
-			if any(item['stream']['support'].values()): label4.append(36223)
-			if any(item['cache']['support'].values()): label4.append(36224)
-			if any(item['select']['support'].values()): label4.append(35542)
-			if any(item['extra']['support'].values()): label4.append(36225)
-			label4 = interface.Format.iconJoin([interface.Translation.string(i) for i in label4])
+			if any(item['stream']['support'].values()): label3.append(36223)
+			if any(item['cache']['support'].values()): label3.append(36224)
+			if any(item['select']['support'].values()): label3.append(35542)
+			#if any(item['extra']['support'].values()): label3.append(36225)
+			label3 = interface.Format.iconJoin([interface.Translation.string(i) for i in label3])
 
 			offset = None
 			if item['id'] == 'premiumize': offset = 1
 
-			return self._addItem(label = label, label1 = label1, label2 = label2, label3 = label3, label4 = label4, icon = item['id'], offset = offset, callback = lambda authenticate = True: self._authenticate(id = item['id'], authenticate = authenticate), selected = self._authenticate(id = item['id'], authenticate = None))
+			return self._addItem(label = label, label1 = label1, label2 = label2, label3 = label3, icon = item['id'], offset = offset, callback = lambda authenticate = True: self._authenticate(id = item['id'], authenticate = authenticate), selected = self._authenticate(id = item['id'], authenticate = None))
 		except: tools.Logger.error()
 
 	@classmethod
@@ -6515,8 +7208,8 @@ class WindowWizard(object):
 
 	ActionClosed = None
 
-	# Also used by WindowOptimization.
-	ProgressOptimization = {'introduction' : 70, 'diagnostics' : 73, 'rating' : 76, 'preferences' : 78}
+	ProgressOptimization = {'introduction' : 80, 'diagnostics' : 83, 'rating' : 86, 'preferences' : 88} # Also used by WindowOptimization.
+	ProgressPreload = {'introduction' : 60, 'preload' : 65} # Also used by WindowMetaPreload
 
 	PropertyInitial = 'internal.initial.wizard'
 
@@ -6598,6 +7291,7 @@ class WindowWizard(object):
 		WindowWizardPremium.prepare(wait = False)
 
 		self.showIntro()
+
 		WindowIntro.close()
 		interface.Loader.hide()
 
@@ -6611,72 +7305,113 @@ class WindowWizard(object):
 	@classmethod
 	def showIntro(self):
 		WindowWizard.Window = WindowWizardIntro
-		WindowWizardIntro.show(progress = 10, helper = True, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackNext = self.showLanguage)
+		WindowWizard.Window.show(progress = 10, helper = True, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackNext = self.showGeneralLanguage)
 		WindowWizardLanguage.close()
 
 	@classmethod
-	def showLanguage(self):
+	def showGeneralLanguage(self):
 		WindowWizard.Window = WindowWizardLanguage
-		WindowWizardLanguage.show(progress = 20, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showIntro, callbackNext = self.showMetaDetail)
+		WindowWizard.Window.show(progress = 15, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showIntro, callbackNext = self.showGeneralContent)
 		WindowWizardIntro.close()
+		WindowWizardContent.close()
+
+	@classmethod
+	def showGeneralContent(self):
+		WindowWizard.Window = WindowWizardContent
+		WindowWizard.Window.show(progress = 15, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showGeneralLanguage, callbackNext = self.showAccountInfo)
+		WindowWizardLanguage.close()
+		WindowWizardInfo.close()
+
+	@classmethod
+	def showExtensionInfo(self):
+		WindowWizard.Window = WindowWizardInfo
+		WindowWizard.Window.show(progress = 20, title = 33720, description = 34094, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showGeneralContent, callbackNext = self.showExtensionInstall)
+		WindowWizardContent.close()
+		WindowWizardExtension.close()
+
+	@classmethod
+	def showExtensionInstall(self):
+		WindowWizard.Window = WindowWizardExtension
+		WindowWizard.Window.show(progress = 20, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showExtensionInfo, callbackNext = self.showAccountInfo)
+		WindowWizardInfo.close()
+		WindowWizardAccount.close()
+
+	@classmethod
+	def showAccountInfo(self):
+		WindowWizard.Window = WindowWizardInfo
+		WindowWizard.Window.show(progress = 25, title = 32346, description = 34005, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showExtensionInstall, callbackNext = self.showAccountUtility)
+		WindowWizardExtension.close()
+		WindowWizardAccount.close()
+
+	@classmethod
+	def showAccountUtility(self):
+		WindowWizard.Window = WindowWizardAccount
+		WindowWizard.Window.show(progress = 30, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccountInfo, callbackNext = self.showAccountPremium)
+		WindowWizardInfo.close()
+		WindowWizardPremium.close()
+
+	@classmethod
+	def showAccountPremium(self):
+		WindowWizard.Window = WindowWizardPremium
+		WindowWizard.Window.show(progress = 35, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccountUtility, callbackNext = self.showMetaInfo)
+		WindowWizardAccount.close()
+		WindowWizardInfo.close()
+
+	@classmethod
+	def showMetaInfo(self):
+		WindowWizard.Window = WindowWizardInfo
+		WindowWizard.Window.show(progress = 40, title = 33015, description = 34006, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccountPremium, callbackNext = self.showMetaDetail)
+		WindowWizardPremium.close()
 		WindowMetaDetail.close()
-		tools.Disclaimer.agree()
 
 	@classmethod
 	def showMetaDetail(self):
 		WindowWizard.Window = WindowMetaDetail
-		WindowMetaDetail.show(progress = 30, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showLanguage, callbackNext = self.showMetaExternal)
-		WindowWizardLanguage.close()
+		WindowWizard.Window.show(progress = 45, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaInfo, callbackNext = self.showMetaExternal)
+		WindowWizardInfo.close()
 		WindowMetaExternal.close()
 
 	@classmethod
 	def showMetaExternal(self):
 		WindowWizard.Window = WindowMetaExternal
-		WindowMetaExternal.show(progress = 40, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaDetail, callbackNext = self.showAccount)
+		WindowWizard.Window.show(progress = 50, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaDetail, callbackNext = self.showMetaPreload)
 		WindowMetaDetail.close()
-		WindowWizardAccount.close()
+		WindowMetaPreload.close()
 
 	@classmethod
-	def showAccount(self):
-		WindowWizard.Window = WindowWizardAccount
-		WindowWizardAccount.show(progress = 50, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaExternal, callbackNext = self.showPremium)
+	def showMetaPreload(self):
+		WindowWizard.Window = WindowMetaPreload
+		WindowWizard.Window.show(progress = 60, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaExternal, callbackNext = self.showAttribution)
 		WindowMetaExternal.close()
-		WindowWizardPremium.close()
+		WindowAttribution.close()
 
 	@classmethod
-	def showPremium(self):
-		WindowWizard.Window = WindowWizardPremium
-		WindowWizardPremium.show(progress = 60, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAccount, callbackNext = self.showOptimization)
-		WindowWizardAccount.close()
+	def showAttribution(self):
+		WindowWizard.Window = WindowAttribution
+		WindowWizard.Window.show(progress = 75, stepper = True, navigationCancel = True, navigationBack = True, navigationNext = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showMetaPreload, callbackNext = self.showOptimization)
+		WindowMetaPreload.close()
 		WindowOptimization.close()
 
 	@classmethod
 	def showOptimization(self):
 		from lib.providers.core.manager import Manager
 		WindowWizard.Window = WindowOptimization
-		Manager.optimizeShow(stepper = True, category = False, navigationNext = {'label' : 33821, 'icon' : 'next'}, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showPremium, callbackNext = self.showAttribution)
-		WindowWizardPremium.close()
+		Manager.optimizeShow(stepper = True, category = False, navigationNext = {'label' : 33821, 'icon' : 'next'}, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAttribution, callbackNext = self.showDonation)
 		WindowAttribution.close()
-
-	@classmethod
-	def showAttribution(self):
-		WindowWizard.Window = WindowAttribution
-		WindowAttribution.show(progress = 80, stepper = True, navigationCancel = True, navigationBack = True, navigationNext = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showOptimization, callbackNext = self.showDonation)
-		WindowOptimization.close()
 		WindowDonation.close()
-		tools.Settings.set(WindowWizard.PropertyInitial, WindowWizard.StatusCompleted) # The remainder of the steps do not configure anything.
 
 	@classmethod
 	def showDonation(self):
 		WindowWizard.Window = WindowDonation
-		WindowDonation.show(progress = 90, stepper = True, navigationCancel = True, navigationBack = True, navigationNext = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showAttribution, callbackNext = self.showOutro)
-		WindowAttribution.close()
+		WindowWizard.Window.show(progress = 90, stepper = True, navigationCancel = True, navigationBack = True, navigationNext = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showOptimization, callbackNext = self.showOutro)
+		WindowOptimization.close()
 		WindowWizardOutro.close()
+		tools.Settings.set(WindowWizard.PropertyInitial, WindowWizard.StatusCompleted) # The remainder of the steps do not configure anything.
 
 	@classmethod
 	def showOutro(self):
 		WindowWizard.Window = WindowWizardOutro
-		WindowWizardOutro.show(progress = 100, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showDonation, callbackNext = self.showFinal)
+		WindowWizard.Window.show(progress = 100, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showDonation, callbackNext = self.showFinal)
 		WindowDonation.close()
 
 	@classmethod
@@ -6752,7 +7487,7 @@ class WindowOracle(object):
 		from lib.oracle import Oracle
 		oracle = Oracle.instance()
 
-		WindowOracle.ChoiceMedia = media if media else tools.Media.TypeMixed
+		WindowOracle.ChoiceMedia = media if media else tools.Media.Mixed
 
 		WindowOracle.Steps = {
 			'intro' : {
@@ -7125,12 +7860,11 @@ class WindowOracleResults(WindowStepScroll):
 		else:
 			navigationNext = {'label' : 35678, 'icon' : 'return'}
 			callbackNext = self.retry
-		return super(WindowOracleResults, self).show(navigationBack = {'label' : 35102, 'icon' : 'categories'}, callbackBack = self.options, navigationNext = navigationNext, callbackNext = callbackNext, **kwargs)
+		return super(WindowOracleResults, self).show(navigationBack = {'label' : 35102, 'icon' : 'niche'}, callbackBack = self.options, navigationNext = navigationNext, callbackNext = callbackNext, **kwargs)
 
 	def _addDetails(self):
 		try:
 			from lib.oracle import Oracle
-			from lib.modules.convert import ConverterDuration
 
 			conversation = WindowOracle.ChoiceConversation
 			service = Oracle.instance(conversation['chatbot']['service'])

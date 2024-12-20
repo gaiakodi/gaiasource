@@ -389,7 +389,7 @@ class ProviderExternal(ProviderBase):
 
 	@classmethod
 	def instanceDomain(self, link):
-		return Networker.linkDomain(link = link, subdomain = True, topdomain = True, ip = True).lstrip('www.')
+		return Tools.stringRemovePrefix(Networker.linkDomain(link = link, subdomain = True, topdomain = True, ip = True), 'www.')
 
 	@classmethod
 	def instanceInitialize(self, scraper, supportMovie, supportShow, id, name, version, rank, path = None, directory = None):
@@ -624,22 +624,22 @@ class ProviderExternalUnstructured(ProviderExternal):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		from lib.providers.core.manager import Manager
 		try:
 			url = None
 			instance = self.instanceObject()
 			if instance:
 				titles = Tools.copy(titles) # Make a copy, because the list is sometimes edited in the scraper.
-				if cacheLoad: url = Manager.linksRetrieve(provider = self, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, time = self.cacheTime())
+				if cacheLoad: url = Manager.linksRetrieve(provider = self, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, time = self.cacheTime())
 				if not url:
 					titleMain = titles['main']
 					titleLocal = titles['local'] if 'local' in titles else titleMain
 					titleEpisode = titles['episode'] if 'episode' in titles else titleMain
 					titleAliases = []
 					if 'alias' in titles:
-						for country, title in titles['alias'].items():
-							titleAliases.extend([{'country' : country, 'title' : t} for t in title])
+						for c, title in titles['alias'].items():
+							titleAliases.extend([{'country' : c, 'title' : t} for t in title])
 
 					date = None
 					if time: date = Time.format(timestamp = time, format = Time.FormatDate)
@@ -653,7 +653,7 @@ class ProviderExternalUnstructured(ProviderExternal):
 					functionMovie = Tools.hasFunction(instance, 'movie')
 
 					if functionShow or functionMovie:
-						if Media.typeTelevision(media):
+						if Media.isSerie(media):
 							if functionShow and functionEpisode:
 								url = instance.tvshow(idImdb, idTvdb, titleMain, titleLocal, titleAliases, str(year))
 								self.statisticsUpdateSearch(request = True)
@@ -668,12 +668,12 @@ class ProviderExternalUnstructured(ProviderExternal):
 										url = instance.movie(idImdb, titleMain, titleAliases, str(year))
 								self.statisticsUpdateSearch(request = True)
 					else: # New FenomScrapers pass the dictionary directly to sources().
-						if Media.typeTelevision(media):
+						if Media.isSerie(media):
 							url = {'imdb': idImdb, 'tvdb': idTvdb, 'tvshowtitle': titleMain, 'aliases': titleAliases, 'year': str(year), 'title': titleEpisode, 'premiered': date, 'season': str(numberSeason), 'episode': str(numberEpisode)}
 						else:
 							url = {'imdb': idImdb, 'title': titleMain, 'aliases': titleAliases, 'year': str(year)}
 
-					if cacheSave and url: Manager.linksInsert(data = url, provider = self, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+					if cacheSave and url: Manager.linksInsert(data = url, provider = self, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
 				if url:
 					count = len(Tools.getParameters(instance.sources))
@@ -806,7 +806,7 @@ class ProviderExternalStructured(ProviderExternal):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			from lib import debrid
 			debridHas = debrid.Debrid.enabled()
@@ -818,7 +818,7 @@ class ProviderExternalStructured(ProviderExternal):
 				try: year = years['common']
 				except: self.logError()
 
-				if Media.typeTelevision(media): items = scraper.scrape_episode(title = titleMain, year = year, show_year = year, season = numberSeason, episode = numberEpisode, imdb = idImdb, tvdb = idTvdb, debrid = debridHas)
+				if Media.isSerie(media): items = scraper.scrape_episode(title = titleMain, year = year, show_year = year, season = numberSeason, episode = numberEpisode, imdb = idImdb, tvdb = idTvdb, debrid = debridHas)
 				else: items = scraper.scrape_movie(title = titleMain, year = str(year), imdb = idImdb, debrid = debridHas)
 				self.statisticsUpdateSearch(request = True, page = True)
 

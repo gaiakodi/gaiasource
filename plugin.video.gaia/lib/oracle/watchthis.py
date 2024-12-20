@@ -41,9 +41,9 @@ class Watchthis(Oracle):
 	# However, this might raise suspicion with the site admin if suddenly other formatted queries comes into his OpenAI account.
 	# So stick with the queries used on the website.
 	QueryFixed				= {
-		Media.TypeMovie		: 'Give me a list of 5 movie recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other movie\'s that I might like. Please return this response as a numbered list with the movie\'s title, followed by a colon, and then a brief description of the movie. There should be a line of whitespace between each item in the list.',
-		Media.TypeShow		: 'Give me a list of 5 tv show recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other tv show\'s that I might like. Please return this response as a numbered list with the tv show\'s title, followed by a colon, and then a brief description of the tv show. There should be a line of whitespace between each item in the list.',
-		Media.TypeMixed		: 'Give me a list of 5 tv show or movie recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other tv show or movie\'s that I might like. Please return this response as a numbered list with the tv show or movie\'s title, followed by a colon, and then a brief description of the tv show or movie. There should be a line of whitespace between each item in the list.',
+		Media.Movie		: 'Give me a list of 5 movie recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other movie\'s that I might like. Please return this response as a numbered list with the movie\'s title, followed by a colon, and then a brief description of the movie. There should be a line of whitespace between each item in the list.',
+		Media.Show		: 'Give me a list of 5 tv show recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other tv show\'s that I might like. Please return this response as a numbered list with the tv show\'s title, followed by a colon, and then a brief description of the tv show. There should be a line of whitespace between each item in the list.',
+		Media.Mixed		: 'Give me a list of 5 tv show or movie recommendations that fit all of the following categories: . Make sure it fits the following description as well: %s. If you do not have 5 recommendations that fit these criteria perfectly, do your best to suggest other tv show or movie\'s that I might like. Please return this response as a numbered list with the tv show or movie\'s title, followed by a colon, and then a brief description of the tv show or movie. There should be a line of whitespace between each item in the list.',
 	}
 
 	##############################################################################
@@ -66,7 +66,7 @@ class Watchthis(Oracle):
 			linkApi			= 'https://watchthis.dev/api/getRecommendation',
 
 			querySupport	= {
-				Media.TypeMixed				: {
+				Media.Mixed					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -78,7 +78,7 @@ class Watchthis(Oracle):
 					Oracle.QueryJsonTitle	: False,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeMovie				: {
+				Media.Movie					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -89,7 +89,7 @@ class Watchthis(Oracle):
 					Oracle.QueryTextId		: False,
 					Oracle.QueryJsonTitle	: False,
 				},
-				Media.TypeSet				: {
+				Media.Set					: {
 					Oracle.ModePlain		: False,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -100,29 +100,7 @@ class Watchthis(Oracle):
 					Oracle.QueryTextId		: False,
 					Oracle.QueryJsonTitle	: False,
 				},
-				Media.TypeDocumentary		: {
-					Oracle.ModePlain		: 'documentary %s', # Add a "documentary" to focus the query.
-					Oracle.ModeList			: False,
-					Oracle.ModeSingle		: False,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: False,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-				},
-				Media.TypeShort				: {
-					Oracle.ModePlain		: 'short films %s',
-					Oracle.ModeList			: False,
-					Oracle.ModeSingle		: False,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: False,
-					Oracle.QueryTextTitle	: False,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-				},
-				Media.TypeShow				: {
+				Media.Show					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -199,7 +177,7 @@ class Watchthis(Oracle):
 			if history: id = history[-1]['id'] + (0 if refine else 1)
 			else: id = 1
 
-			query = Media.TypeShow if Media.typeTelevision(media) else Media.TypeMovie if Media.typeMovie(media) else Media.TypeMixed
+			query = Media.Show if Media.isSerie(media) else Media.Movie if Media.isFilm(media) else Media.Mixed
 			query = Watchthis.QueryFixed[query] % message
 
 			returned = self._request(data = {'searched' : query})

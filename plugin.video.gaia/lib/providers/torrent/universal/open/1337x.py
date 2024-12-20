@@ -23,7 +23,7 @@ from lib.modules.tools import Regex, Time
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://1337x.to', 'https://1337x.st', 'https://x1337x.ws', 'https://x1337x.eu', 'https://x1337x.se']
+	_Link					= ['https://1337x.to', 'https://1337x.so', 'https://1337x.st', 'https://x1337x.ws', 'https://x1337x.eu', 'https://x1337x.se']
 	_Mirror					= ['https://1337x.to/about', 'https://torrends.to/proxy/1337x']
 	_Unblock				= {ProviderHtml.UnblockFormat1 : '1337x', ProviderHtml.UnblockFormat2 : '1337x', ProviderHtml.UnblockFormat3 : '1337x2', ProviderHtml.UnblockFormat4 : '1337x'}
 	_Path					= 'sort-category-search/%s/%s/seeders/desc/%s/'

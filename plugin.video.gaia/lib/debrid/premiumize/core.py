@@ -172,7 +172,7 @@ class Core(base.Core):
 	def __init__(self):
 		base.Core.__init__(self, Core.Id, Core.Name, Core.LinkMain)
 
-		self.mAccount = Account()
+		self.mAccount = Account.instance()
 
 		self.mLinkBasic = None
 		self.mLinkFull = None
@@ -602,7 +602,7 @@ class Core(base.Core):
 				if token:
 					result = self._retrieve(category = Core.CategoryAccount, action = Core.ActionInfo, token = token)
 				elif cached:
-					result = cache.Cache.instance().cacheMini(self._retrieve, category = Core.CategoryAccount, action = Core.ActionInfo)
+					result = cache.Cache.instance().cacheQuick(self._retrieve, category = Core.CategoryAccount, action = Core.ActionInfo)
 					if 'status' in result and result['status'] == 401: result = None # Login failed. The user might have entered the incorrect details which are still stuck in the cache. Force a reload.
 				if result is None:
 					result = cache.Cache.instance().cacheClear(self._retrieve, category = Core.CategoryAccount, action = Core.ActionInfo)
@@ -992,7 +992,7 @@ class Core(base.Core):
 			data += source['data']
 			data += bytearray('\n--%s--\n' % boundry, 'utf8')
 
-			result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, folder = self.folderId(type = tools.Media.TypeMovie if season is None else tools.Media.TypeShow), data = data, headers = headers)
+			result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, folder = self.folderId(type = tools.Media.Movie if season is None else tools.Media.Show), data = data, headers = headers)
 
 			# Returns an API error if already on download list. However, the returned ID should be used.
 			try: return self._addLink(result = result, link = link, title = title, year = year, season = season, episode = episode, pack = pack, strict = strict)
@@ -1007,7 +1007,7 @@ class Core(base.Core):
 			try:
 				if not self.success() and 'content not in cache' in self.error(): cloud = True
 			except: pass
-		if cloud: result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, source = link, folder = self.folderId(type = tools.Media.TypeMovie if season is None else tools.Media.TypeShow))
+		if cloud: result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, source = link, folder = self.folderId(type = tools.Media.Movie if season is None else tools.Media.Show))
 		if self.success(): return self._addLink(result = result, link = link, title = title, year = year, season = season, episode = episode, pack = pack, strict = strict)
 		else: return self.addResult(error = self.errorType())
 
@@ -1018,7 +1018,7 @@ class Core(base.Core):
 			if cached and not cloud:
 				result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionDownload, source = link)
 				if self.success(): return self._addLink(result = result, link = link, title = title, year = year, season = season, episode = episode, pack = pack, strict = strict)
-			result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, source = link, folder = self.folderId(type = tools.Media.TypeMovie if season is None else tools.Media.TypeShow)) # Do not encode again, already done by _request().
+			result = self._retrieve(category = Core.CategoryTransfer, action = Core.ActionCreate, source = link, folder = self.folderId(type = tools.Media.Movie if season is None else tools.Media.Show)) # Do not encode again, already done by _request().
 			# Returns an API error if already on download list. However, the returned ID should be used.
 			try: return self._addLink(result = result, link = link, title = title, year = year, season = season, episode = episode, pack = pack, strict = strict)
 			except: return self.addResult(error = self.errorType())
@@ -1064,7 +1064,7 @@ class Core(base.Core):
 			if not data or not data['root']['id']: return False
 			if not data['root']['name'] == self.folderName(): return False
 			if tools.Settings.getBoolean('premium.premiumize.folder.separate'):
-				for type in [tools.Media.TypeMovie, tools.Media.TypeShow]:
+				for type in [tools.Media.Movie, tools.Media.Show]:
 					if not data[type]['id'] or data[type]['id'] == data['root']['id']: return False
 		return True
 
@@ -1075,11 +1075,11 @@ class Core(base.Core):
 					'id' : None,
 					'name' : self.folderName()
 				},
-				tools.Media.TypeMovie : {
+				tools.Media.Movie : {
 					'id' : None,
 					'name' : None
 				},
-				tools.Media.TypeShow : {
+				tools.Media.Show : {
 					'id' : None,
 					'name' : None
 				}
@@ -1103,27 +1103,27 @@ class Core(base.Core):
 
 				# Handle separate subfolders for different media.
 				if tools.Settings.getBoolean('premium.premiumize.folder.separate'):
-					data[tools.Media.TypeMovie]['name'] = interface.Translation.string(32001)
-					data[tools.Media.TypeShow]['name'] = interface.Translation.string(32002)
+					data[tools.Media.Movie]['name'] = interface.Translation.string(32001)
+					data[tools.Media.Show]['name'] = interface.Translation.string(32002)
 
 					# Check if the media subfolders exist.
 					result = self._retrieve(category = Core.CategoryFolder, action = Core.ActionList, id = data['root']['id'])
 					if result and 'content' in result:
-						for type in [tools.Media.TypeMovie, tools.Media.TypeShow]:
+						for type in [tools.Media.Movie, tools.Media.Show]:
 							for folder in result['content']:
 								if folder['name'] == data[type]['name']:
 									data[type]['id'] = folder['id']
 									break
 
 					# Create the media subfolders if it does not exist.
-					for type in [tools.Media.TypeMovie, tools.Media.TypeShow]:
+					for type in [tools.Media.Movie, tools.Media.Show]:
 						if not data[type]['id']:
 							result = self._retrieve(category = Core.CategoryFolder, action = Core.ActionCreate, name = data[type]['name'], parent = data['root']['id'])
 							if result and 'id' in result and result['id']: data[type]['id'] = result['id']
 							else: return False
 				else:
-					data[tools.Media.TypeMovie] = data['root']
-					data[tools.Media.TypeShow] = data['root']
+					data[tools.Media.Movie] = data['root']
+					data[tools.Media.Show] = data['root']
 
 			tools.Settings.setData('premium.premiumize.folder.data', data)
 		return True
@@ -1132,7 +1132,7 @@ class Core(base.Core):
 		type = None
 		data = tools.Settings.getData('premium.premiumize.folder.data')
 		if data:
-			for t in [tools.Media.TypeMovie, tools.Media.TypeShow]:
+			for t in [tools.Media.Movie, tools.Media.Show]:
 				if data[t]['id'] == parameters[Core.ParameterFolder]:
 					type = t
 					break
@@ -1688,8 +1688,8 @@ class Core(base.Core):
 				# First try the individual file names, and only if nothing was found, try with the full folder path and name.
 				# Otherwise this file will match for "The Terminator 1984":
 				#	The Terminator Collection (1984-2019) 2009.Terminator.Salvation.1920x800.BDRip.x264.DTS-HD.MA.mkv
-				index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues1, title = title, year = year, exclude = True, valid = validTitles)
-				if index is None: index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues2, title = title, year = year, exclude = True, valid = validTitles)
+				index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues1, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
+				if index is None: index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues2, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
 				if not index is None: largest = lookupFiles[index]
 				validTitles = [lookupFiles[i] for i in validTitles]
 
@@ -1717,6 +1717,8 @@ class Core(base.Core):
 								largest = item['file']
 								break
 
+			# For names that did not pass titleProhibited(), because eg the episode title contains forbidden keywords.
+			# Eg ("spoiler" is a prohibited keyword): The.Big.Bang.Theory.S06E15.The.Spoiler.Alert.Segmentation.1080p.AMZN.WEB-DL.DDP5.1.H265-SiGMA.mkv
 			if largest is None:
 				if len(validTitles) > 0: largest = validTitles[0]
 				elif len(validEpisodes) > 0: largest = validEpisodes[0]

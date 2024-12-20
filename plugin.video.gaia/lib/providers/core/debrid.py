@@ -217,7 +217,7 @@ class ProviderDebrid(ProviderPremium):
 					except: self.logError()
 
 				if separateSize: count = None
-				filePack = Stream.FilePackInternal if count and Media.typeTelevision(media) else None # So that OffCloud's show pack file sizes are estimated correctly.
+				filePack = Stream.FilePackInternal if count and Media.isSerie(media) else None # So that OffCloud's show pack file sizes are estimated correctly.
 
 				threads = []
 				lock = self.priorityStart(lock = lock)

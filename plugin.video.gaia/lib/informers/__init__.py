@@ -25,12 +25,12 @@ from lib.modules.window import Window
 
 class Informer(object):
 
-	TypeMovie		= Media.TypeMovie
-	TypeSet			= Media.TypeSet
-	TypeShow		= Media.TypeShow
-	TypeSeason		= Media.TypeSeason
-	TypeEpisode		= Media.TypeEpisode
-	TypePerson		= Media.TypePerson
+	TypeMovie		= Media.Movie
+	TypeSet			= Media.Set
+	TypeShow		= Media.Show
+	TypeSeason		= Media.Season
+	TypeEpisode		= Media.Episode
+	TypePerson		= Media.Person
 	TypeTrailer		= 'trailer' # Play the trailer.
 	TypeSelection	= 'selection' # Current selected item in the GUI.
 
@@ -171,22 +171,22 @@ class Informer(object):
 	# PARAMETERS
 	##############################################################################
 
-	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None):
+	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None):
 		return None
 
 	##############################################################################
 	# DIALOG
 	##############################################################################
 
-	def dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
+	def dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
 		if wait: Loader.show()
-		supported = self._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
+		supported = self._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
 		if not supported: Dialog.notification(title = self.name(), message = 35818, icon = Dialog.IconWarning)
 		if wait: Loader.hide()
 		return supported
 
-	def _dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
-		if type == Informer.TypeSelection or not(imdb or tmdb or tvdb or title):
+	def _dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
+		if type == Informer.TypeSelection or not(imdb or tmdb or tvdb or trakt or title):
 			if metadata:
 				try: type = metadata['mediatype']
 				except: type = None
@@ -209,6 +209,10 @@ class Informer(object):
 					tvdb = metadata['tvdb_id']
 					if tvdb == '': tvdb = None
 				except: tvdb = None
+				try:
+					tvdb = metadata['trakt_id']
+					if trakt == '': trakt = None
+				except: trakt = None
 
 				try:
 					title = metadata['tvshowtitle']
@@ -257,7 +261,7 @@ class Informer(object):
 				episode = System.infoLabel('ListItem.Episode')
 				if episode == '': episode = None
 
-		parameters = self.parameters(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode)
+		parameters = self.parameters(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode)
 		if parameters is None: return False
 
 		self.execute(parameters = parameters)
@@ -276,12 +280,25 @@ class Informer(object):
 	##############################################################################
 
 	@classmethod
-	def show(self, id = None, type = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
+	def show(self, id = None, type = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
 		if wait: Loader.show()
 
 		if not id: id = self.informer()
 		instance = None
 		supported = False
+
+		if not metadata:
+			from lib.meta.manager import MetaManager
+			metadata = MetaManager.instance().metadata(media = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, pack = False) # Do not retrieve the entire pack, which can take long for some shows.
+			if metadata:
+				if not imdb: imdb = metadata.get('imdb')
+				if not tmdb: tmdb = metadata.get('tmdb')
+				if not tvdb: tvdb = metadata.get('tvdb')
+				if not trakt: trakt = metadata.get('trakt')
+				if not title: title = metadata.get('tvshowtitle') or metadata.get('title')
+				if not year: year = metadata.get('year')
+				if season is None: season = metadata.get('season')
+				if episode is None: episode = metadata.get('episode')
 
 		if id:
 			try:
@@ -289,7 +306,7 @@ class Informer(object):
 				installed = instance.installed()
 			except: installed = False
 			if installed:
-				supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
+				supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
 				if not supported: Dialog.notification(title = instance.name(), message = 35818, icon = Dialog.IconWarning)
 			else:
 				if not supported: Dialog.notification(title = instance.name() if instance else 35817, message = 35821, icon = Dialog.IconError)
@@ -297,35 +314,12 @@ class Informer(object):
 			for module in self.instanceModules(kodi = False):
 				instance = self.instanceImport(module)
 				if instance.installed():
-					supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
-					if supported:
-						break
+					supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
+					if supported: break
 			if not supported:
 				instance = self.instanceImport(Informer.IdKodi)
-				supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
+				supported = instance._dialog(type = type, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, metadata = metadata, wait = wait)
 				if not supported: Dialog.notification(title = 35817, message = 35818, icon = Dialog.IconWarning)
 
 		if wait: Loader.hide()
 		return supported
-
-	##############################################################################
-	# NAVIGATOR
-	##############################################################################
-
-	@classmethod
-	def navigators(self, id = None):
-		directory = Directory()
-		for instance in self.instances(kodi = False):
-			id = instance.id()
-			directory.add(label = instance.name(), action = 'informerNavigator', parameters = {'id' : id}, folder = True, icon = id, iconDefault = 'DefaultAddonProgram.png')
-		directory.finish()
-
-	def navigator(self):
-		id = self.id()
-		directory = Directory()
-		if self.installed():
-			directory.add(label = 33256, action = 'informerLaunch', parameters = {'id' : id}, folder = False, icon = id + 'launch.png', iconDefault = 'DefaultAddonProgram.png')
-			directory.add(label = 33011, action = 'informerSettings', parameters = {'id' : id}, folder = False, icon = id + 'settings.png', iconDefault = 'DefaultAddonProgram.png')
-		else:
-			directory.add(label = 33474, action = 'informerInstall', parameters = {'id' : id, 'refresh' : True}, folder = False, icon = id + 'install.png', iconDefault = 'DefaultAddonProgram.png')
-		directory.finish()

@@ -22,7 +22,8 @@ from lib.providers.core.html import ProviderHtml, Html, HtmlLink, HtmlDiv, HtmlA
 
 class Provider(ProviderHtml):
 
-	_Link				= ['https://btmulu.com', 'https://btmulu9.club']
+	#_Link				= ['https://btmulu.com', 'https://btmulu9.club']
+	_Link				= ['https://btmulu.work', 'https://btmulu.live', 'https://btmulu.click', 'https://btmulu.com']
 	_Path				= 'search/%s/page-%s.html'
 
 	_AttributeList		= 'list-view'
@@ -44,7 +45,7 @@ class Provider(ProviderHtml):
 			description				= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has a lot of missing trivial metadata and contains a number of fake uploads. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank					= 2,
 			performance				= ProviderHtml.PerformanceMedium - ProviderHtml.PerformanceStep,
-			status					= ProviderHtml.StatusImpaired, # Cloudflare.
+			status					= ProviderHtml.StatusImpaired, # Cloudflare. Update (2024-12): Probably not using Cloudflare anymore. But leave this, since the results are not that good and domains change often.
 
 			link					= Provider._Link,
 

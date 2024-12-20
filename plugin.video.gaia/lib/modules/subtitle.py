@@ -19,32 +19,37 @@
 '''
 
 from lib.modules.tools import Tools, System, Time, Logger, Settings, Language, File, Converter
+from lib.modules.interface import Dialog, Format, Translation
+from lib.modules.network import Networker
+from lib.modules.cache import Cache
+from lib.modules.convert import ConverterTime, ConverterDuration
+from lib.modules.account import Opensubtitles as Account
 
 class Subtitle(object):
 
-	Link = 'http://api.opensubtitles.org/xml-rpc'
-	Connection = None
-	Token = None
-	Cache = {}
-	Retry = 3
+	Link			= 'https://api.opensubtitles.com'
+	Path			= 'api/v1'
 
-	##############################################################################
-	# RESET
-	##############################################################################
-
-	@classmethod
-	def reset(self, settings = True):
-		Subtitle.Connection = None
-		Subtitle.Token = None
-		Subtitle.Cache = {}
+	ActionLogin		= 'login'
+	ActionSearch	= 'subtitles'
+	ActionDownload	= 'download'
 
 	##############################################################################
 	# GENERAL
 	##############################################################################
 
 	@classmethod
-	def log(self, message):
+	def _log(self, message):
 		Logger.log('[OPENSUBTITLES] %s' % message)
+
+	@classmethod
+	def _agent(self):
+		version = '0.0.1' if System.developerVersion() else System.version()
+		return '%s v%s' % (System.name(), version)
+
+	@classmethod
+	def _key(self):
+		return Account.key()
 
 	##############################################################################
 	# ACCOUNT
@@ -52,58 +57,196 @@ class Subtitle(object):
 
 	@classmethod
 	def account(self):
-		from lib.modules.account import Opensubtitles
-		return Opensubtitles()
+		return Account()
 
 	@classmethod
 	def verify(self, username = None, password = None):
-		if self._connection(username = username, password = password, internal = True) and self._token(): return True
+		if self._login(username = username, password = password, refresh = True): return True
 		else: return False
 
 	##############################################################################
-	# PREPARE
+	# CONNECTION
 	##############################################################################
 
 	@classmethod
-	def prepare(self):
-		from xmlrpc.client import ServerProxy
+	def _request(self, method = None, action = None, data = None, internal = None, authorization = True):
+		link = Subtitle.Link
+		headers = {'Api-Key' : self._key()}
+
+		if authorization:
+			login = self._login()
+			if login:
+				value = login.get('token')
+				if value: headers['Authorization'] = 'Bearer ' + value
+				value = login.get('link')
+				if value: link = ('' if value.startswith('http') else 'https://') + value
+
+		link = Networker.linkJoin(link, Subtitle.Path, action)
+
+		# Do not use the Cloudflare bypasser.
+		# The login/subtitle endpoints work through Cloudflare, but for some reason the download endpoint does not.
+		# Probably because the user-agent has to be fixed, while the Cloudflare bypasser might change the user-agent on the go.
+		# Could also have been a temp issue. OpenSubtitles was down/slow while testing this. Maybe they changed something on the servers.
+		result = Networker().requestJson(link = link, method = method, type = type, data = data, agent = self._agent(), headers = headers, cloudflare = False)
+		error = self._response(data = result, notification = authorization)
+
+		# Token expires after 24 hours. Refresh it.
+		if authorization and result and not internal and error == 'token':
+			login = self._login(refresh = True)
+			if login: return self._request(method = method, action = action, data = data, internal = True)
+
+		return result
+
+	@classmethod
+	def _requestGet(self, action = None, data = None, authorization = True):
+		return self._request(method = Networker.MethodGet, action = action, data = data, authorization = authorization)
+
+	@classmethod
+	def _requestPost(self, action = None, data = None, authorization = True):
+		return self._request(method = Networker.MethodPost, action = action, data = data, authorization = authorization)
+
+	@classmethod
+	def _login(self, username = None, password = None, refresh = False):
+		if username is None and password is None:
+			account = self.account()
+			if username is None: username = account.dataUsername()
+			if password is None: password = account.dataPassword()
+
+		if username and password:
+			from lib.modules.vpn import Vpn
+			if Vpn.killRequest():
+
+				def _login(username, password):
+					self._log('Refreshing Token')
+					data = self._requestPost(action = Subtitle.ActionLogin, data = {'username' : username, 'password' : password}, authorization = False)
+					if data and data.get('token'):
+						self._log('Token Refresh Success')
+						return {
+							'token' : data.get('token'),
+							'link' : data.get('base_url'),
+						}
+					self._log('Token Refresh Failure')
+					return False
+
+				# Tokens are valid for 24 hours.
+				return Cache.instance().cacheSeconds(timeout = Cache.TimeoutClear if refresh else Cache.TimeoutDay1, function = _login, username = username, password = password)
+
+		return None
+
+	@classmethod
+	def _response(self, data, notification = True):
+		try:
+			if not data:
+				self._log('Unknown Server Error')
+				self._notification(message = 35862, error = True, notification = notification)
+				return False
+
+			result = None
+			error = None
+			status = int(data.get('status') or 0)
+			message = (data.get('message') or '').lower()
+			errors = data.get('errors') # Form search(). Eg: {"errors":["Not enough parameters"],"status":400}
+			if errors:
+				errors = ' - '.join(errors)
+				if message: message += ' - '
+				message += errors
+
+			# Do not show notification is token is being refreshed.
+			# A success message can be returned as well from download().
+			#	"message":"Your quota will be renewed in 12 hours and 04 minutes (2024-12-10 23:59:59 UTC) ts=1733831755 "
+			if 'token' in message: result = 'token'
+			elif message and (status >= 300 or not 'remaining' in data): error = message
+
+			if status or error: self._log('Error %s - %s' % (str(status), message))
+
+			if error:
+				self._notification(message = error, error = True, notification = notification)
+				return result if result else False
+			else:
+				if 'remaining' in data:
+					message = []
+
+					requests = data.get('requests')
+					remaining = data.get('remaining')
+					total = requests + remaining
+					if remaining < 0: remaining = 0
+
+					# Only show if few are left.
+					if (remaining / float(total)) < 0.5:
+						 # If limit is used up, returns -1 remaining, and requests is one higher. Eg: {"requests": 21, "remaining": -1}
+						message.append('%s: %d %s %d' % (Translation.string(33367), remaining, Translation.string(33073), total))
+
+						time = data.get('reset_time_utc')
+						if time:
+							time = ConverterTime(time, format = ConverterTime.FormatDateTimeJson).timestamp()
+							time = ConverterDuration(max(0, time - Time.timestamp()), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordMinimal)
+							if time: message.append('%s: %s' % (Translation.string(35479), time.title()))
+
+						self._notification(message = Format.iconJoin(message), error = remaining <= 0, notification = notification)
+
+				return result if result else True
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def _notification(self, message, error = False, notification = True):
+		if notification and Settings.getInteger('playback.subtitle.notifications') > 0:
+			Dialog.notification(title = 35145 if error else 35393, message = message, duplicates = True, icon = Dialog.IconError if error else Dialog.IconInformation)
 
 	##############################################################################
 	# SEARCH
 	##############################################################################
 
 	@classmethod
-	def search(self, language, imdb, title = None, season = None, episode = None, retry = Retry):
+	def search(self, imdb = None, tmdb = None, title = None, year = None, season = None, episode = None, language = None, page = None, refresh = False):
 		try:
-			if Tools.isArray(language):
-				if Tools.isDictionary(language[0]): language = [i[Language.Code][Language.CodeStream] for i in language]
-				language = ','.join(language)
+			serie = not season is None
+			data = {}
 
-			cacheId = self._cacheId(language, imdb, season, episode)
-			cacheData = self._cache(id = cacheId)
-			if cacheData: return cacheData
+			data['type'] = 'episode' if serie else 'movie'
 
-			connection = self._connection()
-			token = self._token()
-			if connection and token:
-				parameters = {'sublanguageid': language}
-				if imdb: parameters['imdbid'] = imdb.replace('tt', '')
-				elif title: parameters['query'] = title
-				if season: parameters['season'] = season
-				if episode: parameters['episode'] = episode
+			if imdb:
+				imdb = int(str(imdb).replace('tt', ''))
+				if serie: data['parent_imdb_id'] = imdb
+				else: data['imdb_id'] = imdb
+			if tmdb:
+				tmdb = int(tmdb)
+				if serie: data['parent_tmdb_id'] = tmdb
+				else: data['tmdb_id'] = tmdb
 
-				for i in range(retry): # Sometimes the connection fails with a HTTP 503 error. Retry a few times.
-					try:
-						data = connection.SearchSubtitles(token, [parameters])
-						break
-					except:
-						self.log('Search failure. Retrying request.')
-						Time.sleep(2)
+			if not imdb and not tmdb:
+				data['query'] = title
+				if year: data['year'] = year
 
-				if not self._error(data = data):
-					data = self.process(data = data['data'])
-					self._cacheSet(id = cacheId, data = data)
-					return data
+			if not season is None: data['season_number'] = season
+			if not episode is None: data['episode_number'] = episode
+
+			# 3-letter code passed in from player.py.
+			if language:
+				if not Tools.isArray(language): language = [language]
+				language = [Language.code(language = i, code = Language.CodePrimary) for i in language]
+			else:
+				language = Language.settingsCode()
+			if language:
+				language = [i for i in language if i]
+				language = Tools.listUnique(language)
+				language = Tools.listSort(language)
+				data['languages'] = ','.join(language)
+
+			data['ai_translated'] = 'include'
+			data['foreign_parts_only'] = 'include'
+			data['hearing_impaired'] = 'include'
+			data['machine_translated'] = 'include'
+			data['trusted_sources'] = 'include'
+
+			data['order_by'] = 'new_download_count'
+			data['order_direction'] = 'desc'
+			if page: data['page'] = page
+
+			result = Cache.instance().cacheSeconds(timeout = Cache.TimeoutClear if refresh else Cache.TimeoutDay1, function = self._requestGet, action = Subtitle.ActionSearch, data = data)
+			if result:
+				result = result.get('data')
+				if result: return self.process(data = result)
 		except: Logger.error()
 		return None
 
@@ -112,46 +255,23 @@ class Subtitle(object):
 	##############################################################################
 
 	@classmethod
-	def download(self, subtitle, retry = Retry):
+	def download(self, subtitle, refresh = False):
 		try:
-			id = subtitle['id']
-			cacheId = self._cacheId(id)
-			cacheData = self._cache(id = cacheId)
-			if cacheData: return cacheData
+			if not subtitle: return None
+			id = subtitle.get('id')
+			if not id: return None
 
-			connection = self._connection()
-			token = self._token()
-			if connection and token:
-				parameters = [id,]
-				data = None
-				for i in range(retry): # Sometimes the connection fails with a HTTP 503 error. Retry a few times.
-					try:
-						data = connection.DownloadSubtitles(token, parameters)
-						break
-					except:
-						self.log('Download failure. Retrying request.')
-						Time.sleep(2)
+			data = {
+				'file_id'		: id,
+				'sub_format'	: 'srt',
+			}
 
-				if not self._error(data = data):
-					data = data['data'][0]['data']
-					data = Converter.base64From(data)
+			# Download links are valid for 3 hours.
+			result = Cache.instance().cacheSeconds(timeout = Cache.TimeoutClear if refresh else (Cache.TimeoutHour3 - 180), function = self._requestPost, action = Subtitle.ActionDownload, data = data)
 
-					import zlib
-					data = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(data)
-
-					# Certain languages (eg: Chinese, Hebrew, etc) have to be decoded so that they can be correctly encoded with UTF-8.
-					# The encoding is not known, and the data returned by OpenSubtitles does not seem to indicate the encoding.
-					# Detect the encoding automatically (best guess).
-					encoding = Converter.encodingDetect(data)
-					subtitle['decoded'] = None
-					if encoding:
-						try:
-							data = data.decode(encoding)
-							subtitle['decoded'] = True
-						except:
-							Logger.error()
-							subtitle['decoded'] = False
-
+			if result:
+				link = result.get('link')
+				if link:
 					# Add the language code to the filename (with a dot), because Kodi uses this format to detect the language from SRT files.
 					# Kodi will remove the code and symbols before displaying it in the Kodi player interface.
 					# NB: Do not append the language to the end (eg: filename.eng.srt).
@@ -165,73 +285,29 @@ class Subtitle(object):
 					path = '%s.%s.srt' % (language.upper(), subtitle['name'])
 
 					path = System.temporary(directory = 'subtitles', file = path)
-					File.writeNow(path, Converter.unicode(data))
-					subtitle['path'] = path
+					if not File.exists(path): Networker().request(link = link, path = path, cloudflare = False)
+					if File.exists(path):
+						subtitle['path'] = path
 
-					self._cacheSet(id = cacheId, data = subtitle)
+						# Decoding should not be neccessary anymore in the new OpenSubtitles, according to their docs:
+						#	Subtitle file in temporary URL will be always in UTF-8 encoding.
+						subtitle['decoded'] = None
+						# Certain languages (eg: Chinese, Hebrew, etc) have to be decoded so that they can be correctly encoded with UTF-8.
+						# The encoding is not known, and the data returned by OpenSubtitles does not seem to indicate the encoding.
+						# Detect the encoding automatically (best guess).
+						'''encoding = Converter.encodingDetect(<file data>)
+						subtitle['decoded'] = None
+						if encoding:
+							try:
+								data = data.decode(encoding)
+								subtitle['decoded'] = True
+							except:
+								Logger.error()
+								subtitle['decoded'] = False'''
 
-			return subtitle
+						return subtitle
 		except: Logger.error()
 		return None
-
-	##############################################################################
-	# CONNECTION
-	##############################################################################
-
-	@classmethod
-	def _connection(self, username = None, password = None, internal = False, retry = Retry):
-		if Subtitle.Connection is None:
-			data = None
-
-			account = self.account()
-			if username is None: username = account.dataUsername()
-			if password is None: password = account.dataPassword()
-
-			if not internal or (username and password): # If not internal (aka verify), try without credentials, maybe it works like in the past.
-				from lib.modules.vpn import Vpn
-				if Vpn.killRequest():
-					from xmlrpc.client import ServerProxy
-					Subtitle.Connection = ServerProxy(Subtitle.Link, verbose = 0)
-					for i in range(retry): # Sometimes the connection fails with a HTTP 503 error. Retry a few times.
-						# Anonymous login not working anymore.
-						#token = Subtitle.Connection.LogIn('', '', 'en', 'XBMC_Subtitles_v1')
-						try:
-							data = Subtitle.Connection.LogIn(username if username else '', password if password else '', 'en', 'XBMC_Subtitles_v1')
-							break
-						except:
-							self.log('Login failure. Retrying request.')
-							Time.sleep(2)
-
-			if self._error(data = data, token = True, notifications = not internal): Subtitle.Connection = False
-			elif data and 'token' in data: self._tokenSet(data['token'])
-
-		return Subtitle.Connection
-
-	@classmethod
-	def _error(self, data, token = False, notifications = True):
-		if not data:
-			self._notification(error = 35862, notifications = notifications)
-			return False
-
-		error = None
-		status = data['status'].lower() if 'status' in data else None
-
-		# If invalid credentials are provided, a token is returned which is not usable. Always check the status.
-		# Always try to login first, even without an account. In case anonymous logins are enabled again.
-		if (token and not 'token' in data) or (status and 'unauthorized' in status):
-			error = 35685 if self.account().authenticated() else 35684
-
-		if error:
-			self._notification(error = error, notifications = notifications)
-			return True
-		else:
-			return False
-
-	@classmethod
-	def _notification(self, error, notifications = True):
-		if notifications and Settings.getInteger('playback.subtitle.notifications') > 0:
-			from lib.modules.interface import Dialog
-			Dialog.notification(title = 35145, message = error, icon = Dialog.IconError)
 
 	##############################################################################
 	# PROCESS
@@ -239,136 +315,62 @@ class Subtitle(object):
 
 	@classmethod
 	def process(self, data, integrated = False, universal = True):
-		if Tools.isArray(data): return [self.process(data = i, integrated = integrated, universal = universal) for i in data]
+		if Tools.isArray(data):
+			if not data: return []
+			result = [self.process(data = i, integrated = integrated, universal = universal) for i in data]
+			return [i for i in result if i]
+
+		if not data: return None
+		if not integrated:
+			data = data.get('attributes')
+			if not data: return None
 
 		result = {}
 
-		try:
-			result['id'] = data['id'] if integrated else data['IDSubtitleFile']
-		except:
-			Logger.error()
-			result['id'] = None
+		file = data.get('files')
+		file = file[0] if file else {}
+		if not integrated and not file: return None
 
-		try:
-			result['name'] = data['name'] if integrated else data['MovieReleaseName']
-		except:
-			Logger.error()
-			result['name'] = None
+		result['id'] = data.get('id') if integrated else file.get('file_id') # Use the "file_id" for downloads.
+		result['name'] = data.get('name' if integrated else 'release')
 
-		try:
-			result['language'] = data['language'] if integrated else data['SubLanguageID']
-			if not Tools.isDictionary(result['language']): result['language'] = Language.language(result['language'], variation = True)
-		except:
-			Logger.error()
-			result['language'] = None
+		result['language'] = data.get('language' if integrated else 'language')
+		if not Tools.isDictionary(result['language']): result['language'] = Language.language(result['language'], variation = True)
 		if universal and not result['language']: result['language'] = Language.universal()
+		result['language'] = {k : v for k, v in Tools.copy(result['language']).items() if k in [Language.Code, Language.Name, Language.Country]}
 
-		try:
-			result['disc'] = int(data['SubSumCD'])
-		except:
-			if not integrated: Logger.error()
-			result['disc'] = None
+		result['rating'] = 1.0 if integrated else (float(data.get('ratings') or 0.0) / 10.0)
+		result['votes'] = None if integrated else (data.get('votes') or 0)
 
-		try:
-			result['format'] = data['SubFormat'].upper()
-		except:
-			if not integrated: Logger.error()
-			result['format'] = None
+		result['download'] = None if integrated else ((data.get('download_count') or 0) + (data.get('new_download_count') or 0))
+		result['comment'] = None if integrated else (data.get('comments') or None)
 
-		try:
-			result['rating'] = 1.0 if integrated else (float(data['SubRating']) / 10.0)
-		except:
-			Logger.error()
-			result['rating'] = None
+		result['time'] = None if integrated else data.get('upload_date')
+		if result['time']: result['time'] = ConverterTime(result['time'], format = ConverterTime.FormatDateTimeJsonBasic).timestamp()
 
-		try:
-			result['votes'] = int(data['SubSumVotes'])
-		except:
-			if not integrated: Logger.error()
-			result['votes'] = None
+		result['link'] = None if integrated else data.get('url')
 
-		try:
-			result['downloads'] = int(data['SubDownloadsCnt'])
-		except:
-			if not integrated: Logger.error()
-			result['downloads'] = None
+		result['type'] = {
+			'integrated'	: integrated,
+			'default'		: data.get('default' if integrated else False) or False,
+			'impaired'		: data.get('impaired' if integrated else 'hearing_impaired') or False,
+			'trusted'		: True if integrated else data.get('from_trusted') or False,
+			'foreign'		: data.get('forced' if integrated else 'foreign_parts_only') or False,
+			'ai'			: data.get('ai' if integrated else 'ai_translated') or False,
+			'machine'		: data.get('machine' if integrated else 'machine_translated' or False),
+		}
 
-		try:
-			result['defective'] = bool(int(data['SubBad']))
-		except:
-			if not integrated: Logger.error()
-			result['defective'] = None
+		result['file'] = {
+			'hd'	: data.get('hd'),
+			'fps'	: data.get('fps'),
+			'disc'	: data.get('disc' if integrated else 'nb_cd'),
+			'name'	: file.get('file_name'),
+		}
 
-		try:
-			result['automatic'] = bool(int(data['SubAutoTranslation']))
-		except:
-			if not integrated: Logger.error()
-			result['automatic'] = None
-
-		try:
-			result['impaired'] = data['impaired'] if integrated else bool(int(data['SubHearingImpaired']))
-		except:
-			Logger.error()
-			result['impaired'] = None
-
-		try:
-			result['foreign'] = data['forced'] if integrated else bool(int(data['SubForeignPartsOnly']))
-		except:
-			Logger.error()
-			result['foreign'] = None
-
-		try:
-			result['trusted'] = bool(int(data['SubFromTrusted']))
-		except:
-			if not integrated: Logger.error()
-			result['trusted'] = None
-
-		try:
-			result['featured'] = bool(int(data['SubFeatured']))
-		except:
-			if not integrated: Logger.error()
-			result['featured'] = None
-
-		try:
-			result['default'] = data['default'] if integrated else False
-		except:
-			Logger.error()
-			result['default'] = None
-
-		result['integrated'] = integrated
+		uploader = data.get('uploader') or {}
+		result['uploader'] = {
+			'name'	: uploader.get('name'),
+			'rank'	: uploader.get('rank'),
+		}
 
 		return result
-
-	##############################################################################
-	# TOKEN
-	##############################################################################
-
-	@classmethod
-	def _token(self):
-		return Subtitle.Token
-
-	@classmethod
-	def _tokenSet(self, token):
-		Subtitle.Token = token
-
-	##############################################################################
-	# CACHE
-	##############################################################################
-
-	@classmethod
-	def _cache(self, id):
-		if id:
-			try: return Subtitle.Cache[id]
-			except: pass
-		return None
-
-	@classmethod
-	def _cacheSet(self, id, data):
-		if id:
-			Subtitle.Cache[id] = Tools.copy(data)
-			return True
-		return False
-
-	@classmethod
-	def _cacheId(self, *args):
-		return '_'.join([str(i) for i in args])

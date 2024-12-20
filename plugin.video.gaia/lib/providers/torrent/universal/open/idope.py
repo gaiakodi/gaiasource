@@ -24,7 +24,7 @@ from lib.modules.tools import Regex
 class Provider(ProviderHtml):
 
 	_Link					= {
-								ProviderHtml.Version1 : ['https://idope.se', 'https://idope.cc'],
+								ProviderHtml.Version1 : ['https://idope.se'], # Down: https://idope.cc
 								ProviderHtml.Version2 : ['https://idope.pw', 'https://idope.xyz'],
 							}
 	_Details				= {

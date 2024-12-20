@@ -19,11 +19,11 @@
 '''
 
 from lib.providers.core.html import ProviderHtml, Html, HtmlResults, HtmlResult, HtmlLink, HtmlListUnordered, HtmlListItem, HtmlDiv, HtmlImage
-from lib.modules.tools import Regex, Language
+from lib.modules.tools import Media, Regex, Language
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://nyaa.si', 'https://nyaa.iss.one']
+	_Link					= ['https://nyaa.si', 'https://nyaa.iss.one', 'https://nyaa.land', 'https://nyaa.digital', 'https://nyaa.iss.ink', 'https://nyaa.ink', 'https://ny.iss.one']
 	_Mirror					= ['https://nyaatorrents.info']
 	_Unblock				= {ProviderHtml.UnblockFormat1 : 'nyaa', ProviderHtml.UnblockFormat2 : 'nyaa', ProviderHtml.UnblockFormat3 : 'nyaa', ProviderHtml.UnblockFormat4 : 'nyaa'}
 
@@ -72,6 +72,7 @@ class Provider(ProviderHtml):
 
 			customVerified					= True,
 
+			supportNiche					= [Media.Anime, Media.Donghua],
 			supportMovie					= True,
 			supportShow						= True,
 			supportPack						= True,

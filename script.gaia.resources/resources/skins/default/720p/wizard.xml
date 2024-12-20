@@ -11,6 +11,8 @@
 
 		<!-- MAIN -->
 		<control type="group">
+			<visible>String.IsEmpty(Window.Property(GaiaHidden)) | Integer.IsEqual(Window.Property(GaiaHidden), 0)</visible>
+
 			<!-- [GAIATYPEQR/] -->
 			<top>20</top>
 			<!-- [/GAIATYPEQR/] -->
@@ -23,20 +25,26 @@
 
 			<control type="image">
 				<visible>Integer.IsGreater(Container(52000).NumItems, 0)</visible> <!-- Slightly reduce the time when items are added and various things, like the splotlight, flicker while being initialized from Python. -->
+				<!-- [GAIATYPEQR/] -->
+				<top>240</top>
+				<height>280</height>
+				<!-- [/GAIATYPEQR/] -->
 
 				<!-- [GAIATYPELARGE/] -->
-				<height>275</height>
+				<height>250</height>
 				<!-- [/GAIATYPELARGE/] -->
 
 				<!-- [GAIATYPESTATIC/] -->
-				<height>260</height>
+				<height>230</height>
 				<!-- [/GAIATYPESTATIC/] -->
-				<height>300</height>
+				<height>270</height>
 				<!-- [/GAIATYPESTATIC] -->
 
 				<!-- [/GAIATYPELARGE] -->
 
-				<top>220</top>
+				<top>225</top>
+				<!-- [/GAIATYPEQR] -->
+
 				<left>490</left>
 				<width>300</width>
 				<aspectratio>keep</aspectratio>
@@ -83,7 +91,7 @@
 			</control>
 			<control type="label">
 				<!-- [GAIATYPEQR/] -->
-				<top>190</top>
+				<top>200</top>
 				<!-- [/GAIATYPEQR/] -->
 
 				<!-- [GAIATYPESTATIC/] -->
@@ -103,6 +111,20 @@
 				<label>$INFO[Window.Property(GaiaDescription2)]</label>
 			</control>
 
+			<!-- TIP -->
+
+			<control type="label">
+				<top>570</top>
+				<left>10%</left>
+				<width>80%</width>
+				<height>30</height>
+				<font>[GAIAFONTSMALL]</font>
+				<aligny>center</aligny>
+				<align>center</align>
+				<wrapmultiline>true</wrapmultiline>
+				<label>$INFO[Window.Property(GaiaTip)]</label>
+			</control>
+
 			<!-- LIST -->
 
 			<control type="group">
@@ -111,11 +133,23 @@
 				<!-- [GAIATYPESTATIC/] -->
 				<control type="fixedlist" id="52000">
 				<!-- [/GAIATYPESTATIC/] -->
+
+				<!-- [GAIATYPEFIXED/] -->
+				<control type="fixedlist" id="52000">
+				<!-- [/GAIATYPEFIXED/] -->
 				<control type="wraplist" id="52000">
+				<!-- [/GAIATYPEFIXED] -->
+
 				<!-- [/GAIATYPESTATIC] -->
 
 					<!-- [GAIATYPELARGE/] -->
+
+					<!-- [GAIATYPEQR/] -->
 					<top>280</top>
+					<!-- [/GAIATYPEQR/] -->
+					<top>260</top>
+					<!-- [/GAIATYPEQR] -->
+
 					<left>140</left>
 					<width>999</width>
 					<focusposition>2</focusposition>
@@ -125,9 +159,9 @@
 					<focusposition>1</focusposition>
 
 					<!-- [GAIATYPESTATIC/] -->
-					<top>270</top>
+					<top>250</top>
 					<!-- [/GAIATYPESTATIC/] -->
-					<top>300</top>
+					<top>280</top>
 					<!-- [/GAIATYPESTATIC] -->
 
 					<!-- [/GAIATYPELARGE] -->
@@ -223,6 +257,70 @@
 
 						<control type="image">
 							<!-- [GAIATYPELARGE/] -->
+							<width>100</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>133</width>
+							<!-- [/GAIATYPELARGE] -->
+
+							<left>38</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
+
+							<!-- [GAIATYPEQR/] -->
+							<!-- [/GAIATYPEQR/] -->
+							<colordiffuse>FF333333</colordiffuse>
+							<!-- [/GAIATYPEQR] -->
+
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>100</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>133</width>
+							<!-- [/GAIATYPELARGE] -->
+
+							<left>50</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
+
+							<!-- [GAIATYPEQR/] -->
+							<!-- [/GAIATYPEQR/] -->
+							<colordiffuse>FF333333</colordiffuse>
+							<!-- [/GAIATYPEQR] -->
+
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>100</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>133</width>
+							<!-- [/GAIATYPELARGE] -->
+
+							<left>62</left>
+							<top>50</top>
+							<height>100</height>
+							<aspectratio>keep</aspectratio>
+
+							<!-- [GAIATYPEQR/] -->
+							<!-- [/GAIATYPEQR/] -->
+							<colordiffuse>FF333333</colordiffuse>
+							<!-- [/GAIATYPEQR] -->
+
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
+						</control>
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
 							<left>86</left>
 							<!-- [/GAIATYPELARGE/] -->
 							<left>115</left>
@@ -250,6 +348,67 @@
 							<colordiffuse>FF333333</colordiffuse>
 							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
 							<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
+						</control>
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level0.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),0)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level1.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),1)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level2.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),2)</visible>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>86</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>115</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>123</top>
+							<width>28</width>
+							<height>28</height>
+							<aspectratio>keep</aspectratio>
+							<colordiffuse>FF333333</colordiffuse>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level3.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),3)</visible>
 						</control>
 
 						<control type="label">
@@ -342,6 +501,74 @@
 								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
 							</animation>
 						</control>
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<left>-5</left>
+							<top>15</top>
+							<height>170</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),-1)</visible>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<left>15</left>
+							<top>15</top>
+							<height>170</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),0)</visible>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<width>170</width>
+							<!-- [/GAIATYPELARGE/] -->
+							<width>226</width>
+							<!-- [/GAIATYPELARGE] -->
+							<height>170</height>
+							<left>35</left>
+							<top>15</top>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/frame.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaOffset),1)</visible>
+							<visible>ListItem.Property(GaiaFrame)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,185" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+
 						<control type="image">
 							<width>170</width>
 							<height>170</height>
@@ -429,6 +656,95 @@
 							<aspectratio>keep</aspectratio>
 							<texture>special://home/addons/script.gaia.resources/resources/media/interface/button/select/selected.png</texture>
 							<visible>String.IsEqual(ListItem.Property(GaiaSelected),1)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>68</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>100</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>140</top>
+							<width>64</width>
+							<height>64</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level0.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),0)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>68</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>100</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>140</top>
+							<width>64</width>
+							<height>64</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level1.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),1)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>68</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>100</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>140</top>
+							<width>64</width>
+							<height>64</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level2.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),2)</visible>
+							<animation type="Focus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="20" end="100" time="500" />
+							</animation>
+							<animation type="Unfocus" condition="Control.HasFocus(52000)">
+								<effect type="zoom" tween="cubic" start="100" end="59" center="100,100" time="500" />
+								<effect type="fade" tween="cubic" start="100" end="20" time="500" />
+							</animation>
+						</control>
+						<control type="image">
+							<!-- [GAIATYPELARGE/] -->
+							<left>68</left>
+							<!-- [/GAIATYPELARGE/] -->
+							<left>100</left>
+							<!-- [/GAIATYPELARGE] -->
+
+							<top>140</top>
+							<width>64</width>
+							<height>64</height>
+							<aspectratio>keep</aspectratio>
+							<texture>special://home/addons/script.gaia.resources/resources/media/interface/level/level3.png</texture>
+							<visible>String.IsEqual(ListItem.Property(GaiaLevel),3)</visible>
 							<animation type="Focus" condition="Control.HasFocus(52000)">
 								<effect type="zoom" tween="cubic" start="59" end="100" center="100,100" time="500" />
 								<effect type="fade" tween="cubic" start="20" end="100" time="500" />

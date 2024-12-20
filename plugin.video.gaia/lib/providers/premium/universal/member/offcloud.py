@@ -34,16 +34,16 @@ class Provider(ProviderDebrid):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			threads = [
-				self.thread(self.searchRetrieve, self.core().CategoryCloud, media, titles, years, numberSeason, numberEpisode, language),
-				self.thread(self.searchRetrieve, self.core().CategoryInstant, media, titles, years, numberSeason, numberEpisode, language)
+				self.thread(self.searchRetrieve, self.core().CategoryCloud, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio),
+				self.thread(self.searchRetrieve, self.core().CategoryInstant, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio)
 			]
 			self.threadExecute(threads, limit = self.concurrencyTasks(level = 1))
 		except: self.logError()
 
-	def searchRetrieve(self, category, media, titles, years, numberSeason, numberEpisode, language):
+	def searchRetrieve(self, category, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio):
 		try:
 			finished = self.core().StatusFinished
 			instant = category == self.core().CategoryInstant
@@ -58,14 +58,14 @@ class Provider(ProviderDebrid):
 						if not id in ids: # The same torrent/NZB can be added multiple times to the downloader.
 							if self.searchValidName(name = item['name']):
 								ids.append(id)
-								if instant: self.searchDetails(category, item, media, titles, years, numberSeason, numberEpisode, language)
-								else: threads.append(self.thread(self.searchDetails, category, item, media, titles, years, numberSeason, numberEpisode, language))
+								if instant: self.searchDetails(category, item, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio)
+								else: threads.append(self.thread(self.searchDetails, category, item, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio))
 
 				if self.verifyBusy(): self.verifyCore()
 				else: self.threadExecute(threads, limit = self.concurrencyTasks(level = 3))
 		except: self.logError()
 
-	def searchDetails(self, category, item, media, titles, years, numberSeason, numberEpisode, language):
+	def searchDetails(self, category, item, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio):
 		try:
 			try: size = item['size']['bytes']
 			except: size = None

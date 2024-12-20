@@ -85,7 +85,7 @@ class Youchat(Oracle):
 			# When requesting JSON, the chatbot basically gives JS code and explains how to generate the JSON yourself.
 			# Generally when requesting very specific data (like IDs), the chatbot just tells you to go onto IMDb/TMDb website and find the stuff yourself.
 			querySupport	= {
-				Media.TypeMixed				: {
+				Media.Mixed					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -97,7 +97,7 @@ class Youchat(Oracle):
 					Oracle.QueryJsonTitle	: False,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeMovie				: {
+				Media.Movie					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -109,7 +109,7 @@ class Youchat(Oracle):
 					Oracle.QueryJsonTitle	: False,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeSet				: {
+				Media.Set					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -121,31 +121,7 @@ class Youchat(Oracle):
 					Oracle.QueryJsonTitle	: False,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeDocumentary		: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShort				: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShow				: {
+				Media.Show					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -208,7 +184,7 @@ class Youchat(Oracle):
 	##############################################################################
 
 	def account(self):
-		return Account()
+		return Account.instance()
 
 	def accountKey(self):
 		return self.account().dataKey()

@@ -10,7 +10,6 @@ from collections import OrderedDict
 # ------------------------------------------------------------------------------- #
 
 # Gaia
-#import xbmcgui
 GaiaCloudscraperAgents = None
 
 class User_Agent():

@@ -23,7 +23,6 @@ import xbmcvfs
 
 from lib import debrid
 from lib.modules import trakt
-from lib.modules.clean import Title
 from lib.modules import tools
 from lib.modules import interface
 from lib.modules import window
@@ -87,6 +86,7 @@ class Player(xbmc.Player):
 			# This causes a sporadic bug (maybe 10-20% of the time) during binge watching.
 			# After the rating/continue dialog, the playback of the next episode starts.
 			# Less than a second into it, the playback is canceled and the playback window closed, by this statement.
+			# Check keepPlaybackAlive() for more details.
 			#self.core.progressPlaybackClose(background = False, loader = False)
 		except: tools.Logger.error()
 		try: xbmc.Player.__del__(self)
@@ -101,7 +101,7 @@ class Player(xbmc.Player):
 	def reset(self, settings = True):
 		Player.Instance = None
 
-	def run(self, media, title, year, season, episode, imdb, tmdb, tvdb, metadata, kids = None, downloadType = None, downloadId = None, source = None, binge = None, resume = None, autoplay = None, reload = None, handle = None, service = None):
+	def run(self, media, title, year, season, episode, imdb, tmdb, tvdb, trakt, metadata, downloadType = None, downloadId = None, source = None, binge = None, resume = None, autoplay = None, reload = None, handle = None, service = None):
 		try:
 			if interface.Player.canceled(): return False
 
@@ -114,12 +114,11 @@ class Player(xbmc.Player):
 			self.navigationStreamsSpecial = tools.Settings.getInteger('interface.stream.interface') == 0
 
 			from lib.modules import core
-			self.core = core.Core(media = media, kids = kids)
+			self.core = core.Core(media = media)
 
 			self.media = media
-			self.kids = kids
-			self.mediaMovie = tools.Media.typeMovie(self.media)
-			self.mediaTelevision = tools.Media.typeTelevision(self.media)
+			self.mediaFilm = tools.Media.isFilm(self.media)
+			self.mediaSerie = tools.Media.isSerie(self.media)
 
 			self.timeTotal = 0
 			self.timeCurrent = 0
@@ -127,8 +126,18 @@ class Player(xbmc.Player):
 			self.idImdb = imdb
 			self.idTmdb = tmdb
 			self.idTvdb = tvdb
-			try: self.idTrakt = metadata['trakt']
-			except: self.idTrakt = None
+			self.idTrakt = trakt
+			self.title = title
+			self.year = int(year) if year else year
+
+			if metadata:
+				if not self.idImdb: self.idImdb = metadata.get('imdb')
+				if not self.idTmdb: self.idTmdb = metadata.get('tmdb')
+				if not self.idTvdb: self.idTvdb = metadata.get('tvdb')
+				if not self.idTrakt: self.idTrakt = metadata.get('trakt')
+				if not self.title: self.title = metadata.get('title')
+				if not self.year: self.year = metadata.get('year')
+
 			try: self.idSet = metadata['collection']['id']
 			except: self.idSet = None
 
@@ -137,20 +146,18 @@ class Player(xbmc.Player):
 			self.handle = handle
 			self.service = service
 			self.kodi = None
-			self.title = title
-			self.year = int(year) if year else year
-			try: self.name = tools.Media.titleUniversal(metadata = metadata)
+			try: self.name = tools.Title.titleUniversal(metadata = metadata)
 			except: self.name = self.title
 
 			try:
-				self.season = int(season) if self.mediaTelevision else None
-				self.seasonString = '%01d' % self.season if self.mediaTelevision else None
+				self.season = int(season) if self.mediaSerie else None
+				self.seasonString = '%01d' % self.season if self.mediaSerie else None
 			except:
 				self.season = None
 				self.seasonString = None
 			try:
-				self.episode = int(episode) if self.mediaTelevision else None
-				self.episodeString = '%01d' % self.episode if self.mediaTelevision else None
+				self.episode = int(episode) if self.mediaSerie else None
+				self.episodeString = '%01d' % self.episode if self.mediaSerie else None
 			except:
 				self.episode = None
 				self.episodeString = None
@@ -177,7 +184,7 @@ class Player(xbmc.Player):
 
 			# Make sure the latests Trakt status is pulled in, so that the item can be correctly marked as watched if the user changes the playcount on Trakt's website just beforehand.
 			self.playback = Playback.instance()
-			self.playback.refresh(media = self.media, wait = False)
+			self.playback.refresh(media = self.media, history = True, progress = True, rating = False, reload = False, wait = False) # NB: Do not reload with this call. Otherwise there are too many requests while playback starts, slowing down things.
 			self.playbackWatched = False
 			self.playbackLock = Lock()
 
@@ -207,7 +214,7 @@ class Player(xbmc.Player):
 			if not self.url: self.url = self.source['stream'].linkResolved()
 
 			self.autopack = None
-			if self.mediaTelevision and self.source['stream'].filePack():
+			if self.mediaSerie and self.source['stream'].filePack():
 				self.autopack = self.source['stream'].hash()
 				if not self.autopack: self.autopack = self.source['stream'].linkPrimary()
 
@@ -264,11 +271,12 @@ class Player(xbmc.Player):
 			# The Trakt addon seems to be able to find episodes without these IDs.
 			# However, for movies these IDs are required, otherwise the addon only detects the year from the self.item set to the player, but not IDs or the title.
 			# Update: Not used anymore, since ratings are now done locally.
-			tools.System.windowPropertySet('script.trakt.ids', tools.Converter.jsonTo({'imdb' : '0', 'tmdb' : '0', 'tvdb' : '0'})) # Add these to prevent Trakt from showing its own rating dialog.
+			tools.System.windowPropertySet('script.trakt.ids', tools.Converter.jsonTo({'imdb' : '0', 'tmdb' : '0', 'tvdb' : '0', 'trakt' : '0'})) # Add these to prevent Trakt from showing its own rating dialog.
 			'''ids = {}
 			if imdb: ids['imdb'] = imdb
 			if tmdb: ids['tmdb'] = tmdb
 			if tvdb: ids['tvdb'] = tvdb
+			if trakt: ids['trakt'] = trakt
 			tools.System.windowPropertySet('script.trakt.ids', tools.Converter.jsonTo(ids))'''
 
 			self.downloadCheck = False
@@ -329,7 +337,8 @@ class Player(xbmc.Player):
 
 				# When retrying, Kodi player might still try to play from the previous time (eg: stuck at connection timeout).
 				# Manually stop to ensure everything is cleared.
-				# NB: Only do this on retying connection. Otherwise this might (maybe) cause the problem with "Retrying Stream Connection", because of internal threads that might only fire after self.play() is called below.
+				# NB: Only do this on retrying connection. Otherwise this might (maybe) cause the problem with "Retrying Stream Connection", because of internal threads that might only fire after self.play() is called below.
+				# Update: The retrying connection still happens, but at least the reconnection seem to work now. Before 95% of reconnections failed.
 				if self.retryBusy:
 					self.stop()
 					for i in range(30): # Wait for self.stop() to finish.
@@ -357,12 +366,16 @@ class Player(xbmc.Player):
 						if self.retryRemaining == 1: self.retryMessage = interface.Translation.string(35294)
 						elif self.retryRemaining > 1: self.retryMessage = interface.Translation.string(35293) % (self.retryRemaining + 1)
 
+					self.detailsPrevious = None # Make sure the metadata is set in the Kore app if the connection fails and we reconnect.
+
 			self._errorLog(finish = True)
 
-			if not success and self.retryRemaining == 0:
-				self.retryBusy = False
-				self._closeFailure()
-				interface.Dialog.notification(title = 33448, message = 33450, icon = interface.Dialog.IconError)
+			if not success:
+				self.core.progressPlaybackClose()
+				if self.retryRemaining == 0:
+					self.retryBusy = False
+					self._closeFailure()
+					interface.Dialog.notification(title = 33448, message = 33450, icon = interface.Dialog.IconError)
 
 			# This should solve the issue of Gaia videos being played twice when launched from OpenMeta or widgets when using the directory structure.
 			# Setting it to True will cause the video to play again after finishing playback, when launched from the local library.
@@ -627,15 +640,15 @@ class Player(xbmc.Player):
 							self.bingeTimeout = True
 
 					observation = self._interactObserverEvaluate()
-					binge = self.binge and (self.bingeContinue or (self.interactContinue and not stopped)) # Always allow if the continue dialog is enabled.
+					binge = self.binge and self.bingeMetadata and (self.bingeContinue or (self.interactContinue and not stopped)) # Always allow if the continue dialog is enabled. Check self.bingeMetadata, in case of last episode.
 					if not self.binge and observation: binge = True # For movies with an observer.
 
-					result = self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, binge = binge, automatic = bool(self.autoplay or self.autopack))
+					result = self.playback.dialogAutorate(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, binge = binge, automatic = bool(self.autoplay or self.autopack))
+					if result is False: self.bingeContinue = False # Otherwise binging continues if the power button was used in the dialog.
 
 					if result and binge and self.interactContinue and self.bingeMetadata:
 						default = None
 						fixed = False
-
 						if not self.bingeTimeout:
 							if self.interactPropagate > 0:
 								action = window.WindowContinue.ActionContinue if self.bingeContinue else window.WindowContinue.ActionStop
@@ -681,7 +694,7 @@ class Player(xbmc.Player):
 
 	def _interactObserverEvaluate(self):
 		self._interactObserverStop()
-		return tools.Observer.evaluate(binge = bool(self.bingeMetadata) if self.mediaTelevision else None, notify = False) # Notify AFTER the rating dialog.
+		return tools.Observer.evaluate(binge = bool(self.bingeMetadata) if self.mediaSerie else None, notify = False) # Notify AFTER the rating dialog.
 
 	def _interactObserverNotify(self, observation):
 		tools.Observer.notify(observation = observation)
@@ -694,7 +707,7 @@ class Player(xbmc.Player):
 				if not self.retryBusy:
 					# Only show the streams window when launched from Gaia.
 					# Do not reload if this is launched from eg the local library.
-					if tools.System.originGaia():
+					if tools.System.originGaia(quick = False):
 						reload = False
 						setting = tools.Settings.getInteger('interface.stream.interface.reload')
 						if setting == 1:
@@ -927,19 +940,19 @@ class Player(xbmc.Player):
 
 	def _bingeScrape(self):
 		try:
-			from lib.indexers.episodes import Episodes
-			self.bingeMetadata = Episodes().metadataNext(title = self.metadata['tvshowtitle'], year = self.metadata['year'], idImdb = self.metadata['imdb'], idTvdb = self.metadata['tvdb'], season = self.metadata['season'], episode = self.metadata['episode'])
+			from lib.meta.manager import MetaManager
+			self.bingeMetadata = MetaManager.instance().metadataEpisodeNext(title = self.metadata['tvshowtitle'], year = self.metadata['year'], imdb = self.metadata['imdb'], tmdb = self.metadata['tmdb'], tvdb = self.metadata['tvdb'], trakt = self.metadata['trakt'], season = self.metadata['season'], episode = self.metadata['episode'])
 			if self.bingeMetadata:
 				tools.System.executePlugin(action = 'scrape', parameters = {
 					'silent' : True,
 					'media' : self.media,
-					'kids' : self.kids,
 					'binge' : tools.Binge.ModeBackground,
 					'title' : self.bingeMetadata['title'],
 					'tvshowtitle' : self.bingeMetadata['tvshowtitle'],
 					'year' : self.bingeMetadata['year'],
 					'imdb' : self.bingeMetadata['imdb'],
 					'tvdb' : self.bingeMetadata['tvdb'],
+					'trakt' : self.bingeMetadata['trakt'],
 					'season' : self.bingeMetadata['season'],
 					'episode' : self.bingeMetadata['episode'],
 					'premiered' : self.bingeMetadata['premiered'],
@@ -954,7 +967,7 @@ class Player(xbmc.Player):
 
 	def _bingeUpNext(self):
 		episodeCurrent = {
-			'episodeid' : tools.Media.titleUniversal(metadata = self.metadata),
+			'episodeid' : tools.Title.titleUniversal(metadata = self.metadata),
 			'tvshowid' : self.metadata['imdb'] if 'imdb' in self.metadata else '',
 			'title' : self.metadata['title'] if 'title' in self.metadata else '',
 			'showtitle' : self.metadata['tvshowtitle'] if 'tvshowtitle' in self.metadata else '',
@@ -968,7 +981,7 @@ class Player(xbmc.Player):
 		}
 
 		episodeNext = {
-			'episodeid' : tools.Media.titleUniversal(metadata = self.bingeMetadata),
+			'episodeid' : tools.Title.titleUniversal(metadata = self.bingeMetadata),
 			'tvshowid' : self.bingeMetadata['imdb'] if 'imdb' in self.bingeMetadata else '',
 			'title' : self.bingeMetadata['title'] if 'title' in self.bingeMetadata else '',
 			'showtitle' : self.bingeMetadata['tvshowtitle'] if 'tvshowtitle' in self.bingeMetadata else '',
@@ -1087,6 +1100,7 @@ class Player(xbmc.Player):
 
 				self.interact() # Rate here, since the call from onPlayBackStopped() only fires after the executePlugin() below is executed.
 				if not self.interactBackground and self.bingeContinue: interface.Loader.show()
+				elif not self.bingeContinue: return self.core.propertySilentSet(self.core.SilentCancel) # Eg: Power button was clicked in the rating dialog.
 
 				# If the background scraping has not finished yet, show the scraping dialog of the current scrape process.
 				# This should not happen often, but can happen if the device is really slow, not able to finish the scrape in 10 minutes, or if the user skips to the end of the video (eg: 10 seconds before the end of the video).
@@ -1097,13 +1111,13 @@ class Player(xbmc.Player):
 					self.core.propertySilentSet(self.core.SilentCancel)
 					tools.System.executePlugin(action = 'scrape', parameters = {
 						'media' : self.media,
-						'kids' : self.kids,
 						'binge' : tools.Binge.ModeContinue,
 						'title' : self.bingeMetadata['title'],
 						'tvshowtitle' : self.bingeMetadata['tvshowtitle'],
 						'year' : self.bingeMetadata['year'],
 						'imdb' : self.bingeMetadata['imdb'],
 						'tvdb' : self.bingeMetadata['tvdb'],
+						'trakt' : self.bingeMetadata['trakt'],
 						'season' : self.bingeMetadata['season'],
 						'episode' : self.bingeMetadata['episode'],
 						'premiered' : self.bingeMetadata['premiered'],
@@ -1146,11 +1160,12 @@ class Player(xbmc.Player):
 
 		window.Window.close(id = window.Window.IdWindowOk)
 
-	def _errorId(self, imdb = None, tmdb = None, tvdb = None, season = None, episode = None, time = False):
+	def _errorId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, time = False):
 		id = []
 		if not imdb is None and not imdb == '' and not imdb == '0': id.append(imdb)
 		elif not tmdb is None and not tmdb == '' and not tmdb == '0': id.append(tmdb)
 		elif not tvdb is None and not tvdb == '' and not tvdb == '0': id.append(tvdb)
+		elif not trakt is None and not trakt == '' and not trakt == '0': id.append(trakt)
 		if season: id.append(season)
 		if episode: id.append(episode)
 		if time: id.append(tools.Time.timestamp())
@@ -1162,7 +1177,7 @@ class Player(xbmc.Player):
 			if finish: return
 		except: pass
 
-		id = self._errorId(imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, time = True) # Add time to always make unique.
+		id = self._errorId(imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, time = True) # Add time to always make unique.
 		start = '[PLAYBACK %s /]' % id
 		end = '[/ PLAYBACK %s]' % id
 
@@ -1326,7 +1341,16 @@ class Player(xbmc.Player):
 			if self.resumeTime: self.resume(self.resumeTime, offset = True)
 
 			self.core.progressPlaybackUpdate(progress = 100, title = title, message = message, status = status, substatus1 = substatus1, substatus2 = substatus2)
-			#self.core.progressPlaybackClose()
+
+			# Important to close here, otherwise the playback window stays open (although invisible), causing a dangling Python process.
+			# We previously closed it in the Player destructor, but that interfered with the binge process, often canceling the next episode's playback.
+			# Check the destructor for more details.
+			# NB: Do not close immediately, otherwise if we resume playback, the WindowStreams shows briefly before the Kodi player window shows.
+			# If Kodi playback starts, it will in any case show on top of the window, so there is no urgency in closing it.
+			def _close():
+				tools.Time.sleep(3)
+				if self.isBusy(): self.core.progressPlaybackClose()
+			Pool.thread(target = _close, start = True)
 
 			addLibrary = tools.Settings.getBoolean('library.general.watched')
 
@@ -1348,10 +1372,10 @@ class Player(xbmc.Player):
 				if self.timeTotal and self.timeTotal > 30:
 					try:
 						if self.timeProgress >= self.playbackEnd and not self.playbackWatched:
-							try: orionoid.Orionoid().streamVote(idItem = self.source['stream'].idOrionItem(), idStream = self.source['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteUp)
+							try: orionoid.Orionoid().streamVote(idItem = self.source['stream'].idOrionItem(), idStream = self.source['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteUp, automatic = True)
 							except: pass
 							self.playbackWatched = True
-							if addLibrary: library.Library(media = self.media).add(title = self.title, year = self.year, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, metadata = self.metadata)
+							if addLibrary: library.Library(media = self.media).add(title = self.title, year = self.year, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, metadata = self.metadata)
 							self._updateLibrary()
 					except: tools.Logger.error()
 					self.progressUpdate()
@@ -1394,7 +1418,7 @@ class Player(xbmc.Player):
 
 	def _progressRetrieve(self):
 		# Use Playback.AdjustSettings. Check playback.py -> progress() for more info.
-		self.progress = self.playback.progress(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode, adjust = self.playback.AdjustInternal)
+		self.progress = self.playback.progress(media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, adjust = self.playback.AdjustInternal)
 
 	def progressUpdate(self, action = None):
 		if self.metadata: # Do not do for exact searches.
@@ -1420,7 +1444,7 @@ class Player(xbmc.Player):
 				#	3. If playback fails or the users stops playback BEFORE Kodi could fully resume, scrobbeling would have reset to 0% before being able to update it to the actual resume progress.
 				# Hence, the progress will be lost in such a case. Instead wait for the playback to resume before updating the scrobbeling progress.
 				if action and (not self.progress or self.progress < 0.5 or self.timeProgress > self.progress or self.timeCurrent > 5):
-					self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, season = self.season, episode = self.episode)
+					self.playback.update(action = action, current = self.timeCurrent, duration = self.timeTotal, media = self.media, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, metadata = self.metadata)
 
 	def progressInitialize(self):
 		locked = False
@@ -1680,8 +1704,8 @@ class Player(xbmc.Player):
 				try: playcount = self.kodi['playcount'] + 1
 				except: playcount = 1
 
-				if self.mediaMovie: tools.System.executeJson(method = 'VideoLibrary.SetMovieDetails', parameters = {'movieid' : str(self.kodi['movieid']), 'playcount' : playcount})
-				elif self.mediaTelevision: tools.System.executeJson(method = 'VideoLibrary.SetEpisodeDetails', parameters = {'episodeid' : str(self.kodi['episodeid']), 'playcount' : playcount})
+				if self.mediaFilm: tools.System.executeJson(method = 'VideoLibrary.SetMovieDetails', parameters = {'movieid' : str(self.kodi['movieid']), 'playcount' : playcount})
+				elif self.mediaSerie: tools.System.executeJson(method = 'VideoLibrary.SetEpisodeDetails', parameters = {'episodeid' : str(self.kodi['episodeid']), 'playcount' : playcount})
 
 				interface.Directory.refresh()
 			except:
@@ -1697,7 +1721,7 @@ class Player(xbmc.Player):
 				Streamer.playerPause()
 
 			Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
-			thread = Subtitle.select(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
+			thread = Subtitle.select(name = self.name, imdb = self.idImdb, tmdb = self.idTmdb, title = self.title, year = self.year, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
 
 			if enabled:
 				if thread: thread.join()
@@ -1708,7 +1732,7 @@ class Player(xbmc.Player):
 			except: pass
 
 	def streamSubtitle(self):
-		Subtitle.internal(name = self.name, imdb = self.idImdb, title = self.title, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
+		Subtitle.internal(name = self.name, imdb = self.idImdb, tmdb = self.idTmdb, title = self.title, year = self.year, season = self.seasonString, episode = self.episodeString, source = self.source['stream'])
 
 	def streamStop(self):
 		Subtitle.stop()
@@ -1743,7 +1767,7 @@ class Player(xbmc.Player):
 
 			# Only do this after the streamSelect() and progressInitialize().
 			# Otherwise the Skip button might show over the resume/subtitle dialogs making them unclickable until the Skip button ius canceled.
-			if self.mediaTelevision: Chapter.select(resume = self.resumedTime)
+			if self.mediaSerie: Chapter.select(resume = self.resumedTime)
 
 			# Only start this AFTER the resume feature and subtitle dialogs, since they pause playback which is incorrectly detected as buffering.
 			self.bufferMonitor()
@@ -1942,7 +1966,7 @@ class Streamer(object):
 		#if not player.status() == interface.Player.StatusPaused: player.pause()
 
 		player = Player.instance()
-		if Streamer.Status is None: Streamer.Status = player.status
+		Streamer.Status = player.status
 
 		#if not player.status == Player.StatusPaused:
 		if not Streamer.Status == Player.StatusPaused:
@@ -1958,7 +1982,7 @@ class Streamer(object):
 		#if player.status() == interface.Player.StatusPaused: player.pause()
 
 		player = Player.instance()
-		if Streamer.Status is None: Streamer.Status = player.status
+		Streamer.Status = player.status
 
 		#if player.status == Player.StatusPaused:
 		if Streamer.Status == Player.StatusPaused:
@@ -2040,7 +2064,9 @@ class Streamer(object):
 
 	@classmethod
 	def languageSet(self, language):
-		Streamer.Language = tools.Language.language(language)
+		if language:
+			if tools.Tools.isArray(language): language = language[0]
+			Streamer.Language = tools.Language.language(language)
 
 	@classmethod
 	def settingsLanguage(self, code = tools.Language.CodeStream, log = False):
@@ -2276,29 +2302,31 @@ class Subtitle(Streamer):
 	def _load(self, subtitle):
 		success = False
 
-		if subtitle['integrated']:
-			self.player().subtitleSelect(id = subtitle['id'])
-			success = True
-			self.log('Integrated subtitles loaded: ' + subtitle['name'])
-		else:
-			# Issues with decoding the subtitles.
-			# This means that the subtitles will not show at all, or show, but with a weird/incorrect encoding.
-			decoded = 'decoded' in subtitle and subtitle['decoded'] is False
-
-			if not 'path' in subtitle:
-				from lib.modules.subtitle import Subtitle as Subtitler
-				self.log('Downloading external subtitles.')
-				subtitle = Subtitler.download(subtitle = subtitle)
-
-			# Do not load if there were decoding problems.
-			# Only do this the first time. If the user selects the subtitles a second time, just display them as is.
-			if not decoded and 'decoded' in subtitle and subtitle['decoded'] is False:
-				success = False
-				self.log('Subtitles decoding failed.')
-			elif 'path' in subtitle:
-				self.player().subtitleSelect(path = subtitle['path'])
+		if subtitle:
+			if (subtitle.get('type') or {}).get('integrated'):
+				self.player().subtitleSelect(id = subtitle.get('id'))
 				success = True
-				self.log('External subtitles loaded: ' + subtitle['name'])
+				self.log('Integrated subtitles loaded: ' + subtitle.get('name'))
+			else:
+				# Issues with decoding the subtitles.
+				# This means that the subtitles will not show at all, or show, but with a weird/incorrect encoding.
+				decoded = 'decoded' in subtitle and subtitle['decoded'] is False
+
+				if not 'path' in subtitle:
+					from lib.modules.subtitle import Subtitle as Subtitler
+					self.log('Downloading external subtitles.')
+					subtitle = Subtitler.download(subtitle = subtitle)
+
+				if subtitle:
+					# Do not load if there were decoding problems.
+					# Only do this the first time. If the user selects the subtitles a second time, just display them as is.
+					if not decoded and 'decoded' in subtitle and subtitle['decoded'] is False:
+						success = False
+						self.log('Subtitles decoding failed.')
+					elif 'path' in subtitle:
+						self.player().subtitleSelect(path = subtitle['path'])
+						success = True
+						self.log('External subtitles loaded: ' + subtitle['name'])
 
 		return success, subtitle
 
@@ -2307,7 +2335,7 @@ class Subtitle(Streamer):
 		Subtitle.InternalStop = True
 
 	@classmethod
-	def internal(self, name, imdb, title, season, episode, source):
+	def internal(self, name, imdb, tmdb, title, year, season, episode, source):
 		# The process of detecting, downloading, and selecting subtitles can take some time.
 		# This can cause this function to be executed again before the previous execution is done, since it is called in a loop.
 		# Only allow a single execution of the select function() at any give time.
@@ -2321,18 +2349,18 @@ class Subtitle(Streamer):
 		if current and not Subtitle.InternalPrevious == current:
 			Subtitle.InternalPrevious = current
 			if current['name'].startswith(Subtitle.InternalSelect): # Note that Kodi formats the filename of the subtitles, removes language codes, symbols, etc.
-				self.select(name = name, imdb = imdb, title = title, season = season, episode = episode, source = source, internal = True)
+				self.select(name = name, imdb = imdb, tmdb = tmdb, title = title, year = year, season = season, episode = episode, source = source, internal = True)
 			else:
 				Subtitle.InternalValid = current # Last valid subtitles that are not InternalSelect.
 
 	@classmethod
-	def select(self, name, imdb, title, season, episode, source, wait = False, internal = False, lock = None):
-		thread = Pool.thread(target = self._select, kwargs = {'name' : name, 'imdb' : imdb, 'title' : title, 'season' : season, 'episode' : episode, 'source' : source, 'internal' : internal, 'lock' : lock}, start = True)
+	def select(self, name, imdb, tmdb, title, year, season, episode, source, wait = False, internal = False, lock = None):
+		thread = Pool.thread(target = self._select, kwargs = {'name' : name, 'imdb' : imdb, 'tmdb' : tmdb, 'title' : title, 'year' : year, 'season' : season, 'episode' : episode, 'source' : source, 'internal' : internal, 'lock' : lock}, start = True)
 		if wait: Player.join(thread)
 		return thread
 
 	@classmethod
-	def _select(self, name, imdb, title, season, episode, source, internal = False, lock = None):
+	def _select(self, name, imdb, tmdb, title, year, season, episode, source, internal = False, lock = None):
 		unpause = False
 		try:
 			if Subtitle.Lock.locked(): return None
@@ -2377,7 +2405,7 @@ class Subtitle(Streamer):
 			else:
 				# Use the cached integrated subtitles, otherwise newley downloaded subtitles will be listed as "integrated" in the dialog if opened again.
 				if Subtitle.InternalIntegrated is None:
-					if streams: Subtitle.InternalIntegrated = [Subtitler.process(data = i, integrated = True) for i in streams if i]
+					if streams: Subtitle.InternalIntegrated = Subtitler.process(data = [i for i in streams if i], integrated = True)
 					else: Subtitle.InternalIntegrated = False
 
 				player.subtitleSelect(path = pathDisable, enable = False)
@@ -2427,11 +2455,12 @@ class Subtitle(Streamer):
 
 					if Audio.streamKnown(primary = primary, secondary = secondary, tertiary = tertiary):
 						if current and current['forced']:
-							try: code = current['language'][tools.Language.Code][tools.Language.CodeDefault]
+							try: code = current['language'][tools.Language.Code][tools.Language.CodeStream]
 							except: code = None
 
 							# If the forced subtitles are in a language the user does not know and the audio stream is known, disable the subtitles.
 							# If the language of the forced subtitles is unknown, leave them on.
+							# Eg: Constellation (2024) series: The audio is 99% English, but there are occasional Swedish/Russian conversations. Leave the forced English subtitles on for that 1%.
 							if code and not code == tools.Language.UniversalCode and settingsLanguage and not code in settingsLanguage:
 								self.log('Audio stream known. Disabling forced subtitles.')
 								player.subtitleDisable()
@@ -2455,17 +2484,18 @@ class Subtitle(Streamer):
 						integrated = []
 						for stream in Subtitle.InternalIntegrated:
 							try:
+								type = stream.get('type') or {}
 								try: sort = 10 - settingsLanguage.index(stream['language'][tools.Language.Code][tools.Language.CodeStream])
 								except: sort = None
 								if not sort is None:
-									if stream['integrated']: sort += 0.001
+									if type.get('integrated'): sort += 0.001
 									else: sort -= 0.001
 
-									if stream['impaired']: sort -= 0.01
+									if stream.get('impaired'): sort -= 0.01
 									else: sort += 0.01
 
 									if known:
-										if stream['default']: sort += 0.1
+										if stream.get('default'): sort += 0.1
 										else: sort -= 0.1
 									else:
 										if stream['name']:
@@ -2497,7 +2527,7 @@ class Subtitle(Streamer):
 				Subtitle.InternalExternal = True
 
 				self.log('Searching external subtitles.')
-				subsubtitles = Subtitler.search(language = settingsLanguage, imdb = imdb, title = title, season = season, episode = episode)
+				subsubtitles = Subtitler.search(language = settingsLanguage, imdb = imdb, tmdb = tmdb, title = title, year = year, season = season, episode = episode)
 				if subsubtitles: subtitles.extend(subsubtitles)
 				elif subsubtitles is None: failure = True
 			if len(subtitles) == 0: return self._finish(status = Subtitle.StatusUnavailable, notification = not failure, unpause = unpause) # OpenSubntitles error already showing if there were server issues.
@@ -2508,11 +2538,12 @@ class Subtitle(Streamer):
 			extensions = tools.Video.extensions(list = True, dot = True)
 			for i in range(len(subtitles)):
 				subtitle = subtitles[i]
-				name = subtitle['name']
+				type = subtitle.get('type') or {}
+				name = subtitle.get('name')
 				nameLower = name.lower()
 
 				# Match ratio.
-				if subtitle['integrated']: match = 1.0
+				if type.get('integrated'): match = 1.0
 				elif filename and name:
 					match = tools.Matcher.levenshtein(filename, name, ignoreCase = True, ignoreSpace = True, ignoreNumeric = False, ignoreSymbol = True)
 
@@ -2524,8 +2555,8 @@ class Subtitle(Streamer):
 
 						for extension in extensions:
 							if filenameNew.endswith(extension):
-								filenameNew = filenameNew.rstrip(extension)
-								nameNew = nameNew.rstrip(extension)
+								filenameNew = tools.Tools.stringRemoveSuffix(filenameNew, extension)
+								nameNew = tools.Tools.stringRemoveSuffix(nameNew, extension)
 								matchNew = tools.Matcher.levenshtein(filenameNew, nameNew, ignoreCase = True, ignoreSpace = True, ignoreNumeric = False, ignoreSymbol = True)
 								if matchNew >= 1: match = matchNew
 								break
@@ -2558,18 +2589,20 @@ class Subtitle(Streamer):
 					index = settingsLanguage.index(subtitle['language'][tools.Language.Code][tools.Language.CodeStream])
 					if index >= 0: sort += (10 - index) * 1000
 				except: pass
-				if subtitle['integrated']: sort += 100000 # Make sure integrated subtitles are always on top.
+
+				if type.get('integrated'): sort += 100000 # Make sure integrated subtitles are always on top.
 				elif match == 1: sort += 100 # Make sure perfect matches are always on top.
-				if subtitle['foreign']: sort += 0.15
-				if subtitle['default']: sort += 0.1
-				if subtitle['featured']: sort += 0.1
-				if subtitle['trusted']: sort += 0.05
-				if subtitle['impaired']: sort -= 0.05
-				if subtitle['automatic']: sort -= 0.1
-				if subtitle['defective']: sort -= 0.2
+
+				if type.get('foreign'): sort += 0.15
+				if type.get('default'): sort += 0.1
+				if type.get('trusted'): sort += 0.05
+				if type.get('impaired'): sort -= 0.05
+				if type.get('ai'): sort -= 0.1
+				if type.get('machine'): sort -= 0.2
+
 				try: sort += subtitle['rating'] * 0.3
 				except: pass
-				try: sort += min(1, subtitle['downloads'] / 10000.0) * 0.2
+				try: sort += min(1, subtitle['download'] / 10000.0) * 0.2
 				except: pass
 				try: sort += min(1, subtitle['votes'] / 1000.0) * 0.1
 				except: pass
@@ -2597,8 +2630,10 @@ class Subtitle(Streamer):
 				for i in range(len(subtitles)):
 					subtitle = subtitles[i]
 					if subtitle['match'] >= 1 and subtitle['language'][tools.Language.Code][tools.Language.CodeStream] in settingsLanguage:
-						success, subtitles[i] = self._load(subtitle = subtitle)
-						if success: break
+						success, subtitle = self._load(subtitle = subtitle)
+						if success:
+							subtitles[i] = subtitle
+							break
 				if not success: settingsSelection = Subtitle.SelectionManual
 
 			if settingsSelection == Subtitle.SelectionAutomatic:
@@ -2609,9 +2644,11 @@ class Subtitle(Streamer):
 				if not success: # Try again with decode-failed subtitles.
 					for i in range(len(subtitles)):
 						subtitle = subtitles[i]
-						if 'decoded' in subtitle and subtitle['decoded'] is False:
-							success, subtitles[i] = self._load(subtitle = subtitle)
-							if success: break
+						if subtitle and 'decoded' in subtitle and subtitle['decoded'] is False:
+							success, subtitle = self._load(subtitle = subtitle)
+							if success:
+								subtitles[i] = subtitle
+								break
 
 			if settingsSelection == Subtitle.SelectionManual:
 				if lock:
@@ -2625,9 +2662,9 @@ class Subtitle(Streamer):
 					if choice < 0: return self._finish(status = Subtitle.StatusCanceled, unpause = True)
 					subtitle = subtitles[choice]
 					success, subtitle = self._load(subtitle = subtitle)
-					subtitles[choice] = subtitle
+					if subtitle: subtitles[choice] = subtitle
 					if success: break
-					elif 'decoded' in subtitle and subtitle['decoded'] is False: self._notification(title = 35860, message = 35861, icon = interface.Dialog.IconWarning)
+					elif subtitle and 'decoded' in subtitle and subtitle['decoded'] is False: self._notification(title = 35860, message = 35861, icon = interface.Dialog.IconWarning)
 
 			return self._finish(status = Subtitle.StatusLoaded if success else Subtitle.StatusFailed, subtitle = subtitle, unpause = True)
 		except:
@@ -2646,46 +2683,46 @@ class Subtitle(Streamer):
 
 		for i in range(len(subtitles)):
 			subtitle = subtitles[i]
+			type = subtitle.get('type') or {}
 
 			# Flag icon.
-			icon = tools.Language.flag(subtitle['language'][tools.Language.Code][tools.Language.CodePrimary], quality = interface.Icon.QualityLarge if supportIcon else interface.Icon.QualitySmall, subtitle = not subtitle['integrated'])
+			icon = tools.Language.flag(subtitle['language'][tools.Language.Code][tools.Language.CodePrimary], quality = interface.Icon.QualityLarge if supportIcon else interface.Icon.QualitySmall, subtitle = not type.get('integrated'))
 
 			# Label line 1.
 			label = subtitle['name']
-			defective = subtitle['defective'] or ('decoded' in subtitle and subtitle['decoded'] is False)
+			defective = 'decoded' in subtitle and subtitle['decoded'] is False
 			if not label: label = interface.Format.fontItalic(interface.Translation.string(35248))
 			if defective: label = interface.Format.fontItalic(label)
 
 			# Label line 2.
 			info = []
-			if subtitle['integrated'] and tools.Language.NameUniversal in subtitle['language'][tools.Language.Name]: language = subtitle['language'][tools.Language.Name][tools.Language.NameUniversal]
+			if type.get('integrated') and tools.Language.NameUniversal in subtitle['language'][tools.Language.Name]: language = subtitle['language'][tools.Language.Name][tools.Language.NameUniversal]
 			else: language = subtitle['language'][tools.Language.Name][tools.Language.NameDefault]
 			info.append(interface.Format.fontBold(language))
-			if subtitle['format']: info.append(subtitle['format'])
-			if subtitle['integrated']: info.append(interface.Format.fontColor(33336, color = interface.Format.colorExcellent()))
+			if type.get('integrated'): info.append(interface.Format.fontColor(33336, color = interface.Format.colorExcellent()))
 			if defective: info.append(interface.Format.fontColor(35360, color = interface.Format.colorBad()))
 			match = subtitle['match']
 			if match >= 1.0: matchLabel = 36107
-			elif match >= 0.75: matchLabel = 36108
-			elif match >= 0.50: matchLabel = 36109
+			elif match >= 0.50: matchLabel = 36108
+			elif match >= 0.30: matchLabel = 36109
 			else: matchLabel = 36110
 			info.append(interface.Format.fontColor('%s (%.0f%%)' % (interface.Translation.string(matchLabel), match * 100), color = interface.Format.colorGradientPick(value = match * 1000, gradient = gradient)))
-			if subtitle['automatic']: info.append(interface.Format.fontColor(35432, color = interface.Format.colorBad()))
-			if subtitle['featured']: info.append(interface.Format.fontColor(35505, color = interface.Format.colorAlternative()))
-			if subtitle['trusted']: info.append(interface.Format.fontColor(35531, color = interface.Format.colorAlternative()))
-			if subtitle['impaired']: info.append(interface.Format.fontColor(33922, color = interface.Format.colorSpecial()))
-			if subtitle['foreign']: info.append(interface.Format.fontColor(35414, color = interface.Format.colorSpecial()))
-			if subtitle['default']: info.append(interface.Format.fontColor(33564, color = interface.Format.colorSpecial()))
-			if not subtitle['rating'] is None:
-				rating = interface.Format.iconRating(count = max(1, tools.Math.roundUp(subtitle['rating'] * 5)), fixed = 5, color = interface.Format.colorGradientPick(value = subtitle['rating'] * 100, gradient = gradient))
-				if not subtitle['integrated']: rating += ' (%s)' % tools.Math.thousand(subtitle['votes'] if subtitle['votes'] else 0)
+			if type.get('machine'): info.append(interface.Format.fontColor(36251, color = interface.Format.colorBad()))
+			if type.get('ai'): info.append(interface.Format.fontColor(35432, color = interface.Format.colorPoor()))
+			if type.get('trusted'): info.append(interface.Format.fontColor(35531, color = interface.Format.colorAlternative()))
+			if type.get('impaired'): info.append(interface.Format.fontColor(33922, color = interface.Format.colorSpecial()))
+			if type.get('foreign'): info.append(interface.Format.fontColor(35414, color = interface.Format.colorSpecial()))
+			if type.get('default'): info.append(interface.Format.fontColor(33564, color = interface.Format.colorSpecial()))
+			if not subtitle.get('rating') is None:
+				rating = interface.Format.iconRating(count = max(1, tools.Math.roundUp(subtitle.get('rating') * 5)), fixed = 5, color = interface.Format.colorGradientPick(value = subtitle.get('rating') * 100, gradient = gradient))
+				if not type.get('integrated'): rating += ' (%s)' % tools.Math.thousand(subtitle.get('votes') or 0)
 				info.append(rating)
-			if not subtitle['downloads'] is None:
-				info.append(interface.Format.fontColor('%s%s' % (iconDown, tools.Math.thousand(subtitle['downloads'])), color = interface.Format.colorGradientPick(value = subtitle['downloads'] / 6.0, gradient = gradient)))
+			if not subtitle.get('download') is None:
+				info.append(interface.Format.fontColor('%s%s' % (iconDown, tools.Math.thousand(subtitle.get('download'))), color = interface.Format.colorGradientPick(value = subtitle.get('download') / 6.0, gradient = gradient)))
 			info = interface.Format.iconJoin(info, pad = '  ')
 
 			if details:
-				if (subtitle['integrated'] or subtitle['match'] >= 1): label = interface.Format.fontBold(label)
+				if (type.get('integrated') or subtitle['match'] >= 1): label = interface.Format.fontBold(label)
 				label2 = info
 			else:
 				label = interface.Format.iconJoin([info, label])
@@ -2756,11 +2793,32 @@ class Chapter(Streamer):
 
 	@classmethod
 	def chapterSkip(self):
-		return {chapter['percent']['start'] : chapter for chapter in Chapter.Chapters if chapter['skip'] and chapter['time']['duration'] > 10}
+		# Some videos has multiple short chapters at the start.
+		# Eg: The Winter King S01E01 has 7 chapters that will be considered intro from the code above.
+		# If there are that many chapters, it is difficult to determine which one is the actual intro and which are normal (short) chapters.
+		# For 1 - 3 intro chapters: show Skip button for all of them.
+		# For 4 intro chapters: only show Skip button for the first 3 chapters.
+		# For 5 intro chapters: only show Skip button for the first 2 chapters.
+		# For 5+ intro chapters: only show Skip button for the first chapter.
+
+		valid = [chapter for chapter in Chapter.Chapters if chapter['skip'] and chapter['time']['duration'] >= 10]
+		if len(valid) < 3: valid = [chapter for chapter in Chapter.Chapters if chapter['skip'] and chapter['time']['duration'] >= 7]
+
+		skipped = 0
+		total = len(valid)
+		limit = 3 if total <= 4 else 2 if total == 5 else 1
+
+		chapters = {}
+		for chapter in valid:
+			if skipped >= limit: break
+			skipped += 1
+			chapters[chapter['percent']['start']] = chapter
+
+		return chapters
 
 	@classmethod
 	def chapterOutro(self, single = True):
-		result = [chapter for chapter in Chapter.Chapters if chapter['type'] == Chapter.TypeOutro and chapter['time']['duration'] > 5]
+		result = [chapter for chapter in Chapter.Chapters if chapter['type'] == Chapter.TypeOutro and chapter['time']['duration'] >= 5]
 		if result: return result[-1] if single else result
 		return None
 
@@ -2855,6 +2913,7 @@ class Chapter(Streamer):
 									'duration' : endTime - startTime,
 								},
 							})
+
 						self.log('Available chapters: ' + (' | '.join([i['label'] for i in Chapter.Chapters])))
 			except: tools.Logger.error()
 
@@ -2887,6 +2946,7 @@ class Chapter(Streamer):
 						except: pass
 						tools.Time.sleep(0.05)
 
+				# Run this for the entire pl;ayback, in case the user changes progress to the start again.
 				while True:
 					if not player.isPlayingVideo() or tools.System.aborted():
 						window.WindowButtonSkip.cancel()

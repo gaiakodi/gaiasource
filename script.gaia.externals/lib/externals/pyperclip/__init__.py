@@ -59,11 +59,15 @@ import warnings
 
 from ctypes import c_size_t, sizeof, c_wchar_p, get_errno, c_wchar
 
+# GAIACODE
+from importlib import import_module
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand')
 
 # `import PyQt4` sys.exit()s if DISPLAY is not in the environment.
 # Thus, we need to detect the presence of $DISPLAY manually
 # and not load PyQt4 if it is absent.
-HAS_DISPLAY = os.getenv("DISPLAY", False)
+#HAS_DISPLAY = os.getenv("DISPLAY", False)
+HAS_DISPLAY = os.getenv("DISPLAY", False) or os.getenv("WAYLAND_DISPLAY", False) # GAIACODE
 
 EXCEPT_MSG = """
     Pyperclip could not find a copy/paste mechanism for your system.
@@ -75,7 +79,8 @@ STR_OR_UNICODE = unicode if PY2 else str # For paste(): Python 3 uses str, Pytho
 
 ENCODING = 'utf-8'
 
-try:
+# GAIACODE
+'''try:
     from shutil import which as _executable_exists
 except ImportError:
     # The "which" unix command finds where a command is.
@@ -87,8 +92,12 @@ except ImportError:
     def _executable_exists(name):
         return subprocess.call(' '.join([WHICH_CMD, name]), # GAIACODE
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell = True) == 0 # GAIACODE
-
-
+'''
+def _executable_exists(name):
+    # The "which" unix command finds where a command is.
+    if platform.system() == 'Windows': WHICH_CMD = 'where'
+    else: WHICH_CMD = 'which'
+    return subprocess.call(gaiaCommand(' '.join(['which', name])), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell = True) == 0 # GAIACODE
 
 # Exceptions
 class PyperclipException(RuntimeError):
@@ -116,13 +125,15 @@ def init_osx_pbcopy_clipboard():
 
     def copy_osx_pbcopy(text):
         text = _stringifyText(text) # Converts non-str values to str.
-        p = subprocess.Popen(['pbcopy', 'w'],
-                             stdin=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['pbcopy', 'w'], stdin=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['pbcopy', 'w']), stdin=subprocess.PIPE, close_fds=True)
         p.communicate(input=text.encode(ENCODING))
 
     def paste_osx_pbcopy():
-        p = subprocess.Popen(['pbpaste', 'r'],
-                             stdout=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['pbpaste', 'r'], stdout=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['pbpaste', 'r']), stdout=subprocess.PIPE, close_fds=True)
         stdout, stderr = p.communicate()
         return stdout.decode(ENCODING)
 
@@ -208,18 +219,18 @@ def init_xclip_clipboard():
         selection=DEFAULT_SELECTION
         if primary:
             selection=PRIMARY_SELECTION
-        p = subprocess.Popen(['xclip', '-selection', selection],
-                             stdin=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['xclip', '-selection', selection], stdin=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['xclip', '-selection', selection]), stdin=subprocess.PIPE, close_fds=True)
         p.communicate(input=text.encode(ENCODING))
 
     def paste_xclip(primary=False):
         selection=DEFAULT_SELECTION
         if primary:
             selection=PRIMARY_SELECTION
-        p = subprocess.Popen(['xclip', '-selection', selection, '-o'],
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['xclip', '-selection', selection, '-o'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['xclip', '-selection', selection, '-o']), stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         stdout, stderr = p.communicate()
         # Intentionally ignore extraneous output on stderr when clipboard is empty
         return stdout.decode(ENCODING)
@@ -236,16 +247,18 @@ def init_xsel_clipboard():
         selection_flag = DEFAULT_SELECTION
         if primary:
             selection_flag = PRIMARY_SELECTION
-        p = subprocess.Popen(['xsel', selection_flag, '-i'],
-                             stdin=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['xsel', selection_flag, '-i'], stdin=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['xsel', selection_flag, '-i']), stdin=subprocess.PIPE, close_fds=True)
         p.communicate(input=text.encode(ENCODING))
 
     def paste_xsel(primary=False):
         selection_flag = DEFAULT_SELECTION
         if primary:
             selection_flag = PRIMARY_SELECTION
-        p = subprocess.Popen(['xsel', selection_flag, '-o'],
-                             stdout=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['xsel', selection_flag, '-o'], stdout=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['xsel', selection_flag, '-o']), stdout=subprocess.PIPE, close_fds=True)
         stdout, stderr = p.communicate()
         return stdout.decode(ENCODING)
 
@@ -262,17 +275,23 @@ def init_wl_clipboard():
             args.append(PRIMARY_SELECTION)
         if not text:
             args.append('--clear')
-            subprocess.check_call(args, close_fds=True)
+            # GAIACODE
+            #subprocess.check_call(args, close_fds=True)
+            subprocess.check_call(gaiaCommand(args), close_fds=True)
         else:
             pass
-            p = subprocess.Popen(args, stdin=subprocess.PIPE, close_fds=True)
+            # GAIACODE
+            #p = subprocess.Popen(args, stdin=subprocess.PIPE, close_fds=True)
+            p = subprocess.Popen(gaiaCommand(args), stdin=subprocess.PIPE, close_fds=True)
             p.communicate(input=text.encode(ENCODING))
 
     def paste_wl(primary=False):
         args = ["wl-paste", "-n"]
         if primary:
             args.append(PRIMARY_SELECTION)
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(args, stdout=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(args), stdout=subprocess.PIPE, close_fds=True)
         stdout, _stderr = p.communicate()
         return stdout.decode(ENCODING)
 
@@ -282,16 +301,15 @@ def init_wl_clipboard():
 def init_klipper_clipboard():
     def copy_klipper(text):
         text = _stringifyText(text) # Converts non-str values to str.
-        p = subprocess.Popen(
-            ['qdbus', 'org.kde.klipper', '/klipper', 'setClipboardContents',
-             text.encode(ENCODING)],
-            stdin=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['qdbus', 'org.kde.klipper', '/klipper', 'setClipboardContents', text.encode(ENCODING)], stdin=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['qdbus', 'org.kde.klipper', '/klipper', 'setClipboardContents', text.encode(ENCODING)]), stdin=subprocess.PIPE, close_fds=True)
         p.communicate(input=None)
 
     def paste_klipper():
-        p = subprocess.Popen(
-            ['qdbus', 'org.kde.klipper', '/klipper', 'getClipboardContents'],
-            stdout=subprocess.PIPE, close_fds=True)
+        # GAIACODE
+        #p = subprocess.Popen(['qdbus', 'org.kde.klipper', '/klipper', 'getClipboardContents'],stdout=subprocess.PIPE, close_fds=True)
+        p = subprocess.Popen(gaiaCommand(['qdbus', 'org.kde.klipper', '/klipper', 'getClipboardContents']),stdout=subprocess.PIPE, close_fds=True)
         stdout, stderr = p.communicate()
 
         # Workaround for https://bugs.kde.org/show_bug.cgi?id=342874
@@ -501,17 +519,16 @@ def init_windows_clipboard():
 
 
 def init_wsl_clipboard():
+
     def copy_wsl(text):
         text = _stringifyText(text) # Converts non-str values to str.
-        p = subprocess.Popen(' '.join(['clip.exe']), # GAIACODE
-                             stdin=subprocess.PIPE, close_fds=True, shell = True) # GAIACODE
+        #p = subprocess.Popen(' '.join(['clip.exe']), stdin=subprocess.PIPE, close_fds=True, shell = True) # GAIACODE
+        p = subprocess.Popen(gaiaCommand(' '.join(['clip.exe'])), stdin=subprocess.PIPE, close_fds=True, shell = True) # GAIACODE
         p.communicate(input=text.encode(ENCODING))
 
     def paste_wsl():
-        p = subprocess.Popen(' '.join(['powershell.exe', '-command', 'Get-Clipboard']), # GAIACODE
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             close_fds=True, shell = True) # GAIACODE
+        #p = subprocess.Popen(' '.join(['powershell.exe', '-command', 'Get-Clipboard']), stdout=subprocess.PIPE,stderr=subprocess.PIPE,close_fds=True, shell = True) # GAIACODE
+        p = subprocess.Popen(gaiaCommand(' '.join(['powershell.exe', '-command', 'Get-Clipboard'])), stdout=subprocess.PIPE,stderr=subprocess.PIPE,close_fds=True, shell = True) # GAIACODE
         stdout, stderr = p.communicate()
         # WSL appends "\r\n" to the contents.
         return stdout[:-2].decode(ENCODING)

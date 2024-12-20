@@ -63,7 +63,7 @@ class Keytalk(Oracle):
 			linkApi			= 'https://deepsearch.mycelebs.com/api',
 
 			querySupport	= {
-				Media.TypeMixed				: {
+				Media.Mixed					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -75,7 +75,7 @@ class Keytalk(Oracle):
 					Oracle.QueryJsonTitle	: False,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeMovie				: {
+				Media.Movie					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -86,7 +86,7 @@ class Keytalk(Oracle):
 					Oracle.QueryTextId		: False,
 					Oracle.QueryJsonTitle	: False,
 				},
-				Media.TypeSet				: {
+				Media.Set					: {
 					Oracle.ModePlain		: False,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -97,29 +97,7 @@ class Keytalk(Oracle):
 					Oracle.QueryTextId		: False,
 					Oracle.QueryJsonTitle	: False,
 				},
-				Media.TypeDocumentary		: {
-					Oracle.ModePlain		: 'documentary %s', # Add a "documentary" keytalk to focus the query.
-					Oracle.ModeList			: False,
-					Oracle.ModeSingle		: False,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: False,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-				},
-				Media.TypeShort				: {
-					Oracle.ModePlain		: False, # Does not work like documentaries.
-					Oracle.ModeList			: False,
-					Oracle.ModeSingle		: False,
-
-					Oracle.QueryContext		: False,
-					Oracle.QueryRaw			: False,
-					Oracle.QueryTextTitle	: False,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: False,
-				},
-				Media.TypeShow				: {
+				Media.Show					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: False,
 					Oracle.ModeSingle		: False,
@@ -193,7 +171,7 @@ class Keytalk(Oracle):
 			time1 = Time.timestamp()
 			duration = 0
 
-			action = Keytalk.ActionShow if Media.typeTelevision(media) else Keytalk.ActionMovie
+			action = Keytalk.ActionShow if Media.isSerie(media) else Keytalk.ActionMovie
 
 			result = self._result()
 			result['error'] = self._requestError(type = Keytalk.ErrorServer)

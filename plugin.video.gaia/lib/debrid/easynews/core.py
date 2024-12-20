@@ -51,7 +51,7 @@ class Core(base.Core):
 
 	def __init__(self):
 		base.Core.__init__(self, Core.Id, Core.Name, Core.LinkMain)
-		self.mAccount = Account()
+		self.mAccount = Account.instance()
 
 	##############################################################################
 	# INTERNAL

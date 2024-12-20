@@ -23,6 +23,9 @@ from lib.modules.concurrency import Lock
 
 class Importer(object):
 
+	InternalDirectory = 'Internals'
+	InternalRefresh = 0.01 # 1%
+
 	Lock = Lock()
 	Modules = {}
 
@@ -39,6 +42,31 @@ class Importer(object):
 	@classmethod
 	def reset(self, settings = True):
 		Importer.Modules = {}
+
+	##############################################################################
+	# UPDATE
+	##############################################################################
+
+	@classmethod
+	def update(self, force = False):
+		from lib.modules.tools import Math, Logger, System, File
+		try:
+			if force is True or Math.randomProbability(force if force else Importer.InternalRefresh): # 1% of the time.
+				# Occasionally refresh the local TLD cache with new/changed TLDs.
+				#self.moduleTldExtract().update(True)
+
+				# Occasionally remove the JS2PY temp directory, to accomodate code updates.
+				# Remove: xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo('profile')), 'Internals', 'js2py')
+
+				# Instead of updating/deleting for each external library, just delete the entire directory, which will force all externals to refresh in any case.
+				# Plus this might also solve some other issues, like subdirs/subfiles not being able to be deleted, due to some permission issues on the parent dir.
+				path = File.joinPath(System.profile(), Importer.InternalDirectory)
+				File.deleteDirectory(path)
+				return True
+			else:
+				return None
+		except: Logger.error()
+		return False
 
 	###################################################################
 	# INTERNAL

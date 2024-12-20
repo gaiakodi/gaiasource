@@ -236,12 +236,14 @@ class Font(object):
 	IconKodi		= 'kodi'
 	IconGaia		= 'gaia'
 	IconOrion		= 'orion'
-	IconTrakt		= 'trakt' # Not used anymore, since Trakt was moved under the Activity context menu.
+	IconTrakt		= 'trakt'
 	IconClose		= 'close'
 	IconBack		= 'back'
 	IconSettings	= 'settings'
 	IconPlay		= 'play'
 	IconPlaylist	= 'playlist'
+	IconExplore		= 'explore'
+	IconSearch		= 'search'
 	IconLibrary		= 'library'
 	IconShortcut	= 'shortcut'
 	IconActivity	= 'activity'
@@ -276,6 +278,8 @@ class Font(object):
 		IconSettings	: '»',
 		IconPlay		: '»',
 		IconPlaylist	: '»',
+		IconExplore		: '»',
+		IconSearch		: '»',
 		IconLibrary		: '»',
 		IconShortcut	: '»',
 		IconActivity	: '»',
@@ -311,6 +315,8 @@ class Font(object):
 		IconSettings	: '\uf013',
 		IconPlay		: '\uf04b ', # Add space, since the icon is narrow and doesn't align with other icons in the context menu.
 		IconPlaylist	: '\ue1d0',
+		IconExplore		: '\uf14e',
+		IconSearch		: '\uf002',
 		IconLibrary		: '\uf5db',
 		IconShortcut	: '\uf364',
 		IconActivity	: '\ue1a2',
@@ -420,6 +426,8 @@ class Font(object):
 				Font.IconPlay,
 				Font.IconPlaylist,
 				Font.IconActivity,
+				Font.IconExplore,
+				Font.IconSearch,
 				Font.IconLibrary,
 				Font.IconShortcut,
 				Font.IconInfo,
@@ -649,7 +657,8 @@ class Font(object):
 	'''
 	@classmethod
 	def font(self, size = 20, deviation = None, aspect = False, spacing = False, bold = None, italic = None, light = None, mono = None, upper = False, lower = False, capital = False, symbol = False, default = True, full = False):
-		if deviation is None: deviation = [int(size * 0.5), int(size * 0.25)]
+		# The default maximum deviation "int(size * 0.25)" is too little for the OSMC skin for FontTiny (OSMC's smallest font is 19). Increase to 0.5.
+		if deviation is None: deviation = [int(size * 0.5), int(size * 0.5)]
 		elif tools.Tools.isInteger(deviation): deviation = [deviation, deviation]
 		key = (size, tuple(deviation), aspect, spacing, bold, italic, light, mono, upper, lower, capital, symbol, default)
 
@@ -682,7 +691,7 @@ class Font(object):
 					allowed = True
 				if not allowed: break
 
-		# Any other font
+		# Any other font.
 		if not font and default:
 			font = self.font(size = size, deviation = deviation, aspect = None, spacing = None, bold = bold, italic = italic, light = light, mono = mono, upper = upper, lower = lower, capital = capital, symbol = symbol, default = False)
 			if not font:
@@ -691,6 +700,7 @@ class Font(object):
 					fonts = self._fontDetect()['fonts']
 					if fonts: font = fonts[0]
 
+		if not font: return font
 		Font.FontSelection[key] = font
 		return font if full else font['name']
 
@@ -754,6 +764,8 @@ class Icon(object):
 	SpecialServices = 'services'
 	SpecialHandlers = 'handlers'
 	SpecialOracle = 'oracle'
+	SpecialContent = 'content'
+	SpecialExtensions = 'extensions'
 
 	ThemeData = {}
 
@@ -784,7 +796,7 @@ class Icon(object):
 					index = theme.find('(')
 					if index >= 0: theme = theme[:index]
 
-				addon = tools.System.pathResources() if theme in ['white', Icon.SpecialQuality, Icon.SpecialDonations, Icon.SpecialNotifications, Icon.SpecialCountries, Icon.SpecialLanguages, Icon.SpecialAddons, Icon.SpecialServices, Icon.SpecialHandlers, Icon.SpecialOracle] else tools.System.pathIcons()
+				addon = tools.System.pathResources() if theme in ['white', Icon.SpecialQuality, Icon.SpecialDonations, Icon.SpecialNotifications, Icon.SpecialCountries, Icon.SpecialLanguages, Icon.SpecialAddons, Icon.SpecialServices, Icon.SpecialHandlers, Icon.SpecialOracle, Icon.SpecialContent, Icon.SpecialExtensions] else tools.System.pathIcons()
 				themePath = tools.File.joinPath(addon, 'resources', 'media', 'icons', theme)
 				quality = tools.Settings.getInteger('theme.general.icon.quality')
 				if quality == 0:
@@ -907,9 +919,9 @@ class Icon(object):
 		items = ['Default', 'White']
 		getMore = Format.fontBold(Translation.string(33739))
 		if tools.Extension.installed(id):
-			# Removed 2 old icon packs, since the ZIP file is becoming too large.
+			# Removed old icon packs, since the ZIP file is becoming too large.
 			#items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Cerulean (Blue)', 'Sky (Blue)', 'Pine (Green)', 'Lime (Green)', 'Ruby (Red)', 'Candy (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)', 'Amber (Brown)'])
-			items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Cerulean (Blue)', 'Sky (Blue)', 'Pine (Green)', 'Lime (Green)', 'Ruby (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)'])
+			items.extend(['Black', 'Glass (Light)', 'Glass (Dark)', 'Shadow (Grey)', 'Fossil (Grey)', 'Navy (Blue)', 'Sky (Blue)', 'Ruby (Red)', 'Tiger (Orange)', 'Pineapple (Yellow)', 'Violet (Purple)', 'Magenta (Pink)'])
 		else:
 			items.extend([getMore])
 		choice = Dialog.select(title = 33338, items = items)
@@ -921,7 +933,6 @@ class Icon(object):
 				tools.Settings.set('theme.general.icon', items[choice])
 				Icon.ThemeData = {}
 				Directory.refresh() # Does not reload new icons, probably because images are cached?
-
 
 class Format(object):
 
@@ -1750,12 +1761,20 @@ class Dialog(object):
 		if sleep: tools.Time.sleep(sleep)
 
 	@classmethod
-	def closeOk(self, sleep = None):
+	def closeConfirm(self, sleep = None):
 		self.close(id = self.IdDialogOk, sleep = sleep)
+
+	@classmethod
+	def closeOption(self, sleep = None):
+		self.close(id = self.IdDialogYesNo, sleep = sleep)
 
 	@classmethod
 	def closeNotification(self, sleep = None):
 		self.close(id = self.IdDialogNotification, sleep = sleep)
+
+	@classmethod
+	def closeText(self, sleep = None):
+		self.close(id = self.IdDialogText, sleep = sleep)
 
 	# Close all open dialog.
 	# Sometimes if you open a dialog right after this, it also clauses. Might need some sleep to prevent this. sleep in ms.
@@ -2226,7 +2245,7 @@ class Dialog(object):
 					if not value is None:
 						label += ': '
 					label = Format.font(label, bold = bold, color = Format.colorSecondary() if color else None)
-				if not value == None:
+				if not value is None:
 					label += Format.font(self.__translate(item['value']), italic = ('link' in item and item['link']))
 
 			return label
@@ -2333,8 +2352,7 @@ class Dialog(object):
 					else:
 						reselection = reselect
 
-					if not choice is None and offset:
-						choice += offset()
+					if offset and not choice is None: choice += offset()
 
 					if reselection: choice = self.select(items = labels, title = title, selection = choice, details = details)
 					else: choice = self.select(items = labels, title = title, details = details)
@@ -3059,12 +3077,13 @@ class Directory(object):
 	ContentSettings = 'settings'
 	ContentGeneral = 'general'
 	ContentDefault = ContentNone
+	ContentMedia = [ContentMovies, ContentShows, ContentSeasons, ContentEpisodes, ContentSets, ContentMixed]
 
 	PropertyId = 'GaiaMenuId'
 
 	def __init__(self, content = ContentDefault, media = ContentGeneral, category = None, view = True, cache = True, update = False, lock = False):
 		self.mHandle = tools.System.handle()
-		self.mMedia = media
+		self.mMedia = tools.Media.Movie if tools.Media.isFilm(media) else media
 
 		self.mContent = content
 		if content == Directory.ContentSettings:
@@ -3152,13 +3171,13 @@ class Directory(object):
 	def _id(self, item):
 		# Used by view.py to determine if the menu was finished loading.
 		if item and self.mId is None:
-			self.mId = str(tools.Time.timestamp()) #  Must be string for comparison.
+			self.mId = str(tools.Time.timestamp()) # Must be string for comparison.
 			item.setProperty(Directory.PropertyId, self.mId)
 
 	def finish(self, content = None, cache = None, update = None, view = None, loader = False, select = None):
 		# Manually set sorting method, otherwise Kodi's default skin shows a "Sort by Date" label, although it is not always sorted by date.
 		sorting = ['SORT_METHOD_UNSORTED']
-		if self.mMedia == tools.Media.TypeMovie or self.mMedia == tools.Media.TypeSet or self.mMedia == tools.Media.TypeShow or self.mMedia == tools.Media.TypeSeason or self.mMedia == tools.Media.TypeEpisode:
+		if self.mMedia == tools.Media.Movie or self.mMedia == tools.Media.Set or self.mMedia == tools.Media.Show or self.mMedia == tools.Media.Season or self.mMedia == tools.Media.Episode:
 			tools.System.pluginPropertySet(property = 'GaiaMenuMedia', value = self.mMedia) # For Gaia Eminence.
 			sorting.extend([
 				'SORT_METHOD_LABEL',
@@ -3188,9 +3207,9 @@ class Directory(object):
 				'SORT_METHOD_LASTPLAYED',
 				'SORT_METHOD_PLAYCOUNT',
 			])
-			if self.mMedia == tools.Media.TypeSeason:
+			if self.mMedia == tools.Media.Season:
 				sorting.extend(['SORT_METHOD_SEASON'])
-			elif self.mMedia == tools.Media.TypeEpisode:
+			elif self.mMedia == tools.Media.Episode:
 				sorting.extend(['SORT_METHOD_EPISODE'])
 		else:
 			tools.System.pluginPropertySet(property = 'GaiaMenuMedia', value = 'general') # For Gaia Eminence.
@@ -3216,7 +3235,7 @@ class Directory(object):
 			if not category:
 				name = tools.System.name()
 				category = []
-				try: category.extend(tools.System.menu())
+				try: category.extend(tools.System.navigation())
 				except: pass
 				category = tools.Tools.listUnique(category)
 				if contented:
@@ -3234,8 +3253,24 @@ class Directory(object):
 			xbmcplugin.setPluginCategory(self.mHandle, category)
 		except: tools.Logger.error()
 
+		# cacheToDisc does not seem to work anymore.
+		# Every time we go back on a cached menu, Kodi calls addon.py again in a new Python invoker to repopulate the menu, without using the cached results.
+		#	https://forum.kodi.tv/showthread.php?tid=351108
+		# It seems that they iternally now have different values (0/False = No caching, 1/True = caching if slow, 2 = always cache)
+		#	https://github.com/xbmc/xbmc/blob/master/xbmc/FileItemList.h
+		# Also note that caching only applies to the window stack. Hence, only if we go back does it cache. Going foward by opening a menu that was previously opened will not use the cache.
+		# Not sure if we always want to cache. For instance, if we open a episode menu, mark all episodes as watched, navigate back, the season still shows as unwatched (no checkmark). Only if we go back one step further, then reopening the seasons menu, does the new status show.
+		# For now, only cache non-media menus.
+		if cache is None: cache = self.mCache
+		if cache is True: cache = 1 if contented in Directory.ContentMedia else 2
+
+		update = self.mUpdate if update is None else update
+
+		path = tools.System.infoLabel('Container.FolderPath', wait = False) # Must be called before xbmcplugin.endOfDirectory().
+
 		xbmcplugin.setContent(self.mHandle, contented)
-		xbmcplugin.endOfDirectory(self.mHandle, cacheToDisc = self.mCache if cache is None else cache, updateListing = self.mUpdate if update is None else update)
+		try: xbmcplugin.endOfDirectory(self.mHandle, cacheToDisc = cache, updateListing = update)
+		except: xbmcplugin.endOfDirectory(self.mHandle, cacheToDisc = bool(cache), updateListing = update) # For older Kodi versions where it might not allow passing in cacheToDisc as an integer.
 
 		if loader: Loader.hide()
 
@@ -3244,29 +3279,39 @@ class Directory(object):
 			if view is None: view = self.mView
 			if view:
 				from lib.modules.view import View
-				View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId, select = select)
+				View.set(media = view if not view is True else self.mMedia if self.mMedia else self.mContent, content = self.mContent, id = self.mId, path = path, select = select)
 
 	# clear: Clear the path history. Can also be a path to reset to.
 	# position: After refresh, go to the previously selected position, becuase Kodi always jumps back to the top after refresh. Not perfect, since the list can become unfocused, or the user moves the mosue over another item before this code is executed.
 	@classmethod
-	def refresh(self, clear = False, position = False, force = False, wait = True, loader = False):
+	def refresh(self, id = None, clear = False, position = False, force = False, wait = True, loader = False):
 		# Do no refresh if we are in an invoker that did a scrape.
 		# Otherwise, when calling Container.Refresh, Kodi will execute the scrape command again.
 		if not force and tools.System.commandIsScrape(): return
 
-		if wait: self._refresh(clear = clear, position = position, loader = loader)
-		else: Pool.thread(target = self._refresh, kwargs = {'clear' : clear, 'position' : position, 'loader' : loader}, start = True)
+		if wait: self._refresh(id = id, clear = clear, position = position, loader = loader)
+		else: Pool.thread(target = self._refresh, kwargs = {'id' : 'id', 'clear' : clear, 'position' : position, 'loader' : loader}, start = True)
 
 	@classmethod
-	def _refresh(self, clear = False, position = False, loader = False):
+	def _refresh(self, id = None, clear = False, position = False, loader = False):
+		container = 'Container'
+
+		# The idea here is to refresh the container the command got called from, ibstead of the "current" container.
+		# This allows the context menu to refresh the menu/list container inside widgets.
+		# However, Container(id).Refresh is not implemented and does not actually reload the widget container.
+		# Leave here, in case Kodi ever implements this, we could re-add it to work for "refreshMenu" and "refreshMetadata" int he context menu.
+		# https://forum.kodi.tv/showthread.php?tid=335235
+		# https://forum.kodi.tv/showthread.php?tid=348712
+		#if id: container += '(%s)' % str(id)
+
 		# wait: NB: it seems that Kodi never finishes when executing Container.Refresh and wait=True.
 		index = -1
 		if position:
-			try: index = int(tools.System.infoLabel('Container.CurrentItem'))
+			try: index = int(tools.System.infoLabel(container + '.CurrentItem'))
 			except: pass
 
-		tools.System.execute('Container.Refresh', wait = False)
-		if clear: tools.System.execute('Container.Update(%s,replace)' % (clear if tools.Tools.isString(clear) else ''), wait = False)
+		tools.System.execute(container + '.Refresh', wait = False)
+		if clear: tools.System.execute(container + '.Update(%s,replace)' % (clear if tools.Tools.isString(clear) else ''), wait = False)
 
 		if position and index >= 0:
 			try:
@@ -3662,33 +3707,45 @@ class Context(object):
 
 	Id = 'Context'
 	Window = 10106
+	Query = None
 
 	def __init__(self,
 		mode = ModeNone,
 		items = None,
 
 		media = None,
-		kids = None,
-		video = None,
+		niche = None,
 
+		imdb = None,
+		tmdb = None,
+		tvdb = None,
+		trakt = None,
+		slug = None,
+		season = None,
+		episode = None,
+		title = None,
+		year = None,
+		set = None,
+		plays = None,
+		rating = None,
+		progress = None,
+
+		query = None,
 		link = None,
+		provider = None,
 		library = None,
 		playlist = None,
 
+		video = None,
 		source = None,
 		metadata = None,
 		orion = None,
-
-		shortcutId = None,
-		shortcutLabel = None,
-		shortcutLocation = None,
-		shortcutCreate = None,
-		shortcutDelete = None,
+		shortcut = None,
 
 		loader = False
 	):
 		if loader: Loader.show()
-		if not mode == self.ModeNone: self._load(mode = mode, items = items, media = media, kids = kids, video = video, link = link, library = library, playlist = playlist, source = source, metadata = metadata, orion = orion, shortcutId = shortcutId, shortcutLabel = shortcutLabel, shortcutLocation = shortcutLocation, shortcutCreate = shortcutCreate, shortcutDelete = shortcutDelete)
+		if not mode == self.ModeNone: self._load(mode = mode, items = items, media = media, niche = niche, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, season = season, episode = episode, title = title, year = year, set = set, plays = plays, rating = rating, progress = progress, query = query, link = link, provider = provider, library = library, playlist = playlist, video = video, source = source, metadata = metadata, orion = orion, shortcut = shortcut)
 
 	##############################################################################
 	# RESET
@@ -3696,6 +3753,7 @@ class Context(object):
 
 	@classmethod
 	def reset(self, settings = True):
+		Context.Query = None
 		if settings:
 			Context.LabelMenu = None
 			from lib.modules.cache import Memory
@@ -3705,30 +3763,53 @@ class Context(object):
 	# GENERAL
 	##############################################################################
 
-	def _load(self, mode = ModeNone, items = None, media = None, kids = None, video = None, link = None, library = None, playlist = None, source = None, metadata = None, orion = None, shortcutId = None, shortcutLabel = None, shortcutLocation = None, shortcutCreate = None, shortcutDelete = None):
+	def _load(self, mode = ModeNone, items = None, media = None, niche = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, season = None, episode = None, title = None, year = None, set = None, plays = None, rating = None, progress = None, query = None, link = None, provider = None, library = None, playlist = None, video = None, source = None, metadata = None, orion = None, shortcut = None):
 		try:
+			from lib.modules.shortcut import Shortcut
 			from lib.meta.tools import MetaTools
+
+			self.mData = None
 
 			self.mMode = mode
 			self.mItems = items if items else []
-			self.mData = None
 
 			self.mMedia = media
-			self.mKids = kids
+			self.mNiche = niche
 			self.mVideo = video
 
+			# Get the command/query that initiated the creation of the context.
+			# Is useful if we want to do something with the original command, like refreshing the metadata.
+			# Using "Container.FolderPath" does the job from within Gaia, but does not work from widgets.
+			# This is not the command of the item the context is opened on, which is self.mLink, but rather the command of the parent container the item is in.
+			if query is None and Context.Query is None: Context.Query = tools.System.query(parse = True)
+			self.mQuery = query or Context.Query
+
 			self.mLink = link
+			self.mProvider = provider
 			self.mLibrary = link if library is True else library
 			self.mPlaylist = playlist
 
+			#gaiaremove - in a future version we have to get rid of self.mSource.
+			#gaiaremove - it is too large and slows down stream window loading, since each item in the window has to JSON+URL/BASE64 encode a large source object, just for the context menu.
+			#gaiaremove - add some cache with a source ID. Only pass the source ID to the context, and when the source is actually needed when an action is executed in the context, use the ID to lookup the actual data.
 			self.mSource = source
 			self.mOrion = orion
 
-			self.mShortcutId = shortcutId
-			self.mShortcutLabel = shortcutLabel
-			self.mShortcutLocation = shortcutLocation
-			self.mShortcutCreate = shortcutCreate
-			self.mShortcutDelete = shortcutDelete
+			self.mShortcut = shortcut
+			self.mShortcutId = None
+			self.mShortcutLabel = None
+			self.mShortcutCommand = None
+			self.mShortcutFolder = None
+			self.mShortcutCreate = None
+			self.mShortcutDelete = None
+			if shortcut:
+				self.mShortcutId = shortcut.get(Shortcut.ParameterId)
+				self.mShortcutLabel = shortcut.get(Shortcut.ParameterLabel)
+				self.mShortcutCommand = shortcut.get(Shortcut.ParameterCommand)
+				self.mShortcutFolder = shortcut.get(Shortcut.ParameterFolder)
+				self.mShortcutCreate = shortcut.get(Shortcut.ParameterCreate)
+				self.mShortcutDelete = shortcut.get(Shortcut.ParameterDelete)
+			if not self.mShortcutCommand: self.mShortcutCommand = self.mLink
 
 			self.mName = None
 			self.mHash = None
@@ -3738,25 +3819,36 @@ class Context(object):
 					self.mName = stream.fileName()
 					self.mHash = stream.hash()
 
-			self.mTitle = None
-			self.mYear = None
-			self.mSeason = None
-			self.mEpisode = None
-			self.mImdb = None
-			self.mTmdb = None
-			self.mTvdb = None
-			self.mTrakt = None
-			self.mSlug = None
+			self.mTitle = title
+			self.mYear = year
+			self.mSeason = season
+			self.mEpisode = episode
+			self.mImdb = imdb
+			self.mTmdb = tmdb
+			self.mTvdb = tvdb
+			self.mTrakt = trakt
+			self.mSlug = slug
 
-			# Removes the current/next/previous season data to reduce time to encode/decode the metadata.
-			# I do not think that this season data is used by any functions in the context menu. The data is only used to set the images of recap/extras a menu.
-			self.mMetadata = MetaTools.reduce(metadata)
+			self.mSet = set
+			self.mPlays = plays
+			self.mRating = rating
+			self.mProgress = progress
 
+			# Do not store the metadata object for the context menu, since most of the attributes are not used anyways.
+			# This just drastically increases menu loading times, since the metadata has to be encoded/decoded with JSON and URL/Base64.
+			# Especially for menus with tons of episodes, and stream windows with 100s of streams, this has to be done for every item, which adds up quickly.
 			if metadata:
+				if not self.mMedia:
+					try: self.mMedia = metadata['media']
+					except: pass
+				if not self.mNiche:
+					try: self.mNiche = metadata['niche']
+					except: pass
+
 				if 'query' in metadata:
 					self.mTitle = metadata['query'] # Season Extras.
 				else:
-					for i in ['tvshowtitle', 'originaltitle', 'title']:
+					for i in ['tvshowtitle', 'originaltitle', 'title', 'name', 'label']:
 						if i in metadata and metadata[i]:
 							self.mTitle = metadata[i]
 							break
@@ -3780,16 +3872,34 @@ class Context(object):
 				try: self.mSlug = metadata['slug']
 				except: pass
 
-				# "Series" menu under the season directory.
-				if self.mMedia == tools.Media.TypeSeason and self.mSeason is None: self.mMedia = tools.Media.TypeShow
+				try: self.mSet = metadata['collection']['id']
+				except: pass
 
-				if self.mShortcutLabel is None:
-					if tools.Media.typeTelevision(self.mMedia):
-						self.mShortcutLabel = tools.Media.title(type = tools.Media.TypeShow, title = self.mTitle, year = self.mYear)
-						if (self.mMedia == tools.Media.TypeSeason or self.mMedia == tools.Media.TypeEpisode) and not self.mSeason is None: # Check the season for the Series menu.
-							self.mShortcutLabel += ' - ' + tools.Media.title(type = self.mMedia, season = self.mSeason, episode = self.mEpisode, special = True)
+				try: self.mPlays = metadata['playcount']
+				except: pass
+				if not self.mPlays: # Partially watched shows/seasons.
+					try: self.mPlays = metadata['count']['episode']['watched']
+					except: pass
+
+				try: self.mRating = metadata['userrating']
+				except: pass
+
+				try: self.mProgress = metadata['progress']
+				except: pass
+
+				# "Series" menu under the season directory.
+				if self.mMedia == tools.Media.Season and self.mSeason is None: self.mMedia = tools.Media.Show
+
+				if self.mShortcut and self.mShortcutLabel is None:
+					if self.mMedia == tools.Media.Person:
+						self.mShortcutLabel = self.mTitle
+					elif tools.Media.isSerie(self.mMedia):
+						self.mShortcutLabel = tools.Title.title(media = tools.Media.Show, title = self.mTitle, year = self.mYear)
+						if (self.mMedia == tools.Media.Season or self.mMedia == tools.Media.Episode) and not self.mSeason is None: # Check the season for the Series menu.
+							self.mShortcutLabel += ' - ' + tools.Title.title(media = self.mMedia, season = self.mSeason, episode = self.mEpisode, special = True)
 					else:
-						self.mShortcutLabel = tools.Media.title(type = self.mMedia, title = self.mTitle, year = self.mYear)
+						self.mShortcutLabel = tools.Title.title(media = self.mMedia, title = self.mTitle, year = self.mYear)
+					self.mShortcut[Shortcut.ParameterLabel] = self.mShortcutLabel
 
 			self.initialize()
 			if len(self.mItems) == 0:
@@ -4012,24 +4122,58 @@ class Context(object):
 	def _labelIcon(self, label, icon, color = False):
 		return self._label(label = label, icon = icon, color = color)
 
-	def _labelItem(self):
-		return tools.Media.title(type = self.mMedia, title = self.mTitle, year = self.mYear, season = self.mSeason, episode = self.mEpisode)
+	def _labelItem(self, stream = True):
+		label = tools.Title.title(media = self.mMedia, title = self.mTitle, year = self.mYear, season = self.mSeason, episode = self.mEpisode)
+		if stream and self.mMode == Context.ModeStream: label = '[%s] %s' % (Translation.string(33071), label)
+		return label
 
 	@classmethod
 	def _close(self):
 		from lib.modules import window
 		window.WindowStreams.close()
 
-	def _command(self, parameters = {}):
-		if not self.mMedia is None and not 'media' in parameters: parameters['media'] = self.mMedia
-		if not self.mKids is None and not 'kids' in parameters: parameters['kids'] = self.mKids
+	@classmethod
+	def _container(self):
+		# The idea is to get the current container the list/menu was loaded in, so we can refresh/reload that container.
+		# This is useful if the container is not an internal Gaia menu, but loaded externally through a widget.
+		# So if the context menu is opened on a widget and we call the metadata refresh command, the widget should be refreshed, not whatever the "current" container is.
+		# However, calling Container(id).Refresh with an ID does not work (yet). Check Directory.refresh() for more info.
+		# Do not wait for System.originContainer(), since it sometimes does not return a value, and just prolongs the context execution time.
+		# This happens especially when using a mouse to navigate the widget, instead of a keyboard/remote.
+		# The mouse probably moves the focus elsewhere and Kodi gets confused about the container.
+		# Since this value cannot be used at the moment, it does not make sense to wait very long for the ID to return.
+		return tools.System.originContainer(wait = False)
+
+	def _command(self, parameters = {}, full = True):
+		if full:
+			if not self.mMedia is None and not 'media' in parameters: parameters['media'] = self.mMedia
+			if not self.mNiche is None and not 'niche' in parameters: parameters['niche'] = self.mNiche
+
+			if 'niche' in parameters:
+				niche = parameters['niche']
+				if niche: parameters['niche'] = tools.Media.stringTo(niche)
+				else: del parameters['niche']
+
 		return dict((key, value) for key, value in parameters.items() if not value is None)
 
-	def _commandPlugin(self, action, parameters = {}, id = None):
-		return tools.System.commandPlugin(action = action, parameters = self._command(parameters))
+	def _commandPlugin(self, action = None, parameters = {}, command = None, id = None, full = True):
+		return tools.System.commandPlugin(action = action, parameters = self._command(parameters, full = full), command = command)
 
-	def _commandContainer(self, action, parameters = {}, id = None, replace = False):
-		return tools.System.commandContainer(action = action, parameters = self._command(parameters), replace = replace)
+	def _commandMenu(self, action = None, parameters = {}, command = None, id = None, replace = False, parent = None, full = True):
+		# Calling Container.Update() externally, especially from widgets, might not work.
+		# If we for instance execute the "Browse" context menu option on a widget, there is not video addon or any other menu opened, and therefore the container cannot be updated.
+		# We have to first launch the addon and then update the container.
+		# This can be done in one go using ActivateWindow(...).
+		if tools.System.originMenu(): return self._commandContainer(action = action, parameters = parameters, command = command, id = id, replace = replace, full = full)
+		else: return self._commandWindow(action = action, parameters = parameters, command = command, id = id, parent = parent, full = full)
+
+	# Rather use _commandMenu().
+	def _commandContainer(self, action = None, parameters = {}, command = None, id = None, replace = False, full = True):
+		return tools.System.commandContainer(action = action, parameters = self._command(parameters, full = full), command = command, replace = replace)
+
+	# Rather use _commandMenu().
+	def _commandWindow(self, action = None, parameters = {}, command = None, id = None, parent = None, full = True):
+		return tools.System.commandWindow(action = action, parameters = self._command(parameters, full = full), command = command, parent = parent)
 
 	def dataTo(self, force = False):
 		# NB: Do not create full commands for each action in the context menu.
@@ -4041,22 +4185,33 @@ class Context(object):
 				'items' : self.mItems,
 
 				'media' : self.mMedia,
-				'kids' : self.mKids,
-				'video' : self.mVideo,
+				'niche' : self.mNiche,
 
+				'title' : self.mTitle,
+				'year' : self.mYear,
+				'season' : self.mSeason,
+				'episode' : self.mEpisode,
+				'imdb' : self.mImdb,
+				'tmdb' : self.mTmdb,
+				'tvdb' : self.mTvdb,
+				'trakt' : self.mTrakt,
+				'slug' : self.mSlug,
+
+				'set' : self.mSet,
+				'plays' : self.mPlays,
+				'rating' : self.mRating,
+				'progress' : self.mProgress,
+
+				'query' : self.mQuery,
 				'link' : self.mLink,
+				'provider' : self.mProvider,
 				'library' : self.mLibrary,
 				'playlist' : self.mPlaylist,
 
+				'video' : self.mVideo,
 				'source' : self.mSource,
-				'metadata' : self.mMetadata,
 				'orion' : self.mOrion,
-
-				'shortcutId' : self.mShortcutId,
-				'shortcutLabel' : self.mShortcutLabel,
-				'shortcutLocation' : self.mShortcutLocation,
-				'shortcutCreate' : self.mShortcutCreate,
-				'shortcutDelete' : self.mShortcutDelete,
+				'shortcut' : self.mShortcut,
 			}
 			self.mData = self._command(self.mData)
 		return self.mData
@@ -4099,7 +4254,10 @@ class Context(object):
 		parameters = Networker.linkDecode(path)
 
 		metadata = parameters.get('metadata')
-		if not metadata == None: metadata = tools.Converter.dictionary(metadata)
+		if not metadata is None: metadata = tools.Converter.dictionary(metadata)
+
+		media = parameters.get('media') or type
+		niche = parameters.get('niche')
 
 		code = item.getProperty('code')
 		imdb = info.getIMDBNumber()
@@ -4108,24 +4266,15 @@ class Context(object):
 
 		tmdb = extract('tmdb', None, parameters, metadata)
 		tvdb = extract('tvdb', None, parameters, metadata)
+		trakt = extract('trakt', None, parameters, metadata)
 		title = extract('title', info.getTitle(), parameters, metadata)
 		tvshowtitle = extract('tvshowtitle', info.getTVShowTitle(), parameters, metadata)
 		year = extract('year', info.getYear(), parameters, metadata)
 		season = extract('season', info.getSeason(), parameters, metadata)
 		episode = extract('episode', info.getEpisode(), parameters, metadata)
 
-		if type == 'movie':
-			from lib.indexers.movies import Movies
-			context = Movies().context(idImdb = imdb, idTmdb = tmdb, title = title, year = year)
-		elif type == 'tvshow':
-			from lib.indexers.shows import Shows
-			context = Shows().context(idImdb = imdb, idTvdb = tvdb, title = tvshowtitle if tvshowtitle else title, year = year)
-		elif type == 'season':
-			from lib.indexers.seasons import Seasons
-			context = Seasons().context(idImdb = imdb, idTvdb = tvdb, title = tvshowtitle if tvshowtitle else title, year = year, season = season)
-		elif type == 'episode':
-			from lib.indexers.episodes import Episodes
-			context = Episodes().context(idImdb = imdb, idTvdb = tvdb, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode)
+		from lib.meta.meny import MetaMenu
+		context = MetaMenu(media = media, niche = niche).buildContext(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode)
 
 		context.show()
 		Loader.hide()
@@ -4136,25 +4285,25 @@ class Context(object):
 		return result
 
 	def commandInformation(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : self.mMedia, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandInformationStream(self):
-		return self._commandPlugin(action = 'streamsInformation', parameters = {'source' : self.mSource, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'streamsInformation', parameters = {'media' : self.mMedia, 'source' : self.mSource})
 
 	def commandInformationPerson(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.TypePerson, 'title' : self.mTitle, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Person, 'title' : self.mTitle})
 
 	def commandInformationMovie(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'title' : self.mTitle, 'year' : self.mYear, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandInformationShow(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.TypeShow, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'title' : self.mTitle, 'year' : self.mYear, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandInformationSeason(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.TypeSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Season, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason})
 
 	def commandInformationEpisode(self):
-		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.TypeEpisode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'episode' : self.mEpisode, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Episode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandFilters(self):
 		return self._commandPlugin(action = 'streamsFilters')
@@ -4178,7 +4327,7 @@ class Context(object):
 		return self._commandPlugin(action = 'playbackReset', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandActivityTrakt(self):
-		return self._commandPlugin(action = 'traktManager', parameters = {'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
+		return self._commandPlugin(action = 'traktManager', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandScrapeAgain(self):
 		return self._commandPlugin(action = 'scrapeAgain', parameters = {'link' : self.mLink})
@@ -4202,7 +4351,7 @@ class Context(object):
 		return self._commandPlugin(action = 'scrapeBinge', parameters = {'link' : self.mLink})
 
 	def commandBinge(self):
-		return self._commandPlugin(action = 'showsBinge', parameters = {'imdb' : self.mImdb, 'tvdb' : self.mTvdb, 'season' : self.mSeason, 'episode' : self.mEpisode})
+		return self._commandPlugin(action = 'binge', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandPlaylistShow(self):
 		return self._commandPlugin(action = 'playlistShow')
@@ -4211,103 +4360,82 @@ class Context(object):
 		return self._commandPlugin(action = 'playlistClear')
 
 	def commandPlaylistAdd(self):
-		return self._commandPlugin(action = 'playlistAdd', parameters = {'link' : self.mLink, 'label' : self._labelItem(), 'metadata' : self.mMetadata, 'context' : self.dataTo()})
+		return self._commandPlugin(action = 'playlistAdd', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'link' : self.mLink, 'label' : self._labelItem(), 'context' : self.dataTo()})
 
 	def commandPlaylistRemove(self):
 		return self._commandPlugin(action = 'playlistRemove', parameters = {'label' : self._labelItem()})
 
 	def commandVideo(self, video = None):
-		from lib.modules.video import Video, Trailer
-		if video is None: video = self.mVideo
-		link = None
-		if video == Trailer.Id:
-			try: link = metadata['trailer']
-			except: pass
-		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video, 'link' : link, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb})
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandVideoManual(self):
-		from lib.modules.video import Video, Trailer
-		link = None
-		if self.mVideo == Trailer.Id:
-			try: link = metadata['trailer']
-			except: pass
-		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'link' : link, 'selection' : Video.ModeManual, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb})
+		from lib.modules.video import Video
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'selection' : Video.ModeManual, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandVideoAutomatic(self):
-		from lib.modules.video import Video, Trailer
-		link = None
-		if self.mVideo == Trailer.Id:
-			try: link = metadata['trailer']
-			except: pass
-		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'link' : link, 'selection' : Video.ModeAutomatic, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb})
+		from lib.modules.video import Video
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'selection' : Video.ModeAutomatic, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandBrowse(self, season = False):
-		tools.System.launchAddon() # Important when called from outside Gaia. Otherwise there is an error: Attempt to use invalid handle -1.
-		if season: return self._commandContainer(action = 'episodesRetrieve', parameters = {'tvshowtitle' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb})
-		else: return self._commandContainer(action = 'seasonsRetrieve', parameters = {'tvshowtitle' : self.mTitle, 'year' : self.mYear, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb})
+		# Important for "parameters=False" to avoid pulling int he parameters of the current menu.
+		# Eg: If executed from a progress submenu, do not add the eg episode number from the submenu.
+		from lib.meta.menu import MetaMenu
+		return self._commandMenu(parameters = MetaMenu.instance().commandCreateMenu(media = tools.Media.Episode if season else tools.Media.Season, imdb = self.mImdb, tmdb = self.mTmdb, tvdb = self.mTvdb, trakt = self.mTrakt, season = self.mSeason if season else None, parameters = False))
 
-	def commandDownloadsCloud(self):
+	def commandDownloadCloud(self):
 		return self._commandPlugin(action = 'downloadCloud', parameters = {'source' : self.mSource})
 
 	def commandManualDefault(self):
-		from lib.modules import handler
-		from lib.modules import downloader
-		from lib.meta.image import MetaImage
-		poster = MetaImage.getPoster(data = self.mMetadata)
-		poster = poster[0] if poster else None
-		return self._commandPlugin(action = 'download', parameters = {'downloadType' : downloader.Downloader.TypeManual, 'handleMode' : handler.Handler.ModeDefault, 'image' : poster, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		from lib.modules.downloader import Downloader
+		return self._commandPlugin(action = 'download', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'downloadType' : Downloader.TypeManual, 'handleMode' : Handler.ModeDefault, 'source' : self.mSource})
 
 	def commandManualSelection(self):
-		from lib.modules import handler
-		from lib.modules import downloader
-		poster = MetaImage.getPoster(data = self.mMetadata)
-		poster = poster[0] if poster else None
-		return self._commandPlugin(action = 'download', parameters = {'downloadType' : downloader.Downloader.TypeManual, 'handleMode' : handler.Handler.ModeSelection, 'image' : poster, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		from lib.modules.downloader import Downloader
+		return self._commandPlugin(action = 'download', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'downloadType' : Downloader.TypeManual, 'handleMode' : Handler.ModeSelection, 'source' : self.mSource})
 
 	def commandManualFile(self):
-		from lib.modules import handler
-		from lib.modules import downloader
-		poster = MetaImage.getPoster(data = self.mMetadata)
-		poster = poster[0] if poster else None
-		return self._commandPlugin(action = 'download', parameters = {'downloadType' : downloader.Downloader.TypeManual, 'handleMode' : handler.Handler.ModeFile, 'image' : poster, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		from lib.modules.downloader import Downloader
+		return self._commandPlugin(action = 'download', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'downloadType' : Downloader.TypeManual, 'handleMode' : Handler.ModeFile, 'source' : self.mSource})
 
 	def commandManualManager(self):
-		from lib.modules import downloader
+		from lib.modules.downloader import Downloader
 		tools.System.launchAddon() # Important when called from outside Gaia.
-		return self._commandContainer(action = 'downloadsManager', parameters = {'downloadType' : downloader.Downloader.TypeManual})
+		return self._commandMenu(action = 'downloadsManager', parameters = {'downloadType' : Downloader.TypeManual})
 
 	def commandCacheDefault(self):
-		from lib.modules import handler
-		from lib.modules import downloader
-		return self._commandPlugin(action = 'playCache', parameters = {'handleMode' : handler.Handler.ModeDefault, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'playCache', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeDefault, 'source' : self.mSource})
 
 	def commandCacheSelection(self):
-		from lib.modules import handler
-		return self._commandPlugin(action = 'playCache', parameters = {'handleMode' : handler.Handler.ModeSelection, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'playCache', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeSelection, 'source' : self.mSource})
 
 	def commandCacheFile(self):
-		from lib.modules import handler
-		return self._commandPlugin(action = 'playCache', parameters = {'handleMode' : handler.Handler.ModeFile, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'playCache', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeFile, 'source' : self.mSource})
 
 	def commandCacheManager(self):
-		from lib.modules import downloader
+		from lib.modules.downloader import Downloader
 		tools.System.launchAddon() # Important when called from outside Gaia.
-		return self._commandContainer(action = 'downloadsManager', parameters = {'downloadType' : downloader.Downloader.TypeCache})
+		return self._commandMenu(action = 'downloadsManager', parameters = {'downloadType' : Downloader.TypeCache})
 
 	def commandPlayDefault(self):
-		from lib.modules import handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : handler.Handler.ModeDefault, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeDefault, 'source' : self.mSource})
 
 	def commandPlaySelection(self):
-		from lib.modules import handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : handler.Handler.ModeSelection, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeSelection, 'source' : self.mSource})
 
 	def commandPlayFile(self):
-		from lib.modules import handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : handler.Handler.ModeFile, 'source' : self.mSource, 'metadata' : self.mMetadata})
+		from lib.modules.handler import Handler
+		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeFile, 'source' : self.mSource})
 
 	def commandFileAdd(self):
-		return self._commandPlugin(action = 'fileAdd', parameters = {'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'fileAdd')
 
 	def commandFileLink(self, mode):
 		return self._commandPlugin(action = 'fileLink', parameters = {'source' : self.mSource, 'mode' : mode})
@@ -4319,13 +4447,13 @@ class Context(object):
 		return self._commandPlugin(action = 'fileHash', parameters = {'hash' : self.mHash})
 
 	def commandLink(self, media = None):
-		return self._commandPlugin(action = 'qr', parameters = {'media' : media, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'qr', parameters = {'media' : media, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandShortcutCreate(self):
-		return self._commandPlugin(action = 'shortcutsShow', parameters = {'link' : self.mLink, 'name' : self.mShortcutLabel, 'create' : True})
+		return self._commandPlugin(action = 'shortcutShow', parameters = {'label' : self.mShortcutLabel, 'command' : self.mShortcutCommand, 'folder' : self.mShortcutFolder, 'create' : True})
 
 	def commandShortcutDelete(self):
-		return self._commandPlugin(action = 'shortcutsShow', parameters = {'id' : self.mShortcutId, 'location' : self.mShortcutLocation, 'delete' : True})
+		return self._commandPlugin(action = 'shortcutShow', parameters = {'id' : self.mShortcutId, 'delete' : True})
 
 	def commandOrionVoteUp(self):
 		return self._commandPlugin(action = 'orionVoteUp', parameters = {'idItem' : self.mOrion['item'], 'idStream' : self.mOrion['stream']})
@@ -4337,19 +4465,19 @@ class Context(object):
 		return self._commandPlugin(action = 'orionRemove', parameters = {'idItem' : self.mOrion['item'], 'idStream' : self.mOrion['stream']})
 
 	def commandRefreshMenu(self):
-		return self._commandPlugin(action = 'refreshMenu', parameters = {'media' : self.mMedia, 'playback' : True})
+		return self._commandPlugin(action = 'refreshMenu', parameters = {'media' : self.mMedia, 'playback' : True, 'container' : self._container()})
 
 	def commandRefreshMovie(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container()})
 
 	def commandRefreshShow(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.TypeShow, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container()})
 
 	def commandRefreshSeason(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.TypeSeason, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Season, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'container' : self._container()})
 
 	def commandRefreshEpisode(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.TypeEpisode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Episode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'container' : self._container()})
 
 	def commandRefreshList(self):
 		# There are different ways we can reload the directory:
@@ -4358,29 +4486,35 @@ class Context(object):
 		#	3. ReplaceWindow(videos,path): Works, but replaces the entire menu history. Also shows and empty window while the new metadata is retrieved.
 		#	4. _commandPlugin(): As if this was just a standard command. Refreshing metadata works, but when recreating the menu with interface.Directory, it complaints that the handle is invalid/-1, since the command was launched from the context instead of the normal directory navigation.
 		#	5. _commandPlugin(): Execute the command to refresh the metadata, but do not create as menu with interface.Directory. Instead, just call Container.Refresh to let Kodi update the directory with the latests metadata.
+		from lib.meta.menu import MetaMenu
 
-		command = tools.System.infoLabel('Container.FolderPath')
-		command = tools.System.commandResolve(command = command)
-		command['refresh'] = True
-		return self._commandPlugin(action = command['action'], parameters = command)
+		# NB: "full=False". Otherwise it this is called from the context of a movie entry, it will add the movie's niche to the refresh command to refresh the menu with, which is not what we want.
+		return self._commandPlugin(parameters = MetaMenu.commandCreateRefresh(container = self._container(), parameters = self.mQuery), full = False)
+
+	def commandProvider(self, provider = None):
+		if provider:
+			from lib.meta.menu import MetaMenu
+			return self._commandMenu(parameters = MetaMenu.commandCreateProvider(provider = provider, command = self.mLink))
+		else:
+			return self._commandMenu(command = self.mLink)
 
 	def commandLibraryAddDirect(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'link' : self.mLibrary})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : self.mMedia, 'link' : self.mLibrary})
 
 	def commandLibraryAddStream(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'link' : self.mLink, 'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'episode' : self.mEpisode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'link' : self.mLink})
 
 	def commandLibraryAddMovie(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'title' : self.mTitle, 'year' : self.mYear, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt})
 
 	def commandLibraryAddEpisode(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'episode' : self.mEpisode, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : tools.Media.Episode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode})
 
 	def commandLibraryAddSeason(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'title' : self.mTitle, 'year' : self.mYear, 'season' : self.mSeason, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : tools.Media.Season, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason})
 
 	def commandLibraryAddShow(self):
-		return self._commandPlugin(action = 'libraryAdd', parameters = {'title' : self.mTitle, 'year' : self.mYear, 'imdb' : self.mImdb, 'tvdb' : self.mTvdb, 'metadata' : self.mMetadata})
+		return self._commandPlugin(action = 'libraryAdd', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt})
 
 	def commandLibraryUpdate(self):
 		return self._commandPlugin(action = 'libraryUpdate', parameters = {'force' : True})
@@ -4449,19 +4583,13 @@ class Context(object):
 		return self._commandPlugin(action = 'oracle', parameters = {'media' : None, 'full' : True}) # Always show the full window process when launched from the context menu. So if the user has disabled certain steps in the settings, the full mode & search mode can still be launched from the context.
 
 	def commandOracleMovie(self):
-		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeMovie, 'full' : True})
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.Movie, 'full' : True})
 
 	def commandOracleShow(self):
-		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeShow, 'full' : True})
-
-	def commandOracleDocu(self):
-		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeDocumentary, 'full' : True})
-
-	def commandOracleShort(self):
-		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeShort, 'full' : True})
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.Show, 'full' : True})
 
 	def commandOracleSet(self):
-		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.TypeSet, 'full' : True})
+		return self._commandPlugin(action = 'oracle', parameters = {'media' : tools.Media.Set, 'full' : True})
 
 	def add(self, label, icon = None, action = None, command = None, parameters = None, condition = None, dynamic = None, close = None, loader = None, items = None):
 		try:
@@ -4486,24 +4614,24 @@ class Context(object):
 									for k in j['items']:
 										if not 'icon' in k: k['icon'] = icon
 			self.mItems.append(item)
-		except:
-			tools.Logger.error()
+		except: tools.Logger.error()
 
 	def addGeneric(self):
 		try:
+			self.addProvider()
 			self.addLibrary()
 			self.addPlaylist()
 			self.addShortcut()
+			self.addTrakt()
 			self.addTools()
-		except:
-			tools.Logger.error()
+		except: tools.Logger.error()
 
 	def addItem(self):
 		try:
 			self.addInformation()
-			if self.mMedia == tools.Media.TypeSet:
+			if self.mMedia == tools.Media.Set:
 				self.addLink()
-			else:
+			elif not self.mMedia == tools.Media.Person:
 				self.addVideos()
 				self.addBrowse()
 				self.addBinge()
@@ -4516,8 +4644,7 @@ class Context(object):
 			self.addDownloads()
 			self.addRefresh()
 			self.addTools()
-		except:
-			tools.Logger.error()
+		except: tools.Logger.error()
 
 	def addStream(self):
 		try:
@@ -4555,18 +4682,21 @@ class Context(object):
 
 	def addInformation(self):
 		items = []
-		if Context.SettingsInformer: # Kodi can only show the dialog for the currently selected ListItem in the GUI.
+
+		# Kodi can only show the dialog for the currently selected ListItem in the GUI.
+		# Update: This seems to be solved in Kodi 21, probably also Kodi 20.
+		if Context.SettingsInformer and tools.System.versionKodiMaximum(version = 19):
 			label = 33419
 			if self.mMode == Context.ModeStream: label = 35506 if self.mEpisode is None else 35509
 			items.insert(0, {'label' : label, 'command' : 'commandInformation', 'loader' : True})
 		else:
-			if self.mMedia == tools.Media.TypePerson: items.insert(0, {'label' : 35819, 'command' : 'commandInformationPerson', 'loader' : True})
-			if tools.Media.typeTelevision(self.mMedia):
+			if self.mMedia == tools.Media.Person: items.insert(0, {'label' : 35819, 'command' : 'commandInformationPerson', 'loader' : True})
+			if tools.Media.isSerie(self.mMedia):
 				if not self.mEpisode is None: items.insert(0, {'label' : 35509, 'command' : 'commandInformationEpisode', 'loader' : True})
 				if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
-				if not self.mTvdb is None: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
-			else:
-				if (self.mImdb is None or not self.mTmdb is None) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
+				if self.mImdb or self.mTmdb or self.mTvdb or self.mTrakt: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
+			elif tools.Media.isFilm(self.mMedia):
+				if (self.mImdb or self.mTmdb or self.mTvdb or self.mTrakt) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
 
 		if self.mMode == Context.ModeStream: items.insert(0, {'label' : 33415, 'command' : 'commandInformationStream', 'loader' : True})
 
@@ -4585,37 +4715,25 @@ class Context(object):
 	def addActivity(self):
 		items = []
 
-		watched = False
-		try: watched = self.mMetadata['playcount'] > 0
-		except: pass
-		if not watched: # Partially watched shows/seasons.
-			try: watched = self.mMetadata['count']['episode']['watched'] > 0
-			except: pass
-
-		rated = False
-		try: rated = self.mMetadata['userrating']
-		except: pass
-
-		progress = None
-		try: progress = self.mMetadata['progress']
-		except: pass
-
 		items.append({'label' : 33651, 'command' : 'commandActivityWatch', 'loader' : True})
-		if watched: items.append({'label' : 33652, 'command' : 'commandActivityUnwatch', 'loader' : True})
+		if self.mPlays: items.append({'label' : 33652, 'command' : 'commandActivityUnwatch', 'loader' : True})
 
 		items.append({'label' : 33653, 'command' : 'commandActivityRate', 'loader' : True})
-		if rated: items.append({'label' : 33654, 'command' : 'commandActivityUnrate', 'loader' : True})
+		if self.mRating: items.append({'label' : 33654, 'command' : 'commandActivityUnrate', 'loader' : True})
 
-		if progress: items.append({'label' : 33979, 'command' : 'commandActivityReset', 'loader' : True})
+		if self.mProgress: items.append({'label' : 33979, 'command' : 'commandActivityReset', 'loader' : True})
 		items.append({'label' : 33678, 'command' : 'commandActivityRefresh', 'loader' : True})
 
 		if Context.EnabledTrakt: items.append({'label' : 32070, 'command' : 'commandActivityTrakt', 'loader' : True})
 
 		self.add(label = 35051, icon = Font.IconActivity, items = items)
 
+	def addTrakt(self):
+		self.add(label = 32315, icon = Font.IconTrakt, command = 'commandActivityTrakt', loader = True)
+
 	def addScrape(self):
 		if self.mTvdb is None or not self.mEpisode is None:
-			television = tools.Media.typeTelevision(self.mMedia)
+			serie = tools.Media.isSerie(self.mMedia)
 			self.add(label = 35514, icon = Font.IconScrape, items = [
 				{'label' : 33353, 'command' : 'commandScrapeAgain', 'loader' : True},
 				{'label' : 35522, 'command' : 'commandScrapeManual', 'loader' : True},
@@ -4624,12 +4742,12 @@ class Context(object):
 					{'label' : 35522, 'command' : 'commandScrapePresetManual', 'loader' : True},
 					{'label' : 35523, 'command' : 'commandScrapePresetAutomatic', 'loader' : True},
 				]},
-				{'label' : 35585, 'command' : 'commandScrapeSingle', 'condition' : 'Context.EnabledBinge', 'loader' : True} if television else None,
-				{'label' : 35586, 'command' : 'commandScrapeBinge', 'condition' : 'not Context.EnabledBinge', 'loader' : True} if television else None,
+				{'label' : 35585, 'command' : 'commandScrapeSingle', 'condition' : 'Context.EnabledBinge', 'loader' : True} if serie else None,
+				{'label' : 35586, 'command' : 'commandScrapeBinge', 'condition' : 'not Context.EnabledBinge', 'loader' : True} if serie else None,
 			])
 
 	def addBinge(self):
-		if tools.Media.typeTelevision(self.mMedia):
+		if tools.Media.isSerie(self.mMedia):
 			self.add(label = 35580, icon = Font.IconBinge, command = 'commandBinge', loader = True)
 
 	def addPlaylist(self):
@@ -4650,7 +4768,7 @@ class Context(object):
 		spoilers = Translation.string(35533)
 		spoilers = ' (%s)' % spoilers
 		self.add(label = 35351, icon = Font.IconVideo, items = [
-			{'label' : Translation.string(video.Trailer.Label), 'command' : 'commandVideo', 'parameters' : video.Trailer.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoTrailer or not tools.Media.typeTelevision(self.mMedia) else None,
+			{'label' : Translation.string(video.Trailer.Label), 'command' : 'commandVideo', 'parameters' : video.Trailer.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoTrailer or not tools.Media.isSerie(self.mMedia) else None,
 			{'label' : Translation.string(video.Recap.Label), 'command' : 'commandVideo', 'parameters' : video.Recap.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoRecap else None,
 			{'label' : Translation.string(video.Review.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Review.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReview else None,
 			{'label' : Translation.string(video.Extra.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Extra.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoExtra else None,
@@ -4669,19 +4787,21 @@ class Context(object):
 		])
 
 	def addRefresh(self):
-		items = [{'label' : 33060, 'command' : 'commandRefreshMenu', 'loader' : True}]
-		if tools.Media.typeMovie(self.mMedia):
+		items = [
+			{'label' : 33060, 'command' : 'commandRefreshMenu', 'loader' : True},
+			{'label' : 33526, 'command' : 'commandRefreshList', 'loader' : True},
+		]
+		if tools.Media.isFilm(self.mMedia):
 			items.append({'label' : 33522, 'command' : 'commandRefreshMovie', 'loader' : True})
-		elif tools.Media.typeTelevision(self.mMedia):
+		elif tools.Media.isSerie(self.mMedia):
 			if not self.mEpisode is None: items.append({'label' : 33525, 'command' : 'commandRefreshEpisode', 'loader' : True})
 			if not self.mSeason is None: items.append({'label' : 33524, 'command' : 'commandRefreshSeason', 'loader' : True})
 			items.append({'label' : 33523, 'command' : 'commandRefreshShow', 'loader' : True})
-		items.append({'label' : 33526, 'command' : 'commandRefreshList', 'loader' : True})
 
 		self.add(label = 32072, icon = Font.IconRefresh, items = items, loader = True)
 
 	def addBrowse(self):
-		if tools.Media.typeTelevision(self.mMedia):
+		if tools.Media.isSerie(self.mMedia):
 			if self.mSeason is None:
 				self.add(label = 32071, icon = Font.IconBrowse, command = 'commandBrowse')
 			else:
@@ -4701,8 +4821,8 @@ class Context(object):
 			{'label' : 35472, 'command' : 'commandManualDefault', 'condition' : 'Context.EnabledDownloadManual'},
 			{'label' : 33562, 'command' : 'commandManualSelection', 'condition' : 'Context.EnabledDownloadManual'},
 			{'label' : 35161, 'command' : 'commandManualFile', 'condition' : 'Context.EnabledDownloadManual'},
-			{'label' : 33229, 'command' : 'commandDownloadsCloud', 'condition' : 'Context.EnabledDownloadCloud'},
 			{'label' : 33585, 'command' : 'commandManualManager', 'close' : True, 'condition' : 'Context.EnabledDownloadManual and Context.EnabledManagerManual', 'loader' : True},
+			{'label' : 33229, 'command' : 'commandDownloadCloud', 'condition' : 'Context.EnabledDownloadCloud'},
 		])
 
 	def addCache(self):
@@ -4726,43 +4846,47 @@ class Context(object):
 			{'label' : 35688, 'command' : 'commandFileLink', 'parameters' : 'resolved', 'loader' : True},
 			{'label' : 35460, 'command' : 'commandFileLink', 'parameters' : 'stream', 'loader' : True},
 		]
-		if tools.Media.typeTelevision(self.mMedia) and not self.mSeason is None:
-			sublinks = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.TypeShow, 'loader' : True}]
-			if not self.mSeason is None: sublinks.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSeason, 'loader' : True})
-			if not self.mEpisode is None: sublinks.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.TypeEpisode, 'loader' : True})
+		if tools.Media.isSerie(self.mMedia) and not self.mSeason is None:
+			sublinks = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.Show, 'loader' : True}]
+			if not self.mSeason is None: sublinks.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.Season, 'loader' : True})
+			if not self.mEpisode is None: sublinks.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.Episode, 'loader' : True})
 			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True, 'items' : sublinks})
-		elif 'collection' in self.mMetadata and 'id' in self.mMetadata['collection'] and self.mMetadata['collection']['id']:
+		elif self.mSet:
 			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True, 'items' : [
-				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.TypeMovie, 'loader' : True},
-				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSet, 'loader' : True}
+				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.Movie, 'loader' : True},
+				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.Set, 'loader' : True}
 			]})
+		elif self.mMedia:
+			links.append({'label' : 36481, 'command' : 'commandLink', 'parameters' : self.mMedia, 'loader' : True})
 		else:
 			links.append({'label' : 36481, 'command' : 'commandLink', 'loader' : True})
 
 		self.add(label = 33380, icon = Font.IconFile, items = [
-			{'label' : 35434, 'command' : 'commandFileAdd', 'close' : True},
+			{'label' : 35434, 'command' : 'commandFileAdd'},
 			{'label' : 33031, 'items' : links},
 			{'label' : 33036, 'command' : 'commandFileName', 'loader' : True} if self.mName else None,
 			{'label' : 33494, 'command' : 'commandFileHash', 'loader' : True} if self.mHash else None,
 		])
 
 	def addLink(self):
-		if tools.Media.typeTelevision(self.mMedia) and not self.mSeason is None:
-			links = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.TypeShow, 'loader' : True}]
-			if not self.mSeason is None: links.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSeason, 'loader' : True})
-			if not self.mEpisode is None: links.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.TypeEpisode, 'loader' : True})
+		if tools.Media.isSerie(self.mMedia) and not self.mSeason is None:
+			links = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.Show, 'loader' : True}]
+			if not self.mSeason is None: links.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.Season, 'loader' : True})
+			if not self.mEpisode is None: links.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.Episode, 'loader' : True})
 			self.add(label = 33381, icon = Font.IconLink, items = links)
-		elif 'collection' in self.mMetadata and 'id' in self.mMetadata['collection'] and self.mMetadata['collection']['id']:
+		elif self.mSet:
 			self.add(label = 33381, icon = Font.IconLink, items = [
-				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.TypeMovie, 'loader' : True},
-				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.TypeSet, 'loader' : True}
+				{'label' : 36485, 'command' : 'commandLink', 'parameters' : tools.Media.Movie, 'loader' : True},
+				{'label' : 36486, 'command' : 'commandLink', 'parameters' : tools.Media.Set, 'loader' : True}
 			])
+		elif self.mMedia:
+			self.add(label = 33381, icon = Font.IconLink, command = 'commandLink', parameters = self.mMedia, loader = True)
 		else:
 			self.add(label = 33381, icon = Font.IconLink, command = 'commandLink', loader = True)
 
 	def addShortcut(self):
-		from lib.modules.shortcuts import Shortcuts
-		if Shortcuts.enabled():
+		from lib.modules.shortcut import Shortcut
+		if Shortcut.enabled():
 			if self.mShortcutCreate: self.add(label = 35119, icon = Font.IconShortcut, command = 'commandShortcutCreate', loader = True)
 			elif self.mShortcutDelete: self.add(label = 35119, icon = Font.IconShortcut, command = 'commandShortcutDelete', loader = True)
 
@@ -4774,15 +4898,27 @@ class Context(object):
 				{'label' : 35529, 'command' : 'commandOrionRemove'},
 			])
 
+	def addProvider(self):
+		if self.mProvider:
+			from lib.meta.menu import MetaMenu
+			from lib.meta.manager import MetaManager
+			items = []
+			search = MetaMenu.commandIsSearch(command = self.mLink)
+			manager = MetaManager.instance()
+			label = Translation.string(36335 if search else 33573)
+			items.append({'label' : 36334 if search else 33572, 'command' : 'commandProvider', 'parameters' : None})
+			for i in self.mProvider: items.append({'label' : label % manager.providerName(i), 'command' : 'commandProvider', 'parameters' : i})
+			self.add(label = 32010 if search else 33537, icon = Font.IconSearch if search else Font.IconExplore, items = items)
+
 	def addLibrary(self):
 		items = []
 		if not self.mLibrary is None:
 			items.append({'label' : self._translate(35495, 32515), 'command' : 'commandLibraryAddDirect', 'condition' : 'Context.EnabledLibrary'})
 		elif self.mMode == Context.ModeStream and not self.mLink is None:
 			items.append({'label' : self._translate(35495, 33071), 'command' : 'commandLibraryAddStream', 'condition' : 'Context.EnabledLibrary'})
-		if tools.Media.typeMovie(self.mMedia) and (not self.mImdb == None or not self.mTmdb is None):
-			items.append({'label' : self._translate(35495, 35497 if self.mMedia == tools.Media.TypeDocumentary else 35110  if self.mMedia == tools.Media.TypeShort else 35496), 'command' : 'commandLibraryAddMovie', 'condition' : 'Context.EnabledLibrary'})
-		if tools.Media.typeTelevision(self.mMedia) and (not self.mImdb is None or not self.mTvdb is None):
+		if tools.Media.isFilm(self.mMedia) and (not self.mImdb == None or not self.mTmdb is None):
+			items.append({'label' : self._translate(35495, 35496), 'command' : 'commandLibraryAddMovie', 'condition' : 'Context.EnabledLibrary'})
+		if tools.Media.isSerie(self.mMedia) and (not self.mImdb is None or not self.mTvdb is None):
 			if not self.mSeason is None and not self.mEpisode is None:
 				items.append({'label' : self._translate(35495, 33028), 'command' : 'commandLibraryAddEpisode', 'condition' : 'Context.EnabledLibrary'})
 			if not self.mSeason is None:
@@ -4829,8 +4965,6 @@ class Context(object):
 				{'label' : 36331, 'icon' : Font.IconSettings, 'command' : 'commandOracleGeneric'},
 				{'label' : 36332, 'icon' : Font.IconSettings, 'command' : 'commandOracleMovie'},
 				{'label' : 36333, 'icon' : Font.IconSettings, 'command' : 'commandOracleShow'},
-				{'label' : 36334, 'icon' : Font.IconSettings, 'command' : 'commandOracleDocu'},
-				{'label' : 36335, 'icon' : Font.IconSettings, 'command' : 'commandOracleShort'},
 				{'label' : 36336, 'icon' : Font.IconSettings, 'command' : 'commandOracleSet'},
 			]},
 		])

@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 __title__ = 'geonamescache'
-__version__ = '1.3.0'
+__version__ = '2.0.0'
 __author__ = 'Ramiro Gómez'
 __license__ = 'MIT'
 
 
-import os
 import json
+import os
+
 from . import geonamesdata
 
 
@@ -19,7 +20,9 @@ class GeonamesCache:
     cities_items = None
     cities_by_names = {}
     us_counties = None
-    datadir = os.path.dirname(os.path.abspath(__file__))
+
+    def __init__(self, min_city_population=15000):
+        self.min_city_population = min_city_population
 
     def get_dataset_by_key(self, dataset, key):
         return dict((d[key], d) for c, d in list(dataset.items()))
@@ -48,7 +51,7 @@ class GeonamesCache:
         """Get a dictionary of cities keyed by geonameid."""
 
         if self.cities is None:
-            self.cities = self._load_data(self.cities, 'cities.json')
+            self.cities = self._load_data(self.cities, f'cities{self.min_city_population}.json')
         return self.cities
 
     def get_cities_by_name(self, name):
@@ -66,35 +69,36 @@ class GeonamesCache:
 
     def get_us_counties(self):
         if self.us_counties is None:
-            self.us_counties = self._load_data(
-                self.us_counties, 'us_counties.json')
+            self.us_counties = self._load_data(self.us_counties, 'us_counties.json')
         return self.us_counties
 
-    def search_cities(self, query, attribute='alternatenames', case_sensitive=True):
+    def search_cities(self, query, attribute='alternatenames', case_sensitive=False, contains_search=True):
         """Search all city records and return list of records, that match query for given attribute."""
-
         results = []
-        for key, record in self.get_cities().items():
-            if case_sensitive:
-                if query in record[attribute]:
+        query = (case_sensitive and query) or query.casefold()
+        for record in self.get_cities().values():
+            record_value = record[attribute]
+            if contains_search:
+                if isinstance(record_value, list):
+                    if any(query in ((case_sensitive and value) or value.casefold()) for value in record_value):
+                        results.append(record)
+                elif query in ((case_sensitive and record_value) or record_value.casefold()):
                     results.append(record)
             else:
-                lower_func = 'casefold' if hasattr('', 'casefold') else 'lower'
-                if isinstance(record[attribute], list):
-                    if any(
-                        getattr(query, lower_func)() == getattr(value, lower_func)()
-                        for value in record[attribute]
-                    ):
-                        results.append(record)
-                elif (
-                    getattr(query, lower_func)()
-                    in getattr(record[attribute], lower_func)()
-                ):
+                if isinstance(record_value, list):
+                    if case_sensitive:
+                        if query in record_value:
+                            results.append(record)
+                    else:
+                        if any(query == value.casefold() for value in record_value):
+                            results.append(record)
+                elif query == ((case_sensitive and record_value) or record_value.casefold()):
                     results.append(record)
         return results
 
-    def _load_data(self, datadict, datafile):
+    @staticmethod
+    def _load_data(datadict, datafile):
         if datadict is None:
-            with open(os.path.join(self.datadir, datafile), 'r') as f:
+            with open(os.path.join(os.path.dirname(__file__), 'data', datafile)) as f:
                 datadict = json.load(f)
         return datadict

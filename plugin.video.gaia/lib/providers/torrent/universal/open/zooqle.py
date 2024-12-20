@@ -21,6 +21,15 @@
 from lib.providers.core.html import ProviderHtml, Html, HtmlResults, HtmlResult, HtmlLink, HtmlDiv
 from lib.modules.tools import Regex
 
+# Update (2024-12):
+#	There are 2 new domains:
+#		https://zooqle.io
+#		https://zooqle.pro
+# But they do not have a table layout anymore.
+# Plus it contains very few links.
+# Plus it only has movies, no shows.
+# So probably not worth implementing these new domains.
+
 class Provider(ProviderHtml):
 
 	_Link				= ['https://zooqle.com']
@@ -56,7 +65,7 @@ class Provider(ProviderHtml):
 			description					= '{name} has a very large database of {containers} and metadata. The site contains results in various languages, but most of them are in Russian or English.',
 			rank						= 5,
 			performance					= ProviderHtml.PerformanceGood,
-			status						= ProviderHtml.StatusDead, # 2022-06-20: website hass been down. From Reddit is seems to be down from April 2022.
+			status						= ProviderHtml.StatusDead, # 2022-06-20: website hass been down. From Reddit is seems to be down from April 2022. Update (2024-12): Still down.
 
 			link						= Provider._Link,
 			mirror						= Provider._Mirror,

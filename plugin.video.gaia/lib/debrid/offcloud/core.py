@@ -145,7 +145,7 @@ class Core(base.Core):
 	def __init__(self):
 		base.Core.__init__(self, Core.Id, Core.Name, Core.LinkMain)
 
-		self.mAccount = Account()
+		self.mAccount = Account.instance()
 
 		self.mDebug = True
 		self.mLinkBasic = None
@@ -1147,8 +1147,8 @@ class Core(base.Core):
 					# First try the individual file names, and only if nothing was found, try with the full folder path and name.
 					# Otherwise this file will match for "The Terminator 1984":
 					#	The Terminator Collection (1984-2019) 2009.Terminator.Salvation.1920x800.BDRip.x264.DTS-HD.MA.mkv
-					index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues1, title = title, year = year, exclude = True, valid = validTitles)
-					if index is None: index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues2, title = title, year = year, exclude = True, valid = validTitles)
+					index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues1, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
+					if index is None: index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues2, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
 					if not index is None: video = lookupFiles[index]
 					validTitles = [lookupFiles[i] for i in validTitles]
 

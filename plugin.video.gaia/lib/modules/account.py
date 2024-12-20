@@ -43,6 +43,7 @@ class Account(object):
 	AttributeCode			= 'code'			# OAuth user_code
 	AttributeDevice			= 'device'			# OAuth device_code
 	AttributeLink			= 'link'			# OAuth verification_url
+	AttributeLinked			= 'linked'			# OAuth verification_url with the code added to the URL for quick QR scanning.
 	AttributeExpiration		= 'expiration'		# OAuth expires_in
 	AttributeInterval		= 'interval'		# OAuth interval
 	AttributeLabel			= 'label'
@@ -80,6 +81,7 @@ class Account(object):
 	DefaultCancel			= 0.5				# 500 milliseconds
 
 	Data					= {}
+	Instance				= {}
 
 	# level: at which Kodi settings level the account should be visible.
 	# rank: a value in [1,5] that shows how important the account is to the functionality of Gaia.
@@ -137,6 +139,18 @@ class Account(object):
 	def reset(self, settings = True):
 		if settings:
 			Account.Data = {}
+			Account.Instance = {}
+
+	##############################################################################
+	# INSTANCE
+	##############################################################################
+
+	@classmethod
+	def instance(self, **parameters):
+		instance = self.__name__
+		if parameters: instance += '_' + str('_'.join(parameters.values()))
+		if not instance in Account.Instance: Account.Instance[instance] = self(**parameters)
+		return Account.Instance[instance]
 
 	##############################################################################
 	# GENERAL
@@ -664,10 +678,11 @@ class Account(object):
 			except: interval = None
 			if not interval: interval = Account.DefaultInterval
 			link = dataInitiate[Account.AttributeLink]
+			linked = dataInitiate.get(Account.AttributeLinked)
 			code = dataInitiate[Account.AttributeCode]
 
 			from lib.modules.window import WindowQr
-			dialog = WindowQr.show(link = link, code = code, icon = self.icon(), color = self.color())
+			dialog = WindowQr.show(link = link, linked = linked, code = code, icon = self.icon(), color = self.color())
 
 			dataCheck = None
 			iterations1 = int(expiration / interval)
@@ -845,6 +860,12 @@ class Youtube(Account):
 			color = 'FFFF0000',
 		)
 
+	@classmethod
+	def agent(self):
+		# Update (2024-11): Making requests to YouTube pages can now return an error page with: "Please update your browser ..."
+		# Add a more recent user-agent to avoid these errors.
+		return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+
 	def _verify(self, data = None):
 		from lib.modules.video import Video
 		if data is None: data = self.dataKey()
@@ -956,7 +977,7 @@ class Trakt(Account):
 
 			level = 0,
 			rank = 5,
-			color = 'FFED1C24',
+			color = 'FFAA39AE',
 		)
 
 	def _verify(self):
@@ -1278,7 +1299,7 @@ class Tvdb(Account):
 
 class Opensubtitles(Account):
 
-	Link = 'https://opensubtitles.org'
+	Link = 'https://opensubtitles.com'
 
 	def __init__(self):
 		Account.__init__(self,
@@ -1293,8 +1314,12 @@ class Opensubtitles(Account):
 
 			level = 1,
 			rank = 3,
-			color = 'FFC1DC14',
+			color = 'FF231F20',
 		)
+
+	@classmethod
+	def key(self):
+		return System.obfuscate(Settings.getString('internal.key.opensubtitles', raw = True))
 
 	@classmethod
 	def prepare(self):
@@ -1302,8 +1327,10 @@ class Opensubtitles(Account):
 		#	from xmlrpc.client import ServerProxy
 		# in Subtitle._connection() can cause a deadlock.
 		# When importing outside a thread first, the deadlock is gone.
-		from lib.modules.subtitle import Subtitle
-		Subtitle.prepare()
+		# Update: The new OpenSubtitles does not use xmlrpc anymore.
+		#from lib.modules.subtitle import Subtitle
+		#Subtitle.prepare()
+		pass
 
 	def _verify(self, data = None):
 		from lib.modules.subtitle import Subtitle

@@ -1,4 +1,62 @@
 
+[B]7.0.0 (2024.12.20)[/B]
+- Way too many changes to list them all here.
+- Added database compression support.
+- Implemented proper Trakt sync activities.
+- Improved Trakt history retrieval.
+- Improved Trakt progress retrieval.
+- Improved Trakt rating retrieval.
+- Fixed Trakt show watched list.
+- Improved Trakt local lookup times.
+- Improved binge process for last episode.
+- Fixed dangling playback window.
+- Improved rating dialog responsiveness.
+- Fixed quick menu loader.
+- Added Trakt movie disc releases.
+- Improved IMDb batch requests.
+- Improved TMDb movie disc releases.
+- Improved TMDb season ratings.
+- Improved TMDb API calls.
+- Retrieve various TMDb release dates.
+- Added audio language to list items.
+- Added TMDb images for shows.
+- Added customizable progress menu.
+- Added progress submenus.
+- Added customizable arrivals menu.
+- Added release submenus.
+- Added advanced menu paging.
+- Added advanced menu sorting.
+- Added advanced menu filtering.
+- Fixed subtitles on paused playback.
+- Added TMDb thumbnails for episodes.
+- Added new OpenSubtitles support.
+- Improved skipping intro chapters.
+- Reduced rating and continue dialog timeouts.
+- Fixed rating and continue dialog actions.
+- Fixed offline provider dataset preparation.
+- Improved stream language detection.
+- Redesigned history database and class.
+- Fixed unique identifier generation.
+- Improved batch title matching.
+- Improved audio codec detection.
+- Improved cache background refreshing.
+- Fixed RealDebrid automatic file selection.
+- Improved stream language detection.
+- Improved file name matching against titles.
+- Fixed fonts for OSMC skin.
+- Fixed release language order.
+- Added visibility and order customization for menus.
+- Added shortcuts for kids menu.
+- Fixed IMDb metadata completion.
+- Fixed QR window if the QR image fails.
+- Removed documentary media type.
+- Removed short film media type.
+- Restructured media class.
+- Reduced threads required for scraping.
+
+[B]6.4.4 (2024.03.11)[/B]
+- Hotfix for new YouTube addon settings.
+
 [B]6.4.3 (2023.08.22)[/B]
 - Re-enabled BitCQ torrent provider.
 - Moved release validation to exclusions.

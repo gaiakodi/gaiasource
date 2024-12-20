@@ -28,14 +28,18 @@ from lib.providers.core.html import ProviderHtml, Html, HtmlResults, HtmlResult,
 #	2. There is no way to filter by seaason/episode number in the API. The API returns all the episode for a given show. If the wanted link is on page 5, but the user only scrapes up to page 3, nothing will be found.
 #	3. The API cannot do exact searches.
 
+# Update (2024-12): The new site now does not show the magnets on the first page anymore and requires a button click.
+# This just sends some form-data to make the magnets visible without much effort.
+# But use the API as default for now.
+
 class Provider(ProviderJson, ProviderHtml):
 
-	_Link				= ['https://eztv.re', 'https://eztv.wf', 'https://eztv.tf', 'https://eztv.yt', 'https://eztv.ag', 'https://eztv.it', 'https://eztv.ch']
+	_Link				= ['https://eztvx.to', 'https://eztv.ag', 'https://eztv.it', 'https://eztv.ch', 'https://eztv.li', 'https://eztv.wf', 'https://eztv.tf', 'https://eztv.yt', 'https://eztv.re']
 	_Mirror				= ['https://eztvstatus.com']
 	_Unblock			= {ProviderHtml.UnblockFormat1 : 'eztv', ProviderHtml.UnblockFormat2 : 'eztv', ProviderHtml.UnblockFormat3 : 'eztv2', ProviderHtml.UnblockFormat4 : 'eztv'}
 	_Path				= {
-							ProviderHtml.Version1 : 'search/%s',
-							ProviderHtml.Version2 : 'api/get-torrents?imdb_id=%s&page=%s&limit=%d',
+							ProviderHtml.Version1 : 'api/get-torrents?imdb_id=%s&page=%s&limit=%d',
+							ProviderHtml.Version2 : 'search/%s',
 						}
 
 	_LimitOffset		= 100	# The maximum number of results returned by a query.
@@ -59,6 +63,9 @@ class Provider(ProviderJson, ProviderHtml):
 
 	_AttributeTable		= 'forum_header_border'
 
+	_AttributeLayout	= 'layout'
+	_AttributeLinks		= 'def_wlinks'
+
 	##############################################################################
 	# INITIALIZE
 	##############################################################################
@@ -66,24 +73,6 @@ class Provider(ProviderJson, ProviderHtml):
 	def initialize(self):
 		version = self.customVersion()
 		if version == ProviderHtml.Version1:
-			provider					= ProviderHtml
-			supportPack					= True
-			offsetStart					= None # Only "latests releases" has page numbers. Result pages list all links on one page.
-			offsetIncrease				= None
-			formatEncode				= ProviderHtml.FormatEncodeMinus
-			formatCase					= ProviderHtml.FormatCaseLower
-			searchQuery					= Provider._Path[version] % ProviderJson.TermQuery
-
-			extractList					= HtmlResults(class_ = Provider._AttributeTable, index = -1, start = 2)
-			extractLink					= [HtmlResult(index = 2), HtmlLink(href_ = ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)]
-			extractFileName				= HtmlResult(index = 1)
-			extractHash					= None
-			extractFileSize				= HtmlResult(index = 3)
-			extractSourceTime			= None
-			extractSourceTimeInexact	= HtmlResult(index = 4)
-			extractSourceSeeds			= HtmlResult(index = 5)
-			extractSourceLeeches		= None
-		elif version == ProviderHtml.Version2:
 			provider					= ProviderJson
 			supportPack					= False
 			offsetStart					= 1
@@ -101,10 +90,35 @@ class Provider(ProviderJson, ProviderHtml):
 			extractSourceTimeInexact	= None
 			extractSourceSeeds			= Provider._AttributeSeeds
 			extractSourceLeeches		= Provider._AttributeLeeches
+		elif version == ProviderHtml.Version2:
+			provider					= ProviderHtml
+			supportPack					= True
+			offsetStart					= None # Only "latests releases" has page numbers. Result pages list all links on one page.
+			offsetIncrease				= None
+			formatEncode				= ProviderHtml.FormatEncodeMinus
+			formatCase					= ProviderHtml.FormatCaseLower
+			searchQuery					= {
+											ProviderHtml.RequestMethod : ProviderHtml.RequestMethodPost,
+											ProviderHtml.RequestPath : Provider._Path[version] % ProviderJson.TermQuery,
+
+											# The new website hides the magnet buttons.
+											# But when POSTing this parameter, the links are made visible.
+											ProviderHtml.RequestData : {Provider._AttributeLayout : Provider._AttributeLinks},
+										},
+
+			extractList					= HtmlResults(class_ = Provider._AttributeTable, index = -1, start = 2)
+			extractLink					= [HtmlResult(index = 2), HtmlLink(href_ = ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)]
+			extractFileName				= HtmlResult(index = 1)
+			extractHash					= None
+			extractFileSize				= HtmlResult(index = 3)
+			extractSourceTime			= None
+			extractSourceTimeInexact	= HtmlResult(index = 4)
+			extractSourceSeeds			= HtmlResult(index = 5)
+			extractSourceLeeches		= None
 
 		provider.initialize(self,
 			name						= 'EZTV',
-			description					= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. {name} only indexes shows and has few results. {name} has two versions of the provider. Version %s scrapes the website and has incomplete metadata. Version %s uses the {name} API. Although the API is fast, its functionality is very limited, often not returning all the available results.' % (ProviderHtml.Version1, ProviderHtml.Version2),
+			description					= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. {name} only indexes shows and has few results. {name} has two versions of the provider. Version %s uses the {name} API. Although the API is fast, its functionality is very limited, often not returning all the available results. Version %s scrapes the website and has incomplete metadata.' % (ProviderHtml.Version1, ProviderHtml.Version2),
 			rank						= 4,
 			performance					= ProviderHtml.PerformanceGood,
 
@@ -141,8 +155,11 @@ class Provider(ProviderJson, ProviderHtml):
 	# PROCESS
 	##############################################################################
 
+	def processFileName(self, value, item, details = None, entry = None):
+		return value if value else None
+
 	def processData(self, data):
-		if self.customVersion2():
+		if self.customVersion1():
 			# EZTV currently only supports searching by IMDb ID, and not by title.
 			# If no results are found, instead of returning nothing, a list of latests releases is returned.
 			# If results are found, the root element contains a IMDb ID attribute.
@@ -150,7 +167,7 @@ class Provider(ProviderJson, ProviderHtml):
 		return data
 
 	def processItems(self, items):
-		if self.customVersion1():
+		if self.customVersion2():
 			# If nothing is found for the query, EZTV returns a table of latest uploads, instead of an empty table.
 			# There seems to be nothing that would distinguish  a fake table like this from a table with actual results.
 			# Just check the number of different shows that appear on the page, and if it exceeds a threshold, assume the page returned nothing.
@@ -160,14 +177,14 @@ class Provider(ProviderJson, ProviderHtml):
 		return items
 
 	def processOffset(self, data, items):
-		if self.customVersion2():
+		if self.customVersion1():
 			count = data[Provider._AttributeCount]
 			limit = data[Provider._AttributeLimit]
 			page = data[Provider._AttributePage]
 			if count <= (limit * page): return ProviderJson.Skip
 
 	def processBefore(self, item):
-		if self.customVersion2():
+		if self.customVersion1():
 			season = item[Provider._AttributeSeason]
 			try: season = int(season)
 			except: season = 0

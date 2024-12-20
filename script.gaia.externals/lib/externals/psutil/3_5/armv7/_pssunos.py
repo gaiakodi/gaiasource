@@ -9,6 +9,8 @@ import functools
 import os
 import socket
 import subprocess
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand')
 import sys
 from collections import namedtuple
 from socket import AF_INET
@@ -140,8 +142,8 @@ def swap_memory():
     #     usr/src/cmd/swap/swap.c
     # ...nevertheless I can't manage to obtain the same numbers as 'swap'
     # cmdline utility, so let's parse its output (sigh!)
-    p = subprocess.Popen(['/usr/bin/env', 'PATH=/usr/sbin:/sbin:%s' %
-                          os.environ['PATH'], 'swap', '-l'],
+    p = subprocess.Popen(gaiaCommand(['/usr/bin/env', 'PATH=/usr/sbin:/sbin:%s' %
+                          os.environ['PATH'], 'swap', '-l']),
                          stdout=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if PY3:
@@ -618,7 +620,7 @@ class Process(object):
         # TODO: rewrite this in C (...but the damn netstat source code
         # does not include this part! Argh!!)
         cmd = "pfiles %s" % pid
-        p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+        p = subprocess.Popen(gaiaCommand(cmd), shell=True, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         if PY3:

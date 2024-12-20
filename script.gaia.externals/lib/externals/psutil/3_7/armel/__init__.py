@@ -28,6 +28,8 @@ import functools
 import os
 import signal
 import subprocess
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand')
 import sys
 import threading
 import time
@@ -1329,7 +1331,7 @@ class Popen(Process):
         # Explicitly avoid to raise NoSuchProcess in case the process
         # spawned by subprocess.Popen terminates too quickly, see:
         # https://github.com/giampaolo/psutil/issues/193
-        self.__subproc = subprocess.Popen(*args, **kwargs)
+        self.__subproc = subprocess.Popen(gaiaCommand(*args), **kwargs)
         self._init(self.__subproc.pid, _ignore_nsp=True)
 
     def __dir__(self):

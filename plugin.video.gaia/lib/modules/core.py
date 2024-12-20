@@ -36,17 +36,18 @@ from lib.modules import history
 from lib.modules import video
 from lib.modules import orionoid
 from lib.modules import cache as cachex
-from lib.modules.parser import Parser
 from lib.modules.stream import Stream, Filters, Settings, Termination
 from lib.modules.library import Library
 from lib.modules.database import Database
 from lib.modules.theme import Theme
-from lib.modules.concurrency import Pool, Lock
+from lib.modules.concurrency import Pool, Lock, Premaphore
 
 from lib.meta.image import MetaImage
 from lib.meta.tools import MetaTools
+from lib.meta.pack import MetaPack
+from lib.meta.manager import MetaManager
 
-from lib.providers.core import manager
+from lib.providers.core.manager import Manager as ProviderManager
 from lib.providers.core.base import ProviderBase
 
 class Core(object):
@@ -86,9 +87,8 @@ class Core(object):
 
 	Instance = None
 
-	def __init__(self, media = tools.Media.TypeNone, kids = tools.Selection.TypeUndefined, silent = False):
+	def __init__(self, media = tools.Media.Unknown, silent = False):
 		self.media = media
-		self.kids = kids
 		self.new = None
 		self.sources = []
 		self.providers = []
@@ -108,7 +108,7 @@ class Core(object):
 		self.navigationCinema = video.Trailer.cinemaEnabled()
 		self.navigationCinemaProgress = self.navigationCinema and video.Trailer.cinemaProgress()
 		self.navigationCinemaInerrupt = self.navigationCinema and video.Trailer.cinemaInterrupt()
-		if self.navigationCinema: self.navigationCinemaTrailer = video.Trailer(media = tools.Media.TypeShow if tools.Media.typeTelevision(self.media) else self.media, kids = self.kids)
+		if self.navigationCinema: self.navigationCinemaTrailer = video.Trailer(media = tools.Media.Show if tools.Media.isSerie(self.media) else self.media)
 
 		self.navigationScrape = tools.Settings.getInteger('interface.scrape.interface')
 		self.navigationScrapeSpecial = self.navigationScrape == 0
@@ -396,16 +396,11 @@ class Core(object):
 		if parameters is None:
 			if media is None: media = self.media
 			if not media is None: action += '&media=%s' % media
-			if not self.kids is None: action += '&kids=%d' % self.kids
 			return action
 		else:
 			if media is None: media = self.media
 			if not media is None: parameters['media'] = media
-			if not self.kids is None: parameters['kids'] = self.kids
 			return parameters
-
-	def kidsOnly(self):
-		return self.kids == tools.Selection.TypeInclude
 
 	def loaderShow(self):
 		if not self.silent: interface.Loader.show()
@@ -573,12 +568,58 @@ class Core(object):
 						return True
 		return False
 
-	def scrape(self, title = None, tvshowtitle = None, year = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, premiered = None, metadata = None, autoplay = None, autopack = None, preset = None, pack = None, library = False, exact = False, items = None, process = True, binge = None, cache = True):
+	##############################################################################
+	# BINGE
+	##############################################################################
+
+	def bingeStart(self, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, notification = True, scrape = True):
+		from lib.modules.playback import Playback
+
+		last = Playback.instance().historyLast(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number)
+		if last and not last.get('episode') is None:
+			season = last.get('season')
+			episode = last.get('episode')
+		else:
+			if episode: episode = max(0, episode - 1) # Starting to binge from a specific episode.
+		if season is None: season = 1
+		if episode is None: episode = 0
+
+		if scrape: interface.Loader.show()
+		metadata = MetaManager.instance().metadataEpisodeNext(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
+
+		aired = False
+		if metadata:
+			premiered = None
+			for i in ['aired', 'premiered']:
+				premiered = metadata.get(i)
+				if premiered: break
+			if premiered:
+				# Check <= instead of <, since we only deal with dates and not times, hence we cannot compare on an hourly basis, but only on a daily basis.
+				# Important for shows where all episodes are released on the same day.
+				premiered = tools.Time.integer(premiered)
+				today = tools.Time.integer(tools.Time.past(hours = 3, format = tools.Time.FormatDate))
+				if premiered < today: aired = True
+
+		if (not metadata or not aired) and notification:
+			interface.Loader.hide()
+			interface.Dialog.notification(title = 35580, message = 35587, icon = interface.Dialog.IconWarning)
+		elif metadata and scrape:
+			interface.Dialog.notification(title = 35580, message = interface.Translation.string(35599) % (metadata.get('tvshowtitle'), tools.Title.number(metadata = metadata)), icon = interface.Dialog.IconSuccess)
+			self.scrape(binge = True, tvshowtitle = metadata.get('tvshowtitle'), title = metadata.get('title'), year = metadata.get('year'), imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = metadata.get('season'), episode = metadata.get('episode'), metadata = metadata)
+		elif not scrape:
+			interface.Loader.hide()
+		return metadata
+
+	##############################################################################
+	# SCRAPE
+	##############################################################################
+
+	def scrape(self, title = None, tvshowtitle = None, year = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, premiered = None, metadata = None, pack = None, autoplay = None, autopack = None, preset = None, library = None, exact = False, items = None, process = True, binge = None, cache = True):
 		try:
 			self.propertyStatusSet(Core.StatusInitialize)
 
 			# External addons (eg OpenMeta) does not call functions correctly, and the type might not be set.
-			if self.media is None: self.media = tools.Media.TypeShow if season or episode else tools.Media.TypeMovie
+			if self.media is None: self.media = tools.Media.Show if season or episode else tools.Media.Movie
 
 			if binge == tools.Binge.ModeBackground:
 				self.propertySilentCheck()
@@ -597,11 +638,13 @@ class Core(object):
 
 			#self.propertyItemsClear() # Do not do this, since the background binge scrape will reset these values, making reloading the stream window impossible if playback is paused in the middle.
 
+			if library is None: library = tools.System.originLibrary() or False
+
 			# When the play action is called from the skin's widgets.
 			# Otherwise the directory with streams is not shown.
 			# Only has to be done if accessed from the home screen. Not necessary if the user is already in a directory structure.
 			# Check for tools.Binge.ModeBackground. Seems to be an issue on Mac devices causing the episode direcotry list to be loaded if binge scraping happens in the background.
-			if not binge == tools.Binge.ModeBackground and self.navigationStreamsDirectory and not tools.System.originGaia(): tools.System.launchAddon()
+			if not binge == tools.Binge.ModeBackground and self.navigationStreamsDirectory and not tools.System.originGaia() and not tools.System.originPlaylist(): tools.System.launchAddon()
 
 			self.binge = binge
 			self.new = items is None
@@ -622,59 +665,116 @@ class Core(object):
 
 			# Retrieve metadata if not available.
 			# Applies to links from Kodi's local library or when launched from an external addon. The metadata cannot be saved in the link, since Kodi cuts off the link if too long. Retrieve it here afterwards.
-			if not metadata and not exact:
-				if tvshowtitle or not season is None:
-					from lib.indexers.episodes import Episodes
-					metadata = Episodes().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, filter = True)
-				else:
-					from lib.indexers.movies import Movies
-					metadata = Movies().metadata(idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, title = title, year = year, filter = True)
+			if not exact:
+				manager = MetaManager.instance()
 
-				if metadata:
-					if not title and 'title' in metadata: title = metadata['title']
-					if not tvshowtitle and 'tvshowtitle' in metadata: tvshowtitle = metadata['tvshowtitle']
-					if not year and 'year' in metadata: year = metadata['year']
-					if not season and 'season' in metadata: season = metadata['season']
-					if not episode and 'episode' in metadata: episode = metadata['episode']
+				if not metadata:
+					if tvshowtitle or not season is None:
+						# Lookup using a specific numbering system if explicity stated. Otherwise use the universal numbers.
+						# This is useful for the _scrapeNumber() when the same number can mean different things.
+						# Eg: Star Wars: Young Jedi Adventures S01E26 (under the S01 menu, TVDb has this as the uncombined episode S01E26, whereas under the Absolute menu this maps to the Trakt/TMDb episode S02E01).
 
-					if not imdb and 'imdb' in metadata: imdb = metadata['imdb']
-					if not tmdb and 'tmdb' in metadata: tmdb = metadata['tmdb']
-					if not tvdb and 'tvdb' in metadata: tvdb = metadata['tvdb']
-					if not trakt and 'trakt' in metadata: trakt = metadata['trakt']
-				else:
-					interface.Dialog.notification(title = 33458, message = 33459, icon = interface.Dialog.IconError)
-					self.progressClose(force = True)
-					return
+						# For Donwton Abbey -> Absolute menu -> S01E00 (Christmas Specials).
+						lookup = number
+						if number == MetaPack.NumberSequential and not season == 1: lookup = MetaPack.NumberStandard
+
+						metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, number = lookup, filter = True)
+					else:
+						metadata = manager.metadataMovie(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, filter = True)
+
+					if not metadata:
+						interface.Dialog.notification(title = 33458, message = 33459, icon = interface.Dialog.IconError)
+						self.progressClose(force = True)
+						return
+
+			# Ask the user if the episode is available under alternative numbers.
+			ignore = False
+			change = self._scrapeNumber(metadata = metadata, number = number)
+			if change:
+				#gaiaremove - this can be removed once proper absolute and season-absolute numbering is correctly filtered.
+				# This ignores seasons that are very different between Trakt/TMDb and TVDb.
+				# Still allow specials (S00) and absolute (S01).
+				# See the comments at the top of tester.py.
+				# Eg: One Piece S03E01
+				#	Gaia: S03E01
+				#	Trakt/TMDb: S03E78
+				#	TVDb: S06E09 (one scraped link was valid for E78, but the rest is for Trakt/TMDb's S06. Ignore this one, as it is also the number for a different episode.)
+				#	Absolute: S01E78
+				#gaiaremove - Also ignore absolute scrapes for now, since those packs are almost always for the normal S01, not the absolute S01 with all episodes.
+				# Maybe for absolute scraping, only check the episode numbers, not the season number.
+				# Eg: One Piece Collection 1-648 + 4 Movies
+				# Also test this when initiated from the Absolute menu vs from a season menu and then changing the number in the dialog.
+				numbers = metadata.get('number') or {}
+				numberStandard = numbers.get(MetaPack.NumberStandard) == [change['season'], change['episode']]
+				try: numberTrakt = numbers.get(MetaPack.ProviderTrakt).get(MetaPack.NumberStandard)[MetaPack.PartSeason] == change['season'] # Eg: One Piece S01E62 (Absolute menu) and then selecting S02E62.
+				except: numberTrakt = False
+				if change['season'] > 1 and not change['season'] == season and not change['number'] == MetaPack.NumberStandard and not numberStandard and not numberTrakt: ignore = True
+				elif MetaPack.NumberAbsolute in change['number'] or MetaPack.NumberSequential in change['number']:
+					if (MetaPack.NumberAbsolute in number or MetaPack.NumberSequential in number) and not numberStandard: ignore = True # When an absolute number is selected in from the Absolute menu.
+					elif not change['episode'] == episode: ignore = True # When an absolute number is selected in from the dialog.
+
+				# Retrieve the metadata if the number changed, in order to get the correct metadata (title, number, etc).
+				changed = not(change['season'] == season and change['episode'] == episode and (change['number'] == (number or MetaPack.NumberStandard)))
+				if changed:
+					season = change['season']
+					episode = change['episode']
+					number = change['number']
+					if number and tools.Tools.isArray(number): number = number[0]
+					metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, number = number, filter = True)
+			elif change is False: # Canceled.
+				self.progressClose(force = True)
+				return
+
+			# Do after the new metadata has been retrieved.
+			if metadata:
+				imdb = metadata.get('imdb')
+				tmdb = metadata.get('tmdb')
+				tvdb = metadata.get('tvdb')
+				trakt = metadata.get('trakt')
+
+				title = metadata.get('title')
+				tvshowtitle = metadata.get('tvshowtitle')
+				year = metadata.get('year')
+
+				season = metadata.get('season')
+				episode = metadata.get('episode')
+
+				pack = metadata.get('pack')
+
+			if not pack and (tvshowtitle or not season is None):
+				pack = manager.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year)
+
+			history.History().add(media = self.media, metadata = metadata) # If already added, will just increase the counter.
 
 			if exact: self.scrapeLabel = title if title else tvshowtitle
-			else: self.scrapeLabel = tools.Media.titleUniversal(metadata = metadata, title = title if tvshowtitle is None else tvshowtitle, year = year, season = season, episode = episode)
+			else: self.scrapeLabel = tools.Title.titleUniversal(metadata = metadata, title = title if tvshowtitle is None else tvshowtitle, year = year, season = season, episode = episode)
 
 			# Clear temporary filter settings.
 			# Must be before self.scrapeItem().
 			if not self.silent: self._showClear()
 
+			# Clear any possible invalid data if we reuse the invoker.
+			Stream.invalidClear()
+
 			if self.new:
 				if not self.silent and self.navigationCinema:
-					try: background = metadata['fanart']
-					except:
-						try: background = metadata['fanart2']
-						except:
-							try: background = metadata['fanart3']
-							except: background = None
+					try: background = MetaImage.extract(data = metadata)[MetaImage.TypeFanart]
+					except: background = None
 					self.navigationCinemaTrailer.cinemaStart(media = self.media, background = background)
 				tools.Logger.log('Scraping Initialized', name = 'CORE', type = tools.Logger.TypeInfo)
 
 				self.timerTotal = None
 				self.timerGlobal = tools.Time(start = True)
 				self.propertyStatusSet(Core.StatusScrape)
-				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, season = season, episode = episode, tvshowtitle = tvshowtitle, premiered = premiered, metadata = metadata, preset = preset, pack = pack, exact = exact, autoplay = autoplay, cache = cache)
+
+				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, tvshowtitle = tvshowtitle, premiered = premiered, metadata = metadata, pack = pack, preset = preset, exact = exact, autoplay = autoplay, cache = cache)
 
 				if result is None or (self.progressCanceled() and not self.navigationCinema): # Avoid the no-streams notification right after the unavailable notification.
 					self.progressClose(force = True)
 					self.propertyStatusSet(Core.StatusFinished)
 					return None
 				try:
-					if not exact:
+					if not exact and not ignore:
 						api = orionoid.Orionoid(silent = True)
 						if api.accountAllow(): api.streamUpdate(metadata, self.sources)
 				except: pass
@@ -736,7 +836,7 @@ class Core(object):
 			self.propertyStatusSet(Core.StatusFinished)
 
 			# Do not play the sound if autoplay and there is also a sound for starting streaming, otherwise they will collide.
-			if not self.silent and not self.binge and not status == Core.StatusCancel and (not autoplay or not Sound.enabledStreamStart()): tools.Sound.executeScrapeFinish()
+			if not self.silent and not self.binge and not status == Core.StatusCancel and (not autoplay or not tools.Sound.enabledStreamStart()): tools.Sound.executeScrapeFinish()
 
 			if self.silent or status == Core.StatusCancel:
 				self.sourcesFilter(items = self.sources, metadata = metadata, autoplay = autoplay)
@@ -747,40 +847,373 @@ class Core(object):
 			elif not self.progressPlaybackCanceled(): # Do not show the streams if the playback window was canceled in _autopack().
 				self.showStreams(items = self.sources, metadata = metadata, autoplay = autoplay, initial = True, library = library, direct = exact, new = self.new, process = process, binge = binge)
 
-			# When launching a scrape process from a STRM file from the Kodi library, and then exiting the streams window, Kodi shows a dialog:
-			#	Playback failed - One or more items failed to play. Check the log for more information abouth this message.
-			# Setting the plugin call as resolved prevents this dialog from showing.
-			# Do not set "success = True", since this does not work and actually makes Kodi call the plugin URI from the STRM file multiple times, hence, starting the scrape process multiple times after clicking on the title in the Kodi library.
-			# Update: The duplicate call problem could probably be solved by using a dummy URL for pluginResolvedSet:
-			#	plugin://plugin.video.gaia/?action=dummy
-			# Kodi will then call the dummy URL which does nothing, without playing the 'scrape' action multiple times.
-			# Update 2: It seems that the error dialog always has some places were it pops up.
-			# Eg: add a movie  to the playlist. Open t he playlist and play the movie from there. 1st time the dialog does not open. When navigating back and then opening the playlist again and play the movie again, the dialog shows.
-			# Maybe Kodi expects the player to launch. If nothing is played, Kodi might assume the playback failed.
-			# Update 3: Place this at the END of the scrape() function. If placed at the START of the scrape() function, Kodi for some reason still shows the dialog.
-			# Update 3: Solves the issue when played from the local library. However, the dialog is still shown when played from the playlist (when the item is played the 2nd time, not the 1st time, from the playlist).
-			# Update 4: These dialogs are now suppressed through advancedsettings.xml. Check tools.Playlist.settings() for more info.
-			# Check the 3rd post here: https://forum.kodi.tv/showthread.php?tid=257787
-			#tools.System.pluginResolvedSet(success = False)
-			tools.System.pluginResolvedSet(success = False, dummy = True)
-
+			self.scrapeResolve()
 			return self.sources
 		except:
 			tools.Logger.error()
 			self.progressClose(force = True)
 		finally:
 			# Clear the stream data, settings, filters, etc, in case we reuse the invoker.
-			Stream.reset()
-			manager.Manager.reset()
+			Stream.reset(invalid = False) # Do not clear invalid, since they arte still used by Orion. This is cleared at the end of addon.py in any case.
+			ProviderManager.reset()
+
+	def _scrapeNumber(self, metadata, number = None):
+		# Test this with:
+		#	One Piece:
+		#		Absolute Menu: S01E61, S01E62
+		#		S00 Menu: S00E42/S00E19
+		#		S02 Menu: S02E01, S02E16, S02E17
+		#		S03 Menu: S03E01
+		#	Dragon Ball Super:
+		#		Absolute Menu: S01E14, S01E15, S01E28
+		#		S01 Menu: S01E14, S01E15
+		#		S02 Menu: S02E01
+		#	Downton Abbey:
+		#		Absolute Menu: S01E00, S01E16
+		#		S02 Menu: S02E09
+		#	Star Wars: Young Jedi Adventures
+		#		Absolute Menu: S01E25, S01E26
+		#		S01 Menu: S01E25, S01E26
+
+		try:
+			if not self.silent and tools.Media.isEpisode(metadata.get('media')):
+				setting = tools.Settings.getInteger('scrape.alternative.number')
+				if setting == 0: return None
+
+				def _mergeNumber(values, *extra):
+					if values:
+						number = [i['number'] for i in values if i['number']]
+						if extra:
+							for i in extra:
+								i = i.get('number')
+								if i: number.extend(i)
+						number = tools.Tools.listUnique(number)
+						return {'season' : values[0].get('season'), 'episode' : values[0].get('episode'), 'number' : number or None}
+					return None
+
+				def _mergeLabel(values, provider = True, exclude = False):
+					if values:
+						label = []
+						for i in values:
+							if exclude and any(i['season'] == j['season'] and i['episode'] == j['episode'] for j in exclude): continue
+							number = _mergeProvider(i['number'])
+							if number:
+								title = interface.Format.fontBold(tools.Title.number(media = tools.Media.Episode, season = i['season'], episode = i['episode']))
+								if provider: label.append('%s (%s)' % (title, number))
+								else: label.append('%s' % title)
+						if label: return ', '.join(label)
+					return None
+
+				def _mergeProvider(values):
+					if values:
+						# Order matters for readability.
+						label = []
+						if MetaPack.NumberStandard in values or MetaPack.NumberSequential in values: label.append(35639)
+						if MetaPack.ProviderTrakt in values: label.append(32315)
+						if MetaPack.ProviderTvdb in values: label.append(35668)
+						if MetaPack.ProviderTmdb in values: label.append(33508)
+						if MetaPack.ProviderImdb in values: label.append(32034)
+						if label: return '/'.join([interface.Translation.string(i) for i in label])
+					return None
+
+				metadata2 = MetaManager.instance().metadataEpisode(imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = metadata.get('season'), episode = metadata.get('episode'), number = MetaPack.NumberStandard, filter = True)
+
+				base = metadata.get('number') or {}
+				season = metadata.get('season')
+				episode = metadata.get('episode')
+
+				packed = metadata.get('packed') or {}
+				type = packed.get('type') or {}
+
+				pack = metadata.get('pack')
+				if pack: pack = MetaPack.instance(pack)
+
+				niche = metadata.get('niche')
+				niche = tools.Media.isAnime(niche) or tools.Media.isDonghua(niche)
+				sequential = number == MetaPack.NumberSequential or type.get(MetaPack.NumberSequential) or niche
+
+				numbers = [{'number' : None, 'season' : season, 'episode' : episode}]
+
+				numberStandard = base.get(MetaPack.NumberStandard)
+				if numberStandard and not numberStandard[MetaPack.PartEpisode] is None: numbers.append({'number' : MetaPack.NumberStandard, 'season' : numberStandard[MetaPack.PartSeason], 'episode' : numberStandard[MetaPack.PartEpisode]})
+
+				if sequential:
+					# Exclude sequential numbers S01E00.
+					# Eg: Donwton Abbey -> Absolute menu -> S01E00 (Christmas Specials).
+					numberSequential = base.get(MetaPack.NumberSequential)
+					if numberSequential and numberSequential[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberSequential, 'season' : numberSequential[MetaPack.PartSeason], 'episode' : numberSequential[MetaPack.PartEpisode]})
+
+				for provider, i in base.items():
+					if tools.Tools.isDictionary(i):
+						numberSeasoned = i.get(MetaPack.NumberStandard)
+						if numberSeasoned and not numberSeasoned[MetaPack.PartEpisode] is None: numbers.append({'number' : provider, 'season' : numberSeasoned[MetaPack.PartSeason], 'episode' : numberSeasoned[MetaPack.PartEpisode]})
+
+				numbersDefault = {}
+				numbersSeason = {}
+				numbersSpecial = {}
+				numbersSequential = {}
+
+				for i in numbers:
+					lookup = []
+					value = i.get('number')
+
+					if not value: lookup.append(numbersDefault)
+
+					if value == MetaPack.NumberSequential: lookup.append(numbersSequential)
+					elif i.get('season') == 0: lookup.append(numbersSpecial)
+					else: lookup.append(numbersSeason)
+
+					if lookup:
+						id = (i.get('season'), i.get('episode'))
+						for j in lookup:
+							if not id in j: j[id] = []
+							j[id].append(i)
+
+				numbersDefault = [_mergeNumber(i) for i in numbersDefault.values()]
+				numbersSeason = [_mergeNumber(i) for i in numbersSeason.values()]
+				numbersSpecial = [_mergeNumber(i, {'number' : [MetaPack.NumberStandard]}) for i in numbersSpecial.values()]
+				numbersSequential = [_mergeNumber(i, *numbersSeason, *numbersSpecial) for i in numbersSequential.values()]
+
+				# Remove numbers that are the same between season and special/sequential.
+				# Do not do for specials only.
+				# Eg: One Piece S00E42.
+				numbersSpecial = [i for i in numbersSpecial if season == 0 or not(i['season'] == season and i['episode'] == episode)]
+				if not sequential: numbersSequential = [i for i in numbersSequential if not(i['season'] == season and i['episode'] == episode)]
+
+				labelDefault = tools.Title.number(media = tools.Media.Episode, season = numbersDefault[0]['season'], episode = numbersDefault[0]['episode']) if numbersDefault else None
+				labelSeason = _mergeLabel(numbersSeason)
+				labelSequential = _mergeLabel(numbersSequential)
+				labelSpecial = _mergeLabel(numbersSpecial)
+
+				choose = False
+				if labelSpecial:
+					choose = True
+				elif labelSequential:
+					# Do not show a dialog if only TVDb has a season number different to the sequential number, since we do not scrape TVDb numbers.
+					# Eg: One Piece -> Absolute menu -> S01E61 vs S01E62.
+					# Update: Allow this now, since we added a "More" button which allows all numbers to be scraped.
+					#numbersFilter = [i for i in numbersSeason if not(i['season'] == numbersSequential[0]['season'] and i['episode'] == numbersSequential[0]['episode'])]
+					numbersFilter = numbersSeason
+
+					if numbersFilter:
+						if len(numbersFilter) > 1:
+							choose = True
+						else:
+							numbering = numbersFilter[0]['number']
+							if MetaPack.NumberStandard in numbering or MetaPack.ProviderTrakt in numbering: choose = True
+							else:
+								# Still allow if TVDb has the only season-based numbering.
+								# Eg: Dragon Ball Super -> S01 menu -> S01E30.
+								numbering = numbering[0]
+								lookup = pack.episode(season = numbersFilter[0]['season'], episode = numbersFilter[0]['episode'], number = numbering)
+								if lookup:
+									# Check if other providers also have this season.
+									# Allow for eg: Dragon Ball Super S01E14 vs S01E15.
+									# Do not allow for eg: One Piece S01E61 vs S01E62.
+									lookup2 = pack.numberStandard(item = lookup, provider = numbering)
+									if lookup2:
+										lookup2 = pack.episode(season = lookup2[MetaPack.PartSeason], episode = lookup2[MetaPack.PartEpisode], number = numbering)
+										if pack.typeUnofficial(item = lookup2): choose = True
+				elif len(numbersSeason) > 1:
+					# Eg: Star Wars: Young Jedi Adventures S01E26.
+					lookup1 = pack.episode(season = numbersSeason[0]['season'], episode = numbersSeason[0]['episode'], number = numbersSeason[0]['number'][0])
+					lookup2 = pack.episode(season = numbersSeason[-1]['season'], episode = numbersSeason[-1]['episode'], number = numbersSeason[-1]['number'][0])
+					if (pack.typeOfficial(item = lookup1) and pack.typeUnofficial(item = lookup2)) or (pack.typeOfficial(item = lookup2) and pack.typeUnofficial(item = lookup1)): choose = True
+
+				if choose:
+					option1 = tools.Tools.copy(numbersDefault[0])
+					option1['number'] = number or MetaPack.NumberStandard
+
+					if labelSpecial:
+						option2 = next((i for i in numbersSpecial if not(i['season'] == option1['season'] and i['episode'] == option1['episode'])), numbersSpecial[0]) # Eg: One Piece S00E42.
+						option2 = tools.Tools.copy(option2)
+						if not option2['number']: option2['number'] = MetaPack.NumberStandard
+					elif labelSequential and not(numbersSequential[0]['season'] == option1['season'] and numbersSequential[0]['episode'] == option1['episode']):
+						option2 = next((i for i in numbersSequential if not(i['season'] == option1['season'] and i['episode'] == option1['episode'])), numbersSequential[0])
+						option2 = tools.Tools.copy(option2)
+						if not option2['number']: option2['number'] = MetaPack.NumberSequential
+					else:
+						option2 = next((i for i in numbersSeason if not(i['season'] == option1['season'] and i['episode'] == option1['episode'])), numbersSeason[0])
+						option2 = tools.Tools.copy(option2)
+						if not option2['number']: option2['number'] = MetaPack.NumberStandard
+
+					if not(option1['season'] == option2['season'] and option1['episode'] == option2['episode']):
+						if setting == 1:
+							label1 = tools.Title.number(media = tools.Media.Episode, season = option1['season'], episode = option1['episode'])
+							label2 = tools.Title.number(media = tools.Media.Episode, season = option2['season'], episode = option2['episode'])
+
+							label = ''
+							if labelSeason: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(32055)) + labelSeason
+							if labelSpecial: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(33105)) + labelSpecial
+							if labelSequential: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(36677)) + labelSequential
+
+							message = interface.Translation.string(36678) % (interface.Format.fontBold(labelDefault), label)
+							choice = interface.Dialog.options(title = 36679, message = message, labelConfirm = label2, labelDeny = 33432, labelCustom = interface.Format.fontBold(label1), default = interface.Dialog.ChoiceCustom)
+
+							if choice == interface.Dialog.ChoiceYes:
+								return option2
+							elif choice == interface.Dialog.ChoiceCustom:
+								return option1
+							if choice == interface.Dialog.ChoiceNo:
+								added = {}
+								items = []
+								values = []
+								for i in [[numbersSeason, MetaPack.NumberStandard, 32055], [numbersSpecial, MetaPack.NumberSpecial, 33105], [numbersSequential, MetaPack.NumberSequential, 36677], [numbersDefault, number, 33564]]:
+									for j in i[0]:
+										id = '%s_%s_%s' % (j['season'], j['episode'], str(j.get('number')))
+										if not id in added and j.get('number'):
+											added[id] = True
+											values.append(j)
+											items.append('%s: %s' % (interface.Format.fontBold(i[2]), _mergeLabel([j])))
+
+								choice = interface.Dialog.select(title = 36679, items = items)
+								if choice >= 0: return values[choice]
+								else: return False
+							else:
+								return False
+						else:
+							episode = None
+							if setting == 2:
+								episode = option1
+							elif setting == 3:
+								if numbersSpecial:
+									episode = numbersSpecial[0]
+									episode['number'] = MetaPack.NumberStandard
+							elif setting == 4:
+								if numbersSpecial:
+									episode = numbersSpecial[0]
+									episode['number'] = MetaPack.NumberStandard
+								elif numbersSequential:
+									episode = numbersSequential[0]
+									episode['number'] = MetaPack.NumberSequential
+							if not episode: episode = option1
+
+							def _notify(wait = False):
+								# Wait for the scraping window to show.
+								# Otherwise the notification pops up first and is then displayed underneath the window and is not visible.
+								if wait:
+									for i in range(6):
+										if window.WindowScrape.visible(): break
+										tools.Time.sleep(0.5)
+
+								labelSequential = _mergeLabel(numbersSequential, provider = False)
+								labelSpecial = _mergeLabel(numbersSpecial, provider = False)
+								labelSeason = _mergeLabel(numbersSeason, provider = False, exclude = numbersSequential + numbersSpecial)
+
+								message = interface.Translation.string(36063) % (labelSpecial or labelSequential, labelSeason)
+								interface.Dialog.notification(title = 36679, message = message, icon = interface.Dialog.IconInformation)
+
+							if self.navigationScrapeSpecial: Pool.thread(target = _notify, kwargs = {'wait' : True}, start = True)
+							else: _notify(wait = False)
+
+							return episode
+		except: tools.Logger.error()
+		return None
+
+	def scrapeResolve(self):
+		# When launching a scrape process from a STRM file from the Kodi library, and then exiting the streams window, Kodi shows a dialog:
+		#	Playback failed - One or more items failed to play. Check the log for more information abouth this message.
+		# Setting the plugin call as resolved prevents this dialog from showing.
+		# Do not set "success = True", since this does not work and actually makes Kodi call the plugin URI from the STRM file multiple times, hence, starting the scrape process multiple times after clicking on the title in the Kodi library.
+		# Update: The duplicate call problem could probably be solved by using a dummy URL for pluginResolvedSet:
+		#	plugin://plugin.video.gaia/?action=dummy
+		# Kodi will then call the dummy URL which does nothing, without playing the 'scrape' action multiple times.
+		# Update 2: It seems that the error dialog always has some places were it pops up.
+		# Eg: add a movie to the playlist. Open t he playlist and play the movie from there. 1st time the dialog does not open. When navigating back and then opening the playlist again and play the movie again, the dialog shows.
+		# Maybe Kodi expects the player to launch. If nothing is played, Kodi might assume the playback failed.
+		# Update 3: Place this at the END of the scrape() function. If placed at the START of the scrape() function, Kodi for some reason still shows the dialog.
+		# Update 3: Solves the issue when played from the local library. However, the dialog is still shown when played from the playlist (when the item is played the 2nd time, not the 1st time, from the playlist).
+		# Update 4: These dialogs are now suppressed through advancedsettings.xml. Check tools.Playlist.settings() for more info.
+		# Check the 3rd post here: https://forum.kodi.tv/showthread.php?tid=257787
+
+		# Update 5 (2024-09-04):
+		# There is another problem with playlists. If a scrape is initiated from the playlist, and the Python process finishes here, Kodi assumes the playback to have failed, and immediatly starts plyaing the enxt item from the playlist, although the user has not selected a stream for playback for the current item yet.
+		# To reproduce:
+		#	1. Add a title to the playlist.
+		#	2. Add another title to the playlist.
+		#	3. Open the playlist menu.
+		#	4. Click on the first item.
+		#	5. Scraping starts, and once finished loads the stream window.
+		#	6. Once the stream window has finished loaded, scraping of the next item immediately starts.
+		#	7. This error is in the log: Playlist Player: skipping unplayable item: 0, path [plugin://plugin.video.gaia/....]
+		# Note that this ONLY happens when the playlist was edited.
+		# Once this error occurred, and the steps above are followed, this does not happen anymore.
+		# To make the problem happen again, remove the last item from the playlist, add it again, and then play the 1st item from the playlist. Now the problem should occur again.
+		# Every combination of:
+		#	xbmcplugin.setResolvedUrl(...)
+		#	xbmcplugin.endOfDirectory(...)
+		# was tried, but the problem persists, and "skipping unplayable item" keeps showing up in the log.
+		# Not sure if this can be solved, or this is just how Kodi works.
+		# Also note sure if xbmcplugin.setResolvedUrl() even does anything in this case.
+		# The problem seems as follows (probably?):
+		#	1. Kodi expects the player to start playing something.
+		#	2. If the item is selected from the playlist, Gaia is executed and scrapes.
+		#	3. Once scraping is done, the stream window is shown, and the Gaia Python process exists.
+		#	4. If at the end of the Python process nothing has played, Kodi throws the "skipping unplayable item" and starts playing the next item in the playlist.
+		# Even if we enable "autoplay", etc, the problem persists, since playback starts with a new Python process, and the previous scraping process exists (which Kodi expects to start playback).
+		# While the Python scraping process is still running, the problem does not show. Only if the process exits, does Kodi do this.
+		# So the problem is that the command added to the playlist must start playback, or at least not exit while the user selects a stream.
+		# A possible solution:
+		#	1. Use a special command/endpoint for playlists. Do not use the "scrape" endpoint directly.
+		#	2. The special endpoint starts the scraping in another process.
+		#	3. The special endpoint does not exit, but keeps running in the background until as video starts playing, or the streams window (or the dialog/directory) closes.
+		# Update: This has its own problems. The special process has to wait until playback finishes. If the process just waits for playback to start, and then exists, the Kodi playlist code will stop playback.
+		# Maybe playlists should only be used to play direct links, not plugin-URLs that exit before playback.
+		# The only reliable way to do this is to create a single process that does the scraping, stream window, and playback all in one single process. Essentially the process has to finish playback before it exists.
+		# Update: xbmcplugin.setResolvedUrl(...) is there to set an already-resolved URL. If you call that function with a direct HTTP URL, Kodi starts playing that URL automatically.
+		# Hence, xbmcplugin.setResolvedUrl(...) should not be called with a Gaia plugin URI (that is not resolved yet).
+		# Basically, xbmcplugin.setResolvedUrl(...) is an alternative to directly calling xbmc.Player().play(...).
+		# Maybe the only way to reliably solve this is to make the entire process (scrape -> stream select -> playback -> rating+binge) run in a single Python process, that holds up the current playlist until scraping/playback has finished.
+		# This would require a fundamental redesign of core.py, since the Python process finishes once the stream window loads, and each ListItem in the window has its own command that it executes.
+		# For now, we implement a horrible hack to make the scrape process wait until all windows are closed and playback finished.
+
+		# Update 6 (2024-09-05):
+		# Similar to playlists, library playbacks also automatically go on to the next episode scrape, the moment scraping of the previous episode is done.
+		# This only happens if the user enabled Kodi Settings -> Player -> Video -> Play next video automatically (disabled by default).
+
+		wait = False
+		if tools.System.originPlaylist():
+			wait = True
+		elif tools.System.originLibrary():
+			setting = tools.Settings.kodi(id = 'videoplayer.autoplaynextitem')
+			if setting:
+				# Should be a list with integers.
+				# Not sure what the autoplay of "TV Shows" does in this setting. Stick to movies and episodes.
+				if tools.Media.isShow(self.media) and 2 in setting: wait = True
+				elif tools.Media.isFilm(self.media) and 3 in setting: wait = True
+
+		if wait:
+			# This still does not work perfect.
+			# If we scrape and then start playback of the 1st playlist item, after playback is done, the next item is not initiated, and Kodi shows an error notification: "PLAYLIST Cant find a next item to play".
+			# This only happens if the actually play the 1st item. If we just exit the streams window without playing, the next item in the playlist is correctly started.
+
+			player = interface.Player()
+			def busy():
+				if player.isPlayback(): return True # Player is playing.
+				if window.Window.currentGaia(): return True # Any of the Gaia windows (scraping, streams, playback, rating, binge).
+				if interface.Dialog.dialogVisible(): return True # Any other native Kodi dialog (Gaia scrape/streams dialog if settings changed, context menu opened in the streams window, subtitle dialog, or any other dialog that might pop up).
+				if self.navigationStreamsDirectory:
+					if interface.Loader.visible(): return True # While the directory with the streams loads.
+					if tools.System.infoLabel('Container.Property(GaiaStreams)') == '1': return True # The streams directory itself.
+				return False
+
+			interval = 1.0
+			iterations = int(10800 / interval) # Only do this for up to 3 hours. If this loop has not exited by then, there is probably a problem with the detection somewhere, and we do not want to make this process run forever.
+			for i in range(iterations):
+				if busy():
+					tools.Time.sleep(interval)
+				else:
+					# Although some time to change between dialogs, end playback, etc.
+					tools.Time.sleep(interval)
+					if not busy(): break
+
+		#tools.System.pluginResolvedSet(success = False)
+		tools.System.pluginResolvedSet(success = False, dummy = True)
 
 	def scrapeExact(self, query = None):
-		if not tools.Settings.getBoolean('internal.initial.exact'):
-			interface.Dialog.confirm(title = 32010, message = 35159)
-			tools.Settings.set('internal.initial.exact', True)
-		if query is None:
-			query = interface.Dialog.input(title = 35158, type = interface.Dialog.InputAlphabetic)
+		if query is None: query = interface.Dialog.input(title = 32010, type = interface.Dialog.InputAlphabetic)
 		if query:
-			if tools.Media.typeTelevision(self.media): return self.scrape(title = query, exact = True)
+			if tools.Media.isSerie(self.media): return self.scrape(title = query, exact = True)
 			else: return self.scrape(title = query, exact = True)
 
 	def scrapeExecute(self, link, parameters):
@@ -790,7 +1223,7 @@ class Core(object):
 
 	def scrapePreset(self, link, autoplay):
 		if not self.navigationCinema: self.loaderShow()
-		preset = manager.Manager.presetsSelection()
+		preset = ProviderManager.presetsSelection()
 		if preset: self.scrapeExecute(link = link, parameters = {'autoplay' : autoplay, 'preset' : preset})
 		self.loaderHide()
 
@@ -884,15 +1317,21 @@ class Core(object):
 
 	def _scrapeProgressElapsed(self, raw = True, mini = False, full = False):
 		seconds = max(0, self.timerScrape.elapsed())
-		if full: return timeStringDescription % seconds
-		elif mini: return timeString % seconds
+		if full: return self.timeStringDescription % seconds
+		elif mini: return self.timeString % seconds
 		else: return seconds
 
-	def scrapeItem(self, title, year, imdb, tmdb, tvdb, season, episode, tvshowtitle, premiered, metadata = None, preset = None, pack = None, exact = False, autoplay = False, cache = True):
+	def scrapeItem(self, title, year, imdb, tmdb, tvdb, trakt, season, episode, tvshowtitle, premiered, metadata, pack = None, preset = None, exact = False, autoplay = False, cache = True):
 		try:
-			def titleClean(value, year = None, internal = False):
+			def titleClean(value, year = None, internal = None):
 				values = []
 				if value is None: return values
+
+				# Titles with mutiple dots, eg: S.W.A.T.
+				if not internal == 1 and value.count('.') >= 3:
+					temp = [value, value.replace('.', ''), value.replace('.', ' ')]
+					values = tools.Tools.listFlatten(temp + [titleClean(value = i, year = year, internal = 1) for i in temp])
+					return tools.Tools.listUnique([i.strip() for i in values])
 
 				# Remove years in brackets from titles.
 				# Do not remove years that are not between brackets, since it might be part of the title. Eg: 2001 A Space Oddesy
@@ -939,17 +1378,21 @@ class Core(object):
 
 				# Censored words which are mostly given in full in the filename.
 				# Eg: The Pimp No F**ing Fairytale
-				if not internal:
+				if not internal == 2:
 					censored = {'(s\*x)' : 'sex', '(p\*+r?n)[a-z]*' : 'porn', '(f\*+(?:c?k|ck)?)(?:ed|ing)?' : 'fuck'}
 					expression = '(?:^|[\.\,\:\-\–\s])%s(?:$|[\.\,\:\-\–\s])'
 					for valFrom, valTo in censored.items():
 						if tools.Regex.match(data = value, expression = expression % valFrom):
 							# Add the unccensored title in FRONT, ssince it is more likley to find values.
-							values = titleClean(tools.Regex.replace(data = value, expression = expression % valFrom, replacement = valTo, group = 1), year = year, internal = True) + values
+							values = titleClean(tools.Regex.replace(data = value, expression = expression % valFrom, replacement = valTo, group = 1), year = year, internal = 2) + values
 
-				seen = set()
-				values = [i for i in values if not (i in seen or seen.add(i))]
-				return values
+				return tools.Tools.listUnique([i.strip() for i in values])
+
+			def titleStrip(title):
+				# Strip mutiple times, since eg after we stripped a "-", there might be a new " " before the "-" that now has to be removed as well.
+				# Eg: "XXXX - "
+				for i in range(3): title = title.strip(' ').strip(':').strip('-').strip('.').strip(',').strip('(').strip(')').strip('[').strip(']')
+				return title
 
 			def titleValid(title, year):
 				# If titles are stripped, ignore certain results.
@@ -959,7 +1402,7 @@ class Core(object):
 				year = str(year)
 				temp = re.sub('\s*[\(\{\[]?\s*' + year + '\s*[\)\}\]]?', '', title)
 				if temp: title = temp
-				lower = title.strip(' :-()[]').lower()
+				lower = titleStrip(title).lower()
 
 				# Ignore if title is too short.
 				# Eg: "Sing 2" -> "2"
@@ -1020,8 +1463,13 @@ class Core(object):
 					except: self.titles['abbreviation'] = titleAbbreviation
 
 				limit = min(10, max(5, int(ProviderBase.settingsGlobalLimitQuery() / (2.0 if titleShow else 1.2))))
-				character = ProviderBase.settingsGlobalTitleCharacter()
+				settingCharacter = ProviderBase.settingsGlobalTitleCharacter()
+				settingAlias = ProviderBase.settingsGlobalTitleAlias()
+				settingLocal = ProviderBase.settingsGlobalTitleLocal()
+				settingNative = ProviderBase.settingsGlobalTitleNative()
+
 				titles = []
+				titleAlias = None
 				processedMain = []
 				processedCollection = []
 				processedEpisode = []
@@ -1053,11 +1501,11 @@ class Core(object):
 						processedMain.insert(0, self.titles['original'])
 						processedBasic.insert(0, self.titles['original'])
 				if 'native' in self.titles and self.titles['native']:
-					#titles.extend(self.titles['native'].values()) # Do not add to the main titles, since we do not want to search these like the other alternative titles.
+					#if settingNative: titles.extend(self.titles['native'].values()) # Do not add to the main titles, since we do not want to search these like the other alternative titles.
 					processedMain.extend(tools.Tools.listFlatten(self.titles['native'].values()))
 					processedBasic.extend(tools.Tools.listFlatten(self.titles['native'].values()))
 				if 'local' in self.titles and self.titles['local']:
-					titles.append(self.titles['local'])
+					if settingLocal: titles.append(self.titles['local'])
 					processedMain.append(self.titles['local'])
 					processedBasic.append(self.titles['local'])
 				if 'extra' in self.titles and self.titles['extra']:
@@ -1076,17 +1524,19 @@ class Core(object):
 					countries2 = tools.Language.countries(ProviderBase.settingsGlobalTitleLanguage(), variation = True)
 					if countries1: countries.extend(countries2)
 
-					countries = tools.Tools.listUnique(countries)
+					aliases = []
+					for country in tools.Tools.listUnique(countries):
+						if country in self.titles['alias']: aliases.extend(self.titles['alias'][country])
+					if 'us' in self.titles['alias']: aliases.extend(self.titles['alias']['us'])
+					if None in self.titles['alias']: aliases.extend(self.titles['alias'][None])
+					aliases = tools.Tools.listUnique(aliases)
 
-					for country in countries:
-						if country in self.titles['alias']: titles.extend(self.titles['alias'][country])
-					if 'us' in self.titles['alias']: titles.extend(self.titles['alias']['us'])
-					if None in self.titles['alias']: titles.extend(self.titles['alias'][None])
-					titles = tools.Tools.listUnique(titles)
+					if aliases: titleAlias = aliases[0]
+					if settingAlias: titles.extend(aliases)
 
 					# Make sure language-setting country aliases are added first to be picked for search titles.
 					# English or user-language titles should be placed before eg Chinese titles.
-					processedMain.extend(titles)
+					processedMain.extend(aliases)
 
 					for value in self.titles['alias'].values(): processedMain.extend(value)
 
@@ -1099,8 +1549,9 @@ class Core(object):
 					if 'main' in self.titles and self.titles['main']:
 						titleReduced = re.sub(self.titles['collection'], '', self.titles['main'], re.IGNORECASE)
 						if not titleReduced == self.titles['main']:
-							titleReduced = titleReduced.strip(' :-()[]')
-							if titleReduced and titleValid(titleReduced, year):
+							titleReduced = titleStrip(titleReduced)
+							# Avoid: "Hotel Transylvania 3 Summer Vacation" -> "3 Summer Vacation"
+							if titleReduced and titleValid(titleReduced, year) and not tools.Tools.isNumeric(titleReduced[0]):
 								titles.append(titleReduced)
 								processedMain.append(titleReduced)
 
@@ -1133,6 +1584,7 @@ class Core(object):
 				#	Guillermo del Toro's Pinocchio (2022)
 				#	Pinocchio (2022)
 				people = ['james cameron', 'george orwell', 'jack snyder', 'christopher nolan', 'stanley kubrick', 'steven spielberg', 'stephen king', 'clint wastwood', 'quentin tarantino', 'ridley scott', 'alfred hitchcock', 'peter jackson', 'spike lee', 'george lucas', 'woody allen', 'martin scorsese']
+				ignore = False
 				for type in ['native', 'alias']:
 					if type in self.titles and self.titles[type]:
 						for key, values in self.titles[type].items():
@@ -1140,28 +1592,38 @@ class Core(object):
 								# replaceNotAlphaNumeric: Also remove symbols from the title.
 								# Eg: "Nineteen Eighty-Four" + "George Orwell Nineteen Eighty Four 1984" = "George Orwell 1984"
 								titleStripped = val.replace(self.titles['main'], '').replace(tools.Tools.replaceNotAlphaNumeric(data = self.titles['main'], replace = ' '), '')
-								titleStripped = titleStripped.replace('  ', ' ').strip(' ()[]:-') # strip brackets, etc.
+								titleStripped = titleStrip(titleStripped.replace('  ', ' ')) # strip brackets, etc.
 								if titleStripped and not titleStripped == val and titleValid(titleStripped, year) and not titleStripped.endswith('\'s') and not titleStripped.lower() in people:
 									# From: The Terminator (1984) [BluRay] [1080p] REMASTERED
 									# To: 1984) [BluRay] [1080p] REMASTERED
 									if (titleStripped.count('(') + titleStripped.count('[')) < 2 and (titleStripped.count(')') + titleStripped.count(']')) < 2:
-										titleStripped = titleStripped.replace('(', '').replace(')', '').replace('[', '').replace(']', '').replace('  ', ' ').strip('')
-										# Do not strip the main title to only end up with eg "Extended Version".
-										# Avatar Extended Version
-										# Avatar - Collector's Edition
-										# Avatar - Extended Collector's Edition
-										# Avatar - Collector's Extended Edition
-										if not tools.Regex.match(data = titleStripped, expression = '(?:edition|version|cut|release|extended|collector|director|ece|special|ultimate|limited|theatrical|retail|imax|colecionador|estendida|colecionador|3d|edição|edicion|coleccionista|edi\u00e7\u00e3o|edicao|edio|wersja|specjalna|rozszerzona|ungeschnittene|fassung|unrated|uncensored|remastered|the\smovie|dvd|bluray|4k|2160p|1080p|disc)(?:\s|$)'):
-											# Do not include short titles.
-											# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
-											#	Westworld: The Maze
-											#	Westworld: The Door
-											#	Westworld: The New World
-											# We do not want to search eg "The Door S01E01", since it might actually be a different show.
-											if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\–\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
-												self.titles[type][key].append(titleStripped)
-												if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
-												processedMain.append(titleStripped)
+										titleStripped = titleStripped.replace('(', '').replace(')', '').replace('[', '').replace(']', '').replace('  ', ' ').strip(' ')
+
+										# Do not include if the 2nd part is just a description that is too vague to scrape.
+										# Eg: Gran Turismo: Based on a True Story
+										# Eg: Gran Turismo. No spēles līdz trasei
+										# Eg: Gran Turismo - De Jogador a Corredor
+										# Eg: Gran Turismo: D'après une histoire vraie
+										# Set a global var, so we also ignore other languages once we detected this for the English title.
+										if tools.Regex.match(data = titleStripped, expression = '($based\s+on|true\s*story)'): ignore = True
+										if not ignore:
+											# Do not strip the main title to only end up with eg "Extended Version".
+											# Avatar Extended Version
+											# Avatar - Collector's Edition
+											# Avatar - Extended Collector's Edition
+											# Avatar - Collector's Extended Edition
+											if not tools.Regex.match(data = titleStripped, expression = '(?:edition|version|cut|release|extended|collector|director|ece|special|ultimate|limited|theatrical|retail|imax|colecionador|estendida|colecionador|3d|edição|edicion|coleccionista|edi\u00e7\u00e3o|edicao|edio|wersja|specjalna|rozszerzona|ungeschnittene|fassung|unrated|uncensored|remastered|the\smovie|dvd|bluray|4k|2160p|1080p|disc)(?:\s|$)'):
+												# Do not include short titles.
+												# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
+												#	Westworld: The Maze
+												#	Westworld: The Door
+												#	Westworld: The New World
+												# We do not want to search eg "The Door S01E01", since it might actually be a different show.
+												if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\–\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
+													self.titles[type][key].append(titleStripped)
+													if (type == 'native' and settingNative) or (type == 'alias' and settingAlias):
+														if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
+													processedMain.append(titleStripped)
 							self.titles[type][key] = tools.Tools.listUnique(self.titles[type][key])
 
 				# Regex check what remains after unicode decoding, otherwise titles like "Harry Potter 1" might degress into "1:" or "1".
@@ -1180,7 +1642,7 @@ class Core(object):
 							if nonalpha or not tools.Regex.match(data = titleCleaned2, expression = expression):
 								main.append(titleCleaned2)
 
-						if character:
+						if settingCharacter:
 							titleCleaned3 = tools.Converter.unicodeNormalize(string = titleCleaned, umlaut = True)
 							if not titleCleaned3.lower() in people:
 								if nonalpha or not tools.Regex.match(data = titleCleaned3, expression = expression):
@@ -1211,7 +1673,7 @@ class Core(object):
 								titleNative = tools.Converter.unicodeNormalize(string = titleCleaned, umlaut = False)
 								if titleValid(titleNative, year): nativeTitles.append(titleNative)
 
-								if character:
+								if settingCharacter:
 									titleNative = tools.Converter.unicodeNormalize(string = titleCleaned, umlaut = True)
 									if titleValid(titleNative, year): nativeTitles.append(titleNative)
 
@@ -1270,7 +1732,7 @@ class Core(object):
 				removes = temp
 
 				temp = []
-				excludes = ['the\smovie', str(year), 'an?', 'james\scameron(?:\'?s)?']
+				excludes = ['the\smovie', str(year), 'james\scameron(?:\'?s)?', '(?<!\s[a-z\d]\s)an?(?!\s[a-z\d]\s)'] # The the lookahead/lookbehind for "an?", otherwise "S.W.A.T." -> "S W A T" will match the "A".
 				for i in excludes: # Do not exclude keywords that appear in the main title.
 					i = '(?:^|\s)\s*%s\s*(?:$|\s)' % i
 					found = False
@@ -1330,7 +1792,12 @@ class Core(object):
 							# Eg: "The Terminator": replace "Terminator" and not just the full "The Terminator".
 							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = '((?:the|an?)\s)'), replacement = '', all = True)
 
-						if i:
+						# Do not include if the 2nd part is just a description that is too vague to scrape.
+						# Eg: Gran Turismo: Based on a True Story
+						# Eg: Gran Turismo. No spēles līdz trasei
+						# Eg: Gran Turismo - De Jogador a Corredor
+						# Eg: Gran Turismo: D'après une histoire vraie
+						if i and not tools.Regex.match(data = i, expression = '($based\s+on|true\s*story)'):
 							i = ' '.join([j for j in i.split(' ') if j])
 							if i:
 								# Very short titles, which will probably not return good search results.
@@ -1350,7 +1817,7 @@ class Core(object):
 								# Eg: If "Terminator" is already in the list, do not use "Terminator 1".
 								if tools.Regex.remove(data = i, expression = '(\s\d)$', all = True).strip() in temp: continue
 
-								# Ignore only symbols  or single digit.
+								# Ignore only symbols or single digit.
 								# Eg: "#9" -> "9".
 								if tools.Regex.match(data = i, expression = '^[\d\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
 
@@ -1367,8 +1834,19 @@ class Core(object):
 					# Add all removed titles again.
 					# The ones later in the list will get removed by the limit below.
 					temp.extend(searchExtra)
-
 					search = tools.Tools.listUnique(temp)
+
+					# For movies with only a single search title, always add an alias if available, even if ProviderBase.settingsGlobalTitleAlias() is disabled.
+					# Eg: ["Nineteen Eighty Four"] -> add the alias "1984"
+					# Do not add similar titles.
+					# Eg: Gran Turismo" and "Gran Turismo: Based on a True Story"
+					if not titleShow and len(search) == 1 and titleAlias and not titleAlias.lower().startswith(search[0].lower()) and not search[0].lower().startswith(titleAlias.lower()):
+						# Ignore very similar titles.
+						# Eg: Hotel Transylvania 3 Summer Vacation
+         				# Eg: Hotel Transylvania 03 Hotel Transylvania 3 Summer Vacation
+						if tools.Matcher.levenshtein(search[0], titleAlias) <= 0.5:
+							search.append(titleAlias)
+							search = tools.Tools.listUnique(search)
 
 				# Remove specific titles.
 				# Each entry in "removals": if 1st value matches any of the search titles, exclude search titles that match the 2nd value.
@@ -1393,11 +1871,11 @@ class Core(object):
 							add = False
 							break
 					if add: temp.append(i)
-				search = temp
+				search = tools.Tools.listUnique(temp)
 
 				self.titles['search'] = {}
 				self.titles['search']['main'] = search
-				self.titles['search']['native'] = native
+				self.titles['search']['native'] = native if settingNative else {}
 				self.titles['search']['collection'] = collection
 				self.titles['search']['episode'] = Stream.titleEpisodeIgnore(episode) # Do not search for very common episode titles (eg: "VII", "Episode 2", etc).
 
@@ -1425,10 +1903,12 @@ class Core(object):
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
 				for title in processedMain:
 					titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = False).strip()
-					if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year): processedExtra.append(titleNew)
-					if character:
+					if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
+						processedExtra.append(titleNew)
+					if settingCharacter:
 						titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = True).strip()
-						if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year): processedExtra.append(titleNew)
+						if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
+							processedExtra.append(titleNew)
 				for i in range(len(processedExtra)):
 					try: processedExtra[i] = processedExtra[i].decode('utf-8')
 					except: pass
@@ -1443,6 +1923,10 @@ class Core(object):
 						for j in range(len(processedMain)):
 							processedNew = tools.Regex.remove(data = processedMain[j], expression = expression, group = 1, all = True)
 							if not processedNew == processedMain[j]: processedMain[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
+
+				# Exclude network/studio prefixes.
+				# Eg: "FX's 将軍" -> "FX's"
+				processedMain = [i for i in processedMain if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
 
 				seen = set()
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))]
@@ -1472,6 +1956,7 @@ class Core(object):
 
 					titles = [original]
 					titles.extend([i for i in self.titles['processed']['main'] if tools.Matcher.levenshtein(original, i) > 0.75])
+					titles = [tools.Regex.extract(data = i, expression = '^\s*[\-\_\:\+]*\s*(.*?)\s*[\-\_\:\+]*\s*$', cache = True) for i in titles] # Remove leading/trailing symbols (except a dot), Eg: ["S.W.A.T.", "S.W.A.T. -", "S.W.A.T.:"]
 					seen = set()
 					titles = [i for i in titles if i and not(i.lower() in seen or seen.add(i.lower()))]
 					self.titles['processed']['original'] = titles
@@ -1498,19 +1983,90 @@ class Core(object):
 				title = tools.Regex.replace(data = title, expression = '\s{2,}', replacement = ' ', all = True)
 				return title
 
-			def additional(title, titleShow, year, imdb, tvdb):
+			def additional(title, titleShow, year, imdb, tmdb, tvdb, trakt, season, episode, metadata):
+				additionalInitialize(title = title, titleShow = titleShow, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, metadata = metadata)
 				self.additionalLockTrakt = Lock()
 				self.additionalLockTmdb = Lock()
 				self.additionalLockImdb = Lock()
 				threads = []
-				threads.append(Pool.thread(target = additionalTitle, kwargs = {'title' : title, 'titleShow' : titleShow, 'year' : year, 'imdb' : imdb, 'tvdb' : tvdb}, start = True))
-				threads.append(Pool.thread(target = additionalYear, kwargs = {'title' : title, 'titleShow' : titleShow, 'year' : year, 'imdb' : imdb, 'tvdb' : tvdb}, start = True))
+				threads.append(Pool.thread(target = additionalTitle, kwargs = {'title' : title, 'titleShow' : titleShow, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
+				threads.append(Pool.thread(target = additionalYear, kwargs = {'title' : title, 'titleShow' : titleShow, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
 				[thread.join() for thread in threads]
+				additionalFinalize()
 
-			def additionalTrakt(imdb):
+			def additionalInitialize(title, titleShow, year, imdb, tmdb, tvdb, trakt, season, episode, metadata):
+				originalLanguage = []
+				originalCountry = []
+				originalNetwork = []
+				originalStudio = []
+
+				if titleShow:
+					if metadata:
+						originalLanguage.append(metadata.get('language'))
+						originalCountry.append(metadata.get('country'))
+						originalNetwork.append(metadata.get('network'))
+						originalStudio.append(metadata.get('studio'))
+					item = MetaManager.instance().metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = titleShow or title, year = year)
+					if item:
+						originalLanguage.append(item.get('language'))
+						originalCountry.append(item.get('country'))
+						originalNetwork.append(item.get('network'))
+						originalStudio.append(item.get('studio'))
+				else:
+					if metadata:
+						originalLanguage.append(metadata.get('language'))
+						originalCountry.append(metadata.get('country'))
+						originalNetwork.append(metadata.get('network'))
+						originalStudio.append(metadata.get('studio'))
+
+				if originalLanguage:
+					items = []
+					for i in originalLanguage: None if not i else items.extend(i) if tools.Tools.isArray(i) else items.append(i)
+					if items: self.originalLanguage = items
+
+				if originalCountry:
+					items = []
+					for i in originalCountry: None if not i else items.extend(i) if tools.Tools.isArray(i) else items.append(i)
+					if items: self.originalCountry = items
+
+				if originalNetwork:
+					items = []
+					for i in originalNetwork: None if not i else items.extend(i) if tools.Tools.isArray(i) else items.append(i)
+					if items: self.originalNetwork = items
+
+				if originalStudio:
+					items = []
+					for i in originalStudio: None if not i else items.extend(i) if tools.Tools.isArray(i) else items.append(i)
+					if items: self.originalStudio = items
+
+			def additionalFinalize():
+				if self.originalLanguage: self.originalLanguage = tools.Tools.listUnique(self.originalLanguage)
+				if self.originalCountry: self.originalCountry = tools.Tools.listUnique(self.originalCountry)
+				if self.originalNetwork:
+					for i in self.originalNetwork:
+						try:
+							# Eg: British Broadcasting Corporation (BBC)
+							abbrivation = tools.Regex.extract(data = i, expression = '(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
+							if abbrivation:
+								self.originalNetwork.append(abbrivation[0][0])
+								self.originalNetwork.append(abbrivation[0][1])
+						except: tools.Logger.error()
+					self.originalNetwork = tools.Tools.listUnique(self.originalNetwork)
+				if self.originalStudio:
+					for i in self.originalStudio:
+						try:
+							# Eg: British Broadcasting Corporation (BBC)
+							abbrivation = tools.Regex.extract(data = i, expression = '(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
+							if abbrivation:
+								self.originalStudio.append(abbrivation[0][0])
+								self.originalStudio.append(abbrivation[0][1])
+						except: tools.Logger.error()
+					self.originalStudio = tools.Tools.listUnique(self.originalStudio)
+
+			def additionalTrakt(trakt, imdb):
 				try:
 					self.additionalLockTrakt.acquire() # Lock, since this function can be called for extracting the year OR the original title, and we only want to make the request once.
-					if imdb: return traktx.SearchMovie(imdb = imdb)
+					if imdb: return traktx.SearchMovie(trakt = trakt, imdb = imdb)
 				except:
 					tools.Logger.error()
 				finally:
@@ -1523,7 +2079,7 @@ class Core(object):
 					self.additionalLockTmdb.acquire() # Lock, since this function can be called for extracting the year OR the original title, and we only want to make the request once.
 					if imdb:
 						from lib.modules.account import Tmdb
-						key = Tmdb().key()
+						key = Tmdb.instance().key()
 						if key: return cachex.Cache.instance().cacheExtended(network.Networker().requestJson, 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=imdb_id' % (imdb, key))
 				except:
 					tools.Logger.error()
@@ -1536,13 +2092,11 @@ class Core(object):
 				try:
 					self.additionalLockImdb.acquire() # Lock, since this function can be called for extracting the year OR the original title, and we only want to make the request once.
 					if imdb:
-						def _additionalImdb(imdb):
-							# NB: Request the English version of ther website.
-							# Otherwise IMDb might use the public IP address (eg: VPN) to return the page in another language.
-							# Otherwise the title prefix ("Original title: ...") will be in another language, making the extraction fail (or at least more complicated, since multiple Regexs are needed).
-							return network.Networker().requestText(link = 'https://imdb.com/title/%s' % imdb, headers = network.Networker.headersAcceptLanguage(language = tools.Language.EnglishCode))
-						result = cachex.Cache.instance().cacheExtended(_additionalImdb, imdb)
-						if result: return Parser(result)
+						# NB: Request the English version of the website.
+						# Otherwise IMDb might use the public IP address (eg: VPN) to return the page (and the original title) in another language.
+						from lib.meta.providers.imdb import MetaImdb
+						result = MetaImdb.instance().metadata(id = imdb, language = tools.Language.EnglishCode, cache = True)
+						if result: return result
 				except:
 					tools.Logger.error()
 				finally:
@@ -1550,7 +2104,7 @@ class Core(object):
 					except: pass
 				return None
 
-			def additionalYear(title, titleShow, year, imdb, tvdb):
+			def additionalYear(title, titleShow, year, imdb, tmdb, tvdb, trakt):
 				# Sometimes the release year of a movie can be different from different sources.
 				# For instance, when searching for "Danny's Game", the search results are from Trakt and show the year as 2019, but on IMDb the year is listed as 2020.
 				# Sometimes the year can be off by 1, for movies released at the start/end of the year with different release dates in different countries.
@@ -1568,12 +2122,13 @@ class Core(object):
 						'all' : [year] if year else [],	# All available years.
 						'imdb' : None,
 						'tmdb' : None,
+						'tvdb' : None,
 						'trakt' : None,
 					}
 
 					if imdb and not titleShow and self.enabledYear: # Only movies.
 						threads = []
-						threads.append(Pool.thread(target = additionalYearTrakt, kwargs = {'imdb' : imdb}, start = True))
+						threads.append(Pool.thread(target = additionalYearTrakt, kwargs = {'trakt' : trakt, 'imdb' : imdb}, start = True))
 						threads.append(Pool.thread(target = additionalYearTmdb, kwargs = {'imdb' : imdb}, start = True))
 						threads.append(Pool.thread(target = additionalYearImdb, kwargs = {'imdb' : imdb}, start = True))
 						[thread.join() for thread in threads]
@@ -1618,10 +2173,10 @@ class Core(object):
 				self.progressYearImdb = 100
 				self.progressYearTmdb = 100
 
-			def additionalYearTrakt(imdb):
+			def additionalYearTrakt(trakt, imdb):
 				self.progressYearTrakt = 0
 				try:
-					result = additionalTrakt(imdb = imdb)
+					result = additionalTrakt(trakt = trakt, imdb = imdb)
 					if result:
 						for i in result:
 							if i['type'] == 'movie':
@@ -1650,40 +2205,30 @@ class Core(object):
 				try:
 					result = additionalImdb(imdb = imdb)
 					if result:
-						types = [
-							'releaseinfo\?ref_=tt_ov_rdat', # Year just underneath the main title.
-							'releaseinfo\?ref_=tt_dt_rdat', # Release date in the "Details" table at the bottom. Sometimes this date can differ from the one under main title (eg: 1984).
-						]
-						for i in types:
-							entry = result.find_all('a', {'href' : re.compile(i, flags = re.IGNORECASE)})
-							if entry:
-								for j in entry:
-									year = tools.Regex.extract(data = j.getText(), expression = '((?:1[89]|2[01])\d{2})')
-									if year:
-										try:
-											year = int(year)
-											if year:
-												self.years['imdb'] = year
-												break
-										except: pass
-									if self.years['imdb']: break
+						year = result.get('year')
+						if year: self.years['imdb'] = year
 				except: tools.Logger.error()
 				self.progressYearImdb = 90
 
-			def additionalTitle(title, titleShow, year, imdb, tvdb):
+			def additionalTitle(title, titleShow, year, imdb, tmdb, tvdb, trakt):
 				threads = []
 
 				original = self.enabledTitle and ProviderBase.settingsGlobalTitleOriginal()
-				threads.append(Pool.thread(target = additionalTitleOriginal, args = (original, title, titleShow, imdb, tvdb)))
+				threads.append(Pool.thread(target = additionalTitleOriginal, args = (original, title, titleShow, imdb, tmdb, tvdb, trakt)))
 
 				if self.enabledTitle:
 					native = ProviderBase.settingsGlobalTitleNative()
 					local = ProviderBase.settingsGlobalTitleLocal()
-					if native or local: threads.append(Pool.thread(target = additionalTitleTranslation, args = (title, titleShow, imdb, tvdb, native, local)))
-					if ProviderBase.settingsGlobalTitleAlias(): threads.append(Pool.thread(target = additionalTitleAlias, args = (title, titleShow, imdb, tvdb)))
+
+					# Always add the native/local/alias titles to the "processed" list for filename matching, irrespective of the setting.
+					# Only later on, exclude these titles from the "search" list if the setting is disbaled.
+					#if native or local: threads.append(Pool.thread(target = additionalTitleTranslation, args = (title, titleShow, imdb, tvdb, native, local)))
+					#if ProviderBase.settingsGlobalTitleAlias(): threads.append(Pool.thread(target = additionalTitleAlias, args = (title, titleShow, imdb, tvdb)))
+					threads.append(Pool.thread(target = additionalTitleTranslation, args = (title, titleShow, imdb, tmdb, tvdb, trakt, True, True)))
+					threads.append(Pool.thread(target = additionalTitleAlias, args = (title, titleShow, imdb, tmdb, tvdb, trakt)))
 
 				if self.enabledCollection and not titleShow:
-					threads.append(Pool.thread(target = additionalTitleCollection, args = (title, imdb, tvdb)))
+					threads.append(Pool.thread(target = additionalTitleCollection, args = (title, imdb, tmdb, tvdb, trakt)))
 
 				[thread.start() for thread in threads]
 				[thread.join() for thread in threads]
@@ -1695,11 +2240,14 @@ class Core(object):
 				self.progressTitleAlias = 100
 				self.progressTitleCollection = 100
 
-			def additionalTitleOriginal(update, title, titleShow, imdb, tvdb):
+			def additionalTitleOriginal(update, title, titleShow, imdb, tmdb, tvdb, trakt):
 				self.progressTitleOriginal = 0
 				try:
-					titleOriginal = None
-					languageOriginal = None
+					originalTitle = None
+					originalLanguage = None
+					originalCountry = None
+					originalNetwork = None
+					originalStudio = None
 
 					result = additionalTmdb(imdb)
 					if result:
@@ -1711,51 +2259,60 @@ class Core(object):
 									if not tools.Tools.isArray(value): value = [value]
 									for k in value:
 										if 'original_title' in k: # Movies
-											titleOriginal = k['original_title']
-											try: languageOriginal = k['original_language']
+											originalTitle = k['original_title']
+											try: originalLanguage = k['original_language']
+											except: pass
+											try: originalCountry = k['origin_country']
 											except: pass
 											break
 										elif 'original_name' in k: # Shows
-											titleOriginal = k['original_name']
-											try: languageOriginal = k['original_language']
+											originalTitle = k['original_name']
+											try: originalLanguage = k['original_language']
+											except: pass
+											try: originalCountry = k['origin_country']
 											except: pass
 											break
-									if titleOriginal: break
-								if titleOriginal: break
-							if titleOriginal: break
+									if originalTitle: break
+								if originalTitle: break
+							if originalTitle: break
 
-					if not titleOriginal:
+					if not originalTitle:
 						result = additionalImdb(imdb)
 						self.progressTitleOriginal = 70
 						if result:
-							for lookup in ['originalTitle', re.compile('originalTitle__*', flags = re.IGNORECASE)]:
-								resultTitle = result.find_all('div', class_ = lookup)
-								if len(resultTitle) > 0:
-									titleOriginal = resultTitle[0].getText()
-									if titleOriginal: break
-							if not titleOriginal:
-								resultTitle = result.find_all('div', {'data-testid' : 'hero-title-block__original-title'})
-								if len(resultTitle) > 0: titleOriginal = resultTitle[0].getText()
-							if not titleOriginal:
-								resultTitle = result.find_all('h1', {'itemprop' : 'name'})
-								if len(resultTitle) > 0: titleOriginal = resultTitle[0].getText()
-							if titleOriginal:
-								index = titleOriginal.rfind('(')
-								if index >= 0: titleOriginal = titleOriginal[:index]
-								titleOriginal = tools.Regex.remove(data = titleOriginal, expression = 'original\s*title\s*:\s*', all = True)
-							try:
-								resultLanguage = result.find_all('li', {'data-testid' : 'title-details-languages'})
-								if resultLanguage:
-									languageOriginal = resultLanguage[0].find_all('a')[0].text
-							except: pass
+							originalTitle = result.get('originaltitle') or result.get('title')
+							originalLanguage = result.get('language')
+							originalCountry = result.get('country')
+							originalStudio = result.get('studio')
 
-					if update and titleOriginal: self.titles['original'] = titleOriginal.strip() or titleShow or title # Sometimes foreign titles have a space at the end.
-					if languageOriginal: self.languageOriginal = tools.Language.code(languageOriginal)
+					if update and originalTitle: self.titles['original'] = originalTitle.strip() or titleShow or title # Sometimes foreign titles have a space at the end.
+
+					if originalLanguage:
+						if not tools.Tools.isArray(originalLanguage): originalLanguage = [originalLanguage]
+						originalLanguage = [tools.Language.code(i) for i in originalLanguage]
+						if self.originalLanguage: self.originalLanguage.extend(originalLanguage)
+						else: self.originalLanguage = originalLanguage
+
+					if originalCountry:
+						if not tools.Tools.isArray(originalCountry): originalCountry = [originalCountry]
+						originalCountry = [tools.Country.code(i) for i in originalCountry]
+						if self.originalCountry: self.originalCountry.extend(originalCountry)
+						else: self.originalCountry = originalCountry
+
+					if originalNetwork:
+						if not tools.Tools.isArray(originalNetwork): originalNetwork = [originalNetwork]
+						if self.originalNetwork: self.originalNetwork.extend(originalNetwork)
+						else: self.originalNetwork = originalNetwork
+
+					if originalStudio:
+						if not tools.Tools.isArray(originalStudio): originalStudio = [originalStudio]
+						if self.originalStudio: self.originalStudio.extend(originalStudio)
+						else: self.originalStudio = originalStudio
 
 				except: tools.Logger.error()
 				self.progressTitleOriginal = 90
 
-			def additionalTitleTranslation(title, titleShow, imdb, tvdb, native = True, local = True):
+			def additionalTitleTranslation(title, titleShow, imdb, tmdb, tvdb, trakt, native = True, local = True):
 				try:
 					self.progressTitleTranslation = 0
 					languages = []
@@ -1775,11 +2332,11 @@ class Core(object):
 					self.progressTitleTranslation = 25
 					if titleShow and (imdb or tvdb):
 						from lib.meta.data import MetaData
-						from lib.meta.manager import MetaManager
+						from lib.meta.core import MetaCore
 
 						# Do not filter by language here. We do it manually below, so that we can use all titlers for 'extra'.
-						#items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
-						items = MetaManager(MetaManager.ProviderTvdb, threaded = MetaManager.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb)
+						#items = MetaCore(MetaCore.ProviderTvdb, threaded = MetaCore.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb, language = languages)
+						items = MetaCore(MetaCore.ProviderTvdb, threaded = MetaCore.ThreadedEnable).translationTitle(media = MetaData.MediaShow, idImdb = imdb, idTvdb = tvdb)
 
 						if items:
 							for key, val in items.items():
@@ -1836,10 +2393,10 @@ class Core(object):
 				except: tools.Logger.error()
 				self.progressTitleTranslation = 90
 
-			def additionalTitleAlias(title, titleShow, imdb, tvdb):
+			def additionalTitleAlias(title, titleShow, imdb, tmdb, tvdb, trakt):
 				self.progressTitleAlias = 25
 				try:
-					aliases = traktx.getTVShowAliases(imdb) if titleShow else traktx.getMovieAliases(imdb)
+					aliases = traktx.getTVShowAliases(imdb or trakt) if titleShow else traktx.getMovieAliases(imdb or trakt)
 					if not aliases: aliases = []
 
 					titleAliases = {}
@@ -1858,11 +2415,11 @@ class Core(object):
 				except: tools.Logger.error()
 				self.progressTitleAlias = 90
 
-			def additionalTitleCollection(title, imdb, tvdb):
+			def additionalTitleCollection(title, imdb, tmdb, tvdb, trakt):
 				self.progressTitleCollection = 0
 				try:
 					from lib.modules.account import Tmdb
-					key = Tmdb().key()
+					key = Tmdb.instance().key()
 					if key:
 						self.tmdbDetails = {}
 						def tmdbDetails(id, key):
@@ -1890,7 +2447,10 @@ class Core(object):
 										except: time = None
 										if time:
 											time = tools.Time.timestamp(fixedTime = time, format = tools.Time.FormatDate)
-											if time and time < current: movies.append(part)
+
+											# Let MetaPack decide which movies to remove.
+											#if time and time < current: movies.append(part)
+											movies.append(part)
 							if len(movies) <= 1:
 								self.titles['collection'] = None
 								self.pack = None
@@ -1900,76 +2460,34 @@ class Core(object):
 									if movie: threads.append(Pool.thread(target = tmdbDetails, kwargs = {'id' : movie['id'], 'key' : key}, start = True))
 								[thread.join() for thread in threads]
 
-								times = []
-								years = []
-								durations = []
-								countMovies = len(movies)
-
-								for i in range(countMovies):
+								for i in range(len(movies)):
 									movie = movies[i]
 									try: time = movie['release_date']
 									except: time = None
 									if time:
 										time = tools.Time.timestamp(fixedTime = time, format = tools.Time.FormatDate)
-										if time: times.append(time)
 									try: year = int(tools.Regex.extract(data = movie['release_date'], expression = '((?:1[89]|2[01])\d{2})'))
 									except: year = None
-									if year: years.append(year)
 									try: duration = self.tmdbDetails[movie['id']]['runtime'] * 60 # Runtime is in minutes.
 									except: duration = None
-									if duration: durations.append(duration)
+									try: status = self.tmdbDetails[movie['id']]['status']
+									except: status = None
+
 									movies[i] = {
 										'title' : tools.Tools.listUnique([movie['original_title'], movie['title']]),
 										'year' : year,
 										'time' : time,
 										'duration' : duration,
+										'status' : status,
 									}
 
-								countDuration = len(durations)
-								duration = sum(durations)
-								durationMean = int(duration / float(countDuration))
-								if countDuration < countMovies: duration += int(duration / float(countDuration)) * (countMovies - countDuration) # Missing duration, use mean duration of other movies.
-
-								timeMinimum = None
-								timeMaximum = None
-								if times:
-									times = tools.Tools.listSort(times)
-									timeMinimum = min(times)
-									timeMaximum = max(times)
-
-								yearMinimum = None
-								yearMaximum = None
-								if years:
-									years = tools.Tools.listSort(years)
-									yearMinimum = min(years)
-									yearMaximum = max(years)
-
-								self.pack = {
-									'title' : titleCollection,
-									'count' : countMovies,
-									'duration' : {
-										'total' : duration,
-										'mean' : durationMean,
-									},
-									'time' : {
-										'start' :timeMinimum,
-										'end' : timeMaximum,
-										'times' : times,
-									},
-									'year' : {
-										'start' :yearMinimum,
-										'end' : yearMaximum,
-										'years' : years,
-									},
-									'movies' : movies,
-								}
-
+								self.pack = MetaPack().generateMovie(title = titleCollection, movies = movies)
 							self.progressTitleCollection = 75
 				except: tools.Logger.error()
 				self.progressTitleCollection = 90
 
-			def initializeProviders(media, preset, imdb, tvdb, exclude = None):
-				self.providers = manager.Manager.providers(enabled = True, exclude = exclude, preset = preset, sort = True)
+			def initializeProviders(media, preset, exclude = None):
+				self.providers = ProviderManager.providers(enabled = True, exclude = exclude, preset = preset, sort = True)
 				self.providersBusy = len(self.providers)
 
 			tools.Logger.log('Scraping Started', name = 'CORE', type = tools.Logger.TypeInfo)
@@ -1981,8 +2499,11 @@ class Core(object):
 			ProviderBase.statisticsClear()
 
 			threads = []
-			movie = tvshowtitle is None if self.media is None else (self.media == tools.Media.TypeMovie or self.media == tools.Media.TypeDocumentary or self.media == tools.Media.TypeShort)
-			media = tools.Media.TypeMovie if movie else tools.Media.TypeShow
+			movie = tvshowtitle is None if self.media is None else self.media == tools.Media.Movie
+			media = tools.Media.Movie if movie else tools.Media.Show
+
+			niche = (metadata.get('niche') if metadata else None)
+			if niche: niche = [i for i in niche if i in [tools.Media.Film, tools.Media.Serie, tools.Media.Topic, tools.Media.Audience]]
 
 			release = None
 			if metadata:
@@ -1998,9 +2519,14 @@ class Core(object):
 
 			try: duration = int(metadata['duration']) # Might come in as a string from "Random Play".
 			except: duration = None
-			try: self.pack = metadata['pack'] if pack is None else pack
-			except: self.pack = None
 			self.usage = None
+
+			self.pack = pack or (metadata.get('pack') if metadata else None)
+			if not self.pack and tools.Media.isSerie(media): tools.Logger.log('No pack metadata available. Pack scraping will be inaccurate.')
+
+			number = None
+			if not number and metadata: number = metadata.get('number')
+			number = MetaPack.reduceNumber(data = number, pack = self.pack, season = season, episode = episode)
 
 			self.timeInitialize = None
 			self.timeMetadata = None
@@ -2019,7 +2545,11 @@ class Core(object):
 			try: episode = int(episode)
 			except: pass
 
-			self.languageOriginal = None
+			self.originalLanguage = None
+			self.originalCountry = None
+			self.originalNetwork = None
+			self.originalStudio = None
+
 			self.titles = {}
 			self.years = None
 			if exact:
@@ -2056,10 +2586,13 @@ class Core(object):
 			self.startedThreads = False
 			self.stopThreads = False
 			self.finishedThreads = False
-			self.threadsAdjusted = []
 			self.sourcesAdjusted = []
-			self.statusAdjusted = []
-			self.priortityAdjusted = []
+			self.tasksAdjusted = []
+
+			# Do not use too many threads, since they are anyways executed sequentially, and we do not want to waste unnecessary threads for low-end devices.
+			# Allow more threads at the end of the process.
+			cores = tools.Hardware.processorCountCore()
+			self.synchronizerAdjusted = {False : Premaphore(min(16, max(int(cores * 1.5), 8))), True : Premaphore(min(24, max(int(cores * 2.0), 16)))}
 
 			labels = []
 
@@ -2087,7 +2620,7 @@ class Core(object):
 			self.enabledYear = ProviderBase.settingsGlobalYearEnabled()
 			self.enabledPack = ProviderBase.settingsGlobalPackEnabled()
 			self.enabledCollection = ProviderBase.settingsGlobalPackMovie()
-			self.enabledFailures = manager.Manager.failureEnabled()
+			self.enabledFailures = ProviderManager.failureEnabled()
 
 			self.preloadEnabled = self.enabledDeveloper and tools.Settings.getBoolean('general.developer.preload.container')
 			self.preloadEnabledTorrent = self.preloadEnabled and tools.Settings.getBoolean('general.developer.preload.container.torrent')
@@ -2191,12 +2724,6 @@ class Core(object):
 
 				self.cacheEnabled = len(self.cacheTypes) > 0
 
-			# Limit the number of running threads.
-			# Can be more than actual core count, since threads in python are run on a single core.
-			# Do not use too many, otherwise Kodi begins lagging (eg: the dialog is not updated very often, and the elapsed seconds are stuck).
-			# NB: Do not use None (aka unlimited). If 500+ links are found, too many threads are started, causing a major delay by having to switch between threads. Use a limited number of threads.
-			self.threadsLimit = max(tools.Hardware.processorCountCore() * 2, 10)
-
 			tools.File.makeDirectory(tools.System.profile())
 
 			self.progressTitleOriginal = 0
@@ -2229,8 +2756,8 @@ class Core(object):
 			self.timerScrape = tools.Time()
 			timerSingle = tools.Time()
 			timeStep = 0.5
-			timeString = '%s ' + interface.Translation.string(32405)
-			timeStringDescription = interface.Translation.string(32404) + ': ' + timeString
+			self.timeString = '%s ' + interface.Translation.string(32405)
+			self.timeStringDescription = interface.Translation.string(32404) + ': ' + self.timeString
 
 			heading = 'Stream Search'
 			message = 'Initializing Providers'
@@ -2252,7 +2779,7 @@ class Core(object):
 			# NB: quick = True: Do not clear the streams database.
 			# If the streams database is very large (300MB+), removing old streams and then compressing the database can take very long (15-20 secs).
 			# This holds up the scraping process ('Initializing Providers' takes 20secs+ instead of the normal 5secs). Instead compress the streams database only on addon launch.
-			manager.Manager.databaseInitialize(quick = True)
+			ProviderManager.databaseInitialize(quick = True)
 
 			self.skip = False
 			specialAllow = False
@@ -2260,7 +2787,7 @@ class Core(object):
 			if (specialAllow or not self.progressCanceled()):
 				timeout = 30 # Do not make this too low, since native titles retrival depends on this.
 				message = 'Initializing Providers'
-				thread = Pool.thread(target = initializeProviders, args = (media, preset, imdb, tvdb))
+				thread = Pool.thread(target = initializeProviders, args = (media, preset))
 
 				thread.start()
 				timerSingle.start()
@@ -2292,7 +2819,7 @@ class Core(object):
 				message = 'Retrieving Additional Metadata'
 				timeout = 45
 
-				thread = Pool.thread(target = additional, args = (title, tvshowtitle, year, imdb, tvdb))
+				thread = Pool.thread(target = additional, args = (title, tvshowtitle, year, imdb, tmdb, tvdb, trakt, season, episode, metadata))
 				thread.start()
 
 				timerSingle.start()
@@ -2321,7 +2848,7 @@ class Core(object):
 			# Finding Sources
 			self.skip = True
 
-			threadProvider = Pool.thread(target = self.scrapeProviders, args = (threads, labels, self.providers, media, self.titles, self.years, release, imdb, tmdb, tvdb, season, episode, self.languageOriginal, self.pack, duration, exact, cache))
+			threadProvider = Pool.thread(target = self.scrapeProviders, args = (threads, labels, self.providers, media, niche, self.titles, self.years, release, imdb, tmdb, tvdb, trakt, season, episode, number, self.originalLanguage, self.originalCountry, self.originalNetwork, self.originalStudio, self.pack, duration, exact, cache))
 			threadProvider.start()
 
 			if (specialAllow or not self.progressCanceled()):
@@ -2438,7 +2965,7 @@ class Core(object):
 					#else: threadsFinished.append(self.providers[i]['id'])
 					if self.providers[i].resultCount(): threadsFinished.append(self.providers[i]['id'])
 					else: threadsUnfinished.append(self.providers[i]['id'])
-				manager.Manager.failureUpdate(finished = threadsFinished, unfinished = threadsUnfinished)
+				ProviderManager.failureUpdate(finished = threadsFinished, unfinished = threadsUnfinished)
 
 			del threads[:] # Make sure all providers are stopped.
 
@@ -2459,12 +2986,11 @@ class Core(object):
 						if timerSingle.elapsed() >= timeout:
 							break
 
-						totalThreads = self.cacheCount + len(self.threadsAdjusted)
-						aliveCount = len([x for x in self.threadsAdjusted if not tools.Tools.isDictionary(x) and x.is_alive()])
-						self.streamsFinished = self.cacheCount + len([x for x in self.statusAdjusted if x == 'done'])
+						totalThreads = self.cacheCount + len(self.tasksAdjusted)
+						self.streamsFinished = self.cacheCount + len([x for x in self.tasksAdjusted if x['status'] == 'done'])
 						self.streamsBusy = totalThreads - self.streamsFinished
 
-						if aliveCount == 0: break
+						if self.streamsBusy == 0: break
 
 						percentage = int((((self.streamsFinished / float(totalThreads)) * percentagePrecheck) + percentageDone) * 100)
 						stringSourcesValue1 = stringInput1 % (self.streamsFinished, totalThreads)
@@ -2495,12 +3021,11 @@ class Core(object):
 						if timerSingle.elapsed() >= timeout:
 							break
 
-						totalThreads = self.cacheCount + len(self.threadsAdjusted)
-						aliveCount = len([x for x in self.threadsAdjusted if not tools.Tools.isDictionary(x) and x.is_alive()])
-						self.streamsFinished = self.cacheCount + len([x for x in self.statusAdjusted if x == 'done'])
+						totalThreads = self.cacheCount + len(self.tasksAdjusted)
+						self.streamsFinished = self.cacheCount + len([x for x in self.tasksAdjusted if x['status'] == 'done'])
 						self.streamsBusy = totalThreads - self.streamsFinished
 
-						if aliveCount == 0: break
+						if self.streamsBusy == 0: break
 
 						percentage = int((((self.streamsFinished / float(totalThreads)) * percentageMetadata) + percentageDone) * 100)
 						stringSourcesValue1 = stringInput1 % (self.streamsFinished, totalThreads)
@@ -2526,14 +3051,16 @@ class Core(object):
 				unfinishedCounter = 0
 				timerSingle.start()
 
+				self.adjustSourceStart(full = True) # Sometimes there is just 1 unfinished stream adjustment (not sure why). Maybe this helps.
+
 				while True:
 					try:
 						elapsedTime = timerSingle.elapsed()
 						if self.progressCanceled() or elapsedTime >= timeout:
 							break
 
-						totalThreads = self.cacheCount + len(self.threadsAdjusted)
-						self.streamsFinished = self.cacheCount + len([x for x in self.statusAdjusted if x == 'done'])
+						totalThreads = self.cacheCount + len(self.tasksAdjusted)
+						self.streamsFinished = self.cacheCount + len([x for x in self.tasksAdjusted if x['status'] == 'done'])
 						self.streamsBusy = totalThreads - self.streamsFinished
 
 						if self.streamsBusy == 0: break
@@ -2544,7 +3071,6 @@ class Core(object):
 						if self.streamsBusy <= 10 or (self.streamsBusy / float(totalThreads)) < 0.03:
 							unfinishedCounter += 1
 							if unfinishedCounter >= (15 / timeStep): break # 15 secs.
-						self.adjustSourceStart() # Sometimes there is just 1 unfinished stream adjustment (not sure why). Maybe this helps.
 
 						percentage = int((((elapsedTime / float(timeout)) * percentageFinalize) + percentageDone) * 100)
 						stringSourcesValue1 = stringInput1 % (self.streamsFinished, totalThreads)
@@ -2653,10 +3179,9 @@ class Core(object):
 				self.timeSave = timerSingle.elapsed()
 
 			# Sources
-			MetaTools.cleanSeason(metadata = metadata) # Remove excessive unused metadata.
+			metadata = MetaTools.reduce(metadata = metadata, seasons = True, copy = False) # Remove excessive unused metadata.
 			self.sources = self.sourcesAdjusted
 			for i in range(len(self.sources)):
-				self.sources[i]['kids'] = self.kids
 				self.sources[i]['media'] = self.media
 				self.sources[i]['metadata'] = metadata # Required by handler for selecting the correct episode from a season pack.
 
@@ -2666,10 +3191,8 @@ class Core(object):
 			self._scrapeProgressUpdate(100, 'Preparing Streams', ' ', ' ', showElapsed = False)
 
 			# Clear because member variable.
-			self.threadsAdjusted = []
+			self.tasksAdjusted = []
 			self.sourcesAdjusted = []
-			self.statusAdjusted = []
-			self.priortityAdjusted = []
 
 			tools.Logger.log('Scraping Finished', name = 'CORE', type = tools.Logger.TypeInfo)
 
@@ -2841,12 +3364,6 @@ class Core(object):
 			]
 			items1.append({'label' : 'Limits', 'items' : [i for i in items2 if not i is None]})
 
-			items2 = [
-				{'label' : 'Concurrency Mode', 'value' : ProviderBase.settingsGlobalConcurrencyModeLabel()},
-				{'label' : 'Concurrency Limit', 'value' : ProviderBase.settingsGlobalConcurrencyLimitLabel()},
-			]
-			items1.append({'label' : 'Concurrency', 'items' : [i for i in items2 if not i is None]})
-
 			packEnabled = ProviderBase.settingsGlobalPackEnabled()
 			items2 = [
 				{'label' : 'Pack Scraping', 'value' : enabled if packEnabled else disabled},
@@ -2905,11 +3422,11 @@ class Core(object):
 			]
 			items1.append({'label' : 'Termination', 'items' : [i for i in items2 if not i is None]})
 
-			failureEnabled = manager.Manager.failureEnabled()
+			failureEnabled = ProviderManager.failureEnabled()
 			items2 = [
 				{'label' : 'Failure Detection', 'value' : enabled if failureEnabled else disabled},
-				{'label' : 'Failure Limit', 'value' : manager.Manager.failureLimit()} if failureEnabled else None,
-				{'label' : 'Retry Delay', 'value' : manager.Manager.failureTimeLabel()} if failureEnabled else None,
+				{'label' : 'Failure Limit', 'value' : ProviderManager.failureLimit()} if failureEnabled else None,
+				{'label' : 'Retry Delay', 'value' : ProviderManager.failureTimeLabel()} if failureEnabled else None,
 			]
 			items1.append({'label' : 'Failures', 'items' : [i for i in items2 if not i is None]})
 
@@ -2924,6 +3441,15 @@ class Core(object):
 			]
 			items1.append({'label' : 'Cache', 'items' : [i for i in items2 if not i is None]})
 
+			concurrency = Pool.settingData()
+			items2 = [
+				{'label' : 'Concurrency Scrape', 'value' : 'Binge' if self.binge else 'Normal'},
+				{'label' : 'Concurrency Mode', 'value' : concurrency['mode']['label']},
+				{'label' : 'Concurrency Limit', 'value' : concurrency['binge']['label'] if self.binge else concurrency['scrape']['label']},
+				{'label' : 'Concurrency Connections', 'value' : concurrency['connection']['label']},
+			]
+			items1.append({'label' : 'Concurrency', 'items' : [i for i in items2 if not i is None]})
+
 			items2 = [
 				{'label' : 'Developer Options', 'value' : enabled if tools.System.developer(version = False) else disabled},
 			]
@@ -2935,7 +3461,11 @@ class Core(object):
 			tools.Logger.scrape(data)
 		except: tools.Logger.error()
 
-	def scrapeProviders(self, threads, labels, providers, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache):
+	def scrapeProviders(self, threads, labels, providers, media, niche, titles, years, time, imdb, tmdb, tvdb, trakt, season, episode, number, language, country, network, studio, pack, duration, exact, cache):
+		# Reduce the pack data passed to Stream.
+		# More info at MetaPack.reduceStream().
+		if pack: pack = MetaPack.instance(pack = pack).reduceStream()
+
 		binge = self.binge == tools.Binge.ModeBackground
 		ProviderBase.concurrencyInitialize(tasks = len(providers), binge = binge)
 
@@ -2946,7 +3476,7 @@ class Core(object):
 		hostersAll = self.hosters()
 		hostersPremium = self.hostersPremium()
 
-		providers = manager.Manager.providersPrioritize(providers = providers)
+		providers = ProviderManager.providersPrioritize(providers = providers)
 		self.providersWait = sum([len(sub) for sub in providers])
 		self.finishedThreads = False
 
@@ -2954,7 +3484,7 @@ class Core(object):
 			if not self.stopThreads:
 				threadsSub = []
 				for provider in sub:
-					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache, hostersAll, hostersPremium))
+					thread = Pool.thread(target = self.scrapeProvider, args = (provider, media, niche, titles, years, time, imdb, tmdb, tvdb, trakt, season, episode, number, language, country, network, studio, pack, duration, exact, cache, hostersAll, hostersPremium))
 					threadsSub.append(thread)
 					threads.append(thread)
 					labels.append(provider.label())
@@ -2971,10 +3501,11 @@ class Core(object):
 		# Use a second variable to indicate everything is done.
 		self.finishedThreads = True
 
-	def scrapeProvider(self, provider, media, titles, years, time, imdb, tmdb, tvdb, season, episode, language, pack, duration, exact, cache, hostersAll, hostersPremium):
+	def scrapeProvider(self, provider, media, niche, titles, years, time, imdb, tmdb, tvdb, trakt, season, episode, number, language, country, network, studio, pack, duration, exact, cache, hostersAll, hostersPremium):
 		try:
 			streams = provider.execute(
 				media = media,
+				niche = niche,
 				titles = titles,
 				years = years,
 				time = time,
@@ -2982,11 +3513,16 @@ class Core(object):
 				idImdb = imdb,
 				idTmdb = tmdb,
 				idTvdb = tvdb,
+				idTrakt = trakt,
 
 				numberSeason = season,
 				numberEpisode = episode,
+				numberPack = number,
 
 				language = language,
+				country = country,
+				network = network,
+				studio = studio,
 				pack = pack,
 				duration = duration,
 
@@ -3068,6 +3604,7 @@ class Core(object):
 		self.propertyExtrasSet(tools.Tools.copy(extras))
 
 		interface.Loader.show()
+		window.WindowStreams.close()
 		self.showStreams(extras = extras, metadata = metadata, autoplay = False, add = True)
 
 	def filterStreams(self):
@@ -3075,6 +3612,10 @@ class Core(object):
 		data = tools.Tools.copy(filters.data()) # Make a copy, otherwise this dictionary is changed as well.
 		filters.show()
 		if not filters.data() == data: # Only reload if the filters have changed.
+			# Without this, when using the Filters dialog from the context menu, about 50% of the time the new WindowStreams does not load, and Kodi goes back to the directory without showing the streams.
+			# Manually closing the window seems to solve the problem.
+			if 'WindowStreams' in window.Window.currentType(): window.WindowStreams.close()
+
 			interface.Loader.show()
 			self.showStreams()
 
@@ -3085,6 +3626,10 @@ class Core(object):
 				previous = None
 				for item in items:
 					current = item['metadata']
+
+					# Do not just compare the entire metadata, since it can be different when the stream window is reloaded after playback is stopped.
+					current = {i : current.get(i) for i in ['trakt', 'imdb', 'tmdb', 'tvdb', 'season', 'episode']}
+
 					if previous and current and not previous == current: return True
 					previous = current
 		except: tools.Logger.error()
@@ -3169,7 +3714,7 @@ class Core(object):
 	def showStreamsExternal(self, filter = None, binge = None, autoplay = None, reload = None):
 		interface.Loader.show() # When the streams are filtered/sorted again.
 		self.reload = reload
-		parameters = {'media' : self.media, 'kids' : self.kids}
+		parameters = {'media' : self.media}
 		if not filter is None: parameters['filterx'] = filter
 		if not binge is None: parameters['binge'] = binge
 		if not autoplay is None: parameters['autoplay'] = autoplay
@@ -3198,6 +3743,8 @@ class Core(object):
 			return None
 
 	def _showStreams(self, items = None, metadata = None, library = False, initial = False, add = False, binge = None):
+		from lib.modules.shortcut import Shortcut
+
 		metatools = MetaTools.instance()
 
 		hasFanart = Theme.artwork()
@@ -3207,6 +3754,17 @@ class Core(object):
 
 		total = len(items)
 		mixed = self.mixedStreams(items = items)
+
+		# When loading a menu for 500+ episodes, this function can take 30-40secs, even on an fast CPU.
+		# Removing the pack reduces it down to 3-4secs.
+		# Not sure if the pack is needed somewhere (eg: context menu, data passed onto the player, binge, etc).
+		# If we ever need the pack again and have to remove this statement, take the loading time into account.
+		# This is also done below for the stream history window with mutiple titles.
+		try: del metadata['pack']
+		except: pass
+
+		try: media = metadata['media']
+		except: media = None
 
 		try: title = metadata['tvshowtitle']
 		except:
@@ -3228,7 +3786,9 @@ class Core(object):
 		except: tmdb = None
 		try: tvdb = metadata['tvdb']
 		except: tvdb = None
-		id = '' if mixed else tools.Hash.sha1((imdb if imdb else tmdb if tmdb else tvdb if tvdb else tools.Converter.jsonTo(metadata)) + '_' + str(season) + '_' + str(episode) + '_' + str(total))
+		try: trakt = metadata['trakt']
+		except: trakt = None
+		id = '' if mixed else tools.Hash.sha1((imdb if imdb else trakt if trakt else tmdb if tmdb else tvdb if tvdb else tools.Converter.jsonTo(metadata)) + '_' + str(season) + '_' + str(episode) + '_' + str(total))
 
 		images = MetaImage.extract(data = metadata)
 		if not hasFanart or not MetaImage.TypeFanart in images: images[MetaImage.TypeFanart] = addonFanart
@@ -3243,7 +3803,10 @@ class Core(object):
 		except: poster3 = None
 		if not poster1 and not poster2 and not poster3: poster1 = Theme.poster() # Exact searches.
 
-		encoded = tools.System.commandEncode({'metadata' : metadata})
+		lookup = {'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}
+		if not season is None: lookup['season'] = season
+		if not episode is None: lookup['episode'] = episode
+
 		if self.navigationStreamsDirectory: metadataKodi = metatools.clean(metadata = metadata, exclude = True)
 		else: metadataKodi = metatools.clean(metadata = metadata)
 
@@ -3277,9 +3840,10 @@ class Core(object):
 			colorHighlightDefault = 'FF000000'
 			colorHighlightBase = Stream.accessCacheColor()
 			colorHighlightLocal = interface.Format.colorAlpha(color = colorHighlightBase, alpha = 'FF')
-			colorHighlightCached = interface.Format.colorAlpha(color = colorHighlightBase, alpha = 'DD')
+			colorHighlightCached = interface.Format.colorAlpha(color = colorHighlightBase, alpha = 'EE')
 			colorHighlightDirect = interface.Format.colorAlpha(color = colorHighlightBase, alpha = '77')
 			colorHighlightDebrid = interface.Format.colorAlpha(color = colorHighlightBase, alpha = '55')
+			colorHighlightCustom = Stream.infoCustomColor()
 			colorHighlightDuplicate = Stream.exclusionDuplicateColor()
 			colorHighlightKeyword = Stream.exclusionKeywordColor()
 			colorHighlightMetadata = Stream.exclusionMetadataColor()
@@ -3327,9 +3891,16 @@ class Core(object):
 				try:
 					if mixed:
 						metadata = itemJson['metadata']
-						encoded = tools.System.commandEncode({'metadata' : metadata})
+
+						# Way faster loading. See full explanation at the top of the function.
+						try: del metadata['pack']
+						except: pass
+
 						if self.navigationStreamsDirectory: metadataKodi = metatools.clean(metadata = metadata, exclude = True)
 						else: metadataKodi = metatools.clean(metadata = metadata)
+
+						try: media = metadata['media']
+						except: media = None
 
 						try: title = metadata['tvshowtitle']
 						except:
@@ -3351,8 +3922,14 @@ class Core(object):
 						except: tmdb = None
 						try: tvdb = metadata['tvdb']
 						except: tvdb = None
+						try: trakt = metadata['trakt']
+						except: trakt = None
 
-						extra = interface.Format.font((title + ' ' + tools.Media.title(metadata = None, title = '', year = year, season = season, episode = episode, skin = False).strip()).strip(), bold = True)
+						lookup = {'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}
+						if not season is None: lookup['season'] = season
+						if not episode is None: lookup['episode'] = episode
+
+						extra = interface.Format.font((title + ' ' + tools.Title.title(metadata = None, title = '', year = year, season = season, episode = episode, skin = False).strip()).strip(), bold = True)
 						if not self.navigationStreamsSpecial: extra += Stream.labelSeparator()
 
 						images = MetaImage.extract(data = metadata)
@@ -3376,10 +3953,10 @@ class Core(object):
 					'binge' : bool(binge),
 					'reload' : not mixed,
 					'source' : {'stream' : itemJson['stream']}, # itemJson can contain other attributes as well, including a full copy of the metadata. Remove all attributes, except the stream.
-					#'metadata' : metadata, # Adding this here requires the metadata to be encoded for each item, adding 4+ seconds to loading time. Only encode the metadata once.
 				}
+				parameters.update(lookup)
 				parameters = self.parameterize(parameters = parameters)
-				url = tools.System.command(action = 'playCache' if not stream.sourceTypeLocal() and enabledCache else 'play', parameters = parameters, encoded = encoded)
+				url = tools.System.command(action = 'playCache' if not stream.sourceTypeLocal() and enabledCache else 'play', parameters = parameters)
 
 				# ITEM
 				if self.navigationStreamsSpecial:
@@ -3420,8 +3997,10 @@ class Core(object):
 							images[MetaImage.TypeIcon] = images[MetaImage.TypeThumb] = interface.Icon.path(icon = 'quality' + stream.videoQuality().lower(), quality = interface.Icon.QualityLarge)
 						else:
 							images[MetaImage.TypeIcon] = images[MetaImage.TypeThumb] = interface.Icon.path(icon = stream.videoQuality().lower(), quality = interface.Icon.QualityLarge, special = interface.Icon.SpecialQuality)
-						try: images[MetaImage.TypePoster] = images[MetaImage.TypeIcon]
-						except: pass
+
+						for x in [MetaImage.PrefixNone, MetaImage.PrefixShow, MetaImage.PrefixSeason]:
+							try: images[x + MetaImage.TypePoster] = images[MetaImage.TypeIcon]
+							except: pass
 
 				properties = {}
 
@@ -3435,12 +4014,14 @@ class Core(object):
 
 					# Order is important, since some streams can be True for multiple of the attributes.
 					highlight = colorHighlightDefault
-					if stream.exclusionSupport(): highlight = colorHighlightSupport
+
+					if stream.infoCustom(): highlight = colorHighlightCustom
+					elif stream.exclusionSupport(): highlight = colorHighlightSupport
 					elif stream.exclusionFormat(): highlight = colorHighlightFormat
 					elif stream.exclusionBlocked(): highlight = colorHighlightBlocked
 					elif stream.exclusionMetadata(): highlight = colorHighlightMetadata
 					elif stream.exclusionDuplicate(): highlight = colorHighlightDuplicate
-					elif stream.exclusionKeyword(): highlight = colorHighlightKeyword
+					elif stream.exclusionKeyword(exception = False): highlight = colorHighlightKeyword
 					elif stream.exclusionFake(): highlight = colorHighlightFake
 					elif stream.exclusionCaptcha(): highlight = colorHighlightCaptcha
 					elif stream.exclusionPrecheck(): highlight = Stream.exclusionPrecheckColor(value = stream.exclusionPrecheck())
@@ -3567,7 +4148,11 @@ class Core(object):
 				# True causes popup dialog from Kodi if playback was unsuccesful.
 				# https://forum.kodi.tv/showthread.php?tid=328080
 				item = directory.item(label = label, label2 = label2)
-				result = metatools.item(label = label, item = item, metadata = metadata, clean = metadataKodi, stream = metadataStream, properties = properties, images = images, playable = False, content = False, context = not(self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain), contextAdd = not self.navigationStreamsSpecial, contextSource = itemJson, contextOrion = orion, contextCommand = url, contextPlaylist = True, contextShortcutCreate = True)
+
+				#gaiafuture - Creating a ListItem still take longer than it should.
+				#gaiafuture - Can we do this similar to the metadata? That is, rather than passing the link/stream data to each ListItem, store the streams on disk or memory, create a unique ID for each of them.
+				#gaiafuture - Then only add the ID to the ListItem and if the item is played or the context menu opened on it (eg: copy stream link), load the data of stream using ID.
+				result = metatools.item(label = label, item = item, metadata = metadata, clean = metadataKodi, stream = metadataStream, properties = properties, images = images, playable = False, content = False, command = False, context = not(self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain), contextAdd = not self.navigationStreamsSpecial, contextSource = itemJson, contextOrion = orion, contextCommand = url, contextPlaylist = True, contextShortcut = Shortcut.item(create = True)) # Important to command=False, otherwise it creates a new command that is not used and takes longer.
 
 				# ADD ITEM
 				if self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain:
@@ -3587,15 +4172,14 @@ class Core(object):
 			window.WindowStreams.update(progress = 100, finished = True)
 			window.WindowStreams.focus()
 			if not mixed: window.WindowStreams.itemReselect() # Go to previously selected position if window is reopened.
-			#if not self.silent: tools.Donations.popup() # Do not show here, since users might just want to play. Show the donation dialog on Gaia launch.
 			self.loaderHide() # When window is reloaded during paused playback and the reloaded window is closed.
 		elif self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain:
 			self.loaderHide()
-			#if not self.silent: tools.Donations.popup(wait = True) # Do not show here, since users might just want to play. Show the donation dialog on Gaia launch.
 			if self.navigationStreamsDialogDetailed: choice = interface.Dialog.select(items = controls, details = True)
 			else: choice = interface.Dialog.select(items = [i.getLabel() for i in controls])
 			if choice >= 0: self.play(items[choice], metadata = metadata, binge = binge)
 		else:
+			tools.System.pluginPropertySet(property = 'GaiaStreams', value = '1') # Used by scrapeResolve().
 			directory.addItems(items = controls)
 			directory.finish()
 			self.progressClose(force = True, loader = False)
@@ -3605,7 +4189,6 @@ class Core(object):
 					if tools.System.infoLabel('Container.Content') == interface.Directory.ContentFiles: break
 					tools.Time.sleep(0.5)
 				self.loaderHide()
-				#if not self.silent: tools.Donations.popup() # Do not show here, since users might just want to play. Show the donation dialog on Gaia launch.
 			threadLoader = Pool.thread(target = closeLoader)
 			threadLoader.start()
 
@@ -3618,7 +4201,7 @@ class Core(object):
 		if library:
 			def closePopups():
 				for i in range(30): # Don't make this too large, otherwise the Gaia stream notification takes too long to show. 20 is too low.
-					interface.Dialog.closeOk()
+					interface.Dialog.closeConfirm()
 					interface.Dialog.closeNotification()
 					tools.Time.sleep(0.05)
 				self.progressNotification(force = True) # Reopen.
@@ -3666,13 +4249,14 @@ class Core(object):
 		imdb = metadata['imdb'] if 'imdb' in metadata else None
 		tmdb = metadata['tmdb'] if 'tmdb' in metadata else None
 		tvdb = metadata['tvdb'] if 'tvdb' in metadata else None
+		trakt = metadata['trakt'] if 'trakt' in metadata else None
 
 		title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
 		year = metadata['year'] if 'year' in metadata else None
 		season = metadata['season'] if 'season' in metadata else None
 		episode = metadata['episode'] if 'episode' in metadata else None
 
-		binging = tools.Media.typeTelevision(self.media) and binge
+		binging = tools.Media.isSerie(self.media) and binge
 		success = False
 		unsupported = 0
 		result = None
@@ -3693,7 +4277,7 @@ class Core(object):
 					result = self.sourceResolve(items[i], handle = handle, info = False, strict = items[i]['stream'].filePack() and not episode is None)
 					items[i]['stream'].streamSet(result)
 					if result['success']:
-						history.History().insert(media = self.media, kids = self.kids, link = items[i]['stream'].linkPrimary(), metadata = metadata, source = items[i])
+						history.History().add(media = self.media, metadata = metadata, stream = items[i]['stream'])
 						if not self.navigationCinema and self.progressPlaybackCanceled(): break
 						if self.navigationCinema:
 							self.navigationCinemaTrailer.cinemaStop()
@@ -3704,7 +4288,7 @@ class Core(object):
 						tools.Sound.executeStreamFinish()
 						from lib.modules.player import Player
 						player = Player.instance(reinitialize = True)
-						success = player.run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, source = items[i], binge = binge, reload = reload, autoplay = self.autoplay, handle = result['handle'] if 'handle' in result else None, service = result['service'] if 'service' in result else None)
+						success = player.run(media = self.media, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, metadata = metadata, source = items[i], binge = binge, reload = reload, autoplay = self.autoplay, handle = result['handle'] if 'handle' in result else None, service = result['service'] if 'service' in result else None)
 
 						if success:
 							binging = player.bingeContinue
@@ -3732,7 +4316,25 @@ class Core(object):
 					return self.play(source = i, metadata = metadata, autopack = True, strict = True, binge = binge)
 		return False
 
-	def play(self, source, metadata = None, downloadType = None, downloadId = None, handle = None, handleMode = None, index = None, autoplay = None, autopack = None, library = None, new = None, add = None, binge = None, reload = True, resume = None, strict = False):
+	def _metadata(self, metadata = None, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, pack = None):
+		try:
+			if metadata is None:
+				metadata = self.propertyMetadata()
+
+				different = False
+				if metadata:
+					for k, v in {'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode}.items():
+						value = metadata.get(k)
+						if not value is None and not v is None and not value == v:
+							different = True
+							break
+				if different: metadata = None
+
+			if not metadata and media and (imdb or tmdb or tvdb or trakt): metadata = MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, pack = pack)
+		except: tools.Logger.error()
+		return metadata
+
+	def play(self, source, metadata = None, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, downloadType = None, downloadId = None, handle = None, handleMode = None, index = None, autoplay = None, autopack = None, library = None, new = None, add = None, binge = None, reload = True, resume = None, strict = False):
 		try:
 			tools.Sound.executeStreamStart()
 			interface.Player.canceledClear()
@@ -3769,29 +4371,22 @@ class Core(object):
 			heading = interface.Translation.string(33451)
 			message = labelInitiate
 
-			self.progressPlaybackInitialize(title = heading, message = labelInitiate, metadata = metadata)
-			self.progressPlaybackUpdate(progress = 1, title = heading, message = message)
+			title = None
+			year = None
 
-			try:
-				if metadata is None: metadata = self.propertyMetadata()
-
+			metadata = self._metadata(metadata = metadata, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
+			if metadata:
 				title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
 				year = metadata['year'] if 'year' in metadata else None
 				season = metadata['season'] if 'season' in metadata else None
 				episode = metadata['episode'] if 'episode' in metadata else None
-
 				imdb = metadata['imdb'] if 'imdb' in metadata else None
 				tmdb = metadata['tmdb'] if 'tmdb' in metadata else None
 				tvdb = metadata['tvdb'] if 'tvdb' in metadata else None
-			except:
-				if not metadata is None: metadata = None
-				title = None
-				year = None
-				season = None
-				episode = None
-				imdb = None
-				tmdb = None
-				tvdb = None
+				trakt = metadata['trakt'] if 'trakt' in metadata else None
+
+			self.progressPlaybackInitialize(title = heading, message = labelInitiate, metadata = metadata)
+			self.progressPlaybackUpdate(progress = 1, title = heading, message = message)
 
 			try:
 				# Why do we copy here?
@@ -3828,16 +4423,6 @@ class Core(object):
 						self.progressPlaybackClose()
 						self.loaderHide()
 						return None
-
-				image = None
-				if not metadata is None:
-					keys = ['poster', 'poster1', 'poster2', 'poster3', 'thumb', 'thumb1', 'thumb2', 'thumb3', 'icon', 'icon1', 'icon2', 'icon3']
-					for key in keys:
-						if key in metadata:
-							value = metadata[key]
-							if not value is None and not value == '':
-								image = value
-								break
 
 				try:
 					if self.progressPlaybackCanceled():
@@ -3952,7 +4537,7 @@ class Core(object):
 
 					if handler.Handler.serviceExternal(handle) and self.tResolved['error'] == handler.Handler.ReturnExternal: # Do not return if there is a different error.
 						stream.streamSet(self.tResolved)
-						history.History().insert(media = self.media, kids = self.kids, link = stream.linkPrimary(), metadata = metadata, source = source)
+						history.History().add(media = self.media, metadata = metadata, stream = stream)
 						self.progressPlaybackUpdate(progress = 100, title = heading, message = message)
 						self.progressPlaybackClose(loader = loader)
 						return self.tResolved['link']
@@ -4047,7 +4632,7 @@ class Core(object):
 					return None
 				elif handler.Handler.serviceExternal(handle) and self.tResolved['error'] == handler.Handler.ReturnExternal: # Do not return if there is a different error.
 					stream.streamSet(self.tResolved)
-					history.History().insert(media = self.media, kids = self.kids, link = stream.linkPrimary(), metadata = metadata, source = source)
+					history.History().add(media = self.media, metadata = metadata, stream = stream)
 					self.progressPlaybackUpdate(progress = 100, title = heading, message = message)
 					self.progressPlaybackClose(loader = loader)
 					return self.tResolved['link']
@@ -4062,7 +4647,7 @@ class Core(object):
 						return None
 
 				stream.streamSet(self.tResolved)
-				history.History().insert(media = self.media, kids = self.kids, link = stream.linkPrimary(), metadata = metadata, source = source)
+				history.History().add(media = self.media, metadata = metadata, stream = stream)
 
 				tools.Time.sleep(0.2)
 				interface.Dialog.close(id = interface.Dialog.IdDialogKeyboard)
@@ -4077,7 +4662,7 @@ class Core(object):
 
 				tools.Sound.executeStreamFinish()
 				from lib.modules.player import Player
-				Player.instance(reinitialize = True).run(media = self.media, kids = self.kids, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, metadata = metadata, downloadType = downloadType, downloadId = downloadId, source = item, binge = binge, reload = reload, resume = resume, autoplay = self.autoplay, handle = self.tResolved['handle'] if 'handle' in self.tResolved else None, service = self.tResolved['service'] if 'service' in self.tResolved else None)
+				Player.instance(reinitialize = True).run(media = self.media, title = title, year = year, season = season, episode = episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, metadata = metadata, downloadType = downloadType, downloadId = downloadId, source = item, binge = binge, reload = reload, resume = resume, autoplay = self.autoplay, handle = self.tResolved['handle'] if 'handle' in self.tResolved else None, service = self.tResolved['service'] if 'service' in self.tResolved else None)
 
 				return self.tResolved['link']
 			except:
@@ -4092,12 +4677,12 @@ class Core(object):
 			self.progressPlaybackClose()
 			return False
 
-	def playCache(self, source, metadata = None, handleMode = None, binge = None, reload = True):
+	def playCache(self, source, metadata = None, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, handleMode = None, binge = None, reload = True):
 		try:
 			if tools.Settings.getBoolean('download.cache.enabled'):
 				self.loaderShow()
 
-				if metadata is None: metadata = self.propertyMetadata()
+				metadata = self._metadata(metadata = metadata, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
 				item = tools.Tools.copy(source)
 				if tools.Tools.isArray(item): item = item[0]
@@ -4142,12 +4727,12 @@ class Core(object):
 			tools.Logger.error()
 
 	# Used by downloader.
-	def playLocal(self, path, source, metadata, downloadType = None, downloadId = None, binge = None, reload = True):
+	def playLocal(self, path, source, metadata = None, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, downloadType = None, downloadId = None, binge = None, reload = True):
 		source['stream'] = Stream.load(data = source['stream'])
 		source['stream'].linkSet(path)
 		source['stream'].streamLinkSet(path)
 		source['stream'].sourceTypeSet(Stream.SourceTypeLocal)
-		self.play(source = source, metadata = metadata, downloadType = downloadType, downloadId = downloadId, binge = binge, reload = reload)
+		self.play(source = source, metadata = metadata, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, downloadType = downloadType, downloadId = downloadId, binge = binge, reload = reload)
 
 	def addSources(self, sources, check):
 		# Do not stop this, otherwise the stats in the window do not update once the providers are finished.
@@ -4238,11 +4823,9 @@ class Core(object):
 							self.streamsTotal += 1
 
 						if check and self.enabledExtra and not source['stream'].exclusionDuplicate():
-							index = len(self.threadsAdjusted)
-							thread = {'target' : self.adjustSource, 'args' : (source, index)} # Do not create a thread here. Only create it if we execute it.
-							self.priortityAdjusted.append(priority) # Give priority to HD links
-							self.statusAdjusted.append('queued')
-							self.threadsAdjusted.append(thread)
+							# Do not create a thread here. Only create it if we execute it.
+							index = len(self.tasksAdjusted)
+							self.tasksAdjusted.append({'target' : self.adjustSource, 'args' : (source, index), 'priority' : priority, 'status' : 'queued'}) # Give priority to HD links
 						else:
 							self.cacheCount += 1
 					except:
@@ -4448,47 +5031,40 @@ class Core(object):
 		finally: self.adjustUnlock()
 
 	# Priority starts stream checks HD720 and greater first.
-	def adjustSourceStart(self, priority = True):
+	def adjustSourceStart(self, priority = True, full = False):
 		# NB: Do not return here if stopped, otherwise the "Finalizing Stream Collection" will get stuck.
 		# Otherwise a bunch of streams will remain in "queued" status, because this function does not get executed.
 		# This sometimes happens during normal scraping, but is very prominent during preemptive termination (which sets self.stopThreads).
 		#if self.stopThreads: return
 
+		# NB: Do not add the threads to a list member variable.
+		# Otherwise the thread object stays in memory until the full scrape has finished and the garbage collector removes them, since the list still keeps a reference to the object, preventing it from being deleted earlier.
+		# When not storing the thread object, it gets deleted the momement the thread is done.
+		# This can save quite a lot of threads, reducing the chances of system threads being used up on low-end devices.
+
 		try:
-			self.adjustLock()
+			synchronizer = self.synchronizerAdjusted[full]
 
 			# HD links
-			running = [i for i in self.threadsAdjusted if not tools.Tools.isDictionary(i) and i.is_alive()]
-			openSlots = None if self.threadsLimit is None else max(0, self.threadsLimit - len(running))
-			counter = 0
-			for j in range(len(self.threadsAdjusted)):
-				if self.priortityAdjusted is True and self.statusAdjusted[j] == 'queued':
-					self.statusAdjusted[j] = 'busy'
-					self.threadsAdjusted[j] = Pool.thread(target = self.threadsAdjusted[j]['target'], args = self.threadsAdjusted[j]['args'], start = True)
-					counter += 1
-					if not openSlots is None and counter > openSlots: return
+			for task in self.tasksAdjusted:
+				if task['priority'] is True and task['status'] == 'queued':
+					task['status'] = 'busy'
+					Pool.thread(target = task['target'], args = task['args'], start = True, synchronizer = synchronizer)
 
 			# Non-HD links
-			running = [i for i in self.threadsAdjusted if not tools.Tools.isDictionary(i) and i.is_alive()]
-			openSlots = None if self.threadsLimit is None else max(0, self.threadsLimit - len(running))
-			counter = 0
-			for j in range(len(self.threadsAdjusted)):
-				if self.statusAdjusted[j] == 'queued':
-					self.statusAdjusted[j] = 'busy'
-					self.threadsAdjusted[j] = Pool.thread(target = self.threadsAdjusted[j]['target'], args = self.threadsAdjusted[j]['args'], start = True)
-					counter += 1
-					if not openSlots is None and counter > openSlots: return
+			for task in self.tasksAdjusted:
+				if task['status'] == 'queued':
+					task['status'] = 'busy'
+					Pool.thread(target = task['target'], args = task['args'], start = True, synchronizer = synchronizer)
+
 		except: tools.Logger.error()
-		finally: self.adjustUnlock()
 
 	def adjustSourceAppend(self, source):
-		#if self.stopThreads: return return # Do not stop here, otherwise the stats in the window are not fully updated when cached streams are retrieved from the database.
+		#if self.stopThreads: return # Do not stop here, otherwise the stats in the window are not fully updated when cached streams are retrieved from the database.
 		try:
-			self.adjustLock()
 			self.adjustSourceContains(source)
 			self.sourcesAdjusted.append(source)
 		except: tools.Loggere.error()
-		finally: self.adjustUnlock()
 
 	def adjustSourceContains(self, source): # Filter out duplicate URLs early on, to reduce the prechecks & metadata on them.
 		#if self.stopThreads: return # Do not stop here, otherwise the stats in the window are not fully updated when cached streams are retrieved from the database.
@@ -4526,31 +5102,19 @@ class Core(object):
 			tools.Logger.error()
 		return contains
 
-	def adjustSourceUpdate(self, index, stream = None, precheck = None, resolved = None, hash = None, mutex = True):
-		if self.stopThreads:
-			return
+	def adjustSourceUpdate(self, index, stream = None, precheck = None, resolved = None, hash = None):
+		if self.stopThreads: return
 		try:
 			if index >= 0:
-				if mutex: self.adjustLock()
-				if not stream is None:
-					self.sourcesAdjusted[index]['stream'] = stream
-				if not precheck is None:
-					self.sourcesAdjusted[index]['stream'].exclusionPrecheckSet(precheck)
-				if not resolved is None:
-					self.sourcesAdjusted[index]['stream'].linkProviderSet(resolved)
-				if not hash is None:
-					self.sourcesAdjusted[index]['stream'].hashContainerSet(hash)
-
-				if mutex: self.adjustUnlock()
+				if not stream is None: self.sourcesAdjusted[index]['stream'] = stream
+				if not precheck is None: self.sourcesAdjusted[index]['stream'].exclusionPrecheckSet(precheck)
+				if not resolved is None: self.sourcesAdjusted[index]['stream'].linkProviderSet(resolved)
+				if not hash is None: self.sourcesAdjusted[index]['stream'].hashContainerSet(hash)
 		except: pass
-		finally:
-			if mutex: self.adjustUnlock()
 
 	# Write changes to database.
 	def adjustSourceDatabase(self, timeout = 30):
 		try:
-			self.adjustLock()
-
 			sources = {}
 			items = self.sourcesAdjusted # In case self.sourcesAdjusted is reset to [] before this function finishes.
 			for i in range(len(items)):
@@ -4567,9 +5131,10 @@ class Core(object):
 					imdb = stream.idImdb()
 					tmdb = stream.idTmdb()
 					tvdb = stream.idTvdb()
+					trakt = stream.idTrakt()
 					query = stream.infoQuerySearch()
 
-					id = [provider.id(), imdb, tmdb, tvdb, query]
+					id = [provider.id(), imdb, tmdb, tvdb, trakt, query]
 					id = [x if x else ' ' for x in id]
 					id = '_'.join(id)
 
@@ -4580,6 +5145,7 @@ class Core(object):
 							'imdb' : imdb,
 							'tmdb' : tmdb,
 							'tvdb' : tvdb,
+							'trakt' : trakt,
 							'season' : stream.metaSeason(),
 							'episode' : stream.metaEpisode(),
 							'streams' : [],
@@ -4590,23 +5156,20 @@ class Core(object):
 
 			try:
 				for source in sources.values():
-					manager.Manager.streamsInsert(data = source['streams'], provider = source['provider'], query = source['query'], idImdb = source['imdb'], idTmdb = source['tmdb'], idTvdb = source['tvdb'], numberSeason = source['season'], numberEpisode = source['episode'])
+					ProviderManager.streamsInsert(data = source['streams'], provider = source['provider'], query = source['query'], idImdb = source['imdb'], idTmdb = source['tmdb'], idTvdb = source['tvdb'], idTrakt = source['trakt'], numberSeason = source['season'], numberEpisode = source['episode'])
 			except: tools.Logger.error()
 
 		except: tools.Logger.error()
-		finally: self.adjustUnlock()
 
 	def adjustSourceDone(self, index):
 		try:
-			self.adjustLock()
-			if index >= 0 and index < len(self.statusAdjusted):
-				self.statusAdjusted[index] = 'done'
+			if index >= 0 and index < len(self.tasksAdjusted):
+				self.tasksAdjusted[index]['status'] = 'done'
 		except: tools.Logger.error()
-		finally: self.adjustUnlock()
 
 	def adjustSource(self, source, index):
 		if self.stopThreads:
-			self.adjustSourceDone(index)
+			self.adjustSourceDone(index = index)
 			return None
 		try:
 			if not source['stream'].exclusionDuplicate():
@@ -4658,7 +5221,6 @@ class Core(object):
 			tools.Logger.error()
 
 		self.adjustSourceDone(index)
-		if not self.threadsLimit is None: self.adjustSourceStart()
 		return source
 
 	def sourcesFilter(self, items, metadata, autoplay = False, apply = True):
@@ -4946,7 +5508,7 @@ class Core(object):
 							if info:
 								message = interface.Translation.string(33757) % extension.upper()
 								interface.Dialog.notification(title = 33448, message = message, icon = interface.Dialog.IconError)
-							try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown)
+							try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown, automatic = True)
 							except: pass
 							return self.sourceResult(error = 'filetype', loader = loader)
 
@@ -4971,7 +5533,7 @@ class Core(object):
 		if error:
 			if log and not error is True: tools.Logger.log(error)
 			if info: interface.Dialog.notification(title = 33448, message = 33449, icon = interface.Dialog.IconError)
-			try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown)
+			try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown, automatic = True)
 			except: pass
 			return self.sourceResult(link = url, error = 'unknown', loader = loader)
 
@@ -5058,7 +5620,7 @@ class Core(object):
 
 					# Do not retrieve only the enabled providers.
 					# The user might have disabled external providers, but might still want to use hosters links from Orion that require these disabled providers.
-					providers = manager.Manager.providers(type = ProviderBase.TypeExternal, enabled = None, local = False)
+					providers = ProviderManager.providers(type = ProviderBase.TypeExternal, enabled = None, local = False)
 
 					for provider in providers:
 						keys = []

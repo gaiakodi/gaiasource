@@ -24,7 +24,7 @@ from lib.modules.tools import Regex
 class Provider(ProviderHtml):
 
 	_Link				= {
-							ProviderHtml.Version1 : ['https://kickass.onl', 'https://thekat.app', 'https://kickasstorrents.bz', 'https://kkickass.com', 'https://kkat.net'],
+							ProviderHtml.Version1 : ['https://kickasst.net', 'https://thekat.app', 'https://kickasstorrents.bz', 'https://kkickass.com', 'https://kkat.net', 'https://thekat.cc'],
 							ProviderHtml.Version2 : ['https://kickasstorrents.to', 'https://katcr.to', 'http://kickass.to', 'https://kickass.sx', 'https://kat.am'],
 						}
 	_Mirror				= {

@@ -19,9 +19,10 @@
 '''
 
 from lib.providers.core.base import ProviderBase
-from lib.modules.tools import Tools, File, Media, Hash, System, Math, Converter, Regex, Archive, Time, Hardware
+from lib.modules.tools import Tools, File, Media, Hash, System, Math, Converter, Regex, Time, Hardware
 from lib.modules.interface import Dialog, Format, Translation
 from lib.modules.network import Networker, Container
+from lib.modules.compression import Archiver
 from lib.modules.database import Database
 from lib.modules.stream import Stream
 from lib.modules.convert import ConverterTime, ConverterSize
@@ -232,7 +233,7 @@ class ProviderOffline(ProviderBase):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			# Download the dataset.
 			# Only do this here and not during initialize(), otherwise downloading will occur just when loading the providers.
@@ -263,8 +264,8 @@ class ProviderOffline(ProviderBase):
 						tables = database._tables()
 						if tables:
 							mixed = '(?:data|mixed|generic|all|full|torrents?|magnets?|links?|urls?|streams?)'
-							if Media.typeMovie(media): expression = '(movie|film|set|collection|%s)' % mixed
-							elif Media.typeTelevision(media): expression = '(tv|television|serie|show|episode|%s)' % mixed
+							if Media.isFilm(media): expression = '(movie|film|set|collection|%s)' % mixed
+							elif Media.isSerie(media): expression = '(tv|television|serie|show|episode|%s)' % mixed
 							if expression: tables = [i for i in tables if Regex.match(data = i, expression = expression)]
 							if not tables: tables = database._tables()
 						for i in tables:
@@ -368,13 +369,13 @@ class ProviderOffline(ProviderBase):
 		]
 
 		data = {
-			Media.TypeMixed : [],
-			Media.TypeMovie : [],
-			Media.TypeShow : [],
+			Media.Mixed : [],
+			Media.Movie : [],
+			Media.Show : [],
 		}
 
 		link = Tools.copy(self.dumpLinkOrignal())
-		if not Tools.isDictionary(link): link = {Media.TypeMixed : link}
+		if not Tools.isDictionary(link): link = {Media.Mixed : link}
 		for k, v in link.items():
 			if Tools.isArray(v) and Regex.match(data = v[0], expression = '\.[a-z]?0*(?:0|1)$'): # Multi-part archive.
 				data[k] = [{'id' : Hash.sha1(v[0]), 'name' : v[0], 'link' : v, 'path' : None}]
@@ -416,9 +417,9 @@ class ProviderOffline(ProviderBase):
 				for i in v:
 					path = System.temporary(directory = File.joinPath(directory, '2-extract'), file = i['id'], gaia = True, make = True, clear = False)
 					if not File.exists(File.joinPath(path, i['id'])):
-						if Archive.isArchive(i['path']):
+						if Archiver.typeArchive(i['path']):
 							File.makeDirectory(path)
-							Archive.decompress(path = i['path'], output = path)
+							Archiver.decompress(path = i['path'], output = path)
 							_, files = File.listDirectory(path = path, absolute = True)
 							if files:
 								i['path'] = files[0]
@@ -464,7 +465,7 @@ class ProviderOffline(ProviderBase):
 				if any(i['path'] for i in v):
 					self.log('   Generating %s database ...' % k)
 
-					table = 'data' if k == Media.TypeMixed else k
+					table = 'data' if k == Media.Mixed else k
 					query = 'INSERT INTO %s (%s) VALUES (%s);' % (table, ', '.join([j['name'] for j in sql]), ', '.join(['?'] * len(sql)))
 					queries = ['CREATE TABLE IF NOT EXISTS %s (%s);' % (table, ', '.join(['%s %s' % (j['name'], j['type']) for j in sql]))]
 					for j in sql:
@@ -520,7 +521,7 @@ class ProviderOffline(ProviderBase):
 										# For other providers (eg TorrentParadise), 1,000,000 rows are around 90-95MB, probably due to longer file names.
 										if countData % 1000000 == 0:
 											database._commit()
-											database._compress()
+											database._compact()
 											database._close()
 
 											pathData.append(System.temporary(directory = directoryData, file = 'data' + str(len(pathData) + 1) + Database.Extension, gaia = True, make = True, clear = False))
@@ -531,7 +532,7 @@ class ProviderOffline(ProviderBase):
 							return False
 
 			database._commit()
-			database._compress()
+			database._compact()
 			database._close()
 
 		self.log('Generating release ...')
@@ -553,10 +554,10 @@ class ProviderOffline(ProviderBase):
 		datas = []
 
 		for i in range(len(pathData)):
-			nameZip = 'data' + str(i + 1) + Archive.extension(type = Archive.TypeZip, dot = True)
+			nameZip = 'data' + str(i + 1) + Archiver.extension(type = Archiver.TypeZip, dot = True)
 			pathZip = System.temporary(directory = File.joinPath(directory, 'data'), file = nameZip, gaia = True, make = True, clear = False)
 
-			if Archive.zipCompress(path = pathData[i], output = pathZip):
+			if Archiver.zipCompress(path = pathData[i], output = pathZip):
 				sizeDownload += File.size(pathZip)
 				sizeStorage += File.size(pathData[i])
 				datas.append(Networker.linkJoin(self.link().replace(nameMeta, ''), 'data', nameZip))
@@ -874,7 +875,7 @@ class ProviderOffline(ProviderBase):
 						pathTemp1 = System.temporaryRandom(directory = directory, gaia = True, make = True, clear = False)
 						pathTemp2 = System.temporary(directory = directory, file = Hash.random(), gaia = True, make = True, clear = False)
 						if Networker().download(link = meta['data'][i], path = pathTemp1):
-							if Archive.zipDecompress(path = pathTemp1, output = pathTemp2):
+							if Archiver.zipDecompress(path = pathTemp1, output = pathTemp2):
 								_, files = File.listDirectory(path = pathTemp2, absolute = True)
 								for file in files:
 									File.move(pathFrom = file, pathTo = self.pathData(id = id), replace = True)
@@ -886,17 +887,17 @@ class ProviderOffline(ProviderBase):
 							Dialog.notification(title = titleError, message = 36368, icon = Dialog.IconError)
 							return False
 
-						File.deleteDirectory(System.temporary(directory = directory, gaia = True, make = True, clear = False))
-						_, files = File.listDirectory(path = self.path(), absolute = True)
-						count = sum([1 if i.endswith(Database.Extension) else 0 for i in files])
-						if count == len(meta['data']):
-							File.writeNow(pathMeta, Converter.jsonTo(meta))
-							if File.exists(pathMeta):
-								Dialog.notification(title = titleDownload, message = 36372, icon = Dialog.IconSuccess)
-								return True
+					File.deleteDirectory(System.temporary(directory = directory, gaia = True, make = True, clear = False))
+					_, files = File.listDirectory(path = self.path(), absolute = True)
+					count = sum([1 if i.endswith(Database.Extension) else 0 for i in files])
+					if count == len(meta['data']):
+						File.writeNow(pathMeta, Converter.jsonTo(meta))
+						if File.exists(pathMeta):
+							Dialog.notification(title = titleDownload, message = 36372, icon = Dialog.IconSuccess)
+							return True
 
-						Dialog.notification(title = titleError, message = 36370, icon = Dialog.IconError)
-						return False
+					Dialog.notification(title = titleError, message = 36370, icon = Dialog.IconError)
+					return False
 				else:
 					return None
 			else:

@@ -1,4 +1,7 @@
 
+[B]7.0.0 (2024.12.20)[/B]
+- Major version upgrade.
+
 [B]6.4.0 (2023.08.22)[/B]
 - Removed old button textures.
 

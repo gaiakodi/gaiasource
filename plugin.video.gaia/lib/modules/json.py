@@ -99,6 +99,21 @@ class Json(object):
 		except: return default
 
 	##############################################################################
+	# RAW
+	##############################################################################
+
+	@classmethod
+	def rawDecode(self, data):
+		return json.loads(data)
+
+	@classmethod
+	def rawEncode(self, data, ascii = True):
+		try:
+			return self._ujsonEncode(data = data, ascii = ascii)
+		except AttributeError:
+			return json.dumps(data, ensure_ascii = ascii, default = self._serializeObject, separators = Json.Separators)
+
+	##############################################################################
 	# NATIVE
 	##############################################################################
 
@@ -168,7 +183,8 @@ class Json(object):
 		# Does not have a 'separators' parameter.
 		# Ujson first tries to call __json__() on the object. If the returned value is not a string, an exception is thrown.
 		# 'default' must return an already encoded string.
-		return self.ujson().dumps(data, ensure_ascii = ascii, default = self._serializeString)
+		# 'reject_bytes' important for rawEncode() called from cache.py, if it is bytes and not a string.
+		return self.ujson().dumps(data, ensure_ascii = ascii, default = self._serializeString, reject_bytes = False)
 
 	@classmethod
 	def ujsonDecode(self, data, default = None):

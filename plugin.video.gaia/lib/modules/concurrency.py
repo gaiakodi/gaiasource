@@ -22,8 +22,13 @@
 from threading import Thread as PyThread, current_thread as PyThreadCurrent, Lock as PyThreadLock, Semaphore as PyThreadSemaphore, Event as PyThreadEvent
 
 Lock = None
-Semaphore = None
 Event = None
+
+Semaphore = None
+
+# These are just Semaphore wrapper classes, which can be passed to Pool.instance/thread/process(synchronizer = ...).
+Premaphore = None	# Hard limit. The semaphore is acquired BEFORE the thread/process object is created and BEFORE it is executed. This tries to prevent too many thread objects being created, even if they do not all execute at the same time.
+Postmaphore = None	# Soft limit. The semaphore is acquired AFTER the thread/process object was created, but BEFORE it is executed. This could create tons of idle threads that although not all executing at the same time, still stay in memory until they can finally be executed.
 
 class Concurrency(object):
 
@@ -51,6 +56,7 @@ class Concurrency(object):
 		if base:
 			base.__init__(self, target = target, group = group, name = name, daemon = daemon, args = args, kwargs = kwargs)
 			self._statusSet(Concurrency.StatusInitial)
+
 		self.mParent = self.current()
 		self.mRank = self.currentRank() + 1
 		self.mSynchronizer = synchronizer
@@ -160,9 +166,10 @@ class Concurrency(object):
 	def synchronizerSet(self, synchronizer):
 		self.mSynchronizer = synchronizer
 
-	def _synchronizerAcquire(self):
-		try: self.mSynchronizer.acquire()
-		except: pass
+	def _synchronizerAcquire(self, force = False):
+		if self.mSynchronizer and (force or isinstance(self.mSynchronizer, Postmaphore)):
+			try: self.mSynchronizer.acquire()
+			except: pass
 
 	def _synchronizerRelease(self):
 		try: self.mSynchronizer.release()
@@ -239,11 +246,12 @@ class Concurrency(object):
 		# However, there is no way to create a signal/callback when the thread/process is done.
 		# The logical idea is to call _finish() at the end of run().
 		# This is fine for threads, since they share memory.
-		# However, with processes that do not share the memoery this does not work. The run() function is executed WITHIN the process and not OUTSIDE in the parent.
+		# However, with processes that do not share the memory this does not work. The run() function is executed WITHIN the process and not OUTSIDE in the parent.
 		# Hence, if a process run() finishes, it will try to remove the process from the copy of the Pool within the process, instead of the Pool of the parent process that actually added the process to its Pool list.
 		# Another idea is to call _finish() at the end of join(), since join() is called from the parent. However, join() can have a timeout and does not mean the thread/process is actually finished.
 		# We therefore try to call _finish() from any function that somehow handles the end of the thread/process (run, join, terminate, kill, close).
 		self._statusSet(status)
+
 		self._synchronizerRelease()
 		Pool.remove(self)
 
@@ -265,9 +273,8 @@ class Concurrency(object):
 			else:
 				System.windowPropertySet(Pool.PropertyNotification, True)
 				lock.release()
-				setting = Settings.getInteger(id = Pool.SettingNotifications)
+				setting = Pool.settingNotification()
 				if setting > 0:
-					from lib.modules.tools import Regex, System
 					from lib.modules.interface import Dialog, Translation, Player
 					if setting == 1:
 						Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000)
@@ -275,26 +282,33 @@ class Concurrency(object):
 						playback = Player().isPlayback()
 						timeout = 30000 if playback else None
 
-						if System.commandIsScrape():
-							expression = '(.*?)(?:$|\s*\[)'
-							recommendation1 = Regex.extract(data = Translation.string(36063), expression = expression)
-							recommendation2 = Regex.extract(data = Translation.string(36078), expression = expression)
-							recommendation = Translation.string(36422) % (recommendation1, Translation.string(35539), recommendation2, Translation.string(32345))
-						else:
-							recommendation = Translation.string(36421) % (Translation.string(36038), Translation.string(32310))
+						message = None
+						if System.commandIsMenu(): message = 36038
+						elif System.commandIsScrape(): message = 36622
+						message = (Translation.string(36422) % Translation.string(message)) if message else ''
 
-						message = '%s %s' % (Translation.string(33246), recommendation)
+						message = Translation.string(36421) % (Translation.string(36619), message, Translation.string(32310))
 						if Dialog.option(title = 36037, message = message, labelConfirm = 32501, labelDeny = 33486, timeout = timeout):
 							System.power(action = System.PowerRestart, proper = True, notification = True)
+
+class ThreadPremaphore(PyThreadSemaphore):
+	pass
+
+class ThreadPostmaphore(PyThreadSemaphore):
+	pass
 
 class Thread(Concurrency, PyThread):
 
 	@classmethod
 	def initialize(self):
-		global Lock, Semaphore, Event
+		global Lock, Event, Semaphore, Premaphore, Postmaphore
+
 		Lock = PyThreadLock
-		Semaphore = PyThreadSemaphore
 		Event = PyThreadEvent
+
+		Semaphore = PyThreadSemaphore
+		Premaphore = ThreadPremaphore
+		Postmaphore = ThreadPostmaphore
 
 	@classmethod
 	def current(self):
@@ -328,6 +342,12 @@ try:
 	from multiprocessing import Process as PyProcess, Manager as PyProcessManager, current_process as PyProcessCurrent
 	from multiprocessing.synchronize import Lock as PyProcessLockBase, Semaphore as PyProcessSemaphore, Event as PyProcessEven
 
+	class ProcessPremaphore(PyProcessSemaphore):
+		pass
+
+	class ProcessPostmaphore(PyProcessSemaphore):
+		pass
+
 	class PyProcessLock(PyProcessLockBase):
 
 		# The multiprocessing Lock does not have a locked() function.
@@ -345,10 +365,14 @@ try:
 
 		@classmethod
 		def initialize(self):
-			global Lock, Semaphore, Event
+			global Lock, Event, Semaphore, Premaphore, Postmaphore
+
 			Lock = PyProcessLock
-			Semaphore = PyProcessSemaphore
 			Event = PyProcessEvent
+
+			Semaphore = PyProcessSemaphore
+			Premaphore = ProcessPremaphore
+			Postmaphore = ProcessPostmaphore
 
 		@classmethod
 		def current(self):
@@ -403,19 +427,34 @@ except:
 			else: result = value
 			return result
 
-
 class Pool(object):
 
-	SettingTask				= 'general.concurrency.task'
-	SettingInstance			= 'general.concurrency.instance'
-	SettingNotifications	= 'general.concurrency.notifications'
+	LevelAutomatic			= 0
+	LevelCustom				= 1
+	LevelLow				= 2
+	LevelMedium				= 3
+	LevelHigh				= 4
+
+	ModeAutomatic			= 0
+	ModeThread				= 1
+	ModeProcess				= 2
+
+	SettingLevel			= 'general.concurrency.level'
+	SettingNotification		= 'general.concurrency.notification'
+	SettingGlobal			= 'general.concurrency.global'
+	SettingGlobalLimit		= 'general.concurrency.global.limit'
+	SettingMetadata			= 'general.concurrency.metadata'
+	SettingMetadataLimit	= 'general.concurrency.metadata.limit'
+	SettingScrape			= 'general.concurrency.scrape'
+	SettingScrapeLimit		= 'general.concurrency.scrape.limit'
+	SettingScrapeBinge		= 'general.concurrency.scrape.binge'
+	SettingScrapeConnection	= 'general.concurrency.scrape.connection'
+	SettingScrapeMode		= 'general.concurrency.scrape.mode'
 
 	PropertyNotification	= 'GaiaConcurrencyNotification'
 
-	LimitTask				= None
-	LimitInstance			= None
 	LimitInternal			= 200 # The internal limit of the maximum threads that should be created. Running more than these threads concurrently propbably means a design mistake.
-	LimitWarning			= 500 # After how many threads a warning message should be shown. Keep in mind that during scraping more threads are used.
+	LimitWarning			= 400 # After how many threads a warning message should be shown. Keep in mind that during scraping more threads are used.
 
 	CountTotal				= {Thread : 0, Process : 0}	# The total number of threads created during this execution.
 	CountConcurrent			= {Thread : 0, Process : 0}	# The maximum number of threads that were running concurrently during this execution.
@@ -423,9 +462,16 @@ class Pool(object):
 	TimeoutStandard			= 1200	# 20 minutes.
 	TimeoutDeveloper		= 60	# 1 minute.
 
+	DataGlobal				= None
+	DataMetadata			= None
+	DataScrape				= None
+	DataConnection			= None
+	DataMode				= None
+
 	Instances				= {}
 	Lock					= None
 	Semaphore				= None
+	Joining					= False
 
 	GlobalLock				= None
 	EventFinish				= {}
@@ -464,6 +510,8 @@ class Pool(object):
 			exceptions = [
 				{'action' : 'scrape', 'instance' : 'Window._initialize1'},		# WindowStreams
 				{'action' : 'streamsShow', 'instance' : 'Window._initialize1'},	# WindowStreams
+				{'action' : 'scrape', 'instance' : 'Trailer._cinemaStart'},		# Cinema Window
+
 			]
 			for exception in exceptions:
 				if action == exception['action'] and label == exception['instance']:
@@ -487,45 +535,404 @@ class Pool(object):
 	@classmethod
 	def reset(self, settings = True):
 		if settings:
-			Pool.LimitTask = None
-			Pool.LimitInstance = None
+			Pool.DataGlobal = None
+			Pool.DataMetadata = None
+			Pool.DataScrape = None
+			Pool.DataConnection = None
 		Pool.CountTotal = {Thread : 0, Process : 0}
 		Pool.CountConcurrent = {Thread : 0, Process : 0}
+		Pool.Joining = False
 
 	@classmethod
-	def limitTask(self):
-		if Pool.LimitTask is None:
-			from lib.modules.tools import Settings
-			limit = Settings.getCustom(id = Pool.SettingTask)
+	def _settingPerformance(self, limit):
+		from lib.modules.tools import Hardware, Math
 
-			if not limit:
-				from lib.modules.tools import Hardware, Math
+		initial = limit.get('initial') or limit
 
-				performance = Hardware.performanceRating()
-				limit = Math.scale(performance, fromMinimum = 0, fromMaximum = 1, toMinimum = 35, toMaximum = 50)
+		performance = Hardware.performanceRating()
+		value = Math.scale(performance, fromMinimum = 0, fromMaximum = 1, toMinimum = initial['minimum'], toMaximum = initial['maximum'])
 
-				processor = Hardware.processorType()
-				if processor:
-					if processor in [Hardware.ProcessorArm, Hardware.ProcessorArc]: limit -= 5
-					elif processor in [Hardware.ProcessorIntel, Hardware.ProcessorAmd]: limit += 5
+		if 'processor' in limit:
+			processor = Hardware.processorType()
+			if processor:
+				if processor in [Hardware.ProcessorArm, Hardware.ProcessorArc]: value += limit['processor']['minimum']
+				elif processor in [Hardware.ProcessorIntel, Hardware.ProcessorAmd]: value += limit['processor']['maximum']
 
-				memory = Hardware.memoryBytes()
-				if memory:
-					adjust = Math.scale(memory, fromMinimum = 1073741824, fromMaximum = 4294967296, toMinimum = -10, toMaximum = 0)
-					if adjust < 0: limit += adjust
+		# The OS assigns fixed stack memory to each thread.
+		# If a system has little memory, not that many thread objects can be created and executed simultaneously.
+		# Hence, the thread limit is more affected by the memory limit than the processor.
+		if 'memory' in limit:
+			memory = Hardware.memoryBytes()
+			if memory:
+				adjust = Math.scale(memory, fromMinimum = 1073741824, fromMaximum = 4294967296, toMinimum = limit['memory']['minimum'], toMaximum = limit['memory']['maximum'])
+				if adjust < 0: value += adjust
 
-				limit = max(20, min(50, int(limit)))
-
-			Pool.LimitTask = limit
-		return Pool.LimitTask
+		return self._settingLimit(value = value, limit = limit)
 
 	@classmethod
-	def limitInstance(self):
-		if Pool.LimitInstance is None:
+	def _settingLimit(self, value, limit):
+		limit = limit.get('final') or limit.get('initial') or limit
+		return max(limit['minimum'], min(limit['maximum'], int(value)))
+
+	@classmethod
+	def settingData(self):
+		from lib.modules.tools import Settings
+
+		unknown = 'Unknown'
+		unlimited = 'Unlimited'
+		labels = {
+			Pool.LevelAutomatic	: 'Automatic',
+			Pool.LevelCustom	: 'Custom',
+			Pool.LevelLow		: 'Low',
+			Pool.LevelMedium	: 'Medium',
+			Pool.LevelHigh		: 'High',
+		}
+
+		level = self.settingLevel()
+		levelGlobal = level
+		levelMetadata = level
+		levelScrape = level
+		levelBinge = level
+		levelConnection = level
+		levelMode = level
+
+		if level == Pool.LevelCustom:
+			levelGlobal = Settings.getInteger(id = Pool.SettingGlobal)
+			levelMetadata = Settings.getInteger(id = Pool.SettingMetadata)
+			levelScrape = Settings.getInteger(id = Pool.SettingScrape)
+			levelBinge = levelScrape
+			levelConnection = levelScrape
+			levelMode = levelScrape
+
+		valueGlobal = None
+		valueMetadata = None
+		valueScrape = None
+		valueBinge = None
+		valueConnection = None
+		valueMode = None
+
+		label = labels.get(level, unknown)
+		labelGlobal = unknown
+		labelMetadata = unknown
+		labelScrape = unknown
+		labelBinge = unknown
+		labelConnection = unknown
+		labelMode = unknown
+
+		try:
+			valueGlobal = self.settingGlobal()
+			labelGlobal = '%s (%s Threads)' % (labels.get(levelGlobal, unknown), str(valueGlobal) if valueGlobal else unlimited)
+		except: pass
+
+		try:
+			valueMetadata = self.settingMetadata()
+			labelMetadata = '%s (%s Tasks)' % (labels.get(levelMetadata, unknown), str(valueMetadata) if valueMetadata else unlimited)
+		except: pass
+
+		try:
+			valueScrape = self.settingScrape(binge = False)
+			labelScrape = '%s (%s Tasks)' % (labels.get(levelScrape, unknown), str(valueScrape) if valueScrape else unlimited)
+		except: pass
+
+		try:
+			valueBinge = self.settingScrape(binge = True)
+			labelBinge = '%s (%s Tasks)' % (labels.get(levelBinge, unknown), str(valueBinge) if valueBinge else unlimited)
+		except: pass
+
+		try:
+			valueConnection = self.settingConnection()
+			labelConnection = '%s (%s Connections)' % (labels.get(levelConnection, unknown), str(valueConnection) if valueConnection else unlimited)
+		except: pass
+
+		try:
+			valueMode = Settings.getInteger(id = Pool.SettingScrapeMode) if levelMode == Pool.LevelCustom else Pool.ModeThread
+			labelMode = '%s (%s)' % (labels.get(levelMode, unknown), 'Multi-Processing' if valueMode == Pool.ModeProcess else 'Multi-Threading')
+		except: pass
+
+		return {
+			'level' : level,
+			'label' : label,
+
+			'global' : {
+				'level' : levelGlobal,
+				'value' : valueGlobal,
+				'label' : labelGlobal,
+			},
+			'metadata' : {
+				'level' : levelMetadata,
+				'value' : valueMetadata,
+				'label' : labelMetadata,
+			},
+			'scrape' : {
+				'level' : levelScrape,
+				'value' : valueScrape,
+				'label' : labelScrape,
+			},
+			'binge' : {
+				'level' : levelBinge,
+				'value' : valueBinge,
+				'label' : labelBinge,
+			},
+			'connection' : {
+				'level' : levelConnection,
+				'value' : valueConnection,
+				'label' : labelConnection,
+			},
+			'mode' : {
+				'level' : levelMode,
+				'value' : valueMode,
+				'label' : labelMode,
+			},
+		}
+
+	@classmethod
+	def settingLevel(self):
+		from lib.modules.tools import Settings
+		return Settings.getInteger(id = Pool.SettingLevel)
+
+	@classmethod
+	def settingCustom(self):
+		return self.settingLevel() == Pool.LevelCustom
+
+	@classmethod
+	def settingNotification(self):
+		from lib.modules.tools import Settings
+		return Settings.getInteger(id = Pool.SettingNotification)
+
+	@classmethod
+	def settingGlobal(self):
+		# Intel i7:
+		#	LevelLow: 250
+		#	LevelMedium: 581
+		#	LevelHigh: 1422
+		# ARM Cortex-A73:
+		#	LevelLow: 176
+		#	LevelMedium: 418
+		#	LevelHigh: 1075
+
+		if Pool.DataGlobal is None:
+			from lib.modules.tools import Settings, Hardware
+
+			value = 0
+			main = True
+			level = self.settingLevel()
+			if level == Pool.LevelCustom:
+				main = False
+				level = Settings.getInteger(id = Pool.SettingGlobal)
+
+			threads = Hardware.threadLimit(memory = False, adjust = True, minimum = 150, maximum = 2000)
+			if not threads or threads >= 1500: threads = 0
+
+			if level == Pool.LevelCustom:
+				value = Settings.getCustom(id = Pool.SettingGlobalLimit)
+				if value is None: value = threads
+			elif level == Pool.LevelAutomatic:
+				value = threads
+			else:
+				limit = {
+					'minimum' : 150,
+					'maximum' : 1000,
+					'processor'	: {'minimum' : -20, 'maximum' : 20},
+					'memory'	: {'minimum' : -50, 'maximum' : 50},
+				}
+				if level == Pool.LevelLow: limit.update({'minimum' : 150, 'maximum' : 250})
+				elif level == Pool.LevelMedium: limit.update({'minimum' : 300, 'maximum' : 600})
+				elif level == Pool.LevelHigh: limit.update({'minimum' : 750, 'maximum' : 1500})
+				value = self._settingPerformance(limit = limit)
+
+				if main and value:
+					base = Hardware.threadLimit(memory = False, adjust = False)
+					if base and base >= 150: value = min(value, base)
+
+			Pool.DataGlobal = value or 0
+		return Pool.DataGlobal
+
+	@classmethod
+	def settingMetadata(self):
+		# Intel i7:
+		#	LevelLow: 35
+		#	LevelMedium: 50
+		#	LevelHigh: 60
+		# ARM Cortex-A73:
+		#	LevelLow: 26
+		#	LevelMedium: 36
+		#	LevelHigh: 51
+
+		if Pool.DataMetadata is None:
 			from lib.modules.tools import Settings
-			limit = Settings.getCustom(id = Pool.SettingInstance)
-			Pool.LimitInstance = limit if limit else 0
-		return Pool.LimitInstance
+
+			value = 0
+			limit = {
+				'initial'	: {'minimum' : 35, 'maximum' : 50},
+				'final'		: {'minimum' : 25, 'maximum' : 50},
+				'processor'	: {'minimum' : -5, 'maximum' : 5},
+				'memory'	: {'minimum' : -10, 'maximum' : 10},
+			}
+
+			level = self.settingLevel()
+			if level == Pool.LevelCustom: level = Settings.getInteger(id = Pool.SettingMetadata)
+
+			if level == Pool.LevelCustom:
+				value = Settings.getCustom(id = Pool.SettingMetadataLimit)
+				if value == 0:
+					# Still impose an upper limit on "Unlimited", due to metadata provider request rate limits.
+					# 150 migfht already be too high if metadata for all titles in a menu have to be retrieved.
+					value = 150
+					limit.update({'final' : {'minimum' : 10, 'maximum' : value}})
+				elif not value is None:
+					limit.update({'final' : {'minimum' : 1, 'maximum' : 100}})
+			elif level == Pool.LevelLow:
+				limit.update({
+					'initial'	: {'minimum' : 25, 'maximum' : 40},
+					'final'		: {'minimum' : 20, 'maximum' : 35},
+				})
+			elif level == Pool.LevelMedium:
+				limit.update({
+					'initial'	: {'minimum' : 35, 'maximum' : 50},
+					'final'		: {'minimum' : 25, 'maximum' : 50},
+				})
+			elif level == Pool.LevelHigh:
+				limit.update({
+					'initial'	: {'minimum' : 50, 'maximum' : 65},
+					'final'		: {'minimum' : 30, 'maximum' : 60},
+				})
+
+			if not value: value = self._settingPerformance(limit = limit)
+			value = self._settingLimit(value = value, limit = limit)
+
+			Pool.DataMetadata = value
+		return Pool.DataMetadata
+
+	@classmethod
+	def settingScrape(self, binge = None):
+		# Normal (Threads)
+		#	Intel i7:
+		#		LevelLow: 6
+		#		LevelMedium: 15
+		#		LevelHigh: 30
+		#	ARM Cortex-A73:
+		#		LevelLow: 2
+		#		LevelMedium: 6
+		#		LevelHigh: 14
+		# Binge (Threads)
+		#	Intel i7:
+		#		LevelLow: 3
+		#		LevelMedium: 9
+		#		LevelHigh: 18
+		#	ARM Cortex-A73:
+		#		LevelLow: 2
+		#		LevelMedium: 3
+		#		LevelHigh: 6
+		# Normal (Processes)
+		#	Intel i7: 12
+		#	ARM Cortex-A73: 7
+		# Binge (Processes)
+		#	Intel i7: 7
+		#	ARM Cortex-A73: 4
+
+		binge = True if binge else False
+		if Pool.DataScrape is None or not binge in Pool.DataScrape:
+			from lib.modules.tools import Settings, Math
+
+			adjust = 0.6 # Binge adjustment percentage.
+			value = 0
+			limit = {
+				'initial'	: {'minimum' : 5, 'maximum' : 20},
+				'final'		: {'minimum' : 3, 'maximum' : 15},
+				'processor'	: {'minimum' : -5, 'maximum' : 5},
+				'memory'	: {'minimum' : -10, 'maximum' : 10},
+			}
+
+			level = self.settingLevel()
+			if level == Pool.LevelCustom: level = Settings.getInteger(id = Pool.SettingScrape)
+
+			if level == Pool.LevelCustom:
+				value = Settings.getCustom(id = Pool.SettingScrapeBinge if binge else Pool.SettingScrapeLimit)
+				if value == 0:
+					# Still impose an upper limit on "Unlimited".
+					value = 150
+					limit.update({'final' : {'minimum' : 1, 'maximum' : value}})
+				elif not value is None:
+					limit.update({'final' : {'minimum' : 1, 'maximum' : 100}})
+
+				if value is None:
+					mode = Settings.getInteger(id = Pool.SettingScrapeMode)
+					if mode == Pool.ModeProcess:
+						# 0.5x core-count (3): 100 seconds | 51% CPU load
+						# 1x core-count + 1 (7): 68 seconds | 72% CPU load
+						# 2x core-count + 1 (13): 58 seconds | 83% CPU load
+						# Unlimited: 60 seconds | 81% CPU load
+						from lib.modules.tools import Hardware
+						threads = Hardware.processorCountThread() or 3
+						limit.update({
+							'initial'	: {'minimum' : max(2, int(threads * 0.5)), 'maximum' : max(2, threads * 2)},
+							'final'		: {'minimum' : max(2, threads + 1), 'maximum' : max(2, threads * 2)},
+							'processor'	: {'minimum' : -3, 'maximum' : 3},
+							'memory'	: {'minimum' : 0, 'maximum' : 0},
+						})
+						if binge:
+							for i in ['initial', 'final']:
+								for j in ['minimum', 'maximum']:
+									limit[i][j] = max(2, int(Math.roundDown(limit[i][j] * adjust)))
+
+			elif level == Pool.LevelLow:
+				limit.update({
+					'initial'	: {'minimum' : 4, 'maximum' : 8},
+					'final'		: {'minimum' : 2, 'maximum' : 6},
+				})
+			elif level == Pool.LevelMedium:
+				limit.update({
+					'initial'	: {'minimum' : 5, 'maximum' : 20},
+					'final'		: {'minimum' : 3, 'maximum' : 15},
+				})
+			elif level == Pool.LevelHigh:
+				limit.update({
+					'initial'	: {'minimum' : 6, 'maximum' : 35},
+					'final'		: {'minimum' : 4, 'maximum' : 30},
+				})
+
+			if binge and not level == Pool.LevelCustom:
+				for i in ['initial', 'final']:
+					for j in ['minimum', 'maximum']:
+						limit[i][j] = max(1, int(Math.roundDown(limit[i][j] * adjust)))
+
+			if not value: value = self._settingPerformance(limit = limit)
+			if binge and not level == Pool.LevelCustom and value <= 3: value += 1
+			value = self._settingLimit(value = value, limit = limit)
+
+			if Pool.DataScrape is None: Pool.DataScrape = {}
+			Pool.DataScrape[binge] = value
+		return Pool.DataScrape[binge]
+
+	@classmethod
+	def settingConnection(self):
+		if Pool.DataConnection is None:
+			from lib.modules.tools import Settings
+
+			value = 0
+
+			level = self.settingLevel()
+			if level == Pool.LevelCustom: level = Settings.getInteger(id = Pool.SettingScrape)
+			if level == Pool.LevelCustom: value = Settings.getCustom(id = Pool.SettingScrapeConnection)
+
+			Pool.DataConnection = value or 0
+		return Pool.DataConnection
+
+	@classmethod
+	def settingMode(self):
+		if Pool.DataMode is None:
+			from lib.modules.tools import Settings
+
+			value = 0
+
+			level = self.settingLevel()
+			if level == Pool.LevelCustom: level = Settings.getInteger(id = Pool.SettingScrape)
+			if level == Pool.LevelCustom: value = Settings.getInteger(id = Pool.SettingScrapeMode)
+
+			# If "Automatic" is selected, always use threading, even if the system supports multi-processing.
+			# Multi-processing has many potential problems and is mostly not even faster (1-5 secs slower = 10%).
+			Pool.DataMode = value or Pool.ModeThread
+		return Pool.DataMode
 
 	# Returns the maximum number of threads allowed by the system.
 	# Returns None if there is probably no maximum limit, aka an unlimited number of threads can be created.
@@ -558,7 +965,7 @@ class Pool(object):
 
 	@classmethod
 	def join(self, instance = None, busy = False, timeout = None):
-		from lib.modules.tools import Time, System
+		from lib.modules.tools import Time, System, Tools
 
 		if busy is True: busy = 0.05
 
@@ -570,6 +977,7 @@ class Pool(object):
 			# It seems that no new threads can be created, because the limit has been reached, and the ones created before were not returned to the OS properley.
 			# Wait for all threads to return before exiting Gaia - not sure if this solves the problem.
 
+			Pool.Joining = True
 			time = Time(start = True)
 
 			# Use a timeout by default if joining all remaining instances at the end of invoker execution.
@@ -645,6 +1053,8 @@ class Pool(object):
 			self._log('Finished in %s seconds' % time.elapsed())
 			self._logLine()
 		else:
+			if not Tools.isArray(instance): instance = [instance]
+
 			# No timeout by default when joining individual instances.
 			if timeout is True: timeout = self._timeout()
 			elif timeout is None or timeout is False: timeout = None
@@ -652,25 +1062,44 @@ class Pool(object):
 			if busy:
 				if timeout:
 					timer = Time(start = True)
-					while instance.alive():
-						Time.sleep(busy)
-						if timer.elapsed() > timeout:
-							if instance.alive(): self._logDangling(instance = instance)
-							break
+					for i in instance:
+						while i.alive():
+							Time.sleep(busy)
+							if timer.elapsed() > timeout:
+								if i.alive(): self._logDangling(instance = i)
+								break
 				else:
-					while instance.alive():
-						Time.sleep(busy)
+					for i in instance:
+						while i.alive():
+							Time.sleep(busy)
 			else:
-				instance.join(timeout = timeout)
-				if instance.alive(): self._logDangling(instance = instance)
+				for i in instance:
+					i.join(timeout = timeout)
+					if i.alive(): self._logDangling(instance = i)
 
+	@classmethod
+	def wait(self, delay = 1, interval = 0.5):
+		# Either wait the full delay, or until the Python process is finishing (addon.py -> Pool.join()).
+		# If the Python process is done in any case, there is no need to wait any longer, since there is no other code to be execute that could interfer.
+		if delay:
+			from lib.modules.tools import Logger
+			from lib.modules.tools import Time
+			if delay <= interval:
+				Time.sleep(delay)
+			else:
+				for i in range(int(delay / float(interval))):
+					if Pool.Joining: break
+					Time.sleep(interval)
+
+	# synchronizer: if Semaphore/Premaphore, it is aqcuired BEFORE creating a thread object and BEFORE starting execution.
+	# synchronizer: if Postmaphore, it is aqcuired AFTER creating a thread object, but BEFORE starting execution.
 	@classmethod
 	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
 		try:
 			Pool.Lock.acquire()
 
 			if Pool.Semaphore is None:
-				limit = self.limitInstance()
+				limit = self.settingGlobal()
 				if limit: Pool.Semaphore = Semaphore(limit)
 				else: Pool.Semaphore = True
 			try: Pool.Semaphore.acquire()
@@ -683,6 +1112,16 @@ class Pool(object):
 					try: function = args[0]
 					except: function = None
 				if function: name += ' | ' + str(function)
+
+			if synchronizer and not isinstance(synchronizer, Postmaphore):
+				# NB: Important to release the global lock before waiting for the synchronizer.
+				# Otherwise a synchronized thread that starts its own internal thread(s) will deadlock, since the child thread cannot acquire the global lock still held by the parent.
+				try: Pool.Lock.release()
+				except: pass
+				try: synchronizer.acquire()
+				except: pass
+				try: Pool.Lock.acquire()
+				except: pass
 
 			instance = type(target = target, name = name, synchronizer = synchronizer, args = args, kwargs = kwargs)
 			Pool.Instances[instance.id()] = instance
@@ -707,6 +1146,7 @@ class Pool(object):
 			# This does not even include all the threads started by other parts of Gaia, like the Cache class.
 			# The indexer classes have now been updated to reduce/disable sub-threads.
 			# Only on the outer level in metadata(), threads are started for each movie/episode in the list. All sub-function calls do not use threads anymore if they were called from a parent thread.
+			# Update: the default thread stack size on Linux is 8MB (ulimit -a), so on a 4GB device, 512 threads is the theoretical maximum, but since the OS/programs also use RAM, it will probably be more between 250-350.
 			count = self.count(type = type)
 			Pool.CountTotal[type] += 1
 			Pool.CountConcurrent[type] = max(Pool.CountConcurrent[type], count)

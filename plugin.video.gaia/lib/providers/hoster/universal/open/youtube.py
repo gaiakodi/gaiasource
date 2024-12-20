@@ -64,10 +64,10 @@ class Provider(ProviderBase):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		lock = None
 		try:
-			media = Media.TypeShow if Media.typeTelevision(media) else Media.TypeMovie
+			media = Media.Show if Media.isSerie(media) else Media.Movie
 			title = titles['search']['main'][0]
 			year = years['common']
 			if self.queryAllow(media, title, year, numberSeason, numberEpisode):

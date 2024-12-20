@@ -78,8 +78,6 @@ class Downloader(Database):
 	# Must correspond with tools.Media.
 	MediaMovie = 'movie'
 	MediaShow = 'show'
-	MediaDocumentary = 'documentary'
-	MediaShort = 'short'
 	MediaOther = 'other'
 
 	# Actions
@@ -166,15 +164,11 @@ class Downloader(Database):
 		'download.manual.location.combined' 		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/',
 		'download.manual.location.movie'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Movies/',
 		'download.manual.location.show'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Shows/',
-		'download.manual.location.documentary'		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Documentaries/',
-		'download.manual.location.short'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Shorts/',
 		'download.manual.location.other'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Other/',
 
 		'download.cache.location.combined'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/',
 		'download.cache.location.movie'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Movies/',
 		'download.cache.location.show'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Shows/',
-		'download.cache.location.documentary'		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Documentaries/',
-		'download.cache.location.short'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Shorts/',
 		'download.cache.location.other'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Other/',
 	}
 
@@ -195,8 +189,6 @@ class Downloader(Database):
 		# Create the first time, in case they do not exist.
 		self._fileCreateDirectory(self._locationMovies())
 		self._fileCreateDirectory(self._locationShows())
-		self._fileCreateDirectory(self._locationDocumentaries())
-		self._fileCreateDirectory(self._locationShorts())
 		self._fileCreateDirectory(self._locationOther())
 
 		self._initialize()
@@ -554,7 +546,7 @@ class Downloader(Database):
 		result = self._setting('enabled') == 'true'
 		if full and result:
 			selection = int(self._setting('location.selection'))
-			result = (selection == 0 and self._fileExistsDirectory(self._settingPath('location.combined'))) or (selection == 1 and (self._fileExistsDirectory(self._settingPath('location.movies') or self._fileExistsDirectory(self._settingPath('location.shows')))))
+			result = (selection == 0 and self._fileExistsDirectory(self._settingPath('location.combined'))) or (selection == 1 and (self._fileExistsDirectory(self._settingPath('location.movie') or self._fileExistsDirectory(self._settingPath('location.show')))))
 		return result
 
 	def _location(self, media = None):
@@ -565,10 +557,6 @@ class Downloader(Database):
 			return self._locationMovies()
 		elif media == Downloader.MediaShow:
 			return self._locationShows()
-		elif media == Downloader.MediaDocumentary:
-			return self._locationDocumentaries()
-		elif media == Downloader.MediaShort:
-			return self._locationShorts()
 		elif media == Downloader.MediaOther:
 			return self._locationOther()
 		else:
@@ -581,7 +569,7 @@ class Downloader(Database):
 			try: xbmcvfs.mkdir(path)
 			except: pass
 		else:
-			path = self._settingPath('location.movies')
+			path = self._settingPath('location.movie')
 		if not path.endswith('/') and not path.endswith('\\'): path += '/'
 		return path
 
@@ -592,29 +580,7 @@ class Downloader(Database):
 			try: xbmcvfs.mkdirs(path)
 			except: pass
 		else:
-			path = self._settingPath('location.shows')
-		if not path.endswith('/') and not path.endswith('\\'): path += '/'
-		return path
-
-	def _locationDocumentaries(self):
-		path = None
-		if self._setting('location.selection') == '0':
-			path = os.path.join(self._settingPath('location.combined'), self._translate(33470))
-			try: xbmcvfs.mkdirs(path)
-			except: pass
-		else:
-			path = self._settingPath('location.documentaries')
-		if not path.endswith('/') and not path.endswith('\\'): path += '/'
-		return path
-
-	def _locationShorts(self):
-		path = None
-		if self._setting('location.selection') == '0':
-			path = os.path.join(self._settingPath('location.combined'), self._translate(33471))
-			try: xbmcvfs.mkdirs(path)
-			except: pass
-		else:
-			path = self._settingPath('location.shorts')
+			path = self._settingPath('location.show')
 		if not path.endswith('/') and not path.endswith('\\'): path += '/'
 		return path
 
@@ -641,7 +607,6 @@ class Downloader(Database):
 
 		# Remove old [x] version in title.
 		title = re.sub('\[\d*\]', '', title).strip()
-
 		path = self._location()
 		if len(content) == 0:
 			try: directoryName = os.path.splitext(title)[0] # Remove file extension.
@@ -655,6 +620,7 @@ class Downloader(Database):
 		path = path.replace('\\', '/') # Otherwise smb paths on Windows have mixed slashes. And also avoids escape character. Kodi seems to handle both slashes fine on Windows.
 		xbmcvfs.mkdirs(path)
 		counter = 0
+
 		if self._fileExists(path):
 			fileName = title + '.' + extension
 			filePath = os.path.join(path, fileName)
@@ -740,7 +706,7 @@ class Downloader(Database):
 	def _fileRead(self, path):
 		if self._fileExists(path):
 			file = xbmcvfs.File(path)
-			data = file.read()
+			data = file.readBytes()
 			file.close()
 			return data
 		else:
@@ -749,15 +715,17 @@ class Downloader(Database):
 
 	def _fileExists(self, path, extension = True, exact = True):
 		# os.exists can not handle network (smb) paths.
-		if extension:
-			return xbmcvfs.exists(path)
-		else:
-			title = os.path.splitext(os.path.basename(path))[0]
-			directory = os.path.dirname(path)
-			if self._fileFind(directory, title, exact = exact) == None:
-				return False
+		if path:
+			if extension:
+				return xbmcvfs.exists(path)
 			else:
-				return True
+				title = os.path.splitext(os.path.basename(path))[0]
+				directory = os.path.dirname(path)
+				if self._fileFind(directory, title, exact = exact) == None:
+					return False
+				else:
+					return True
+		return False
 
 	def _fileExistsDirectory(self, path):
 		if not path.endswith('/') and not path.endswith('\\'):
@@ -1095,8 +1063,6 @@ class Downloader(Database):
 			else:
 				File.deleteDirectory(downloader._locationMovies())
 				File.deleteDirectory(downloader._locationShows())
-				File.deleteDirectory(downloader._locationDocumentaries())
-				File.deleteDirectory(downloader._locationShorts())
 				File.deleteDirectory(downloader._locationOther())
 
 	@classmethod
@@ -1127,14 +1093,6 @@ class Downloader(Database):
 				else: total += size
 
 				size = File.sizeDirectory(downloader._locationShows(), limit = limit)
-				if size < 0: return None
-				else: total += size
-
-				size = File.sizeDirectory(downloader._locationDocumentaries(), limit = limit)
-				if size < 0: return None
-				else: total += size
-
-				size = File.sizeDirectory(downloader._locationShorts(), limit = limit)
 				if size < 0: return None
 				else: total += size
 
@@ -1316,6 +1274,7 @@ class Downloader(Database):
 			item.addContextMenuItems(menu)
 
 			try:
+				#gaiaremove - remove old images and other obsolute metadata attributes.
 				fanart = self.mDownloadMetadata['fanart'] if 'fanart' in self.mDownloadMetadata else self.mDownloadMetadata['fanart2'] if 'fanart2' in self.mDownloadMetadata else self.mDownloadMetadata['fanart3'] if 'fanart3' in self.mDownloadMetadata else None
 				if fanart == None or fanart == '':
 					raise Exception()
@@ -1697,7 +1656,6 @@ class Downloader(Database):
 				self._insertDownload(self.mDownloadLink, self.mDownloadMedia, title, name, path, image = self.mDownloadImage, headers = self.mDownloadHeaders, metadata = self.mDownloadMetadata, source = self.mDownloadSource)
 				self._load()
 				self._run(Downloader.ActionDownloadNew)
-
 			return True
 		except Exception as error:
 			self._log(error)
@@ -1705,11 +1663,10 @@ class Downloader(Database):
 	# If title == None, will automatically extract title from metadata if present.
 	# If image == None, will automatically extract image from metadata if present.
 	def download(self, media = None, link = None, title = None, image = None, metadata = None, source = None, id = None, forceAction = False, refresh = False, automatic = False):
-		if id == None:
-			id = self.mDownloadId
+		if id is None: id = self.mDownloadId
 
-		if id == None:
-			if link == None or link == '':
+		if id is None:
+			if not link:
 				self._notification((33062, 33067), Downloader.StatusFailed)
 				return False
 
@@ -1723,7 +1680,7 @@ class Downloader(Database):
 			# Title
 			# Always overwrite the title to ensure that it contains all info, irrespective of which label format the user selected in the settings.
 			#if not metadata == None and title == None or title == '':
-			if not metadata == None:
+			if not metadata is None:
 				if 'tvshowtitle' in metadata and 'season' in metadata and 'episode' in metadata:
 					title = '%s S%02dE%02d' % (metadata['tvshowtitle'], int(metadata['season']), int(metadata['episode']))
 				elif 'title' in metadata and 'year' in metadata:
@@ -1735,19 +1692,21 @@ class Downloader(Database):
 
 			self.mDownloadTitle = title
 
-			if self.mDownloadTitle == None:
+			if self.mDownloadTitle is None:
 				self._notification((33062, 33067), Downloader.StatusFailed)
 				return False
 
 			# Image
-			if not metadata == None:
-				keys = ['poster', 'poster1', 'poster2', 'poster3', 'thumb', 'thumb1', 'thumb2', 'thumb3', 'icon', 'icon1', 'icon2', 'icon3']
-				for key in keys:
-					if key in metadata:
-						value = metadata[key]
-						if not value == None and not value == '':
-							image = value
-							break
+			if not image:
+				if not metadata is None:
+					#gaiaremove - remove old images and other obsolute metadata attributes.
+					keys = ['poster', 'poster1', 'poster2', 'poster3', 'thumb', 'thumb1', 'thumb2', 'thumb3', 'icon', 'icon1', 'icon2', 'icon3']
+					for key in keys:
+						if key in metadata:
+							value = metadata[key]
+							if not value == None and not value == '':
+								image = value
+								break
 			self.mDownloadImage = image
 
 			notification = True
@@ -1842,9 +1801,8 @@ class Downloader(Database):
 			self.mFile.seek(self.mDownloadSize - 1, 0)
 			self.mFile.write('\0')
 			self.mFile.seek(0, 0)
-
 			while True:
-				data = oldFile.read(Downloader.ChunkSizeRead)
+				data = oldFile.readBytes(Downloader.ChunkSizeRead)
 				if data == None or len(data) == 0:
 					break
 				self.mFile.write(data)
@@ -2141,7 +2099,7 @@ class Downloader(Database):
 			if 'tvshowtitle' in self.mDownloadMetadata and not self.mDownloadMetadata['tvshowtitle'] == None and not self.mDownloadMetadata['tvshowtitle'] == '':
 				path = [self._locationShows()]
 			else:
-				path = [self._locationMovies(), self._locationDocumentaries(), self._locationShorts()]
+				path = [self._locationMovies()]
 			path.append(self._locationOther())
 			if removed:
 				xbmc.executebuiltin('CleanLibrary(video)')
@@ -2161,7 +2119,7 @@ class Downloader(Database):
 		return int(self._setting('size')) * 1073741824
 
 	def _cacheSizeUsed(self):
-		paths = list(set([self._locationMovies(), self._locationShows(), self._locationDocumentaries(), self._locationShorts(), self._locationOther()]))
+		paths = list(set([self._locationMovies(), self._locationShows(), self._locationOther()]))
 		result = 0
 		for path in paths:
 			result += self._cacheSizeDirectory(path)

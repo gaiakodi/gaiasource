@@ -23,7 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://torrentfunk.com', 'https://torrentfunk2.com']
+	_Link					= ['https://www.torrentfunk.com', 'https://www.torrentfunk2.com'] # Update (2024-12): Main domain needs www subdomain, otherwise it redirects to an invalid URL.
 	_Mirror					= ['https://torrents-proxy.com/torrentfunk/']
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'torrentfunk'}
 	_Path					= '%s/torrents/%s.html'

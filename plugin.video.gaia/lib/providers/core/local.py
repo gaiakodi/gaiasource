@@ -66,12 +66,8 @@ class ProviderLocal(ProviderBase):
 
 	def paths(self, media):
 		paths = []
-		if Media.typeTelevision(media):
-			paths.append(self.pathShow())
-		else:
-			paths.append(self.pathMovie())
-			paths.append(self.pathDocumentary())
-			paths.append(self.pathShort())
+		if Media.isSerie(media): paths.append(self.pathShow())
+		else: paths.append(self.pathMovie())
 		paths.append(self.pathOther())
 		return paths
 
@@ -84,12 +80,6 @@ class ProviderLocal(ProviderBase):
 	def pathMovie(self):
 		return self.path(type = 'movies', label = 'Movies')
 
-	def pathDocumentary(self):
-		return self.path(type = 'documentaries', label = 'Documentaries')
-
-	def pathShort(self):
-		return self.path(type = 'shorts', label = 'Shorts')
-
 	def pathShow(self):
 		return self.path(type = 'shows', label = 'Shows')
 
@@ -100,15 +90,15 @@ class ProviderLocal(ProviderBase):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			paths = self.paths(media = media)
 			for path in paths:
-				self.searchFind(path = path, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+				self.searchFind(path = path, media = media, niche = niche, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack)
 				self.statisticsUpdateSearch(page = True)
 		except: self.logError()
 
-	def searchMatch(self, name, parents, titles, years, numberSeason, numberEpisode):
+	def searchMatch(self, name, parents, titles, years, numberSeason, numberEpisode, numberPack):
 		# This should be very lenient matching, since proper validation is done by Stream.
 		# Only filter out clearly incorrect files, since disk I/O has do be reduced when the Extractor detects metadata from the file in Stream.
 
@@ -135,7 +125,7 @@ class ProviderLocal(ProviderBase):
 
 		return False
 
-	def searchFind(self, path, media, titles, years, numberSeason, numberEpisode, language, pack, parents = []):
+	def searchFind(self, path, media, niche, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio, pack, parents = []):
 		if not path.endswith('\\') and not path.endswith('/'): path += '/' # Must end with a slash for tools.File.exists.
 
 		if not self.stopped() and File.exists(path):
@@ -149,7 +139,7 @@ class ProviderLocal(ProviderBase):
 					lock = self.priorityStart(lock = lock)
 					for file in chunk:
 						if self.stopped(): break
-						if self.searchMatch(name = file, parents = parents, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode):
+						if self.searchMatch(name = file, parents = parents, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack):
 							self.searchProcess(path = File.joinPath(path, file), parents = parents)
 					self.priorityEnd(lock = lock)
 			except: self.logError()
@@ -159,7 +149,7 @@ class ProviderLocal(ProviderBase):
 				if self.stopped(): break
 				sub = Tools.copy(parents)
 				sub.append(directory)
-				self.searchFind(path = File.joinPath(path, directory), parents = sub, media = media, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+				self.searchFind(path = File.joinPath(path, directory), parents = sub, media = media, niche = niche, titles = titles, years = years, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack)
 
 	def searchProcess(self, path, parents):
 		link = File.translate(path)

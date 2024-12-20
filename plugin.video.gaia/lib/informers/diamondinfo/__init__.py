@@ -36,7 +36,7 @@ class Informer(InformerBase):
 	# PARAMETERS
 	##############################################################################
 
-	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None):
+	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None):
 		parameters = {}
 
 		if type == InformerBase.TypeMovie:
@@ -72,5 +72,5 @@ class Informer(InformerBase):
 			if title: parameters['name'] = title
 		else:
 			return None # Not supported.
-			
+
 		return parameters

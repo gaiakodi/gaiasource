@@ -18,78 +18,97 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Tools, Logger, Country, Language
+from lib.modules.tools import Logger, Converter, Tools, Time, Language, Country, Media, Audience, Matcher, Regex
 from lib.modules.concurrency import Pool, Lock, Semaphore
-from lib.modules.cache import Cache
-from lib.modules.network import Networker
-from lib.meta.data import MetaData
-
-'''
-	In future extensions when TMDb/Trakt/IMDb is added:
-		1. Make the "season" function callable by season ID/query/year or by show ID/query/year.
-		2. Make the "episode" function callable by episode ID/query/year or by season ID/query/year or by show ID/query/year.
-		3. Trakt and IMDb seem to require the show ID + season/episode number, instead of using separate season/episode IDs.
-		4. That means each function should get additional parameters for the above.
-		5. Also put the implementation of this in the subclasses, instead of abstracting everything in the parent class. Would make things easier to code, since every provider is very different on its parameter requirnments.
-		6. Update "CacheParameters"
-		7. Maybe also do this with the id(...) lookup in _idDefault(), since subclasses might treat id lookups differently.
-		8. Maybe also make the "year" parameter (and maybe the "query" parameter as well) to take in a list of values. And/or add a "yearFrom" and "yearTo" that is then converted to a list of years. Some providers, like Trakt support requests with year ranges. Will be more efficient for shows.py -> _details() for looking up the year +- 1.
-		9. Maybe change the levels: l1=basic, l2=extended, l3=super-extended, l4=threaded-down, l5=threaded-up (for better consistency between providers).
-		10. NB: Improve the speed of providers. Currently it can take 3secs+ just to process a show on level6 (excluding the API request time). A problem does not seem to be the data extraction, but rather _process() in TVDb. Some delays are caused by the dataUpdate() function in metadata.
-'''
+from lib.modules.cache import Cache, Memory
+from lib.meta.tools import MetaTools
 
 class MetaProvider(object):
 
-	# Cache
+	# RELEASE
 
-	CacheClear			= Cache.TimeoutClear
-	CacheRefresh		= Cache.TimeoutRefresh
+	ReleaseNew						= 'new'						# Movies, Shows, Seasons, Episodes.
+	ReleaseHome						= 'home'					# Movies.
+	ReleaseFinale					= 'finale'					# Episodes.
+	ReleaseFuture					= 'future'					# Movies, Shows, Seasons, Episodes.
 
-	CacheSearch			= Cache.TimeoutDay1
-	CacheId				= Cache.TimeoutDay1
-	CacheLanguage		= Cache.TimeoutMonth1
-	CacheMovie			= Cache.TimeoutWeek1
-	CacheCollection		= Cache.TimeoutWeek1
-	CacheShow			= Cache.TimeoutDay3
-	CacheSeason			= Cache.TimeoutDay1
-	CacheEpisode		= Cache.TimeoutDay3
-	CachePerson			= Cache.TimeoutMonth1
-	CacheCharacter		= Cache.TimeoutMonth1
-	CacheCompany		= Cache.TimeoutMonth3
-	CacheTranslation	= Cache.TimeoutMonth1
+	# COMPANY
 
-	CacheParameters		= ['id', 'idImdb', 'idTmdb', 'idTvdb', 'idTrakt', 'query', 'year', 'number', 'numberSeason', 'numberEpisode', 'media', 'limit', 'page', 'offset']
+	CompanyStudio					= 'studio'					# Studios only.
+	CompanyNetwork					= 'network'					# Networks only.
+	CompanyVendor					= 'vendor'					# Vendors only.
+	CompanyProducer					= 'producer'				# Studios only at the moment.
+	CompanyBroadcaster				= 'broadcaster'				# Studios and networks.
+	CompanyDistributor				= 'distributor'				# Studios, networks, and vendors.
+	CompanyOriginal					= 'original'				# Studios and networks, excluding other major companies.
 
-	# Level
+	# VOTING
 
-	Level1				= 1			# Retrieves only basic data. A single request is made.
-	Level2				= 2			# Same as Level1, but also retrieves addititonal data, which is typically the "extended" endpoint in APIs. A single request is made which should not take much longer than Level1.
-	Level3				= 3			# Same as Level2, but also retrieves additional data, which is typically extra translations in APIs. A single request is made which should not take much longer than Level2.
-	Level4				= 4			# Same as Level3, but also retrieves partially detailed data. Show data is detailed, whereas season and episode data is only basic. A single request is made, but it can take a little longer than Level3.
-	Level5				= 5			# Same as Level4, but also retrieves partially detailed data. Show and season data is detailed, whereas episode data is only basic. Multiple concurrent requests are made for seasons in separate threads and it can take a lot longer than Level3.
-	Level6				= 6			# Same as Level5, but also retrieves fully detailed data. Show, season, and episode data is detailed. Multiple concurrent requests are made in separate threads for seasons and episodes and it can take a lot longer than Level5. Only retrieves detailed data from lower levels (eg: for seasons retrieve detailed episodes, but NOT detailed show data).
-	Level7				= 7			# Same as Level6, but also retrieves fully detailed data. Show, season, and episode data is detailed. Multiple concurrent requests are made in separate threads for the show, seasons, and episodes and it can take a lot longer than Level6. Retrieves detailed data from lower AND upper levels (eg: for seasons retrieve detailed episodes and detailed show data).
-	LevelDefault		= Level4
+	VotingNone						= 'none'					# Allow all without any filtering. Do not use None, since we test the value.
+	VotingMinimal					= 'minimal'					# Remove those with very few votes.
+	VotingLenient					= 'lenient'					# Only remove those with a very low rating or vote count.
+	VotingNormal					= 'normal'					# Remove those generally considered to crappy to watch.
+	VotingModerate					= 'moderate'				# Keep decent ones.
+	VotingStrict					= 'strict'					# Only keep the best.
+	VotingExtreme					= 'extreme'					# Extreme cases.
 
-	# Translation
+	# FILTER
 
-	TranslationTitle	= 'title'
-	TranslationOverview	= 'overview'
+	FilterNone						= 0							# Do not apply any filtering and return results as is.
+	FilterLenient					= 1							# Apply filtering to remove obviously wrong media, such as removing short films from feature movies.
+	FilterStrict					= 2							# Apply filtering to remove wrong media according to Gaia's menus, such as removing documentaries and anime from the standard feature movie menus.
 
-	# Limit
+	# CONVERT
+	ConvertDirect					= True
+	ConvertInverse					= False
+	Convert							= {}
 
-	LimitThread			= 50		# The maximum number of concurrent threads for multi-requests. Limit this for low-end devices, otherwise shows with 100s of episodes might start too many threads simultaneously.
-	LimitRequest		= 50		# The maximum number of concurrent requests that each subclass can make to their respective API/website.
-	LimitSearch			= 50		# The default maximum number of results returned for searches. Some providers (eg: TVDb) can return a lot of results, but we probably do not need all of them.
+	# REGION
+	Language						= Language.CodeEnglish		# Default language.
+	Country							= Country.CodeUnitedStates	# Default country.
 
-	# Lock
+	# TEMP
+	Temp							= 'temp'
 
-	CacheLock			= Lock()
-	CacheLocks			= {}
-	CacheData			= {}
+	# CONCURRENCY
+	Concurrency						= 30						# Default maximum concurrent requests. Can be overwritten by subclasses.
 
-	RequestLock			= Lock()
-	RequestLocks		= {}
+	# CACHE
+	Cache							= Cache.TimeoutExtended		# Default cache timeout.
+
+	# USAGE
+	UsageProperty					= 'GaiaRequests'
+	UsageAuthenticatedRequest		= 1000						# Can be overwritten by subclasses.
+	UsageAuthenticatedDuration		= 300						# Can be overwritten by subclasses.
+	UsageUnauthenticatedRequest		= 1000						# Can be overwritten by subclasses.
+	UsageUnauthenticatedDuration	= 300						# Can be overwritten by subclasses.
+
+	# OTHER
+	Id								= None
+	Name							= None
+	Lock							= Lock()
+	Instance						= {}
+
+	##############################################################################
+	# CONSTRUCTOR
+	##############################################################################
+
+	def __init__(self, account = None):
+		self.mAccount = account
+		self.mLock = {}
+		self.mCache = Cache.instance()
+		self.mMetatools = MetaTools.instance()
+		self.mLanguage = self.mMetatools.settingsLanguage()
+		self.mCountry = self.mMetatools.settingsCountry()
+
+	@classmethod
+	def instance(self):
+		id = self.id()
+		if not id in MetaProvider.Instance:
+			MetaProvider.Lock.acquire()
+			if not id in MetaProvider.Instance: MetaProvider.Instance[id] = self()
+			MetaProvider.Lock.release()
+		return self.Instance[id]
 
 	##############################################################################
 	# RESET
@@ -97,602 +116,659 @@ class MetaProvider(object):
 
 	@classmethod
 	def reset(self, settings = True):
-		MetaProvider.CacheData = {}
+		MetaProvider.Instance = {} # Clear instances, accounts, and class member variables in subclasses.
 
-	###################################################################
-	# GENERAL
-	##################################################################
-
-	@classmethod
-	def provider(self):
-		try: return self.Provider
-		except: return self.__name__.lower().replace('meta', '')
-
-	###################################################################
-	# CACHE
-	###################################################################
-
-	@classmethod
-	def _cache(self, timeout, function, result = [], threading = True, semaphore = None, *args, **kwargs):
-		# Use a lock when retrieving from cache.
-		# If the cache is empty (new installation or cache was just cleared), multiple equal requests might be executed in parallel.
-		# For instance, the TVDB authentication (token retrieval) might execute multiple times, since it is not in the cache yet.
-		# Using a cache makes sure that these kinds of requests are only executed once.
-
-		cache = Cache.instance()
-		id = cache.id(function = function, **kwargs)
-		data = None
-
-		try:
-			# Cache in memory, which is faster then reading/writing from the cache database (disk).
-			# Update: The cache now also caches in memory. But this should still be a few seconds faster, since the cache function overheads are skipped.
-			data = MetaProvider.CacheData[id]
-		except:
-			if not id in MetaProvider.CacheLocks:
-				MetaProvider.CacheLock.acquire()
-				if not id in MetaProvider.CacheLocks: MetaProvider.CacheLocks[id] = Lock()
-				MetaProvider.CacheLock.release()
-
-			if not kwargs: kwargs = {}
-			kwargs['function_'] = function
-			kwargs['threading'] = threading
-
-			MetaProvider.CacheLocks[id].acquire()
-
-			# Only go through the cache if it is an API request and not if it is a local processing function.
-			# This drastically increases the speed on slow devices (from +- 120 secs down to 80 secs).
-			# NB: The cache has been improved to reduce certain calculations and writing to disk in a separate thread.
-			# The cache is not slowing down things anymore, and in some cases is actually faster (at least on a SSD).
-			# If this is ever enabled again, note that any calls to Manager.movie(), Manager.show(), etc, will not cache the data. So the processing always has to be redone.
-			#	if function == MetaProvider._request or function == MetaProvider._requestJson: data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
-			#	else: data = self._cacheThread(*args, **kwargs)
-			if timeout is False: data = self._cacheThread(*args, **kwargs)
-			else: data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
-
-			MetaProvider.CacheData[id] = data
-			MetaProvider.CacheLocks[id].release()
-
-		if semaphore: semaphore.release()
-		result.append(data)
-		return data
-
-	@classmethod
-	def _cacheThread(self, threading, *args, **kwargs):
-		kwargs['result_'] = result_ = []
-		if threading: Pool.thread(target = self._cacheExecute, args = args, kwargs = kwargs, start = True, join = True)
-		else: self._cacheExecute(*args, **kwargs) # Already running in a parent thread, do not start a new thread (since creating threads takes long). Or threading was disabled.
-		return result_[0]
-
-	@classmethod
-	def _cacheExecute(self, function_, result_, *args, **kwargs):
-		result_.append(function_(*args, **kwargs))
-
-	@classmethod
-	def _cacheDefault(self, threaded, cache, timeout, function, *args, **kwargs):
-		kwargs = self._idDefault(**kwargs)
-		parameter = self._cacheParameter(**kwargs)
-
-		if cache is False: timeout = False
-		elif not cache is None and not cache is True: timeout = cache
-
-		# Remove parameters passed to _cacheDefault() that are not a parameter in "function".
-		arguments = {}
-		parameters = Tools.getParameters(function)
-		for k, v in kwargs.items():
-			if k in parameters:
-				arguments[k] = v
-		if 'level' in arguments and arguments['level'] is None: arguments['level'] = MetaProvider.LevelDefault
-
-		# Pass on the "threaded" value to the function, since they internally retrieve further shows/season/episodes.
-		if 'threaded' in parameters: arguments['threaded'] = threaded
-
-		# Pass on the "cache" value to the function, since they internally retrieve further shows/season/episodes.
-		if function == self.__show or function == self.__season or function == self.__episode: arguments['cache'] = cache
-
-		if parameter:
-			# Starting new threads can be slow, especially on low-end devices.
-			# Start threads here, since multiple resources can be requested at the same time, and sequentially requesting them is slower.
-			# Eg: When opening a show, all the shows seasons/episodes might be requested with a single call to this function.
-			# Pass "threading" in, in order not to create another sub-thread within _cache().
-
-			results = []
-			threads = []
-			parameter = self._cacheParameters(parameter, **arguments)
-
-			limit = 1
-			if threaded is True:
-				limit = MetaProvider.LimitThread
-			elif threaded is None:
-				# If a day-time show is retrieved that has 30 seasons, each containing 200 episodes.
-				# If the Trakt progress list is retrieved, this can mean a few 100 requests:
-				#	1. 200 individual detailed episode requests, plus a possible extra 200 requests if the next episode is in the next season instead of the current season.
-				#	2. 30 individual detailed season requests.
-				# If threading is completely disabled, 230+ requests have to be done sequentially.
-				# This can make a single episode/show in the list hold up the entire menu loading, while all other list entries are already finished and there are technically enough threads available.
-				# Allow a few extra threads here, depending on how many threads are currently running, and how many seasons/episodes need to be retrieved.
-				# Eg: retrieving S28 for Hollyoaks (tt0112004):
-				#	Full threading (max MetaProvider.LimitThread): 13 secs
-				#	Dynamic threading (4-8 threads): 32 secs
-				#	No threading (0 threads): 150 secs
-
-				threaded = True
-				counter = len(parameter)
-				maximum = 5 if counter < 50 else 6 if counter < 100 else 7 if counter < 150 else 8
-				available = Pool.threadAvailable(percent = True)
-				while available > 0.2 and counter > 0:
-					limit += 1
-					available -= 0.02
-					counter -= 10
-					if limit >= maximum: break # No more than 5 threads.
-			semaphore = Semaphore(limit)
-
-			for i in parameter:
-				semaphore.acquire() # Limit the number of concurrent threads, otherwise low-end devices might run out of threads and won't be able to create new ones.
-				result = []
-				results.append(result)
-				i.update({'result' : result, 'timeout' : timeout, 'function' : function, 'threading' : False, 'semaphore' : semaphore})
-				if threaded: threads.append(Pool.thread(target = self._cache, args = args, kwargs = i, start = True))
-				else: self._cache(*args, **i)
-			[i.join() for i in threads]
-			return [i[0] for i in results]
-		else:
-			arguments['threading'] = threaded
-			return self._cache(timeout, function, *args, **arguments)
-
-	@classmethod
-	def _cacheParameter(self, **kwargs):
-		for key, value in kwargs.items():
-			if key in MetaProvider.CacheParameters:
-				if Tools.isArray(value): return key
-		return None
-
-	@classmethod
-	def _cacheParameters(self, parameter, **kwargs):
-		result = []
-		for i in range(len(kwargs[parameter])):
-			parameters = {}
-			parameters.update(kwargs)
-			for key in MetaProvider.CacheParameters:
-				try:
-					if Tools.isArray(kwargs[key]): parameters[key] = kwargs[key][i]
-				except:
-					try:
-						if not Tools.isArray(kwargs[key]):
-							parameters[key] = kwargs[key]
-					except: pass
-			result.append(parameters)
-		return result
-
-	###################################################################
-	# REQUEST
-	###################################################################
-
-	@classmethod
-	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
-		if not cache is None: return self._cache(threaded = threaded, timeout = cache, function = MetaProvider._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies)
-
-		result = None
-		try:
-			self._requestLock()
-			result = Networker().request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, agent = Networker.AgentSession)
-		finally:
-			self._requestUnlock()
-		return result
-
-	@classmethod
-	def _requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
-		response = MetaProvider._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, cache = cache, threaded = threaded)
-		if response: return Networker.dataJson(response['data'])
-		else: return None
-
-	@classmethod
-	def _requestLock(self):
-		# Limit the number of concurrent requests to the same API/website.
-		# Some servers have restrictions on the number of simulations requests from the same IP, but even if they don't have, do not overload.
-
-		id = self.provider()
-
-		if not id in MetaProvider.RequestLocks:
-			MetaProvider.RequestLock.acquire()
-			if not id in MetaProvider.RequestLocks: MetaProvider.RequestLocks[id] = Semaphore(MetaProvider.LimitRequest)
-			MetaProvider.RequestLock.release()
-
-		MetaProvider.RequestLocks[id].acquire()
-
-	@classmethod
-	def _requestUnlock(self):
-		MetaProvider.RequestLocks[self.provider()].release()
-
-	###################################################################
-	# DEFAULT
-	###################################################################
-
-	@classmethod
-	def _default(self, media, year = None, number = None, numberSeason = None, numberEpisode = None, strict = True):
-		numberSeason, numberEpisode = self._defaultNumber(media = media, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-		media = self._defaultMedia(media = media, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, strict = strict)
-		numberSeason, numberEpisode = self._defaultNumber(media = media, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-		return media, numberSeason, numberEpisode
-
-	@classmethod
-	def _defaultMedia(self, media = None, year = None, numberSeason = None, numberEpisode = None, strict = True):
-		if media is None:
-			if not numberEpisode is None: return MetaData.MediaEpisode
-			elif not numberSeason is None: return MetaData.MediaSeason
-
-			if not strict:
-				if not year is None: return MetaData.MediaMovie
-				else: return MetaData.MediaShow
-		return media
-
-	@classmethod
-	def _defaultNumber(self, media = None, number = None, numberSeason = None, numberEpisode = None):
-		if not number is None:
-			if numberSeason is None and media == MetaData.MediaSeason: numberSeason = number
-			if numberEpisode is None and media == MetaData.MediaEpisode: numberEpisode = number
-
-		if media == MetaData.MediaEpisode:
-			if numberSeason is None: numberSeason = 1
-			if numberEpisode is None: numberEpisode = 1
-		elif not number is None:
-			numberSeason = number
-
-		return numberSeason, numberEpisode
-
-	###################################################################
-	# LANGUAGE
-	###################################################################
-
-	@classmethod
-	def language(self, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheLanguage, function = self._language, level = level)
-
-	# Virtual
-	@classmethod
-	def _language(self, level = None):
-		return None
-
-	###################################################################
-	# SEARCH
-	###################################################################
-
-	# year: single year or list of years. Some providers might not support year ranges and will have to make separate queries for each year.
-	# page: the page offset, starting at 1.
-	# offset: the absolute offset starting at 0.
-	# Provide either a page or an offset.
-	@classmethod
-	def search(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None,  number = None, numberSeason = None, numberEpisode = None, media = None, limit = None, offset = None, page = None, level = None, cache = None, threaded = None):
-		if limit is None: limit = MetaProvider.LimitSearch
-		if offset is None: offset = ((limit * page) - 1) if page else 0
-		if page is None: page = int(offset / float(limit)) if offset else 1
-
-		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSearch, function = self._search, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, limit = limit, offset = offset, page = page, level = level)
-
-	# Virtual
-	@classmethod
-	def _search(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, media = None, limit = None, offset = None, page = None, level = None):
-		return None
-
-	###################################################################
+	##############################################################################
 	# ID
-	###################################################################
+	##############################################################################
 
 	@classmethod
-	def id(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, extract = None, level = None, cache = None, threaded = None):
-		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
+	def id(self):
+		return self.Id or self._idGenerate()
 
-		result = self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheId, function = self._id, idLookup = False, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, level = level)
-		if extract:
-			try: return result[extract]
-			except: return None
+	@classmethod
+	def _idGenerate(self):
+		if self.Id is None: self.Id = self.__name__.lower().replace('meta', '')
+		return self.Id
+
+	##############################################################################
+	# NAME
+	##############################################################################
+
+	# Can be overwritten by subclasses.
+	@classmethod
+	def name(self, id = None):
+		if self.Name is None:
+			if id is None: id = self.id()
+			if len(id) == 4: self.Name = id[:3].upper() + id[3].lower() # IMDb, TMDb, TVDb.
+			else: self.Name = id.title() # Trakt, others.
+		return self.Name
+
+	##############################################################################
+	# ACCOUNT
+	##############################################################################
+
+	def account(self):
+		return self.mAccount
+
+	def accountId(self):
+		try: return self.mAccount.dataId()
+		except: return None
+
+	def accountUser(self):
+		try: return self.mAccount.dataUsername()
+		except: return None
+
+	def accountKey(self, internal = True):
+		try:
+			key = self.mAccount.dataKey()
+			if not key and internal: key = self.mAccount.key() # TMDb, TVDb
+			return key
+		except: return None
+
+	def accountValid(self):
+		try: return self.mAccount.authenticated()
+		except: return False
+
+	def accountAuthenticate(self):
+		try: return self.mAccount.authenticate(settings = False)
+		except: return False
+
+	##############################################################################
+	# EXECUTE
+	##############################################################################
+
+	def _execute(self, requests, threaded = None, lock = None):
+		result = {}
+		if requests:
+			if lock is None: lock = True
+			if threaded is None: threaded = len(requests) > 1
+			if threaded:
+				threads = [Pool.thread(target = self._executeFunction, kwargs = {'request' : request, 'result' : result, 'lock' : lock}, start = True) for request in requests]
+				[thread.join() for thread in threads]
+			else:
+				for request in requests: self._executeFunction(request = request, result = result, lock = lock)
 		return result
 
-	@classmethod
-	def idImdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderImdb, level = level, cache = cache, threaded = threaded)
+	def _executeFunction(self, request, result, lock):
+		try:
+			if lock: self._lock(limit = lock)
+			result[request['id']] = None
+			function = request.get('function') or self._executeRequest
+			result[request['id']] = function(**(request.get('parameters') or {}))
+		except:
+			Logger.error()
+		finally:
+			if lock: self._unlock(limit = lock)
+
+	# Can be overwritten by subclasses to call their native _request() function if it is not named "_request()".
+	def _executeRequest(self, **parameters):
+		try: return self._request(**parameters)
+		except: Logger.error()
+
+	##############################################################################
+	# USAGE
+	##############################################################################
 
 	@classmethod
-	def idTmdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTmdb, level = level, cache = cache, threaded = threaded)
+	def usageGlobal(self, authenticated = False, full = False):
+		from lib.meta.providers.trakt import MetaTrakt
+		from lib.meta.providers.imdb import MetaImdb
+		from lib.meta.providers.tmdb import MetaTmdb
+		providers = [MetaTrakt, MetaImdb, MetaTmdb]
+		usage = {i.id() : i.instance().usage(authenticated = authenticated) for i in providers}
+		maximum = max(usage.values())
+		if full:
+			usage['global'] = maximum
+			return usage
+		return maximum
+
+	def usage(self, authenticated = False, count = False):
+		requests = []
+		total = 0.0
+
+		if authenticated is True or authenticated is None:
+			requests.extend(self._usageClean(Memory.get(id = self._usageId(authenticated = True), local = True, kodi = True)))
+			total += self.UsageAuthenticatedRequest
+
+		if authenticated is False or authenticated is None:
+			requests.extend(self._usageClean(Memory.get(id = self._usageId(authenticated = False), local = True, kodi = True)))
+			total += self.UsageUnauthenticatedRequest
+
+		if count: return len(requests)
+		elif total: return len(requests) / total
+		else: return 0.0
+
+	def _usageId(self, authenticated = False):
+		return '%s_%s_%s' % (self.UsageProperty, self.id(), str(authenticated))
+
+	def _usageUpdate(self, authenticated = False):
+		id = self._usageId(authenticated = authenticated)
+		requests = self._usageClean(Memory.get(id = id, local = True, kodi = True))
+		requests.append(Time.timestamp())
+		Memory.set(id = id, value = requests, local = True, kodi = True)
+
+	def _usageClean(self, requests, authenticated = False):
+		if requests:
+			threshold = Time.timestamp() - (self.UsageAuthenticatedDuration if authenticated else self.UsageUnauthenticatedDuration) - 1
+			return [i for i in requests if i > threshold]
+		return []
+
+	##############################################################################
+	# CONVERT
+	##############################################################################
 
 	@classmethod
-	def idTvdb(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTvdb, level = level, cache = cache, threaded = threaded)
+	def _convert(self, values, value, inverse = False, default = None):
+		id = Tools.id(values)
+		if not id in MetaProvider.Convert:
+			inversed = {}
 
-	@classmethod
-	def idTrakt(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, level = None, cache = None, threaded = None):
-		return self.id(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, extract = MetaData.ProviderTrakt, level = level, cache = cache, threaded = threaded)
+			# List and dict values cannot be reversed looked up (eg: MetaTrakt Studios or MetaImdb Companies).
+			for k, v in values.items():
+				if not Tools.isStructure(v):
+					inversed[v] = k
+					if Tools.isString(v): inversed[v.lower()] = k # Also add the lower case, for providers like MetaImdb (HTML vs JSON vs CSV genres).
 
-	@classmethod
-	def _idDefault(self, **kwargs):
-		try: idLookup = kwargs['idLookup']
-		except: idLookup = True
+			MetaProvider.Convert[id] = {
+				MetaProvider.ConvertDirect : values,
+				MetaProvider.ConvertInverse : inversed,
+			}
 
-		try: idAny = kwargs['idAny']
-		except: idAny = False
-
-		# Remove invalid IDs.
-		for key, value in kwargs.items():
-			if key.startswith('id'):
-				if not value or value in ['0', 'tt']:
-					kwargs[key] = None
-
-		if idAny:
-			for key, value in kwargs.items():
-				if key.startswith('id') and not value is None:
-					kwargs['id'] = value
-					break
+		# Check prefix, so that eg "!anime" can also be looked up.
+		data = MetaProvider.Convert[id][MetaProvider.ConvertInverse if inverse else MetaProvider.ConvertDirect]
+		if Tools.isArray(value):
+			temp = []
+			for i in value:
+				if Tools.isString(i):
+					prefix = i[0]
+					if Tools.isAlphabeticNumeric(prefix):
+						key = i
+						prefix = None
+					else:
+						key = Tools.stringRemovePrefix(i, prefix)
+				else:
+					key = i
+					prefix = None
+				result = data.get(key, key if default is True else default)
+				temp.append((prefix + result) if (prefix and result) else result)
+			temp = Tools.listFlatten(temp) # TMDb genres.
+			return [i for i in temp if not i is None]
 		else:
-			provider = self.provider()
-			providerCapital = provider.capitalize()
-
-			idKey = None
-			try: id = kwargs['id']
-			except: id = None
-
-			for key, value in kwargs.items():
-				if key.startswith('id') and providerCapital in key:
-					idKey = key
-					if not value is None: id = value
-					break
-
-			# If Trakt provider is added in the future, change the automatic native ID lookup, since Trakt API calls work with both Trakt IDs and IMDb IDs.
-			# Maybe add something to subclasses that indicates for which IDs automatic lookups should be done.
-			# And what about directly searching with query/year/number instead of an ID?
-			if id is None and idLookup:
-				parameters = {'extract' : provider}
-				for i in ['query', 'year', 'numberSeason', 'numberEpisode', 'media', 'level']:
-					try: parameters[i] = kwargs[i]
-					except: pass
-				for i in MetaData.Providers:
-					i = 'id' + i.capitalize()
-					try: parameters[i] = kwargs[i]
-					except: pass
-				id = self.id(**parameters)
-
-			if id:
-				if idKey: kwargs[idKey] = id
-				kwargs['id'] = id
-
-		return kwargs
-
-	# Virtual
-	@classmethod
-	def _id(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, media = None, level = None):
-		return None
-
-	###################################################################
-	# MOVIE
-	###################################################################
+			if Tools.isString(value):
+				prefix = value[0]
+				if Tools.isAlphabeticNumeric(prefix):
+					key = value
+					prefix = None
+				else:
+					key = Tools.stringRemovePrefix(value, prefix)
+			else:
+				key = value
+				prefix = None
+			result = data.get(key, key if default is True else default)
+			return (prefix + result) if (prefix and result) else result
 
 	@classmethod
-	def movie(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheMovie, function = self._movie, media = MetaData.MediaMovie, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
-
-	# Virtual
-	@classmethod
-	def _movie(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None):
-		return None
-
-	###################################################################
-	# COLLECTION
-	###################################################################
+	def _convertGenre(self, genre, inverse = False, default = None):
+		return self._convert(values = self.Genres, value = genre, inverse = inverse, default = default)
 
 	@classmethod
-	def collection(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCollection, function = self._collection, media = MetaData.MediaCollection, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
-
-	# Virtual
-	@classmethod
-	def _collection(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None):
-		return None
-
-	###################################################################
-	# SHOW
-	###################################################################
+	def _convertStatus(self, status, inverse = False, default = None):
+		return self._convert(values = self.Status, value = status, inverse = inverse, default = default)
 
 	@classmethod
-	def show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheShow, function = self.__show, media = MetaData.MediaShow, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberAdjust = numberAdjust, level = level)
+	def _convertCertificate(self, certificate, inverse = False, default = None):
+		if not certificate: return certificate
+		elif Tools.isArray(certificate): return [self._convertCertificate(certificate = i, inverse = inverse, default = default) for i in certificate]
+		else: return Audience.clean(certificate) if inverse else Audience.format(certificate)
 
 	@classmethod
-	def __show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberAdjust = True, level = None, cache = None, threaded = None):
-		result = self._show(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, level = level)
-		if result:
-			if level >= MetaProvider.Level5:
-				provider = self.provider()
-				if not number is None or not numberSeason is None: # Retrieve specific season.
-					numberSeason, _ = self._defaultNumber(media = MetaData.MediaSeason, number = number, numberSeason = numberSeason)
-					provider = self.provider()
-					season = result.season(number = numberSeason)
-					if season: season = season.idSeason(provider = provider)
-				else: # Retrieve all seasons.
-					season = result.idSeason(provider = provider)
+	def _convertAward(self, award, inverse = False, default = None):
+		return self._convert(values = self.Awards, value = award, inverse = inverse, default = default)
 
-				if season:
-					season = self.season(id = season, show = result, level = level, cache = cache, threaded = threaded)
-					if season: result.seasonSet(value = season, unique = provider)
+	@classmethod
+	def _convertGender(self, gender, inverse = False, default = None):
+		return self._convert(values = self.Genders, value = gender, inverse = inverse, default = default)
 
-		# TVDb uses the year as season number for some daytime shows.
-		# Eg: Coronation Street - https://thetvdb.com/series/coronation-street
-		if numberAdjust and result: result.numberAdjust()
+	@classmethod
+	def _convertPleasure(self, pleasure, inverse = False, default = None):
+		pleasures = self._convert(values = MetaTools.pleasure(), value = pleasure, inverse = inverse, default = default)
+		if pleasures:
+			id = self.id()
+			pleasures = [i['provider'][id] for i in pleasures]
+		return pleasures
 
+	@classmethod
+	def _convertCompany(self, company, inverse = False, default = None):
+		type = None
+		if Tools.isList(company):
+			type = company[1]
+			company = company[0]
+		elif Tools.isDictionary(company):
+			type = next(iter(company.values()))
+			company = next(iter(company.keys()))
+		result = self._convert(values = self._companies(), value = company, inverse = inverse, default = default)
+		if result and type: result = result.get(type)
 		return result
 
-	# Virtual
-	@classmethod
-	def _show(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, level = None):
-		return None
-
-	###################################################################
-	# SEASON
-	###################################################################
-
-	@classmethod
-	def season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, show = None, level = None, cache = None, threaded = None):
-		numberSeason, _ = self._defaultNumber(media = MetaData.MediaSeason, number = number, numberSeason = numberSeason)
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheSeason, function = self.__season, media = MetaData.MediaSeason, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, show = show, level = level)
-
-	@classmethod
-	def __season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, show = None, level = None, cache = None, threaded = None):
-		result = self._season(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, show = show, level = level)
-		if result:
-			if level >= MetaProvider.Level6:
-				provider = self.provider()
-
-				episode = result.idEpisode(provider = provider)
-				if episode:
-					episode = self.episode(id = episode, show = show, season = result, level = MetaProvider.Level6, cache = cache, threaded = threaded)
-					if episode: result.episodeSet(value = episode, unique = provider)
-
-				if level >= MetaProvider.Level7:
-					resultShow = result.idShow(provider = provider)
-					if resultShow:
-						resultShow = self.show(id = resultShow, level = MetaProvider.Level3, cache = cache, threaded = threaded)
-						if resultShow: result.showSet(value = resultShow, unique = provider)
-		return result
-
-	# Virtual
-	@classmethod
-	def _season(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, show = None, level = None):
-		pass
-
-	###################################################################
-	# EPISODE
-	###################################################################
-
-	@classmethod
-	def episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, threaded = None):
-		numberSeason, numberEpisode = self._defaultNumber(media = MetaData.MediaEpisode, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode)
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheEpisode, function = self.__episode, media = MetaData.MediaEpisode, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level)
-
-	@classmethod
-	def __episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None, cache = None, threaded = None):
-		result = self._episode(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, show = show, season = season, level = level)
-		if result:
-			if level >= MetaProvider.Level7:
-				provider = self.provider()
-				resultSeason = result.idSeason(provider = provider)
-
-				if resultSeason:
-					resultSeason = self.season(id = resultSeason, show = show, level = MetaProvider.Level4, threaded = threaded)
-					if resultSeason:
-						resultShow = result.idShow(provider = provider)
-						if resultShow:
-							resultShow = self.show(id = resultShow, level = MetaProvider.Level4, threaded = threaded)
-							if resultShow:
-								resultSeason.showSet(value = resultShow, unique = provider)
-								result.showSet(value = resultShow, unique = provider) # Set for the episode as well.
-						result.seasonSet(value = resultSeason, unique = provider)
-		return result
-
-	# Virtual
-	@classmethod
-	def _episode(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, show = None, season = None, level = None):
-		return None
-
-	###################################################################
-	# CHARACTER
-	###################################################################
-
-	@classmethod
-	def character(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCharacter, function = self._character, media = MetaData.MediaCharacter, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
-
-	# Virtual
-	@classmethod
-	def _character(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None):
-		return None
-
-	###################################################################
-	# PERSON
-	###################################################################
-
-	@classmethod
-	def person(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CachePerson, function = self._person, media = MetaData.MediaPerson, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
-
-	# Virtual
-	@classmethod
-	def _person(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None):
-		return None
-
-	###################################################################
+	##############################################################################
 	# COMPANY
-	###################################################################
-
-	@classmethod
-	def company(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None, cache = None, threaded = None):
-		return self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheCompany, function = self._company, media = MetaData.MediaCompany, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, level = level)
+	##############################################################################
 
 	# Virtual
 	@classmethod
-	def _company(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, level = None):
+	def _companies(self):
 		return None
 
+	@classmethod
+	def company(self, niche = None, company = None, studio = None, network = None, parameters = None, delete = True):
+		companies = {}
+
+		def _add(name, type = None):
+			name = str(name)
+			if not name in companies: companies[name] = []
+			if not type or type == 'company': type = MetaProvider.CompanyBroadcaster
+			companies[name].append(type)
+
+		if niche:
+			niche = Media.stringFrom(niche)
+			if Media.isEnterprise(niche):
+				for i in MetaTools.company().keys():
+					if Media.isMedia(media = niche, type = i):
+						_add(name = i, type = Media.type(media = niche, type = Media.Enterprise))
+
+		if company:
+			if Tools.isDictionary(company):
+				for k, v in company.items(): _add(name = k, type = v)
+			else:
+				if not Tools.isArray(company): company = [company]
+				for i in company: _add(name = i)
+
+		if studio:
+			for i in studio if Tools.isArray(studio) else [studio]: _add(name = i, type = MetaProvider.CompanyStudio)
+
+		if network:
+			for i in network if Tools.isArray(network) else [network]: _add(name = i, type = MetaProvider.CompanyNetwork)
+
+		if parameters:
+			for i in ['company', MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor, MetaProvider.CompanyProducer, MetaProvider.CompanyBroadcaster, MetaProvider.CompanyDistributor, MetaProvider.CompanyOriginal]:
+				parameter = parameters.get(i)
+				if delete:
+					try: del parameters[i]
+					except: pass
+				if parameter:
+					for j in parameter if Tools.isArray(parameter) else [parameter]: _add(name = j, type = i)
+
+		if companies:
+			company = {}
+			for k, v in companies.items():
+				v = Tools.listUnique(v)
+				if v: company[k] = v
+			if company: return company
+
+		return None
+
+	##############################################################################
+	# CACHE
+	##############################################################################
+
+	def _cache(self, function, timeout = None, **parameters):
+		return self.mCache.cacheSeconds(timeout = self._cacheTimeout() if timeout is None or timeout is True else timeout, function = function, **parameters)
+
+	def _cacheTimeout(self):
+		return self.Cache # Use "self" instead of "MetaProvider" so that each subclasses has its own variable.
+
+	def _cacheDelete(self, function, **parameters):
+		return self.mCache.cacheDelete(function = function, **parameters)
+
 	###################################################################
-	# TRANSLATION
+	# LOG
 	###################################################################
 
 	@classmethod
-	def translation(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, translation = None, language = None, limit = None, level = None, cache = None, threaded = None):
-		if translation is None: translation = MetaProvider.TranslationTitle
-		media, numberSeason, numberEpisode = self._default(media = media, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, strict = False)
+	def _log(self, message, data1 = None, data2 = None, data3 = None, type = Logger.TypeError):
+		data = self.id().upper()
+		if message: data += ' ' + message
+		data += ': '
 
-		result = self._cacheDefault(threaded = threaded, cache = cache, timeout = MetaProvider.CacheTranslation, function = self._translation, id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = translation, level = level)
+		if data1 and Tools.isStructure(data1): data1 = Converter.jsonTo(data1)
+		if data2 and Tools.isStructure(data2): data2 = Converter.jsonTo(data2)
+		if data3 and Tools.isStructure(data3): data3 = Converter.jsonTo(data3)
 
-		if result:
-			if not language is None:
-				if Tools.isArray(language):
-					temp = {}
-					for i in language:
-						try: temp[i] = result[i]
-						except: pass
-					result = temp
-				elif language is True:
-					try: result = result[MetaData.LanguageUniversal]
-					except:
-						try: result = result[MetaData.LanguageEnglish]
-						except: result = None
-				else:
-					try: result = result[language]
-					except: result = None
+		Logger.log(data, data1, data2, data3, type = type)
 
-			if not limit is None:
-				if limit is True or limit == 1:
-					if Tools.isArray(result):
-						try: result = result[0]
-						except: result = None
-					else:
-						temp = {}
-						for key, value in result.items():
-							try: temp[key] = value[0]
-							except: pass
-						result = temp
-				else:
-					if Tools.isArray(result):
-						try: result = result[:limit]
-						except: result = None
-					else:
-						temp = {}
-						for key, value in result.items():
-							try: temp[key] = value[:limit]
-							except: pass
-						result = temp
+	@classmethod
+	def _error(self):
+		Logger.error(self.id().upper())
+
+	##############################################################################
+	# CONCURRENCY
+	##############################################################################
+
+	def _concurrency(self, limit = None):
+		id = self.id()
+
+		if limit is None or limit is True: limit = self._concurrencyLimit()
+		elif limit is False: limit = 1
+
+		if not id in self.mLock:
+			MetaProvider.Lock.acquire()
+			if not id in self.mLock: self.mLock[id] = {}
+			MetaProvider.Lock.release()
+
+		if not limit in self.mLock[id]:
+			MetaProvider.Lock.acquire()
+			if not limit in self.mLock[id]: self.mLock[id][limit] = Lock() if limit <= 0 else Semaphore(limit)
+			MetaProvider.Lock.release()
+
+		return self.mLock[id][limit]
+
+	def _concurrencyLimit(self):
+		return self.Concurrency # Use "self" instead of "MetaProvider" so that each subclasses has its own variable.
+
+	def _lock(self, limit = None):
+		self._concurrency(limit = limit).acquire()
+
+	def _unlock(self, limit = None):
+		try: self._concurrency(limit = limit).release()
+		except: pass
+
+	##############################################################################
+	# DATA
+	##############################################################################
+
+	@classmethod
+	def _data(self, item, key = None, default = None):
+		for i in self._dataKeys(key = key):
+			try: item = item[i]
+			except: return default
+		return item
+
+	@classmethod
+	def _dataSet(self, item = None, key = None, value = None, copy = False):
+		result = item
+		if copy: value = Tools.copy(value)
+
+		key = self._dataKeys(key = key)
+		if key:
+			for i in key[:-1]:
+				if not i in item: item[i] = {}
+				item = item[i]
+			key = key[-1]
+
+			if key in item:
+				entry = item[key]
+				if Tools.isDictionary(entry): Tools.update(entry, value)
+				elif Tools.isArray(entry): item[key] = Tools.listUnique(entry + (value if Tools.isArray(value) else [value]))
+				else: item[key] = value
+			else:
+				item[key] = value
+		else:
+			Tools.update(item, value)
 
 		return result
 
 	@classmethod
-	def translationTitle(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None, threaded = None):
-		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationTitle, language = language, limit = limit, level = level, cache = cache, threaded = threaded)
+	def _dataRemove(self, item = None, key = None, clean = False):
+		if Tools.isList(item):
+			return [self._dataRemove(item = i, key = key, clean = clean) for i in item]
+		else:
+			result = item
+			key = self._dataKeys(key = key)
+			if key:
+				# Clean if nested objects are empty.
+				if clean:
+					key = Tools.copy(key)# Copy the key, since since values are deleted from it, and the key is reused if this function is called with mutiple items.
+					while key:
+						value = item
+						for i in key[:-1]:
+							try:
+								value = value[i]
+							except:
+								value = None
+								break
+						if value:
+							val = value.get(key[-1])
+							if not val and not val is False:
+								try: del value[key[-1]]
+								except: pass
+							del key[-1]
+						else:
+							break
+				else: # Remove last key.
+					value = item
+					for i in key[:-1]:
+						try:
+							value = value[i]
+						except:
+							value = None
+							break
+					if value:
+						try: del value[key[-1]]
+						except: pass
+			return result
 
 	@classmethod
-	def translationOverview(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, number = None, numberSeason = None, numberEpisode = None, media = None, language = None, limit = None, level = None, cache = None, threaded = None):
-		return self.translation(id = id, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, query = query, year = year, number = number, numberSeason = numberSeason, numberEpisode = numberEpisode, media = media, translation = MetaProvider.TranslationOverview, language = language, limit = limit, level = level, cache = cache, threaded = threaded)
+	def _dataKeys(self, key = None):
+		if key and not Tools.isArray(key): key = [key]
+		return key
 
-	# Virtual
+	##############################################################################
+	# TEMP
+	##############################################################################
+
 	@classmethod
-	def _translation(self, id = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, query = None, year = None, numberSeason = None, numberEpisode = None, media = None, translation = None, level = None):
-		return None
+	def _temp(self, item, key = None, default = None):
+		return self._data(item = item, key = self._tempKeys(key = key), default = default)
+
+	@classmethod
+	def _tempSet(self, item = None, key = None, value = None, copy = False, clean = False):
+		if clean and not value is None: value = self._tempRemove(item = value, key = None if clean is True else clean, clean = True)
+		return self._dataSet(item = item, key = self._tempKeys(key = key), value = value, copy = copy)
+
+	@classmethod
+	def _tempRemove(self, item = None, key = None, clean = False):
+		return self._dataRemove(item = item, key = self._tempKeys(key = key), clean = clean)
+
+	# Delete entire "temp" dictionary.
+	@classmethod
+	def _tempClean(self, item = None):
+		return self._dataRemove(item = item, key = self._tempKey())
+
+	@classmethod
+	def _tempKeys(self, key = None):
+		keys = [self._tempKey(), self.id()]
+		if not key is None:
+			if Tools.isArray(key): keys.extend(key)
+			else: keys.append(key)
+		return keys
+
+	@classmethod
+	def _tempKey(self):
+		return MetaProvider.Temp
+
+	##############################################################################
+	# VOTING
+	##############################################################################
+
+	@classmethod
+	def _voting(self, media, niche, release = None, year = None, date = None, genre = None, language = None, country = None, certificate = None, company = None, status = None, rating = None, votes = None, sort = None, active = None):
+		exceptionAll = None
+		exceptionDate = None
+		exceptionVote = None
+		exceptionBest = None
+		exceptionPrestige = None
+
+		isBase = False
+		isLenient = False
+		isAnime = Media.isAnime(niche) or (genre and MetaTools.GenreAnime in genre)
+		isDonghua = Media.isDonghua(niche) or (genre and MetaTools.GenreDonghua in genre)
+
+		isNew = release == MetaProvider.ReleaseNew or Media.isNew(niche)
+		isHome = release == MetaProvider.ReleaseHome or Media.isHome(niche)
+		isFuture = release == MetaProvider.ReleaseFuture or Media.isFuture(niche)
+
+		try: dateStart = date[0]
+		except: dateStart = None if Tools.isArray(date) else date
+		try: dateEnd = date[1]
+		except: dateEnd = None if Tools.isArray(date) else date
+		try: dateDifference = abs(Time.timestamp() - (dateEnd or dateStart))
+		except: dateDifference = None
+
+		if date and not isFuture:
+			future = Time.timestamp(fixedTime = Time.future(days = 1, format = Time.FormatDate), format = Time.FormatDate)
+			isFuture = any(not i is None and i > future for i in (date if Tools.isArray(date) else [date]))
+
+		if not dateStart is None and dateStart == dateEnd: # For single day menus. Otherwise too few/no titles might be returned.
+			exceptionAll = MetaProvider.VotingMinimal
+			exceptionDate = MetaProvider.VotingMinimal
+		elif not dateDifference is None and dateDifference <= 1209600 and not isHome: # Titles released within the past 2 weeks. Probably has less votes.
+			if active: # IMDb
+				pass # Typically has a lot of votes, even for new releases.
+			else: # Trakt
+				exceptionAll = MetaProvider.VotingMinimal
+				exceptionDate = MetaProvider.VotingMinimal
+				exceptionVote = MetaProvider.VotingLenient
+				exceptionBest = MetaProvider.VotingLenient
+				exceptionPrestige = MetaProvider.VotingLenient
+		elif not dateDifference is None and dateDifference <= 2678400 and not isHome: # Titles released within the past month. Probably has less votes.
+			if active: # IMDb
+				pass # Typically has a lot of votes, even for new releases.
+			elif not active: # Trakt
+				exceptionAll = MetaProvider.VotingLenient
+				exceptionDate = MetaProvider.VotingLenient
+				exceptionVote = MetaProvider.VotingLenient
+				exceptionBest = MetaProvider.VotingLenient
+				exceptionPrestige = MetaProvider.VotingLenient
+		elif isNew or isHome: # New/home releases have way less votes on Trakt.
+			if active: # IMDb
+				exceptionVote = MetaProvider.VotingNormal
+				exceptionBest = MetaProvider.VotingNormal
+				exceptionPrestige = MetaProvider.VotingNormal
+			else: # Trakt
+				if isHome: # Trakt has very little titles in the DVD calendar.
+					exceptionAll = MetaProvider.VotingMinimal
+					exceptionDate = MetaProvider.VotingMinimal
+					exceptionVote = MetaProvider.VotingMinimal
+					exceptionBest = MetaProvider.VotingMinimal
+					exceptionPrestige = MetaProvider.VotingMinimal
+				else:
+					exceptionVote = MetaProvider.VotingMinimal
+					exceptionBest = MetaProvider.VotingLenient # Otherwise only 1 or 2 titles are sometimes return.
+					exceptionPrestige = MetaProvider.VotingLenient
+		elif any(bool(i) for i in [year, date, genre, language, country, certificate, status]): # Be more lenient for submenus, since otherwise often very few items are returned because they have few votes (eg: the normal genre menu Anime).
+			exceptionVote = MetaProvider.VotingNormal
+			if isAnime or isDonghua:
+				exceptionBest = MetaProvider.VotingNormal
+				exceptionPrestige = MetaProvider.VotingNormal
+			elif language:
+				if any(i for i in language if not i in ['en', 'de', 'fr']):
+					exceptionBest = MetaProvider.VotingNormal
+					exceptionPrestige = MetaProvider.VotingNormal
+				else:
+					exceptionBest = MetaProvider.VotingModerate
+					exceptionPrestige = MetaProvider.VotingModerate
+			elif country:
+				if any(i for i in country if not i in ['us', 'gb', 'uk', 'ca', 'au', 'de', 'fr', 'jp', 'in']):
+					exceptionBest = MetaProvider.VotingNormal
+					exceptionPrestige = MetaProvider.VotingNormal
+				else:
+					exceptionBest = MetaProvider.VotingModerate
+					exceptionPrestige = MetaProvider.VotingModerate
+			elif certificate and any(i in [Audience.CertificateNr, Audience.CertificateNc17, Audience.CertificateTvma] for i in certificate): # IMDb has very few eg NC-17 rated titles.
+				exceptionBest = MetaProvider.VotingNormal
+				exceptionPrestige = MetaProvider.VotingNormal
+			else:
+				exceptionBest = MetaProvider.VotingStrict # For "Best Rated", require more votes, otherwise too many old/foreign films are listed which are over-rated (eg: Comedy genre menu).
+				exceptionPrestige = MetaProvider.VotingModerate
+		else:
+			isBase = not niche or len(niche) <= 1
+
+		if company: # Do not apply on any studios/networks, since those lists are already small.
+			exceptionAll = MetaProvider.VotingNone
+			exceptionDate = MetaProvider.VotingNone
+
+		if Media.isPleasure(niche): isLenient = True # Too few titles and most have very few votes.
+		if genre and MetaTools.GenreNone in genre: isLenient = True # Titles under the "None" genre on Trakt have very few votes.
+		if isLenient:
+			exceptionAll = MetaProvider.VotingLenient
+			exceptionDate = MetaProvider.VotingLenient
+			exceptionVote = MetaProvider.VotingLenient
+			exceptionBest = MetaProvider.VotingLenient
+			exceptionPrestige = MetaProvider.VotingLenient
+
+		if Media.isExplore(niche):
+			if Media.isAll(niche):
+				if rating is None: rating = exceptionAll or MetaProvider.VotingLenient
+				if votes is None: votes = exceptionAll or MetaProvider.VotingLenient
+			elif Media.isNew(niche):
+				if rating is None: rating = exceptionDate or MetaProvider.VotingLenient
+				if votes is None: votes = exceptionDate or MetaProvider.VotingNormal
+			elif Media.isHome(niche):
+				if votes is None: votes = exceptionDate or MetaProvider.VotingNormal # Otherwise too many unknown titles are returned.
+			elif Media.isBest(niche):
+				# Do not add this if sorting is supported (eg IMDb), otherwise few results might be returned, especially for niches.
+				# Still add for providers that do not support sorting (eg Trakt).
+				if rating is None and not sort: rating = MetaProvider.VotingStrict
+
+				# Sometimes less than 250 items are retruned (eg: Action genre Best Rated) with VotingStrict.
+				# Make an exception for the main/normal Best menu that does not have any other niches or parameters.
+				if votes is None: votes = exceptionBest or (MetaProvider.VotingExtreme if isBase else MetaProvider.VotingModerate)
+			elif Media.isWorst(niche):
+				if votes is None: votes = MetaProvider.VotingNormal
+			elif Media.isPrestige(niche):
+				if rating is None: rating = MetaProvider.VotingStrict
+				if votes is None: votes = exceptionPrestige or MetaProvider.VotingModerate
+			elif Media.isPopular(niche):
+				if votes is None: votes = exceptionVote or MetaProvider.VotingModerate
+			elif Media.isUnpopular(niche):
+				pass
+			elif Media.isViewed(niche):
+				if votes is None: votes = exceptionVote or MetaProvider.VotingStrict
+			elif Media.isGross(niche):
+				pass
+			elif Media.isAward(niche):
+				pass
+			elif Media.isTrend(niche):
+				pass
+
+		# Do not use voting for future releases, since there are not many votes.
+		if isFuture:
+			rating = None
+			votes = None
+		elif not Media.isBest(niche) and not Media.isWorst(niche) and not Media.isPrestige(niche) and not Media.isPopular(niche) and not Media.isUnpopular(niche) and not Media.isViewed(niche):
+			if Media.isPoor(niche):
+				if votes and not votes == MetaProvider.VotingNone: votes = MetaProvider.VotingMinimal
+			elif Media.isBad(niche):
+				votes = None
+
+		if rating == MetaProvider.VotingNone: rating = None
+		if votes == MetaProvider.VotingNone: votes = None
+
+		return rating, votes
+
+	##############################################################################
+	# LOCATION
+	##############################################################################
+
+	def language(self, language = None, exclude = False, default = True):
+		if default is True: default = MetaProvider.Language
+		if language is None or language is True:
+			language = self.mLanguage
+			if not language and default: language = default
+		if exclude:
+			if exclude is True: exclude = MetaProvider.Language
+			if Tools.isArray(exclude) and language in exclude: return None
+			elif language == exclude: return None
+		return language
+
+	def country(self, country = None, exclude = False, default = True):
+		if default is True: default = MetaProvider.Country
+		if country is None or country is True:
+			country = self.mCountry
+			if not country and default: country = default
+		if exclude:
+			if exclude is True: exclude = MetaProvider.Country
+			if Tools.isArray(exclude) and country in exclude: return None
+			elif country == exclude: return None
+		return country

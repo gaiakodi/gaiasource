@@ -177,12 +177,12 @@ class Interface(base.Interface):
 				link = interface.Dialog.browse(title = title, type = interface.Dialog.BrowseFile, multiple = False, mask = ['torrent', 'nzb'])
 
 			if not link == None and not link == '':
-				interface.Dialog.notification(title = 35070, message = 35071, icon = interface.Dialog.IconSuccess)
+				interface.Dialog.notification(title = 35070, message = 33549, icon = interface.Dialog.IconSuccess)
 				interface.Loader.show()
 				result = self.add(link, category = category)
 				if result['success']:
 					interface.Dialog.closeAllProgress()
-					choice = interface.Dialog.option(title = 35073, message = 35074)
+					choice = interface.Dialog.option(title = 35073, message = 33550)
 					if choice: interface.Player.playNow(result['link'])
 
 		interface.Loader.hide()

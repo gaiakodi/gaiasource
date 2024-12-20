@@ -1157,8 +1157,8 @@ class HandleGaia(Handle):
 	@classmethod
 	def reset(self, settings = True):
 		if settings:
-			HandleGaia.Support = {}
-			HandleGaia.Services = {}
+			HandleGaia.Support = None
+			HandleGaia.Services = None
 
 	##############################################################################
 	# GENERAL
@@ -1321,8 +1321,8 @@ class HandleOrion(Handle):
 	@classmethod
 	def reset(self, settings = True):
 		if settings:
-			HandleOrion.Support = {}
-			HandleOrion.Services = {}
+			HandleOrion.Support = None
+			HandleOrion.Services = None
 
 	##############################################################################
 	# GENERAL
@@ -1393,7 +1393,7 @@ class HandleOrion(Handle):
 							validVideo = True
 							if Stream.titleValid(data = name, media = media, title = title):
 								validTitle = True
-								if tools.Media.typeMovie(media) or Stream.numberShowValid(data = name, season = season, episode = episode):
+								if tools.Media.isFilm(media) or Stream.numberShowValid(data = name, season = season, episode = episode):
 									validNumber = True
 									if not Stream.titleProhibited(data = name, title = title, exception = not season is None and season == 0):
 										validProhibited = True
@@ -1408,7 +1408,7 @@ class HandleOrion(Handle):
 								result = file['original']['link']
 								break
 
-						if result is None and tools.Media.typeTelevision(media):
+						if result is None and tools.Media.isSerie(media):
 							# Match video, ignore title, match number, and allow prohibited keywords.
 							for file in files:
 								if file['video'] and file['number']:
@@ -1487,7 +1487,10 @@ class HandleOrion(Handle):
 				# This function is called multiple times during scraping, so do not use cacheRefreshXXX().
 				data = cache.Cache.instance().cacheShort(Orionoid().debridSupport)
 
-				if data:
+				# data can be {} if no services were debrid authenticated on Orion.
+				# Set the values in this case.
+				# Otherwise if we only did "if data:", this function would get fully executed every time we check a stream's support from stream.py, drastically slowing down scraping.
+				if not data is None:
 					HandleOrion.Support = data
 					HandleOrion.Services = []
 
@@ -1645,7 +1648,7 @@ class HandleTorrenter(Handle):
 				if stream:
 					if stream.metaMediaShow(): media = 'episode'
 				elif 'type' in item and item['type']:
-					if tools.Media.typeTelevision(item['type']): media = 'episode'
+					if tools.Media.isSerie(item['type']): media = 'episode'
 				elif 'tvshowtitle' in item: media = 'episode'
 			data.append({'name' : 'type', 'data' : media})
 
@@ -1668,7 +1671,7 @@ class HandleTorrenter(Handle):
 			else:
 				try:
 					from lib.modules.account import Tmdb
-					key = Tmdb().key()
+					key = Tmdb.instance().key()
 					if key:
 						if media == 'episode' and tvdb: # Shows - IMDb ID for episodes does not work on TMDb.
 							result = cache.Cache.instance().cacheExtended(network.Networker().requestJson, link = 'http://api.themoviedb.org/3/find/%s?api_key=%s&external_source=tvdb_id' % (tvdb, key))

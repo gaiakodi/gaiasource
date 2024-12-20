@@ -60,7 +60,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has a lot of missing trivial metadata. The search page of {name} does not contain all the metadata. A subpage must therefore be retrieved for each result in order to extract the magnet link, which substantially increases scraping time.',
 			rank						= 2,
 			performance					= ProviderHtml.PerformanceBad,
-			status						= ProviderHtml.StatusDead, # Now redirects to porn site.
+			status						= ProviderHtml.StatusDead, # Now redirects to porn site. Update (2024-12): All domains seem to be gone.
 
 			link						= Provider._Link,
 			mirror						= Provider._Mirror,

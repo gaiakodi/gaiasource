@@ -27,6 +27,7 @@ from lib.modules.cache import Cache
 from lib.modules.external import Importer, Loader
 from lib.modules.concurrency import Pool
 from lib.modules.database import Database
+from lib.modules import trakt as Trakt
 from lib.providers.core.manager import Manager
 
 class Service(object):
@@ -126,11 +127,15 @@ class Service(object):
 			# Context Menu
 			Context.initialize(force = True, wait = False)
 
+			# Trakt Cache
+			# Retry previously failed Trakt POST requests.
+			Trakt.cacheRetry(force = True, wait = False)
+
 			# Database Cleanup
 			# This can take very long for large databases.
 			# Do here instead of during launch. Nothing important requires this to finish first.
-			Manager.streamsDatabaseClearOld(wait = True)
-			Database.cleanAutomatic(wait = True)
+			Manager.streamsDatabaseClearOld(notification = True, wait = True)
+			Database.cleanAutomatic(notification = True, wait = True)
 
 			# Wait for threads.
 			# Do not timeout, since there might be various threads that should run continuously (eg: Bluetooth and Library service).

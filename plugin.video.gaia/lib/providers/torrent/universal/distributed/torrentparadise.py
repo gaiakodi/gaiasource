@@ -32,9 +32,10 @@
 # A HTTP API exists, but there sre not useful links returned:
 #	https://app.swaggerhub.com/apis-docs/ipfs-search/ipfs-search/1.0.2
 
-# gaiaremove - Does a new domain exist yet?
-# gaiaremove - Can we somehow convert the JS on the website to Python?
-# gaiaremove - Or maybe even execute the JS in a Python-JS interpreter?
+#gaiafuture - Does a new domain exist yet?
+#gaiafuture - Can we somehow convert the JS on the website to Python?
+#gaiafuture - Or maybe even execute the JS in a Python-JS interpreter?
+#gaiafuture - Maybe rename this to "TorrentParadised" (ending with a D), and add this as a new one to the "open" category: https://torrentparadise.org / https://torrentparadise.net / https://torrent-paradise.com
 
 from lib.providers.core.json import ProviderJson
 

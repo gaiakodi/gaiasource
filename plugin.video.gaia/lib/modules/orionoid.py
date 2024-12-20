@@ -193,18 +193,6 @@ try:
 			self.mOrion.settingsFilters(app = True, wait = wait)
 			self.initialize(background = True, settings = Orionoid.SettingsFilters)
 
-		def settingsScrapingTimeout(self):
-			return self.mOrion.settingsScrapingTimeout()
-
-		def settingsScrapingMode(self):
-			return self.mOrion.settingsScrapingMode()
-
-		def settingsScrapingCount(self):
-			return self.mOrion.settingsScrapingCount()
-
-		def settingsScrapingQuality(self):
-			return self.mOrion.settingsScrapingQuality()
-
 		##############################################################################
 		# ADDON
 		##############################################################################
@@ -666,33 +654,33 @@ try:
 				# Check if True, since the function can also return "orion".
 				# "orion" duplicate links are marked as duplicate solely because there is another duplicate link that comes from Orion and should always have preference.
 				# However, the locally retrieved duplicate link might contain additional info (eg: full filename, updated seeds/leeches, etc), andshould therefore still be submitted to Orion.
-				if not stream.exclusionDuplicateHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionDuplicateHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionDuplicate() is True: return True
 
 				# Release exclusions
-				if not stream.exclusionReleaseHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionReleaseHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionRelease(): return True
 
 				# Keyword exclusions
-				if not stream.exclusionKeywordHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionKeywordHas(exception = False): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionKeyword(): return True
 
 				# Metadata exclusions
-				if not stream.exclusionMetadataHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionMetadataHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionMetadata(): return True
 
 				# Format exclusions
-				if not stream.exclusionFormatHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionFormatHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionFormat(): return True
 
 				# Fake exclusions
-				if not stream.exclusionFakeHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionFakeHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionFake(): return True
 
 				# Blocked domains
 				# Probably does not work. Many guarded links or text-paste services
 				# Check core.py -> hostersBlocked()
-				if not stream.exclusionBlockedHas(): return True # The stream was not completely processed (eg: scrape cancled).
+				if not stream.exclusionBlockedHas(): return True # The stream was not completely processed (eg: scrape canceled).
 				if stream.exclusionBlocked(): return True
 
 				# Local streams
@@ -748,25 +736,66 @@ try:
 				return True
 			return False
 
-		def _streamUpdate(self, meta, streams):
-			item = self._streamUpdateMeta(meta)
-			item['filter'] = {'default' : Stream.thresholdNameDefault(), 'threshold' : Stream.thresholdName()}
-			item['streams'] = []
+		def _streamUpdate(self, meta, streams, invalid = None):
+			try:
+				# Sleep, to allow the main Gaia thread to continue loading streams and doing other things, before the Orion code is exeucte.
+				# Forces Python to execute other code while this thread is sleeping.
+				# Do not wait too long, otherwise with autoplay/bingeplay, the stream-vote call might end up being executed before this call.
+				Time.sleep(3)
 
-			new = self.structureNew()
+				item = self._streamUpdateMeta(meta)
+				item['filter'] = {'default' : Stream.thresholdNameDefault(), 'threshold' : Stream.thresholdName()}
+				item['streams'] = []
+				item['invalid'] = []
 
-			for stream in streams:
-				try:
-					stream = stream['stream']
-					if not self._streamIgnore(stream):
-						if new: data = self._streamUpdateNew(stream)
-						else: data = self._streamUpdateOld(stream)
-						if data: item['streams'].append(data)
-				except:
-					Logger.error()
+				lookup = {}
+				new = self.structureNew()
+				extract = Stream.invalidExtract()
 
-			if item['streams']: return OrionItem(data = item).update()
-			return False
+				for stream in streams:
+					try:
+						stream = stream['stream']
+						if not self._streamIgnore(stream):
+							if new: data = self._streamUpdateNew(stream)
+							else: data = self._streamUpdateOld(stream)
+							if data:
+								item['streams'].append(data)
+
+								value = stream.idOrionStream()
+								if value: lookup[value] = True
+								value = stream.hashes()
+								if value: lookup.update({v : True for v in value if v})
+								value = stream.link()
+								if value: lookup.update({v : True for v in value if v})
+					except:
+						if System.developer(): Logger.error()
+
+				attributes1 = ['id', 'hash', 'link']
+				attributes2 = ['name', 'provider']
+				for i in [invalid, Stream.invalid()]:
+					if i:
+						for j in i:
+							values = []
+							for k in attributes1:
+								value = j.get(k)
+								if value: values.extend(value) if Tools.isArray(value) else values.append(value)
+							if not any(k in lookup for k in values):
+								# If the local Orion scraper does not re-extract metadata, do not include Orion streams as invalid.
+								# Since some unextracted metadata might be needed for Stream.exclusionXYZ().
+								if extract or not j.get('id'):
+									for k in attributes1: # Avoid duplicates within the invalids.
+										value = j.get(k)
+										if value: lookup.update({v : True for v in value if v})
+									value = Tools.copy(j)
+									for k in attributes2:
+										try: del value[k]
+										except: pass
+									item['invalid'].append(value)
+
+				if item['streams'] or item['invalid']: return OrionItem(data = item).update()
+				return False
+			except:
+				if System.developer(): Logger.error()
 
 		def _streamUpdateOld(self, stream):
 			try:
@@ -889,8 +918,29 @@ try:
 				return None
 
 		def _streamUpdateMeta(self, meta):
+			#gaiaremove - how do we handle absolute numbers? Probably just submit as an additional episode under S01, instead of converting the episode numbers to multi-season.
+
+			def _clean(data):
+				# Already shallow-copied. Remove unnecessary data.
+				# Do not delete in nested dicts, since they are not deep-copied.
+				if data:
+					try: del data['pack']
+					except: pass
+					try: del data['cast']
+					except: pass
+					image = data.get('image')
+					if image:
+						images = {}
+						for k, v in image.items():
+							if v and Tools.isList(v): images[k] = v[0] # Check if list, to exclude aggregated images.
+						data['image'] = images
+				return data
+
 			item = {}
 			item['type'] = type = Orionoid.TypeShow if 'tvshowtitle' in meta else Orionoid.TypeMovie
+
+			from lib.meta.tools import MetaTools
+			language = MetaTools.instance().settingsLanguage()
 
 			if item['type'] == Orionoid.TypeMovie:
 				item['movie'] = {}
@@ -898,13 +948,22 @@ try:
 				item['movie']['id'] = {}
 				try: item['movie']['id']['imdb'] = meta['imdb'].replace('tt', '')
 				except: pass
+				try: item['movie']['id']['trakt'] = meta['trakt']
+				except: pass
 				try: item['movie']['id']['tmdb'] = meta['tmdb']
+				except: pass
+				try: item['movie']['id']['tvdb'] = meta['tvdb']
 				except: pass
 
 				item['movie']['meta'] = {}
 				try: item['movie']['meta']['title'] = meta['title']
 				except: pass
 				try: item['movie']['meta']['year'] = int(meta['year'])
+				except: pass
+
+				try: item['movie']['data'] = _clean(meta)
+				except: pass
+				try: item['movie']['language'] = language
 				except: pass
 			elif item['type'] == Orionoid.TypeShow:
 				item['show'] = {}
@@ -913,7 +972,11 @@ try:
 				item['show']['id'] = {}
 				try: item['show']['id']['imdb'] = meta['imdb'].replace('tt', '')
 				except: pass
-				try: item['show']['id']['tmdb'] = meta['tvdb']
+				try: item['show']['id']['trakt'] = meta['trakt']
+				except: pass
+				try: item['show']['id']['tvdb'] = meta['tvdb']
+				except: pass
+				try: item['show']['id']['tmdb'] = meta['tmdb']
 				except: pass
 
 				item['show']['meta'] = {}
@@ -923,7 +986,7 @@ try:
 					except: pass
 				try: item['show']['meta']['year'] = int(meta['tvshowyear'])
 				except:
-					try: item['show']['meta']['title'] = meta['year']
+					try: item['show']['meta']['year'] = meta['year']
 					except: pass
 
 				item['episode']['meta'] = {}
@@ -933,7 +996,7 @@ try:
 					except: pass
 				try: item['episode']['meta']['year'] = int(meta['year'])
 				except:
-					try: item['episode']['meta']['title'] = meta['tvshowyear']
+					try: item['episode']['meta']['year'] = meta['tvshowyear']
 					except: pass
 
 				item['episode']['number'] = {}
@@ -948,21 +1011,33 @@ try:
 					try: item['episode']['number']['episode'] = Converter.roman(episode)
 					except: pass
 
+				from lib.meta.manager import MetaManager
+				try: item['show']['data'] = _clean(MetaManager.instance().metadataShow(imdb = meta.get('imdb'), tmdb = meta.get('tmdb'), tvdb = meta.get('tvdb'), trakt = meta.get('trakt'), pack = False))
+				except: pass
+				try: item['show']['language'] = language
+				except: pass
+				try: item['episode']['data'] = _clean(meta)
+				except: pass
+				try: item['episode']['language'] = language
+				except: pass
+
 			return item
 
-		def streamUpdate(self, meta, streams, wait = False):
-			if meta and streams:
-				thread = Pool.thread(target = self._streamUpdate, args = (meta, streams))
+		def streamUpdate(self, meta, streams, invalid = None, wait = False):
+			if meta and (streams or invalid):
+				# Copy the streams, since the array might be edited outside in core.py.
+				# Update: Doing a deep copy of streams takes 20-40 secs. Is this really needed? Should a shallow copy suffice?
+				thread = Pool.thread(target = self._streamUpdate, args = (Tools.copy(meta, deep = False), Tools.copy(streams, deep = False), Tools.copy(invalid, deep = False)))
 				thread.start()
 				if wait: thread.join()
 
 		def streamRetrieve(self, type, idImdb = None, idTmdb = None, idTvdb = None, idTvrage = None, idTrakt = None, numberSeason = None, numberEpisode = None, title = None, year = None, query = None, verify = False):
 			limit = 1 if verify else Orion.FilterSettings
 			result = None
-			if not query == None:
+			if not query is None:
 				result = self.mOrion.streams(type = type, query = query, limitCount = limit, limitRetry = limit, details = True)
 			elif type == Orionoid.TypeMovie:
-				if not idImdb is None:
+				if not idImdb is None or not idTmdb is None or not idTvdb is None or not idTrakt is None:
 					result = self.mOrion.streams(type = type, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTvrage = idTvrage, idTrakt = idTrakt, limitCount = limit, limitRetry = limit, details = True)
 				elif not title is None:
 					query = title
@@ -970,7 +1045,7 @@ try:
 					result = self.mOrion.streams(type = type, query = query, limitCount = limit, limitRetry = limit, details = True)
 			elif type == Orionoid.TypeShow:
 				if not numberSeason is None and not numberEpisode is None:
-					if not idImdb is None:
+					if not idImdb is None or not idTmdb is None or not idTvdb is None or not idTrakt is None:
 						result = self.mOrion.streams(type = type, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTvrage = idTvrage, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, limitCount = limit, limitRetry = limit, details = True)
 					elif not title == None:
 						query = title + ' ' + Converter.unicode(numberSeason) + ' ' + Converter.unicode(numberEpisode)
@@ -980,11 +1055,29 @@ try:
 		def streamsCount(self, streams):
 			return self.mOrion.streamsCount(streams = streams, quality = self.mOrion.FilterSettings)
 
-		def streamVote(self, idItem, idStream, vote = VoteUp, notification = False):
-			if idItem and idStream: self.mOrion.streamVote(idItem = idItem, idStream = idStream, vote = vote, notification = notification)
+		def streamVote(self, idItem, idStream, vote = VoteUp, automatic = False, notification = False):
+			if idItem and idStream:
+				try:
+					self.mOrion.streamVote(idItem = idItem, idStream = idStream, vote = vote, automatic = automatic, notification = notification)
+				except Exception as error:
+					if 'automatic' in str(error):
+						try:
+							self.mOrion.streamVote(idItem = idItem, idStream = idStream, vote = vote, notification = notification) # Older Orion versions.
+						except:
+							if System.developer(): Logger.error()
+					elif System.developer(): Logger.error()
 
-		def streamRemove(self, idItem, idStream, notification = False):
-			if idItem and idStream: self.mOrion.streamRemove(idItem = idItem, idStream = idStream, notification = notification)
+		def streamRemove(self, idItem, idStream, automatic = False, notification = False):
+			if idItem and idStream:
+				try:
+					self.mOrion.streamRemove(idItem = idItem, idStream = idStream, automatic = automatic, notification = notification)
+				except Exception as error:
+					if 'automatic' in str(error):
+						try:
+							self.mOrion.streamRemove(idItem = idItem, idStream = idStream, notification = notification) # Older Orion versions.
+						except:
+							if System.developer(): Logger.error()
+					elif System.developer(): Logger.error()
 
 		##############################################################################
 		# HASHES
@@ -1098,7 +1191,7 @@ try:
 
 		def debridSupport(self, type = None, status = None):
 			# Exclude RealDebrid status checking, since RealDebrid often says hosters are down (eg: NitroFlare, RuTube, etc), although they correctly resolve.
-			# UPDATE: Seesm to be the same case with AllDebrid and dropapk.to/drop.download.
+			# UPDATE: Seems to be the same case with AllDebrid and dropapk.to/drop.download.
 			# Just retrieve all services and ignore the status.
 			# If a service is truely down, resolving will fail and the user will just have to select another debrid or link and try again.
 			#if status is None: status = '-realdebrid'

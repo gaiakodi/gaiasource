@@ -55,7 +55,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a well-known {container} site. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link and other metadata, which substantially increases scraping time.',
 			rank						= 3,
 			performance					= ProviderHtml.PerformanceBad,
-			status						= ProviderHtml.StatusDead, # Domain does not load for a week now.
+			status						= ProviderHtml.StatusDead, # Domain does not load for a week now. Update (2024-12): Still down.
 
 			link						= Provider._Link,
 			mirror						= Provider._Mirror,

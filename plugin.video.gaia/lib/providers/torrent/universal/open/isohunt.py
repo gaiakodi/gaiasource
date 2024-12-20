@@ -22,7 +22,7 @@ from lib.providers.core.html import ProviderHtml, Html, HtmlBody, HtmlResultsTab
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://isohunt.nz', 'https://isohunt.app', 'https://isohunt.ch', 'https://isohunt.fun', 'https://isohunt.info', 'https://isohunt.org', 'https://isohunt2.net']
+	_Link					= ['https://isohunt.app', 'https://isohunt.ch', 'https://isohunt.nz']
 	_Mirror					= ['https://techraver.com/isohunt-proxy-mirror-sites', 'https://isohunt.page']
 	_Path					= 'torrents'
 

@@ -20,6 +20,9 @@ from externals.urllib3.util.ssl_ import create_urllib3_context, DEFAULT_CIPHERS
 
 from .user_agents import USER_AGENTS
 
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand') # GAIACODE
+
 __version__ = "2.1.1"
 
 DEFAULT_USER_AGENT = random.choice(USER_AGENTS)
@@ -318,10 +321,7 @@ class CloudflareScraper(Session):
         stderr = ''
 
         try:
-            node = subprocess.Popen(
-                ' '.join(["node", "-e", js]), stdout=subprocess.PIPE, stderr=subprocess.PIPE, #GAIACODE
-                universal_newlines=True, shell = True #GAIACODE
-                )
+            node = subprocess.Popen(gaiaCommand(' '.join(["node", "-e", js])), stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell = True) # GAIACODE
             result, stderr = node.communicate()
             if node.returncode != 0:
                 stderr = "Node.js Exception:\n%s" % (stderr or None)

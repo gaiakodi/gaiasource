@@ -449,7 +449,7 @@ class Chatgpt(Oracle):
 			# Update: Many IMDb IDs are also wrong if the search is very narrow, like searching for Korean/Japanese shows.
 			# Disable all ID searches for now and only search by title.
 			querySupport	= {
-				Media.TypeMixed				: {
+				Media.Mixed					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -461,7 +461,7 @@ class Chatgpt(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeMovie				: {
+				Media.Movie					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -473,7 +473,7 @@ class Chatgpt(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeSet				: {
+				Media.Set					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -485,31 +485,7 @@ class Chatgpt(Oracle):
 					Oracle.QueryJsonTitle	: True,
 					Oracle.QueryJsonId		: False,
 				},
-				Media.TypeDocumentary		: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: True,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: True,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShort				: {
-					Oracle.ModePlain		: True,
-					Oracle.ModeList			: True,
-					Oracle.ModeSingle		: True,
-
-					Oracle.QueryContext		: True,
-					Oracle.QueryRaw			: True,
-					Oracle.QueryTextTitle	: True,
-					Oracle.QueryTextId		: False,
-					Oracle.QueryJsonTitle	: True,
-					Oracle.QueryJsonId		: False,
-				},
-				Media.TypeShow				: {
+				Media.Show					: {
 					Oracle.ModePlain		: True,
 					Oracle.ModeList			: True,
 					Oracle.ModeSingle		: True,
@@ -776,7 +752,7 @@ class Chatgpt(Oracle):
 	##############################################################################
 
 	def account(self):
-		return Account()
+		return Account.instance()
 
 	def accountKey(self):
 		return self.account().dataKey()
@@ -963,7 +939,7 @@ class Chatgpt(Oracle):
 
 		result = None
 		if self.accountAuthenticated(): result = self._requestChatgpt(message = message, context = context, conversation = conversation, refine = refine, model = model, limit = limit, randomness = randomness, creativity = creativity)
-		
+
 		try: last = result['chat']['history'][-1]['data']
 		except: last = None
 		if not result or (result['error'] and (not last or (Tools.isDictionary(last) and 'error' in last))):

@@ -4,17 +4,21 @@ import subprocess, os, codecs, glob
 from .evaljs import translate_js, DEFAULT_HEADER
 from .translators.friendly_nodes import is_valid_py_name
 from externals.six import six
-#import tempfile # GAIA
+#import tempfile # GAIACODE
 import hashlib
 import random
 
-DID_INIT = False
-#DIRNAME = tempfile.mkdtemp() # GAIA
-#PY_NODE_MODULES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'py_node_modules') # GAIA
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand') # GAIACODE
 
-# GAIA
-import xbmcvfs
-DIRNAME = xbmcvfs.translatePath('special://temp/gaia/externals/js2py/')
+DID_INIT = False
+#DIRNAME = tempfile.mkdtemp() # GAIACODE
+#PY_NODE_MODULES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'py_node_modules') # GAIGAIACODEA
+
+# GAIACODE
+import xbmcvfs, xbmcaddon
+#DIRNAME = xbmcvfs.translatePath('special://temp/gaia/externals/js2py/')
+DIRNAME = os.path.join(xbmcvfs.translatePath(xbmcaddon.Addon().getAddonInfo('profile')), 'Internals', 'js2py') # Path must adhere to lib.modules.external.py -> update().
 xbmcvfs.mkdirs(DIRNAME)
 PY_NODE_MODULES_PATH = os.path.join(xbmcvfs.translatePath('special://home'), 'addons', 'script.gaia.externals', 'lib', 'externals', 'js2py', 'py_node_modules')
 
@@ -23,11 +27,10 @@ def _init():
     if DID_INIT:
         return
     assert subprocess.call(
-        'node -v', shell=True, cwd=DIRNAME
+        gaiaCommand('node -v'), shell=True, cwd=DIRNAME # GAIACODE
     ) == 0, 'You must have node installed! run: brew install node'
     assert subprocess.call(
-        'cd %s;npm install babel-core babel-cli babel-preset-es2015 babel-polyfill babelify browserify browserify-shim'
-        % repr(DIRNAME),
+        gaiaCommand('cd %s;npm install babel-core babel-cli babel-preset-es2015 babel-polyfill babelify browserify browserify-shim' % repr(DIRNAME)), # GAIACODE
         shell=True,
         cwd=DIRNAME) == 0, 'Could not link required node_modules'
     DID_INIT = True
@@ -99,15 +102,14 @@ def _get_and_translate_npm_module(module_name, include_polyfill=False, update=Fa
             pkg_name += '@' + maybe_version_str
         # make sure the module is installed
         assert subprocess.call(
-            'cd %s;npm install %s' % (repr(DIRNAME), pkg_name),
+            gaiaCommand('cd %s;npm install %s' % (repr(DIRNAME), pkg_name)), # GAIACODE
             shell=True,
             cwd=DIRNAME
         ) == 0, 'Could not install the required module: ' + pkg_name
 
         # convert the module
         assert subprocess.call(
-            '''node -e "(require('browserify')('./%s').bundle(function (err,data) {if (err) {console.log(err);throw new Error(err);};fs.writeFile('%s', require('babel-core').transform(data, {'presets': require('babel-preset-es2015')}).code, ()=>{});}))"'''
-            % (in_file_name, out_file_name),
+            gaiaCommand('''node -e "(require('browserify')('./%s').bundle(function (err,data) {if (err) {console.log(err);throw new Error(err);};fs.writeFile('%s', require('babel-core').transform(data, {'presets': require('babel-preset-es2015')}).code, ()=>{});}))"''' % (in_file_name, out_file_name)), # GAIACODE
             shell=True,
             cwd=DIRNAME,
         ) == 0, 'Error when converting module to the js bundle'

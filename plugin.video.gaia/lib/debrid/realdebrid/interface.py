@@ -359,7 +359,6 @@ class Interface(base.Interface):
 			background = interface.Core.background()
 
 			while True:
-
 				# Do not launch the dialog if the torrent is cached, since RealDebird downloads do not distiguish between cahced and non-cahced downloads.
 				# Do not use the the item's cached status, since it might be outdated (eg: items from the stream history list).
 				if not cached:

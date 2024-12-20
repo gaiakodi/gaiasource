@@ -23,7 +23,7 @@ from lib.modules.network import Networker
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://www5.yggtorrent.fi', 'https://www5.yggtorrent.la', 'https://www5.yggtorrent.re', 'https://www5.yggtorrent.nz', 'https://www5.yggtorrent.si', 'https://www5.yggtorrent.se', 'https://www5.yggtorrent.to', 'https://www5.yggtorrent.gg', 'https://www5.yggtorrent.is']
+	_Link					= ['https://www5.yggtorrent.re', 'https://www5.yggtorrent.fi', 'https://www5.yggtorrent.la', 'https://www5.yggtorrent.nz', 'https://www5.yggtorrent.si', 'https://www5.yggtorrent.se', 'https://www5.yggtorrent.to', 'https://www5.yggtorrent.gg', 'https://www5.yggtorrent.is']
 	_Mirror					= ['https://www5.yggtorrent.fi/engine/domains']
 
 	_PathSearch				= 'engine/search?do=search&name=%s&category=2145&sub_category=%s&page=%s' # 2145 = Video

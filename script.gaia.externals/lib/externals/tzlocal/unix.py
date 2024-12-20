@@ -55,7 +55,9 @@ def _get_localzone(_root='/'):
     # Are we under Termux on Android?
     if os.path.exists('/system/bin/getprop'):
         import subprocess
-        androidtz = subprocess.check_output(['getprop', 'persist.sys.timezone']).strip().decode()
+        from importlib import import_module # GAIACODE
+        gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand') # GAIACODE
+        androidtz = subprocess.check_output(gaiaCommand(['getprop', 'persist.sys.timezone'])).strip().decode() # GAIACODE
         return pytz.timezone(androidtz)
 
     # Now look for distribution specific configuration files

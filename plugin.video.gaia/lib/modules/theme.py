@@ -27,9 +27,9 @@ class Theme(object):
 	IdPoster		= 'ThemePoster'
 	IdBanner		= 'ThemeBanner'
 	IdFanart		= 'ThemeFanart'
-	IdNextPoster	= 'ThemeNextPoster'
-	IdNextThumbnail	= 'ThemeNextThumbnail'
-	IdNextBanner	= 'ThemeNextBanner'
+	IdMorePoster	= 'ThemeMorePoster'
+	IdMoreThumbnail	= 'ThemeMoreThumbnail'
+	IdMoreBanner	= 'ThemeMoreBanner'
 
 	@classmethod
 	def skin(self):
@@ -72,9 +72,9 @@ class Theme(object):
 		self.thumbnailClear()
 		self.bannerClear()
 		self.fanartClear()
-		self.nextPosterClear()
-		self.nextThumbnailClear()
-		self.nextBannerClear()
+		self.morePosterClear()
+		self.moreThumbnailClear()
+		self.moreBannerClear()
 
 		# Make sure the global properties are reloaded.
 		# Otherwise the theme does not change if the settings are changed.
@@ -82,9 +82,9 @@ class Theme(object):
 		self.thumbnail()
 		self.banner()
 		self.fanart()
-		self.nextPoster()
-		self.nextThumbnail()
-		self.nextBanner()
+		self.morePoster()
+		self.moreThumbnail()
+		self.moreBanner()
 
 	@classmethod
 	def icon(self):
@@ -232,11 +232,11 @@ class Theme(object):
 		Memory.clear(id = Theme.IdFanart, local = True, kodi = True)
 
 	@classmethod
-	def nextBanner(self):
+	def moreBanner(self):
 		# This function is called often during menu navigation.
 		# Save it in memory cache to speed up retrieving the value.
 
-		result = Memory.get(id = Theme.IdNextBanner, uncached = True, local = True, kodi = True)
+		result = Memory.get(id = Theme.IdMoreBanner, uncached = True, local = True, kodi = True)
 		if Memory.cached(result): return result
 
 		result = False
@@ -255,25 +255,25 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'next', 'banner', name)
+						path = File.joinPath(path, 'more', 'banner', name)
 						for i in ['.png', '.jpg']:
 							if File.exists(path + i):
 								result = path + i
 								break
 
 		if result is False: result = System.info('icon')
-		return Memory.set(id = Theme.IdNextBanner, value = result, local = True, kodi = True)
+		return Memory.set(id = Theme.IdMoreBanner, value = result, local = True, kodi = True)
 
 	@classmethod
-	def nextBannerClear(self):
-		Memory.clear(id = Theme.IdNextBanner, local = True, kodi = True)
+	def moreBannerClear(self):
+		Memory.clear(id = Theme.IdMoreBanner, local = True, kodi = True)
 
 	@classmethod
-	def nextPoster(self):
+	def morePoster(self):
 		# This function is called often during menu navigation.
 		# Save it in memory cache to speed up retrieving the value.
 
-		result = Memory.get(id = Theme.IdNextPoster, uncached = True, local = True, kodi = True)
+		result = Memory.get(id = Theme.IdMorePoster, uncached = True, local = True, kodi = True)
 		if Memory.cached(result): return result
 
 		result = False
@@ -292,25 +292,25 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'next', 'poster', name)
+						path = File.joinPath(path, 'more', 'poster', name)
 						for i in ['.png', '.jpg']:
 							if File.exists(path + i):
 								result = path + i
 								break
 
 		if result is False: result = System.info('icon')
-		return Memory.set(id = Theme.IdNextPoster, value = result, local = True, kodi = True)
+		return Memory.set(id = Theme.IdMorePoster, value = result, local = True, kodi = True)
 
 	@classmethod
-	def nextPosterClear(self):
-		Memory.clear(id = Theme.IdNextPoster, local = True, kodi = True)
+	def morePosterClear(self):
+		Memory.clear(id = Theme.IdMorePoster, local = True, kodi = True)
 
 	@classmethod
-	def nextThumbnail(self):
+	def moreThumbnail(self):
 		# This function is called often during menu navigation.
 		# Save it in memory cache to speed up retrieving the value.
 
-		result = Memory.get(id = Theme.IdNextThumbnail, uncached = True, local = True, kodi = True)
+		result = Memory.get(id = Theme.IdMoreThumbnail, uncached = True, local = True, kodi = True)
 		if Memory.cached(result): return result
 
 		result = False
@@ -329,15 +329,15 @@ class Theme(object):
 					if name is None:
 						result = None
 					else:
-						path = File.joinPath(path, 'next', 'thumbnail', name)
+						path = File.joinPath(path, 'more', 'thumbnail', name)
 						for i in ['.png', '.jpg']:
 							if File.exists(path + i):
 								result = path + i
 								break
 
 		if result is False: result = System.info('icon')
-		return Memory.set(id = Theme.IdNextThumbnail, value = result, local = True, kodi = True)
+		return Memory.set(id = Theme.IdMoreThumbnail, value = result, local = True, kodi = True)
 
 	@classmethod
-	def nextThumbnailClear(self):
-		Memory.clear(id = Theme.IdNextThumbnail, local = True, kodi = True)
+	def moreThumbnailClear(self):
+		Memory.clear(id = Theme.IdMoreThumbnail, local = True, kodi = True)

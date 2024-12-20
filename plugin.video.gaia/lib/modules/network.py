@@ -224,6 +224,23 @@ class Networker(object):
 		return Importer.moduleUrllib3()
 
 	###################################################################
+	# SIZE
+	###################################################################
+
+	# Note compressed GZIP sizes are only estimates.
+	@classmethod
+	def size(self, data, headers = None, compressed = False):
+		try: size = len(data)
+		except: size = None
+
+		if compressed and size:
+			try:
+				if 'gz' in headers['Content-Encoding']: size = int(size * 0.25) # GZIP size is trypically arround 25% of the actual size.
+			except: pass
+
+		return size
+
+	###################################################################
 	# LINK
 	###################################################################
 
@@ -241,7 +258,8 @@ class Networker(object):
 	# If plus parameter is True, + are also replaced with spaces instead of only %20.
 	@classmethod
 	def linkUnquote(self, data, plus = False):
-		return unquote_plus(data) if plus else unquote(data)
+		if data: return unquote_plus(data) if plus else unquote(data)
+		else: return data
 
 	# Encodes a dictionary into a GET parameter string.
 	@classmethod
@@ -332,29 +350,34 @@ class Networker(object):
 				if tools.Tools.isArray(parameters):
 					parameters = self.moduleOrderedDict()(parameters)
 
-				if encode:
-					parameters = self.linkEncode(data = parameters, duplicates = duplicates)
-				else:
-					# urllib.urlencode only has the "quote_via" parameter since Python 3.5.
-					# So we have to create it manually to accomodate older Kodi versions.
-					url = []
-					for key, value in parameters.items():
-						keyNew = str(key) + '[]'
-						found = False
-						if not duplicates:
-							for i in url:
-								if i[0] == key or i[0] == keyNew:
-									found = True
-									break
-						if not found:
-							if tools.Tools.isArray(value):
-								for i in value: url.append((keyNew, i))
-							else:
-								url.append((key,value))
-					parameters = '&'.join([str(i[0]) + '=' + str(i[1]) for i in url])
+				if not duplicates and link and '?' in link:
+					current = self.linkParameters(link = link)
+					if current: parameters = {k : v for k, v in parameters.items() if not k in current}
+
+				if parameters:
+					if encode:
+						parameters = self.linkEncode(data = parameters, duplicates = duplicates)
+					else:
+						# urllib.urlencode only has the "quote_via" parameter since Python 3.5.
+						# So we have to create it manually to accomodate older Kodi versions.
+						url = []
+						for key, value in parameters.items():
+							keyNew = str(key) + '[]'
+							found = False
+							if not duplicates:
+								for i in url:
+									if i[0] == key or i[0] == keyNew:
+										found = True
+										break
+							if not found:
+								if tools.Tools.isArray(value):
+									for i in value: url.append((keyNew, i))
+								else:
+									url.append((key,value))
+						parameters = '&'.join([str(i[0]) + '=' + str(i[1]) for i in url])
 			if link is None:
 				link = parameters
-			else:
+			elif parameters:
 				if not self.linkPath(link = link) and not link.endswith('/'): link += '/'
 				link += ('&' if '?' in link else '?') + parameters
 		return link
@@ -382,15 +405,15 @@ class Networker(object):
 
 	@classmethod
 	def linkIs(self, link, magnet = False):
-		return tools.Tools.isString(link) and (tools.Regex.match(data = link, expression = '^\s*(http|ftp)s?:\/{2}') or (magnet and self.linkIsMagnet(link)))
+		return tools.Tools.isString(link) and (tools.Regex.match(data = link, expression = '^\s*(http|ftp)s?:\/{2}', cache = True) or (magnet and self.linkIsMagnet(link)))
 
 	@classmethod
 	def linkIsMagnet(self, link):
-		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*magnet:')
+		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*magnet:', cache = True)
 
 	@classmethod
 	def linkIsIp(self, link):
-		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*((http|ftp)s?:\/{2})?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*((http|ftp)s?:\/{2})?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', cache = True)
 
 	# Checks if a link is a local domain or IP address.
 	@classmethod
@@ -427,17 +450,21 @@ class Networker(object):
 			tools.Logger.error()
 			return None
 
-		result = parts[1]
+		result = parts.domain
 		if not ip and self.linkIsIp(result): return None
 
 		try:
-			if topdomain is True and parts[2]: result = result + '.' + parts[2]
-			elif topdomain: result = result + '.' + topdomain
+			if topdomain is True:
+				if parts.suffix: result = result + '.' + parts.suffix
+			elif topdomain:
+				result = result + '.' + topdomain
 		except: pass
 
 		try:
-			if subdomain is True and parts[0]: result = parts[0] + '.' + result
-			elif subdomain: result = subdomain + '.' + result
+			if subdomain is True:
+				if parts.subdomain: result = parts.subdomain + '.' + result
+			elif subdomain:
+				result = subdomain + '.' + result
 		except: pass
 
 		if port:
@@ -455,15 +482,25 @@ class Networker(object):
 		path = self.linkPath(link = link)
 		return self.linkJoin(domain, path)
 
+	# Extracts the base from the link (protocol, subdomain, domain, and path. excluding parameters and parts).
+	@classmethod
+	def linkBase(self, link):
+		return link.split('?')[0]
+
 	# Extracts the path from the link (excluding the protocol, domain, and parameters).
 	@classmethod
-	def linkPath(self, link, parameters = False, strip = True):
-		parse = urlparse(link)
-		path = parse.path
+	def linkPath(self, link, parameters = False, strip = True, full = False):
+		parse = None
+		if not full or parameters: parse = urlparse(link)
+
+		if full: path = link.split('?')[0].split('&')[0].split('#')[0]
+		else: path = parse.path
+
 		if parameters:
 			query = tools.Converter.unicode(parse.query)
 			if query: path += '?' + query
 		if strip: path = path.lstrip('/')
+
 		return path
 
 	# Extracts the path from the link (excluding the protocol, domain, and parameters), split by / into a list.
@@ -660,6 +697,7 @@ class Networker(object):
 			return 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36'
 		elif agent == Networker.AgentMobileRandom:
 			agents = [
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.3',
 				'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36',
 				'Mozilla/5.0 (Linux; Android 12; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36',
 				'Mozilla/5.0 (Android 12; Mobile; LG-M255; rv:102.0) Gecko/102.0 Firefox/102.0',
@@ -669,7 +707,7 @@ class Networker(object):
 			]
 			return tools.Tools.listPick(agents)
 		elif agent == Networker.AgentDesktopFixed:
-			return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+			return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 		elif agent == Networker.AgentDesktopRandom:
 			browser = [['%s.0' % i for i in range(18, 43)], ['37.0.2062.103', '37.0.2062.120', '37.0.2062.124', '38.0.2125.101', '38.0.2125.104', '38.0.2125.111', '39.0.2171.71', '39.0.2171.95', '39.0.2171.99', '40.0.2214.93', '40.0.2214.111', '40.0.2214.115', '42.0.2311.90', '42.0.2311.135', '42.0.2311.152', '43.0.2357.81', '43.0.2357.124', '44.0.2403.155', '44.0.2403.157', '45.0.2454.101', '45.0.2454.85', '46.0.2490.71', '46.0.2490.80', '46.0.2490.86', '47.0.2526.73', '47.0.2526.80'], ['11.0']]
 			windows = ['Windows NT 10.0', 'Windows NT 7.0', 'Windows NT 6.3', 'Windows NT 6.2', 'Windows NT 6.1', 'Windows NT 6.0', 'Windows NT 5.1', 'Windows NT 5.0']
@@ -677,6 +715,8 @@ class Networker(object):
 			agents = ['Mozilla/5.0 ({windows}{feature}; rv:{browser}) Gecko/20100101 Firefox/{browser}', 'Mozilla/5.0 ({windows}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{browser} Safari/537.36', 'Mozilla/5.0 ({windows}{feature}; Trident/7.0; rv:{browser}) like Gecko']
 			index = tools.Math.random(0, len(agents) - 1)
 			return agents[index].format(windows = tools.Tools.listPick(windows), feature = tools.Tools.listPick(features), browser = tools.Tools.listPick(browser[index]))
+		elif tools.Tools.isString(agent) and ('/' in agent or ' ' in agent): # Eg: subtitle.py.
+			return agent
 		else:
 			if link:
 				link = self.linkDomain(link = link, subdomain = False, topdomain = True, ip = True, scheme = False)
@@ -812,10 +852,12 @@ class Networker(object):
 
 	@classmethod
 	def dataText(self, data):
+		if data is None: return None # Otherwise it gets encoded into the string "None".
 		return tools.Converter.unicode(data)
 
 	@classmethod
 	def dataJson(self, data):
+		if data is None: return None
 		return tools.Converter.jsonFrom(data)
 
 	###################################################################
@@ -953,20 +995,20 @@ class Networker(object):
 				'cookies' : <None/Dictionary - The response cookies (case sensitive keys - can be accessed with any case, since it uses CaseInsensitiveDict).>,
 			}
 	'''
-	def request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None, cache = False):
+	def request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, cloudflare = True, debug = None, cache = False):
 		if cache is False:
-			return self._request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+			return self._request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
 		else:
 			from lib.modules.cache import Cache
 			if tools.Tools.isFunction(cache):
-				self.mResponse = cache(function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+				self.mResponse = cache(function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
 			else:
 				if tools.Tools.isNumber(cache): time = cache
 				else: time = Cache.TimeoutMedium
-				self.mResponse = Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, debug = debug)
+				self.mResponse = Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
 			return self.mResponse
 
-	def _request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, debug = None):
+	def _request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, cloudflare = True, process = True, debug = None):
 		try:
 			if link is None: return self.mRequest
 
@@ -984,7 +1026,7 @@ class Networker(object):
 				link = self.linkCreate(link = link, parameters = data, encode = encode)
 				data = None
 			else: # POST and others.
-				if encode is False or charset:
+				if (encode is False or charset) and not type == Networker.DataJson:
 					# Create a POST query manually, since otherwise Requests will re-encode already encoded values in the dictionary.
 					# This seems to only apply to encoding that is different to UTF-8. Eg the encoded data coming in as Windows-1251 encoded.
 					# There seems to be no parameter in Requests to tell it not to encode the dict values.
@@ -1052,7 +1094,7 @@ class Networker(object):
 							Networker.ConcurrencyLock.release()
 						Networker.ConcurrencySemaphore[concurrency].acquire()
 
-					if Cloudflare.enabled():
+					if cloudflare and Cloudflare.enabled():
 						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, path = path, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, log = False)
 						response = result['response']
 						responseCookies = result['cookies']
@@ -1107,8 +1149,10 @@ class Networker(object):
 						self.mResponse['error']['message'] = 'VPN not connected and the request blocked.'
 					else:
 						self.mResponse['error']['type'] = Networker.ErrorRequest
-						self.mResponse['error']['code'] = response.status_code
-						self.mResponse['error']['message'] = response.reason
+						try: self.mResponse['error']['code'] = response.status_code
+						except: pass
+						try: self.mResponse['error']['message'] = response.reason
+						except: pass
 
 				try: self.mResponse['duration']['connection'] = int(response.elapsed.total_seconds() * 1000)
 				except: pass
@@ -1169,8 +1213,8 @@ class Networker(object):
 				# https://support.cloudflare.com/hc/en-us/articles/360029779472-Troubleshooting-Cloudflare-1XXX-errors
 				if self.mResponse['error']['code'] == 403:
 					try:
-						if tools.Regex.match(data = responseText, expression = 'cloudflare'):
-							if tools.Regex.match(data = responseText, expression = '(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3})'):
+						if tools.Regex.match(data = responseText, expression = '(cloudflare|_cf_chl_opt)'):
+							if tools.Regex.match(data = responseText, expression = '(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3}|enable\s*javascript\s*and\s*cookies)'):
 								self.mResponse['error']['type'] = Networker.ErrorCloudflare
 					except: pass
 
@@ -1269,9 +1313,9 @@ class Networker(object):
 		RETURNS
 			The response data object on request success, otherwise None.
 	'''
-	def requestData(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestData(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mRequest['data']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return self.responseDataBytes()
 
 	'''
@@ -1281,9 +1325,9 @@ class Networker(object):
 		RETURNS
 			The response binary data on request success, otherwise None.
 	'''
-	def requestBytes(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestBytes(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mRequest['data']
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return self.responseDataBytes()
 
 	'''
@@ -1293,9 +1337,9 @@ class Networker(object):
 		RETURNS
 			The response unicode text data on request success, otherwise None.
 	'''
-	def requestText(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestText(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.dataText(self.mRequest['data'])
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return self.responseDataText()
 
 	'''
@@ -1305,9 +1349,9 @@ class Networker(object):
 		RETURNS
 			The response JSON dictionary on request success and if the returned data is JSON, otherwise None.
 	'''
-	def requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.dataJson(self.mRequest['data'])
-		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return self.responseDataJson()
 
 	'''
@@ -1317,9 +1361,9 @@ class Networker(object):
 		RETURNS
 			The response headers as a dictionary (lower case keys) on request success, otherwise None.
 	'''
-	def requestHeaders(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestHeaders(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mRequest['headers']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return response['headers']
 
 	'''
@@ -1329,9 +1373,9 @@ class Networker(object):
 		RETURNS
 			The response cookies as a dictionary (case sensitive keys) on request success, otherwise None.
 	'''
-	def requestCookies(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestCookies(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mRequest['cookies']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return response['cookies']
 
 	'''
@@ -1341,9 +1385,9 @@ class Networker(object):
 		RETURNS
 			The response final redirected URL on request success, otherwise None.
 	'''
-	def requestLink(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestLink(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mRequest['link']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		result = response['link']
 		if result == link:
 			try:
@@ -1360,9 +1404,9 @@ class Networker(object):
 		RETURNS
 			The response success status.
 	'''
-	def requestSuccess(self, link = None, method = MethodHead, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
+	def requestSuccess(self, link = None, method = MethodHead, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
 		if link is None: return self.mResponse['success']
-		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+		response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 		return response['success']
 
 	'''
@@ -1372,8 +1416,8 @@ class Networker(object):
 		RETURNS
 			The response status.
 	'''
-	def requestStatus(self, link, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cache = False):
-		response = self.request(link = link, method = Networker.MethodHead, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cache = cache)
+	def requestStatus(self, link, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, vpn = True, cloudflare = True, cache = False):
+		response = self.request(link = link, method = Networker.MethodHead, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 
 		if not response['success']:
 			if response['error']['type'] == Networker.ErrorCloudflare:
@@ -1383,7 +1427,7 @@ class Networker(object):
 
 		if response['meta']['type']:
 			if any(i in response['meta']['type'] for i in ['text', 'json']):
-				response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, cache = cache)
+				response = self.request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, vpn = vpn, cloudflare = cloudflare, cache = cache)
 				text = self.responseDataText()
 				if text:
 					text = text.lower()
@@ -1407,6 +1451,10 @@ class Networker(object):
 
 	def responseData(self):
 		return self.mResponse['data']
+
+	# Note compressed GZIP sizes are only estimates.
+	def responseDataSize(self, compressed = False):
+		return self.size(data = self.responseData(), headers = self.responseHeaders(), compressed = compressed)
 
 	def responseDataBytes(self):
 		return self.responseData()
@@ -1452,6 +1500,9 @@ class Networker(object):
 
 	def responseErrorDescription(self):
 		return self.mResponse['error']['description']
+
+	def responseErrorNetwork(self):
+		return self.responseErrorType() in Networker.ErrorNetwork
 
 	def responseErrorCloudflare(self):
 		return self.responseErrorType() == Networker.ErrorCloudflare
@@ -2975,7 +3026,7 @@ class Container(object):
 
 	def _cacheData(self, path):
 		if not path or Networker.linkIs(link = path, magnet = True): return None
-		return tools.File.readNow(path, bytes = True, native = True)
+		return tools.File.readNow(path, bytes = True, native = True, exists = True)
 
 	def _cacheFind(self, id, type = None):
 		try:
@@ -3003,7 +3054,7 @@ class Container(object):
 		if not path or Networker.linkIs(link = path, magnet = True): return None
 
 		# NB: Do not add a try-catch here, since other function rely on this to fail.
-		data = tools.File.readNow(path, bytes = True, native = True) # Native, otherwise bencode cannot decode the data.
+		data = tools.File.readNow(path, bytes = True, native = True, exists = True) # Native, otherwise bencode cannot decode the data.
 		data = Importer.moduleBencode().bdecode(data)
 		if info:
 			try: data = data[b'info']
@@ -3334,7 +3385,7 @@ class Container(object):
 
 	def _usenetData(self, path):
 		if not path or Networker.linkIs(link = path, magnet = True): return None
-		return tools.File.readNow(path, native = True) # Native, otherwise zome NZBs fail to read.
+		return tools.File.readNow(path, native = True, exists = True) # Native, otherwise zome NZBs fail to read.
 
 	# local: If true, does not retrieve any data from the internet, only local extensions, names, and files.
 	def _usenetIs(self, link, local = False):
@@ -3525,7 +3576,7 @@ class Tracker(object):
 
 	# gaiaremove - update these
 	# Common Trackers
-	# Last update: 2021-09-28
+	# Last update: 2024-11-27
 	# Do not add too many trackers. Anything above 150 trackers in a magnet link will cause a failure on Premiumize, most likeley due to GET/POST size limits. Also makes the magnet unnecessarily large for Orion.
 	# Trackers are automatically retrieved from newtrackon.com, but keep this list as backup in case newtrackon.com is not accessible.
 	# https://newtrackon.com
@@ -3533,30 +3584,45 @@ class Tracker(object):
 	Trackers = {}
 	TrackersNew = {}
 	TrackersCommon = [
-		'udp://open.stealth.si:80/announce',					# 100% uptime (Norway)
-		'udp://tracker.torrent.eu.org:451/announce',			# 100% uptime (France)
-		'udp://tracker.birkenwald.de:6969/announce',			# 100% uptime (Germany)
-		'http://tracker.files.fm:6969/announce',				# 100% uptime (Germany)
-		'udp://tracker.beeimg.com:6969/announce',				# 100% uptime (Switzerland)
-		'udp://tracker.zerobytes.xyz:1337/announce',			# 100% uptime (Netherlands)
-		'udp://tracker.moeking.eu.org:6969/announce',			# 100% uptime (Netherlands)
-		'http://tracker.bt4g.com:2095/announce',				# 100% uptime (United States)
-		'https://tracker.nanoha.org:443/announce',				# 100% uptime (United States)
-		'udp://tracker.cyberia.is:6969/announce',				# 99.9% uptime (Switzerland)
-		'udp://exodus.desync.com:6969/announce',				# 99.9% uptime (United States)
-		'https://tracker.lilithraws.cf:443/announce',			# 99.9% uptime (United States)
-		'udp://tracker.army:6969/announce',						# 99.8% uptime (United States)
-		'udp://tracker.bitsearch.to:1337/announce',				# 99.8% uptime (Netherlands)
-		'udp://tracker.opentrackr.org:1337/announce',			# 99.6% uptime (Netherlands)
-		'udp://explodie.org:6969/announce',						# 99.5% uptime (United States)
-		'http://t.nyaatracker.com:80/announce',					# 98.6% uptime (Canada/France/Singapore)
-		'udp://bt1.archive.org:6969/announce',					# 98.3% uptime (United States)
-		'udp://tracker.leech.ie:1337/announce',					# 97.7% uptime (Luxembourg)
-		'udp://tracker.openbittorrent.com:80/announce',			# 85.3% uptime (Sweden)
-		'https://1337.abcvg.info:443/announce',					# 75.6% uptime (United States/Canada)
-		'udp://retracker.netbynet.ru:2710/announce',			# 67.0% uptime (Russia)
-		'https://tracker.foreverpirates.co:443/announce',		# 54.4% uptime (United States)
+		'udp://tracker.opentrackr.org:1337/announce',			# 100% uptime (Netherlands)
+		'udp://exodus.desync.com:6969/announce',				# 100% uptime (United States)
+		'https://tracker.lilithraws.org:443/announce',			# 100% uptime (Canada/United States)
+		'https://tracker.moeking.me:443/announce',				# 100% uptime (Canada/United States)
+		'udp://z.mercax.com:53/announce',						# 100% uptime (United States)
+		'udp://u4.trakx.crim.ist:1337/announce',				# 100% uptime (United States)
+		'https://tracker.tamersunion.org:443/announce',			# 100% uptime (Canada/United States)
+		'https://trackers.mlsub.net:443/announce',				# 100% uptime (United States)
+		'https://tracker.ipfsscan.io:443/announce',				# 100% uptime (Canada/United States)
+		'https://tracker.yemekyedim.com:443/announce',			# 100% uptime (Canada/United States)
+		'udp://amigacity.xyz:6969/announce',					# 100% uptime (United States)
+		'udp://odd-hd.fr:6969/announce',						# 100% uptime (France)
+		'udp://bandito.byterunner.io:6969/announce',			# 99.9% uptime (Germany)
+		'udp://explodie.org:6969/announce',						# 99.9% uptime (United States)
+		'udp://open.stealth.si:80/announce',					# 99.8% uptime (Norway)
+		'https://pybittrack.retiolus.net:443/announce',			# 99.8% uptime (Finland)
+		'udp://trackarr.org:6969/announce',						# 99.8% uptime (Germany)
+		'udp://tracker.torrent.eu.org:451/announce',			# 99.8% uptime (France)
+		'http://tracker.beeimg.com:6969/announce',				# 99.8% uptime (Switzerland)
+		'udp://t.overflow.biz:6969/announce',					# 99.8% uptime (Brazil)
+		'udp://tracker.tryhackx.org:6969/announce',				# 99.6% uptime (Germany)
+		'udp://ismaarino.com:1234/announce',					# 99.6% uptime (Spain)
+		'http://tracker.bt4g.com:2095/announce',				# 99.5% uptime (Canada/United States)
+		'udp://tracker.cyberia.is:6969/announce',				# 92.1% uptime (Ukraine)
 
+		#'udp://tracker.birkenwald.de:6969/announce',			# 100% uptime (Germany)
+		#'http://tracker.files.fm:6969/announce',				# 100% uptime (Germany)
+		#'udp://tracker.beeimg.com:6969/announce',				# 100% uptime (Switzerland)
+		#'udp://tracker.zerobytes.xyz:1337/announce',			# 100% uptime (Netherlands)
+		#'https://tracker.nanoha.org:443/announce',				# 100% uptime (United States)
+		#'udp://tracker.army:6969/announce',					# 99.8% uptime (United States)
+		#'udp://tracker.bitsearch.to:1337/announce',			# 99.8% uptime (Netherlands)
+		#'http://t.nyaatracker.com:80/announce',				# 98.6% uptime (Canada/France/Singapore)
+		#'udp://bt1.archive.org:6969/announce',					# 98.3% uptime (United States)
+		#'udp://tracker.leech.ie:1337/announce',				# 97.7% uptime (Luxembourg)
+		#'udp://tracker.openbittorrent.com:80/announce',		# 85.3% uptime (Sweden)
+		#'https://1337.abcvg.info:443/announce',				# 75.6% uptime (United States/Canada)
+		#'udp://retracker.netbynet.ru:2710/announce',			# 67.0% uptime (Russia)
+		#'https://tracker.foreverpirates.co:443/announce',		# 54.4% uptime (United States)
 		#'udp://9.rarbg.com:2890/announce',						# 97.9% uptime (France) - RarBG shut down.
 	]
 

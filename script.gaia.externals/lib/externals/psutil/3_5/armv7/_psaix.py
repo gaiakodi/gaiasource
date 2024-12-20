@@ -11,6 +11,8 @@ import glob
 import os
 import re
 import subprocess
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand')
 import sys
 from collections import namedtuple
 
@@ -145,7 +147,7 @@ def cpu_count_logical():
 
 def cpu_count_cores():
     cmd = "lsdev -Cc processor"
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+    p = subprocess.Popen(gaiaCommand(cmd), shell=True, stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if PY3:
@@ -244,7 +246,7 @@ def net_if_stats():
         # looks like it is using an undocumented ioctl?)
         duplex = ""
         speed = 0
-        p = subprocess.Popen(["/usr/bin/entstat", "-d", name],
+        p = subprocess.Popen(gaiaCommand(["/usr/bin/entstat", "-d", name]),
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         if PY3:
@@ -504,7 +506,7 @@ class Process(object):
     def open_files(self):
         # TODO rewrite without using procfiles (stat /proc/pid/fd/* and then
         # find matching name of the inode)
-        p = subprocess.Popen(["/usr/bin/procfiles", "-n", str(self.pid)],
+        p = subprocess.Popen(gaiaCommand(["/usr/bin/procfiles", "-n", str(self.pid)]),
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         if PY3:

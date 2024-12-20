@@ -117,7 +117,9 @@ class Api(object):
 		parameters[Api.ParameterKey] = tools.Hash.sha256(tools.Converter.unicode(tools.System.obfuscate(tools.Settings.getString(tools.Converter.base64From('aW50ZXJuYWwua2V5LmdhaWE='), raw = True), 15 % 10)) + str(time) + tools.System.name().lower())
 		parameters[Api.ParameterTime] = time
 		try:
-			result = network.Networker().requestText(link = tools.Settings.getString('internal.link.api', raw = True), data = parameters, agent = network.Networker.AgentAddon, cache = cache)
+			# Sometimes the SSL cerificate is outdated, causing the API calls to take long and then finally fail. Disable the certificate check.
+			# Update: Even with "certificate = False" this can still happen. Refresh the server SSL certificate.
+			result = network.Networker().requestText(link = tools.Settings.getString('internal.link.api', raw = True), data = parameters, agent = network.Networker.AgentAddon, cache = cache, certificate = False)
 			if raw:
 				return result
 			else:

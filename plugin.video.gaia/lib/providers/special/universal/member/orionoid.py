@@ -21,7 +21,8 @@
 from lib.providers.core.base import ProviderBase
 from lib.modules.orionoid import Orionoid
 from lib.modules.stream import Stream
-from lib.modules.tools import Media, Hardware, Math, Converter
+from lib.modules.tools import Media, Hardware, Math, Converter, System
+from lib.meta.pack import MetaPack
 
 class Provider(ProviderBase):
 
@@ -134,29 +135,39 @@ class Provider(ProviderBase):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		lock = None
 		try:
-			type = Orionoid.TypeShow if Media.typeTelevision(media) else Orionoid.TypeMovie
-			title = titles['search']['main'][0]
+			type = Orionoid.TypeShow if Media.isSerie(media) else Orionoid.TypeMovie
+			title = None
 			year = None
-			try: year = years['common']
-			except: self.logError()
+			if exact:
+				try: title = titles['search']['exact'][0]
+				except: self.logError()
+			else:
+				try: title = titles['search']['main'][0]
+				except: self.logError()
+				try: year = years['common']
+				except: self.logError()
 			query = title if exact else None
 
-			if self.queryAllow(type, query, idImdb, idTmdb, idTvdb, title, year, numberSeason, numberEpisode):
-				streams = Orionoid(silent = silent).streamRetrieve(type = type, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, title = title, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, verify = self.verifyBusy())
+			if self.queryAllow(type, query, idImdb, idTmdb, idTvdb, idTrakt, title, year, numberSeason, numberEpisode):
+				streams = Orionoid(silent = silent).streamRetrieve(type = type, query = query, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, title = title, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, verify = self.verifyBusy())
 				self.statisticsUpdateSearch(request = True, page = True)
 				if streams:
+					validate = not exact # Do not validate filenames if it is an exact search.
+
 					data = streams
 					streams = streams['streams']
+
 					extract = self.extract(streams = streams)
+					Stream.invalidExtractSet(extract = extract)
 
 					chunks = self.priorityChunks(streams)
 					for chunk in chunks:
 						lock = self.priorityStart(lock = lock)
 						for stream in chunk:
-							stream = self.stream(data = data, stream = stream, extract = extract, media = media, titles = titles, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack)
+							stream = self.stream(data = data, stream = stream, extract = extract, media = media, niche = niche, titles = titles, year = year, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, validate = validate)
 							if stream: self.resultAdd(stream)
 						self.priorityEnd(lock = lock)
 		except: self.logError()
@@ -167,6 +178,7 @@ class Provider(ProviderBase):
 	##############################################################################
 
 	# gaiaremove - this we should be able to remove (make "extract = False") when Orion has updated its database/metadata in the future.
+	# gaiaremove - also check orionoid.py -> Stream.invalidExtract() if thisz is ever changed.
 	def extract(self, streams):
 		extract = Provider._CustomEnabled
 		try:
@@ -183,17 +195,10 @@ class Provider(ProviderBase):
 	# STREAM
 	##############################################################################
 
-	def stream(self, data, stream, extract, media, titles, year, numberSeason, numberEpisode, language, pack):
+	def stream(self, data, stream, extract, media, niche, titles, year, numberSeason, numberEpisode, numberPack, language, country, network, studio, pack, validate = True):
 		try:
-			television = Media.typeTelevision(media)
+			serie = Media.isSerie(media)
 			sourceType = self.streamExtract(stream, 'stream', 'type')
-
-			packSeason = None
-			if television and pack:
-				for season in pack['seasons']:
-					if season['number'] == numberSeason:
-						packSeason = season
-						break
 
 			link = self.streamExtract(stream, 'links')
 			hash = self.streamExtract(stream, 'file', 'hash')
@@ -308,24 +313,16 @@ class Provider(ProviderBase):
 			# Orion estimates the file size for packs.
 			# Try to get as close as possible to ther original size.
 			if filePack:
-				if television:
-					filePack = Stream.FilePackSeason
-					try:
-						try: counter = packSeason['count']
-						except: counter = pack['count']['mean']['main']
-						fileSizeInexact = fileSize
-						if counter: fileSize *= counter
-					except:
-						fileSizeInexact = fileSize
-						fileSize = None
-				else:
-					filePack = Stream.FilePackCollection
-					try:
-						fileSizeInexact = fileSize
-						fileSize *= pack['count']
-					except:
-						fileSizeInexact = fileSize
-						fileSize = None
+				if serie: filePack = Stream.FilePackSeason
+				else: filePack = Stream.FilePackCollection
+				fileSizeInexact = fileSize
+				if fileSize:
+					if serie:
+						try: counter = pack[MetaPack.ValueCount][MetaPack.ValueSeason][numberSeason]
+						except: counter = pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueMean]
+					else:
+						counter = pack[MetaPack.ValueCount][MetaPack.ValueTotal]
+					if counter: fileSize *= counter
 
 			if extract:
 				videoCodec = None # Does not have all codecs.
@@ -347,9 +344,15 @@ class Provider(ProviderBase):
 				releaseGroup = None
 
 			streamy = self.resultStream(
-				validateTitle			= False,
-				validateYear			= False,
-				validateShow			= False,
+				# Update (2024-05-28): Validate again, since old Orion links might be invalid.
+				#validateTitle			= False,
+				#validateYear			= False,
+				#validateShow			= False,
+				# Update (2024-08-25): Use the parameter for trhis now, to not filter exact searches.
+				validateTitle			= validate,
+				validateYear			= validate,
+				validateShow			= validate,
+
 				extract					= extract,
 
 				idOrionStream			= self.streamExtract(stream, 'id'),
@@ -402,17 +405,23 @@ class Provider(ProviderBase):
 
 			if streamy:
 				# Estimate the file size for show and episode packs.
-				if streamy.filePack() and television:
+				if streamy.filePack() and serie:
 					if timeUpdated and timeUpdated > 1646870400: # Ignore for old streams.
-						counter = 0
 						number = streamy.numberShow()
-						if len(number['season']) > 1:
-							counter = 0
+						countSeason = len(number['season']) if number['season'] else 0
+						countEpisode = len(number['episode']) if number['episode'] else 0
+
+						counter = 0
+
+						if countSeason == 1 and number['season'][0] == Stream.NumberPack: # Show pack.
+							counter = pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueEpisode]
+						elif countSeason > 1 or not countEpisode: # Show or season pack.
 							for i in number['season']:
-								try: counter += packSeason['count']
-								except: counter += pack['count']['mean']['main']
-						elif len(number['episode']) > 1:
+								try: counter += pack[MetaPack.ValueCount][MetaPack.ValueSeason][i]
+								except: counter += pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueMean]
+						elif countEpisode > 1: # Season or episode pack.
 							counter = len(number['episode'])
+
 						if counter:
 							try:
 								fileSizeInexact = fileSizeOriginal
@@ -423,7 +432,7 @@ class Provider(ProviderBase):
 
 				if streamy.audioChannels() is None and not audioChannels is None: streamy.audioChannelsSet(audioChannels)
 			else:
-				self.log('Invalid stream data: ' + Converter.jsonTo(stream))
+				if System.developer(): self.log('Invalid Orion Stream: ' + str(stream.get('file', {}).get('name') or stream.get('link')))
 
 			return streamy
 		except: self.logError()

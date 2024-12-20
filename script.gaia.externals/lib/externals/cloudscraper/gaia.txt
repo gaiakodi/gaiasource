@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://github.com/VeNoMouS/cloudscraper
-Current Version:	1.2.66 (2022-11-29)
+Current Version:		1.2.71 (2024-11-29)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -58,6 +58,10 @@ It seems that the custom function set "self.ssl_context.check_hostname", which i
 
 Add "shell = True" to all "subprocess" calls, otherwise a CMD window pops up in Windows.
 Commands must be a string, not a list, when shell=True.
+
+#########################################################################################################################
+
+Add the gaiaCommand() calls.
 
 #########################################################################################################################
 

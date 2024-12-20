@@ -5,6 +5,9 @@ import sys
 from . import JavaScriptInterpreter
 from .encapsulated import template
 
+from importlib import import_module # GAIACODE
+gaiaCommand = getattr(import_module('gaia'), 'gaiaCommand') # GAIACODE
+
 # ------------------------------------------------------------------------------- #
 
 
@@ -29,7 +32,7 @@ class ChallengeInterpreter(JavaScriptInterpreter):
 
             # Gaia - Command must be string if shell=True.
             #return subprocess.check_output(['node', '-e', js])
-            return subprocess.check_output(' '.join(['node', '-e', js]), shell = True)
+            return subprocess.check_output(gaiaCommand(' '.join(['node', '-e', js])), shell = True) # GAIACODE
 
         except OSError as e:
             if e.errno == 2:

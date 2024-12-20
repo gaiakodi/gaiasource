@@ -1,5 +1,15 @@
 """Export tldextract's public interface."""
 
-from .tldextract import extract, TLDExtract
+from . import _version
 
-from ._version import version as __version__
+# GAIA
+#from .tldextract import TLDExtract, extract
+from .tldextract import TLDExtract, extract, update
+
+__version__: str = _version.version
+
+__all__ = [
+    "extract",
+    "TLDExtract",
+    "__version__",
+]

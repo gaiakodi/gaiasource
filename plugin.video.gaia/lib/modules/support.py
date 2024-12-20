@@ -37,7 +37,7 @@ class Support(object):
 		Networker.linkShow(link = tools.Settings.getString('internal.link.support', raw = True))
 
 	@classmethod
-	def navigator(self):
+	def menu(self):
 		directory = interface.Directory()
 		directory.add(label = 35314, action = 'supportCategories', folder = True, icon = 'help')
 		directory.add(label = 36097, action = 'supportReport', folder = False, icon = 'bug')
@@ -61,7 +61,7 @@ class Support(object):
 				pathNew = tools.File.joinPath(pathData, tools.File.name(path, extension = True))
 				tools.File.copy(path, pathNew)
 				if pathNew.endswith(Database.Extension):
-					Database(path = pathNew)._deleteAll(query = 'DELETE FROM %s WHERE id LIKE "account.%%" or id LIKE "premium.%%";', commit = True, compress = True)
+					Database(path = pathNew)._deleteAll(query = 'DELETE FROM %s WHERE id LIKE "account.%%" or id LIKE "premium.%%";', commit = True, compact = True)
 
 			import zipfile
 			zip = zipfile.ZipFile(pathReport, 'w')

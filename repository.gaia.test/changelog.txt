@@ -1,7 +1,10 @@
 
 [B][/B]
-- Updated XML structure.
 - Major version upgrade.
+
+[B]6.0.0 (2022.12.12)[/B]
+- Major version upgrade.
+- Updated XML structure.
 
 [B]5.0.0[/B]
 - Initial release.

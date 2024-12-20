@@ -22,7 +22,7 @@ from lib.providers.core.json import ProviderJson
 
 class Provider(ProviderJson):
 
-	_Link					= ['https://torrents-csv.ml']
+	_Link					= ['https://torrents-csv.com'] # https://torrents-csv.ml is down.
 	_Path					= 'service/search'
 
 	_LimitOffset			= 100 # 100 seems to be the maximum results the API returns.
@@ -32,6 +32,7 @@ class Provider(ProviderJson):
 	_ParameterPage			= 'page'
 	_ParameterLimit			= 'size'
 
+	_AttributeList			= 'torrents'
 	_AttributeHash			= 'infohash'
 	_AttributeName			= 'name'
 	_AttributeSize			= 'size_bytes'
@@ -50,6 +51,7 @@ class Provider(ProviderJson):
 			description				= '{name} is collaborative Git repository collecting {containers} into a large CSV file. The API contains results in various languages, but most of them are in English.',
 			rank					= 5,
 			performance				= ProviderJson.PerformanceExcellent,
+			#status					= ProviderJson.StatusDead, # Domain and Git repo is down. Update (2024-12): New .com domain works.
 
 			link					= Provider._Link,
 
@@ -67,11 +69,12 @@ class Provider(ProviderJson):
 										ProviderJson.RequestPath : Provider._Path,
 										ProviderJson.RequestData : {
 											Provider._ParameterQuery	: ProviderJson.TermQuery,
-											Provider._ParameterPage		: ProviderJson.TermOffset,
+											Provider._ParameterPage		: ProviderJson.TermOffset, # Paging does not work anymore with the .com and is also not documented. Can still return only 100 results.
 											Provider._ParameterLimit	: Provider._LimitOffset,
 										},
 									},
 
+			extractList				= Provider._AttributeList,
 			extractHash				= Provider._AttributeHash,
 			extractFileName			= Provider._AttributeName,
 			extractFileSize			= Provider._AttributeSize,

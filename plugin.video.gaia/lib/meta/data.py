@@ -22,7 +22,7 @@ from lib.meta.image import MetaImage
 
 from lib.modules.serializer import Serializer
 from lib.modules.convert import ConverterTime
-from lib.modules.tools import Regex, Tools, Time, Converter, Settings, Language, Country, Media, Logger
+from lib.modules.tools import Regex, Tools, Time, Converter, Settings, Language, Country, Media, Title, Logger
 
 class MetaData(Serializer):
 
@@ -64,15 +64,15 @@ class MetaData(Serializer):
 
 	# Number
 
-	NumberOfficial				= 'official'		# Officialy aired order with episodes divided into seasons.
+	NumberStandard				= 'standard'		# Officialy aired order with episodes divided into seasons.
 	NumberAbsolute				= 'absolute'		# Absolute order without seasons where episodes are numbered sequentially.
 	NumberDisc					= 'disc'			# Order as released on DVD or BluRay.
 	NumberYear					= 'year'			# The year is used as season number. sometimes used by TVDd for daytime shows.
 	NumberRegional				= 'regional'		# TVDb.
 	NumberAlternative			= 'alternative'		# TVDb.
 	NumberAlternativeDisc		= 'alternativedisc'	# TVDb.
-	NumberDefault				= NumberOfficial
-	Numbers						= [NumberOfficial, NumberAbsolute, NumberDisc, NumberYear, NumberRegional, NumberAlternative, NumberAlternativeDisc]
+	NumberDefault				= NumberStandard
+	Numbers						= [NumberStandard, NumberAbsolute, NumberDisc, NumberYear, NumberRegional, NumberAlternative, NumberAlternativeDisc]
 
 	# Character
 
@@ -142,6 +142,7 @@ class MetaData(Serializer):
 	CountryOriginal				= 'original'
 	CountrySettings				= 'settings'
 	CountryUniversal			= Country.UniversalCode
+	CountryUnitedStates			= Country.CodeUnitedStates
 	CountryDefault				= Default
 
 	# Image
@@ -197,19 +198,18 @@ class MetaData(Serializer):
 	# Genre
 
 	GenreAction					= 'action'
-	GenreScience				= 'science'
+	GenreScifi					= 'scifi'
 	GenreFantasy				= 'fantasy'
 	GenreAdventure				= 'adventure'
 	GenreHorror					= 'horror'
-	GenreDisaster				= 'disaster'
 	GenreMystery				= 'mystery'
 	GenreSuspense				= 'suspense'
 	GenreThriller				= 'thriller'
 	GenreCrime					= 'crime'
 	GenreMartial				= 'martial'
-	GenreEastern				= 'eastern'
 	GenreWestern				= 'western'
 	GenreWar					= 'war'
+	GenrePolitics				= 'politics'
 	GenreHistory				= 'history'
 	GenreComedy					= 'comedy'
 	GenreRomance				= 'romance'
@@ -244,61 +244,8 @@ class MetaData(Serializer):
 	GenreShort					= 'short'
 	GenreIndie					= 'indie'
 	GenreNoir					= 'noir'
-	GenreFan					= 'fan'
 
 	GenreDefault				= Default
-
-	GenreNames					= {
-		GenreAction				: 'Action',
-		GenreScience			: 'Science Fiction',
-		GenreFantasy			: 'Fantasy',
-		GenreAdventure			: 'Adventure',
-		GenreHorror				: 'Horror',
-		GenreDisaster			: 'Disaster',
-		GenreMystery			: 'Mystery',
-		GenreSuspense			: 'Suspense',
-		GenreThriller			: 'Thriller',
-		GenreCrime				: 'Crime',
-		GenreMartial			: 'Martial Arts',
-		GenreEastern			: 'Eastern',
-		GenreWestern			: 'Western',
-		GenreWar				: 'War',
-		GenreHistory			: 'History',
-		GenreComedy				: 'Comedy',
-		GenreRomance			: 'Romance',
-		GenreDrama				: 'Drama',
-
-		GenreFamily				: 'Family',
-		GenreChildren			: 'Children',
-		GenreAnimation			: 'Animation',
-		GenreAnime				: 'Anime',
-		GenreMusic				: 'Music',
-		GenreMusical			: 'Musical',
-
-		GenreDocumentary		: 'Documentary',
-		GenreBiography			: 'Biography',
-		GenreSport				: 'Sport',
-		GenreSporting			: 'Sporting Event',
-		GenreTravel				: 'Travel',
-		GenreHoliday			: 'Holiday',
-		GenreHome				: 'Home and Garden',
-		GenreFood				: 'Food',
-
-		GenreSoap				: 'Soap',
-		GenreReality			: 'Reality',
-		GenreNews				: 'News',
-		GenreTalk				: 'Talk Show',
-		GenreGame				: 'Game Show',
-		GenreAward				: 'Awards Show',
-		GenreMini				: 'Mini Series',
-		GenrePodcast			: 'Podcast',
-		GenreTelevision			: 'Television',
-
-		GenreShort				: 'Short',
-		GenreIndie				: 'Indie',
-		GenreNoir				: 'Noir',
-		GenreFan				: 'Fan',
-	}
 
 	# Vote
 
@@ -336,32 +283,19 @@ class MetaData(Serializer):
 
 	# Status
 
-	StatusRumoured				= 'rumoured'		# Rumoured, but not officially announced.
+	StatusRumored				= 'rumored'			# Rumored, but not officially announced.
 	StatusPlanned				= 'planned'			# Planned or announced, but production has not started.
 	StatusPreproduction			= 'preproduction'	# Busy with initial production phase.
 	StatusProduction			= 'production'		# Busy filming.
 	StatusPostproduction		= 'postproduction'	# Busy with post production phase.
 	StatusCompleted				= 'completed'		# Completed with production, but not yet released.
-	StatusPilot					= 'pilot'			# First pilot episode released. For shows.
 	StatusReleased				= 'released'		# Released and in theaters. For movies.
+	StatusPilot					= 'pilot'			# First pilot episode released. For shows.
+	StatusUpcoming				= 'upcoming'		# Upcoming release. For shows.
 	StatusContinuing			= 'continuing'		# Continuing show on returning for a next season. For shows.
 	StatusEnded					= 'ended'			# Ended with last episode. For shows.
 	StatusCanceled				= 'canceled'		# Canceled without ending properley. For shows.
 	StatusDefault				= Default
-
-	StatusLabels				= {
-		StatusRumoured			: 'Rumoured',
-		StatusPlanned			: 'Planned',
-		StatusPreproduction		: 'In Pre-Production',
-		StatusProduction		: 'In Production',
-		StatusPostproduction	: 'In Post-Production',
-		StatusCompleted			: 'Completed',
-		StatusPilot				: 'Pilot',
-		StatusReleased			: 'Released',
-		StatusContinuing		: 'Continuing',
-		StatusEnded				: 'Ended',
-		StatusCanceled			: 'Canceled',
-	}
 
 	# Special
 	# https://thetvdb.com/taxonomy
@@ -1893,11 +1827,11 @@ class MetaData(Serializer):
 			numberSeason = self.numberSeason()
 			numberEpisode = self.numberEpisode()
 			try:
-				if format == MetaData.FormatUniversal: return Media.numberUniversal(season = numberSeason, episode = numberEpisode)
+				if format == MetaData.FormatUniversal: return Title.numberUniversal(season = numberSeason, episode = numberEpisode)
 				else: return format % (numberSeason, numberEpisode)
 			except:
-				result = Media.number(season = numberSeason, episode = numberEpisode)
-				if not result: result = Media.numberUniversal(season = numberSeason, episode = numberEpisode) # Format selected that requires the title.
+				result = Title.number(season = numberSeason, episode = numberEpisode)
+				if not result: result = Title.numberUniversal(season = numberSeason, episode = numberEpisode) # Format selected that requires the title.
 				return result
 		elif number is MetaData.Default:
 			return self.dataRetrieve(type = ['number'], media = media)
@@ -1982,15 +1916,15 @@ class MetaData(Serializer):
 								if season:
 									numberYear = season.numberSeason()
 									if numberYear >= minimum:
-										numberOfficial = numbers[numberYear]
+										numberStandard = numbers[numberYear]
 										season.numberSeasonSet(value = numberYear, number = MetaData.NumberYear)
-										season.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+										season.numberSeasonSet(value = numberStandard, number = MetaData.NumberStandard)
 										episodes = season.episode()
 										if episodes:
 											for episode in episodes:
 												if episode:
 													episode.numberSeasonSet(value = numberYear, number = MetaData.NumberYear)
-													episode.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+													episode.numberSeasonSet(value = numberStandard, number = MetaData.NumberStandard)
 							except: pass
 					else:
 						# The parent season might have already gone through numberAdjust() and now has the correct season number.
@@ -1998,11 +1932,11 @@ class MetaData(Serializer):
 						# Without this, TVDb detailed episodes will have the year as season number, and if episode menus are loaded, it will show both 1x02 (Trakt/IMDb) and 1960x02 (TVDb), eg (Coronation Street S01).
 						for season in seasons:
 							if season:
-								numberOfficial = season.numberSeason()
+								numberStandard = season.numberSeason()
 								episodes = season.episode()
 								if episodes:
 									for episode in episodes:
-										if episode: episode.numberSeasonSet(value = numberOfficial, number = MetaData.NumberOfficial)
+										if episode: episode.numberSeasonSet(value = numberStandard, number = MetaData.NumberStandard)
 
 				# Calculating the absolute episode order here does not always work.
 				# When retrieving detailed episode metadata from episodes.py, only a single season and its episodes are retrieved.
@@ -2048,7 +1982,7 @@ class MetaData(Serializer):
 
 	def languageSettings(self, media = None, type = None, decor = None):
 		if media: return MetaImage.settingsLanguage(media = media, type = self.imageTypeConvert(media = media, type = type, decor = decor))
-		else: return Language.settingsCustom('metadata.location.language')
+		else: return Language.settingsCustom('metadata.general.language')
 
 	def languageDefault(self, language, universal = True, media = None, type = None, decor = None):
 		if language == MetaData.LanguageUnknown: language = MetaData.LanguageDefault
@@ -2063,7 +1997,7 @@ class MetaData(Serializer):
 
 	def countryDefault(self, country, universal = True):
 		if country is MetaData.CountryDefault: country = MetaData.CountryOriginal
-		elif country == MetaData.CountrySettings: country = Country.settings('metadata.location.country')
+		elif country == MetaData.CountrySettings: country = Country.settings('metadata.general.country')
 		if country == Country.Automatic: country = MetaData.CountryOriginal
 		if universal and country == MetaData.CountryOriginal: country = MetaData.CountryUniversal
 		return country
@@ -3201,14 +3135,9 @@ class MetaData(Serializer):
 	# GENRE
 	###################################################################
 
-	def genre(self, name = False, media = MediaDefault, selection = SelectionDefault):
+	def genre(self, media = MediaDefault, selection = SelectionDefault):
 		result = self.dataRetrieve(type = 'genre', media = media, selection = selection)
-		if name and result: result = [MetaData.GenreNames[i] for i in result]
 		return result
-
-	def genreName(self, format = FormatNone, media = MediaDefault, selection = SelectionDefault):
-		genre = self.genre(name = True, media = media, selection = selection)
-		return self.format(value = genre, format = format)
 
 	def genreSet(self, value, media = MediaDefault):
 		if value: self.dataUpdate(data = {'genre' : self.dataList(value)}, media = media)
@@ -3220,19 +3149,18 @@ class MetaData(Serializer):
 
 		provider = MetaData.GenreDefault
 		if Regex.match(data = data, expression = '(?:action)', cache = True): genre = MetaData.GenreAction
-		elif Regex.match(data = data, expression = '(?:sci(?:ence)?[\s\-]*fi(?:ction)?)', cache = True): genre = MetaData.GenreScience
+		elif Regex.match(data = data, expression = '(?:sci(?:ence)?[\s\-]*fi(?:ction)?)', cache = True): genre = MetaData.GenreScifi
 		elif Regex.match(data = data, expression = '(?:fantasy)', cache = True): genre = MetaData.GenreFantasy
 		elif Regex.match(data = data, expression = '(?:adventure)', cache = True): genre = MetaData.GenreAdventure
 		elif Regex.match(data = data, expression = '(?:horror)', cache = True): genre = MetaData.GenreHorror
-		elif Regex.match(data = data, expression = '(?:disaster|apocalyp)', cache = True): genre = MetaData.GenreDisaster
 		elif Regex.match(data = data, expression = '(?:mystery)', cache = True): genre = MetaData.GenreMystery
 		elif Regex.match(data = data, expression = '(?:suspense)', cache = True): genre = MetaData.GenreSuspense
 		elif Regex.match(data = data, expression = '(?:thriller)', cache = True): genre = MetaData.GenreThriller
 		elif Regex.match(data = data, expression = '(?:crime)'): genre = MetaData.GenreCrime
 		elif Regex.match(data = data, expression = '(?:martial|karate|kong[\s\-]*fu)', cache = True): genre = MetaData.GenreMartial
-		elif Regex.match(data = data, expression = '(?:east)', cache = True): genre = MetaData.GenreEastern
 		elif Regex.match(data = data, expression = '(?:west)', cache = True): genre = MetaData.GenreWestern
 		elif Regex.match(data = data, expression = '(?:war)', cache = True): genre = MetaData.GenreWar
+		elif Regex.match(data = data, expression = '(?:politics)', cache = True): genre = MetaData.GenrePolitics
 		elif Regex.match(data = data, expression = '(?:histor(?:y|ical))', cache = True): genre = MetaData.GenreHistory
 		elif Regex.match(data = data, expression = '(?:comedy)', cache = True): genre = MetaData.GenreComedy
 		elif Regex.match(data = data, expression = '(?:romance|love)', cache = True): genre = MetaData.GenreRomance
@@ -3267,7 +3195,6 @@ class MetaData(Serializer):
 		elif Regex.match(data = data, expression = '(?:short)', cache = True): genre = MetaData.GenreShort
 		elif Regex.match(data = data, expression = '(?:ind(?:ie|ependent))', cache = True): genre = MetaData.GenreIndie
 		elif Regex.match(data = data, expression = '(?:noir)', cache = True): genre = MetaData.GenreNoir
-		elif Regex.match(data = data, expression = '(?:fan)', cache = True): genre = MetaData.GenreFan
 
 		MetaData.DataGenre[data] = genre
 		return genre
@@ -3323,8 +3250,8 @@ class MetaData(Serializer):
 	def status(self, media = MediaDefault):
 		return self.dataRetrieve(type = 'status', media = media)
 
-	def statusRumoured(self, media = MediaDefault):
-		return self.status() == MetaData.StatusRumoured
+	def statusRumored(self, media = MediaDefault):
+		return self.status() == MetaData.StatusRumored
 
 	def statusPlanned(self, media = MediaDefault):
 		return self.status() == MetaData.StatusPlanned
@@ -3341,11 +3268,14 @@ class MetaData(Serializer):
 	def statusCompleted(self, media = MediaDefault):
 		return self.status() == MetaData.StatusCompleted
 
+	def statusReleased(self, media = MediaDefault):
+		return self.status() == MetaData.StatusReleased
+
 	def statusPilot(self, media = MediaDefault):
 		return self.status() == MetaData.StatusPilot
 
-	def statusReleased(self, media = MediaDefault):
-		return self.status() == MetaData.StatusReleased
+	def statusUpcoming(self, media = MediaDefault):
+		return self.status() == MetaData.StatusUpcoming
 
 	def statusContinuing(self, media = MediaDefault):
 		return self.status() == MetaData.StatusContinuing
@@ -3356,11 +3286,6 @@ class MetaData(Serializer):
 	def statusCanceled(self, media = MediaDefault):
 		return self.status() == MetaData.StatusCanceled
 
-	def statusLabel(self, media = MediaDefault):
-		status = self.status(media = media)
-		if status: return MetaData.StatusLabels[status]
-		return None
-
 	def statusSet(self, value, media = MediaDefault):
 		if value: self.dataUpdate(data = {'status' : value}, media = media)
 
@@ -3370,24 +3295,25 @@ class MetaData(Serializer):
 		except: pass
 
 		# TMDb:
-		#	Movies: Canceled, In Production, Planned, Post Production, Released, Rumoured
+		#	Movies: Canceled, In Production, Planned, Post Production, Released, Rumored
 		#	Shows: Returning Series, Planned, In Production, Ended, Canceled, Pilot
 		# TVDb:
 		#	Movies: Announced, Pre-Production, Filming / Post-Production, Completed, Released
 		#	Shows: Continuing, Ended, Upcoming
 		# Trakt:
-		#	Movies: released, in production, post production, planned, Rumoured, or canceled
+		#	Movies: released, in production, post production, planned, rumored, or canceled
 		#	Shows: returning series, in production, planned, canceled, ended
 
 		status = MetaData.StatusDefault
-		if Regex.match(data = data, expression = '(?:rumou?r)', cache = True): status = MetaData.StatusRumoured
+		if Regex.match(data = data, expression = '(?:rumou?r)', cache = True): status = MetaData.StatusRumored
 		elif Regex.match(data = data, expression = '(?:plan)', cache = True): status = MetaData.StatusPlanned
 		elif Regex.match(data = data, expression = '(?:pre.?product)', cache = True): status = MetaData.StatusPreproduction
 		elif Regex.match(data = data, expression = '(?:post.?product)', cache = True): status = MetaData.StatusPostproduction
-		elif Regex.match(data = data, expression = '(?:product|film|upcoming)', cache = True): status = MetaData.StatusProduction
+		elif Regex.match(data = data, expression = '(?:product|film)', cache = True): status = MetaData.StatusProduction
 		elif Regex.match(data = data, expression = '(?:complet)', cache = True): status = MetaData.StatusCompleted
-		elif Regex.match(data = data, expression = '(?:pilot|test)', cache = True): status = MetaData.StatusPilot
 		elif Regex.match(data = data, expression = '(?:release)', cache = True): status = MetaData.StatusReleased
+		elif Regex.match(data = data, expression = '(?:pilot|test)', cache = True): status = MetaData.StatusPilot
+		elif Regex.match(data = data, expression = '(?:upcoming)', cache = True): status = MetaData.StatusUpcoming
 		elif Regex.match(data = data, expression = '(?:contin|return|busy|running)', cache = True): status = MetaData.StatusContinuing
 		elif Regex.match(data = data, expression = '(?:end|finish)', cache = True): status = MetaData.StatusEnded
 		elif Regex.match(data = data, expression = '(?:cancel)', cache = True): status = MetaData.StatusCanceled
@@ -3399,20 +3325,29 @@ class MetaData(Serializer):
 	# SPECIAL
 	###################################################################
 
-	def special(self, media = MediaDefault, selection = SelectionDefault):
-		return self.dataRetrieve(type = 'special', media = media, selection = selection)
+	def special(self, type = None, media = MediaDefault, selection = SelectionDefault):
+		return self.dataRetrieve(type = ['special', type] if type else 'special', media = media, selection = selection)
+
+	def specialType(self, media = MediaDefault, selection = SelectionDefault):
+		return self.special(type = 'type', media = media, selection = selection)
 
 	def specialStory(self, special = None, media = MediaDefault):
-		if special is None: special = self.special(media = media, selection = MetaData.SelectionList)
+		if special is None: special = self.specialType(media = media, selection = MetaData.SelectionList)
 		elif not Tools.isArray(special): special = [special]
 		if special: return any(i in MetaData.SpecialStory for i in special)
 		return None
 
 	def specialExtra(self, special = None, media = MediaDefault):
-		if special is None: special = self.special(media = media, selection = MetaData.SelectionList)
+		if special is None: special = self.specialType(media = media, selection = MetaData.SelectionList)
 		elif not Tools.isArray(special): special = [special]
 		if special: return any(i in MetaData.SpecialExtra for i in special)
 		return None
+
+	def specialBefore(self, media = MediaDefault, selection = SelectionDefault):
+		return self.special(type = 'before', media = media, selection = selection)
+
+	def specialAfter(self, media = MediaDefault, selection = SelectionDefault):
+		return self.special(type = 'after', media = media, selection = selection)
 
 	@classmethod
 	def specialExtraLegacy(self, special = None, title = None, exclude = None):
@@ -3425,7 +3360,7 @@ class MetaData(Serializer):
 		return None
 
 	def specialSet(self, value, media = MediaDefault):
-		if value: self.dataUpdate(data = {'special' : self.dataList(value)}, media = media)
+		if value: self.dataUpdate(data = {'special' : value}, media = media)
 
 	@classmethod
 	def specialExtract(self, data, exclude = None):
@@ -3446,6 +3381,10 @@ class MetaData(Serializer):
 			MetaData.SpecialRecap		: '((?:(?:show|series|season)[\s\-]*)?recap)',
 			MetaData.SpecialShort		: '(short(?:[\s\-]*episode)?|webisode|webinar)',
 			MetaData.SpecialPodcast		: '((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)', 								# Eg: Last of Us S00E02, S00E06, S00E07, etc.
+			MetaData.SpecialUnimportant	: '(best[\s\-]*of|rewind|concert|pre[\s\-]*show)',								# Eg: Doctor Who S00E37, S00E40, S00E41, S00E50, S00E76, S00E128
+
+			# Do this after Unimportant. Eg: "Best of the Christmas Specials"
+			MetaData.SpecialEpisode		: '((?:christmas|holiday)[\s\-]*specials?)',									# Eg: The Office UK S00E01, S00E02.
 		}
 
 		for key, value in expression.items():
@@ -3457,6 +3396,7 @@ class MetaData(Serializer):
 						if Regex.match(data = j, expression = value):
 							ignore = True
 							break
+				if key in MetaData.SpecialStory and any(i in MetaData.SpecialExtra for i in special): ignore = True # Eg: "Best of the Christmas Specials" (containing both "Best of" and "Christmas Specials")
 				if not ignore: special.append(key)
 
 		return special if special else MetaData.SpecialDefault

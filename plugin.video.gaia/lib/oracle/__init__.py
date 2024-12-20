@@ -119,17 +119,15 @@ class Oracle(object):
 	QueryJsonId					= 'jsonid'		# JSON: IMDb/TMDb ID.
 
 	QuerySupport				= {
-		Media.TypeMixed			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
-		Media.TypeMovie			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
-		Media.TypeSet			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
-		Media.TypeDocumentary	: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
-		Media.TypeShort			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
-		Media.TypeShow			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
+		Media.Mixed			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
+		Media.Movie			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
+		Media.Set			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
+		Media.Show			: {ModePlain : True, ModeList : True, ModeSingle : True, QueryContext : False, QueryRaw : True, QueryTextTitle : False, QueryTextId : False, QueryJsonTitle : False, QueryJsonId : False},
 	}
 
 	QueryDefault				= {
 		Language.CodeEnglish		: {
-			Media.TypeMixed			: {
+			Media.Mixed			: {
 				ModeSystem			: OrderedDict({
 					QueryContext	: 'You are a chatbot that knows everything about movies and TV shows. Current date: %s' % TermDate,
 				}),
@@ -151,7 +149,7 @@ class Oracle(object):
 					QueryRaw		: TermQuery,
 				}),
 			},
-			Media.TypeMovie			: {
+			Media.Movie			: {
 				ModeSystem			: OrderedDict({
 					QueryContext	: 'You are a chatbot that knows everything about movies. Current date: %s' % TermDate,
 				}),
@@ -173,7 +171,7 @@ class Oracle(object):
 					QueryRaw		: TermQuery,
 				}),
 			},
-			Media.TypeSet			: {
+			Media.Set			: {
 				ModeSystem			: OrderedDict({
 					QueryContext	: 'You are a chatbot that knows everything about movie collections and sets. Current date: %s' % TermDate,
 				}),
@@ -195,51 +193,7 @@ class Oracle(object):
 					QueryRaw		: TermQuery,
 				}),
 			},
-			Media.TypeDocumentary	: {
-				ModeSystem			: OrderedDict({
-					QueryContext	: 'You are a chatbot that knows everything about documentary films. Current date: %s' % TermDate,
-				}),
-				ModePlain			: OrderedDict({
-					QueryRaw		: TermQuery,
-				}),
-				ModeList			: OrderedDict({
-					QueryJsonId		: 'List in JSON format %s IMDb IDs of documentaries for: %s' % (TermCount, TermQuery),
-					QueryJsonTitle	: 'List in JSON format %s titles and years of documentaries for: %s' % (TermCount, TermQuery),
-					QueryTextId		: 'List %s IMDb IDs of documentaries for: %s' % (TermCount, TermQuery),
-					QueryTextTitle	: 'List %s titles and years of documentaries for: %s' % (TermCount, TermQuery),
-					QueryRaw		: TermQuery,
-				}),
-				ModeSingle			: OrderedDict({
-					QueryJsonId		: 'Provide in JSON format the IMDb ID of the documentary for: %s' % TermQuery,
-					QueryJsonTitle	: 'Provide in JSON format the title and year of the documentary for: %s' % TermQuery,
-					QueryTextId		: 'Provide the IMDb ID of the documentary for: %s' % TermQuery,
-					QueryTextTitle	: 'Provide the title and year of the documentary for: %s' % TermQuery,
-					QueryRaw		: TermQuery,
-				}),
-			},
-			Media.TypeShort			: {
-				ModeSystem			: OrderedDict({
-					QueryContext	: 'You are a chatbot that knows everything about short films. Current date: %s' % TermDate,
-				}),
-				ModePlain			: OrderedDict({
-					QueryRaw		: TermQuery,
-				}),
-				ModeList			: OrderedDict({
-					QueryJsonId		: 'List in JSON format %s IMDb IDs of short films for: %s' % (TermCount, TermQuery),
-					QueryJsonTitle	: 'List in JSON format %s titles and years of short films for: %s' % (TermCount, TermQuery),
-					QueryTextId		: 'List %s IMDb IDs of short films for: %s' % (TermCount, TermQuery),
-					QueryTextTitle	: 'List %s titles and years of short films for: %s' % (TermCount, TermQuery),
-					QueryRaw		: TermQuery,
-				}),
-				ModeSingle			: OrderedDict({
-					QueryJsonId		: 'Provide in JSON format the IMDb ID of the short film for: %s' % TermQuery,
-					QueryJsonTitle	: 'Provide in JSON format the title and year of the short film for: %s' % TermQuery,
-					QueryTextId		: 'Provide the IMDb ID of the short film for: %s' % TermQuery,
-					QueryTextTitle	: 'Provide the title and year of the short film for: %s' % TermQuery,
-					QueryRaw		: TermQuery,
-				}),
-			},
-			Media.TypeShow			: {
+			Media.Show			: {
 				ModeSystem			: OrderedDict({
 					QueryContext	: 'You are a chatbot that knows everything about TV shows. Current date: %s' % TermDate,
 				}),
@@ -474,7 +428,7 @@ class Oracle(object):
 	# discover: Lookup the IMDb/TMDb/TVDb/Trakt IDs for the extracted titles/years.
 	# metadata: Retrieve the detailed metadata for each discovered ID.
 	# progress: Callback function with 2 parameters "progress" and "status", or a dictionarty with 2 of the same keys.
-	def chat(self, query, media = None, mode = None, history = None, conversation = None, refine = None, cache = CacheDefault, extract = True, discover = True, metadata = True, menu = True, progress = None):
+	def chat(self, query, media = None, niche = None, mode = None, history = None, conversation = None, refine = None, cache = CacheDefault, extract = True, discover = True, metadata = True, menu = True, progress = None):
 		timer = Time(start = True)
 		if self._chatProgress(instance = progress, progress = [0.01, 0.05], status = 36323) is False: return False
 		if self._chatProgress(instance = progress, progress = [0.05, 0.55], status = 36324) is False: return False
@@ -482,8 +436,10 @@ class Oracle(object):
 		if query and not history:
 			Oracle.History = original = Oracle.History or query
 			from lib.modules.search import Search
-			if refine: Search().updateOracle(original, searchData = {'service' : self.id(), 'media' : media, 'mode' : mode, 'query' : query, 'conversation' : conversation, 'refine' : refine})
-			elif not history: Search().insertOracle(original, searchData = {'service' : self.id(), 'media' : media, 'mode' : mode, 'query' : query, 'conversation' : conversation, 'refine' : refine})
+			if refine: function = Search.instance().update
+			elif not history: function = Search.instance().insert
+			else: function = None
+			if function: function(type = Search.TypeOracle, media = media, niche = niche, label = original, query = {'service' : self.id(), 'media' : media, 'mode' : mode, 'query' : query, 'conversation' : conversation, 'refine' : refine})
 
 		queries, context = self.query(query = query, media = media, mode = mode)
 		if refine: context = None
@@ -678,6 +634,25 @@ class Oracle(object):
 		return items
 
 	##############################################################################
+	# EXECUTE
+	##############################################################################
+
+	@classmethod
+	def execute(self, media = None, full = False, history = None):
+		# Hitting the ENTER key twice shortly after each other calls this endpoint twice.
+		property = 'GaiaOracleBusy'
+		id = System.windowPropertyGet(property)
+		time = Time.timestamp()
+
+		# In case a previous search did not clear the property, allow a new scrape after 2 seconds.
+		if not id or (time - int(id) > 2):
+			try:
+				System.windowPropertySet(property, str(time))
+				self.show(media = media, full = full, history = history)
+			except: Logger.error()
+			System.windowPropertyClear(property)
+
+	##############################################################################
 	# SHOW
 	##############################################################################
 
@@ -686,7 +661,7 @@ class Oracle(object):
 		 self.instance()._show(media = media, full = full, history = history)
 
 	def _show(self, media = None, full = False, history = None):
-		if not media: media = Media.TypeMixed
+		if not media: media = Media.Mixed
 		interface = self.settingsInterface()
 
 		if interface == Oracle.InterfaceSpecial: self.showSpecial(media = media, full = full, history = history)
@@ -1199,7 +1174,7 @@ class Oracle(object):
 		default = Oracle.QueryDefault[Language.CodeEnglish]
 		current = self.mQueryItems
 
-		count = {k : {True : 0, False : 0} for k in Oracle.QuerySupport[Media.TypeMixed].keys()}
+		count = {k : {True : 0, False : 0} for k in Oracle.QuerySupport[Media.Mixed].keys()}
 		for k1, v1 in default.items():
 			if media is None or media == k1:
 				for k2, v2 in v1.items():
@@ -1229,7 +1204,7 @@ class Oracle(object):
 		]
 
 		values = [
-			{'label' : (system, context), 'mode' : [Oracle.QueryContext]} if mode is None and self.mQuerySupport[Media.TypeMixed][Oracle.QueryContext] else None,
+			{'label' : (system, context), 'mode' : [Oracle.QueryContext]} if mode is None and self.mQuerySupport[Media.Mixed][Oracle.QueryContext] else None,
 			{'label' : (raw, plain), 'mode' : [Oracle.QueryRaw]},
 			{'label' : (text, all), 'mode' : [Oracle.QueryTextId, Oracle.QueryTextTitle]},
 			{'label' : (text, id), 'mode' : [Oracle.QueryTextId]},
@@ -1319,7 +1294,7 @@ class Oracle(object):
 			{'title' : Dialog.prefixNext(33183), 'action' : self._queryToggle},
 		]
 
-		queries = {Media.TypeMixed : 36280, Media.TypeMovie : 36281, Media.TypeShow : 36282, Media.TypeDocumentary : 36283, Media.TypeShort : 36284, Media.TypeSet: 36285}
+		queries = {Media.Mixed : 36280, Media.Movie : 36281, Media.Show : 36282, Media.Set: 36285}
 		for media, title in queries.items():
 			try: context = self.mQuerySupport[media][Oracle.QueryContext]
 			except: context = False
@@ -1451,9 +1426,9 @@ class Oracle(object):
 		# Determine the media type.
 		media = None
 		medias = {
-			Media.TypeSet : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : '(?:^|[\s\.\,\-\–])(%s)' % Oracle.ExpressionSet},
-			Media.TypeMovie : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(movies?|films?|(?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))'},
-			Media.TypeShow : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(tv|television|shows?|(?<!book[\s\-\–])(?<!novel[\s\-\–])series?|seasons?|episodes?)'},
+			Media.Set : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : '(?:^|[\s\.\,\-\–])(%s)' % Oracle.ExpressionSet},
+			Media.Movie : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(movies?|films?|(?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))'},
+			Media.Show : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(tv|television|shows?|(?<!book[\s\-\–])(?<!novel[\s\-\–])series?|seasons?|episodes?)'},
 		}
 		for key, value in medias.items():
 			for data in [(request, False, 1.5), (response, True, 1.0)]:
@@ -1486,30 +1461,30 @@ class Oracle(object):
 
 			# Only do this for movies vs collections, since collection text will most likley also contain movie keywords.
 			# Otherwise leave this and detect this later by searching both movie and show IDs.
-			if not media and medias[Media.TypeShow]['percent'] < 0.3:
+			if not media and medias[Media.Show]['percent'] < 0.3:
 				current = 0
 				for key, value in medias.items():
-					if value['percent'] > current and (key == Media.TypeSet or key == Media.TypeMovie):
+					if value['percent'] > current and (key == Media.Set or key == Media.Movie):
 						current = value['percent']
 						media = key
 
 				# For a mixture of movies/sets, only pick a media if it is substantially more frequent than the others.
-				if (media == Media.TypeMovie or media == Media.TypeSet) and abs(medias[Media.TypeMovie]['percent'] - medias[Media.TypeSet]['percent']) < 0.15:
+				if (media == Media.Movie or media == Media.Set) and abs(medias[Media.Movie]['percent'] - medias[Media.Set]['percent']) < 0.15:
 					# Only do this if the keywords appear many times.
-					if abs(sum(medias[Media.TypeMovie]['extracted'].values()) - sum(medias[Media.TypeSet]['extracted'].values())) > 10:
+					if abs(sum(medias[Media.Movie]['extracted'].values()) - sum(medias[Media.Set]['extracted'].values())) > 10:
 						media = None
 
 		# Sometimes the chatbot returns individual movies, even though sets were requested, especially if the query addresses a release date.
 		# If the list does not contain any set keywords, IDs, or year ranges, assume they are movies.
-		if media == Media.TypeSet:
+		if media == Media.Set:
 			subresponse = Regex.extract(data = response, expression = '.*?((?:[\{\[]|\n\s*[-\d]).*(?:[\}\]]|\n))', flags = Regex.FlagAllLines)
 			if subresponse:
-				if not Regex.match(data = subresponse, expression = medias[Media.TypeSet]['match']):
+				if not Regex.match(data = subresponse, expression = medias[Media.Set]['match']):
 					ids = Regex.extract(data = subresponse, expression = Oracle.ExpressionIdGeneric, group = None, all = True)
 					if not ids or len(ids) <= 5:
 						if not Regex.match(data = subresponse, expression = Oracle.ExpressionYearMultiple):
 							if not Regex.match(data = subresponse, expression = Oracle.ExpressionYearSequence):
-								media = Media.TypeMovie
+								media = Media.Movie
 
 		# Determine if IDs were requested.
 		id = None
@@ -1899,7 +1874,7 @@ class Oracle(object):
 		valid = []
 		for item in items:
 			try:
-				if not Media.typeMovie(item['extract']['metadata']['media']):
+				if not Media.isFilm(item['extract']['metadata']['media']):
 					valid.append(item)
 					continue
 			except: pass
@@ -1991,17 +1966,17 @@ class Oracle(object):
 			# In rare cases, ChatgPT might return a trilogy/set when requesting a movie.
 			# In other rare cases, ChatgPT might return a show when requesting a movie.
 			expressions = (
-				(Media.TypeSet, Oracle.ExpressionSetExtended, None), # Before checking multiple years.
-				(Media.TypeSet, '(?:(films?|movies?).*?(series?)|(series?).*?(films?|movies?))', None),
-				(Media.TypeSet, '(?:films|movies)\s*(?:$|[\(\[\{\:\.\!\?\-])', '(tv|television|shows?)') if extendedSet else (None, None, None),
-				(Media.TypeShow, '((?:tv|television)(?:[\s\-\–]*(?:shows?%s))?)' % ('' if media == Media.TypeSet else '|series?'), None),
-				(Media.TypeMovie, '(movies?|films?)', None),
-				(Media.TypeMovie, '((?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))', None) if extendedDocu else (None, None, None),
-				(Media.TypeMovie, '(oscars?|academy\s*awards?)', None),
-				(Media.TypeShow, '(emm(?:ys?|ies))', None),
-				(Media.TypeShow, '(shows%s)' % ('' if media == Media.TypeSet else '(?<!book[\s\-\–])(?<!novel[\s\-\–])series?'), None),
-				(Media.TypeSet if result == Media.TypeMovie or result == Media.TypeSet else Media.TypeShow, '(%s)' % Oracle.ExpressionYearMultiple, None),
-				(Media.TypeShow, '(seasons?|episodes?)(?!\s[ivx]+)', None), # Ignore 'Star Wars: Episode IV'.
+				(Media.Set, Oracle.ExpressionSetExtended, None), # Before checking multiple years.
+				(Media.Set, '(?:(films?|movies?).*?(series?)|(series?).*?(films?|movies?))', None),
+				(Media.Set, '(?:films|movies)\s*(?:$|[\(\[\{\:\.\!\?\-])', '(tv|television|shows?)') if extendedSet else (None, None, None),
+				(Media.Show, '((?:tv|television)(?:[\s\-\–]*(?:shows?%s))?)' % ('' if media == Media.Set else '|series?'), None),
+				(Media.Movie, '(movies?|films?)', None),
+				(Media.Movie, '((?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))', None) if extendedDocu else (None, None, None),
+				(Media.Movie, '(oscars?|academy\s*awards?)', None),
+				(Media.Show, '(emm(?:ys?|ies))', None),
+				(Media.Show, '(shows%s)' % ('' if media == Media.Set else '(?<!book[\s\-\–])(?<!novel[\s\-\–])series?'), None),
+				(Media.Set if result == Media.Movie or result == Media.Set else Media.Show, '(%s)' % Oracle.ExpressionYearMultiple, None),
+				(Media.Show, '(seasons?|episodes?)(?!\s[ivx]+)', None), # Ignore 'Star Wars: Episode IV'.
 			)
 
 			label = None
@@ -2200,8 +2175,8 @@ class Oracle(object):
 
 		# Strip keywords from sets.
 		# Eg: The Indiana Jones Series -> Indiana Jones
-		if item and 'media' in item['extract']['metadata'] and item['extract']['metadata']['media'] == Media.TypeSet:
-			if description is None: description = guidance == Media.TypeSet
+		if item and 'media' in item['extract']['metadata'] and item['extract']['metadata']['media'] == Media.Set:
+			if description is None: description = guidance == Media.Set
 
 			suffix1 = Regex.match(data = result, expression = '[\s\-\–](series?|extended\s*editions?|%s)' % Oracle.ExpressionSet)
 			suffix2 = Regex.match(data = result, expression = '[\s\-\–](movies|films)\s*(?:$|[\(\[\{\:\.\!\?\-])')
@@ -2390,48 +2365,48 @@ class Oracle(object):
 		elif title or (imdb or tmdb or tvdb or trakt):
 			# If not known whether this is a movie or show, retrieve both and pick the 'best' one.
 			threads = []
-			threads.append(Pool.thread(target = self._discoverId, kwargs = {'item' : item, 'media' : Media.TypeMovie, 'title' : title, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
-			threads.append(Pool.thread(target = self._discoverId, kwargs = {'item' : item, 'media' : Media.TypeShow, 'title' : title, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
+			threads.append(Pool.thread(target = self._discoverId, kwargs = {'item' : item, 'media' : Media.Movie, 'title' : title, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
+			threads.append(Pool.thread(target = self._discoverId, kwargs = {'item' : item, 'media' : Media.Show, 'title' : title, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
 			[thread.join() for thread in threads]
 
-			if Media.TypeMovie in item['discover'] and Media.TypeShow in item['discover']:
+			if Media.Movie in item['discover'] and Media.Show in item['discover']:
 				# Firstly check search score returned by Trakt.
-				try: movie = item['discover'][Media.TypeMovie]['score']
+				try: movie = item['discover'][Media.Movie]['score']
 				except: movie = None
-				try: show = item['discover'][Media.TypeShow]['score']
+				try: show = item['discover'][Media.Show]['score']
 				except: show = None
-				if movie and show and movie > show: discover = Media.TypeMovie
-				elif movie and show and show > movie: discover = Media.TypeShow
+				if movie and show and movie > show: discover = Media.Movie
+				elif movie and show and show > movie: discover = Media.Show
 				else:
 					# Secondly check the number of votes (Trakt and TMDb, not TVDb).
-					try: movie = item['discover'][Media.TypeMovie]['votes']
+					try: movie = item['discover'][Media.Movie]['votes']
 					except: movie = None
-					try: show = item['discover'][Media.TypeShow]['votes']
+					try: show = item['discover'][Media.Show]['votes']
 					except: show = None
-					if movie and (not show or movie > show): discover = Media.TypeMovie
-					elif show and (not movie or show > movie): discover = Media.TypeShow
+					if movie and (not show or movie > show): discover = Media.Movie
+					elif show and (not movie or show > movie): discover = Media.Show
 					else:
 						# Thirdly check the rating (Trakt and TMDb, not TVDb).
-						try: movie = item['discover'][Media.TypeMovie]['rating']
+						try: movie = item['discover'][Media.Movie]['rating']
 						except: movie = None
-						try: show = item['discover'][Media.TypeShow]['rating']
+						try: show = item['discover'][Media.Show]['rating']
 						except: show = None
-						if movie and (not show or movie > show): discover = Media.TypeMovie
-						elif show and (not movie or show > movie): discover = Media.TypeShow
+						if movie and (not show or movie > show): discover = Media.Movie
+						elif show and (not movie or show > movie): discover = Media.Show
 						else:
 							# Fourthly check the comment count (only Trakt, not TMDb or TVDb).
-							try: movie = item['discover'][Media.TypeMovie]['comments']
+							try: movie = item['discover'][Media.Movie]['comments']
 							except: movie = None
-							try: show = item['discover'][Media.TypeShow]['comments']
+							try: show = item['discover'][Media.Show]['comments']
 							except: show = None
-							if movie and (not show or movie > show): discover = Media.TypeMovie
-							elif show and (not movie or show > movie): discover = Media.TypeShow
+							if movie and (not show or movie > show): discover = Media.Movie
+							elif show and (not movie or show > movie): discover = Media.Show
 							else:
 								# Finally, pick whichever one is available, with preference on movies.
-								if Media.TypeMovie in item['discover'] and item['discover'][Media.TypeMovie]: discover = Media.TypeMovie
-								elif Media.TypeShow in item['discover'] and item['discover'][Media.TypeShow]: discover = Media.TypeShow
-			elif Media.TypeMovie in item['discover']: discover = Media.TypeMovie
-			elif Media.TypeShow in item['discover']: discover = Media.TypeShow
+								if Media.Movie in item['discover'] and item['discover'][Media.Movie]: discover = Media.Movie
+								elif Media.Show in item['discover'] and item['discover'][Media.Show]: discover = Media.Show
+			elif Media.Movie in item['discover']: discover = Media.Movie
+			elif Media.Show in item['discover']: discover = Media.Show
 
 		item['discover']['metadata'] = None
 		if discover:
@@ -2453,15 +2428,15 @@ class Oracle(object):
 		# Eg (year should be 2023): John Wick: Chapter 4 (2022)
 
 		ids = None
-		if media == Media.TypeSet:
+		if media == Media.Set:
 			# Better results when searching with suffix 'Collection'.
 			# Eg: When searching TMDb for 'Rocky', there are 2 sets: 'Rocky'  and 'Rocky Collection'. We want the latter one.
 			# 'extended = True': sometimes ChatGPT returns sets, but has a movie title in between.
 			# Eg: Fantastic Beasts and Where to Find Them
 			# If a set could not be found, search movies with the title and check if they are part of a set.
-			ids = MetaTools.instance().id(media = media, title = title + ' Collection', year = year, idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, deviation = True, extra = True, extended = True)
+			ids = MetaTools.instance().id(media = media, title = title + ' Collection', year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, deviation = True, extra = True, extended = True)
 
-		if not ids: ids = MetaTools.instance().id(media = media, title = title, year = year, idImdb = imdb, idTmdb = tmdb, idTvdb = tvdb, idTrakt = trakt, deviation = True, extra = True, extended = True)
+		if not ids: ids = MetaTools.instance().id(media = media, title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, deviation = True, extra = True, extended = True)
 
 		if ids: item['discover'][media] = ids
 		return ids
@@ -2491,7 +2466,7 @@ class Oracle(object):
 							items.append(Tools.copy(metadata))
 					if replace and items: break
 		if len(media.keys()) == 1: media = list(media.keys())[0]
-		else: media = Media.TypeMixed
+		else: media = Media.Mixed
 
 		data['content'] = {'media' : media, 'items' : MetaTools.instance().filterDuplicate(items)}
 		return data
@@ -2527,13 +2502,13 @@ class Oracle(object):
 	def _metadata(self, data):
 		threads = []
 
-		items = [i for i in data['content']['items'] if 'media' in i and Media.typeMovie(i['media'])]
+		items = [i for i in data['content']['items'] if 'media' in i and Media.isFilm(i['media'])]
 		if items: threads.append(Pool.thread(target = self._metadataMovies, kwargs = {'items' : items}, start = True))
 
-		items = [i for i in data['content']['items'] if 'media' in i and i['media'] == Media.TypeSet]
+		items = [i for i in data['content']['items'] if 'media' in i and Media.isSet(i['media'])]
 		if items: threads.append(Pool.thread(target = self._metadataSets, kwargs = {'items' : items}, start = True))
 
-		items = [i for i in data['content']['items'] if 'media' in i and Media.typeTelevision(i['media'])]
+		items = [i for i in data['content']['items'] if 'media' in i and Media.isSerie(i['media'])]
 		if items: threads.append(Pool.thread(target = self._metadataShows, kwargs = {'items' : items}, start = True))
 
 		[thread.join() for thread in threads]
@@ -2541,16 +2516,16 @@ class Oracle(object):
 		return data
 
 	def _metadataMovies(self, items):
-		from lib.indexers.movies import Movies
-		Movies().metadata(items = items)
+		from lib.meta.manager import MetaManager
+		return MetaManager.instance().metadataMovie(items = items)
 
 	def _metadataSets(self, items):
-		from lib.indexers.sets import Sets
-		Sets().metadata(items = items)
+		from lib.meta.manager import MetaManager
+		return MetaManager.instance().metadataSet(items = items)
 
 	def _metadataShows(self, items):
-		from lib.indexers.shows import Shows
-		Shows().metadata(items = items)
+		from lib.meta.manager import MetaManager
+		return MetaManager.instance().metadataShow(items = items)
 
 	##############################################################################
 	# RESULT
@@ -3039,7 +3014,7 @@ class Oracle(object):
 
 			try: data = data['content']
 			except: pass
-			media = data['media'] if 'media' in data and data['media'] else Media.TypeMixed
+			media = data['media'] if 'media' in data and data['media'] else Media.Mixed
 			directory = Directory(content = Directory.ContentSettings, media = media, cache = True, lock = False)
 			directory.addItems(items = MetaTools.instance().items(metadatas = data['items'], media = media, multiple = True, mixed = True, contextPlaylist = True, contextShortcutCreate = True))
 			directory.finish(loader = True)
@@ -3065,26 +3040,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight', 'year' : 2008, 'imdb' : 'tt0468569'},
-					{'media' : Media.TypeMovie, 'title' : 'Gladiator', 'year' : 2000, 'imdb' : 'tt0172495'},
-					{'media' : Media.TypeMovie, 'title' : 'Braveheart', 'year' : 1995, 'imdb' : 'tt0112573'},
-					{'media' : Media.TypeMovie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991, 'imdb' : 'tt0103064'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard', 'year' : 1988, 'imdb' : 'tt0095016'},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999, 'imdb' : 'tt0133093'},
-					{'media' : Media.TypeMovie, 'title' : 'Mad Max: Fury Road', 'year' : 2015, 'imdb' : 'tt1392190'},
-					{'media' : Media.TypeMovie, 'title' : 'The Bourne Ultimatum', 'year' : 2007, 'imdb' : 'tt0440963'},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon', 'year' : 1987, 'imdb' : 'tt0093409'},
-					{'media' : Media.TypeMovie, 'title' : 'The Fugitive', 'year' : 1993, 'imdb' : 'tt0106977'},
-					{'media' : Media.TypeMovie, 'title' : 'The Raid: Redemption', 'year' : 2011, 'imdb' : 'tt1899353'},
-					{'media' : Media.TypeMovie, 'title' : 'The Hurt Locker', 'year' : 2008, 'imdb' : 'tt0887912'},
-					{'media' : Media.TypeMovie, 'title' : 'The French Connection', 'year' : 1971, 'imdb' : 'tt0067116'},
-					{'media' : Media.TypeMovie, 'title' : 'The Incredibles', 'year' : 2004, 'imdb' : 'tt0317705'},
-					{'media' : Media.TypeMovie, 'title' : 'The Avengers', 'year' : 2012, 'imdb' : 'tt0848228'},
-					{'media' : Media.TypeMovie, 'title' : 'The Revenant', 'year' : 2015, 'imdb' : 'tt1663202'},
-					{'media' : Media.TypeMovie, 'title' : 'The Departed', 'year' : 2006, 'imdb' : 'tt0407887'},
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003, 'imdb' : 'tt0167260'},
-					{'media' : Media.TypeMovie, 'title' : 'Kill Bill: Vol. 1', 'year' : 2003, 'imdb' : 'tt0266697'},
-					{'media' : Media.TypeMovie, 'title' : 'Black Panther', 'year' : 2018, 'imdb' : 'tt1825683'},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight', 'year' : 2008, 'imdb' : 'tt0468569'},
+					{'media' : Media.Movie, 'title' : 'Gladiator', 'year' : 2000, 'imdb' : 'tt0172495'},
+					{'media' : Media.Movie, 'title' : 'Braveheart', 'year' : 1995, 'imdb' : 'tt0112573'},
+					{'media' : Media.Movie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991, 'imdb' : 'tt0103064'},
+					{'media' : Media.Movie, 'title' : 'Die Hard', 'year' : 1988, 'imdb' : 'tt0095016'},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999, 'imdb' : 'tt0133093'},
+					{'media' : Media.Movie, 'title' : 'Mad Max: Fury Road', 'year' : 2015, 'imdb' : 'tt1392190'},
+					{'media' : Media.Movie, 'title' : 'The Bourne Ultimatum', 'year' : 2007, 'imdb' : 'tt0440963'},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon', 'year' : 1987, 'imdb' : 'tt0093409'},
+					{'media' : Media.Movie, 'title' : 'The Fugitive', 'year' : 1993, 'imdb' : 'tt0106977'},
+					{'media' : Media.Movie, 'title' : 'The Raid: Redemption', 'year' : 2011, 'imdb' : 'tt1899353'},
+					{'media' : Media.Movie, 'title' : 'The Hurt Locker', 'year' : 2008, 'imdb' : 'tt0887912'},
+					{'media' : Media.Movie, 'title' : 'The French Connection', 'year' : 1971, 'imdb' : 'tt0067116'},
+					{'media' : Media.Movie, 'title' : 'The Incredibles', 'year' : 2004, 'imdb' : 'tt0317705'},
+					{'media' : Media.Movie, 'title' : 'The Avengers', 'year' : 2012, 'imdb' : 'tt0848228'},
+					{'media' : Media.Movie, 'title' : 'The Revenant', 'year' : 2015, 'imdb' : 'tt1663202'},
+					{'media' : Media.Movie, 'title' : 'The Departed', 'year' : 2006, 'imdb' : 'tt0407887'},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003, 'imdb' : 'tt0167260'},
+					{'media' : Media.Movie, 'title' : 'Kill Bill: Vol. 1', 'year' : 2003, 'imdb' : 'tt0266697'},
+					{'media' : Media.Movie, 'title' : 'Black Panther', 'year' : 2018, 'imdb' : 'tt1825683'},
 				],
 			},
 
@@ -3100,16 +3075,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Misery', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'The Exorcist', 'year' : 1973},
-					{'media' : Media.TypeMovie, 'title' : 'Rosemary\'s Baby', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Psycho', 'year' : 1960},
-					{'media' : Media.TypeMovie, 'title' : 'The Sixth Sense', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'The Others', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'The Fly', 'year' : 1986},
-					{'media' : Media.TypeMovie, 'title' : 'The Ring', 'year' : 2002},
+					{'media' : Media.Movie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Misery', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Exorcist', 'year' : 1973},
+					{'media' : Media.Movie, 'title' : 'Rosemary\'s Baby', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Psycho', 'year' : 1960},
+					{'media' : Media.Movie, 'title' : 'The Sixth Sense', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'The Others', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Fly', 'year' : 1986},
+					{'media' : Media.Movie, 'title' : 'The Ring', 'year' : 2002},
 				],
 			},
 
@@ -3125,16 +3100,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'The Exorcist', 'year' : 1973},
-					{'media' : Media.TypeMovie, 'title' : 'Jaws', 'year' : 1975},
-					{'media' : Media.TypeMovie, 'title' : 'Psycho', 'year' : 1960},
-					{'media' : Media.TypeMovie, 'title' : 'Rosemary\'s Baby', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'The Sixth Sense', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Get Out', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Hereditary', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'The Babadook', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'The Exorcist', 'year' : 1973},
+					{'media' : Media.Movie, 'title' : 'Jaws', 'year' : 1975},
+					{'media' : Media.Movie, 'title' : 'Psycho', 'year' : 1960},
+					{'media' : Media.Movie, 'title' : 'Rosemary\'s Baby', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'The Sixth Sense', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Get Out', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Hereditary', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'The Babadook', 'year' : 2014},
 				],
 			},
 
@@ -3150,14 +3125,14 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Animal Farm', 'year' : 1954},
-					{'media' : Media.TypeMovie, 'title' : '1984', 'year' : 1956},
-					{'media' : Media.TypeMovie, 'title' : 'Animal Farm', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : '1984', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'Animal Farm', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'Nineteen Eighty-Four', 'year' : 2013},
-					{'media' : Media.TypeMovie, 'title' : 'Animal Farm', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : '1984', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Animal Farm', 'year' : 1954},
+					{'media' : Media.Movie, 'title' : '1984', 'year' : 1956},
+					{'media' : Media.Movie, 'title' : 'Animal Farm', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : '1984', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'Animal Farm', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'Nineteen Eighty-Four', 'year' : 2013},
+					{'media' : Media.Movie, 'title' : 'Animal Farm', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : '1984', 'year' : 2019},
 				],
 			},
 
@@ -3173,16 +3148,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003},
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'Blade Runner', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'The Terminator', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'Star Wars: Episode IV - A New Hope', 'year' : 1977},
-					{'media' : Media.TypeMovie, 'title' : 'The NeverEnding Story', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'The Fifth Element', 'year' : 1997},
-					{'media' : Media.TypeMovie, 'title' : 'The Chronicles of Riddick', 'year' : 2004},
-					{'media' : Media.TypeMovie, 'title' : 'The Hobbit: The Desolation of Smaug', 'year' : 2013},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'Blade Runner', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'The Terminator', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'Star Wars: Episode IV - A New Hope', 'year' : 1977},
+					{'media' : Media.Movie, 'title' : 'The NeverEnding Story', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'The Fifth Element', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'The Chronicles of Riddick', 'year' : 2004},
+					{'media' : Media.Movie, 'title' : 'The Hobbit: The Desolation of Smaug', 'year' : 2013},
 				],
 			},
 
@@ -3198,7 +3173,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar'},
+					{'media' : Media.Movie, 'title' : 'Avatar'},
 				],
 			},
 
@@ -3214,7 +3189,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009},
 				],
 			},
 
@@ -3230,7 +3205,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar'},
+					{'media' : Media.Movie, 'title' : 'Avatar'},
 				],
 			},
 
@@ -3246,7 +3221,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
 				],
 			},
 
@@ -3262,7 +3237,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
 				],
 			},
 
@@ -3278,7 +3253,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Cinderella', 'year' : 1950},
+					{'media' : Media.Movie, 'title' : 'Cinderella', 'year' : 1950},
 				],
 			},
 
@@ -3294,7 +3269,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Smurfs'},
+					{'media' : Media.Movie, 'title' : 'The Smurfs'},
 				],
 			},
 
@@ -3310,26 +3285,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'The Boys'},
-					{'media' : Media.TypeShow, 'title' : 'The Marvelous Mrs. Maisel'},
-					{'media' : Media.TypeShow, 'title' : 'Jack Ryan'},
-					{'media' : Media.TypeShow, 'title' : 'Hanna'},
-					{'media' : Media.TypeShow, 'title' : 'Bosch'},
-					{'media' : Media.TypeShow, 'title' : 'Sneaky Pete'},
-					{'media' : Media.TypeShow, 'title' : 'The Tick'},
-					{'media' : Media.TypeShow, 'title' : 'Patriot'},
-					{'media' : Media.TypeShow, 'title' : 'Homecoming'},
-					{'media' : Media.TypeShow, 'title' : 'Carnival Row'},
-					{'media' : Media.TypeShow, 'title' : 'Hunters'},
-					{'media' : Media.TypeShow, 'title' : 'Upload'},
-					{'media' : Media.TypeShow, 'title' : 'Tales from the Loop'},
-					{'media' : Media.TypeShow, 'title' : 'The Wilds'},
-					{'media' : Media.TypeShow, 'title' : 'Invincible'},
-					{'media' : Media.TypeShow, 'title' : 'Panic'},
-					{'media' : Media.TypeShow, 'title' : 'Solos'},
-					{'media' : Media.TypeShow, 'title' : 'Them'},
-					{'media' : Media.TypeShow, 'title' : 'The Underground Railroad'},
-					{'media' : Media.TypeShow, 'title' : 'Luxe Listings Sydney'},
+					{'media' : Media.Show, 'title' : 'The Boys'},
+					{'media' : Media.Show, 'title' : 'The Marvelous Mrs. Maisel'},
+					{'media' : Media.Show, 'title' : 'Jack Ryan'},
+					{'media' : Media.Show, 'title' : 'Hanna'},
+					{'media' : Media.Show, 'title' : 'Bosch'},
+					{'media' : Media.Show, 'title' : 'Sneaky Pete'},
+					{'media' : Media.Show, 'title' : 'The Tick'},
+					{'media' : Media.Show, 'title' : 'Patriot'},
+					{'media' : Media.Show, 'title' : 'Homecoming'},
+					{'media' : Media.Show, 'title' : 'Carnival Row'},
+					{'media' : Media.Show, 'title' : 'Hunters'},
+					{'media' : Media.Show, 'title' : 'Upload'},
+					{'media' : Media.Show, 'title' : 'Tales from the Loop'},
+					{'media' : Media.Show, 'title' : 'The Wilds'},
+					{'media' : Media.Show, 'title' : 'Invincible'},
+					{'media' : Media.Show, 'title' : 'Panic'},
+					{'media' : Media.Show, 'title' : 'Solos'},
+					{'media' : Media.Show, 'title' : 'Them'},
+					{'media' : Media.Show, 'title' : 'The Underground Railroad'},
+					{'media' : Media.Show, 'title' : 'Luxe Listings Sydney'},
 				],
 			},
 
@@ -3345,16 +3320,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'The Marvelous Mrs. Maisel', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'Jack Ryan', 'year' : 2018},
-					{'media' : Media.TypeShow, 'title' : 'The Man in the High Castle', 'year' : 2015},
-					{'media' : Media.TypeShow, 'title' : 'Bosch', 'year' : 2014},
-					{'media' : Media.TypeShow, 'title' : 'Transparent', 'year' : 2014},
-					{'media' : Media.TypeShow, 'title' : 'Hanna', 'year' : 2019},
-					{'media' : Media.TypeShow, 'title' : 'Sneaky Pete', 'year' : 2015},
-					{'media' : Media.TypeShow, 'title' : 'The Tick', 'year' : 2016},
-					{'media' : Media.TypeShow, 'title' : 'Goliath', 'year' : 2016},
-					{'media' : Media.TypeShow, 'title' : 'Homecoming', 'year' : 2018},
+					{'media' : Media.Show, 'title' : 'The Marvelous Mrs. Maisel', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Jack Ryan', 'year' : 2018},
+					{'media' : Media.Show, 'title' : 'The Man in the High Castle', 'year' : 2015},
+					{'media' : Media.Show, 'title' : 'Bosch', 'year' : 2014},
+					{'media' : Media.Show, 'title' : 'Transparent', 'year' : 2014},
+					{'media' : Media.Show, 'title' : 'Hanna', 'year' : 2019},
+					{'media' : Media.Show, 'title' : 'Sneaky Pete', 'year' : 2015},
+					{'media' : Media.Show, 'title' : 'The Tick', 'year' : 2016},
+					{'media' : Media.Show, 'title' : 'Goliath', 'year' : 2016},
+					{'media' : Media.Show, 'title' : 'Homecoming', 'year' : 2018},
 				],
 			},
 
@@ -3370,16 +3345,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'The Simpsons', 'year' : 1989},
-					{'media' : Media.TypeShow, 'title' : 'Law & Order: Special Victims Unit', 'year' : 1999},
-					{'media' : Media.TypeShow, 'title' : 'Grey\'s Anatomy', 'year' : 2005},
-					{'media' : Media.TypeShow, 'title' : 'NCIS', 'year' : 2003},
-					{'media' : Media.TypeShow, 'title' : 'CSI: Crime Scene Investigation', 'year' : 2000},
-					{'media' : Media.TypeShow, 'title' : 'ER', 'year' : 1994},
-					{'media' : Media.TypeShow, 'title' : 'Friends', 'year' : 1994},
-					{'media' : Media.TypeShow, 'title' : 'Cheers', 'year' : 1982},
-					{'media' : Media.TypeShow, 'title' : 'M*A*S*H', 'year' : 1972},
-					{'media' : Media.TypeShow, 'title' : 'The Love Boat', 'year' : 1977},
+					{'media' : Media.Show, 'title' : 'The Simpsons', 'year' : 1989},
+					{'media' : Media.Show, 'title' : 'Law & Order: Special Victims Unit', 'year' : 1999},
+					{'media' : Media.Show, 'title' : 'Grey\'s Anatomy', 'year' : 2005},
+					{'media' : Media.Show, 'title' : 'NCIS', 'year' : 2003},
+					{'media' : Media.Show, 'title' : 'CSI: Crime Scene Investigation', 'year' : 2000},
+					{'media' : Media.Show, 'title' : 'ER', 'year' : 1994},
+					{'media' : Media.Show, 'title' : 'Friends', 'year' : 1994},
+					{'media' : Media.Show, 'title' : 'Cheers', 'year' : 1982},
+					{'media' : Media.Show, 'title' : 'M*A*S*H', 'year' : 1972},
+					{'media' : Media.Show, 'title' : 'The Love Boat', 'year' : 1977},
 				],
 			},
 
@@ -3395,26 +3370,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Dexter: New Blood'},
-					{'media' : Media.TypeShow, 'title' : 'Sex and the City: And Just Like That...'},
-					{'media' : Media.TypeShow, 'title' : 'Yellowstone'},
-					{'media' : Media.TypeShow, 'title' : 'The Morning Show'},
-					{'media' : Media.TypeShow, 'title' : 'Succession'},
-					{'media' : Media.TypeShow, 'title' : 'The Witcher'},
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things'},
-					{'media' : Media.TypeShow, 'title' : 'Ozark'},
-					{'media' : Media.TypeShow, 'title' : 'The Handmaid\'s Tale'},
-					{'media' : Media.TypeShow, 'title' : 'Cobra Kai'},
-					{'media' : Media.TypeShow, 'title' : 'You'},
-					{'media' : Media.TypeShow, 'title' : 'The Crown'},
-					{'media' : Media.TypeShow, 'title' : 'The Marvelous Mrs. Maisel'},
-					{'media' : Media.TypeShow, 'title' : 'The Boys'},
-					{'media' : Media.TypeShow, 'title' : 'The Walking Dead'},
-					{'media' : Media.TypeShow, 'title' : 'American Horror Story: Double Feature'},
-					{'media' : Media.TypeShow, 'title' : 'NCIS: Hawai\'i'},
-					{'media' : Media.TypeShow, 'title' : 'CSI: Vegas'},
-					{'media' : Media.TypeShow, 'title' : 'Law & Order: Organized Crime'},
-					{'media' : Media.TypeShow, 'title' : 'Grey\'s Anatomy'},
+					{'media' : Media.Show, 'title' : 'Dexter: New Blood'},
+					{'media' : Media.Show, 'title' : 'Sex and the City: And Just Like That...'},
+					{'media' : Media.Show, 'title' : 'Yellowstone'},
+					{'media' : Media.Show, 'title' : 'The Morning Show'},
+					{'media' : Media.Show, 'title' : 'Succession'},
+					{'media' : Media.Show, 'title' : 'The Witcher'},
+					{'media' : Media.Show, 'title' : 'Stranger Things'},
+					{'media' : Media.Show, 'title' : 'Ozark'},
+					{'media' : Media.Show, 'title' : 'The Handmaid\'s Tale'},
+					{'media' : Media.Show, 'title' : 'Cobra Kai'},
+					{'media' : Media.Show, 'title' : 'You'},
+					{'media' : Media.Show, 'title' : 'The Crown'},
+					{'media' : Media.Show, 'title' : 'The Marvelous Mrs. Maisel'},
+					{'media' : Media.Show, 'title' : 'The Boys'},
+					{'media' : Media.Show, 'title' : 'The Walking Dead'},
+					{'media' : Media.Show, 'title' : 'American Horror Story: Double Feature'},
+					{'media' : Media.Show, 'title' : 'NCIS: Hawai\'i'},
+					{'media' : Media.Show, 'title' : 'CSI: Vegas'},
+					{'media' : Media.Show, 'title' : 'Law & Order: Organized Crime'},
+					{'media' : Media.Show, 'title' : 'Grey\'s Anatomy'},
 				],
 			},
 
@@ -3430,16 +3405,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones'},
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad'},
-					{'media' : Media.TypeShow, 'title' : 'The Sopranos'},
-					{'media' : Media.TypeShow, 'title' : 'The West Wing'},
-					{'media' : Media.TypeShow, 'title' : 'Mad Men'},
-					{'media' : Media.TypeShow, 'title' : 'The Crown'},
-					{'media' : Media.TypeShow, 'title' : 'The Handmaid\'s Tale'},
-					{'media' : Media.TypeShow, 'title' : 'Fleabag'},
-					{'media' : Media.TypeShow, 'title' : 'Schitt\'s Creek'},
-					{'media' : Media.TypeShow, 'title' : 'Friends'},
+					{'media' : Media.Show, 'title' : 'Game of Thrones'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad'},
+					{'media' : Media.Show, 'title' : 'The Sopranos'},
+					{'media' : Media.Show, 'title' : 'The West Wing'},
+					{'media' : Media.Show, 'title' : 'Mad Men'},
+					{'media' : Media.Show, 'title' : 'The Crown'},
+					{'media' : Media.Show, 'title' : 'The Handmaid\'s Tale'},
+					{'media' : Media.Show, 'title' : 'Fleabag'},
+					{'media' : Media.Show, 'title' : 'Schitt\'s Creek'},
+					{'media' : Media.Show, 'title' : 'Friends'},
 				],
 			},
 
@@ -3455,16 +3430,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones', 'year' : 2019},
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad', 'year' : 2014},
-					{'media' : Media.TypeShow, 'title' : 'The Sopranos', 'year' : 2007},
-					{'media' : Media.TypeShow, 'title' : 'The West Wing', 'year' : 2000},
-					{'media' : Media.TypeShow, 'title' : 'Mad Men', 'year' : 2011},
-					{'media' : Media.TypeShow, 'title' : 'The Crown', 'year' : 2018},
-					{'media' : Media.TypeShow, 'title' : 'The Handmaid\'s Tale', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'Friends', 'year' : 2002},
-					{'media' : Media.TypeShow, 'title' : 'The Marvelous Mrs. Maisel', 'year' : 2018},
-					{'media' : Media.TypeShow, 'title' : 'Modern Family', 'year' : 2010},
+					{'media' : Media.Show, 'title' : 'Game of Thrones', 'year' : 2019},
+					{'media' : Media.Show, 'title' : 'Breaking Bad', 'year' : 2014},
+					{'media' : Media.Show, 'title' : 'The Sopranos', 'year' : 2007},
+					{'media' : Media.Show, 'title' : 'The West Wing', 'year' : 2000},
+					{'media' : Media.Show, 'title' : 'Mad Men', 'year' : 2011},
+					{'media' : Media.Show, 'title' : 'The Crown', 'year' : 2018},
+					{'media' : Media.Show, 'title' : 'The Handmaid\'s Tale', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Friends', 'year' : 2002},
+					{'media' : Media.Show, 'title' : 'The Marvelous Mrs. Maisel', 'year' : 2018},
+					{'media' : Media.Show, 'title' : 'Modern Family', 'year' : 2010},
 				],
 			},
 
@@ -3551,7 +3526,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Silence of the Lambs', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Silence of the Lambs', 'year' : 1990},
 				],
 			},
 
@@ -3567,7 +3542,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Forrest Gump', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Forrest Gump', 'year' : 1990},
 				],
 			},
 
@@ -3585,8 +3560,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Silence of the Lambs', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather Part III', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'The Silence of the Lambs', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Godfather Part III', 'year' : 1991},
 				],
 			},
 
@@ -3604,8 +3579,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Forrest Gump', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'The Artist', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Forrest Gump', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Artist', 'year' : 1990},
 				],
 			},
 
@@ -3621,11 +3596,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Matrix'},
-					{'media' : Media.TypeMovie, 'title' : 'Mission Impossible'},
-					{'media' : Media.TypeMovie, 'title' : 'Rambo'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard'},
-					{'media' : Media.TypeMovie, 'title' : 'Bourne'},
+					{'media' : Media.Movie, 'title' : 'Matrix'},
+					{'media' : Media.Movie, 'title' : 'Mission Impossible'},
+					{'media' : Media.Movie, 'title' : 'Rambo'},
+					{'media' : Media.Movie, 'title' : 'Die Hard'},
+					{'media' : Media.Movie, 'title' : 'Bourne'},
 				],
 			},
 
@@ -3641,14 +3616,14 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Matrix'},
-					{'media' : Media.TypeMovie, 'title' : 'Mission Impossible'},
-					{'media' : Media.TypeMovie, 'title' : 'Rambo'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard'},
-					{'media' : Media.TypeMovie, 'title' : 'Bourne'},
-					{'media' : Media.TypeMovie, 'title' : 'Bourne'},
-					{'media' : Media.TypeMovie, 'title' : 'Top Gun'},
-					{'media' : Media.TypeMovie, 'title' : 'Inception'},
+					{'media' : Media.Movie, 'title' : 'Matrix'},
+					{'media' : Media.Movie, 'title' : 'Mission Impossible'},
+					{'media' : Media.Movie, 'title' : 'Rambo'},
+					{'media' : Media.Movie, 'title' : 'Die Hard'},
+					{'media' : Media.Movie, 'title' : 'Bourne'},
+					{'media' : Media.Movie, 'title' : 'Bourne'},
+					{'media' : Media.Movie, 'title' : 'Top Gun'},
+					{'media' : Media.Movie, 'title' : 'Inception'},
 				],
 			},
 
@@ -3664,11 +3639,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'John Wick', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'The Raid: Redemption', 'year' : 2011},
-					{'media' : Media.TypeMovie, 'title' : 'Mad Max: Fury Road', 'year' : 2015},
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight', 'year' : 2008},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard', 'year' : 1988},
+					{'media' : Media.Movie, 'title' : 'John Wick', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'The Raid: Redemption', 'year' : 2011},
+					{'media' : Media.Movie, 'title' : 'Mad Max: Fury Road', 'year' : 2015},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight', 'year' : 2008},
+					{'media' : Media.Movie, 'title' : 'Die Hard', 'year' : 1988},
 				],
 			},
 
@@ -3684,8 +3659,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad'},
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad'},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight'},
 				],
 			},
 
@@ -3703,13 +3678,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'John Wick'},
-					{'media' : Media.TypeMovie, 'title' : 'The Bourne Identity'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard'},
-					{'media' : Media.TypeMovie, 'title' : 'Mad Max: Fury Road'},
-					{'media' : Media.TypeMovie, 'title' : 'The Raid: Redemption'},
-					{'media' : Media.TypeMovie, 'title' : 'Kill Bill: Volume 1'},
-					{'media' : Media.TypeMovie, 'title' : 'Mission: Impossible - Fallout'},
+					{'media' : Media.Movie, 'title' : 'John Wick'},
+					{'media' : Media.Movie, 'title' : 'The Bourne Identity'},
+					{'media' : Media.Movie, 'title' : 'Die Hard'},
+					{'media' : Media.Movie, 'title' : 'Mad Max: Fury Road'},
+					{'media' : Media.Movie, 'title' : 'The Raid: Redemption'},
+					{'media' : Media.Movie, 'title' : 'Kill Bill: Volume 1'},
+					{'media' : Media.Movie, 'title' : 'Mission: Impossible - Fallout'},
 				],
 			},
 
@@ -3725,8 +3700,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard'},
+					{'media' : Media.Movie, 'title' : 'The Matrix'},
+					{'media' : Media.Movie, 'title' : 'Die Hard'},
 				],
 			},
 
@@ -3742,8 +3717,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'John Wick', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'The Raid: Redemption', 'year' : 2011},
+					{'media' : Media.Movie, 'title' : 'John Wick', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'The Raid: Redemption', 'year' : 2011},
 				],
 			},
 
@@ -3759,8 +3734,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather'},
-					{'media' : Media.TypeMovie, 'title' : 'Inception'},
+					{'media' : Media.Movie, 'title' : 'The Godfather'},
+					{'media' : Media.Movie, 'title' : 'Inception'},
 				],
 			},
 
@@ -3778,13 +3753,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight', 'year' : 2008},
-					{'media' : Media.TypeMovie, 'title' : 'John Wick', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'Mission: Impossible - Fallout', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'Mad Max: Fury Road', 'year' : 2015},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard', 'year' : 1988},
-					{'media' : Media.TypeMovie, 'title' : 'The Bourne Ultimatum', 'year' : 2007},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight', 'year' : 2008},
+					{'media' : Media.Movie, 'title' : 'John Wick', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'Mission: Impossible - Fallout', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'Mad Max: Fury Road', 'year' : 2015},
+					{'media' : Media.Movie, 'title' : 'Die Hard', 'year' : 1988},
+					{'media' : Media.Movie, 'title' : 'The Bourne Ultimatum', 'year' : 2007},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999},
 				],
 			},
 
@@ -3800,8 +3775,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'year' : 2001},
 				],
 			},
 
@@ -3817,15 +3792,15 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Marvel Cinematic Universe'},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars'},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter'},
-					{'media' : Media.TypeSet, 'title' : 'Lord of The Rings'},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones'},
-					{'media' : Media.TypeSet, 'title' : 'Alien'},
-					{'media' : Media.TypeSet, 'title' : 'Terminator'},
-					{'media' : Media.TypeSet, 'title' : 'Rocky'},
-					{'media' : Media.TypeSet, 'title' : 'Fast and the Furious'},
+					{'media' : Media.Set, 'title' : 'The Marvel Cinematic Universe'},
+					{'media' : Media.Set, 'title' : 'Star Wars'},
+					{'media' : Media.Set, 'title' : 'Harry Potter'},
+					{'media' : Media.Set, 'title' : 'Lord of The Rings'},
+					{'media' : Media.Set, 'title' : 'Indiana Jones'},
+					{'media' : Media.Set, 'title' : 'Alien'},
+					{'media' : Media.Set, 'title' : 'Terminator'},
+					{'media' : Media.Set, 'title' : 'Rocky'},
+					{'media' : Media.Set, 'title' : 'Fast and the Furious'},
 				],
 			},
 
@@ -3841,16 +3816,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Godfather'},
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings'},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars Skywalker'},
-					{'media' : Media.TypeSet, 'title' : 'The Dark Knight'},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones'},
-					{'media' : Media.TypeSet, 'title' : 'The Matrix'},
-					{'media' : Media.TypeSet, 'title' : 'Back to the Future'},
-					{'media' : Media.TypeSet, 'title' : 'Toy Story'},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter'},
-					{'media' : Media.TypeSet, 'title' : 'Marvel Cinematic Universe'},
+					{'media' : Media.Set, 'title' : 'The Godfather'},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings'},
+					{'media' : Media.Set, 'title' : 'Star Wars Skywalker'},
+					{'media' : Media.Set, 'title' : 'The Dark Knight'},
+					{'media' : Media.Set, 'title' : 'Indiana Jones'},
+					{'media' : Media.Set, 'title' : 'The Matrix'},
+					{'media' : Media.Set, 'title' : 'Back to the Future'},
+					{'media' : Media.Set, 'title' : 'Toy Story'},
+					{'media' : Media.Set, 'title' : 'Harry Potter'},
+					{'media' : Media.Set, 'title' : 'Marvel Cinematic Universe'},
 				],
 			},
 
@@ -3866,11 +3841,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Hobbit', 'year' : 2012},
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones', 'year' : 2011},
-					{'media' : Media.TypeSet, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
-					{'media' : Media.TypeMovie, 'title' : 'Braveheart', 'year' : 1995},
-					{'media' : Media.TypeMovie, 'title' : 'Gladiator', 'year' : 2000},
+					{'media' : Media.Set, 'title' : 'The Hobbit', 'year' : 2012},
+					{'media' : Media.Show, 'title' : 'Game of Thrones', 'year' : 2011},
+					{'media' : Media.Set, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
+					{'media' : Media.Movie, 'title' : 'Braveheart', 'year' : 1995},
+					{'media' : Media.Movie, 'title' : 'Gladiator', 'year' : 2000},
 				],
 			},
 
@@ -3886,16 +3861,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'A Clockwork Orange', 'year' : 1971},
-					{'media' : Media.TypeMovie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'year' : 1964},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Full Metal Jacket', 'year' : 1987},
-					{'media' : Media.TypeMovie, 'title' : 'Barry Lyndon', 'year' : 1975},
-					{'media' : Media.TypeMovie, 'title' : 'Eyes Wide Shut', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'Lolita', 'year' : 1962},
-					{'media' : Media.TypeMovie, 'title' : 'Killer\'s Kiss', 'year' : 1955},
-					{'media' : Media.TypeMovie, 'title' : 'The Killing', 'year' : 1956},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'A Clockwork Orange', 'year' : 1971},
+					{'media' : Media.Movie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'year' : 1964},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Full Metal Jacket', 'year' : 1987},
+					{'media' : Media.Movie, 'title' : 'Barry Lyndon', 'year' : 1975},
+					{'media' : Media.Movie, 'title' : 'Eyes Wide Shut', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'Lolita', 'year' : 1962},
+					{'media' : Media.Movie, 'title' : 'Killer\'s Kiss', 'year' : 1955},
+					{'media' : Media.Movie, 'title' : 'The Killing', 'year' : 1956},
 				],
 			},
 
@@ -3911,11 +3886,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Friends'},
-					{'media' : Media.TypeShow, 'title' : 'The Office US'},
-					{'media' : Media.TypeShow, 'title' : 'Parks and Recreation'},
-					{'media' : Media.TypeShow, 'title' : 'Bob Ross: Beauty is Everywhere'},
-					{'media' : Media.TypeShow, 'title' : 'Cosmos: A Spacetime Odyssey'},
+					{'media' : Media.Show, 'title' : 'Friends'},
+					{'media' : Media.Show, 'title' : 'The Office US'},
+					{'media' : Media.Show, 'title' : 'Parks and Recreation'},
+					{'media' : Media.Show, 'title' : 'Bob Ross: Beauty is Everywhere'},
+					{'media' : Media.Show, 'title' : 'Cosmos: A Spacetime Odyssey'},
 				],
 			},
 
@@ -3931,11 +3906,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Jumanji: Welcome to the Jungle', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'Friends'},
-					{'media' : Media.TypeMovie, 'title' : 'The Grand Budapest Hotel', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'Avengers: Endgame', 'year' : 2019},
-					{'media' : Media.TypeShow, 'title' : 'Jeopardy!'},
+					{'media' : Media.Movie, 'title' : 'Jumanji: Welcome to the Jungle', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Friends'},
+					{'media' : Media.Movie, 'title' : 'The Grand Budapest Hotel', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'Avengers: Endgame', 'year' : 2019},
+					{'media' : Media.Show, 'title' : 'Jeopardy!'},
 				],
 			},
 
@@ -3966,13 +3941,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
-					{'media' : Media.TypeMovie, 'title' : 'The Smurfs', 'year' : 2011, 'imdb' : 'tt0472181'},
-					{'media' : Media.TypeMovie, 'title' : 'The Blue Angel', 'year' : 1930, 'imdb' : 'tt0020697'},
-					{'media' : Media.TypeMovie, 'title' : 'Blue Is the Warmest Color', 'year' : 2013, 'imdb' : 'tt2278871'},
-					{'media' : Media.TypeMovie, 'title' : 'Blue Thunder', 'year' : 1983, 'imdb' : 'tt0085255'},
-					{'media' : Media.TypeMovie, 'title' : 'Blue Crush', 'year' : 2002, 'imdb' : 'tt0291253'},
-					{'media' : Media.TypeMovie, 'title' : 'The Blue Lagoon', 'year' : 1980, 'imdb' : 'tt0080453'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'The Smurfs', 'year' : 2011, 'imdb' : 'tt0472181'},
+					{'media' : Media.Movie, 'title' : 'The Blue Angel', 'year' : 1930, 'imdb' : 'tt0020697'},
+					{'media' : Media.Movie, 'title' : 'Blue Is the Warmest Color', 'year' : 2013, 'imdb' : 'tt2278871'},
+					{'media' : Media.Movie, 'title' : 'Blue Thunder', 'year' : 1983, 'imdb' : 'tt0085255'},
+					{'media' : Media.Movie, 'title' : 'Blue Crush', 'year' : 2002, 'imdb' : 'tt0291253'},
+					{'media' : Media.Movie, 'title' : 'The Blue Lagoon', 'year' : 1980, 'imdb' : 'tt0080453'},
 				],
 			},
 
@@ -3988,7 +3963,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
 				],
 			},
 
@@ -4004,7 +3979,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar 2', 'year' : 2022},
+					{'media' : Media.Movie, 'title' : 'Avatar 2', 'year' : 2022},
 				],
 			},
 
@@ -4022,8 +3997,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar 2', 'year' : 2022, 'imdb' : 'tt9253866'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009, 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'Avatar 2', 'year' : 2022, 'imdb' : 'tt9253866'},
 				],
 			},
 
@@ -4069,16 +4044,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Toy Story', 'imdb' : 'tt0114709'},
-					{'media' : Media.TypeMovie, 'title' : 'The Lion King', 'imdb' : 'tt0110357'},
-					{'media' : Media.TypeMovie, 'title' : 'Finding Nemo', 'imdb' : 'tt0266543'},
-					{'media' : Media.TypeMovie, 'title' : 'Up', 'imdb' : 'tt1049413'},
-					{'media' : Media.TypeMovie, 'title' : 'Moana', 'imdb' : 'tt3521164'},
-					{'media' : Media.TypeMovie, 'title' : 'Frozen', 'imdb' : 'tt2294629'},
-					{'media' : Media.TypeMovie, 'title' : 'Inside Out', 'imdb' : 'tt2096673'},
-					{'media' : Media.TypeMovie, 'title' : 'Zootopia', 'imdb' : 'tt2948356'},
-					{'media' : Media.TypeMovie, 'title' : 'Monsters, Inc', 'imdb' : 'tt0198781'},
-					{'media' : Media.TypeMovie, 'title' : 'The Incredibles', 'imdb' : 'tt0317705'},
+					{'media' : Media.Movie, 'title' : 'Toy Story', 'imdb' : 'tt0114709'},
+					{'media' : Media.Movie, 'title' : 'The Lion King', 'imdb' : 'tt0110357'},
+					{'media' : Media.Movie, 'title' : 'Finding Nemo', 'imdb' : 'tt0266543'},
+					{'media' : Media.Movie, 'title' : 'Up', 'imdb' : 'tt1049413'},
+					{'media' : Media.Movie, 'title' : 'Moana', 'imdb' : 'tt3521164'},
+					{'media' : Media.Movie, 'title' : 'Frozen', 'imdb' : 'tt2294629'},
+					{'media' : Media.Movie, 'title' : 'Inside Out', 'imdb' : 'tt2096673'},
+					{'media' : Media.Movie, 'title' : 'Zootopia', 'imdb' : 'tt2948356'},
+					{'media' : Media.Movie, 'title' : 'Monsters, Inc', 'imdb' : 'tt0198781'},
+					{'media' : Media.Movie, 'title' : 'The Incredibles', 'imdb' : 'tt0317705'},
 				],
 			},
 
@@ -4094,13 +4069,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'year' : 2016, 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeShow, 'title' : 'The Umbrella Academy', 'year' : 2019, 'imdb' : 'tt1312171'},
-					{'media' : Media.TypeShow, 'title' : 'Riverdale', 'year' : 2017, 'imdb' : 'tt5420376'},
-					{'media' : Media.TypeShow, 'title' : 'The Flash', 'year' : 2014, 'imdb' : 'tt3107288'},
-					{'media' : Media.TypeShow, 'title' : 'Teen Wolf', 'year' : 2011, 'imdb' : 'tt1567432'},
-					{'media' : Media.TypeShow, 'title' : 'The 100', 'year' : 2014, 'imdb' : 'tt2661044'},
-					{'media' : Media.TypeShow, 'title' : 'Arrow', 'year' : 2012, 'imdb' : 'tt2193021'},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'year' : 2016, 'imdb' : 'tt4574334'},
+					{'media' : Media.Show, 'title' : 'The Umbrella Academy', 'year' : 2019, 'imdb' : 'tt1312171'},
+					{'media' : Media.Show, 'title' : 'Riverdale', 'year' : 2017, 'imdb' : 'tt5420376'},
+					{'media' : Media.Show, 'title' : 'The Flash', 'year' : 2014, 'imdb' : 'tt3107288'},
+					{'media' : Media.Show, 'title' : 'Teen Wolf', 'year' : 2011, 'imdb' : 'tt1567432'},
+					{'media' : Media.Show, 'title' : 'The 100', 'year' : 2014, 'imdb' : 'tt2661044'},
+					{'media' : Media.Show, 'title' : 'Arrow', 'year' : 2012, 'imdb' : 'tt2193021'},
 				],
 			},
 
@@ -4116,13 +4091,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Handmaiden', 'year' : 2016, 'imdb' : 'tt4016934'},
-					{'media' : Media.TypeMovie, 'title' : 'Moonlight', 'year' : 2016, 'imdb' : 'tt4975722'},
-					{'media' : Media.TypeMovie, 'title' : 'The Lobster', 'year' : 2015, 'imdb' : 'tt3464902'},
-					{'media' : Media.TypeMovie, 'title' : 'The Witch', 'year' : 2015, 'imdb' : 'tt4263482'},
-					{'media' : Media.TypeMovie, 'title' : 'The Florida Project', 'year' : 2017, 'imdb' : 'tt5649144'},
-					{'media' : Media.TypeMovie, 'title' : 'Under the Skin', 'year' : 2013, 'imdb' : 'tt1441395'},
-					{'media' : Media.TypeMovie, 'title' : 'Colossal', 'year' : 2016, 'imdb' : 'tt4680182'},
+					{'media' : Media.Movie, 'title' : 'The Handmaiden', 'year' : 2016, 'imdb' : 'tt4016934'},
+					{'media' : Media.Movie, 'title' : 'Moonlight', 'year' : 2016, 'imdb' : 'tt4975722'},
+					{'media' : Media.Movie, 'title' : 'The Lobster', 'year' : 2015, 'imdb' : 'tt3464902'},
+					{'media' : Media.Movie, 'title' : 'The Witch', 'year' : 2015, 'imdb' : 'tt4263482'},
+					{'media' : Media.Movie, 'title' : 'The Florida Project', 'year' : 2017, 'imdb' : 'tt5649144'},
+					{'media' : Media.Movie, 'title' : 'Under the Skin', 'year' : 2013, 'imdb' : 'tt1441395'},
+					{'media' : Media.Movie, 'title' : 'Colossal', 'year' : 2016, 'imdb' : 'tt4680182'},
 				],
 			},
 
@@ -4138,13 +4113,13 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
-					{'media' : Media.TypeShow, 'title' : 'Lost', 'imdb' : 'tt0411008'},
-					{'media' : Media.TypeShow, 'title' : 'Dexter', 'imdb' : 'tt0773262'},
-					{'media' : Media.TypeShow, 'title' : 'Westworld', 'imdb' : 'tt0475784'},
-					{'media' : Media.TypeShow, 'title' : 'The OA', 'imdb' : 'tt4635282'},
-					{'media' : Media.TypeShow, 'title' : 'Twin Peaks', 'imdb' : 'tt0098936'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
+					{'media' : Media.Show, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
+					{'media' : Media.Show, 'title' : 'Lost', 'imdb' : 'tt0411008'},
+					{'media' : Media.Show, 'title' : 'Dexter', 'imdb' : 'tt0773262'},
+					{'media' : Media.Show, 'title' : 'Westworld', 'imdb' : 'tt0475784'},
+					{'media' : Media.Show, 'title' : 'The OA', 'imdb' : 'tt4635282'},
+					{'media' : Media.Show, 'title' : 'Twin Peaks', 'imdb' : 'tt0098936'},
 				],
 			},
 
@@ -4160,26 +4135,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
-					{'media' : Media.TypeShow, 'title' : 'The Crown', 'imdb' : 'tt4786824'},
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
-					{'media' : Media.TypeShow, 'title' : 'The Office US', 'imdb' : 'tt0386676'},
-					{'media' : Media.TypeShow, 'title' : 'Friends', 'imdb' : 'tt0108778'},
-					{'media' : Media.TypeShow, 'title' : 'Narcos', 'imdb' : 'tt2707408'},
-					{'media' : Media.TypeShow, 'title' : 'Black Mirror', 'imdb' : 'tt2085059'},
-					{'media' : Media.TypeShow, 'title' : 'Peaky Blinders', 'imdb' : 'tt2442560'},
-					{'media' : Media.TypeShow, 'title' : 'The Witcher', 'imdb' : 'tt5180504'},
-					{'media' : Media.TypeShow, 'title' : 'Money Heist', 'imdb' : 'tt6468322'},
-					{'media' : Media.TypeShow, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
-					{'media' : Media.TypeShow, 'title' : 'The Mandalorian', 'imdb' : 'tt8111088'},
-					{'media' : Media.TypeShow, 'title' : 'The Haunting of Hill House', 'imdb' : 'tt6763664'},
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeShow, 'title' : 'The Sopranos', 'imdb' : 'tt0141842'},
-					{'media' : Media.TypeShow, 'title' : 'Chernobyl', 'imdb' : 'tt7366338'},
-					{'media' : Media.TypeShow, 'title' : 'The Boys', 'imdb' : 'tt1190634'},
-					{'media' : Media.TypeShow, 'title' : 'The Handmaid\'s Tale', 'imdb' : 'tt5834204'},
-					{'media' : Media.TypeShow, 'title' : 'Better Call Saul', 'imdb' : 'tt3032476'},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
+					{'media' : Media.Show, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
+					{'media' : Media.Show, 'title' : 'The Crown', 'imdb' : 'tt4786824'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
+					{'media' : Media.Show, 'title' : 'The Office US', 'imdb' : 'tt0386676'},
+					{'media' : Media.Show, 'title' : 'Friends', 'imdb' : 'tt0108778'},
+					{'media' : Media.Show, 'title' : 'Narcos', 'imdb' : 'tt2707408'},
+					{'media' : Media.Show, 'title' : 'Black Mirror', 'imdb' : 'tt2085059'},
+					{'media' : Media.Show, 'title' : 'Peaky Blinders', 'imdb' : 'tt2442560'},
+					{'media' : Media.Show, 'title' : 'The Witcher', 'imdb' : 'tt5180504'},
+					{'media' : Media.Show, 'title' : 'Money Heist', 'imdb' : 'tt6468322'},
+					{'media' : Media.Show, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
+					{'media' : Media.Show, 'title' : 'The Mandalorian', 'imdb' : 'tt8111088'},
+					{'media' : Media.Show, 'title' : 'The Haunting of Hill House', 'imdb' : 'tt6763664'},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
+					{'media' : Media.Show, 'title' : 'The Sopranos', 'imdb' : 'tt0141842'},
+					{'media' : Media.Show, 'title' : 'Chernobyl', 'imdb' : 'tt7366338'},
+					{'media' : Media.Show, 'title' : 'The Boys', 'imdb' : 'tt1190634'},
+					{'media' : Media.Show, 'title' : 'The Handmaid\'s Tale', 'imdb' : 'tt5834204'},
+					{'media' : Media.Show, 'title' : 'Better Call Saul', 'imdb' : 'tt3032476'},
 				],
 			},
 
@@ -4195,26 +4170,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
-					{'media' : Media.TypeShow, 'title' : 'The Sopranos', 'imdb' : 'tt0141842'},
-					{'media' : Media.TypeShow, 'title' : 'Lost', 'imdb' : 'tt0411008'},
-					{'media' : Media.TypeShow, 'title' : 'The Leftovers', 'imdb' : 'tt2699128'},
-					{'media' : Media.TypeShow, 'title' : 'Westworld', 'imdb' : 'tt0475784'},
-					{'media' : Media.TypeShow, 'title' : 'Mr. Robot', 'imdb' : 'tt4158110'},
-					{'media' : Media.TypeShow, 'title' : 'Twin Peaks', 'imdb' : 'tt0098936'},
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
-					{'media' : Media.TypeShow, 'title' : 'The OA', 'imdb' : 'tt4635282'},
-					{'media' : Media.TypeShow, 'title' : 'True Detective', 'imdb' : 'tt2356777'},
-					{'media' : Media.TypeShow, 'title' : 'Fargo', 'imdb' : 'tt2802850'},
-					{'media' : Media.TypeShow, 'title' : 'American Horror Story', 'imdb' : 'tt1844624'},
-					{'media' : Media.TypeShow, 'title' : 'Dark', 'imdb' : 'tt5753856'},
-					{'media' : Media.TypeShow, 'title' : 'Sherlock', 'imdb' : 'tt1475582'},
-					{'media' : Media.TypeShow, 'title' : 'Bates Motel', 'imdb' : 'tt2188671'},
-					{'media' : Media.TypeShow, 'title' : 'Black Mirror', 'imdb' : 'tt2085059'},
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeShow, 'title' : 'Big Little Lies', 'imdb' : 'tt3920596'},
-					{'media' : Media.TypeShow, 'title' : 'The Handmaid\'s Tale', 'imdb' : 'tt5834204'},
-					{'media' : Media.TypeShow, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad', 'imdb' : 'tt0903747'},
+					{'media' : Media.Show, 'title' : 'The Sopranos', 'imdb' : 'tt0141842'},
+					{'media' : Media.Show, 'title' : 'Lost', 'imdb' : 'tt0411008'},
+					{'media' : Media.Show, 'title' : 'The Leftovers', 'imdb' : 'tt2699128'},
+					{'media' : Media.Show, 'title' : 'Westworld', 'imdb' : 'tt0475784'},
+					{'media' : Media.Show, 'title' : 'Mr. Robot', 'imdb' : 'tt4158110'},
+					{'media' : Media.Show, 'title' : 'Twin Peaks', 'imdb' : 'tt0098936'},
+					{'media' : Media.Show, 'title' : 'Game of Thrones', 'imdb' : 'tt0944947'},
+					{'media' : Media.Show, 'title' : 'The OA', 'imdb' : 'tt4635282'},
+					{'media' : Media.Show, 'title' : 'True Detective', 'imdb' : 'tt2356777'},
+					{'media' : Media.Show, 'title' : 'Fargo', 'imdb' : 'tt2802850'},
+					{'media' : Media.Show, 'title' : 'American Horror Story', 'imdb' : 'tt1844624'},
+					{'media' : Media.Show, 'title' : 'Dark', 'imdb' : 'tt5753856'},
+					{'media' : Media.Show, 'title' : 'Sherlock', 'imdb' : 'tt1475582'},
+					{'media' : Media.Show, 'title' : 'Bates Motel', 'imdb' : 'tt2188671'},
+					{'media' : Media.Show, 'title' : 'Black Mirror', 'imdb' : 'tt2085059'},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
+					{'media' : Media.Show, 'title' : 'Big Little Lies', 'imdb' : 'tt3920596'},
+					{'media' : Media.Show, 'title' : 'The Handmaid\'s Tale', 'imdb' : 'tt5834204'},
+					{'media' : Media.Show, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
 				],
 			},
 
@@ -4230,26 +4205,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Fargo', 'year' : 1996, 'imdb' : 'tt0116282'},
-					{'media' : Media.TypeMovie, 'title' : 'The Lobster', 'year' : 2015, 'imdb' : 'tt3316960'},
-					{'media' : Media.TypeMovie, 'title' : 'The Big Sick', 'year' : 2017, 'imdb' : 'tt5311514'},
-					{'media' : Media.TypeMovie, 'title' : 'Blue Velvet', 'year' : 1986, 'imdb' : 'tt0091763'},
-					{'media' : Media.TypeMovie, 'title' : 'Magnolia', 'year' : 1999, 'imdb' : 'tt0160399'},
-					{'media' : Media.TypeMovie, 'title' : 'The Prestige', 'year' : 2006, 'imdb' : 'tt0468569'},
-					{'media' : Media.TypeMovie, 'title' : 'The Guilty', 'year' : 2018, 'imdb' : 'tt7558302'},
-					{'media' : Media.TypeMovie, 'title' : 'Paris, Texas', 'year' : 1984, 'imdb' : 'tt0086886'},
-					{'media' : Media.TypeMovie, 'title' : 'Dead Man', 'year' : 1995, 'imdb' : 'tt0115956'},
-					{'media' : Media.TypeMovie, 'title' : 'Trainspotting', 'year' : 1996, 'imdb' : 'tt0116231'},
-					{'media' : Media.TypeMovie, 'title' : 'The Intouchables', 'year' : 2011, 'imdb' : 'tt0993846'},
-					{'media' : Media.TypeMovie, 'title' : 'Primer', 'year' : 2004, 'imdb' : 'tt0379725'},
-					{'media' : Media.TypeMovie, 'title' : 'Burning', 'year' : 2018, 'imdb' : 'tt7083526'},
-					{'media' : Media.TypeMovie, 'title' : 'Wild at Heart', 'year' : 1990, 'imdb' : 'tt0099348'},
-					{'media' : Media.TypeMovie, 'title' : 'My Dinner with Andre', 'year' : 1981, 'imdb' : 'tt0084745'},
-					{'media' : Media.TypeMovie, 'title' : 'It Follows', 'year' : 2014, 'imdb' : 'tt3397754'},
-					{'media' : Media.TypeMovie, 'title' : 'Heat', 'year' : 1995, 'imdb' : 'tt0113247'},
-					{'media' : Media.TypeMovie, 'title' : 'Adaptation', 'year' : 2002, 'imdb' : 'tt0268978'},
-					{'media' : Media.TypeMovie, 'title' : 'Maria Full of Grace', 'year' : 2004, 'imdb' : 'tt0353969'},
-					{'media' : Media.TypeMovie, 'title' : 'Persona', 'year' : 1966, 'imdb' : 'tt0065214'},
+					{'media' : Media.Movie, 'title' : 'Fargo', 'year' : 1996, 'imdb' : 'tt0116282'},
+					{'media' : Media.Movie, 'title' : 'The Lobster', 'year' : 2015, 'imdb' : 'tt3316960'},
+					{'media' : Media.Movie, 'title' : 'The Big Sick', 'year' : 2017, 'imdb' : 'tt5311514'},
+					{'media' : Media.Movie, 'title' : 'Blue Velvet', 'year' : 1986, 'imdb' : 'tt0091763'},
+					{'media' : Media.Movie, 'title' : 'Magnolia', 'year' : 1999, 'imdb' : 'tt0160399'},
+					{'media' : Media.Movie, 'title' : 'The Prestige', 'year' : 2006, 'imdb' : 'tt0468569'},
+					{'media' : Media.Movie, 'title' : 'The Guilty', 'year' : 2018, 'imdb' : 'tt7558302'},
+					{'media' : Media.Movie, 'title' : 'Paris, Texas', 'year' : 1984, 'imdb' : 'tt0086886'},
+					{'media' : Media.Movie, 'title' : 'Dead Man', 'year' : 1995, 'imdb' : 'tt0115956'},
+					{'media' : Media.Movie, 'title' : 'Trainspotting', 'year' : 1996, 'imdb' : 'tt0116231'},
+					{'media' : Media.Movie, 'title' : 'The Intouchables', 'year' : 2011, 'imdb' : 'tt0993846'},
+					{'media' : Media.Movie, 'title' : 'Primer', 'year' : 2004, 'imdb' : 'tt0379725'},
+					{'media' : Media.Movie, 'title' : 'Burning', 'year' : 2018, 'imdb' : 'tt7083526'},
+					{'media' : Media.Movie, 'title' : 'Wild at Heart', 'year' : 1990, 'imdb' : 'tt0099348'},
+					{'media' : Media.Movie, 'title' : 'My Dinner with Andre', 'year' : 1981, 'imdb' : 'tt0084745'},
+					{'media' : Media.Movie, 'title' : 'It Follows', 'year' : 2014, 'imdb' : 'tt3397754'},
+					{'media' : Media.Movie, 'title' : 'Heat', 'year' : 1995, 'imdb' : 'tt0113247'},
+					{'media' : Media.Movie, 'title' : 'Adaptation', 'year' : 2002, 'imdb' : 'tt0268978'},
+					{'media' : Media.Movie, 'title' : 'Maria Full of Grace', 'year' : 2004, 'imdb' : 'tt0353969'},
+					{'media' : Media.Movie, 'title' : 'Persona', 'year' : 1966, 'imdb' : 'tt0065214'},
 				],
 			},
 
@@ -4265,26 +4240,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Parasite', 'year' : 2019, 'imdb' : 'tt8579674'},
-					{'media' : Media.TypeMovie, 'title' : 'Her', 'year' : 2013, 'imdb' : 'tt2395469'},
-					{'media' : Media.TypeMovie, 'title' : 'Children of Men', 'year' : 2006, 'imdb' : 'tt0470752'},
-					{'media' : Media.TypeMovie, 'title' : 'Before Sunrise', 'year' : 1995, 'imdb' : 'tt0109830'},
-					{'media' : Media.TypeMovie, 'title' : 'Am\u00e9lie', 'year' : 2001, 'imdb' : 'tt0245712'},
-					{'media' : Media.TypeMovie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0172495'},
-					{'media' : Media.TypeMovie, 'title' : 'Once', 'year' : 2007, 'imdb' : 'tt0477348'},
-					{'media' : Media.TypeMovie, 'title' : 'Moonlight', 'year' : 2016, 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeMovie, 'title' : 'Eternal Sunshine of the Spotless Mind', 'year' : 2004, 'imdb' : 'tt0434409'},
-					{'media' : Media.TypeMovie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006, 'imdb' : 'tt0443706'},
-					{'media' : Media.TypeMovie, 'title' : 'The Big Lebowski', 'year' : 1998, 'imdb' : 'tt0118715'},
-					{'media' : Media.TypeMovie, 'title' : 'The Master', 'year' : 2012, 'imdb' : 'tt1937390'},
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'year' : 2001, 'imdb' : 'tt0120737'},
-					{'media' : Media.TypeMovie, 'title' : 'Oldboy', 'year' : 2003, 'imdb' : 'tt0364569'},
-					{'media' : Media.TypeMovie, 'title' : 'Room', 'year' : 2015, 'imdb' : 'tt4302938'},
-					{'media' : Media.TypeMovie, 'title' : 'Raging Bull', 'year' : 1980, 'imdb' : 'tt0080684'},
-					{'media' : Media.TypeMovie, 'title' : 'Monty Python\'s Life of Brian', 'year' : 1979, 'imdb' : 'tt0079470'},
-					{'media' : Media.TypeMovie, 'title' : 'Close Encounters of the Third Kind', 'year' : 1977, 'imdb' : 'tt0077269'},
-					{'media' : Media.TypeMovie, 'title' : 'One Flew Over the Cuckoo\'s Nest', 'year' : 1975, 'imdb' : 'tt0073195'},
-					{'media' : Media.TypeMovie, 'title' : 'The Good, the Bad and the Ugly', 'year' : 1966, 'imdb' : 'tt0066921'},
+					{'media' : Media.Movie, 'title' : 'Parasite', 'year' : 2019, 'imdb' : 'tt8579674'},
+					{'media' : Media.Movie, 'title' : 'Her', 'year' : 2013, 'imdb' : 'tt2395469'},
+					{'media' : Media.Movie, 'title' : 'Children of Men', 'year' : 2006, 'imdb' : 'tt0470752'},
+					{'media' : Media.Movie, 'title' : 'Before Sunrise', 'year' : 1995, 'imdb' : 'tt0109830'},
+					{'media' : Media.Movie, 'title' : 'Am\u00e9lie', 'year' : 2001, 'imdb' : 'tt0245712'},
+					{'media' : Media.Movie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0172495'},
+					{'media' : Media.Movie, 'title' : 'Once', 'year' : 2007, 'imdb' : 'tt0477348'},
+					{'media' : Media.Movie, 'title' : 'Moonlight', 'year' : 2016, 'imdb' : 'tt4574334'},
+					{'media' : Media.Movie, 'title' : 'Eternal Sunshine of the Spotless Mind', 'year' : 2004, 'imdb' : 'tt0434409'},
+					{'media' : Media.Movie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006, 'imdb' : 'tt0443706'},
+					{'media' : Media.Movie, 'title' : 'The Big Lebowski', 'year' : 1998, 'imdb' : 'tt0118715'},
+					{'media' : Media.Movie, 'title' : 'The Master', 'year' : 2012, 'imdb' : 'tt1937390'},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'year' : 2001, 'imdb' : 'tt0120737'},
+					{'media' : Media.Movie, 'title' : 'Oldboy', 'year' : 2003, 'imdb' : 'tt0364569'},
+					{'media' : Media.Movie, 'title' : 'Room', 'year' : 2015, 'imdb' : 'tt4302938'},
+					{'media' : Media.Movie, 'title' : 'Raging Bull', 'year' : 1980, 'imdb' : 'tt0080684'},
+					{'media' : Media.Movie, 'title' : 'Monty Python\'s Life of Brian', 'year' : 1979, 'imdb' : 'tt0079470'},
+					{'media' : Media.Movie, 'title' : 'Close Encounters of the Third Kind', 'year' : 1977, 'imdb' : 'tt0077269'},
+					{'media' : Media.Movie, 'title' : 'One Flew Over the Cuckoo\'s Nest', 'year' : 1975, 'imdb' : 'tt0073195'},
+					{'media' : Media.Movie, 'title' : 'The Good, the Bad and the Ugly', 'year' : 1966, 'imdb' : 'tt0066921'},
 
 				],
 			},
@@ -4301,11 +4276,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'imdb' : 'tt0062622'},
-					{'media' : Media.TypeMovie, 'title' : 'A Clockwork Orange', 'imdb' : 'tt0066921'},
-					{'media' : Media.TypeMovie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'imdb' : 'tt0057012'},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'imdb' : 'tt0081505'},
-					{'media' : Media.TypeMovie, 'title' : 'Full Metal Jacket', 'imdb' : 'tt0093058'},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'imdb' : 'tt0062622'},
+					{'media' : Media.Movie, 'title' : 'A Clockwork Orange', 'imdb' : 'tt0066921'},
+					{'media' : Media.Movie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'imdb' : 'tt0057012'},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'imdb' : 'tt0081505'},
+					{'media' : Media.Movie, 'title' : 'Full Metal Jacket', 'imdb' : 'tt0093058'},
 				],
 			},
 
@@ -4321,11 +4296,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'imdb' : 'tt0062622'},
-					{'media' : Media.TypeMovie, 'title' : 'A Clockwork Orange', 'imdb' : 'tt0066921'},
-					{'media' : Media.TypeMovie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'imdb' : 'tt0057012'},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'imdb' : 'tt0081505'},
-					{'media' : Media.TypeMovie, 'title' : 'Full Metal Jacket', 'imdb' : 'tt0093058'},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'imdb' : 'tt0062622'},
+					{'media' : Media.Movie, 'title' : 'A Clockwork Orange', 'imdb' : 'tt0066921'},
+					{'media' : Media.Movie, 'title' : 'Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb', 'imdb' : 'tt0057012'},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'imdb' : 'tt0081505'},
+					{'media' : Media.Movie, 'title' : 'Full Metal Jacket', 'imdb' : 'tt0093058'},
 				],
 			},
 
@@ -4341,11 +4316,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'imdb' : 'tt0120737'},
-					{'media' : Media.TypeMovie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'imdb' : 'tt0241527'},
-					{'media' : Media.TypeMovie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'imdb' : 'tt0363771'},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
-					{'media' : Media.TypeMovie, 'title' : 'Beauty and the Beast', 'imdb' : 'tt2771200'},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'imdb' : 'tt0120737'},
+					{'media' : Media.Movie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'imdb' : 'tt0241527'},
+					{'media' : Media.Movie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'imdb' : 'tt0363771'},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'imdb' : 'tt0499549'},
+					{'media' : Media.Movie, 'title' : 'Beauty and the Beast', 'imdb' : 'tt2771200'},
 				],
 			},
 
@@ -4361,16 +4336,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'year' : 2016},
-					{'media' : Media.TypeShow, 'title' : 'The Crown', 'year' : 2016},
-					{'media' : Media.TypeShow, 'title' : 'Narcos', 'year' : 2015},
-					{'media' : Media.TypeShow, 'title' : 'Ozark', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'Dark', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'Black Mirror', 'year' : 2011},
-					{'media' : Media.TypeShow, 'title' : 'Mindhunter', 'year' : 2017},
-					{'media' : Media.TypeShow, 'title' : 'The Haunting of Hill House', 'year' : 2018},
-					{'media' : Media.TypeShow, 'title' : 'The Witcher', 'year' : 2019},
-					{'media' : Media.TypeShow, 'title' : 'Money Heist', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'year' : 2016},
+					{'media' : Media.Show, 'title' : 'The Crown', 'year' : 2016},
+					{'media' : Media.Show, 'title' : 'Narcos', 'year' : 2015},
+					{'media' : Media.Show, 'title' : 'Ozark', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Dark', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'Black Mirror', 'year' : 2011},
+					{'media' : Media.Show, 'title' : 'Mindhunter', 'year' : 2017},
+					{'media' : Media.Show, 'title' : 'The Haunting of Hill House', 'year' : 2018},
+					{'media' : Media.Show, 'title' : 'The Witcher', 'year' : 2019},
+					{'media' : Media.Show, 'title' : 'Money Heist', 'year' : 2017},
 				],
 			},
 
@@ -4386,16 +4361,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
-					{'media' : Media.TypeShow, 'title' : 'The Crown', 'imdb' : 'tt4786824'},
-					{'media' : Media.TypeShow, 'title' : 'Narcos', 'imdb' : 'tt2707408'},
-					{'media' : Media.TypeShow, 'title' : 'House of Cards', 'imdb' : 'tt1856010'},
-					{'media' : Media.TypeShow, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
-					{'media' : Media.TypeShow, 'title' : 'Dark', 'imdb' : 'tt5753856'},
-					{'media' : Media.TypeShow, 'title' : 'The Queen\'s Gambit', 'imdb' : 'tt10048342'},
-					{'media' : Media.TypeShow, 'title' : 'Orange is the New Black', 'imdb' : 'tt2372162'},
-					{'media' : Media.TypeShow, 'title' : 'Bojack Horseman', 'imdb' : 'tt3398228'},
-					{'media' : Media.TypeShow, 'title' : 'The Witcher', 'imdb' : 'tt5180504'},
+					{'media' : Media.Show, 'title' : 'Stranger Things', 'imdb' : 'tt4574334'},
+					{'media' : Media.Show, 'title' : 'The Crown', 'imdb' : 'tt4786824'},
+					{'media' : Media.Show, 'title' : 'Narcos', 'imdb' : 'tt2707408'},
+					{'media' : Media.Show, 'title' : 'House of Cards', 'imdb' : 'tt1856010'},
+					{'media' : Media.Show, 'title' : 'Ozark', 'imdb' : 'tt5071412'},
+					{'media' : Media.Show, 'title' : 'Dark', 'imdb' : 'tt5753856'},
+					{'media' : Media.Show, 'title' : 'The Queen\'s Gambit', 'imdb' : 'tt10048342'},
+					{'media' : Media.Show, 'title' : 'Orange is the New Black', 'imdb' : 'tt2372162'},
+					{'media' : Media.Show, 'title' : 'Bojack Horseman', 'imdb' : 'tt3398228'},
+					{'media' : Media.Show, 'title' : 'The Witcher', 'imdb' : 'tt5180504'},
 				],
 			},
 
@@ -4446,26 +4421,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeShow, 'imdb' : 'tt2575988'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt2574602'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt5592232'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt2572632'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt6524350'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt6468322'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0108778'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt2575912'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt2575980'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0250735'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0072562'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0106179'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt1439629'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0182576'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0094535'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0105953'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0273855'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0121955'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0386676'},
-					{'media' : Media.TypeShow, 'imdb' : 'tt0367279'},
+					{'media' : Media.Show, 'imdb' : 'tt2575988'},
+					{'media' : Media.Show, 'imdb' : 'tt2574602'},
+					{'media' : Media.Show, 'imdb' : 'tt5592232'},
+					{'media' : Media.Show, 'imdb' : 'tt2572632'},
+					{'media' : Media.Show, 'imdb' : 'tt6524350'},
+					{'media' : Media.Show, 'imdb' : 'tt6468322'},
+					{'media' : Media.Show, 'imdb' : 'tt0108778'},
+					{'media' : Media.Show, 'imdb' : 'tt2575912'},
+					{'media' : Media.Show, 'imdb' : 'tt2575980'},
+					{'media' : Media.Show, 'imdb' : 'tt0250735'},
+					{'media' : Media.Show, 'imdb' : 'tt0072562'},
+					{'media' : Media.Show, 'imdb' : 'tt0106179'},
+					{'media' : Media.Show, 'imdb' : 'tt1439629'},
+					{'media' : Media.Show, 'imdb' : 'tt0182576'},
+					{'media' : Media.Show, 'imdb' : 'tt0094535'},
+					{'media' : Media.Show, 'imdb' : 'tt0105953'},
+					{'media' : Media.Show, 'imdb' : 'tt0273855'},
+					{'media' : Media.Show, 'imdb' : 'tt0121955'},
+					{'media' : Media.Show, 'imdb' : 'tt0386676'},
+					{'media' : Media.Show, 'imdb' : 'tt0367279'},
 				],
 			},
 
@@ -4534,25 +4509,25 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'Hobbit', 'tmdb' : '256322'},			# Many of these have incorrect IDs.
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones', 'tmdb' : '1241'},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'tmdb' : '8355'},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'tmdb' : '12'},
-					{'media' : Media.TypeSet, 'title' : 'Lord of the Rings', 'tmdb' : '1955'},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'tmdb' : '1724'},
-					{'media' : Media.TypeSet, 'title' : 'Maze Runner', 'tmdb' : '173710'},
-					{'media' : Media.TypeSet, 'title' : 'James Bond', 'tmdb' : '239'},
-					{'media' : Media.TypeSet, 'title' : 'John Wick', 'tmdb' : '221612'},
-					{'media' : Media.TypeSet, 'title' : 'Avengers', 'tmdb' : '266856'},
-					{'media' : Media.TypeSet, 'title' : 'Mummy', 'tmdb' : '1243'},
-					{'media' : Media.TypeSet, 'title' : 'Hunger Games', 'tmdb' : '85678'},
-					{'media' : Media.TypeSet, 'title' : 'Chronicles of Narnia', 'tmdb' : '121938'},
-					{'media' : Media.TypeSet, 'title' : 'Terminator', 'tmdb' : '10134'},
-					{'media' : Media.TypeSet, 'title' : 'Wonder Woman', 'tmdb' : '430236'},
-					{'media' : Media.TypeSet, 'title' : 'Transformers', 'tmdb' : '10763'},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic World', 'tmdb' : '458583'},
-					{'media' : Media.TypeSet, 'title' : 'Expendables', 'tmdb' : '80643'},
-					{'media' : Media.TypeSet, 'title' : 'Guardians of the Galaxy', 'tmdb' : '118340'},
+					{'media' : Media.Set, 'title' : 'Hobbit', 'tmdb' : '256322'},			# Many of these have incorrect IDs.
+					{'media' : Media.Set, 'title' : 'Indiana Jones', 'tmdb' : '1241'},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'tmdb' : '8355'},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'tmdb' : '12'},
+					{'media' : Media.Set, 'title' : 'Lord of the Rings', 'tmdb' : '1955'},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'tmdb' : '1724'},
+					{'media' : Media.Set, 'title' : 'Maze Runner', 'tmdb' : '173710'},
+					{'media' : Media.Set, 'title' : 'James Bond', 'tmdb' : '239'},
+					{'media' : Media.Set, 'title' : 'John Wick', 'tmdb' : '221612'},
+					{'media' : Media.Set, 'title' : 'Avengers', 'tmdb' : '266856'},
+					{'media' : Media.Set, 'title' : 'Mummy', 'tmdb' : '1243'},
+					{'media' : Media.Set, 'title' : 'Hunger Games', 'tmdb' : '85678'},
+					{'media' : Media.Set, 'title' : 'Chronicles of Narnia', 'tmdb' : '121938'},
+					{'media' : Media.Set, 'title' : 'Terminator', 'tmdb' : '10134'},
+					{'media' : Media.Set, 'title' : 'Wonder Woman', 'tmdb' : '430236'},
+					{'media' : Media.Set, 'title' : 'Transformers', 'tmdb' : '10763'},
+					{'media' : Media.Set, 'title' : 'Jurassic World', 'tmdb' : '458583'},
+					{'media' : Media.Set, 'title' : 'Expendables', 'tmdb' : '80643'},
+					{'media' : Media.Set, 'title' : 'Guardians of the Galaxy', 'tmdb' : '118340'},
 				],
 			},
 
@@ -4568,26 +4543,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'tmdb' : '38635'},
-					{'media' : Media.TypeSet, 'tmdb' : '306316'},
-					{'media' : Media.TypeSet, 'tmdb' : '328425'},
-					{'media' : Media.TypeSet, 'tmdb' : '1241'},
-					{'media' : Media.TypeSet, 'tmdb' : '915'},
-					{'media' : Media.TypeSet, 'tmdb' : '334543'},
-					{'media' : Media.TypeSet, 'tmdb' : '123911'},
-					{'media' : Media.TypeSet, 'tmdb' : '61791'},
-					{'media' : Media.TypeSet, 'tmdb' : '61658'},
-					{'media' : Media.TypeSet, 'tmdb' : '86960'},
-					#{'media' : Media.TypeSet, 'tmdb' : '119'},		# ChatGPT incorrectly formatted the JSON and closed with a round instead of curley bracket.
-					{'media' : Media.TypeSet, 'tmdb' : '131297'},
-					{'media' : Media.TypeSet, 'tmdb' : '1123'},
-					{'media' : Media.TypeSet, 'tmdb' : '97304'},
-					{'media' : Media.TypeSet, 'tmdb' : '329'},
-					{'media' : Media.TypeSet, 'tmdb' : '100061'},
-					#{'media' : Media.TypeSet, 'tmdb' : '147'},		# ChatGPT incorrectly formatted the JSON and closed with a round instead of curley bracket.
-					{'media' : Media.TypeSet, 'tmdb' : '80072'},
-					{'media' : Media.TypeSet, 'tmdb' : '12931'},
-					{'media' : Media.TypeSet, 'tmdb' : '228'},
+					{'media' : Media.Set, 'tmdb' : '38635'},
+					{'media' : Media.Set, 'tmdb' : '306316'},
+					{'media' : Media.Set, 'tmdb' : '328425'},
+					{'media' : Media.Set, 'tmdb' : '1241'},
+					{'media' : Media.Set, 'tmdb' : '915'},
+					{'media' : Media.Set, 'tmdb' : '334543'},
+					{'media' : Media.Set, 'tmdb' : '123911'},
+					{'media' : Media.Set, 'tmdb' : '61791'},
+					{'media' : Media.Set, 'tmdb' : '61658'},
+					{'media' : Media.Set, 'tmdb' : '86960'},
+					#{'media' : Media.Set, 'tmdb' : '119'},		# ChatGPT incorrectly formatted the JSON and closed with a round instead of curley bracket.
+					{'media' : Media.Set, 'tmdb' : '131297'},
+					{'media' : Media.Set, 'tmdb' : '1123'},
+					{'media' : Media.Set, 'tmdb' : '97304'},
+					{'media' : Media.Set, 'tmdb' : '329'},
+					{'media' : Media.Set, 'tmdb' : '100061'},
+					#{'media' : Media.Set, 'tmdb' : '147'},		# ChatGPT incorrectly formatted the JSON and closed with a round instead of curley bracket.
+					{'media' : Media.Set, 'tmdb' : '80072'},
+					{'media' : Media.Set, 'tmdb' : '12931'},
+					{'media' : Media.Set, 'tmdb' : '228'},
 				],
 			},
 
@@ -4603,26 +4578,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones', 'year' : 1981},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'year' : 1977},
-					{'media' : Media.TypeSet, 'title' : 'The Hobbit', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'The Mummy', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'National Treasure', 'year' : 2004},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic Park', 'year' : 1993},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
-					{'media' : Media.TypeSet, 'title' : 'Mission: Impossible', 'year' : 1996},
-					{'media' : Media.TypeSet, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'The Hunger Games', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'The Bourne Identity', 'year' : 2002},
-					{'media' : Media.TypeSet, 'title' : 'The Fast and the Furious', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Terminator', 'year' : 1984},
-					{'media' : Media.TypeSet, 'title' : 'The Expendables', 'year' : 2010},
-					{'media' : Media.TypeSet, 'title' : 'The Dark Knight', 'year' : 2005},
-					{'media' : Media.TypeSet, 'title' : 'Back to the Future', 'year' : 1985},
-					{'media' : Media.TypeSet, 'title' : 'Die Hard', 'year' : 1988},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
+					{'media' : Media.Set, 'title' : 'Indiana Jones', 'year' : 1981},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'year' : 1977},
+					{'media' : Media.Set, 'title' : 'The Hobbit', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'The Mummy', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'National Treasure', 'year' : 2004},
+					{'media' : Media.Set, 'title' : 'Jurassic Park', 'year' : 1993},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
+					{'media' : Media.Set, 'title' : 'Mission: Impossible', 'year' : 1996},
+					{'media' : Media.Set, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'The Hunger Games', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'The Bourne Identity', 'year' : 2002},
+					{'media' : Media.Set, 'title' : 'The Fast and the Furious', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Terminator', 'year' : 1984},
+					{'media' : Media.Set, 'title' : 'The Expendables', 'year' : 2010},
+					{'media' : Media.Set, 'title' : 'The Dark Knight', 'year' : 2005},
+					{'media' : Media.Set, 'title' : 'Back to the Future', 'year' : 1985},
+					{'media' : Media.Set, 'title' : 'Die Hard', 'year' : 1988},
 				],
 			},
 
@@ -4638,26 +4613,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'tmdb' : '914'},
-					{'media' : Media.TypeSet, 'tmdb' : '10'},
-					{'media' : Media.TypeSet, 'tmdb' : '85'},
-					{'media' : Media.TypeSet, 'tmdb' : '748'},
-					{'media' : Media.TypeSet, 'tmdb' : '345911'},
-					{'media' : Media.TypeSet, 'tmdb' : '131635'},
-					{'media' : Media.TypeSet, 'tmdb' : '328'},
-					{'media' : Media.TypeSet, 'tmdb' : '22'},
-					{'media' : Media.TypeSet, 'tmdb' : '256322'},
-					{'media' : Media.TypeSet, 'tmdb' : '415131'},
-					{'media' : Media.TypeSet, 'tmdb' : '164242'},
-					{'media' : Media.TypeSet, 'tmdb' : '1956'},
-					{'media' : Media.TypeSet, 'tmdb' : '119'},
-					{'media' : Media.TypeSet, 'tmdb' : '87101'},
-					{'media' : Media.TypeSet, 'tmdb' : '141241'},
-					{'media' : Media.TypeSet, 'tmdb' : '414'},
-					{'media' : Media.TypeSet, 'tmdb' : '245891'},
-					{'media' : Media.TypeSet, 'tmdb' : '9648'},
-					{'media' : Media.TypeSet, 'tmdb' : '441'},
-					{'media' : Media.TypeSet, 'tmdb' : '406'},
+					{'media' : Media.Set, 'tmdb' : '914'},
+					{'media' : Media.Set, 'tmdb' : '10'},
+					{'media' : Media.Set, 'tmdb' : '85'},
+					{'media' : Media.Set, 'tmdb' : '748'},
+					{'media' : Media.Set, 'tmdb' : '345911'},
+					{'media' : Media.Set, 'tmdb' : '131635'},
+					{'media' : Media.Set, 'tmdb' : '328'},
+					{'media' : Media.Set, 'tmdb' : '22'},
+					{'media' : Media.Set, 'tmdb' : '256322'},
+					{'media' : Media.Set, 'tmdb' : '415131'},
+					{'media' : Media.Set, 'tmdb' : '164242'},
+					{'media' : Media.Set, 'tmdb' : '1956'},
+					{'media' : Media.Set, 'tmdb' : '119'},
+					{'media' : Media.Set, 'tmdb' : '87101'},
+					{'media' : Media.Set, 'tmdb' : '141241'},
+					{'media' : Media.Set, 'tmdb' : '414'},
+					{'media' : Media.Set, 'tmdb' : '245891'},
+					{'media' : Media.Set, 'tmdb' : '9648'},
+					{'media' : Media.Set, 'tmdb' : '441'},
+					{'media' : Media.Set, 'tmdb' : '406'},
 				],
 			},
 
@@ -4673,26 +4648,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones', 'year' : 1981},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'year' : 1977},
-					{'media' : Media.TypeSet, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
-					{'media' : Media.TypeSet, 'title' : 'The Mummy', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'The Hobbit', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic Park', 'year' : 1993},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'National Treasure', 'year' : 2004},
-					{'media' : Media.TypeSet, 'title' : 'Mission: Impossible', 'year' : 1996},
-					{'media' : Media.TypeSet, 'title' : 'Alien', 'year' : 1979},
-					{'media' : Media.TypeSet, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'The Hunger Games', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'The Fast and the Furious', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Terminator', 'year' : 1984},
-					{'media' : Media.TypeSet, 'title' : 'Iron Man', 'year' : 2008},
-					{'media' : Media.TypeSet, 'title' : 'Captain America', 'year' : 2011},
-					{'media' : Media.TypeSet, 'title' : 'Thor', 'year' : 2011},
-					{'media' : Media.TypeSet, 'title' : 'Guardians of the Galaxy', 'year' : 2014},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
+					{'media' : Media.Set, 'title' : 'Indiana Jones', 'year' : 1981},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'year' : 1977},
+					{'media' : Media.Set, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
+					{'media' : Media.Set, 'title' : 'The Mummy', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'The Hobbit', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Jurassic Park', 'year' : 1993},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'National Treasure', 'year' : 2004},
+					{'media' : Media.Set, 'title' : 'Mission: Impossible', 'year' : 1996},
+					{'media' : Media.Set, 'title' : 'Alien', 'year' : 1979},
+					{'media' : Media.Set, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'The Hunger Games', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'The Fast and the Furious', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Terminator', 'year' : 1984},
+					{'media' : Media.Set, 'title' : 'Iron Man', 'year' : 2008},
+					{'media' : Media.Set, 'title' : 'Captain America', 'year' : 2011},
+					{'media' : Media.Set, 'title' : 'Thor', 'year' : 2011},
+					{'media' : Media.Set, 'title' : 'Guardians of the Galaxy', 'year' : 2014},
 				],
 			},
 
@@ -4708,26 +4683,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Hobbit', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones', 'year' : 1981},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic Park', 'year' : 1993},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'year' : 1977},
-					{'media' : Media.TypeSet, 'title' : 'The Mummy', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
-					{'media' : Media.TypeSet, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'The Avengers', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Dark Knight', 'year' : 2005},
-					{'media' : Media.TypeSet, 'title' : 'The Hunger Games', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'The Maze Runner', 'year' : 2014},
-					{'media' : Media.TypeSet, 'title' : 'The Fast and the Furious', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Expendables', 'year' : 2010},
-					{'media' : Media.TypeSet, 'title' : 'Terminator', 'year' : 1984},
-					{'media' : Media.TypeSet, 'title' : 'Die Hard', 'year' : 1988},
-					{'media' : Media.TypeSet, 'title' : 'Rocky', 'year' : 1976},
-					{'media' : Media.TypeSet, 'title' : 'Rambo', 'year' : 1982},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Hobbit', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
+					{'media' : Media.Set, 'title' : 'Indiana Jones', 'year' : 1981},
+					{'media' : Media.Set, 'title' : 'Jurassic Park', 'year' : 1993},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'year' : 1977},
+					{'media' : Media.Set, 'title' : 'The Mummy', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'The Chronicles of Narnia', 'year' : 2005},
+					{'media' : Media.Set, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'The Avengers', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Dark Knight', 'year' : 2005},
+					{'media' : Media.Set, 'title' : 'The Hunger Games', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'The Maze Runner', 'year' : 2014},
+					{'media' : Media.Set, 'title' : 'The Fast and the Furious', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Expendables', 'year' : 2010},
+					{'media' : Media.Set, 'title' : 'Terminator', 'year' : 1984},
+					{'media' : Media.Set, 'title' : 'Die Hard', 'year' : 1988},
+					{'media' : Media.Set, 'title' : 'Rocky', 'year' : 1976},
+					{'media' : Media.Set, 'title' : 'Rambo', 'year' : 1982},
 				],
 			},
 
@@ -4743,26 +4718,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avengers: Endgame', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Joker', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Frozen II', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Star Wars: The Rise of Skywalker', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Spider-Man: Far From Home', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Captain Marvel', 'year' : 2019},
-					{'media' : Media.TypeMovie, 'title' : 'Aquaman', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'Incredibles 2', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'Black Panther', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'Avengers: Infinity War', 'year' : 2018},
-					{'media' : Media.TypeMovie, 'title' : 'The Last Jedi', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Wonder Woman', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Guardians of the Galaxy Vol. 2', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Logan', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Doctor Strange', 'year' : 2016},
-					{'media' : Media.TypeMovie, 'title' : 'Rogue One', 'year' : 2016},
-					{'media' : Media.TypeMovie, 'title' : 'The Secret Life of Pets', 'year' : 2016},
-					{'media' : Media.TypeMovie, 'title' : 'Finding Dory', 'year' : 2016},
-					{'media' : Media.TypeMovie, 'title' : 'Civil War', 'year' : 2016},
-					{'media' : Media.TypeMovie, 'title' : 'The Force Awakens', 'year' : 2015},
+					{'media' : Media.Movie, 'title' : 'Avengers: Endgame', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Joker', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Frozen II', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Star Wars: The Rise of Skywalker', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Spider-Man: Far From Home', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Captain Marvel', 'year' : 2019},
+					{'media' : Media.Movie, 'title' : 'Aquaman', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'Incredibles 2', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'Black Panther', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'Avengers: Infinity War', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'The Last Jedi', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Wonder Woman', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Guardians of the Galaxy Vol. 2', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Logan', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Doctor Strange', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'Rogue One', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'The Secret Life of Pets', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'Finding Dory', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'Civil War', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'The Force Awakens', 'year' : 2015},
 				],
 			},
 
@@ -4778,26 +4753,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'Avengers', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Dark Knight', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Hobbit', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'The Hunger Games', 'year' : 2012},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars Sequel', 'year' : 2015},
-					{'media' : Media.TypeSet, 'title' : 'DC Extended Universe', 'year' : 2016},
-					{'media' : Media.TypeSet, 'title' : 'Marvel Cinematic Universe Phase Three', 'year' : 2016},
-					{'media' : Media.TypeSet, 'title' : 'Fantastic Beasts and Where to Find Them', 'year' : 2016},
-					{'media' : Media.TypeSet, 'title' : 'Planet of the Apes', 'year' : 2017},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'year' : 2017},
-					{'media' : Media.TypeSet, 'title' : 'Wonder Woman', 'year' : 2017},
-					{'media' : Media.TypeSet, 'title' : 'Thor', 'year' : 2017},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic World', 'year' : 2018},
-					{'media' : Media.TypeSet, 'title' : 'Deadpool', 'year' : 2018},
-					{'media' : Media.TypeSet, 'title' : 'Incredibles', 'year' : 2018},
-					{'media' : Media.TypeSet, 'title' : 'Mission: Impossible', 'year' : 2018},
-					{'media' : Media.TypeSet, 'title' : 'Spider-Man: Homecoming', 'year' : 2019},
-					{'media' : Media.TypeSet, 'title' : 'John Wick', 'year' : 2019},
-					{'media' : Media.TypeSet, 'title' : 'The Lion King', 'year' : 2019},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'year' : 2020},
+					{'media' : Media.Set, 'title' : 'Avengers', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Dark Knight', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Hobbit', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'The Hunger Games', 'year' : 2012},
+					{'media' : Media.Set, 'title' : 'Star Wars Sequel', 'year' : 2015},
+					{'media' : Media.Set, 'title' : 'DC Extended Universe', 'year' : 2016},
+					{'media' : Media.Set, 'title' : 'Marvel Cinematic Universe Phase Three', 'year' : 2016},
+					{'media' : Media.Set, 'title' : 'Fantastic Beasts and Where to Find Them', 'year' : 2016},
+					{'media' : Media.Set, 'title' : 'Planet of the Apes', 'year' : 2017},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'year' : 2017},
+					{'media' : Media.Set, 'title' : 'Wonder Woman', 'year' : 2017},
+					{'media' : Media.Set, 'title' : 'Thor', 'year' : 2017},
+					{'media' : Media.Set, 'title' : 'Jurassic World', 'year' : 2018},
+					{'media' : Media.Set, 'title' : 'Deadpool', 'year' : 2018},
+					{'media' : Media.Set, 'title' : 'Incredibles', 'year' : 2018},
+					{'media' : Media.Set, 'title' : 'Mission: Impossible', 'year' : 2018},
+					{'media' : Media.Set, 'title' : 'Spider-Man: Homecoming', 'year' : 2019},
+					{'media' : Media.Set, 'title' : 'John Wick', 'year' : 2019},
+					{'media' : Media.Set, 'title' : 'The Lion King', 'year' : 2019},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'year' : 2020},
 				],
 			},
 
@@ -4828,26 +4803,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather', 'year' : 1972},
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather: Part II', 'year' : 1974},
-					{'media' : Media.TypeMovie, 'title' : 'One Flew Over the Cuckoo\'s Nest', 'year' : 1975},
-					{'media' : Media.TypeMovie, 'title' : 'Rocky', 'year' : 1976},
-					{'media' : Media.TypeMovie, 'title' : 'Annie Hall', 'year' : 1977},
-					{'media' : Media.TypeMovie, 'title' : 'The Deer Hunter', 'year' : 1978},
-					{'media' : Media.TypeMovie, 'title' : 'Kramer vs. Kramer', 'year' : 1979},
-					{'media' : Media.TypeMovie, 'title' : 'Ordinary People', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Chariots of Fire', 'year' : 1981},
-					{'media' : Media.TypeMovie, 'title' : 'Gandhi', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'Terms of Endearment', 'year' : 1983},
-					{'media' : Media.TypeMovie, 'title' : 'Amadeus', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'Out of Africa', 'year' : 1985},
-					{'media' : Media.TypeMovie, 'title' : 'Platoon', 'year' : 1986},
-					{'media' : Media.TypeMovie, 'title' : 'The Last Emperor', 'year' : 1987},
-					{'media' : Media.TypeMovie, 'title' : 'Rain Man', 'year' : 1988},
-					{'media' : Media.TypeMovie, 'title' : 'Driving Miss Daisy', 'year' : 1989},
-					{'media' : Media.TypeMovie, 'title' : 'Dances with Wolves', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Unforgiven', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'The Godfather', 'year' : 1972},
+					{'media' : Media.Movie, 'title' : 'The Godfather: Part II', 'year' : 1974},
+					{'media' : Media.Movie, 'title' : 'One Flew Over the Cuckoo\'s Nest', 'year' : 1975},
+					{'media' : Media.Movie, 'title' : 'Rocky', 'year' : 1976},
+					{'media' : Media.Movie, 'title' : 'Annie Hall', 'year' : 1977},
+					{'media' : Media.Movie, 'title' : 'The Deer Hunter', 'year' : 1978},
+					{'media' : Media.Movie, 'title' : 'Kramer vs. Kramer', 'year' : 1979},
+					{'media' : Media.Movie, 'title' : 'Ordinary People', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Chariots of Fire', 'year' : 1981},
+					{'media' : Media.Movie, 'title' : 'Gandhi', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'Terms of Endearment', 'year' : 1983},
+					{'media' : Media.Movie, 'title' : 'Amadeus', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'Out of Africa', 'year' : 1985},
+					{'media' : Media.Movie, 'title' : 'Platoon', 'year' : 1986},
+					{'media' : Media.Movie, 'title' : 'The Last Emperor', 'year' : 1987},
+					{'media' : Media.Movie, 'title' : 'Rain Man', 'year' : 1988},
+					{'media' : Media.Movie, 'title' : 'Driving Miss Daisy', 'year' : 1989},
+					{'media' : Media.Movie, 'title' : 'Dances with Wolves', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Silence of the Lambs', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Unforgiven', 'year' : 1992},
 				],
 			},
 
@@ -4863,26 +4838,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'The Godfather', 'year' : 1972},
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Star Wars', 'year' : 1977},
-					{'media' : Media.TypeSet, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeSet, 'title' : 'Indiana Jones', 'year' : 1981},
-					{'media' : Media.TypeSet, 'title' : 'The Silence of the Lambs', 'year' : 1991},
-					{'media' : Media.TypeSet, 'title' : 'Rocky', 'year' : 1976},
-					{'media' : Media.TypeSet, 'title' : 'Star Trek', 'year' : 1979},
-					{'media' : Media.TypeSet, 'title' : 'The Exorcist', 'year' : 1973},
-					{'media' : Media.TypeSet, 'title' : 'Back to the Future', 'year' : 1985},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'year' : 2002},
-					{'media' : Media.TypeSet, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
-					{'media' : Media.TypeSet, 'title' : 'The Lion King', 'year' : 1994},
-					{'media' : Media.TypeSet, 'title' : 'Die Hard', 'year' : 1988},
-					{'media' : Media.TypeSet, 'title' : 'Gladiator', 'year' : 2000},
-					{'media' : Media.TypeSet, 'title' : 'Jurassic Park', 'year' : 1993},
-					{'media' : Media.TypeSet, 'title' : 'Terminator', 'year' : 1984},
-					{'media' : Media.TypeSet, 'title' : 'Ocean\'s Eleven', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Midnight Cowboy', 'year' : 1969},
-					{'media' : Media.TypeSet, 'title' : 'Forrest Gump', 'year' : 1994},
+					{'media' : Media.Set, 'title' : 'The Godfather', 'year' : 1972},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Star Wars', 'year' : 1977},
+					{'media' : Media.Set, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Set, 'title' : 'Indiana Jones', 'year' : 1981},
+					{'media' : Media.Set, 'title' : 'The Silence of the Lambs', 'year' : 1991},
+					{'media' : Media.Set, 'title' : 'Rocky', 'year' : 1976},
+					{'media' : Media.Set, 'title' : 'Star Trek', 'year' : 1979},
+					{'media' : Media.Set, 'title' : 'The Exorcist', 'year' : 1973},
+					{'media' : Media.Set, 'title' : 'Back to the Future', 'year' : 1985},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'year' : 2002},
+					{'media' : Media.Set, 'title' : 'Pirates of the Caribbean', 'year' : 2003},
+					{'media' : Media.Set, 'title' : 'The Lion King', 'year' : 1994},
+					{'media' : Media.Set, 'title' : 'Die Hard', 'year' : 1988},
+					{'media' : Media.Set, 'title' : 'Gladiator', 'year' : 2000},
+					{'media' : Media.Set, 'title' : 'Jurassic Park', 'year' : 1993},
+					{'media' : Media.Set, 'title' : 'Terminator', 'year' : 1984},
+					{'media' : Media.Set, 'title' : 'Ocean\'s Eleven', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Midnight Cowboy', 'year' : 1969},
+					{'media' : Media.Set, 'title' : 'Forrest Gump', 'year' : 1994},
 				],
 			},
 
@@ -4915,7 +4890,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Sixth Sense', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'The Sixth Sense', 'year' : 1999},
 				],
 			},
 
@@ -4931,7 +4906,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0133093'},
+					{'media' : Media.Movie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0133093'},
 				],
 			},
 
@@ -4968,16 +4943,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Titanic', 'year' : 1997, 'imdb' : 'tt0120338'},
-					{'media' : Media.TypeMovie, 'title' : 'Gladiator', 'year' : 2000, 'imdb' : 'tt0172495'},
-					{'media' : Media.TypeMovie, 'title' : 'The Departed', 'year' : 2006, 'imdb' : 'tt0407887'},
-					{'media' : Media.TypeMovie, 'title' : 'Romeo + Juliet', 'year' : 1996, 'imdb' : 'tt0117509'},
-					{'media' : Media.TypeMovie, 'title' : 'The Fault in Our Stars', 'year' : 2014, 'imdb' : 'tt2582846'},
-					{'media' : Media.TypeMovie, 'title' : 'Million Dollar Baby', 'year' : 2004, 'imdb' : 'tt0405159'},
-					{'media' : Media.TypeMovie, 'title' : 'A Walk to Remember', 'year' : 2002, 'imdb' : 'tt0281358'},
-					{'media' : Media.TypeMovie, 'title' : 'Romeo Must Die', 'year' : 2000, 'imdb' : 'tt0165929'},
-					{'media' : Media.TypeMovie, 'title' : 'The Last Samurai', 'year' : 2003, 'imdb' : 'tt0325710'},
-					{'media' : Media.TypeMovie, 'title' : 'Harry Potter and the Deathly Hallows: Part 2', 'year' : 2011, 'imdb' : 'tt1201607'},
+					{'media' : Media.Movie, 'title' : 'Titanic', 'year' : 1997, 'imdb' : 'tt0120338'},
+					{'media' : Media.Movie, 'title' : 'Gladiator', 'year' : 2000, 'imdb' : 'tt0172495'},
+					{'media' : Media.Movie, 'title' : 'The Departed', 'year' : 2006, 'imdb' : 'tt0407887'},
+					{'media' : Media.Movie, 'title' : 'Romeo + Juliet', 'year' : 1996, 'imdb' : 'tt0117509'},
+					{'media' : Media.Movie, 'title' : 'The Fault in Our Stars', 'year' : 2014, 'imdb' : 'tt2582846'},
+					{'media' : Media.Movie, 'title' : 'Million Dollar Baby', 'year' : 2004, 'imdb' : 'tt0405159'},
+					{'media' : Media.Movie, 'title' : 'A Walk to Remember', 'year' : 2002, 'imdb' : 'tt0281358'},
+					{'media' : Media.Movie, 'title' : 'Romeo Must Die', 'year' : 2000, 'imdb' : 'tt0165929'},
+					{'media' : Media.Movie, 'title' : 'The Last Samurai', 'year' : 2003, 'imdb' : 'tt0325710'},
+					{'media' : Media.Movie, 'title' : 'Harry Potter and the Deathly Hallows: Part 2', 'year' : 2011, 'imdb' : 'tt1201607'},
 				],
 			},
 
@@ -4993,7 +4968,7 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0137523'},
+					{'media' : Media.Movie, 'title' : 'Fight Club', 'year' : 1999, 'imdb' : 'tt0137523'},
 				],
 			},
 
@@ -5024,16 +4999,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0242423'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0118715'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0099785'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0068646'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0317219'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0126029'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0088763'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0077975'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0414982'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt2294629'},
+					{'media' : Media.Movie, 'imdb' : 'tt0242423'},
+					{'media' : Media.Movie, 'imdb' : 'tt0118715'},
+					{'media' : Media.Movie, 'imdb' : 'tt0099785'},
+					{'media' : Media.Movie, 'imdb' : 'tt0068646'},
+					{'media' : Media.Movie, 'imdb' : 'tt0317219'},
+					{'media' : Media.Movie, 'imdb' : 'tt0126029'},
+					{'media' : Media.Movie, 'imdb' : 'tt0088763'},
+					{'media' : Media.Movie, 'imdb' : 'tt0077975'},
+					{'media' : Media.Movie, 'imdb' : 'tt0414982'},
+					{'media' : Media.Movie, 'imdb' : 'tt2294629'},
 				],
 			},
 
@@ -5064,16 +5039,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0107048'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0114709'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0126029'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0133093'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0167260'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0335266'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0365748'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0405422'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt0910936'},
-					{'media' : Media.TypeMovie, 'imdb' : 'tt2395427'},
+					{'media' : Media.Movie, 'imdb' : 'tt0107048'},
+					{'media' : Media.Movie, 'imdb' : 'tt0114709'},
+					{'media' : Media.Movie, 'imdb' : 'tt0126029'},
+					{'media' : Media.Movie, 'imdb' : 'tt0133093'},
+					{'media' : Media.Movie, 'imdb' : 'tt0167260'},
+					{'media' : Media.Movie, 'imdb' : 'tt0335266'},
+					{'media' : Media.Movie, 'imdb' : 'tt0365748'},
+					{'media' : Media.Movie, 'imdb' : 'tt0405422'},
+					{'media' : Media.Movie, 'imdb' : 'tt0910936'},
+					{'media' : Media.Movie, 'imdb' : 'tt2395427'},
 				],
 			},
 
@@ -5114,14 +5089,14 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeSet, 'title' : 'Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'Harry Potter', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'year' : 2005},
-					{'media' : Media.TypeMovie, 'title' : 'The Princess Bride', 'year' : 1987},
-					{'media' : Media.TypeMovie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006},
-					{'media' : Media.TypeMovie, 'title' : 'The NeverEnding Story', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Crystal', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'Spirited Away', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'Harry Potter', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'year' : 2005},
+					{'media' : Media.Movie, 'title' : 'The Princess Bride', 'year' : 1987},
+					{'media' : Media.Movie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006},
+					{'media' : Media.Movie, 'title' : 'The NeverEnding Story', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'The Dark Crystal', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'Spirited Away', 'year' : 2001},
 				],
 			},
 
@@ -5137,9 +5112,9 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The NeverEnding Story', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Crystal', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'Labyrinth', 'year' : 1986},
+					{'media' : Media.Movie, 'title' : 'The NeverEnding Story', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'The Dark Crystal', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'Labyrinth', 'year' : 1986},
 				],
 			},
 
@@ -5155,16 +5130,16 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight', 'imdb' : 'tt0468569'},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard', 'imdb' : 'tt0095016'},
-					{'media' : Media.TypeMovie, 'title' : 'Mad Max: Fury Road', 'imdb' : 'tt1392190'},
-					{'media' : Media.TypeMovie, 'title' : 'John Wick', 'imdb' : 'tt2911666'},
-					{'media' : Media.TypeMovie, 'title' : 'The Bourne Identity', 'imdb' : 'tt0258463'},
-					{'media' : Media.TypeMovie, 'title' : 'Bad Boys', 'imdb' : 'tt0112442'},
-					{'media' : Media.TypeMovie, 'title' : 'The Raid: Redemption', 'imdb' : 'tt1899353'},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon', 'imdb' : 'tt0093409'},
-					{'media' : Media.TypeMovie, 'title' : 'Gladiator', 'imdb' : 'tt0172495'},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'imdb' : 'tt0133093'},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight', 'imdb' : 'tt0468569'},
+					{'media' : Media.Movie, 'title' : 'Die Hard', 'imdb' : 'tt0095016'},
+					{'media' : Media.Movie, 'title' : 'Mad Max: Fury Road', 'imdb' : 'tt1392190'},
+					{'media' : Media.Movie, 'title' : 'John Wick', 'imdb' : 'tt2911666'},
+					{'media' : Media.Movie, 'title' : 'The Bourne Identity', 'imdb' : 'tt0258463'},
+					{'media' : Media.Movie, 'title' : 'Bad Boys', 'imdb' : 'tt0112442'},
+					{'media' : Media.Movie, 'title' : 'The Raid: Redemption', 'imdb' : 'tt1899353'},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon', 'imdb' : 'tt0093409'},
+					{'media' : Media.Movie, 'title' : 'Gladiator', 'imdb' : 'tt0172495'},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'imdb' : 'tt0133093'},
 				],
 			},
 
@@ -5385,32 +5360,32 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard with a Vengeance', 'year' : 1995},
-					{'media' : Media.TypeMovie, 'title' : 'Speed', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'True Lies', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Independence Day', 'year' : 1996},
-					{'media' : Media.TypeMovie, 'title' : 'Point Break', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Total Recall', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'Con Air', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Die Hard with a Vengeance', 'year' : 1995},
+					{'media' : Media.Movie, 'title' : 'Speed', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'True Lies', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Independence Day', 'year' : 1996},
+					{'media' : Media.Movie, 'title' : 'Point Break', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Total Recall', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Con Air', 'year' : 1997},
 
-					{'media' : Media.TypeMovie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard 2', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'Point Break', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Hard Target', 'year' : 1993},
-					{'media' : Media.TypeMovie, 'title' : 'Speed', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'Total Recall', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'True Lies', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Desperado', 'year' : 1995},
-					{'media' : Media.TypeMovie, 'title' : 'The Last Boy Scout', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'The Rock', 'year' : 1996},
-					{'media' : Media.TypeMovie, 'title' : 'Under Siege', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'Con Air', 'year' : 1997},
-					{'media' : Media.TypeMovie, 'title' : 'Face/Off', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Die Hard 2', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Point Break', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Hard Target', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'Speed', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'Total Recall', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'True Lies', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Desperado', 'year' : 1995},
+					{'media' : Media.Movie, 'title' : 'The Last Boy Scout', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'The Rock', 'year' : 1996},
+					{'media' : Media.Movie, 'title' : 'Under Siege', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'Con Air', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'Face/Off', 'year' : 1997},
 				],
 			},
 
@@ -5427,31 +5402,31 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard 2: Die Harder', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'The Matrix', 'year' : 1999},
-					{'media' : Media.TypeMovie, 'title' : 'Speed', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Jurassic Park', 'year' : 1993},
-					{'media' : Media.TypeMovie, 'title' : 'True Lies', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'Bad Boys', 'year' : 1995},
-					{'media' : Media.TypeMovie, 'title' : 'Point Break', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Die Hard 2: Die Harder', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'The Matrix', 'year' : 1999},
+					{'media' : Media.Movie, 'title' : 'Speed', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Jurassic Park', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'True Lies', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'Bad Boys', 'year' : 1995},
+					{'media' : Media.Movie, 'title' : 'Point Break', 'year' : 1991},
 
-					{'media' : Media.TypeMovie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Die Hard 2: Die Harder', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'Point Break', 'year' : 1991},
-					{'media' : Media.TypeMovie, 'title' : 'Speed', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'The Rock', 'year' : 1996},
-					{'media' : Media.TypeMovie, 'title' : 'Total Recall', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'True Lies', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Hard Target', 'year' : 1993},
-					{'media' : Media.TypeMovie, 'title' : 'Under Siege', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'Cliffhanger', 'year' : 1993},
-					{'media' : Media.TypeMovie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
-					{'media' : Media.TypeMovie, 'title' : 'Face/Off', 'year' : 1997},
-					{'media' : Media.TypeMovie, 'title' : 'The Last Action Hero', 'year' : 1993},
-					{'media' : Media.TypeMovie, 'title' : 'Desperado', 'year' : 1995},
-					{'media' : Media.TypeMovie, 'title' : 'The Fugitive', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'Terminator 2: Judgment Day', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Die Hard 2: Die Harder', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Point Break', 'year' : 1991},
+					{'media' : Media.Movie, 'title' : 'Speed', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'The Rock', 'year' : 1996},
+					{'media' : Media.Movie, 'title' : 'Total Recall', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'True Lies', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Hard Target', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'Under Siege', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'Cliffhanger', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'Lethal Weapon 3', 'year' : 1992},
+					{'media' : Media.Movie, 'title' : 'Face/Off', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'The Last Action Hero', 'year' : 1993},
+					{'media' : Media.Movie, 'title' : 'Desperado', 'year' : 1995},
+					{'media' : Media.Movie, 'title' : 'The Fugitive', 'year' : 1993},
 				],
 			},
 
@@ -5527,26 +5502,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Notebook', 'year' : 2004},
-					{'media' : Media.TypeMovie, 'title' : 'A Walk to Remember', 'year' : 2002},
-					{'media' : Media.TypeMovie, 'title' : 'Titanic', 'year' : 1997},
-					{'media' : Media.TypeMovie, 'title' : 'The Fault in Our Stars', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'The Vow', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'Dear John', 'year' : 2010},
-					{'media' : Media.TypeMovie, 'title' : 'Twilight', 'year' : 2008},
-					{'media' : Media.TypeMovie, 'title' : 'The Twilight Saga: New Moon', 'year' : 2009},
-					{'media' : Media.TypeMovie, 'title' : 'The Twilight Saga: Eclipse', 'year' : 2010},
-					{'media' : Media.TypeMovie, 'title' : 'The Twilight Saga: Breaking Dawn - Part 1', 'year' : 2011},
-					{'media' : Media.TypeMovie, 'title' : 'The Twilight Saga: Breaking Dawn - Part 2', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'The Time Traveler\'s Wife', 'year' : 2009},
-					{'media' : Media.TypeMovie, 'title' : 'PS I Love You', 'year' : 2007},
-					{'media' : Media.TypeMovie, 'title' : 'Leap Year', 'year' : 2010},
-					{'media' : Media.TypeMovie, 'title' : 'The Best of Me', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'The Lucky One', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'The Longest Ride', 'year' : 2015},
-					{'media' : Media.TypeMovie, 'title' : 'About Time', 'year' : 2013},
-					{'media' : Media.TypeMovie, 'title' : 'Silver Linings Playbook', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'La La Land', 'year' : 2016},
+					{'media' : Media.Movie, 'title' : 'The Notebook', 'year' : 2004},
+					{'media' : Media.Movie, 'title' : 'A Walk to Remember', 'year' : 2002},
+					{'media' : Media.Movie, 'title' : 'Titanic', 'year' : 1997},
+					{'media' : Media.Movie, 'title' : 'The Fault in Our Stars', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'The Vow', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'Dear John', 'year' : 2010},
+					{'media' : Media.Movie, 'title' : 'Twilight', 'year' : 2008},
+					{'media' : Media.Movie, 'title' : 'The Twilight Saga: New Moon', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'The Twilight Saga: Eclipse', 'year' : 2010},
+					{'media' : Media.Movie, 'title' : 'The Twilight Saga: Breaking Dawn - Part 1', 'year' : 2011},
+					{'media' : Media.Movie, 'title' : 'The Twilight Saga: Breaking Dawn - Part 2', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'The Time Traveler\'s Wife', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'PS I Love You', 'year' : 2007},
+					{'media' : Media.Movie, 'title' : 'Leap Year', 'year' : 2010},
+					{'media' : Media.Movie, 'title' : 'The Best of Me', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'The Lucky One', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'The Longest Ride', 'year' : 2015},
+					{'media' : Media.Movie, 'title' : 'About Time', 'year' : 2013},
+					{'media' : Media.Movie, 'title' : 'Silver Linings Playbook', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'La La Land', 'year' : 2016},
 				],
 			},
 
@@ -5624,8 +5599,8 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'John Wick: Chapter 3 - Parabellum'},
-					{'media' : Media.TypeMovie, 'title' : 'Mission Impossible: Fallout'},
+					{'media' : Media.Movie, 'title' : 'John Wick: Chapter 3 - Parabellum'},
+					{'media' : Media.Movie, 'title' : 'Mission Impossible: Fallout'},
 				],
 			},
 
@@ -5657,26 +5632,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003},
-					{'media' : Media.TypeMovie, 'title' : 'The Shape of Water', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006},
-					{'media' : Media.TypeMovie, 'title' : 'The Lion King', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'year' : 2005},
-					{'media' : Media.TypeMovie, 'title' : 'Ex Machina', 'year' : 2014},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009},
-					{'media' : Media.TypeMovie, 'title' : 'The Curious Case of Benjamin Button', 'year' : 2008},
-					{'media' : Media.TypeMovie, 'title' : 'The Golden Compass', 'year' : 2007},
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'The Imaginarium of Doctor Parnassus', 'year' : 2009},
-					{'media' : Media.TypeMovie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'Gravity', 'year' : 2013},
-					{'media' : Media.TypeMovie, 'title' : 'The Dark Knight', 'year' : 2008},
-					{'media' : Media.TypeMovie, 'title' : 'Eternal Sunshine of the Spotless Mind', 'year' : 2004},
-					{'media' : Media.TypeMovie, 'title' : 'The Lord of the Rings: The Two Towers', 'year' : 2002},
-					{'media' : Media.TypeMovie, 'title' : 'Life of Pi', 'year' : 2012},
-					{'media' : Media.TypeMovie, 'title' : 'The Shape of Water', 'year' : 2017},
-					{'media' : Media.TypeMovie, 'title' : 'King Kong', 'year' : 2005},
-					{'media' : Media.TypeMovie, 'title' : 'Black Panther', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Return of the King', 'year' : 2003},
+					{'media' : Media.Movie, 'title' : 'The Shape of Water', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'Pan\'s Labyrinth', 'year' : 2006},
+					{'media' : Media.Movie, 'title' : 'The Lion King', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'year' : 2005},
+					{'media' : Media.Movie, 'title' : 'Ex Machina', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'The Curious Case of Benjamin Button', 'year' : 2008},
+					{'media' : Media.Movie, 'title' : 'The Golden Compass', 'year' : 2007},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Fellowship of the Ring', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Imaginarium of Doctor Parnassus', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'Harry Potter and the Philosopher\'s Stone', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'Gravity', 'year' : 2013},
+					{'media' : Media.Movie, 'title' : 'The Dark Knight', 'year' : 2008},
+					{'media' : Media.Movie, 'title' : 'Eternal Sunshine of the Spotless Mind', 'year' : 2004},
+					{'media' : Media.Movie, 'title' : 'The Lord of the Rings: The Two Towers', 'year' : 2002},
+					{'media' : Media.Movie, 'title' : 'Life of Pi', 'year' : 2012},
+					{'media' : Media.Movie, 'title' : 'The Shape of Water', 'year' : 2017},
+					{'media' : Media.Movie, 'title' : 'King Kong', 'year' : 2005},
+					{'media' : Media.Movie, 'title' : 'Black Panther', 'year' : 2018},
 				],
 			},
 
@@ -5692,11 +5667,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Annie Hall', 'year' : 1977},
-					{'media' : Media.TypeMovie, 'title' : 'The Apartment', 'year' : 1960},
-					{'media' : Media.TypeMovie, 'title' : 'It Happened One Night', 'year' : 1934},
-					{'media' : Media.TypeMovie, 'title' : 'The Artist', 'year' : 2011},
-					{'media' : Media.TypeMovie, 'title' : 'Shakespeare in Love', 'year' : 1998},
+					{'media' : Media.Movie, 'title' : 'Annie Hall', 'year' : 1977},
+					{'media' : Media.Movie, 'title' : 'The Apartment', 'year' : 1960},
+					{'media' : Media.Movie, 'title' : 'It Happened One Night', 'year' : 1934},
+					{'media' : Media.Movie, 'title' : 'The Artist', 'year' : 2011},
+					{'media' : Media.Movie, 'title' : 'Shakespeare in Love', 'year' : 1998},
 				],
 			},
 
@@ -5712,26 +5687,26 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'It Happened One Night', 'year' : 1934},
-					{'media' : Media.TypeMovie, 'title' : 'You Can\'t Take It with You', 'year' : 1938},
-					{'media' : Media.TypeMovie, 'title' : 'Going My Way', 'year' : 1944},
-					{'media' : Media.TypeMovie, 'title' : 'Gentleman\'s Agreement', 'year' : 1947},
-					{'media' : Media.TypeMovie, 'title' : 'All About Eve', 'year' : 1950},
-					{'media' : Media.TypeMovie, 'title' : 'An American in Paris', 'year' : 1951},
-					{'media' : Media.TypeMovie, 'title' : 'The Greatest Show on Earth', 'year' : 1952},
-					{'media' : Media.TypeMovie, 'title' : 'Around the World in 80 Days', 'year' : 1956},
-					{'media' : Media.TypeMovie, 'title' : 'The Apartment', 'year' : 1960},
-					{'media' : Media.TypeMovie, 'title' : 'Tom Jones', 'year' : 1963},
-					{'media' : Media.TypeMovie, 'title' : 'A Man for All Seasons', 'year' : 1966},
-					{'media' : Media.TypeMovie, 'title' : 'The Sting', 'year' : 1973},
-					{'media' : Media.TypeMovie, 'title' : 'Annie Hall', 'year' : 1977},
-					{'media' : Media.TypeMovie, 'title' : 'The Deer Hunter', 'year' : 1978},
-					{'media' : Media.TypeMovie, 'title' : 'Kramer vs. Kramer', 'year' : 1979},
-					{'media' : Media.TypeMovie, 'title' : 'Rain Man', 'year' : 1988},
-					{'media' : Media.TypeMovie, 'title' : 'Driving Miss Daisy', 'year' : 1989},
-					{'media' : Media.TypeMovie, 'title' : 'Forrest Gump', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Shakespeare in Love', 'year' : 1998},
-					{'media' : Media.TypeMovie, 'title' : 'Green Book', 'year' : 2018},
+					{'media' : Media.Movie, 'title' : 'It Happened One Night', 'year' : 1934},
+					{'media' : Media.Movie, 'title' : 'You Can\'t Take It with You', 'year' : 1938},
+					{'media' : Media.Movie, 'title' : 'Going My Way', 'year' : 1944},
+					{'media' : Media.Movie, 'title' : 'Gentleman\'s Agreement', 'year' : 1947},
+					{'media' : Media.Movie, 'title' : 'All About Eve', 'year' : 1950},
+					{'media' : Media.Movie, 'title' : 'An American in Paris', 'year' : 1951},
+					{'media' : Media.Movie, 'title' : 'The Greatest Show on Earth', 'year' : 1952},
+					{'media' : Media.Movie, 'title' : 'Around the World in 80 Days', 'year' : 1956},
+					{'media' : Media.Movie, 'title' : 'The Apartment', 'year' : 1960},
+					{'media' : Media.Movie, 'title' : 'Tom Jones', 'year' : 1963},
+					{'media' : Media.Movie, 'title' : 'A Man for All Seasons', 'year' : 1966},
+					{'media' : Media.Movie, 'title' : 'The Sting', 'year' : 1973},
+					{'media' : Media.Movie, 'title' : 'Annie Hall', 'year' : 1977},
+					{'media' : Media.Movie, 'title' : 'The Deer Hunter', 'year' : 1978},
+					{'media' : Media.Movie, 'title' : 'Kramer vs. Kramer', 'year' : 1979},
+					{'media' : Media.Movie, 'title' : 'Rain Man', 'year' : 1988},
+					{'media' : Media.Movie, 'title' : 'Driving Miss Daisy', 'year' : 1989},
+					{'media' : Media.Movie, 'title' : 'Forrest Gump', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Shakespeare in Love', 'year' : 1998},
+					{'media' : Media.Movie, 'title' : 'Green Book', 'year' : 2018},
 				],
 			},
 
@@ -5747,11 +5722,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Spy Game', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'The Bourne Identity', 'year' : 2002},
-					{'media' : Media.TypeMovie, 'title' : 'Casino Royale', 'year' : 2006},
-					{'media' : Media.TypeMovie, 'title' : 'Mission: Impossible - Ghost Protocol', 'year' : 2011},
-					{'media' : Media.TypeMovie, 'title' : 'Kingsman: The Secret Service', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'Spy Game', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Bourne Identity', 'year' : 2002},
+					{'media' : Media.Movie, 'title' : 'Casino Royale', 'year' : 2006},
+					{'media' : Media.Movie, 'title' : 'Mission: Impossible - Ghost Protocol', 'year' : 2011},
+					{'media' : Media.Movie, 'title' : 'Kingsman: The Secret Service', 'year' : 2014},
 				],
 			},
 
@@ -5795,11 +5770,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Back to the Future', 'year' : 1985},
-					{'media' : Media.TypeMovie, 'title' : 'The Terminator', 'year' : 1984},
-					{'media' : Media.TypeMovie, 'title' : 'Back to the Future Part II', 'year' : 1989},
-					{'media' : Media.TypeMovie, 'title' : 'Back to the Future Part III', 'year' : 1990},
-					{'media' : Media.TypeMovie, 'title' : 'Interstellar', 'year' : 2014},
+					{'media' : Media.Movie, 'title' : 'Back to the Future', 'year' : 1985},
+					{'media' : Media.Movie, 'title' : 'The Terminator', 'year' : 1984},
+					{'media' : Media.Movie, 'title' : 'Back to the Future Part II', 'year' : 1989},
+					{'media' : Media.Movie, 'title' : 'Back to the Future Part III', 'year' : 1990},
+					{'media' : Media.Movie, 'title' : 'Interstellar', 'year' : 2014},
 				],
 			},
 
@@ -5816,11 +5791,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'Avatar: The Way of Water', 'year' : 2022},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar', 'year' : 2009},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar 3', 'year' : 2024},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar 4', 'year' : 2026},
-					{'media' : Media.TypeMovie, 'title' : 'Avatar 5', 'year' : 2028},
+					{'media' : Media.Movie, 'title' : 'Avatar: The Way of Water', 'year' : 2022},
+					{'media' : Media.Movie, 'title' : 'Avatar', 'year' : 2009},
+					{'media' : Media.Movie, 'title' : 'Avatar 3', 'year' : 2024},
+					{'media' : Media.Movie, 'title' : 'Avatar 4', 'year' : 2026},
+					{'media' : Media.Movie, 'title' : 'Avatar 5', 'year' : 2028},
 				],
 			},
 
@@ -5835,11 +5810,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'Blade Runner', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Apocalypse Now', 'year' : 1979},
-					{'media' : Media.TypeMovie, 'title' : 'Memento', 'year' : 2000},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'Blade Runner', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Apocalypse Now', 'year' : 1979},
+					{'media' : Media.Movie, 'title' : 'Memento', 'year' : 2000},
 				],
 			},
 
@@ -5854,11 +5829,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'Blade Runner', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Apocalypse Now', 'year' : 1979},
-					{'media' : Media.TypeMovie, 'title' : 'Memento', 'year' : 2000},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'Blade Runner', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Apocalypse Now', 'year' : 1979},
+					{'media' : Media.Movie, 'title' : 'Memento', 'year' : 2000},
 				],
 			},
 
@@ -5873,11 +5848,11 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
-					{'media' : Media.TypeMovie, 'title' : 'Blade Runner', 'year' : 1982},
-					{'media' : Media.TypeMovie, 'title' : 'The Shining', 'year' : 1980},
-					{'media' : Media.TypeMovie, 'title' : 'Apocalypse Now', 'year' : 1979},
-					{'media' : Media.TypeMovie, 'title' : 'Memento', 'year' : 2000},
+					{'media' : Media.Movie, 'title' : '2001: A Space Odyssey', 'year' : 1968},
+					{'media' : Media.Movie, 'title' : 'Blade Runner', 'year' : 1982},
+					{'media' : Media.Movie, 'title' : 'The Shining', 'year' : 1980},
+					{'media' : Media.Movie, 'title' : 'Apocalypse Now', 'year' : 1979},
+					{'media' : Media.Movie, 'title' : 'Memento', 'year' : 2000},
 				],
 			},
 
@@ -5892,14 +5867,14 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Princess Bride'},
-					{'media' : Media.TypeMovie, 'title' : 'The Shawshank Redemption'},
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings'},
-					{'media' : Media.TypeSet, 'title' : 'The Godfather'},
-					{'media' : Media.TypeMovie, 'title' : 'Casablanca'},
-					{'media' : Media.TypeMovie, 'title' : 'The Wizard of Oz'},
-					{'media' : Media.TypeMovie, 'title' : 'Singin\' in the Rain'},
-					{'media' : Media.TypeMovie, 'title' : 'Mary Poppins'},
+					{'media' : Media.Movie, 'title' : 'The Princess Bride'},
+					{'media' : Media.Movie, 'title' : 'The Shawshank Redemption'},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings'},
+					{'media' : Media.Set, 'title' : 'The Godfather'},
+					{'media' : Media.Movie, 'title' : 'Casablanca'},
+					{'media' : Media.Movie, 'title' : 'The Wizard of Oz'},
+					{'media' : Media.Movie, 'title' : 'Singin\' in the Rain'},
+					{'media' : Media.Movie, 'title' : 'Mary Poppins'},
 				],
 			},
 
@@ -5914,19 +5889,19 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Princess Bride', 'year' : 1987},
-					{'media' : Media.TypeMovie, 'title' : 'Spirited Away', 'year' : 2001},
-					{'media' : Media.TypeMovie, 'title' : 'The Shawshank Redemption', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'The Big Lebowski', 'year' : 1998},
-					{'media' : Media.TypeMovie, 'title' : 'Singin\' in the Rain', 'year' : 1952},
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather', 'year' : 1972},
-					{'media' : Media.TypeMovie, 'title' : 'Casablanca', 'year' : 1942},
-					{'media' : Media.TypeMovie, 'title' : 'The Wizard of Oz', 'year' : 1939},
-					{'media' : Media.TypeMovie, 'title' : 'The Breakfast Club', 'year' : 1985},
-					{'media' : Media.TypeMovie, 'title' : 'Forrest Gump', 'year' : 1994},
-					{'media' : Media.TypeMovie, 'title' : 'Pulp Fiction', 'year' : 1994},
-					{'media' : Media.TypeSet, 'title' : 'The Lord of the Rings', 'year' : 2001},
-					{'media' : Media.TypeSet, 'title' : 'The Harry Potter', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Princess Bride', 'year' : 1987},
+					{'media' : Media.Movie, 'title' : 'Spirited Away', 'year' : 2001},
+					{'media' : Media.Movie, 'title' : 'The Shawshank Redemption', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'The Big Lebowski', 'year' : 1998},
+					{'media' : Media.Movie, 'title' : 'Singin\' in the Rain', 'year' : 1952},
+					{'media' : Media.Movie, 'title' : 'The Godfather', 'year' : 1972},
+					{'media' : Media.Movie, 'title' : 'Casablanca', 'year' : 1942},
+					{'media' : Media.Movie, 'title' : 'The Wizard of Oz', 'year' : 1939},
+					{'media' : Media.Movie, 'title' : 'The Breakfast Club', 'year' : 1985},
+					{'media' : Media.Movie, 'title' : 'Forrest Gump', 'year' : 1994},
+					{'media' : Media.Movie, 'title' : 'Pulp Fiction', 'year' : 1994},
+					{'media' : Media.Set, 'title' : 'The Lord of the Rings', 'year' : 2001},
+					{'media' : Media.Set, 'title' : 'The Harry Potter', 'year' : 2001},
 				],
 			},
 
@@ -5941,18 +5916,18 @@ class Oracle(object):
 				},
 
 				'items' : [
-					{'media' : Media.TypeMovie, 'title' : 'The Shawshank Redemption'},
-					{'media' : Media.TypeMovie, 'title' : 'Forrest Gump'},
-					{'media' : Media.TypeMovie, 'title' : 'The Princess Bride'},
-					{'media' : Media.TypeShow, 'title' : 'Stranger Things'},
-					{'media' : Media.TypeShow, 'title' : 'Breaking Bad'},
-					{'media' : Media.TypeShow, 'title' : 'Game of Thrones'},
-					{'media' : Media.TypeMovie, 'title' : 'Casablanca'},
-					{'media' : Media.TypeMovie, 'title' : 'Gone with the Wind'},
-					{'media' : Media.TypeMovie, 'title' : 'The Godfather'},
-					{'media' : Media.TypeMovie, 'title' : 'Toy Story'},
-					{'media' : Media.TypeMovie, 'title' : 'Up'},
-					{'media' : Media.TypeMovie, 'title' : 'Spirited Away'},
+					{'media' : Media.Movie, 'title' : 'The Shawshank Redemption'},
+					{'media' : Media.Movie, 'title' : 'Forrest Gump'},
+					{'media' : Media.Movie, 'title' : 'The Princess Bride'},
+					{'media' : Media.Show, 'title' : 'Stranger Things'},
+					{'media' : Media.Show, 'title' : 'Breaking Bad'},
+					{'media' : Media.Show, 'title' : 'Game of Thrones'},
+					{'media' : Media.Movie, 'title' : 'Casablanca'},
+					{'media' : Media.Movie, 'title' : 'Gone with the Wind'},
+					{'media' : Media.Movie, 'title' : 'The Godfather'},
+					{'media' : Media.Movie, 'title' : 'Toy Story'},
+					{'media' : Media.Movie, 'title' : 'Up'},
+					{'media' : Media.Movie, 'title' : 'Spirited Away'},
 					{'title' : 'Planet Earth'},
 					{'title' : 'Blackfish'},
 					{'title' : 'Making a Murderer'},

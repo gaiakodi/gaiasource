@@ -23,7 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://glodls.to', 'https://gtdb.to', 'https://gtdb.cc']
+	_Link					= ['https://glodls.to', 'https://gtso.cc'] # Offline: https://gtdb.to https://gtdb.cc
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'glotorrents', ProviderHtml.UnblockFormat3 : 'glotorrents', ProviderHtml.UnblockFormat4 : 'glotorrents'}
 	_Path					= 'search_results.php'
 

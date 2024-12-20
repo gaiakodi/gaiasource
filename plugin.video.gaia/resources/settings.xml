@@ -155,9 +155,91 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
+			<!-- ########## GENERAL - CONTENT ########## -->
+			<group id="general.content" label="36699">
+				<setting id="general.content.docu" type="integer" label="36703" help="34272">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.content.short" type="integer" label="36704" help="34273">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.content.family" type="integer" label="36708" help="34277">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.content.anima" type="integer" label="36705" help="34274">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.content.anime" type="integer" label="36706" help="34275">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.content.donghua" type="integer" label="36707" help="34276">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="36043">0</option>
+							<option label="36700">1</option>
+							<option label="36701">2</option>
+							<option label="36702">3</option>
+						</options>
+					</constraints>
+				</setting>
+			</group>
+
 			<!-- ########## GENERAL - SOUND ########## -->
 			<group id="general.sound" label="33423">
-				<setting id="general.sound.effects" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.sound.effects" type="boolean"><default>false</default><control type="toggle"></control><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
 				<setting id="general.sound.effects.label" type="string" label="36514" help="34112">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsSound&settings=true)</data>
@@ -168,96 +250,6 @@ The label is then added to the action element:
 					<constraints>
 						<allowempty>true</allowempty>
 					</constraints>
-				</setting>
-			</group>
-
-			<!-- ########## GENERAL - KIDS ########## -->
-			<group id="general.kids" label="33429">
-				<setting id="general.kids.locked" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>4</level></setting> <!-- Level 4 to not reset on default -->
-				<setting id="general.kids.enabled" type="boolean" label="33438" help="34124">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="general.kids.locked">false</dependency>
-					</dependencies>
-				</setting>
-				<setting id="general.kids.restriction" type="integer" label="33432" help="34114" parent="general.kids.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33433">0</option>
-							<option label="33434">1</option>
-							<option label="33435">2</option>
-							<option label="33436">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="general.kids.locked">false</condition>
-								<condition setting="general.kids.enabled">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="general.kids.password" type="string" label="33439" help="34115" parent="general.kids.enabled">
-					<control type="edit" format="string">
-						<heading>33439</heading>
-						<hidden>true</hidden>
-					</control>
-					<default/>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="general.kids.locked">false</condition>
-								<condition setting="general.kids.enabled">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="general.kids.lock" type="string" label="33442" help="34116">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=kidsLock)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 35824]</default>
-					<level>2</level>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="general.kids.locked">false</condition>
-								<condition setting="general.kids.enabled">true</condition>
-								<condition setting="general.kids.password" operator="!is"></condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="general.kids.unlock" type="string" label="33443" help="34117">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=kidsUnlock)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 35823]</default>
-					<level>2</level>
-					<dependencies>
-						<dependency type="visible">
-							<or>
-								<condition setting="general.kids.locked">true</condition> <!-- If Default button was clicked while locked. -->
-								<and>
-									<condition setting="general.kids.locked">true</condition>
-									<condition setting="general.kids.enabled">true</condition>
-									<condition setting="general.kids.password" operator="!is"></condition>
-								</and>
-							</or>
-						</dependency>
-					</dependencies>
 				</setting>
 			</group>
 
@@ -299,7 +291,7 @@ The label is then added to the action element:
 				<setting id="general.settings.cache" type="boolean" label="33937" help="34302">
 					<control type="toggle"/>
 					<level>3</level>
-					<default>true</default>
+					<default>false</default> <!-- Newer versions of Kodi now seem to have their own addon settings cache, and this is no longer needed. Getting settings is actually faster with this setting diabled. -->
 				</setting>
 				<setting id="general.settings.backup.time" type="integer"><default>0</default><control type="edit" format="integer"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>4</level></setting> <!-- Use level 4 in order not to reset the value if the Default button is clicked in the settings dialog. -->
 				<setting id="general.settings.backup.enabled" type="boolean" label="35208" help="34287">
@@ -353,6 +345,20 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
+				<setting id="general.database.compression" type="integer" label="36533" help="34103" parent="general.database.limit.label">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33800">1</option>
+							<option label="33643">2</option>
+							<option label="33999">3</option>
+							<option label="33644">4</option>
+						</options>
+					</constraints>
+				</setting>
 				<setting id="general.database.clean" type="string" label="36428" help="34640" parent="general.database.limit.label">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=clean&settings=true)</data>
@@ -368,34 +374,24 @@ The label is then added to the action element:
 
 			<!-- ########## GENERAL - CONCURRENCY ########## -->
 			<group id="general.concurrency" label="36042">
-				<setting id="general.concurrency.task" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="general.concurrency.task.label" type="string" label="36038" help="34560">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.task&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33800]</default>
+				<setting id="general.concurrency.level" type="integer" label="36619" help="34127">
+					<control type="spinner" format="string"/>
+					<default>0</default>
 					<level>2</level>
 					<constraints>
-						<allowempty>true</allowempty>
+						<options>
+							<option label="33800">0</option>
+							<option label="35233">1</option>
+							<option label="33643">2</option>
+							<option label="33999">3</option>
+							<option label="33644">4</option>
+						</options>
 					</constraints>
 				</setting>
-				<setting id="general.concurrency.instance" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
-				<setting id="general.concurrency.instance.label" type="string" label="36037" help="34476" parent="general.concurrency.task.label">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.instance&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 35221]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="general.concurrency.notifications" type="integer" label="36169" help="34511" parent="general.concurrency.task.label">
+				<setting id="general.concurrency.notification" type="integer" label="33109" help="34511" parent="general.concurrency.level">
 					<control type="spinner" format="string"/>
 					<default>2</default>
-					<level>3</level>
+					<level>2</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -403,6 +399,177 @@ The label is then added to the action element:
 							<option label="35877">2</option>
 						</options>
 					</constraints>
+				</setting>
+				<setting id="general.concurrency.global" type="integer" label="36037" help="34117">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="35233">1</option>
+							<option label="33643">2</option>
+							<option label="33999">3</option>
+							<option label="33644">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="general.concurrency.level">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.global.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.concurrency.global.limit.label" type="string" label="36620" help="34476" parent="general.concurrency.global">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.global.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.global">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.metadata" type="integer" label="36038" help="34128">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="35233">1</option>
+							<option label="33643">2</option>
+							<option label="33999">3</option>
+							<option label="33644">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="general.concurrency.level">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.metadata.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.concurrency.metadata.limit.label" type="string" label="36621" help="34560" parent="general.concurrency.metadata">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.metadata.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.metadata">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.scrape" type="integer" label="36622" help="34150">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="35233">1</option>
+							<option label="33643">2</option>
+							<option label="33999">3</option>
+							<option label="33644">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="general.concurrency.level">1</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.scrape.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="general.concurrency.scrape.limit.label" type="string" label="36621" help="34151" parent="general.concurrency.scrape">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.scrape.limit&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.scrape">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.scrape.binge" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="general.concurrency.scrape.binge.label" type="string" label="36624" help="34630" parent="general.concurrency.scrape">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.scrape.binge&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.scrape">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.scrape.connection" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="general.concurrency.scrape.connection.label" type="string" label="32038" help="34304" parent="general.concurrency.scrape">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.concurrency.scrape.connection&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.scrape">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.concurrency.scrape.mode" type="integer" label="36623" help="34475" parent="general.concurrency.scrape">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="36039">1</option>
+							<option label="36040">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="general.concurrency.level">1</condition>
+								<condition setting="general.concurrency.scrape">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
 				</setting>
 			</group>
 
@@ -414,14 +581,8 @@ The label is then added to the action element:
 						<close>true</close>
 					</control>
 
-					<!--
-						NB: In the future we might want to enable this by default. Leave disabled for now to do more testing.
-						If the default value is ever changed, make sure this value here in the settings has the same value as <reuselanguageinvoker> in addon.xml.
-						NB: Since <reuselanguageinvoker> is set dynamically through Gaia, changing the value in addon.xml won't help.
-						Instead, update publisher.py to replace the value when creating a new release ZIP.
-						This prevents unnecessarily reloading the Kodi profile if Gaia is installed or upgraded, which causes Kodi to be unresposive for a few moments (from service.py).
-					-->
-					<default>$ADDON[plugin.video.gaia 32302]</default>
+					<!-- UPDATE: This is now enabled by default from v7 onwards. The value in addon.xml is replaced from publisher.py when the ZIP is created. -->
+					<default>$ADDON[plugin.video.gaia 36091]</default>
 
 					<level>3</level>
 					<constraints>
@@ -448,6 +609,47 @@ The label is then added to the action element:
 							<option label="36091">2</option>
 							<option label="36092">3</option>
 						</options>
+					</constraints>
+				</setting>
+			</group>
+
+			<!-- ########## GENERAL - ENVIRONMENT ########## -->
+			<group id="general.enviroment" label="36399">
+				<setting id="general.enviroment.command" type="integer" label="33246" help="34095">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="33800">1</option>
+							<option label="35233">2</option>
+							<option label="36627">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="general.enviroment.command.custom" type="string" label="36625" help="34095" parent="general.enviroment.command">
+					<control type="edit" format="string">
+						<heading>36625</heading>
+					</control>
+					<default/>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="general.enviroment.command">2</dependency>
+					</dependencies>
+				</setting>
+				<setting id="general.enviroment.command.test" type="string" label="36626" help="34096" parent="general.enviroment.command">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsEnvironment&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33387]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
 			</group>
@@ -593,6 +795,7 @@ The label is then added to the action element:
 					<level>0</level>
 					<default>false</default>
 				</setting>
+				<setting id="account.trakt.sync" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="account.trakt.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="account.trakt.authentication.label" type="string" label="33101" help="34219">
 					<control type="button" format="action">
@@ -801,7 +1004,7 @@ The label is then added to the action element:
 			<group id="account.opensubtitles" label="35683">
 				<setting id="account.opensubtitles.link" type="string" label="">
 					<control type="button" format="action"></control>
-					<default>https://opensubtitles.org</default>
+					<default>https://opensubtitles.com</default>
 					<level>1</level>
 					<enable>false</enable>
 					<constraints><allowempty>true</allowempty></constraints>
@@ -1587,58 +1790,6 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## PROVIDER - CONCURRENCY ########## -->
-			<group id="provider.concurrency" label="36042">
-				<setting id="provider.concurrency.mode" type="integer" label="36062" help="34475">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="33800">0</option>
-							<option label="36039">1</option>
-							<option label="36040">2</option>
-						</options>
-					</constraints>
-				</setting>
-				<setting id="provider.concurrency.limit" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.concurrency.limit.label" type="string" label="36063" help="34474" parent="provider.concurrency.mode">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.limit&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="provider.concurrency.binge" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.concurrency.binge.label" type="string" label="36399" help="34630" parent="provider.concurrency.mode">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.binge&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="provider.concurrency.connection" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
-				<setting id="provider.concurrency.connection.label" type="string" label="32038" help="34304">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=provider.concurrency.connection&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>3</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-			</group>
-
 			<!-- ########## PROVIDER - MIRROR ########## -->
 			<group id="provider.mirror" label="35830">
 				<setting id="provider.mirror.domain" type="boolean" label="36060" help="34111">
@@ -2122,7 +2273,7 @@ The label is then added to the action element:
 				<setting id="scrape.cache.inspection.premiumize" type="integer" label="33959" help="34278" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>1</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -2137,7 +2288,7 @@ The label is then added to the action element:
 				<setting id="scrape.cache.inspection.offcloud" type="integer" label="33960" help="34279" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>1</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -2151,8 +2302,8 @@ The label is then added to the action element:
 				</setting>
 				<setting id="scrape.cache.inspection.realdebrid" type="integer" label="33961" help="34280" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
+					<default>0</default> <!-- As of Nov 2024 RealDebrid does not have cache lookups anymore. Disable by default to avoid unnecessary API requests. -->
+					<level>1</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -2166,8 +2317,8 @@ The label is then added to the action element:
 				</setting>
 				<setting id="scrape.cache.inspection.debridlink" type="integer" label="36218" help="36219" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
+					<default>0</default> <!-- As of Nov 2024 DebridLink does not have cache lookups anymore. Disable by default to avoid unnecessary API requests. -->
+					<level>1</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -2181,8 +2332,8 @@ The label is then added to the action element:
 				</setting>
 				<setting id="scrape.cache.inspection.alldebrid" type="integer" label="36216" help="36217" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
+					<default>0</default> <!-- As of Nov 2024 AllDebrid does not have cache lookups anymore. Disable by default to avoid unnecessary API requests. -->
+					<level>1</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -2194,6 +2345,7 @@ The label is then added to the action element:
 						<dependency type="visible" setting="scrape.cache.inspection">true</dependency>
 					</dependencies>
 				</setting>
+
 			</group>
 
 			<!-- ########## SCRAPE - TERMINATION ########## -->
@@ -2290,6 +2442,24 @@ The label is then added to the action element:
 					<dependencies>
 						<dependency type="visible" setting="scrape.termination.unresponsive">true</dependency>
 					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## SCRAPE - ALTERNATIVE ########## -->
+			<group id="scrape.alternative" label="35239">
+				<setting id="scrape.alternative.number" type="integer" label="36679" help="34157">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35143">1</option>
+							<option label="36682">2</option>
+							<option label="32055">3</option>
+							<option label="35239">4</option>
+						</options>
+					</constraints>
 				</setting>
 			</group>
 
@@ -3182,6 +3352,280 @@ The label is then added to the action element:
 						<dependency type="visible" on="property" name="infobool">System.AddonIsEnabled(plugin.video.youtube)</dependency>
 					</dependencies>
 				</setting>
+				<setting id="stream.youtube.quality" type="string" label="33889" help="34512">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=youtubeQuality&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<dependencies>
+						<dependency type="enable" on="property" name="infobool">System.AddonIsEnabled(plugin.video.youtube)</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.name" type="integer" label="35836" help="34224">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33039">0</option>
+							<option label="33040">1</option>
+							<option label="35296">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval" type="integer" label="35833" help="34357">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+							<option label="35233">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.trailer" type="integer" label="35536" help="34355" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.recap" type="integer" label="35535" help="34356" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.review" type="integer" label="35651" help="34430" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.extra" type="integer" label="35653" help="34433" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.deleted" type="integer" label="35654" help="34434" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.making" type="integer" label="35650" help="34431" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.director" type="integer" label="35377" help="34435" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.interview" type="integer" label="35655" help="34436" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.explanation" type="integer" label="35652" help="34432" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.reaction" type="integer" label="33990" help="34464" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+
 			</group>
 
 		</category>
@@ -4618,7 +5062,7 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="metadata.general.external" type="string" label="33301" help="34559">
+				<setting id="metadata.general.external" type="string" label="33301" help="34559" parent="metadata.general.detail">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaExternal&settings=true)</data>
 						<close>true</close>
@@ -4629,451 +5073,85 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-			</group>
-
-			<!-- ########## METADATA - LOCATION ########## -->
-			<group id="metadata.location" label="33874">
-				<setting id="metadata.location.language" type="string" label="33238" help="34001">
+				<setting id="metadata.general.language" type="string" label="33238" help="34001">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=metadata.location.language&title=33238&automatic=true&none=false)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=metadata.general.language&title=33238&automatic=true&none=false)</data>
 						<close>false</close>
 					</control>
 					<default>Automatic</default>
 					<level>2</level>
 				</setting>
-				<setting id="metadata.location.country" type="string" label="33947" help="34462">
+				<setting id="metadata.general.country" type="string" label="33947" help="34462">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCountry&id=metadata.location.country&title=33238&automatic=true&none=false)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCountry&id=metadata.general.country&title=33238&automatic=true&none=false&frequency=true)</data>
 						<close>false</close>
 					</control>
 					<default>Automatic</default>
 					<level>3</level>
 				</setting>
-			</group>
-
-			<!-- ########## METADATA - LABEL ########## -->
-			<group id="metadata.label" label="35546">
-				<setting id="metadata.label.force" type="integer" label="33106" help="34408">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="32301">1</option>
-							<option label="33800">2</option>
-						</options>
-					</constraints>
-				</setting>
-				<setting id="metadata.label.layout" type="boolean" label="33107" help="34182">
+				<setting id="metadata.general.audience" type="boolean" label="33438" help="34124">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="metadata.label.layout.movie" type="integer" label="33634" help="34160" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33634</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.label.layout.show" type="integer" label="33635" help="34161" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33635</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.label.layout.season" type="integer" label="33636" help="34162" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33636</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33599">2</option>
-							<option label="33600">3</option>
-							<option label="33601">4</option>
-							<option label="33602">5</option>
-							<option label="33603">6</option>
-							<option label="33604">7</option>
-							<option label="33605">8</option>
-							<option label="33606">9</option>
-							<option label="33607">10</option>
-							<option label="33608">11</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.label.layout.episode" type="integer" label="33637" help="34163" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33637</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33609">3</option>
-							<option label="33610">4</option>
-							<option label="33611">5</option>
-							<option label="33612">6</option>
-							<option label="33172">7</option>
-							<option label="33173">8</option>
-							<option label="33613">9</option>
-							<option label="33614">10</option>
-							<option label="33615">11</option>
-							<option label="33174">12</option>
-							<option label="33175">13</option>
-							<option label="33176">14</option>
-							<option label="33616">15</option>
-							<option label="33617">16</option>
-							<option label="33618">17</option>
-							<option label="33619">18</option>
-							<option label="33177">19</option>
-							<option label="33178">20</option>
-							<option label="33620">21</option>
-							<option label="33621">22</option>
-							<option label="33622">23</option>
-							<option label="33179">24</option>
-							<option label="33180">25</option>
-							<option label="33181">26</option>
-							<option label="33623">27</option>
-							<option label="33624">28</option>
-							<option label="33625">29</option>
-							<option label="33626">30</option>
-							<option label="33627">31</option>
-							<option label="33628">32</option>
-							<option label="33629">33</option>
-							<option label="33630">34</option>
-							<option label="33631">35</option>
-							<option label="33632">36</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.label.layout.documentary" type="integer" label="33638" help="34164" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33638</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.label.layout.short" type="integer" label="33639" help="34165" parent="metadata.label.layout">
-					<control type="list" format="string">
-						<heading>33639</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## METADATA - DETAIL ########## -->
-			<group id="metadata.detail" label="33379">
-				<setting id="metadata.detail.enabled" type="boolean" label="32359" help="34319">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="metadata.detail.level" type="integer" label="32531" help="34542" parent="metadata.detail.enabled">
+				<setting id="metadata.general.audience.kid" type="integer" label="33439" help="34114" parent="metadata.general.audience">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>8</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="36090">0</option>
-							<option label="36091">1</option>
-							<option label="36092">2</option>
+							<option label="33433">0</option>
+							<option label="33434">2</option>
+							<option label="33435">7</option>
+							<option label="33436">8</option>
+							<option label="36534">13</option>
+							<option label="36535">14</option>
+							<option label="36536">17</option>
+							<option label="35221">99</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
+						<dependency type="visible" setting="metadata.general.audience">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="metadata.detail.placement" type="integer" label="32358" help="34320" parent="metadata.detail.enabled">
+				<setting id="metadata.general.audience.teen" type="integer" label="33440" help="34115" parent="metadata.general.audience">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>14</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="32051">0</option>
-							<option label="32050">1</option>
-							<option label="32053">2</option>
-							<option label="32052">3</option>
+							<option label="33433">0</option>
+							<option label="33434">2</option>
+							<option label="33435">7</option>
+							<option label="33436">8</option>
+							<option label="36534">13</option>
+							<option label="36535">14</option>
+							<option label="36536">17</option>
+							<option label="35221">99</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
+						<dependency type="visible" setting="metadata.general.audience">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="metadata.detail.decoration" type="integer" label="32407" help="34410" parent="metadata.detail.enabled">
+				<setting id="metadata.general.audience.adult" type="integer" label="33441" help="34116" parent="metadata.general.audience">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>99</default>
 					<level>2</level>
 					<constraints>
 						<options>
-							<option label="33112">0</option>
-							<option label="35049">1</option>
-							<option label="35050">2</option>
-							<option label="35367">3</option>
+							<option label="33433">0</option>
+							<option label="33434">2</option>
+							<option label="33435">7</option>
+							<option label="33436">8</option>
+							<option label="36534">13</option>
+							<option label="36535">14</option>
+							<option label="36536">17</option>
+							<option label="35221">99</option>
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.style" type="integer" label="32406" help="34409" parent="metadata.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35644">1</option>
-							<option label="36027">2</option>
-							<option label="36028">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.color" type="integer" label="32408" help="34541" parent="metadata.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35486">1</option>
-							<option label="35487">2</option>
-							<option label="36052">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.play" type="boolean" label="35021" help="34218">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.play.threshold" type="integer" label="35039" help="34539" parent="metadata.detail.play">
-					<control type="slider" format="integer">
-						<heading>35039</heading>
-						<popup>true</popup>
-					</control>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="metadata.detail.enabled">true</condition>
-								<condition setting="metadata.detail.play">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.progress" type="boolean" label="35040" help="34540">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.rating" type="boolean" label="35020" help="34215">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.air" type="boolean" label="35017" help="34213">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="metadata.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.air.zone" type="integer" label="35018" help="34214" parent="metadata.detail.air">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-							<option label="35022">1</option>
-							<option label="35023">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="metadata.detail.enabled">true</condition>
-								<condition setting="metadata.detail.air">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.air.format" type="integer" label="35019" help="34216" parent="metadata.detail.air">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="35029">0</option>
-							<option label="35028">1</option>
-							<option label="35030">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="metadata.detail.enabled">true</condition>
-								<condition setting="metadata.detail.air">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.air.format.day" type="integer" label="35031" help="34217" parent="metadata.detail.air">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35049">0</option>
-							<option label="35050">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="metadata.detail.enabled">true</condition>
-								<condition setting="metadata.detail.air">true</condition>
-								<condition setting="metadata.detail.air.format" operator="!is">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.detail.air.format.time" type="integer" label="35048" help="34228" parent="metadata.detail.air">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35049">0</option>
-							<option label="35050">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="metadata.detail.enabled">true</condition>
-								<condition setting="metadata.detail.air">true</condition>
-								<condition setting="metadata.detail.air.format" operator="!is">1</condition>
-							</and>
-						</dependency>
+						<dependency type="visible" setting="metadata.general.audience">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -5173,283 +5251,6 @@ The label is then added to the action element:
 							<option label="35547">2</option>
 						</options>
 					</constraints>
-				</setting>
-			</group>
-
-			<!-- ########## METADATA - VIDEO ########## -->
-			<group id="metadata.video" label="35351">
-				<setting id="metadata.video.quality" type="string" label="33889" help="34512">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=youtubeQuality&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<dependencies>
-						<dependency type="enable" on="property" name="infobool">System.AddonIsEnabled(plugin.video.youtube)</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.name" type="integer" label="35836" help="34224">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="33039">0</option>
-							<option label="33040">1</option>
-							<option label="35296">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval" type="integer" label="35833" help="34357">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-							<option label="35233">4</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.trailer" type="integer" label="35536" help="34355" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.recap" type="integer" label="35535" help="34356" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.review" type="integer" label="35651" help="34430" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.extra" type="integer" label="35653" help="34433" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.deleted" type="integer" label="35654" help="34434" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.making" type="integer" label="35650" help="34431" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.director" type="integer" label="35377" help="34435" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.interview" type="integer" label="35655" help="34436" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.explanation" type="integer" label="35652" help="34432" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="metadata.video.retrieval.reaction" type="integer" label="33990" help="34464" parent="metadata.video.retrieval">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33489">1</option>
-							<option label="33800">2</option>
-							<option label="33110">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="metadata.video.retrieval">4</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.youtube.enabled">true</condition>
-								<condition setting="account.youtube.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
 				</setting>
 			</group>
 
@@ -5660,7 +5461,7 @@ The label is then added to the action element:
 				<setting id="image.special.season" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.season.label" type="string" label="35590" help="34417">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=specialseason&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=seasonx&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -5677,7 +5478,7 @@ The label is then added to the action element:
 				<setting id="image.special.episode" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.episode.label" type="string" label="35591" help="34418">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=specialepisode&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=episodex&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -5699,7 +5500,7 @@ The label is then added to the action element:
 				<setting id="image.special.recap" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.recap.label" type="string" label="35592" help="34419">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=specialrecap&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=recap&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -5711,7 +5512,7 @@ The label is then added to the action element:
 				<setting id="image.special.extra" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.extra.label" type="string" label="35593" help="34420">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=specialextra&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=extra&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 33564]</default>
@@ -5724,343 +5525,37 @@ The label is then added to the action element:
 
 		</category>
 
-
 		<!-- ########## MENU ########## -->
 		<category id="menu" label="32319" help="33951">
 
 			<!-- ########## MENU - MAIN ########## -->
-			<group id="menu.main" label="35397">
-				<setting id="menu.main.movie" type="boolean" label="32001" help="34125">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.show" type="boolean" label="32002" help="34126">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.documentary" type="boolean" label="33470" help="34127">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.short" type="boolean" label="33471" help="34128">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.kid" type="boolean" label="33429" help="34113">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.quick" type="boolean" label="35550" help="34579">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.arrival" type="boolean" label="33490" help="34118">
+			<group id="menu.general" label="32310">
+				<setting id="menu.general.shortcut" type="boolean" label="36192" help="34514">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="menu.main.favourite" type="boolean" label="33000" help="34007">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="menu.main.search" type="boolean" label="32010" help="34119">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.promotion" type="boolean" label="35442" help="34361">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.main.shortcut" type="boolean" label="35119" help="34243">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="enable" setting="navigation.general.shortcut">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## MENU - QUICK ########## -->
-			<group id="menu.quick" label="35550">
-				<setting id="menu.quick.enabled" type="boolean" label="35575" help="34568">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="menu.quick.direct" type="boolean" label="35492" help="34578" parent="menu.quick.enabled">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.progress" type="integer" label="36016" help="34569" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36016</heading>
-						<popup>true</popup>
-					</control>
-					<default>8</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.history" type="integer" label="36017" help="34570" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36017</heading>
-						<popup>true</popup>
-					</control>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.watchlist" type="integer" label="36018" help="34571" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36018</heading>
-						<popup>true</popup>
-					</control>
-					<default>3</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.recommended" type="integer" label="36019" help="34572" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36019</heading>
-						<popup>true</popup>
-					</control>
-					<default>3</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.arrivals" type="integer" label="36020" help="34573" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36020</heading>
-						<popup>true</popup>
-					</control>
-					<default>2</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.popular" type="integer" label="36021" help="34574" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36021</heading>
-						<popup>true</popup>
-					</control>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.trending" type="integer" label="36022" help="34575" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36022</heading>
-						<popup>true</popup>
-					</control>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.quick.featured" type="integer" label="36023" help="34576" parent="menu.quick.enabled">
-					<control type="slider" format="integer">
-						<heading>36023</heading>
-						<popup>true</popup>
-					</control>
-					<default>1</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.quick.enabled">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## MENU - ARRIVAL ########## -->
-			<group id="menu.arrival" label="33490">
-				<setting id="menu.arrival.movie" type="integer" label="32320" help="34005">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>1</level>
-					<constraints>
-						<options>
-							<option label="33004">0</option>
-							<option label="33571">1</option>
-							<option label="32323">2</option>
-							<option label="33006">3</option>
-							<option label="33007">4</option>
-						</options>
-					</constraints>
-				</setting>
-				<setting id="menu.arrival.show" type="integer" label="32325" help="34006">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>1</level>
-					<constraints>
-						<options>
-							<option label="33004">0</option>
-							<option label="33571">1</option>
-							<option label="33009">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<or>
-								<condition setting="account.trakt.enabled">false</condition>
-								<condition setting="account.trakt.authentication">false</condition>
-							</or>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.arrival.show.trakt" type="integer" label="32325" help="34006">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>1</level>
-					<constraints>
-						<options>
-							<option label="33004">0</option>
-							<option label="33571">1</option>
-							<option label="33009">2</option>
-							<option label="32327">3</option>
-							<option label="32328">4</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="account.trakt.enabled">true</condition>
-								<condition setting="account.trakt.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.arrival.documentary" type="integer" label="33572" help="34157">
+				<setting id="menu.general.explore" type="integer" label="35872" help="34007">
 					<control type="spinner" format="string"/>
 					<default>0</default>
-					<level>1</level>
+					<level>3</level>
 					<constraints>
 						<options>
-							<option label="33004">0</option>
-							<option label="33571">1</option>
-							<option label="32323">2</option>
-							<option label="33006">3</option>
-							<option label="33007">4</option>
+							<option label="35143">0</option>
+							<option label="36527">1</option>
+							<option label="33004">2</option>
+							<option label="33571">3</option>
+							<option label="33733">4</option>
+							<option label="36528">5</option>
+							<option label="32018">6</option>
+							<option label="36529">7</option>
+							<option label="33008">8</option>
+							<option label="33010">9</option>
+							<option label="33007">10</option>
 						</options>
 					</constraints>
 				</setting>
-				<setting id="menu.arrival.short" type="integer" label="33573" help="34158">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>1</level>
-					<constraints>
-						<options>
-							<option label="33004">0</option>
-							<option label="33571">1</option>
-							<option label="32323">2</option>
-							<option label="33006">3</option>
-							<option label="33007">4</option>
-						</options>
-					</constraints>
-				</setting>
-			</group>
-
-		</category>
-
-
-		<!-- ########## NAVIGATION ########## -->
-		<category id="navigation" label="33232" help="33943">
-
-			<!-- ########## NAVIGATION - GENERAL ########## -->
-			<group id="navigation.general" label="32310">
-				<setting id="navigation.general.shortcut" type="boolean" label="36192" help="34514">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="navigation.general.hide" type="integer" label="35672" help="34439">
+				<setting id="menu.general.watched" type="integer" label="35672" help="34439">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>3</level>
@@ -6072,90 +5567,231 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
+				<setting id="menu.general.notification" type="integer" label="33679" help="34158">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="36092">3</option>
+						</options>
+					</constraints>
+				</setting>
 			</group>
 
-			<!-- ########## NAVIGATION - SHOW ########## -->
-			<group id="navigation.show" label="32002">
-				<setting id="navigation.show.direct" type="boolean" label="35492" help="34393">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
+			<!-- ########## MENU - LEVEL ########## -->
+			<group id="menu.level" label="32319">
+				<setting id="menu.level.quick" type="integer" label="36016" help="34578">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+							<option label="35235">3</option>
+						</options>
+					</constraints>
 				</setting>
-				<setting id="navigation.show.flatten" type="boolean" label="33234" help="34008">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
+				<setting id="menu.level.progress" type="integer" label="36017" help="34579">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+							<option label="35235">3</option>
+						</options>
+					</constraints>
 				</setting>
-				<setting id="navigation.show.series" type="boolean" label="33231" help="34015">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="enable" setting="navigation.show.flatten">false</dependency>
-					</dependencies>
+				<setting id="menu.level.arrival" type="integer" label="36018" help="34118">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+							<option label="35235">3</option>
+						</options>
+					</constraints>
 				</setting>
-				<setting id="navigation.show.future" type="boolean" label="35835" help="34091">
+				<setting id="menu.level.favorite" type="integer" label="36019" help="34100">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35235">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.level.search" type="integer" label="36020" help="34119">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+							<option label="35235">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.level.movie" type="integer" label="35122" help="34125">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.level.show" type="integer" label="35124" help="34126">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.level.tool" type="integer" label="35137" help="34101">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.level.promotion" type="integer" label="36021" help="34102">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="35397">2</option>
+						</options>
+					</constraints>
+				</setting>
+			</group>
+
+			<!-- ########## MENU - SHOW ########## -->
+			<group id="menu.show" label="32002">
+				<setting id="menu.show.submenu" type="boolean" label="35492" help="34393">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="navigation.show.future.season" type="boolean" label="35117" help="34241" parent="navigation.show.future">
+				<setting id="menu.show.flat" type="boolean" label="33234" help="34008">
 					<control type="toggle"/>
 					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="navigation.show.future">true</dependency>
-					</dependencies>
+					<default>false</default>
 				</setting>
-				<setting id="navigation.show.future.episode" type="boolean" label="35118" help="34242" parent="navigation.show.future">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="navigation.show.future">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.show.special" type="boolean" label="35838" help="34248">
-					<control type="toggle"/>
+				<setting id="menu.show.serie" type="integer" label="33231" help="34015">
+					<control type="spinner" format="string"/>
+					<default>2</default>
 					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.show.special.season" type="boolean" label="33235" help="34009" parent="navigation.show.special">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="33509">3</option>
+						</options>
+					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.special">true</dependency>
+						<dependency type="enable" setting="menu.show.flat">false</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.special.episode" type="boolean" label="33236" help="34010" parent="navigation.show.special">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
+				<setting id="menu.show.absolute" type="integer" label="33648" help="34098">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="33509">3</option>
+						</options>
+					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.special">true</dependency>
+						<dependency type="enable" setting="menu.show.flat">false</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave" type="boolean" label="33251" help="34226">
+				<setting id="menu.show.special" type="integer" label="35838" help="34099">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="33509">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" setting="menu.show.flat">false</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.special.season" type="boolean" label="33235" help="34009" parent="menu.show.special">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.special" operator="gt">0</dependency>
+						<dependency type="enable" setting="menu.show.flat">false</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.special.episode" type="boolean" label="33236" help="34010" parent="menu.show.special">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.special" operator="gt">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.interleave" type="boolean" label="33251" help="34226">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>true</default>
 					<dependencies>
 						<dependency type="enable">
-							<and>
-								<condition setting="navigation.show.special">true</condition>
-								<or>
-									<condition setting="navigation.show.flatten">true</condition>
-									<condition setting="navigation.show.series">true</condition>
-								</or>
-							</and>
+							<or>
+								<condition setting="menu.show.flat">true</condition>
+								<condition setting="menu.show.serie" operator="gt">0</condition>
+							</or>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave.unofficial" type="integer" label="33254" help="34227" parent="navigation.show.interleave">
+				<setting id="menu.show.interleave.unofficial" type="integer" label="33254" help="34227" parent="menu.show.interleave">
 					<control type="spinner" format="string"/>
 					<default>2</default>
-					<level>2</level>
+					<level>3</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -6164,22 +5800,19 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.interleave">true</dependency>
+						<dependency type="visible" setting="menu.show.interleave">true</dependency>
 						<dependency type="enable">
-							<and>
-								<condition setting="navigation.show.special">true</condition>
-								<or>
-									<condition setting="navigation.show.flatten">true</condition>
-									<condition setting="navigation.show.series">true</condition>
-								</or>
-							</and>
+							<or>
+								<condition setting="menu.show.flat">true</condition>
+								<condition setting="menu.show.serie" operator="gt">0</condition>
+							</or>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave.extra" type="integer" label="33261" help="34310" parent="navigation.show.interleave">
+				<setting id="menu.show.interleave.extra" type="integer" label="33261" help="34310" parent="menu.show.interleave">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>3</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -6189,22 +5822,19 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.interleave">true</dependency>
+						<dependency type="visible" setting="menu.show.interleave">true</dependency>
 						<dependency type="enable">
-							<and>
-								<condition setting="navigation.show.special">true</condition>
-								<or>
-									<condition setting="navigation.show.flatten">true</condition>
-									<condition setting="navigation.show.series">true</condition>
-								</or>
-							</and>
+							<or>
+								<condition setting="menu.show.flat">true</condition>
+								<condition setting="menu.show.serie" operator="gt">0</condition>
+							</or>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.interleave.duration" type="integer" label="33255" help="34236" parent="navigation.show.interleave">
+				<setting id="menu.show.interleave.duration" type="integer" label="33255" help="34236" parent="menu.show.interleave">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>3</level>
 					<constraints>
 						<options>
 							<option label="32302">0</option>
@@ -6214,58 +5844,92 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.interleave">true</dependency>
+						<dependency type="visible" setting="menu.show.interleave">true</dependency>
 						<dependency type="enable">
-							<and>
-								<condition setting="navigation.show.special">true</condition>
-								<or>
-									<condition setting="navigation.show.flatten">true</condition>
-									<condition setting="navigation.show.series">true</condition>
-								</or>
-							</and>
+							<or>
+								<condition setting="menu.show.flat">true</condition>
+								<condition setting="menu.show.serie" operator="gt">0</condition>
+							</or>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.extra" type="boolean" label="35648" help="34437">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.show.counter" type="boolean" label="33891" help="34208">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-				</setting>
-				<setting id="navigation.show.counter.special" type="boolean" label="33918" help="34237" parent="navigation.show.counter">
+				<setting id="menu.show.future" type="boolean" label="35835" help="34091">
 					<control type="toggle"/>
 					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.show.future.season" type="boolean" label="35117" help="34241" parent="menu.show.future">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.future">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.future.episode" type="boolean" label="35118" help="34242" parent="menu.show.future">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.future">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.bonus" type="boolean" label="35648" help="34437">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.show.bonus.recap" type="boolean" label="33649" help="34580" parent="menu.show.bonus">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.bonus">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.bonus.extra" type="boolean" label="33650" help="34581" parent="menu.show.bonus">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.show.bonus">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.show.count" type="boolean" label="33891" help="34208">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.show.count.special" type="boolean" label="33918" help="34237" parent="menu.show.count">
+					<control type="toggle"/>
+					<level>3</level>
 					<default>false</default>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.counter">true</dependency>
+						<dependency type="visible" setting="menu.show.count">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.counter.unwatched" type="boolean" label="33927" help="34309" parent="navigation.show.counter">
+				<setting id="menu.show.count.unwatched" type="boolean" label="33927" help="34309" parent="menu.show.count">
 					<control type="toggle"/>
-					<level>2</level>
+					<level>3</level>
 					<default>true</default>
 					<dependencies>
-						<dependency type="visible" setting="navigation.show.counter">true</dependency>
+						<dependency type="visible" setting="menu.show.count">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.counter.limit" type="boolean" label="33892" help="34209" parent="navigation.show.counter">
+				<setting id="menu.show.count.limit" type="boolean" label="33892" help="34209" parent="menu.show.count">
 					<control type="toggle"/>
-					<level>2</level>
+					<level>3</level>
 					<default>false</default>
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="navigation.show.counter">true</condition>
-								<condition setting="navigation.show.counter.unwatched">true</condition>
+								<condition setting="menu.show.count">true</condition>
+								<condition setting="menu.show.count.unwatched">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.show.discrepancy" type="integer" label="32534" help="34565">
+				<setting id="menu.show.discrepancy" type="integer" label="32534" help="34565">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -6279,9 +5943,9 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## NAVIGATION - PAGE ########## -->
-			<group id="navigation.page" label="33666">
-				<setting id="navigation.page.movie" type="integer" label="35382" help="34155">
+			<!-- ########## MENU - PAGE ########## -->
+			<group id="menu.page" label="33666">
+				<setting id="menu.page.movie" type="integer" label="35382" help="34155">
 					<control type="slider" format="integer">
 						<heading>35382</heading>
 						<popup>true</popup>
@@ -6289,12 +5953,12 @@ The label is then added to the action element:
 					<default>50</default>
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 				</setting>
-				<setting id="navigation.page.show" type="integer" label="35383" help="34156">
+				<setting id="menu.page.show" type="integer" label="35383" help="34156">
 					<control type="slider" format="integer">
 						<heading>35383</heading>
 						<popup>true</popup>
@@ -6302,70 +5966,78 @@ The label is then added to the action element:
 					<default>50</default>
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 				</setting>
-				<setting id="navigation.page.episode" type="integer" label="35384" help="34134" parent="navigation.page.show">
+				<setting id="menu.page.serie" type="integer" label="35388" help="34353" parent="menu.page.show">
+					<control type="slider" format="integer">
+						<heading>35388</heading>
+						<popup>true</popup>
+					</control>
+					<default>50</default> <!-- Should be high enough to list all episodes of a season (same as menu.page.episode), but preferably a little bit higher, since specials are also interleaved, and some shows can have a lot of specials. -->
+					<level>3</level>
+					<constraints>
+						<minimum>5</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable">
+							<or>
+								<condition setting="menu.show.flat">true</condition>
+								<condition setting="menu.show.serie" operator="gt">0</condition>
+							</or>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.page.absolute" type="integer" label="35391" help="34333" parent="menu.page.show">
+					<control type="slider" format="integer">
+						<heading>35391</heading>
+						<popup>true</popup>
+					</control>
+					<default>40</default>
+					<level>3</level>
+					<constraints>
+						<minimum>5</minimum>
+						<step>1</step>
+						<maximum>100</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" setting="menu.show.absolute" operator="gt">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.page.episode" type="integer" label="35384" help="34134" parent="menu.page.show">
 					<control type="slider" format="integer">
 						<heading>35384</heading>
 						<popup>true</popup>
 					</control>
-					<default>30</default> <!-- 50 is too much and makes menu loading slow. -->
+					<default>30</default> <!-- Should be high enough to list all episodes of a standard "long" season (20-25 episodes), but not too large to make large menus load slowly. -->
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 				</setting>
-				<setting id="navigation.page.multiple" type="integer" label="35385" help="34333" parent="navigation.page.show">
+				<setting id="menu.page.submenu" type="integer" label="35541" help="34585" parent="menu.page.show">
 					<control type="slider" format="integer">
-						<heading>35385</heading>
-						<popup>true</popup>
-					</control>
-					<default>15</default>
-					<level>3</level>
-					<constraints>
-						<minimum>1</minimum>
-						<step>1</step>
-						<maximum>100</maximum>
-					</constraints>
-				</setting>
-				<setting id="navigation.page.submenu" type="integer" label="35541" help="34585" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35385</heading>
+						<heading>35541</heading>
 						<popup>true</popup>
 					</control>
 					<default>10</default>
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 					<dependencies>
-						<dependency type="enable" setting="navigation.show.direct">false</dependency>
+						<dependency type="enable" setting="menu.show.submenu">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.page.flatten" type="integer" label="35388" help="34353" parent="navigation.page.show">
-					<control type="slider" format="integer">
-						<heading>35388</heading>
-						<popup>true</popup>
-					</control>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>100</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="enable" setting="navigation.show.flatten">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.page.search" type="integer" label="35437" help="34423">
+				<setting id="menu.page.search" type="integer" label="35437" help="34423">
 					<control type="slider" format="integer">
 						<heading>35437</heading>
 						<popup>true</popup>
@@ -6373,346 +6045,414 @@ The label is then added to the action element:
 					<default>20</default>
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 				</setting>
-				<setting id="navigation.page.mixed" type="integer" label="35513" help="34577">
+				<setting id="menu.page.progress" type="integer" label="35463" help="34413">
+					<control type="slider" format="integer">
+						<heading>35463</heading>
+						<popup>true</popup>
+					</control>
+					<default>15</default> <!-- NB: Keep this number low, no more than 20, which is already a lot. Each menu entry has to retrieve the episode metadata of the entire season and the show metadata. The database retrieval/decompression can take 100-200ms for a season with 20+ episodes and even longer for seasons with 100s of episodes. -->
+					<level>3</level>
+					<constraints>
+						<minimum>5</minimum>
+						<step>1</step>
+						<maximum>50</maximum>
+					</constraints>
+				</setting>
+				<setting id="menu.page.mixed" type="integer" label="35513" help="34577">
 					<control type="slider" format="integer">
 						<heading>35513</heading>
 						<popup>true</popup>
 					</control>
-					<default>30</default>
+					<default>50</default>
 					<level>3</level>
 					<constraints>
-						<minimum>1</minimum>
+						<minimum>5</minimum>
 						<step>1</step>
 						<maximum>100</maximum>
 					</constraints>
 				</setting>
 			</group>
 
-			<!-- ########## NAVIGATION - SORT ########## -->
-			<group id="navigation.sort" label="35189">
-				<setting id="navigation.sort" type="boolean" label="35841" help="34286">
+			<!-- ########## MENU - LABEL ########## -->
+			<group id="menu.label" label="35546">
+				<setting id="menu.label.force" type="integer" label="33106" help="34408">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32301">1</option>
+							<option label="33800">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.label.layout" type="boolean" label="33107" help="34182">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="menu.label.layout.movie" type="integer" label="33634" help="34160" parent="menu.label.layout">
+					<control type="list" format="string">
+						<heading>33634</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33589">3</option>
+							<option label="33590">4</option>
+							<option label="33591">5</option>
+							<option label="33592">6</option>
+							<option label="33593">7</option>
+							<option label="33594">8</option>
+							<option label="33595">9</option>
+							<option label="33596">10</option>
+							<option label="33597">11</option>
+							<option label="33598">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.label.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.label.layout.show" type="integer" label="33635" help="34161" parent="menu.label.layout">
+					<control type="list" format="string">
+						<heading>33635</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33589">3</option>
+							<option label="33590">4</option>
+							<option label="33591">5</option>
+							<option label="33592">6</option>
+							<option label="33593">7</option>
+							<option label="33594">8</option>
+							<option label="33595">9</option>
+							<option label="33596">10</option>
+							<option label="33597">11</option>
+							<option label="33598">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.label.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.label.layout.season" type="integer" label="33636" help="34162" parent="menu.label.layout">
+					<control type="list" format="string">
+						<heading>33636</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33599">2</option>
+							<option label="33600">3</option>
+							<option label="33601">4</option>
+							<option label="33602">5</option>
+							<option label="33603">6</option>
+							<option label="33604">7</option>
+							<option label="33605">8</option>
+							<option label="33606">9</option>
+							<option label="33607">10</option>
+							<option label="33608">11</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.label.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.label.layout.episode" type="integer" label="33637" help="34163" parent="menu.label.layout">
+					<control type="list" format="string">
+						<heading>33637</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33609">3</option>
+							<option label="33610">4</option>
+							<option label="33611">5</option>
+							<option label="33612">6</option>
+							<option label="33172">7</option>
+							<option label="33173">8</option>
+							<option label="33613">9</option>
+							<option label="33614">10</option>
+							<option label="33615">11</option>
+							<option label="33174">12</option>
+							<option label="33175">13</option>
+							<option label="33176">14</option>
+							<option label="33616">15</option>
+							<option label="33617">16</option>
+							<option label="33618">17</option>
+							<option label="33619">18</option>
+							<option label="33177">19</option>
+							<option label="33178">20</option>
+							<option label="33620">21</option>
+							<option label="33621">22</option>
+							<option label="33622">23</option>
+							<option label="33179">24</option>
+							<option label="33180">25</option>
+							<option label="33181">26</option>
+							<option label="33623">27</option>
+							<option label="33624">28</option>
+							<option label="33625">29</option>
+							<option label="33626">30</option>
+							<option label="33627">31</option>
+							<option label="33628">32</option>
+							<option label="33629">33</option>
+							<option label="33630">34</option>
+							<option label="33631">35</option>
+							<option label="33632">36</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.label.layout">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## MENU - DETAIL ########## -->
+			<group id="menu.detail" label="33379">
+				<setting id="menu.detail.enabled" type="boolean" label="32359" help="34319">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="navigation.sort.article" type="boolean" label="35195" help="34277" parent="navigation.sort">
-					<control type="toggle"/>
+				<setting id="menu.detail.level" type="integer" label="32531" help="34542" parent="menu.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
 					<level>2</level>
+					<constraints>
+						<options>
+							<option label="36090">0</option>
+							<option label="36091">1</option>
+							<option label="36092">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.placement" type="integer" label="32358" help="34320" parent="menu.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32051">0</option>
+							<option label="32050">1</option>
+							<option label="32053">2</option>
+							<option label="32052">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.decoration" type="integer" label="32407" help="34410" parent="menu.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35049">1</option>
+							<option label="35050">2</option>
+							<option label="35367">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.style" type="integer" label="32406" help="34409" parent="menu.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35644">1</option>
+							<option label="36027">2</option>
+							<option label="36028">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.color" type="integer" label="32408" help="34541" parent="menu.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35486">1</option>
+							<option label="35487">2</option>
+							<option label="36052">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.release" type="boolean" label="36676" help="34268">
+					<control type="toggle"/>
+					<level>1</level>
 					<default>true</default>
 					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.movie.type" type="integer" label="35190" help="34272">
+				<setting id="menu.detail.play" type="boolean" label="35021" help="34218">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.play.threshold" type="integer" label="35039" help="34539" parent="menu.detail.play">
+					<control type="slider" format="integer">
+						<heading>35039</heading>
+						<popup>true</popup>
+					</control>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="menu.detail.enabled">true</condition>
+								<condition setting="menu.detail.play">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.progress" type="boolean" label="35040" help="34540">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.rating" type="boolean" label="35020" help="34215">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.air" type="boolean" label="35017" help="34213">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.air.zone" type="integer" label="35018" help="34214" parent="menu.detail.air">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+							<option label="35022">1</option>
+							<option label="35023">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="menu.detail.enabled">true</condition>
+								<condition setting="menu.detail.air">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.air.format" type="integer" label="35019" help="34216" parent="menu.detail.air">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="35029">0</option>
+							<option label="35028">1</option>
+							<option label="35030">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="menu.detail.enabled">true</condition>
+								<condition setting="menu.detail.air">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.detail.air.format.day" type="integer" label="35031" help="34217" parent="menu.detail.air">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>3</level>
 					<constraints>
 						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.movie.order" type="integer" label="33679" help="34276" parent="navigation.sort.movie.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
+							<option label="35049">0</option>
+							<option label="35050">1</option>
 						</options>
 					</constraints>
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.movie.type" operator="gt">0</condition>
+								<condition setting="menu.detail.enabled">true</condition>
+								<condition setting="menu.detail.air">true</condition>
+								<condition setting="menu.detail.air.format" operator="!is">0</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="navigation.sort.documentary.type" type="integer" label="35192" help="34274">
+				<setting id="menu.detail.air.format.time" type="integer" label="35048" help="34228" parent="menu.detail.air">
 					<control type="spinner" format="string"/>
 					<default>1</default>
-					<level>2</level>
+					<level>3</level>
 					<constraints>
 						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.documentary.order" type="integer" label="33679" help="34276" parent="navigation.sort.documentary.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
+							<option label="35049">0</option>
+							<option label="35050">1</option>
 						</options>
 					</constraints>
 					<dependencies>
 						<dependency type="visible">
 							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.documentary.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.short.type" type="integer" label="35193" help="34275">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.short.order" type="integer" label="33679" help="34276" parent="navigation.sort.short.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.short.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.set.type" type="integer" label="35203" help="34580">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.set.order" type="integer" label="33679" help="34276" parent="navigation.sort.set.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.set.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.show.type" type="integer" label="35191" help="34273">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.show.order" type="integer" label="33679" help="34276" parent="navigation.sort.show.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.show.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.progress.type" type="integer" label="35572" help="34169">
-					<control type="spinner" format="string"/>
-					<default>8</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-							<option label="35463">8</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.progress.order" type="integer" label="33679" help="34276" parent="navigation.sort.progress.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.progress.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.calendar.type" type="integer" label="35573" help="34563">
-					<control type="spinner" format="string"/>
-					<default>5</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="33039">2</option>
-							<option label="35187">3</option>
-							<option label="35188">4</option>
-							<option label="35391">5</option>
-							<option label="35392">6</option>
-							<option label="35393">7</option>
-							<option label="35463">8</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.calendar.order" type="integer" label="33679" help="34413" parent="navigation.sort.calendar.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.calendar.type" operator="gt">0</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.quick.type" type="integer" label="35245" help="34581">
-					<control type="spinner" format="string"/>
-					<default>8</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33648">0</option>
-							<option label="33564">1</option>
-							<option label="35463">8</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="navigation.sort">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="navigation.sort.quick.order" type="integer" label="33679" help="34276" parent="navigation.sort.quick.type">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33649">0</option>
-							<option label="33650">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="navigation.sort">true</condition>
-								<condition setting="navigation.sort.quick.type" operator="gt">0</condition>
+								<condition setting="menu.detail.enabled">true</condition>
+								<condition setting="menu.detail.air">true</condition>
+								<condition setting="menu.detail.air.format" operator="!is">1</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -6720,7 +6460,6 @@ The label is then added to the action element:
 			</group>
 
 		</category>
-
 
 		<!-- ########## INTERFACE ########## -->
 		<category id="interface" label="33223" help="34085">
@@ -9011,7 +8750,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="library.general.precheck" type="boolean" label="35172" help="34259">
 					<control type="toggle"/>
-					<level>2</level>
+					<level>3</level>
 					<default>false</default>
 					<dependencies>
 						<dependency type="visible" setting="library.general.enabled">true</dependency>
@@ -9105,44 +8844,6 @@ The label is then added to the action element:
 				<setting id="library.location.movie" type="path" label="35871" help="34266" parent="library.location.selection">
 					<control type="button" format="path">
 						<heading>35871</heading>
-					</control>
-					<default>Default</default>
-					<level>2</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="library.general.enabled">true</condition>
-								<condition setting="library.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="library.location.documentary" type="path" label="35872" help="34268" parent="library.location.selection">
-					<control type="button" format="path">
-						<heading>35872</heading>
-					</control>
-					<default>Default</default>
-					<level>2</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="library.general.enabled">true</condition>
-								<condition setting="library.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="library.location.short" type="path" label="35873" help="34269" parent="library.location.selection">
-					<control type="button" format="path">
-						<heading>35873</heading>
 					</control>
 					<default>Default</default>
 					<level>2</level>
@@ -9286,44 +8987,6 @@ The label is then added to the action element:
 				<setting id="download.manual.location.movie" type="path" label="35871" help="34076" parent="download.manual.location.selection">
 					<control type="button" format="path">
 						<heading>35871</heading>
-					</control>
-					<default>Default</default>
-					<level>2</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="download.manual.enabled">true</condition>
-								<condition setting="download.manual.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="download.manual.location.documentary" type="path" label="35872" help="34150" parent="download.manual.location.selection">
-					<control type="button" format="path">
-						<heading>35872</heading>
-					</control>
-					<default>Default</default>
-					<level>2</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="download.manual.enabled">true</condition>
-								<condition setting="download.manual.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="download.manual.location.short" type="path" label="35873" help="34269" parent="download.manual.location.selection">
-					<control type="button" format="path">
-						<heading>35873</heading>
 					</control>
 					<default>Default</default>
 					<level>2</level>
@@ -9508,44 +9171,6 @@ The label is then added to the action element:
 				<setting id="download.cache.location.movie" type="path" label="35871" help="34076" parent="download.cache.location.selection">
 					<control type="button" format="path">
 						<heading>35871</heading>
-					</control>
-					<default>Default</default>
-					<level>3</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="download.cache.enabled">true</condition>
-								<condition setting="download.cache.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="download.cache.location.documentary" type="path" label="35872" help="34150" parent="download.cache.location.selection">
-					<control type="button" format="path">
-						<heading>35872</heading>
-					</control>
-					<default>Default</default>
-					<level>3</level>
-					<constraints>
-						<writable>true</writable>
-						<allowempty>true</allowempty>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="download.cache.enabled">true</condition>
-								<condition setting="download.cache.location.selection">1</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="download.cache.location.short" type="path" label="35873" help="34269" parent="download.cache.location.selection">
-					<control type="button" format="path">
-						<heading>35873</heading>
 					</control>
 					<default>Default</default>
 					<level>3</level>
@@ -10140,13 +9765,15 @@ The label is then added to the action element:
 				<setting id="internal.speedtest" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.lottery" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.dolbyvision" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.compression" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
+				<setting id="internal.smart" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.initial.launch" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.wizard" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.optimization" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.disclaimer" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
-				<setting id="internal.initial.exact" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.promotions" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.initial.menu" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.key.gaia" type="string"><default>PVlsVndKblZ1NTBkTlpsVzFGVmJ3ZDFVR3BFZFcxR2UzWlZNTmRIVldSV2FVcEhiWVoxYUpoblZHRlVQ</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.orion" type="string"><default>PTRVTWtGMVVGZEhOT3BtVFZGbFZaVlRVV0ZGTVRwSGFNTmxSSlJqVnJWelNWWmxXVFJWUmt0VVVVdFdQ</default><level>4</level><visible>false</visible></setting>
@@ -10155,6 +9782,7 @@ The label is then added to the action element:
 				<setting id="internal.key.trakt.id" type="string"><default>PT13VFhsbE1hUjFaeTBrZW5sWFRFRlVOTlJrU3Mxa2FuSlRUeTBVZWFSVlJ3b2xhVmRYVEhwVWFPcFdWNjVFVlZSelRFVlVOWmRWU3drRlZWRmpXcUZFZVpwbVJ0bGxlTlZUVHFKRmFOZFZTNTFFUmpGalRCMVRQ</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.trakt.client" type="string"><default>PT1nV1UxRU1PcG5RcDVrTUpCaldxTjJkTlJrVG81a2FLaG1UcU5XZVBSMFl3NDBWS2hXVHkwa01OUlVVeDgwUlcxV1Q2bDBkWmRsU28xa2VKVnpUVU5HTk5wblZwbEZWT2wyVEVsVmVhZFZWNHBGVkJKVFdSMVRQ</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.fanart" type="string"><default>PW8xVkZCVFdYVlVlUFJsVnBsbGVKQmpUeVVrZU9kVlV6MEVWUmhYVHFGVU1hZGtSdHBGVmtobVdxbFVQ</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.key.opensubtitles" type="string"><default>PU1sYk9CbFd6NGtibFZFY3hSRmJPSmtZRmh6TWpoa1VTMUViczFXVllaRWFpZGxUb0pXYjBNelRGRlZQ</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.premiumize" type="string"><default>TlJVVXk4RVZSbG5UVVYwTQ==</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.realdebrid" type="string"><default>PVFsVmFoVVVyeG1RWFJrVUM1RVZSbDNWQjFUUA==</default><level>4</level><visible>false</visible></setting>
 

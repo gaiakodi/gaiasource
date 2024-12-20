@@ -22,7 +22,7 @@ from lib.providers.core.base import ProviderBase
 from lib.modules.tools import Tools, Media, Time, Regex, Converter, Language, System, Logger
 from lib.modules.network import Networker
 from lib.modules.stream import Stream
-from lib.modules.concurrency import Lock, Semaphore
+from lib.modules.concurrency import Pool, Lock, Semaphore
 
 class ProviderWeb(ProviderBase):
 
@@ -42,6 +42,7 @@ class ProviderWeb(ProviderBase):
 	TermIdImdbNumber				= '{id_imdb_number}'	# IMDb ID with the "tt" prefix stripped away.
 	TermIdTmdb						= '{id_tmdb}'			# TMDb ID
 	TermIdTvdb						= '{id_tvdb}'			# TVDb ID
+	TermIdTrakt						= '{id_trakt}'			# Trakt ID
 
 	TermQuery						= '{query}'				# Query search string
 	TermLetter						= '{letter}'			# The first letter of the query search string, used by MagnetDl
@@ -108,7 +109,7 @@ class ProviderWeb(ProviderBase):
 												QueryModeFull : ['%s %s' % (TermTitleMovie, TermYear)],
 											},
 											QueryTypeSeason : {
-												QueryModeFull : ['%s S%s' % (TermTitleShow, TermSeasonZero)],
+												QueryModeFull : ['%s S%s' % (TermTitleShow, TermSeasonZero), '%s S%s' % (TermTitleShow, TermSeason)], # Sometimes easier to find with "Title Sx" than "Title S0x", especially for "Title S0" vs "Title S00", but there are also many links for eg "Title S1".
 											},
 											QueryTypeEpisode : {
 												QueryModeFull : ['%s S%sE%s' % (TermTitleShow, TermSeasonZero, TermEpisodeZero)],
@@ -355,7 +356,7 @@ class ProviderWeb(ProviderBase):
 		#	4. List-of-lists of strings/dictionaries: Same as fallback list, but each query in the nested list will be used (AND instead of OR). Eg: [..., [q1, q2], ...] both q1 and q2 are executed. Eg: two different queries for special episodes (one searching by number, one by title).
 		searchQuery					= None,
 
-		searchConcurrency			= None,						# Wether or not to run the extraction of individual items in parallel. Only set this to True if absolutely necessary, since thread creation has computational overhead. This is useful if each item requires further requests to get more metadata.
+		searchConcurrency			= None,						# Wether or not to run the extraction of individual items in parallel. Only set this to True if absolutely necessary, since thread creation has computational overhead. This is useful if each item requires further requests to get more metadata. If set to an integer, it will force a certain number of threads to be used, irrespective of what concurrencyTasks() returns. A list with 2 values can also be passed, the first for the details page concurreny, while the second is for sub-details concurrency. Be careful used a fixed number of threads.
 		searchCategory				= None,						# A list of movie/show categories.
 		searchCategoryMovie			= None,						# A list of movie categories.
 		searchCategoryShow			= None,						# A list of show categories.
@@ -375,6 +376,7 @@ class ProviderWeb(ProviderBase):
 		#	String: GET URL of the request.
 		#	Dictionary: {
 		#		RequestMethod (string)			# Optional HTTP method.
+		#		RequestType (string)			# Optional request data type. Eg: RequestTypeJson if the data has to be posted as JSON.
 		#		RequestLink (string)			# Optional authentication link (excluding the query) if it is different to the main link. Either a link or a query (or both) must be provided.
 		#		RequestPath (string)			# Optional query path appended to the link for the authentication request.
 		#		RequestData (dictionary)		# Optional GET/POST parameters to add to the authentication request.
@@ -656,7 +658,7 @@ class ProviderWeb(ProviderBase):
 	# REQUEST
 	##############################################################################
 
-	def request(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, retries = None, scrape = False):
+	def request(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, retries = None, scrape = False):
 		try:
 			if not self.timerCheck(): return None
 
@@ -724,7 +726,7 @@ class ProviderWeb(ProviderBase):
 
 			replacements = self.accountAuthenticationFormat()
 
-			concurrency = self.settingsGlobalConcurrencyConnection()
+			concurrency = Pool.settingConnection()
 
 			headersNew = None
 			cookiesNew = None
@@ -763,13 +765,13 @@ class ProviderWeb(ProviderBase):
 				if cookies:
 					cookiesNew = self.replace(data = Tools.copy(cookies), replacements = replacementsNew)
 				if data:
-					dataNew = self.replace(data = Tools.copy(data), replacements = replacementsNew)
+					dataNew = self.replace(data = Tools.copy(data), replacements = replacementsNew, json = type == ProviderBase.RequestTypeJson)
 
 					# Encode here. Check if already encoded from the query string.
 					# We force the encoding type, and then tell networker "encode = False".
 					set = self.formatSet()
 					encode = self.formatEncode()
-					if encode:
+					if encode and not type == ProviderBase.RequestTypeJson:
 						encodePlus = encode == ProviderWeb.FormatEncodePlus
 						for key, value in dataNew.items():
 							if Tools.isArray(value): value = [Networker.linkQuote(data = val, plus = encodePlus, check = True) for val in value]
@@ -778,7 +780,7 @@ class ProviderWeb(ProviderBase):
 
 				#self.log('PROVIDER REQUEST: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew)), developer = True)
 				self.statisticsUpdateSearch(request = True)
-				networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
+				networker.request(link = linkNew, method = method, type = type, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
 				# If there are Cloudflare errors, prevent all future requests to the domain, since they will most likley also fail with a Cloudflare error.
 				# Rather do this on a per-provider basis, instead of a per-domain basis, since mirror domains typically point to the same server.
@@ -869,7 +871,7 @@ class ProviderWeb(ProviderBase):
 						elif delay: Time.sleep(delay)
 
 						#self.log('PROVIDER RETRY: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew)), developer = True)
-						networker.request(link = linkNew, method = method, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
+						networker.request(link = linkNew, method = method, type = type, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
 						if networker.responseErrorCloudflare():
 							ProviderWeb.RequestError[id] = True
@@ -912,18 +914,18 @@ class ProviderWeb(ProviderBase):
 			self.logError()
 			return None
 
-	def requestText(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
+	def requestText(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
 		# Use bytes and not text, since there are special characters (like the yellow star) in file names. Returning responseDataText() converts these characters to some other weird characters.
 		# Do not work with bytes, because providers do string processing on the var (eg: TorrentProject -> processRequest()).
 		# Instead, get the bytes and manual convert to unicode. The special icon characters are in any case removed in streams.py.
 		#try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape).responseDataBytes()
 		#except: return None
 
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataText()
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataText()
 		except: return None
 
-	def requestJson(self, link = None, path = None, subdomain = None, method = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataJson()
+	def requestJson(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataJson()
 		except: return None
 
 	def requestExtract(self, data = None, request = None, extract = None, fixed = None):
@@ -1034,7 +1036,7 @@ class ProviderWeb(ProviderBase):
 										if valuesData is None: valuesData = Converter.jsonTo(values)
 										result[type][key] = Regex.extract(data = valuesData, expression = value)
 									else:
-										result[type][key] = values[value]
+										result[type][key] = values.get(value)
 
 			return result
 		except: self.logError()
@@ -1102,29 +1104,41 @@ class ProviderWeb(ProviderBase):
 		except: self.logError()
 		return result
 
-	def replace(self, data, replacements, nested = False):
+	def replace(self, data, replacements, nested = False, json = False):
 		if data:
-			for key, value in replacements.items():
-				if value is None: replacements[key] = ''
-				elif Tools.isBoolean(value): replacements[key] = int(value)
+			if not json:
+				for key, value in replacements.items():
+					if value is None: replacements[key] = ''
+					elif Tools.isBoolean(value): replacements[key] = int(value)
 
 			if Tools.isDictionary(data):
 				# Convert bool to integer. If this is ever changed, make sure to update EasyNews.
-				for key, value in data.items():
-					if Tools.isBoolean(value): data[key] = int(value)
+				# Do not do for JSON data (eg: Knaben requires boolean values to stay boolean).
+				if not json:
+					for key, value in data.items():
+						if Tools.isBoolean(value): data[key] = int(value)
+
 				result = {}
 				if nested:
 					for key, value in data.items():
 						try:
-							if Tools.isArray(value): value = [str(val).format(**replacements).format(**replacements) for val in value]
-							else: value = str(value).format(**replacements).format(**replacements)
+							if json:
+								if Tools.isArray(value): value = [(replacements[val.replace('{', '').replace('}', '')] if '{' in val and val.replace('{', '').replace('}', '') in replacements else str(val).format(**replacements).format(**replacements)) if Tools.isString(val) else val for val in value]
+								else: value = (replacements[value.replace('{', '').replace('}', '')] if '{' in value and value.replace('{', '').replace('}', '') in replacements else str(value).format(**replacements).format(**replacements)) if Tools.isString(value) else value
+							else:
+								if Tools.isArray(value): value = [str(val).format(**replacements).format(**replacements) for val in value]
+								else: value = str(value).format(**replacements).format(**replacements)
 							result[str(key).format(**replacements).format(**replacements)] = value
 						except: result[key] = ProviderBase.Skip
 				else:
 					for key, value in data.items():
 						try:
-							if Tools.isArray(value): value = [str(val).format(**replacements) for val in value]
-							else: value = str(value).format(**replacements)
+							if json:
+								if Tools.isArray(value): value = [(replacements[val.replace('{', '').replace('}', '')] if '{' in val and val.replace('{', '').replace('}', '') in replacements else str(val).format(**replacements)) if Tools.isString(val) else val for val in value]
+								else: value = (replacements[value.replace('{', '').replace('}', '')] if '{' in value and value.replace('{', '').replace('}', '') in replacements else str(value).format(**replacements)) if Tools.isString(value) else value
+							else:
+								if Tools.isArray(value): value = [str(val).format(**replacements) for val in value]
+								else: value = str(value).format(**replacements)
 							result[str(key).format(**replacements)] = value
 						except: result[key] = ProviderBase.Skip
 				data = result
@@ -1150,6 +1164,7 @@ class ProviderWeb(ProviderBase):
 		subdomain = None
 		path = None
 		method = None
+		type = None
 		headers = None
 		cookies = None
 		data = None
@@ -1167,6 +1182,8 @@ class ProviderWeb(ProviderBase):
 			try: path = search['path']
 			except: pass
 			try: method = search['method']
+			except: pass
+			try: type = search['type']
 			except: pass
 			try: headers = search['headers']
 			except: pass
@@ -1190,7 +1207,7 @@ class ProviderWeb(ProviderBase):
 			key = self.replaceClean(match)
 			if not key in replacements: replacements[key] = match
 
-		return link, subdomain, path, method, headers, cookies, data, replacements
+		return link, subdomain, path, method, type, headers, cookies, data, replacements
 
 	##############################################################################
 	# LINK
@@ -1303,7 +1320,7 @@ class ProviderWeb(ProviderBase):
 		result = Tools.listUnique(result)
 		return result
 
-	def queryGenerate(self, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, exact):
+	def queryGenerate(self, media, niche, titles, years, time, idImdb, idTmdb, idTvdb, idTrakt, numberSeason, numberEpisode, numberPack, language, country, network, studio, exact):
 		queries = []
 		queryTitles = []
 		try:
@@ -1549,11 +1566,13 @@ class ProviderWeb(ProviderBase):
 							'imdb' : None if pack == 'movie' else idImdb,
 							'tmdb' : None if pack == 'movie' else idTmdb,
 							'tvdb' : None if pack == 'movie' else idTvdb,
+							'trakt' : None if pack == 'movie' else idTrakt,
 						},
 						'title' : title,
 						'number' : {
 							'season' : None if pack == 'show' else numberSeason,
 							'episode' : None if (pack == 'show' or pack == 'season') else numberEpisode,
+							'pack' : numberPack if Media.isSerie(media) else None,
 						},
 					})
 				except: self.logError()
@@ -1584,7 +1603,7 @@ class ProviderWeb(ProviderBase):
 				return value
 
 			if self.typeExternal():
-				if Media.typeTelevision(media):
+				if Media.isSerie(media):
 					if self.supportShow() and (self.supportSpecial() or not(numberSeason is None and numberEpisode is None)):
 						title = titles['search']['main'][0]
 						format = {
@@ -1629,7 +1648,7 @@ class ProviderWeb(ProviderBase):
 							titlesSearch.extend(titles['search']['native'][lang])
 					titlesSearch = Tools.listUnique(titlesSearch)
 
-					if Media.typeTelevision(media):
+					if Media.isSerie(media):
 						if self.supportShow() and (self.supportSpecial() or not(numberSeason is None and numberEpisode is None)):
 							format = {
 								'year' : yearDefault,
@@ -1796,9 +1815,9 @@ class ProviderWeb(ProviderBase):
 
 		return queries
 
-	def queryReplacements(self, media, title, year, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, pack, exact, special):
-		movie = Media.typeMovie(media)
-		show = Media.typeTelevision(media)
+	def queryReplacements(self, media, niche, title, year, time, idImdb, idTmdb, idTvdb, idTrakt, numberSeason, numberEpisode, numberPack, pack, exact, special):
+		movie = Media.isFilm(media)
+		show = Media.isSerie(media)
 
 		replacements = {
 			self.replaceClean(ProviderWeb.TermTypeExact) : '' if exact else ProviderBase.Skip,
@@ -1823,6 +1842,7 @@ class ProviderWeb(ProviderBase):
 			self.replaceClean(ProviderWeb.TermIdImdbNumber) : idImdb.replace('tt', '') if idImdb else ProviderBase.Skip,
 			self.replaceClean(ProviderWeb.TermIdTmdb) : idTmdb if idTmdb else ProviderBase.Skip,
 			self.replaceClean(ProviderWeb.TermIdTvdb) : idTvdb if idTvdb else ProviderBase.Skip,
+			self.replaceClean(ProviderWeb.TermIdTrakt) : idTrakt if idTrakt else ProviderBase.Skip,
 		}
 
 		if exact:
@@ -2071,7 +2091,7 @@ class ProviderWeb(ProviderBase):
 						if not result['networker'].responseSuccess(): return None
 					except: pass
 
-				if not validate and all(not i for i in result.values()): return None
+				if not validate and result and all(not i for i in result.values()): return None
 
 				try: del result['networker']
 				except: pass
@@ -2168,8 +2188,8 @@ class ProviderWeb(ProviderBase):
 	def searchCategoryShow(self):
 		return self.mData['search']['category']['show']
 
-	def searchRequest(self, path = None, link = None, subdomain = None, method = None, data = None, headers = None, cookies = None):
-		return self.requestText(scrape = True, link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies)
+	def searchRequest(self, path = None, link = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None):
+		return self.requestText(scrape = True, link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies)
 
 	def searchExtract(self, item, data = None, details = None, entry = None):
 		try:
@@ -2637,7 +2657,8 @@ class ProviderWeb(ProviderBase):
 			id = self.id()
 
 			item = self.processItem(item = item)
-			if item == ProviderBase.Skip: return
+			if item == ProviderBase.Skip:
+				return
 
 			if self.processBefore(item = item) == ProviderBase.Skip: return
 
@@ -2656,6 +2677,9 @@ class ProviderWeb(ProviderBase):
 				if details == ProviderBase.Skip: return
 				elif not details is None:
 					if not id in ProviderWeb.DetailsData:
+						# The ID will not be in the lock list if the scraping was aborted, but some provider threads are still running.
+						if not id in ProviderBase.ResultLock: return
+
 						ProviderBase.ResultLock[id].acquire()
 						if not id in ProviderWeb.DetailsData: ProviderWeb.DetailsData[id] = {}
 						ProviderBase.ResultLock[id].release()
@@ -2671,6 +2695,10 @@ class ProviderWeb(ProviderBase):
 						details = {ProviderBase.RequestPath: details}
 
 					if value in ProviderWeb.DetailsData[id]: return # Already retrieved by another query.
+
+					# The ID will not be in the lock list if the scraping was aborted, but some provider threads are still running.
+					if not id in ProviderBase.ResultLock: return
+
 					ProviderBase.ResultLock[id].acquire()
 					ProviderWeb.DetailsData[id][value] = True
 					ProviderBase.ResultLock[id].release()
@@ -2690,9 +2718,11 @@ class ProviderWeb(ProviderBase):
 						if not stream.reload(**data, validate = validate, validateAdjust = self.streamAdjust()): return
 					else: # Multiple entries on details page.
 						streams = []
-						if self.searchConcurrency():
+						concurrency = self.searchConcurrency()
+						if Tools.isList(concurrency): concurrency = concurrency[-1]
+						if concurrency:
 							threads = [self.thread(self.searchEntry, streams, stream, data, item, details, entry) for entry in entries]
-							self.threadExecute(threads = threads, limit = self.concurrencyTasks(level = 3))
+							self.threadExecute(threads = threads, limit = concurrency if Tools.isInteger(concurrency) else self.concurrencyTasks(level = 3))
 						else:
 							[self.searchEntry(streams, stream, data, item, details, entry) for entry in entries]
 						stream = streams
@@ -2742,7 +2772,7 @@ class ProviderWeb(ProviderBase):
 			validateEpisode = validateEpisode,
 		)
 
-	def search(self, link, subdomain, path, method, headers, cookies, data, replacements, category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack):
+	def search(self, link, subdomain, path, method, type, headers, cookies, data, replacements, category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, idTrakt, numberSeason, numberEpisode, numberPack, language, country, network, studio, pack):
 		timer = self.statisticsTimer()
 		lock = None
 		try:
@@ -2754,7 +2784,7 @@ class ProviderWeb(ProviderBase):
 				linkNew = self.replace(data = link, replacements = replacements)
 				subdomainNew = self.replace(data = subdomain, replacements = replacements)
 				pathNew = self.replace(data = path, replacements = replacements)
-				dataNew = self.replace(data = data, replacements = replacements)
+				dataNew = self.replace(data = data, replacements = replacements, json = type == ProviderBase.RequestTypeJson)
 
 				result = None
 				items = None
@@ -2762,7 +2792,7 @@ class ProviderWeb(ProviderBase):
 
 				if self.queryAllow(pathNew, dataNew) and not self.stopped():
 					self.statisticsUpdateSearch(page = True)
-					result = self.searchRequest(link = linkNew, subdomain = subdomainNew, path = pathNew, method = method, headers = headers, cookies = cookies, data = dataNew)
+					result = self.searchRequest(link = linkNew, subdomain = subdomainNew, path = pathNew, method = method, type = type, headers = headers, cookies = cookies, data = dataNew)
 					if result and not result == ProviderBase.Skip and not self.stopped():
 						result = self.processRequest(data = result)
 						if result and not result == ProviderBase.Skip and not self.stopped():
@@ -2777,9 +2807,11 @@ class ProviderWeb(ProviderBase):
 											chunks = self.priorityChunks(items)
 											for chunk in chunks:
 												lock = self.priorityStart(lock = lock)
-												if self.searchConcurrency():
+												concurrency = self.searchConcurrency()
+												if Tools.isList(concurrency): concurrency = concurrency[0]
+												if concurrency:
 													threads = [self.thread(self.searchProcess, added, item, validate) for item in chunk]
-													self.threadExecute(threads, limit = self.concurrencyTasks(level = 2))
+													self.threadExecute(threads, limit = concurrency if Tools.isInteger(concurrency) else self.concurrencyTasks(level = 2))
 												else:
 													for item in chunk:
 														self.searchProcess(added = added, item = item, validate = validate)
@@ -2798,18 +2830,18 @@ class ProviderWeb(ProviderBase):
 	# EXECUTE
 	##############################################################################
 
-	def executeSearch(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def executeSearch(self, media, niche, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, duration = None, exact = False, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
-			self.parametersSet(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+			self.parametersSet(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent)
 			self.processInitial()
 
 			validate = not exact
 			searches = self.searchQuery()
-			queries = self.queryGenerate(media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, exact = exact)
+			queries = self.queryGenerate(media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, exact = exact)
 			replacements = self.replacements()
 
-			if Media.typeMovie(media): categories = self.searchCategoryMovie()
-			elif Media.typeTelevision(media): categories = self.searchCategoryShow()
+			if Media.isFilm(media): categories = self.searchCategoryMovie()
+			elif Media.isSerie(media): categories = self.searchCategoryShow()
 			else: categories = self.searchCategoryAll()
 			if not categories: categories = [None]
 
@@ -2824,8 +2856,10 @@ class ProviderWeb(ProviderBase):
 					queryIdImdb = query['id']['imdb']
 					queryIdTmdb = query['id']['tmdb']
 					queryIdTvdb = query['id']['tvdb']
+					queryIdTrakt = query['id']['trakt']
 					queryNumberSeason = query['number']['season']
 					queryNumberEpisode = query['number']['episode']
+					queryNumberPack = query['number']['pack']
 					queryPack = query['pack']
 					querySpecial = query['special']
 					queryRaw = query['raw']
@@ -2834,10 +2868,10 @@ class ProviderWeb(ProviderBase):
 					# Set the season/episode number to None for packs.
 					# Ensures that replacements will skip certain fallback queries (eg Newznab).
 					# Eg: if we are searching show packs, the season/episode number, year, and time should be None.
-					replacements.update(self.queryReplacements(media = media, title = queryTitle, year = queryTime, time = queryTime, idImdb = queryIdImdb, idTmdb = queryIdTmdb, idTvdb = queryIdTvdb, numberSeason = queryNumberSeason, numberEpisode = queryNumberEpisode, pack = queryPack, exact = exact, special = querySpecial))
+					replacements.update(self.queryReplacements(media = media, niche = niche, title = queryTitle, year = queryTime, time = queryTime, idImdb = queryIdImdb, idTmdb = queryIdTmdb, idTvdb = queryIdTvdb, idTrakt = queryIdTrakt, numberSeason = queryNumberSeason, numberEpisode = queryNumberEpisode, numberPack = queryNumberPack, pack = queryPack, exact = exact, special = querySpecial))
 
 					timer = self.statisticsTimer()
-					streams = self.cacheRetrieve(cache = cacheLoad, query = querySearch, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+					streams = self.cacheRetrieve(cache = cacheLoad, query = querySearch, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
 					if streams is None:
 						replacements[self.replaceClean(ProviderWeb.TermQuery)] = querySearch
@@ -2845,7 +2879,7 @@ class ProviderWeb(ProviderBase):
 						try: replacements[letter] = querySearch[0]
 						except: replacements[letter] = ''
 
-						if cacheSave: self.cacheInitialize(query = querySearch, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode)
+						if cacheSave: self.cacheInitialize(query = querySearch, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode)
 
 						for category in categories:
 							replacements[self.replaceClean(ProviderWeb.TermCategory)] = category if not category is None else ProviderBase.Skip
@@ -2854,25 +2888,25 @@ class ProviderWeb(ProviderBase):
 
 								values = []
 								for se in search:
-									linkNew, subdomainNew, pathNew, methodNew, headersNew, cookiesNew, dataNew, replacementsNew = self.replaceSearch(search = se, replacements = replacements)
+									linkNew, subdomainNew, pathNew, methodNew, typeNew, headersNew, cookiesNew, dataNew, replacementsNew = self.replaceSearch(search = se, replacements = replacements)
 									linkNew = self.replace(data = linkNew, replacements = replacementsNew, nested = True)
 									subdomainNew = self.replace(data = subdomainNew, replacements = replacementsNew, nested = True)
 									pathNew = self.replace(data = pathNew, replacements = replacementsNew, nested = True)
 									headersNew = self.replace(data = headersNew, replacements = replacementsNew, nested = True)
 									cookiesNew = self.replace(data = cookiesNew, replacements = replacementsNew, nested = True)
-									dataNew = self.replace(data = dataNew, replacements = replacementsNew, nested = True)
+									dataNew = self.replace(data = dataNew, replacements = replacementsNew, nested = True, json = typeNew == ProviderBase.RequestTypeJson)
 
 									# Do not execute the query if some metadata is missing.
 									# For instance, if a query needs an IMDb ID, but it is not available, do not search, since it will return no or incorrect results.
-									if (pathNew or dataNew) and not((pathNew and ProviderBase.Skip in pathNew) or (dataNew and any(ProviderBase.Skip in d for d in dataNew.values()))):
-										values.append({'replacements' : replacementsNew, 'link' : linkNew, 'subdomain' : subdomainNew, 'path' : pathNew, 'method' : methodNew, 'headers' : headersNew, 'cookies' : cookiesNew, 'data' : dataNew})
+									if (pathNew or dataNew) and not((pathNew and ProviderBase.Skip in pathNew) or (dataNew and any(ProviderBase.Skip in d if Tools.isString(d) else False for d in dataNew.values()))):
+										values.append({'replacements' : replacementsNew, 'link' : linkNew, 'subdomain' : subdomainNew, 'path' : pathNew, 'method' : methodNew, 'type' : typeNew, 'headers' : headersNew, 'cookies' : cookiesNew, 'data' : dataNew})
 
 								if values:
 									for value in values:
 										provider = self.copy() # Create a copy, since some class variables might be accessed by multiple threads (eg: self.added).
-										provider.parametersSet(query = query, media = media, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, numberSeason = numberSeason, numberEpisode = numberEpisode, language = language, pack = pack, duration = duration, exact = exact, silent = silent)
+										provider.parametersSet(query = query, media = media, niche = niche, titles = titles, years = years, time = time, idImdb = idImdb, idTmdb = idTmdb, idTvdb = idTvdb, idTrakt = idTrakt, numberSeason = numberSeason, numberEpisode = numberEpisode, numberPack = numberPack, language = language, country = country, network = network, studio = studio, pack = pack, duration = duration, exact = exact, silent = silent)
 										provider.statisticsUpdateSearch(query = True)
-										threads.append(self.thread(provider.search, value['link'], value['subdomain'], value['path'], value['method'], value['headers'], value['cookies'], value['data'], value['replacements'], category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, numberSeason, numberEpisode, language, pack))
+										threads.append(self.thread(provider.search, value['link'], value['subdomain'], value['path'], value['method'], value['type'], value['headers'], value['cookies'], value['data'], value['replacements'], category, validate, media, titles, years, time, idImdb, idTmdb, idTvdb, idTrakt, numberSeason, numberEpisode, numberPack, language, country, network, studio, pack))
 									break # Skip fallback queries.
 					else:
 						self.statisticsUpdateSearch(cache = True)

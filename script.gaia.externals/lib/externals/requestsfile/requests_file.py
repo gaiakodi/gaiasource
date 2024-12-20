@@ -7,7 +7,10 @@ import stat
 import locale
 import io
 
-from externals.six.six import BytesIO
+try:
+    from io import BytesIO
+except ImportError:
+    from StringIO import StringIO as BytesIO
 
 
 class FileAdapter(BaseAdapter):
@@ -34,6 +37,7 @@ class FileAdapter(BaseAdapter):
             raise ValueError("file: URLs with hostname components are not permitted")
 
         resp = Response()
+        resp.request = request
 
         # Open the file, translate certain errors into HTTP responses
         # Use urllib's unquote to translate percent escapes into whatever

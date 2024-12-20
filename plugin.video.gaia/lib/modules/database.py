@@ -33,14 +33,15 @@ except:
 	try: from sqlite3 import dbapi2 as database
 	except: from pysqlite2 import dbapi2 as database
 
+try: from lib.modules.compression import Compressor
+except: pass
+
 DatabaseInstances = {}
 DatabaseLock = Lock()
 DatabaseLocks = {}
 DatabaseLocksCustom = {}
 
 class Database(object):
-
-	Timeout = 20
 
 	Extension = '.db'
 
@@ -58,10 +59,22 @@ class Database(object):
 	NameDownloads = 'downloads'
 	NameSettings = 'settings'
 
-	LimitSetting = 'general.database.limit'
-	LimitFree = 0.8
+	SettingLimit = 'general.database.limit'
+	SettingCompression = 'general.database.compression'
 
-	def __init__(self, name = None, addon = None, default = None, path = None, label = False, connect = True):
+	LimitFree = 0.8
+	Timeout = 20
+	Compression = None
+
+	# 2024-12
+	# Use the "new" Write-Ahead-Logging (WAL), instead of the old Journaling (DELETE) mode.
+	# This might possibley reduce the "database is locked" error, and can handle concurrent access better and more ifficient.
+	# https://stackoverflow.com/questions/4060772/sqlite-concurrent-access
+	# https://www.sqlite.org/wal.html
+	# https://charlesleifer.com/blog/going-fast-with-sqlite-and-python/
+	WriteAhead = True
+
+	def __init__(self, name = None, addon = None, default = None, path = None, label = False, compression = None, connect = True):
 		try:
 			if name is None and path: name = hashlib.sha256(path.encode('utf-8')).hexdigest().upper()
 
@@ -72,6 +85,7 @@ class Database(object):
 			self._mDatabase = None
 			self._mConnection = None
 			self._mLabel = label
+			self._mCompression = compression
 
 			# Locks are required to query the database from multiple threads.
 			# Otherwise errors like these occur: ProgrammingError -> Recursive use of cursors not allowed.
@@ -158,8 +172,13 @@ class Database(object):
 
 			# SQLite does not allow database objects to be used from multiple threads. Explicitly allow multi threading.
 			self.__lock()
-			try: self._mConnection = database.connect(self._mPath, check_same_thread = False, timeout = Database.Timeout)
-			except: self._mConnection = database.connect(self._mPath, timeout = Database.Timeout)
+			if self.WriteAhead:
+				try: self._mConnection = database.connect(self._mPath, check_same_thread = False, timeout = Database.Timeout, isolation_level = None)
+				except: self._mConnection = database.connect(self._mPath, timeout = Database.Timeout, isolation_level = None)
+				self._mConnection.execute('PRAGMA journal_mode=WAL;')
+			else:
+				try: self._mConnection = database.connect(self._mPath, check_same_thread = False, timeout = Database.Timeout)
+				except: self._mConnection = database.connect(self._mPath, timeout = Database.Timeout)
 
 			if self._mLabel: self._mConnection.row_factory = database.Row # SELECT rows as a dictionary instead of a list.
 			self._mDatabase = self._mConnection.cursor()
@@ -194,6 +213,13 @@ class Database(object):
 	def _null(self):
 		return 'NULL'
 
+	def _niche(self, niche):
+		if niche:
+			from lib.modules.tools import Media
+			query = ['niche LIKE "%' + i + '%"' for i in Media.stringFrom(niche)]
+			if query: return ' (%s) ' % ' OR '.join(query)
+		return None
+
 	def _commit(self):
 		try:
 			self._mConnection.commit()
@@ -201,31 +227,32 @@ class Database(object):
 		except:
 			return False
 
-	def _compress(self, commit = True, lock = True, unlock = True, log = True):
+	def _compact(self, commit = True, lock = True, unlock = True, log = True):
 		return self._execute('vacuum', commit = commit, lock = lock, unlock = unlock, log = log) # Reduce the file size.
 
 	def _size(self):
 		return xbmcvfs.File(self._mPath).size()
 
-	def _execute(self, query, parameters = None, commit = True, compress = False, lock = True, unlock = True, log = True):
+	def _execute(self, query, parameters = None, commit = True, compact = False, lock = True, unlock = True, log = True, retry = True):
 		try:
 			if lock: self.__lock()
 			try: query = query % self._mName
 			except: pass
+
 			if parameters is None: self._mDatabase.execute(query)
 			else: self._mDatabase.execute(query, parameters)
 
 			# There is a bug in SQLite for Python 3.6: cannot VACUUM from within a transaction
-			# Try to compress and if unsuccessful, try again after commit.
+			# Try to compact and if unsuccessful, try again after commit.
 			# https://github.com/ghaering/pysqlite/issues/109
-			'''if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
+			'''if compact: compacted = self._compact(commit = False, lock = False, unlock = False, log = False)
 			if commit: self._commit()
-			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)'''
+			if compact and not compacted: self._compact(commit = True, lock = False, unlock = False)'''
 
-			# Update: does it not make sense to compress AFTER the commit?
+			# Update: does it not make sense to compact AFTER the commit?
 			# https://stackoverflow.com/questions/2250462/should-i-run-vacuum-in-transaction-or-after
 			if commit: self._commit()
-			if compress: self._compress(commit = True, lock = False, unlock = False)
+			if compact: self._compact(commit = True, lock = False, unlock = False)
 
 			return True
 		except Exception as error:
@@ -238,10 +265,23 @@ class Database(object):
 					import time
 					timestamp = int(time.time())
 					last = xbmcgui.Window(10000).getProperty('GaiaDatabaseLock')
-					if not last or timestamp - int(last) >= 180: # Only show every 3 minutes.
+					if not last or timestamp - int(last) >= 120: # Only show every 2 minutes.
 						xbmcgui.Window(10000).setProperty('GaiaDatabaseLock', str(timestamp))
 						addon = self._addon()
 						xbmcgui.Dialog().notification('%s - %s' % (addon.getAddonInfo('name'), addon.getLocalizedString(33949)), addon.getLocalizedString(33950), xbmcgui.NOTIFICATION_ERROR, 10000, True)
+
+					# Update (2024-12): Database locking happens again in v7.
+					# This is probably the smart-refresh functions holding a lock on the database from another process.
+					# Sleep a few seconds and retry.
+					# Another suggested solution: close the connection after each query.
+					# We now use WAL mode, which might solve the problems.
+					if retry:
+						if retry is True: retry = 2
+						if retry > 0:
+							if unlock: self.__unlock()
+							Time.sleep(1.0)
+							return self._execute(query = query, parameters = parameters, commit = commit, compact = compact, lock = lock, unlock = unlock, log = log, retry = retry - 1)
+
 				return False
 		finally:
 			if unlock: self.__unlock()
@@ -249,24 +289,24 @@ class Database(object):
 	# query must contain %s for table name.
 	# tables can be None, table name, or list of tables names.
 	# If tables is None, will retrieve all tables in the database.
-	def _executeAll(self, query, tables = None, parameters = None, commit = True, compress = True, lock = True, unlock = True):
+	def _executeAll(self, query, tables = None, parameters = None, commit = True, compact = True, lock = True, unlock = True):
 		try:
 			if lock: self.__lock()
 			result = True
 			if tables is None: tables = self._tables(lock = False, unlock = False)
 			tables = self._list(tables)
 			for table in tables:
-				result = result and self._execute(query % table, parameters = parameters, commit = False, compress = False, lock = False, unlock = False)
+				result = result and self._execute(query % table, parameters = parameters, commit = False, compact = False, lock = False, unlock = False)
 
 			# There is a bug in SQLite for Python 3.6: cannot VACUUM from within a transaction
-			# Try to compress and if unsuccessful, try again after commit.
+			# Try to compact and if unsuccessful, try again after commit.
 			# https://github.com/ghaering/pysqlite/issues/109
-			'''if compress: compressed = self._compress(commit = False, lock = False, unlock = False, log = False)
+			'''if compact: compacted = self._compact(commit = False, lock = False, unlock = False, log = False)
 			if commit: self._commit()
-			if compress and not compressed: self._compress(commit = True, lock = False, unlock = False)'''
+			if compact and not compacted: self._compact(commit = True, lock = False, unlock = False)'''
 
 			if commit: self._commit()
-			if compress: self._compress(commit = True, lock = False, unlock = False)
+			if compact: self._compact(commit = True, lock = False, unlock = False)
 
 			return result
 		finally:
@@ -333,30 +373,30 @@ class Database(object):
 
 	# Deletes specific row in table.
 	# If table is none, assumes it was already set in the query
-	def _delete(self, query, table = None, parameters = None, commit = True, compress = False):
+	def _delete(self, query, table = None, parameters = None, commit = True, compact = False):
 		if not table is None: query = query % table
-		self._execute(query, parameters = parameters, commit = commit, compress = compress)
+		self._execute(query, parameters = parameters, commit = commit, compact = compact)
 		try: return self._mDatabase.rowcount # Number of rows deleted.
 		except: return 0
 
 	# Deletes all rows in table.
 	# tables can be None, table name, or list of tables names.
 	# If tables is None, deletes all rows in all tables.
-	def _deleteAll(self, query = None, tables = None, parameters = None, commit = True, compress = True):
+	def _deleteAll(self, query = None, tables = None, parameters = None, commit = True, compact = True):
 		if query is None: query = 'DELETE FROM `%s`;'
-		return self._executeAll(query, tables, parameters = parameters, commit = commit, compress = compress)
+		return self._executeAll(query, tables, parameters = parameters, commit = commit, compact = compact)
 
 	def _deleteFile(self):
 		from lib.modules import tools
 		return tools.File.delete(self._mPath)
 
 	# Drops single table.
-	def _drop(self, table, parameters = None, commit = True, compress = True):
-		return self._execute('DROP TABLE IF EXISTS `%s`;' % table, parameters = parameters, commit = commit, compress = compress)
+	def _drop(self, table, parameters = None, commit = True, compact = True):
+		return self._execute('DROP TABLE IF EXISTS `%s`;' % table, parameters = parameters, commit = commit, compact = compact)
 
 	# Drops all tables.
-	def _dropAll(self, parameters = None, commit = True, compress = True):
-		return self._executeAll('DROP TABLE IF EXISTS `%s`;', parameters = parameters, commit = commit, compress = compress)
+	def _dropAll(self, parameters = None, commit = True, compact = True):
+		return self._executeAll('DROP TABLE IF EXISTS `%s`;', parameters = parameters, commit = commit, compact = compact)
 
 	# tables can be None, table name, or list of tables names.
 	# If tables is provided, only clears the specific table(s), otherwise clears all tables.
@@ -376,12 +416,114 @@ class Database(object):
 				xbmcgui.Dialog().notification(title, message, icon = icon)
 
 	##############################################################################
+	# COMPRESSION
+	##############################################################################
+
+	def _compression(self):
+		if self._mCompression: return {'enabled' : True, 'type' : self._mCompression, 'limit' : 1}
+		elif self._mCompression is False: return False
+
+		if Database.Compression is None:
+			try:
+				from lib.modules.tools import Settings
+				setting = Settings.getInteger(Database.SettingCompression)
+				types = Compressor.typeDefault(database = True)
+
+				# NB: Do not compress very small objects.
+				# Eg: In streams.db, there are a lot of no-results (eg: []) which should not waste time on compression.
+				# Eg: In cache.db there are smaller objects (eg: API tokens) that should not be compressed due to regular access.
+				# There are still larger objects in the cache that are regularly accessed (eg: Trakt history).
+
+				# On an i7:
+				#	Metadata: total decompression duration for loading a menu:
+				#		50 movies: 4-5 ms
+				#		50 shows: 5-6 ms
+				#	Streams: 413 total movie streams (including duplicates, etc) from 5 providers:
+				#		Maybe compression is faster than decompression, because compression is done in batches as scrapers finish, while decompression is all done at once in a short period of time.
+				#		LZMA (135KB):
+				#			Compression: 38-50 ms
+				#			Decompression: 80-110 ms
+				#		ZLIB (279KB):
+				#			Compression: 15-20 ms
+				#			Decompression: 45-100 ms (big difference between multiple executions)
+				#	Streams: 1326 total episode streams (including duplicates, etc) from 20 providers:
+				#		LZMA (1.1MB):
+				#			Compression: 460-520 ms
+				#			Decompression: 1800-3200 ms
+				#		ZLIB (15.2MB):
+				#			Compression: 580-600 ms
+				#			Decompression: 1750-2900 ms
+
+				small = 1024 # 1KB
+				medium = 10240 # 10KB
+				large = 102400 # 100KB
+				if setting >= 4: # Force compression of smaller objects.
+					large = medium
+					medium = small
+
+				level1 = setting == 1 or setting >= 2
+				level2 = setting == 1 or setting >= 3
+				level3 = setting >= 2
+				level4 = setting >= 3
+
+				Database.Compression = {
+					Database.NameCache		: {'enabled' : level2,	'type' : types[Compressor.SizeSmall],	'limit' : medium},
+
+					# The library only inserts very small show objects. Typically too small to benefit from compression.
+					Database.NameLibrary	: {'enabled' : level3,	'type' : types[Compressor.SizeSmall],	'limit' : small},
+
+					# The metadata database generally does not contain very large objects, with the exception of show packs.
+					# Eg: Days of our Lives has a 6MB umcompressed show pack, which is only 200KB compressed.
+					# Plus daytime shows like these can have a single absolute season with 1000s of episodes. Days of our Lives has 17k+ episodes.
+					# LZMA is about 25-35% slower to decompress than Zlib/Gzip, making menus slower. Can make a huge difference if an episode Progress menu is loaded with shows that have 20+ episodes per season (aka large metadata).
+					Database.NameMetadata	: {'enabled' : level2,	'type' : types[Compressor.SizeSmall],	'limit' : small},
+
+					# Stores a few large data objects. Every playback inserts a single stream JSON object.
+					Database.NameHistory	: {'enabled' : level1,	'type' : types[Compressor.SizeMedium],	'limit' : small},
+
+					# Stores a lot of large data objects. Every scrape inserts a large JSON object with 100s of streams.
+					Database.NameStreams	: {'enabled' : level1,	'type' : types[Compressor.SizeMedium],	'limit' : small},
+				}
+			except:
+				Database.Compression = False
+
+		try: return Database.Compression[self._mName]
+		except: return False
+
+	def _compress(self, data, force = False):
+		compression = self._compression()
+		if compression and compression['enabled'] and (force or len(data) > compression['limit']):
+			try: data = Compressor.compress(data = bytes(data, 'utf-8'), type = compression['type'], level = 0)
+			except: pass
+		return data
+
+	def _decompress(self, data, type = None):
+		binary = False
+		try:
+			if isinstance(data, bytes):
+				binary = True
+				# Note that the algorithm could change. So do not decompress with a fixed algorithm, but instead detect it.
+				# First try the default algorithm, to avoid having to scan all magic numbers.
+				if not type:
+					compression = self._compression()
+					if Compressor.typeIs(type = compression['type'], data = data): type = compression['type']
+					else: type = Compressor.type(data = data)
+				if type:
+					try: data = str(Compressor.decompress(data = data, type = type), 'utf-8')
+					except: pass
+		except:
+			# Cannot decompress.
+			# Eg: unsupported compression algorithm used to generate the external metadata addon.
+			if binary: data = None
+		return data
+
+	##############################################################################
 	# CLEAN
 	##############################################################################
 
 	# time: delete everything before this time.
 	# size: delete until the size is lower than this.
-	def clean(self, time = None, size = None, force = False):
+	def clean(self, time = None, size = None, force = False, notification = False):
 		result = False
 		try:
 			if size:
@@ -389,29 +531,39 @@ class Database(object):
 
 				sizeBefore = self._size()
 				if sizeBefore > size:
-					# Compress before checking the size for the first time.
+					# Compact before checking the size for the first time.
 					# For large databases (300MB+) this can take 5secs+ on an SSD.
-					# Update: This can take long for large databases. Only makes sense to compress if we just removed rows from the database.
-					#self._compress()
+					# Update: This can take long for large databases. Only makes sense to compact if we just removed rows from the database.
+					# During compaction, the entire database is copied over to a new file.
+					#self._compact()
 
 					if sizeBefore > size:
-						# We want to delete more rows in one go, since every deletion + compression can take a long time.
+						if notification: self.cleanNotification(size = sizeBefore, finished = False)
+
+						# We want to delete more rows in one go, since every deletion + compaction can take a long time.
 						# A better way would be to count the rows. However, SQLite is very slow with COUNT(*).
-						count = max(10, min(100, int(sizeBefore / 5242880.0)))
+						# Update: Enable all providers and scrape a few full seasons of Big Bang Theory. The database quickly grows to 4GB+.
+						# On such a large database, a single iteration of delete + compact can take minutes, even with a fast SSD.
+						# If this is done during launch, no further scraping can take place, because the streams.db is locked while this clean is busy.
+						# For large databases, delete more rows at once.
+						# With a single scrape with most providers enabled, 500 rows (about 5MB - 20MB) can be added to streams.db, with most rows just having an empty array.
+						limit = 1000 if sizeBefore < 1073741824 else 2000 if sizeBefore < 2147483648 else 3000 if sizeBefore < 3221225472 else 4000
+						count = max(10, min(limit, int(sizeBefore / 5242880.0)))
 
 						sizeChanged = 0
+						sizeFinal = min(size, max(5242880, int(size * 0.75))) # Otherwise the database is only reduced by a few MBs on each launch, slowing down the device.
 
 						for i in range(100000 if force else 1000):
 							timed = self._cleanTime(count = count)
 							if not timed: break
 							timed = self._cleanAdjust(time = timed, force = force)
 
-							if self._clean(time = timed, commit = False, compress = False):
+							if self._clean(time = timed, commit = False, compact = False):
 								self._commit()
-								self._compress()
+								self._compact()
 								sizeAfter = self._size()
 
-								# Sometimes deleting a few rows from a small database does not change the file size, even after compressing.
+								# Sometimes deleting a few rows from a small database does not change the file size, even after compacting.
 								# Check a few iterations before breaking out of the loop.
 								if sizeBefore == sizeAfter:
 									sizeChanged += 1
@@ -420,35 +572,52 @@ class Database(object):
 									sizeChanged = 0
 
 								result = True
-								if sizeAfter < size: break
+								if sizeAfter < sizeFinal: break
 								sizeBefore = sizeAfter
 							else:
 								break # No rows deleted.
+
+						if notification: self.cleanNotification(size = sizeAfter, finished = True)
 			if time:
-				if self._clean(time = self._cleanAdjust(time = time, force = force), commit = False, compress = False):
-					self._compress(commit = True)
+				if notification: self.cleanNotification(finished = False)
+				if self._clean(time = self._cleanAdjust(time = time, force = force), commit = False, compact = False):
+					self._compact(commit = True)
 				result = True
+				if notification: self.cleanNotification(finished = True)
 		except:
 			from lib.modules.tools import Logger
 			Logger.error()
 		return result
 
-	def cleanCompress(self):
-		self._compress()
+	def cleanCompact(self):
+		self._compact()
 
 	def cleanReduce(self):
 		self.clean(size = self._cleanSettings(name = self._mName))
 
-	@classmethod
-	def cleanAutomatic(self, wait = False):
-		if wait:
-			self._cleanAutomatic()
-		else:
-			from lib.modules.concurrency import Pool
-			Pool.thread(target = self._cleanAutomatic, start = True)
+	def cleanNotification(self, size = None, finished = False, force = False):
+		# Large databases (1GB+) can take a while to compress on low-end devices, slowing down Gaia and to an extend Kodi as well.
+		# Show a notification so that the user knows what is happening.
+		# This should not happen that often.
+		# Only do this for larger databases.
+		if size is None: size = self._size()
+		if force or size > 314572800: # 300 MB
+			from lib.modules.interface import Dialog, Translation
+			from lib.modules.convert import ConverterSize
+			size = ConverterSize(size, unit = ConverterSize.Byte).stringOptimal()
+			message = Translation.string(36532 if finished else 36531) % (self._mName.capitalize(), size)
+			Dialog.notification(title = 36530, message = message, icon = Dialog.IconWarning)
 
 	@classmethod
-	def _cleanAutomatic(self):
+	def cleanAutomatic(self, notification = False, wait = False):
+		if wait:
+			self._cleanAutomatic(notification = notification)
+		else:
+			from lib.modules.concurrency import Pool
+			Pool.thread(target = self._cleanAutomatic, kwargs = {'notification' : notification}, start = True)
+
+	@classmethod
+	def _cleanAutomatic(self, notification = False):
 		settings = self._cleanSettings()
 		databases = self._cleanSettingsDatabases()
 
@@ -463,7 +632,7 @@ class Database(object):
 			if database['type'] == 'automatic':
 				name = database['name']
 				limit = settings[name] if name in settings else 0
-				if limit: database['instance']().clean(size = limit)
+				if limit: database['instance']().clean(size = limit, notification = notification)
 
 	@classmethod
 	def cleanSettings(self, settings = False):
@@ -473,12 +642,12 @@ class Database(object):
 		self.tCanceled = False
 		Dialog.information(title = 36036, refresh = self._cleanSettingsItems, reselect = Dialog.ReselectYes)
 
-		if settings: Settings.launchData(id = Database.LimitSetting)
+		if settings: Settings.launchData(id = Database.SettingLimit)
 
 	@classmethod
 	def _cleanSettings(self, name = None):
 		from lib.modules.tools import Settings
-		settings = Settings.getDataObject(Database.LimitSetting)
+		settings = Settings.getDataObject(Database.SettingLimit)
 		if not settings: settings = {}
 		if name: return settings[name] if name in settings else None
 		return settings
@@ -492,6 +661,9 @@ class Database(object):
 		from lib.modules.playback import Playback
 		from lib.modules.search import Search
 		from lib.modules.video import Trailer
+
+		# NB: Note that these defaults values are based on the old databases, before compression.
+		# With compression, at least the streams and history databases should be considerably smaller.
 
 		return [
 			{
@@ -645,7 +817,7 @@ class Database(object):
 		items = [
 			{'title' : Dialog.prefixBack(33486), 'close' : True},
 			{'title' : Dialog.prefixNext(33239), 'action' : self._cleanSettingsHelp},
-			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompress},
+			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompact},
 			{'title' : Dialog.prefixNext(35269), 'action' : self._cleanSettingsOptimize},
 			{'title' : 36437, 'items' : statistics},
 			{'title' : 35220, 'items' : limits},
@@ -686,7 +858,7 @@ class Database(object):
 		])
 
 	@classmethod
-	def _cleanSettingsCompress(self, database = None):
+	def _cleanSettingsCompact(self, database = None):
 		from lib.modules.interface import Dialog, Loader
 
 		choice = Dialog.options(title = 36036, message = 36448, labelConfirm = 32532, labelDeny = 36447, labelCustom = 33743)
@@ -699,7 +871,7 @@ class Database(object):
 				if database['type'] == 'automatic':
 					instance = database['instance']()
 					if choice == Dialog.ChoiceYes: instance.cleanReduce()
-					elif choice == Dialog.ChoiceNo: instance.cleanCompress()
+					elif choice == Dialog.ChoiceNo: instance.cleanCompact()
 		except:
 			from lib.modules.tools import Logger
 			Logger.error()
@@ -760,7 +932,7 @@ class Database(object):
 
 		unlimited = Translation.string(35221)
 
-		# Recalculate these, in case we use the "Compress" action.
+		# Recalculate these, in case we use the "Compact" action.
 		name = database['name']
 		free = Hardware.storageUsageFreeBytes(refresh = True)
 		usable = int(free * Database.LimitFree)
@@ -771,7 +943,7 @@ class Database(object):
 		return [
 			{'title' : Dialog.prefixBack(35374), 'close' : True},
 			{'title' : Dialog.prefixNext(33239), 'action' : self._cleanSettingsHelp},
-			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompress, 'parameters' : {'database' : database}},
+			{'title' : Dialog.prefixNext(36447), 'action' : self._cleanSettingsCompact, 'parameters' : {'database' : database}},
 			{'title' : 36437, 'items' : [
 				{'title' : 33026, 'value' : database['name'].capitalize()},
 				{'title' : 36435, 'value' : ConverterSize(free, unit = ConverterSize.Byte).stringOptimal()},
@@ -836,7 +1008,7 @@ class Database(object):
 		if label == 0: label = Translation.string(35221)
 		else: label = ConverterSize(label, unit = ConverterSize.Byte).stringOptimal()
 
-		Settings.setData(id = Database.LimitSetting, value = settings, label = label)
+		Settings.setData(id = Database.SettingLimit, value = settings, label = label)
 
 		return True
 
@@ -849,7 +1021,7 @@ class Database(object):
 		return time
 
 	# Should be overwritten by subclasses to clear older entries and reduce disk storage space.
-	def _clean(self, time, commit = True, compress = True):
+	def _clean(self, time, commit = True, compact = True):
 		return None
 
 	# Should be overwritten by subclasses.

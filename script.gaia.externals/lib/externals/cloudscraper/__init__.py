@@ -38,7 +38,7 @@ from .user_agent import User_Agent
 
 # ------------------------------------------------------------------------------- #
 
-__version__ = '1.2.66'
+__version__ = '1.2.71'
 
 # ------------------------------------------------------------------------------- #
 
@@ -47,7 +47,7 @@ class CipherSuiteAdapter(HTTPAdapter):
 
     __attrs__ = [
         'ssl_context',
-		'ssl_verify', # Gaia - Disable SSL
+        'ssl_verify', # Gaia - Disable SSL
         'max_retries',
         'config',
         '_pool_connections',
@@ -71,13 +71,13 @@ class CipherSuiteAdapter(HTTPAdapter):
                 raise TypeError(
                     "source_address must be IP address string or (ip, port) tuple"
                 )
-
+                
         # Gaia - Disable SSL
         self.ssl_verify = kwargs.pop('ssl_verify', 3)
 
         if not self.ssl_context:
             self.ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-
+            
             # Gaia
             #self.ssl_context.orig_wrap_socket = self.ssl_context.wrap_socket
             #self.ssl_context.wrap_socket = self.wrap_socket
@@ -91,8 +91,11 @@ class CipherSuiteAdapter(HTTPAdapter):
 
             self.ssl_context.set_ciphers(self.cipherSuite)
             self.ssl_context.set_ecdh_curve(self.ecdhCurve)
-            self.ssl_context.options |= (ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1)
 
+            # Gaia
+            #self.ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            #self.ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
+            
         # Gaia - Disable SSL
         if self.ssl_verify <= 2:
             self.ssl_context.check_hostname = False # Must be set BEFORE verify_mode, otherwise this statement is ignored and an error is thrown: " Cannot set verify_mode to CERT_NONE when check_hostname is enabled."
@@ -159,7 +162,7 @@ class CloudScraper(Session):
         self.source_address = kwargs.pop('source_address', None)
         self.server_hostname = kwargs.pop('server_hostname', None)
         self.ssl_context = kwargs.pop('ssl_context', None)
-
+        
         # Gaia - Disable SSL
         self.ssl_verify = kwargs.pop('ssl_verify', 3)
 
@@ -309,7 +312,7 @@ class CloudScraper(Session):
                 # Gaia
                 #response = newResponse
                 self.response = response = newResponse
-
+                
                 if self.debug:
                     print('==== requestPostHook Debug ====')
                     self.debugRequest(response)
@@ -439,5 +442,6 @@ if ssl.OPENSSL_VERSION_INFO < (1, 1, 1):
 # ------------------------------------------------------------------------------- #
 
 create_scraper = CloudScraper.create_scraper
+session = CloudScraper.create_scraper
 get_tokens = CloudScraper.get_tokens
 get_cookie_string = CloudScraper.get_cookie_string

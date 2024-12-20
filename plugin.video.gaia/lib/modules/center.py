@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Tools, Regex, Platform, System, File, Hash, Settings, Media, Language, Logger
+from lib.modules.tools import Tools, Regex, Platform, System, File, Hash, Settings, Media, Title, Language, Logger
 from lib.modules.interface import Translation, Format, Dialog, Loader
 from lib.modules.convert import ConverterSpeed
 from lib.modules.network import Networker
@@ -740,13 +740,13 @@ class Center(object):
 
 	def _search(self, index, media, title, year, numberSeason, numberEpisode, exact):
 		try:
-			television = None
+			serie = None
 			if exact:
 				type = 'Movie,Series,Episode'
 			else:
 				# Do not search by "Episode" type, since it searches the episode title and not the series title.
-				television = Media.typeTelevision(media)
-				type = 'Series' if television else 'Movie'
+				serie = Media.isSerie(media)
+				type = 'Series' if serie else 'Movie'
 
 			if not Tools.isArray(title): title = [title] if title else []
 			if not Tools.isArray(year): year = [year] if year else []
@@ -764,7 +764,7 @@ class Center(object):
 			items = [i for i in items if not i['Type'] == 'Series']
 
 			if not exact:
-				if television: items = [i for i in items if (not 'ParentIndexNumber' in i or i['ParentIndexNumber'] == numberSeason) and (not 'IndexNumber' in i or i['IndexNumber'] == numberEpisode)]
+				if serie: items = [i for i in items if (not 'ParentIndexNumber' in i or i['ParentIndexNumber'] == numberSeason) and (not 'IndexNumber' in i or i['IndexNumber'] == numberEpisode)]
 				else: items = [i for i in items if not 'ProductionYear' in i or i['ProductionYear'] in year] # Some do not have a ProductionYear entry.
 
 			threads.extend([Pool.thread(target = self._searchInfo, args = (index, i), start = True) for i in items])
@@ -952,7 +952,7 @@ class Center(object):
 						except: pass
 
 						description = []
-						try: description.append(Media.titleUniversal(title = titleShow if titleShow else title, year = year, season = season, episode = episode))
+						try: description.append(Title.titleUniversal(title = titleShow if titleShow else title, year = year, season = season, episode = episode))
 						except: pass
 						try: description.append(title if titleShow and not titleShow == title else None)
 						except: pass

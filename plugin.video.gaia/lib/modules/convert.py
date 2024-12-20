@@ -590,6 +590,14 @@ class ConverterDuration(ConverterBase):
 		string = string.lower()
 		string = string.replace('and', '')
 		string = string.strip(' ').strip('.')
+
+		if string.startswith('a'):
+			if string == 'a year': string = '1 year'
+			elif string == 'a month': string = '1 month'
+			elif string == 'a week': string = '1 week'
+			elif string == 'a day': string = '1 day'
+			elif string == 'a hour' or string == 'a hour': string = '1 hour'
+
 		result = Importer.moduleTimeParse().timeparse(string)
 		if not result is None: result *= 1000
 		else: result = 0
@@ -813,10 +821,12 @@ class ConverterTime(ConverterBase):
 	FormatDateTime = '%Y-%m-%d %H:%M:%S'
 	FormatDateTimeShort = '%Y-%m-%d %H:%M'
 	FormatDateTimeJson = '%Y-%m-%dT%H:%M:%S.%fZ' # Timezone microseconds with 6 decimal places.
+	FormatDateTimeJsonBasic = '%Y-%m-%dT%H:%M:%SZ' # Timezone without microseconds.
 	FormatDateTimeJsonShort = '%Y-%m-%dT%H:%M:%S._Z' # Timezone microseconds with 3 decimal places. Some features (like Trakt) can only handle 3 decimal places.
 	FormatDateShort = '%d %b %Y'
 	FormatDateLong = '%d %B %Y'
 	FormatDateAmerican = '%B %d, %Y'
+	FormatDateAmericanShort = '%b %d, %Y'
 	FormatMonth = '%B %Y'
 	FormatMonthShort = '%b %Y'
 	FormatTime = '%H:%M:%S'
@@ -833,6 +843,9 @@ class ConverterTime(ConverterBase):
 		'%Y-%m-%dT%H:%M:%S.%fZ',	# FormatDateTime
 		'%Y-%m-%dT%H:%M:%S',		# TNTFork
 		'%Y-%m-%dT%H:%M:%S%z',
+
+		#'%Y-%m-%dT%H:%M:%S%:z',	# Knaben (API) - %:z is only supported in Python 3.12 and later.
+
 		'%d-%m-%Y %H:%M:%S',		# ETTV
 		'%d-%m-%Y',					# EliteTorrent
 
@@ -856,6 +869,10 @@ class ConverterTime(ConverterBase):
 		'%a, %d-%b-%Y (%H:%M)',		# NzbServer and NzbStars
 		'%d-%b-%Y (%H:%M)',			# NzbServer and NzbStars
 		'%d-%b-%Y',					# Binsearch
+
+		# Too many inconsistencies in TorrentGalaxy formatting. Do not use.
+		#'%B %d, %Y, %H:%M %p',		# TorrentGalaxy
+		#'%b %d, %Y, %H:%M %p',		# TorrentGalaxy
 	)
 
 	Languages	= {
@@ -881,7 +898,8 @@ class ConverterTime(ConverterBase):
 	#	Int: the difference in number of seconds from UTC. Hence, in France (UTC+1), the offset must be 3600.
 	#	String ("utc" or "gmt"): uses the UTC/GMT timezone.
 	#	String ("+-hhmm"): the timezone offset, eg: +0500
-	def __init__(self, value, format = None, offset = OffsetLocal):
+	# utc=False: interpret the date string without a timezone (eg 2024-10-01) as a local date, which could cause a few hours offset from UTC. utc=True: interpret the date string as a UTC date.
+	def __init__(self, value, format = None, offset = OffsetLocal, utc = False):
 		self.mDatetime = None
 		self.mTimestamp = None
 
@@ -940,8 +958,7 @@ class ConverterTime(ConverterBase):
 				#	Wed, 27 Jan 2021 08:09:14  +2000
 				#	Wed, 27 Jan 2021 08:09:14  -0030 - None
 				# The first time it works and the date is correctly parsed. When executing it the 2nd+ time, it does not work.
-				# Kodi/Python probably caches something internally after the first call.
-				# It probably is the "Wed" part.
+				# This has been a Python bug for years.
 				try:
 					self.mDatetime = datetime.datetime(*(time.strptime(val, form)[0:6]))
 					break # Skip rest of the formats.
@@ -957,19 +974,30 @@ class ConverterTime(ConverterBase):
 			offsetInvert = False
 
 		if self.mDatetime:
-			offsetInverted = -1 if offsetInvert else 1
-			if offsetInvert:
-				# .replace(microsecond = 0): now() and utcnow() are taken at slightly different times, so their microsecond parts are slightly off.
-				# So a 2 hour offset will show as "1:59:59.999999".
-				# Drop the microsecond part to get to closest second.
+			if not utc:
+				offsetInverted = -1 if offsetInvert else 1
+				if offsetInvert:
+					# .replace(microsecond = 0): now() and utcnow() are taken at slightly different times, so their microsecond parts are slightly off.
+					# So a 2 hour offset will show as "1:59:59.999999".
+					# Drop the microsecond part to get to closest second.
 
-				offsetLocal = datetime.datetime.now().replace(microsecond = 0) - datetime.datetime.utcnow().replace(microsecond = 0) # First adjust the local time to UTC. All datetime are by default in local timezone.
-				self.mDatetime = self.mDatetime - (offsetLocal * offsetInverted)
+					offsetLocal = datetime.datetime.now().replace(microsecond = 0) - datetime.datetime.utcnow().replace(microsecond = 0) # First adjust the local time to UTC. All datetime are by default in local timezone.
+					self.mDatetime = self.mDatetime - (offsetLocal * offsetInverted)
 
-			if self._isNumber(offset): self.mDatetime = self.mDatetime + (datetime.timedelta(seconds = offset) * offsetInverted)
+				if self._isNumber(offset): self.mDatetime = self.mDatetime + (datetime.timedelta(seconds = offset) * offsetInverted)
 
 			try:
-				self.mTimestamp = int(time.mktime(self.mDatetime.timetuple()))
+				function1 = None
+				function2 = None
+				if utc:
+					try:
+						import calendar
+						function1 = calendar.timegm
+					except: pass
+				try: function2 = time.mktime
+				except: pass
+				try: self.mTimestamp = int(function1(self.mDatetime.timetuple()))
+				except: self.mTimestamp = int(function2(self.mDatetime.timetuple()))
 			except:
 				# time.mktime() relies on the underlying OS C library.
 				# On Windows 10 the library does not seem to support timestamps before the epoch/1970.
@@ -980,7 +1008,14 @@ class ConverterTime(ConverterBase):
 				difference = self.mDatetime - epoch
 				self.mTimestamp = (difference.days * 86400) + difference.seconds
 
-			if offsetHas and self.daylight(timestamp = self.mTimestamp, date = self.mDatetime, timezone = ConverterTime.OffsetUtc):
+			# Check tester.py -> streamSourceTime() for more info.
+			# This has been disabled, since it causes an addtional (incorrect) hour offset.
+			# Do the same in string().
+			# This did work previously, but now it does not (when daylight savings in active in Europe). Test this again if there is no daylight savings, if tester still works.
+			# Update (2024-11-04): Only do this if locally it is not daylight savings, but the timestamp is daylight savings. Change the local date/clock between Aug and Nov to test both with and without daylight savings.
+			#if offsetHas and self.daylight(timestamp = self.mTimestamp, date = self.mDatetime, timezone = ConverterTime.OffsetUtc):
+			#	self.mTimestamp += 3600
+			if offsetHas and not self.daylight() and self.daylight(timestamp = self.mTimestamp, date = self.mDatetime, timezone = ConverterTime.OffsetUtc):
 				self.mTimestamp += 3600
 
 	@classmethod
@@ -1027,7 +1062,7 @@ class ConverterTime(ConverterBase):
 		return result
 
 	@classmethod
-	def daylight(self, timestamp, date = None, timezone = OffsetUtc):
+	def daylight(self, timestamp = None, date = None, timezone = OffsetUtc):
 		try:
 			return bool(time.localtime(timestamp).tm_isdst)
 		except: # Windows cannot handle negative timestamps (before 1970).
@@ -1041,6 +1076,7 @@ class ConverterTime(ConverterBase):
 			return self.timestamp(offset = offset)
 		else:
 			date = self.mDatetime
+			if not date: return None
 			if not offset == ConverterTime.OffsetLocal:
 
 				# First adjust the local time to UTC. All datetime are by default in local timezone.
@@ -1051,8 +1087,19 @@ class ConverterTime(ConverterBase):
 
 				# Important when marking items as watched on Trakt at a specific time.
 				# If the time is set as 12h00 and the date falls in daylight savings, the time is formatted to 13h00.
-				if self.daylight(timestamp = self.mTimestamp, date = date, timezone = ConverterTime.OffsetUtc):
+				# Update (2024-11-04): Only do this if locally it is not daylight savings, but the timestamp is daylight savings.
+				'''if self.daylight(timestamp = self.mTimestamp, date = date, timezone = ConverterTime.OffsetUtc):
 					if not offset: offset = 0
+					offset -= 3600
+				'''
+				if not self.daylight() and self.daylight(timestamp = self.mTimestamp, date = date, timezone = ConverterTime.OffsetUtc):
+					if not offset: offset = 0
+
+					# Check tester.py -> streamSourceTime() for more info.
+					# This has been disabled, since it causes an addtional (incorrect) hour offset.
+					# Do the same in __init__().
+					# This did work previously, but now it does not (when daylight savings in active in Europe). Test this again if there is no daylight savings, if tester still works.
+					# Update (2024-11-04): Check comment above.
 					offset -= 3600
 
 				if offset: date = date + datetime.timedelta(seconds = offset)

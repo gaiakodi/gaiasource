@@ -24,7 +24,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderJson, ProviderHtml):
 
-	_Link					= ['https://solidtorrents.to', 'https://solidtorrents.net', 'https://solidtorrents.eu']
+	_Link					= ['https://solidtorrents.to', 'https://solidtorrents.eu', 'https://solidtorrents.net']
 	_Path					= {
 								ProviderHtml.Version1 : 'search',
 								ProviderHtml.Version2 : 'api/v1/search',
@@ -36,6 +36,7 @@ class Provider(ProviderJson, ProviderHtml):
 								ProviderHtml.Version2 : 2000,
 							}
 
+	# NB: There are a lot of titles listed under Other/Video.
 	_CategoryMovie			= [2, 1] # 2 = Movies, 1 = Other
 	_CategoryShow			= [3, 1] # 3 = TV, 1 = Other
 	_CategoryVideo			= 'Video'
@@ -83,6 +84,10 @@ class Provider(ProviderJson, ProviderHtml):
 		rank					= 5
 		performance				= ProviderJson.PerformanceExcellent
 
+		# Update (2024-12): Domain has been down for a few weeks, although it was working a few weeks earlier. Leave enabled, since it will probably come back online and SolidTorrents is one of the better providers.
+		# Update (2024-12-20): Domain is up again, but sometimes a search results in a gateway error.
+		status					= ProviderJson.StatusOperational
+
 		version = self.customVersion()
 		if version == ProviderHtml.Version1:
 			ProviderHtml.initialize(self,
@@ -90,6 +95,7 @@ class Provider(ProviderJson, ProviderHtml):
 				description					= description,
 				rank						= rank,
 				performance					= performance,
+				status						= status,
 
 				link						= Provider._Link,
 
@@ -132,6 +138,7 @@ class Provider(ProviderJson, ProviderHtml):
 				description				= description,
 				rank					= rank,
 				performance				= performance,
+				status					= status,
 
 				link					= Provider._Link,
 

@@ -87,7 +87,7 @@ class Provider(ProviderJson, ProviderHtml):
 		description		= '{name} is one of newer {container} site similar to Torrentz. The site contains results in various languages, but most of them are in English. {name} changes their domain often and has missing metadata. Version %s uses the new website structure. Version %s uses an API which does not have its own data, but instead retrieves data from ApiBay.' % (ProviderHtml.Version1, ProviderHtml.Version2)
 		rank			= 2
 		performance		= ProviderHtml.PerformanceMedium - ProviderHtml.PerformanceStep
-		status			= ProviderHtml.StatusDead, # Now redirects to torrentify.buzz, which has a different structure.
+		status			= ProviderHtml.StatusDead # Now redirects to torrentify.buzz, which has a different structure. Update (2024-12): Still down.
 		link			= Provider._Link[version]
 		customVersion	= 2
 		supportMovie	= True

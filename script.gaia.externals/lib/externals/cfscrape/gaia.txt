@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://github.com/Anorov/cloudflare-scrape
-Current Version:	2.1.1 (2021-02-23)
+Current Version:		2.1.1 (2021-02-23)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -14,5 +14,9 @@ find ./ -type f -exec sed -i -e 's/from urllib3/from externals.urllib3/g' {} \;
 
 Add "shell = True" to all "subprocess" calls, otherwise a CMD window pops up in Windows.
 Commands must be a string, not a list, when shell=True.
+
+#########################################################################################################################
+
+Add the gaiaCommand() calls.
 
 #########################################################################################################################

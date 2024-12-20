@@ -23,7 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://pirateiro.com']
+	_Link					= ['https://pirateiro.com', 'https://pirateiro.io']
 	_Mirror					= ['https://torrends.to/site/pirateiro']
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'pirateiro', ProviderHtml.UnblockFormat3 : 'pirateiro'}
 	_Path					= 'search'
@@ -33,13 +33,13 @@ class Provider(ProviderHtml):
 
 	_AttributeContainer		= 'card-container'
 	_AttributeDetails		= 'card-body'
-	_AttributeBox			= 'card-link'
+	_AttributeBox			= 'list-group-item'		# Previous: card-link
 	_AttributeCategory		= 'cat-span'
-	_AttributeTitle			= 'card-title'
-	_AttributeTime			= 'text-muted'
-	_AttributeSize			= 'size-badge'
-	_AttributeSeeds			= 'prog-green'
-	_AttributeLeeches		= 'prog-red'
+	_AttributeTitle			= 'pt-title'			# Previous: card-title
+	_AttributeTime			= 'time-torrent'		# Previous: text-muted (main page)
+	_AttributeSize			= 'single-size'			# Previous: size-badge (main page)
+	_AttributeSeeds			= 'btn-seed-home'		# Previous: prog-green
+	_AttributeLeeches		= 'btn-leech-home'		# Previous: prog-red
 	_AttributePages			= 'pagi-container'
 	_AttributePage			= 'pagi-link'
 	_AttributeDisabled		= 'disabled'
@@ -54,8 +54,8 @@ class Provider(ProviderHtml):
 	def initialize(self):
 		ProviderHtml.initialize(self,
 			name						= 'Pirateiro',
-			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. The search page of {name} does not contain all the metadata. A subpage must therefore be retrieved for each result in order to extract the magnet link, which substantially increases scraping time.',
-			rank						= 3,
+			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. The search page of {name} does not contain all the metadata. A subpage must therefore be retrieved for each result in order to extract the magnet link, which substantially increases scraping time. Subpages also load very slowly, further increasing scraping time.',
+			rank						= 2, # Because of slow subpages.
 			performance					= ProviderHtml.PerformanceBad,
 
 			link						= Provider._Link,
@@ -69,7 +69,12 @@ class Provider(ProviderHtml):
 			offsetStart					= 1,
 			offsetIncrease				= 1,
 
-			formatEncode				= ProviderHtml.FormatEncodeQuote,
+			formatEncode				= ProviderHtml.FormatEncodePlus,
+
+			# Subpages take very long to load, sometimes 10+ seconds.
+			# Maybe a temp problem, or Pirateiro does this to prevent scraping.
+			# Set a fixed number of threads to use, in order to retrieve mutiple subpages concurrently.
+			searchConcurrency			= 6,
 
 			searchQuery					= {
 											ProviderHtml.RequestMethod : ProviderHtml.RequestMethodGet,
@@ -86,8 +91,8 @@ class Provider(ProviderHtml):
 			extractDetails				= [Html(extract = Html.AttributeHref)],
 			extractLink					= [ProviderHtml.Details, HtmlLink(href_ = ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)],
 			extractFileName				= [Html(class_ = Provider._AttributeTitle)],
-			extractFileSize				= [Html(class_ = Provider._AttributeSize)],
-			extractSourceTimeInexact	= [Html(class_ = Provider._AttributeTime)],
+			extractFileSize				= [ProviderHtml.Details, Html(class_ = Provider._AttributeSize)],
+			extractSourceTimeInexact	= [ProviderHtml.Details, Html(class_ = Provider._AttributeTime)],
 			extractSourceSeeds			= [Html(class_ = Provider._AttributeSeeds)],
 			extractSourceLeeches		= [Html(class_ = Provider._AttributeLeeches)],
 		)

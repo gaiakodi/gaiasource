@@ -41,7 +41,7 @@ class Informer(InformerBase):
 	# PARAMETERS
 	##############################################################################
 
-	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None):
+	def parameters(self, type, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None):
 		parameters = {}
 
 		if type == InformerBase.TypeMovie: parameters['call'] = 'movie'
@@ -64,7 +64,7 @@ class Informer(InformerBase):
 	# DIALOG
 	##############################################################################
 
-	def _dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
+	def _dialog(self, type = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, metadata = None, wait = True):
 		if metadata:
 			# Get rid of possible double year (one from the skin and the other one that was forcefully added to the title).
 			if 'originaltitle' in metadata and metadata['originaltitle']: metadata['title'] = metadata['originaltitle']
@@ -94,8 +94,7 @@ class Informer(InformerBase):
 			item = Directory(cache = False, lock = False).item()
 			if metadata:
 				metatools = MetaTools.instance()
-				metadataKodi = metatools.clean(metadata = metadata, studio = False)
-				item = metatools.item(item = item, metadata = metadata, clean = metadataKodi)
+				item = metatools.item(item = item, metadata = metadata, extendLabel = MetaTools.ExtendTitle, cleanStudio = False) # Do not decorate the title with the season/episode number, progress percentage, etc, since it looks ugly.
 				try: background = item['images'][MetaImage.TypeFanart]
 				except: pass
 				item = item['item']

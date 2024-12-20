@@ -155,7 +155,7 @@ class Core(base.Core):
 	def __init__(self, debug = True):
 		base.Core.__init__(self, Core.Id, Core.Name, Core.LinkMain)
 
-		self.mAccount = Account()
+		self.mAccount = Account.instance()
 
 		self.mDebug = debug
 		self.mLinkBasic = None
@@ -495,11 +495,21 @@ class Core(base.Core):
 
 				#if not self.success(): # Do not use this, since it will be false for cache calls.
 				if result and tools.Tools.isDictionary(result) and 'id' in result and result['id']:
-					expiration = result['expiration']
-					index = expiration.find('.')
-					if index >= 0: expiration = expiration[:index]
-					expiration = expiration.strip().lower().replace('t', ' ')
-					expiration = tools.Time.datetime(expiration, '%Y-%m-%d %H:%M:%S')
+					try:
+						expiration = result['expiration']
+						index = expiration.find('.')
+						if index >= 0: expiration = expiration[:index]
+						expiration = expiration.strip().lower().replace('t', ' ')
+						expiration = tools.Time.datetime(expiration, '%Y-%m-%d %H:%M:%S')
+						expirationTimestamp = tools.Time.timestamp(expiration)
+						expirationDate = expiration.strftime('%Y-%m-%d %H:%M:%S')
+						expirationRemaining = (expiration - datetime.datetime.today()).days
+					except:
+						tools.Logger.error()
+						expiration = None
+						expirationTimestamp = None
+						expirationDate = None
+						expirationRemaining = None
 
 					return {
 						'user' : result['username'],
@@ -509,9 +519,9 @@ class Core(base.Core):
 						'locale' : result['locale'],
 						'points' : result['points'],
 						'expiration' : {
-							'timestamp' : tools.Time.timestamp(expiration),
-							'date' : expiration.strftime('%Y-%m-%d %H:%M:%S'),
-							'remaining' : (expiration - datetime.datetime.today()).days
+							'timestamp' : expirationTimestamp,
+							'date' : expirationDate,
+							'remaining' : expirationRemaining,
 						}
 					}
 				else:
@@ -701,7 +711,7 @@ class Core(base.Core):
 				if files == Core.SelectionAll:
 					result = Core.SelectionAll
 				elif files == Core.SelectionName:
-					if item == None: item = self.item(id)
+					if item is None: item = self.item(id)
 					if item and 'files' in item:
 						validTitles1 = []
 						validTitles2 = []
@@ -726,8 +736,8 @@ class Core(base.Core):
 							# First try the individual file names, and only if nothing was found, try with the full folder path and name.
 							# Otherwise this file will match for "The Terminator 1984":
 							#	The Terminator Collection (1984-2019) 2009.Terminator.Salvation.1920x800.BDRip.x264.DTS-HD.MA.mkv
-							index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues1, title = title, year = year, exclude = True, valid = validTitles1)
-							if index is None: index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues2, title = title, year = year, exclude = True, valid = validTitles1)
+							index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues1, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles1)
+							if index is None: index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues2, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles1)
 							if not index is None: largest = lookupFiles[index]
 							validTitles1 = [lookupFiles[i] for i in validTitles1]
 
@@ -774,6 +784,7 @@ class Core(base.Core):
 						# If only media files are selected, no RAR is created and each file can be accessed individually.
 						if pack: result = ','.join([str(file['id']) for file in item['files'] if file['video']])
 						else: result = str(largest['id'])
+
 				elif files == Core.SelectionLargest:
 					if item is None:
 						item = self.item(id)
@@ -966,6 +977,8 @@ class Core(base.Core):
 		items = self.items(default = [])
 		if tools.Tools.isArray(items):
 			if len(items) > 0:
+				# NB: If too many items are in the list and we delete them all in one go using threads, the API returns HTTP 429: Too many requests
+				'''
 				def _deleteAll(id):
 					Core().delete(id)
 				threads = []
@@ -981,6 +994,18 @@ class Core(base.Core):
 				if wait:
 					for i in range(1, len(threads)):
 						threads[i].join()
+				'''
+
+				def _deleteAll(ids):
+					core = Core()
+					for id in ids: core.delete(id)
+
+				ids = [item['id'] for item in items]
+				threads = [ # Still use 2 threads, otherwise it is too slow.
+					Pool.thread(target = _deleteAll, args = (ids[:len(ids)//2],), start = True),		# First half.
+						Pool.thread(target = _deleteAll, args = (ids[len(ids)//2:],), start = True),	# Second half.
+				]
+				if wait: [thread.join() for thread in threads]
 			return True
 		else:
 			return Core.ErrorRealDebrid
@@ -1268,8 +1293,8 @@ class Core(base.Core):
 						# First try the individual file names, and only if nothing was found, try with the full folder path and name.
 						# Otherwise this file will match for "The Terminator 1984":
 						#	The Terminator Collection (1984-2019) 2009.Terminator.Salvation.1920x800.BDRip.x264.DTS-HD.MA.mkv
-						index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues1, title = title, year = year, exclude = True, valid = validTitles)
-						if index is None: index = Stream.titlesValid(media = tools.Media.TypeMovie, data = lookupValues2, title = title, year = year, exclude = True, valid = validTitles)
+						index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues1, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
+						if index is None: index = Stream.titlesValid(media = tools.Media.Movie, data = lookupValues2, title = title, year = year, filter = True, quick = True, exclude = True, valid = validTitles)
 						if not index is None: largest = lookupFiles[index]
 						validTitles = [lookupFiles[i] for i in validTitles]
 
@@ -1280,7 +1305,7 @@ class Core(base.Core):
 							file = files[i]
 							if file['selected']:
 								if not(season and episode) or Stream.numberShowValid(data = file['path'], season = season, episode = episode, single = True):
-									validTitles.append({'file' : file, 'index' : index, 'offset' : offset})
+									validTitles.append({'file' : file, 'index' : i, 'offset' : offset})
 									if not title or not Stream.titleProhibited(data = file['path'], title = title, exception = not season is None and season == 0):
 										if largest is None or file['bytes'] > largest['file']['bytes']:
 											largest = {'file' : file, 'index' : i, 'offset' : offset}
@@ -1294,7 +1319,7 @@ class Core(base.Core):
 							file = files[i]
 							if file['selected']:
 								if Stream.numberShowValid(data = file['path'], episode = episode, single = True):
-									validEpisodes.append({'file' : file, 'index' : index, 'offset' : offset})
+									validEpisodes.append({'file' : file, 'index' : i, 'offset' : offset})
 									if not title or not Stream.titleProhibited(data = file['path'], title = title, exception = not season is None and season == 0):
 										if largest is None or file['bytes'] > largest['file']['bytes']:
 											largest = {'file' : file, 'index' : i, 'offset' : offset}

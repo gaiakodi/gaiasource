@@ -41,26 +41,6 @@ else:
     except ImportError:
         from externals.urllib3.util import timeout
 
-if requests.__build__ < 0x021000:
-    gaecontrib = None
-else:
-    try:
-        from externals.requests.packages.urllib3.contrib import appengine as gaecontrib
-    except ImportError:
-        from externals.urllib3.contrib import appengine as gaecontrib
-
-if requests.__build__ < 0x021200:
-    PyOpenSSLContext = None
-else:
-    try:
-        from externals.requests.packages.urllib3.contrib.pyopenssl \
-                import PyOpenSSLContext
-    except ImportError:
-        try:
-            from externals.urllib3.contrib.pyopenssl import PyOpenSSLContext
-        except ImportError:
-            PyOpenSSLContext = None
-
 PY3 = sys.version_info > (3, 0)
 
 if PY3:
@@ -318,7 +298,5 @@ __all__ = (
     'HTTPHeaderDict',
     'queue',
     'urlencode',
-    'gaecontrib',
     'urljoin',
-    'PyOpenSSLContext',
 )

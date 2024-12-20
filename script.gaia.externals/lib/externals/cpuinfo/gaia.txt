@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://pypi.org/project/py-cpuinfo/#files
-Current Version:	8.0.0 (2022-03-03)
+Current Version:		9.0.0 (2024-11-29)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -19,5 +19,9 @@ Commands must be a string, not a list, when shell=True.
 
 Remove all calls to Process(). Although they might be supported, on Windows starting a process just hangs.
 Disable CAN_CALL_CPUID_IN_SUBPROCESS
+
+#########################################################################################################################
+
+Add the gaiaCommand() calls.
 
 #########################################################################################################################

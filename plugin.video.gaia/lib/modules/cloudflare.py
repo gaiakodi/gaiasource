@@ -71,7 +71,7 @@ class Cloudflare(object):
 
 	Links = [
 		'http://kat.tv',
-		'https://www2.yggtorrent.ch',
+		'https://yggtorrent.re',
 		'https://soap2day.is',
 		'https://iptorrents.eu',
 		'https://arma-models.ru',
@@ -82,13 +82,20 @@ class Cloudflare(object):
 
 		'https://bt4g.org/search/dummy',
 		'https://btmet.com',
-		'https://btmulu.com',
 		'https://demonoid.is/files/?query=dummy',
 		'https://ext.to/search/?q=dummy',
 		'https://idope.se',
 		'https://www.torrentfunk.com/all/torrents/dummy.html',
-		'https://www.magnetdl.com/d/dummy/',
 		'https://torrentquest.com/search/?q=dummy',
+
+		'https://cloudflare.com',
+		'https://gitlab.com',
+		'https://w3.org',
+		'https://vimeo.com',
+
+		# Domain down.
+		#'https://www.magnetdl.com/d/dummy/',
+		#'https://btmulu.com',
 	]
 
 	Headers = [

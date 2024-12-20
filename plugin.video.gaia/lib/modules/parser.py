@@ -18,6 +18,9 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+# NB: Careful when importing this file, since it can take a long time (100ms).
+# Only import on-demand and not at the top of a file. Otherwise menus are slow, when the nested imports import this file without it actually being used during execution.
+
 import re
 from lib.modules.tools import Tools
 from lib.modules.external import Importer
@@ -86,129 +89,3 @@ class Strainer(SoupStrainer):
 			attributes['class'] = lambda text: text and value in text.split(' ')
 
 		SoupStrainer.__init__(self, name = True if tag is None else tag, string = string, attrs = attributes)
-
-
-# gaiaremove - legacy - should be replaced by BeautifulSoup at some time.
-class Raw(object):
-
-	@classmethod
-	def parse(self, data, tag = '', attributes = None, extract = False):
-		if attributes: attributes = dict((key, re.compile(value + ('$' if value else ''))) for key, value in attributes.items())
-		results = self._parse(data, tag, attributes, extract)
-		if extract: results = [result.attrs[extract.lower()] for result in results]
-		else: results = [result.content for result in results]
-		return results
-
-	@classmethod
-	def _parse(self, data, tag = '', attributes = None, extract = False):
-		from collections import namedtuple
-		dom = namedtuple('DOMMatch', ['attrs', 'content'])
-
-		if attributes is None: attributes = {}
-		tag = tag.strip()
-		if Tools.isInstance(data, dom):
-			data = [data]
-		elif Tools.isString(data):
-			try:
-				data = [data.decode("utf-8")]  # Replace with chardet thingy
-			except:
-				try: data = [data.decode("utf-8", "replace")]
-				except: data = [data]
-		elif not Tools.isList(data):
-			return ''
-
-		if not tag: return ''
-		if not Tools.isDictionary(attributes): return ''
-
-		if extract:
-			if not Tools.isList(extract): extract = [extract]
-			extract = set([key.lower() for key in extract])
-
-		results = []
-		for item in data:
-			if Tools.isInstance(item, dom): item = item.content
-
-			result = []
-			for element in self._parseElements(item, tag, attributes):
-				attributes = self._parseAttributes(element)
-				if extract and not extract <= set(attributes.keys()): continue
-				temp = self._parseDocument(item, tag, element).strip()
-				result.append(dom(attributes, temp))
-				item = item[item.find(temp, item.find(element)):]
-			results += result
-
-		return results
-
-	@classmethod
-	def _parseDocument(self, data, tag, match):
-		if match.endswith('/>'): return ''
-
-		# Override tag name with tag from match if possible.
-		element = re.match('<([^\s/>]+)', match)
-		if element: tag = element.group(1)
-
-		prefix = '<%s' % tag
-		suffix = "</%s" % tag
-
-		# Start/end tags without matching case cause issues.
-		start = data.find(match)
-		end = data.find(suffix, start)
-		index = data.find(prefix, start + 1)
-
-		while index < end and not index == -1:  # Ignore too early </endstr> return.
-			tend = data.find(suffix, end + len(suffix))
-			if not tend == -1: end = tend
-			index = data.find(prefix, index + 1)
-
-		if start == -1 and end == -1: result = ''
-		elif start > -1 and end > -1: result = data[start + len(match):end]
-		elif end > -1: result = data[:end]
-		elif start > -1: result = data[start + len(match):]
-		else: result = ''
-
-		return result
-
-	@classmethod
-	def _parseElements(self, item, tag, attributes):
-		if not attributes:
-			pattern = '(<%s(?:\s[^>]*>|/?>))' % tag
-			current = re.findall(pattern, item, re.M | re.S | re.I)
-		else:
-			regexType = type(re.compile(''))
-			last = None
-			for key, value in attributes.items():
-				isRegex =  Tools.isInstance(value, regexType)
-				isString = Tools.isString(value)
-				pattern = '''(<{tag}[^>]*\s{key}=(?P<delim>['"])(.*?)(?P=delim)[^>]*>)'''.format(tag = tag, key = key)
-				extracted = re.findall(pattern, item, re.M | re.S | re.I)
-				if isRegex:
-					current = [r[0] for r in extracted if re.match(value, r[2])]
-				else:
-					temp = [value] if isString else value
-					current = [r[0] for r in extracted if set(temp) <= set(r[2].split(' '))]
-
-				if not current:
-					has_space = (isRegex and ' ' in value.pattern) or (isString and ' ' in value)
-					if not has_space:
-						pattern = '''(<{tag}[^>]*\s{key}=([^\s/>]*)[^>]*>)'''.format(tag = tag, key = key)
-						extracted = re.findall(pattern, item, re.M | re.S | re.I)
-						if isRegex: current = [r[0] for r in extracted if re.match(value, r[1])]
-						else: current = [r[0] for r in extracted if value == r[1]]
-
-				if last is None: last = current
-				else: last = [item for item in current if item in last]
-			current = last
-
-		return current
-
-	@classmethod
-	def _parseAttributes(self, element):
-		attributes = {}
-		for match in re.finditer('''\s+(?P<key>[^=]+)=\s*(?:(?P<delim>["'])(?P<value1>.*?)(?P=delim)|(?P<value2>[^"'][^>\s]*))''', element):
-			match = match.groupdict()
-			value1 = match.get('value1')
-			value2 = match.get('value2')
-			value = value1 if value1 is not None else value2
-			if value is None: continue
-			attributes[match['key'].lower().strip()] = value
-		return attributes

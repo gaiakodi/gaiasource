@@ -30,9 +30,21 @@ import os
 import re
 import hashlib
 import time
+import datetime
 
 from lib.modules.concurrency import Pool, Lock
 from lib.modules.json import Json
+
+# When calling datetime.strptime() it works the first time, but then Python changes the function to None and calling it a second time does not work.
+# This has been an issue since older Kodis with Python 2.7, and newer Kodi 21+ with Python 3.x.
+# https://forum.kodi.tv/showthread.php?tid=112916&page=2
+# https://bugs.python.org/issue27400
+# This causes issues in eg Time.datetime().
+class DateProxy(datetime.datetime):
+	@staticmethod
+	def strptime(string, format):
+		return datetime.datetime(*(time.strptime(string, format)[0:6]))
+datetime.datetime = DateProxy
 
 class Time(object):
 
@@ -59,10 +71,16 @@ class Time(object):
 	FormatTime = '%H:%M:%S'
 	FormatTimeShort = '%H:%M'
 
+	Timestamp = None
+
 	def __init__(self, start = False, mode = ModeDefault):
 		self.mStart = None
 		self.mMode = mode
 		if start: self.start()
+
+	@classmethod
+	def reset(self, settings = True):
+		Time.Timestamp = None
 
 	def start(self):
 		self.mStart = self.time(mode = self.mMode)
@@ -124,12 +142,15 @@ class Time(object):
 
 	# UTC timestamp
 	# iso: Convert ISO to UTC timestamp.
+	# utc=False: interpret the date string without a timezone (eg 2024-10-01) as a local date, which could cause a few hours offset from UTC. utc=True: interpret the date string as a UTC date.
 	@classmethod
-	def timestamp(self, fixedTime = None, format = None, iso = False, milliseconds = False):
+	def timestamp(self, fixedTime = None, format = None, iso = False, utc = False, milliseconds = False, cached = False):
+		if cached:
+			if Time.Timestamp is None: Time.Timestamp = self.timestamp(cached = False)
+			return int(Time.Timestamp * 1000) if milliseconds else Time.Timestamp
+
 		if iso:
 			if not fixedTime: return 0
-
-			import datetime
 
 			delimiter = -1
 			if not fixedTime.endswith('Z'):
@@ -168,17 +189,29 @@ class Time(object):
 				return int(time.time() * 1000) if milliseconds else int(time.time())
 			else:
 				if format:
-					fixedTime = self.datetime(fixedTime, format)
+					fixedTime = self.datetime(fixedTime, format = format, utc = utc)
 					if not fixedTime: return 0
-				try: return int(time.mktime(fixedTime.timetuple()) * 1000) if milliseconds else int(time.mktime(fixedTime.timetuple()))
+
+				function1 = None
+				function2 = None
+				if utc:
+					try:
+						import calendar
+						function1 = calendar.timegm
+					except: pass
+				try: function2 = time.mktime
+				except: pass
+
+				try: return int(function1(fixedTime.timetuple()) * 1000) if milliseconds else int(function1(fixedTime.timetuple()))
 				except:
-					# Somtimes mktime fails (mktime argument out of range), which seems to be an issue with very large dates (eg 2120-02-03) on Android.
-					try: return int(time.strftime('%s', fixedTime) * 1000) if milliseconds else int(time.strftime('%s', fixedTime))
-					except: return 0
+					try: return int(function2(fixedTime.timetuple()) * 1000) if milliseconds else int(function2(fixedTime.timetuple()))
+					except:
+						# Somtimes mktime fails (mktime argument out of range), which seems to be an issue with very large dates (eg 2120-02-03) on Android.
+						try: return int(time.strftime('%s', fixedTime) * 1000) if milliseconds else int(time.strftime('%s', fixedTime))
+						except: return 0
 
 	@classmethod
 	def format(self, timestamp = None, format = FormatDateTime, local = None):
-		import datetime
 		if timestamp is None: timestamp = self.timestamp()
 		date = datetime.datetime.utcfromtimestamp(timestamp)
 		if local:
@@ -187,34 +220,59 @@ class Time(object):
 			date = pytz.utc.localize(date).astimezone(pytz.timezone(self.zone()))
 		return date.strftime(format)
 
-	# datetime object from string
+	# datetime object from string.
+	# utc=False: interpret a date string without a timezone (eg 2024-10-01) as a local date. utc=True: interpret the date string as a UTC date.
 	@classmethod
-	def datetime(self, string, format = FormatDateTime):
-		import datetime
+	def datetime(self, string, format = FormatDateTime, utc = False):
+		# Python has had a bug for years, that changes the function datetime.datetime.strptime to None after it was called the first time.
+		# http://forum.kodi.tv/showthread.php?tid=112916
 		try:
 			return datetime.datetime.strptime(string, format)
 		except:
-			# Older Kodi Python versions do not have the strptime function.
-			# http://forum.kodi.tv/showthread.php?tid=112916
-			return datetime.datetime.fromtimestamp(time.mktime(time.strptime(string, format)))
+			try:
+				# This should not happen anymore, due to the fix with DateProxy.
+				# But still leave herte in case there are other issues, like the function notr exisiting in some older Python or Android versions.
+				function1 = None
+				function2 = None
+				if utc:
+					try:
+						import calendar
+						function1 = calendar.timegm
+					except: pass
+				try: function2 = time.mktime
+				except: pass
+
+				try: return datetime.datetime.fromtimestamp(function1(time.strptime(string, format)))
+				except: return datetime.datetime.fromtimestamp(function2(time.strptime(string, format)))
+			except:
+				# Somtimes mktime fails (mktime argument out of range), which seems to be an issue with very large dates (eg 2120-02-03) on Android or dates before 1970 on Windows.
+				return None
+
+	@classmethod
+	def delta(self, weeks = 0, days = 0, hours = 0, minutes = 0, seconds = 0, milliseconds = 0, microseconds = 0):
+		return datetime.timedelta(weeks = weeks, days = days, hours = hours, minutes = minutes, seconds = seconds, milliseconds = milliseconds, microseconds = microseconds)
 
 	@classmethod
 	def year(self, timestamp = None):
-		import datetime
 		if timestamp is None: return datetime.datetime.now().year
 		else: return datetime.datetime.utcfromtimestamp(timestamp).year
 
 	@classmethod
-	def past(self, seconds = 0, minutes = 0, hours = 0, days = 0, timestamp = None, format = FormatTimestamp, local = None):
-		if timestamp is None: timestamp = self.timestamp()
-		result = timestamp - seconds - (minutes * 60) - (hours * 3600) - (days * 86400)
+	def month(self, timestamp = None):
+		if timestamp is None: return datetime.datetime.now().month
+		else: return datetime.datetime.utcfromtimestamp(timestamp).month
+
+	@classmethod
+	def past(self, seconds = 0, minutes = 0, hours = 0, days = 0, months = 0, years = 0, timestamp = None, format = FormatTimestamp, local = None, utc = False):
+		if timestamp is None: timestamp = self.timestamp(utc = utc)
+		result = timestamp - seconds - (minutes * 60) - (hours * 3600) - (days * 86400) - (months * 2592000) - (years * 31557600)
 		if not format == self.FormatTimestamp: result = self.format(timestamp = result, format = format, local = local)
 		return result
 
 	@classmethod
-	def future(self, seconds = 0, minutes = 0, hours = 0, days = 0, timestamp = None, format = FormatTimestamp, local = None):
-		if timestamp is None: timestamp = self.timestamp()
-		result = timestamp + seconds + (minutes * 60) + (hours * 3600) + (days * 86400)
+	def future(self, seconds = 0, minutes = 0, hours = 0, days = 0, months = 0, years = 0, timestamp = None, format = FormatTimestamp, local = None, utc = False):
+		if timestamp is None: timestamp = self.timestamp(utc = utc)
+		result = timestamp + seconds + (minutes * 60) + (hours * 3600) + (days * 86400) + (months * 2592000) + (years * 31557600)
 		if not format == self.FormatTimestamp: result = self.format(timestamp = result, format = format, local = local)
 		return result
 
@@ -235,7 +293,6 @@ class Time(object):
 
 	@classmethod
 	def offset(self, zone = None, country = None, all = False):
-		import datetime
 		from lib.modules.external import Importer
 		pytz = Importer.modulePytz()
 
@@ -245,7 +302,6 @@ class Time(object):
 
 	@classmethod
 	def convert(self, stringTime, stringDay = None, abbreviate = False, formatInput = FormatTimeShort, formatOutput = None, zoneFrom = ZoneUtc, zoneTo = ZoneLocal):
-		import datetime
 		from lib.modules.external import Importer
 		pytz = Importer.modulePytz()
 
@@ -334,6 +390,14 @@ class Copier(object):
 class Tools(object):
 
 	@classmethod
+	def get(self, data, *args, **kwargs):
+		try:
+			for i in args: data = data[i]
+			return data
+		except:
+			return kwargs.get('default')
+
+	@classmethod
 	def copy(self, instance, deep = True, fast = True):
 		# Deep copy is slow in Python.
 		# https://stackoverflow.com/questions/45858084/what-is-a-fast-pythonic-way-to-deepcopy-just-data-from-a-python-dict-or-list
@@ -347,17 +411,18 @@ class Tools(object):
 			import copy
 			return copy.deepcopy(instance) if deep else copy.copy(instance)
 
+	# inverse=True: when merging lists, do structure2+structure1 instead of structure1+structure2.
 	@classmethod
-	def update(self, structure1, structure2, none = True, lists = False, unique = True):
+	def update(self, structure1, structure2, none = True, lists = False, unique = True, inverse = False):
 		attribute = unique if Tools.isString(unique) or Tools.isArray(unique) else None
 		if not structure1 is None and not structure2 is None:
 			for key, value in structure2.items():
 				if not none and key in structure1 and value is None: pass
 				elif not key in structure1 or structure1[key] is None: structure1[key] = value
 				elif Tools.isDictionary(value):
-					structure1[key] = self.update(structure1 = structure1.get(key, {}), structure2 = value, lists = lists, unique = unique)
+					structure1[key] = self.update(structure1 = structure1.get(key, {}), structure2 = value, none = none, lists = lists, unique = unique, inverse = inverse)
 				elif lists and Tools.isArray(value):
-					structure1[key] = (structure1.get(key, []) + value)
+					structure1[key] = (value + structure1.get(key, [])) if inverse else (structure1.get(key, []) + value)
 					if unique: structure1[key] = self.listUnique(structure1[key], attribute = attribute, update = True, none = none, lists = lists, unique = unique)
 				else: structure1[key] = value
 		return structure1
@@ -369,6 +434,10 @@ class Tools(object):
 	@classmethod
 	def id(self, variable):
 		return id(variable)
+
+	@classmethod
+	def list(self, variable):
+		return list(variable)
 
 	@classmethod
 	def replaceInsensitive(self, data, value, replacement = ''):
@@ -551,6 +620,8 @@ class Tools(object):
 				for i in data:
 					if not i in result: result.append(i)
 				return result
+			elif len(data) > 0 and self.isList(data[0]):
+				return [list(j) for j in set(tuple(i) for i in data)]
 			else:
 				seen = set()
 				add = seen.add
@@ -570,33 +641,50 @@ class Tools(object):
 		return result
 
 	@classmethod
-	def listSort(self, data, key = None, reverse = False):
-		return sorted(data, key = key, reverse = reverse)
+	def listSort(self, data, key = None, reverse = False, inplace = False):
+		if inplace:
+			data.sort(key = key, reverse = reverse)
+			return data
+		else:
+			return sorted(data, key = key, reverse = reverse)
 
 	@classmethod
-	def listShuffle(self, data):
+	def listReverse(self, data, inplace = False):
+		if inplace:
+			data.reverse()
+			return data
+		else:
+			return list(reversed(data)) # reversed() returns an iterator.
+
+	@classmethod
+	def listSplit(self, data, size = 1):
+		for i in range(0, len(data), size):
+			yield data[i : i + size]
+
+	@classmethod
+	def listShuffle(self, data, copy = False):
 		import random
+		if copy: data = self.copy(data, deep = False)
 		random.shuffle(data)
 		return data
 
 	@classmethod
-	def listInterleave(self, data1, data2):
-	    result = []
-	    length1 = len(data1)
-	    length2 = len(data2)
-	    for i in range(max(length1, length2)):
-	        if i < length1: result.append(data1[i])
-	        if i < length2: result.append(data2[i])
-	    return result
+	def listInterleave(self, *lists):
+		from itertools import zip_longest
+		return [y for x in zip_longest(*lists) for y in x if y is not None]
 
 	@classmethod
 	def listConsecutive(self, data):
 		if not data: return None
 		return data == list(range(min(data), max(data) + 1))
 
+	@classmethod
+	def listChunk(self, data, chunk = 10):
+		return [data[i : i + chunk] for i in range(0, len(data), chunk)]
+
 	# Randomly pick an item from a list.
 	@classmethod
-	def listPick(self, data, count = 1, remove = False):
+	def listPick(self, data, count = 1, remove = False, weights = None):
 		import random
 		if remove:
 			# Not very efficient. This operation is O(n) or more specifically O(count*n).
@@ -609,7 +697,7 @@ class Tools(object):
 			else:
 				return data.pop(random.randint(0, len(data) - 1))
 		else:
-			if count > 1: return random.choices(data, k = count)
+			if count > 1 or weights: return random.choices(data, k = count, weights = weights)
 			else: return random.choice(data)
 
 	# Pick the most frequent/common element in the list.
@@ -618,8 +706,12 @@ class Tools(object):
 		from collections import Counter
 		result = Counter(data).most_common(count)
 		if result: result = [i[0] for i in result]
-		if count == 1: return result[0]
+		if count == 1: return result[0] if result else None
 		else: return result
+
+	@classmethod
+	def listCount(self, data, value):
+		return data.count(value)
 
 	# Get middle value from list.
 	@classmethod
@@ -627,6 +719,15 @@ class Tools(object):
 		if sort: data = self.listSort(data)
 		index = int((len(data) - 1) / 2)
 		return data[index]
+
+	@classmethod
+	def listMean(self, data):
+		return float(sum(data)) / len(data)
+
+	@classmethod
+	def listIndex(self, data, value, default = -1):
+		try: return data.index(value)
+		except: return default
 
 	@classmethod
 	def stringSplit(self, value, length, join = None):
@@ -649,11 +750,13 @@ class Tools(object):
 
 	@classmethod
 	def stringRemovePrefix(self, data, remove):
+		# str.removeprefix() is only avilable in Python 3.9+
 		if data.startswith(remove): data = data[len(remove):]
 		return data
 
 	@classmethod
 	def stringRemoveSuffix(self, data, remove):
+		# str.removesuffix() is only avilable in Python 3.9+
 		if data.endswith(remove): data = data[:len(remove)]
 		return data
 
@@ -683,6 +786,10 @@ class Tools(object):
 		return isinstance(value, bool)
 
 	@classmethod
+	def isBytes(self, value):
+		return isinstance(value, bytes)
+
+	@classmethod
 	def isString(self, value):
 		try: return isinstance(value, (str, bytes))
 		except:
@@ -705,15 +812,33 @@ class Tools(object):
 		return isinstance(value, (int, float))
 
 	# Check if string is numeric.
+	# Floats and negative numbers are not considered numeric if "full = False".
 	@classmethod
-	def isNumeric(self, value):
-		try: return value.isnumeric()
-		except: return False
+	def isNumeric(self, value, full = False):
+		if full:
+			return Regex.match(data = value, expression = '^[\-\+]?\d+(?:\.\d*)?$', cache = True)
+		else:
+			try: return value.isnumeric()
+			except: return False
+
+	@classmethod
+	def isNumericInteger(self, value, exact = False):
+		return Regex.match(data = value, expression = '^[\-\+]?\d+$' if exact else '^[\-\+]?\d+(?:\.\d*)?$', cache = True)
+
+	@classmethod
+	def isNumericFloat(self, value, exact = False):
+		return Regex.match(data = value, expression = '^[\-\+]?\d+(?:\.\d*)$' if exact else '^[\-\+]?\d+$', cache = True)
 
 	# Check if string is alphabetic.
 	@classmethod
 	def isAlphabetic(self, value):
 		try: return value.isalpha()
+		except: return False
+
+	# Check if string is alphabetic or numeric.
+	@classmethod
+	def isAlphabeticNumeric(self, value):
+		try: return value.isalnum()
 		except: return False
 
 	@classmethod
@@ -737,177 +862,6 @@ class Tools(object):
 		return isinstance(value, (dict, list, tuple))
 
 
-class Archive(object):
-
-	TypeZip			= 'zip'
-	TypeGzip		= 'gzip'
-	Type7zip		= '7zip'
-	TypeXz			= 'xz'
-	TypeUnknown		= None
-
-	ExtensionZip	= 'zip'
-	ExtensionGzip	= 'gz'
-	Extension7zip	= '7z'
-	ExtensionXz		= 'xz'
-
-	# https://en.wikipedia.org/wiki/List_of_file_signatures
-	Magic			= {
-		TypeZip		: [b'\x50\x4b\x03\x04', b'\x50\x4b\x05\x06', b'\x50\x4b\x07\x08'],
-		TypeGzip	: [b'\x1f\x8b'],
-		Type7zip	: [b'\x37\x7a\xbc\xaf\x27\x1c'],
-		TypeXz		: [b'\xfd\x37\x7a\x58\x5a\x00'],
-	}
-
-	@classmethod
-	def extension(self, type, dot = True):
-		extension = None
-		if type == Archive.TypeZip: extension = Archive.ExtensionZip
-		elif type == Archive.TypeGzip: extension = Archive.ExtensionGzip
-		elif type == Archive.Type7zip: extension = Archive.Extension7zip
-		elif type == Archive.TypeXz: extension = Archive.ExtensionXz
-		if extension and dot: extension = '.' + extension
-		return extension
-
-	@classmethod
-	def size(self, magic):
-		return len(Converter.unicode(magic))
-
-	@classmethod
-	def magic(self, path = None, data = None, size = 2):
-		try:
-			if path:
-				with open(path, 'rb') as file:
-					return file.read(size)
-			elif data:
-				return data[:size]
-		except: return None
-
-	@classmethod
-	def type(self, path = None, data = None):
-		for type, magic in Archive.Magic.items():
-			if self.magic(path = path, data = data, size = self.size(magic[0])) in magic:
-				return type
-		return Archive.TypeUnknown
-
-	@classmethod
-	def isArchive(self, path = None, data = None):
-		return not self.type(path = path, data = data) == Archive.TypeUnknown
-
-	@classmethod
-	def isType(self, type, path = None, data = None):
-		try:
-			magic = Archive.Magic[type]
-			return self.magic(path = path, data = data, size = self.size(magic[0])) in magic
-		except: return False
-
-	@classmethod
-	def compress(self, type, path = None, output = None, flatten = True):
-		if type == Archive.TypeZip: return self.zipCompress(path = path, output = output, flatten = flatten)
-		else: return None
-
-	@classmethod
-	def decompress(self, path = None, output = None, data = None):
-		type = self.type(path = path, data = data)
-		if type == Archive.TypeZip: return self.zipDecompress(path = path, output = output, data = data)
-		elif type == Archive.TypeGzip: return self.gzipDecompress(path = path, output = output, data = data)
-		elif type == Archive.Type7zip: return self.szipDecompress(path = path, output = output, data = data)
-		elif type == Archive.TypeXz: return self.xzDecompress(path = path, output = output, data = data)
-		else: return None
-
-	@classmethod
-	def zipIs(self, path = None, data = None):
-		return self.isType(type = Archive.TypeZip, path = path, data = data)
-
-	@classmethod
-	def zipCompress(self, path = None, output = None, flatten = True):
-		try:
-			if Tools.isString(path):
-				if File.existsDirectory(path = path): _, path = File.listDirectory(path)
-				else: path = [path]
-
-			from zipfile import ZipFile, ZIP_DEFLATED
-			zip = ZipFile(output, 'w', ZIP_DEFLATED)
-			for i in path:
-				if flatten: zip.write(i, File.name(path = i, extension = True))
-				else: zip.write(i)
-			zip.close()
-
-			return True
-		except: Logger.error()
-		return None
-
-	@classmethod
-	def zipDecompress(self, path = None, output = None, data = None):
-		try:
-			from zipfile import ZipFile
-			if path:
-				with ZipFile(path, 'r') as zip:
-					zip.extractall(path = output)
-				return True
-			elif data:
-				# NB: Not tested.
-				from io import BytesIO
-				data = BytesIO(data)
-				file = ZipFile(file = data)
-				result = file.read()
-				file.close()
-				return result
-		except: Logger.error()
-		return None
-
-	@classmethod
-	def gzipIs(self, path):
-		return self.isType(type = Archive.TypeGzip, path = path, data = data)
-
-	@classmethod
-	def gzipDecompress(self, path = None, output = None, data = None):
-		try:
-			if path:
-				import gzip
-				with gzip.open(path, 'rb') as fileIn:
-					with open(File.joinPath(output, File.name(path = path, extension = False)), 'wb') as fileOut:
-						for line in fileIn: fileOut.write(line)
-			elif data:
-				from gzip import GzipFile
-				from io import BytesIO
-				data = BytesIO(data)
-				file = GzipFile(fileobj = data)
-				result = file.read()
-				file.close()
-				return result
-		except: Logger.error()
-		return None
-
-	@classmethod
-	def szipIs(self, path):
-		return self.isType(type = Archive.Type7zip, path = path, data = data)
-
-	@classmethod
-	def szipDecompress(self, path = None, output = None, data = None):
-		try:
-			if path:
-				Subprocess.open(command = '7z x "%s" -o"%s"' % (path, output))
-			elif data:
-				raise Exception('7zip in-memory decompression is not implemented yet.')
-		except: Logger.error()
-		return None
-
-	@classmethod
-	def xzIs(self, path):
-		return self.isType(type = Archive.TypeXz, path = path, data = data)
-
-	@classmethod
-	def xzDecompress(self, path = None, output = None, data = None):
-		try:
-			if path:
-				File.makeDirectory(output)
-				Subprocess.open(command = 'xz -dc "%s" > "%s"' % (path, File.joinPath(output, File.name(path = path, extension = False))))
-			elif data:
-				raise Exception('XZ in-memory decompression is not implemented yet.')
-		except: Logger.error()
-		return None
-
-
 class Regex(object):
 
 	FlagNone			= 0
@@ -924,16 +878,19 @@ class Regex(object):
 
 	@classmethod
 	def expression(self, expression, flags = FlagsDefault, cache = False):
-		if cache:
-			try:
-				id = expression + '_' + str(flags)
-				return Regex.Cache[id]
-			except:
-				compiled = re.compile(expression, flags = flags)
-				Regex.Cache[id] = compiled
-				return compiled
+		if Tools.isString(expression):
+			if cache:
+				try:
+					id = expression + '_' + str(flags)
+					return Regex.Cache[id]
+				except:
+					compiled = re.compile(expression, flags = flags)
+					Regex.Cache[id] = compiled
+					return compiled
+			else:
+				return re.compile(expression, flags = flags)
 		else:
-			return re.compile(expression, flags = flags)
+			return expression # Already compiled expression.
 
 	@classmethod
 	def escape(self, data):
@@ -1056,6 +1013,14 @@ class Math(object):
 		return '{:,}'.format(value)
 
 	@classmethod
+	def human(self, value):
+		magnitude = 0
+		while abs(value) >= 1000:
+			magnitude += 1
+			value /= 1000.0
+		return '%.0f%s' % (value, ['', 'K', 'M', 'G', 'T', 'P'][magnitude])
+
+	@classmethod
 	def absolute(self, value):
 		return abs(value)
 
@@ -1129,6 +1094,41 @@ class Math(object):
 		if value is None: return False
 		import math
 		return math.copysign(1, value) < 0
+
+	# Calculate mean.
+	@classmethod
+	def mean(self, values):
+		if not values: return 0
+		return sum(values) / len(values)
+
+	# Calculate standard deviation.
+	@classmethod
+	def deviation(self, values, mean = None):
+		if not values: return 0
+		from math import sqrt
+		if mean is None: mean = self.mean(values = values)
+		return sqrt(sum(pow(i - mean, 2) for i in values) / len(values))
+
+	# Remove outliers from list.
+	# https://www.askpython.com/python/examples/how-to-determine-outliers
+	# upper=True: remove highest outliers.
+	# lower=True: remove lowest outliers.
+	# middle=True: remove middle values between upper and lower outliers.
+	@classmethod
+	def outliers(self, values, threshold = 2, upper = True, lower = True, middle = False):
+		result = []
+		mean = self.mean(values = values)
+		deviation = self.deviation(values = values, mean = mean)
+		for i in values:
+			value = ((i - mean) / deviation) if deviation else 0
+			if value > threshold:
+				if not upper: result.append(i)
+			elif value < -threshold:
+				if not lower: result.append(i)
+			elif not middle:
+				result.append(i)
+		return result
+
 
 class Matcher(object):
 
@@ -1274,12 +1274,20 @@ class Language(object):
 	CaseUpper = 1
 	CaseLower = 2
 
+	# Codes
+	CodePrimary = 0 # ISO-639-1
+	CodeSecondary = 1 # ISO-639-2-B
+	CodeTertiary = 2 # ISO-639-3 or ISO-639-2-T
+	CodeStream = CodeSecondary # The code used by Kodi's player and OpenSubtitles.
+	CodeDefault = CodePrimary
+
 	# Code
 	CodeUniversal = 'un'
 	CodeAutomatic = 'xa'
 	CodePlain = 'xp'
 	CodeNone = 'xn'
 	CodeUnknown = 'xu'
+	CodeNative = 'xx'
 	CodeEnglish = 'en'
 	CodeFrench = 'fr'
 	CodeSpanish = 'es'
@@ -1289,6 +1297,8 @@ class Language(object):
 	CodeDutch = 'nl'
 	CodeRussian = 'ru'
 	CodeChinese = 'zh'
+	CodeTurkish = 'tr'
+	CodeIndian = ('hi', 'bn', 'mr', 'te', 'ta', 'gu', 'ur', 'kn', 'or', 'ml', 'pa', 'as', 'sa', 'mai', 'mni') # Must be a tuple to be used as a dict-key in MetaImdb.
 
 	# Names
 	NameUniversal = CodeUniversal
@@ -1301,15 +1311,8 @@ class Language(object):
 	NameDutch = CodeDutch
 	NameRussian = CodeRussian
 	NameChinese = CodeChinese
-	NameNative = None
 	NameDefault = NameEnglish
-
-	# Codes
-	CodePrimary = 0 # ISO-639-1
-	CodeSecondary = 1 # ISO-639-2-B
-	CodeTertiary = 2 # ISO-639-3 or ISO-639-2-T
-	CodeStream = CodeSecondary # The code used by Kodi's player and OpenSubtitles.
-	CodeDefault = CodePrimary
+	NameNative = CodeNative # Do not use None, since it gets converted to the string "null" during JSON-encoding if used as a dict-key. Eg: from subtitle.py.
 
 	# Country
 	CountryNone = None
@@ -1416,7 +1419,7 @@ class Language(object):
 				{ Language.Name : { Language.NameNative : 'རྫོང་ཁ་', Language.NameEnglish : 'Dzongkha', Language.NameFrench : 'Dzongkha', Language.NameSpanish : 'Dzongkha', Language.NamePortuguese : 'Dzongkha', Language.NameItalian : 'Dzongkha', Language.NameGerman : 'Dzongkha', Language.NameDutch : 'Dzongkha', Language.NameRussian : 'Дзунгха' }, Language.Code : ('dz', 'dzo', 'dzo'), Language.Country : 'bt', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'English', Language.NameEnglish : 'English', Language.NameFrench : 'Anglais', Language.NameSpanish : 'Inglés', Language.NamePortuguese : 'Inglês', Language.NameItalian : 'Inglese', Language.NameGerman : 'Englisch', Language.NameDutch : 'Engels', Language.NameRussian : 'Английский' }, Language.Code : ('en', 'eng', 'eng'), Language.Country : 'gb', Language.Frequency : Language.FrequencyCommon },
 				{ Language.Name : { Language.NameNative : 'Esperantaj', Language.NameEnglish : 'Esperanto', Language.NameFrench : 'Espéranto', Language.NameSpanish : 'Esperanto', Language.NamePortuguese : 'Esperanto', Language.NameItalian : 'Esperanto', Language.NameGerman : 'Esperanto', Language.NameDutch : 'Esperanto', Language.NameRussian : 'Эсперанто' }, Language.Code : ('eo', 'epo', 'epo'), Language.Country : Language.CountryNone, Language.Frequency : Language.FrequencyNone },
-				{ Language.Name : { Language.NameNative : 'Eesti', Language.NameEnglish : 'Estonian', Language.NameFrench : 'Estonien', Language.NameSpanish : 'Estonio', Language.NamePortuguese : 'Estoniano', Language.NameItalian : 'Estone', Language.NameGerman : 'Estnisch', Language.NameDutch : 'Estlands', Language.NameRussian : 'Эстонский' }, Language.Code : ('et', 'est', 'est'), Language.Country : 'ee', Language.Frequency : Language.FrequencyUncommon },
+				{ Language.Name : { Language.NameNative : 'Eesti', Language.NameEnglish : 'Estonian', Language.NameFrench : 'Estonien', Language.NameSpanish : 'Estonio', Language.NamePortuguese : 'Estoniano', Language.NameItalian : 'Estone', Language.NameGerman : 'Estnisch', Language.NameDutch : 'Estlands', Language.NameRussian : 'Эстонский' }, Language.Code : ('et', 'est', 'est'), Language.Country : 'ee', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Èʋegbe', Language.NameEnglish : 'Ewe', Language.NameFrench : 'Ewe', Language.NameSpanish : 'Ewe', Language.NamePortuguese : 'Ewe', Language.NameItalian : 'Ewe', Language.NameGerman : 'Ewe', Language.NameDutch : 'Ewe', Language.NameRussian : 'Ewe' }, Language.Code : ('ee', 'ewe', 'ewe'), Language.Country : 'gh', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Føroyskt', Language.NameEnglish : 'Faroese', Language.NameFrench : 'Farsee', Language.NameSpanish : 'Feroz', Language.NamePortuguese : 'Faroese', Language.NameItalian : 'Faroese', Language.NameGerman : 'Faroese', Language.NameDutch : 'Farroom', Language.NameRussian : 'Faroese' }, Language.Code : ('fo', 'fao', 'fao'), Language.Country : 'fo', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Vakaviti', Language.NameEnglish : 'Fijian', Language.NameFrench : 'Fidjien', Language.NameSpanish : 'Fiyian', Language.NamePortuguese : 'Fijiano', Language.NameItalian : 'Fijian', Language.NameGerman : 'Fidschi', Language.NameDutch : 'Fijian', Language.NameRussian : 'Фиджийский' }, Language.Code : ('fj', 'fij', 'fij'), Language.Country : 'fj', Language.Frequency : Language.FrequencyUncommon },
@@ -1470,9 +1473,9 @@ class Language(object):
 				{ Language.Name : { Language.NameNative : 'Lèmburgs', Language.NameEnglish : 'Limburgish', Language.NameFrench : 'Limburgish', Language.NameSpanish : 'Limbúrgico', Language.NamePortuguese : 'Limburgo', Language.NameItalian : 'Limbongshish', Language.NameGerman : 'Limburgisch', Language.NameDutch : 'Limburgs', Language.NameRussian : 'Лимбургский' }, Language.Code : ('li', 'lim', 'lim'), Language.Country : 'nl', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Lingála', Language.NameEnglish : 'Lingala', Language.NameFrench : 'Lingala', Language.NameSpanish : 'Lingala', Language.NamePortuguese : 'Lingala', Language.NameItalian : 'Lingala', Language.NameGerman : 'Lingala', Language.NameDutch : 'Lingala', Language.NameRussian : 'Лингла' }, Language.Code : ('ln', 'lin', 'lin'), Language.Country : 'cd', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'ພາສາລາວ', Language.NameEnglish : 'Lao', Language.NameFrench : 'Lao', Language.NameSpanish : 'Lao', Language.NamePortuguese : 'Lao', Language.NameItalian : 'Lao', Language.NameGerman : 'Lao', Language.NameDutch : 'Lao', Language.NameRussian : 'Лаос' }, Language.Code : ('lo', 'lao', 'lao'), Language.Country : 'la', Language.Frequency : Language.FrequencyOccasional },
-				{ Language.Name : { Language.NameNative : 'Lietuvių', Language.NameEnglish : 'Lithuanian', Language.NameFrench : 'Lituanien', Language.NameSpanish : 'Lituano', Language.NamePortuguese : 'Lituano', Language.NameItalian : 'Lituano', Language.NameGerman : 'Litauisch', Language.NameDutch : 'Litouws', Language.NameRussian : 'Литовский' }, Language.Code : ('lt', 'lit', 'lit'), Language.Country : 'lt', Language.Frequency : Language.FrequencyUncommon },
+				{ Language.Name : { Language.NameNative : 'Lietuvių', Language.NameEnglish : 'Lithuanian', Language.NameFrench : 'Lituanien', Language.NameSpanish : 'Lituano', Language.NamePortuguese : 'Lituano', Language.NameItalian : 'Lituano', Language.NameGerman : 'Litauisch', Language.NameDutch : 'Litouws', Language.NameRussian : 'Литовский' }, Language.Code : ('lt', 'lit', 'lit'), Language.Country : 'lt', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Tshiluba', Language.NameEnglish : 'Luba-Kasai', Language.NameFrench : 'Luba-Kasaï', Language.NameSpanish : 'Luba-Kasai', Language.NamePortuguese : 'Luba-Kasai', Language.NameItalian : 'Luba-Kasai', Language.NameGerman : 'Luba-Kasai', Language.NameDutch : 'Luba-Kasai', Language.NameRussian : 'Luba-Kasai' }, Language.Code : ('lu', 'lub', 'lub'), Language.Country : 'cd', Language.Frequency : Language.FrequencyUncommon },
-				{ Language.Name : { Language.NameNative : 'Latviešu', Language.NameEnglish : 'Latvian', Language.NameFrench : 'Letton', Language.NameSpanish : 'Letón', Language.NamePortuguese : 'Letão', Language.NameItalian : 'Lettone', Language.NameGerman : 'Lettisch', Language.NameDutch : 'Letland', Language.NameRussian : 'Латышский' }, Language.Code : ('lv', 'lav', 'lav'), Language.Country : 'lv', Language.Frequency : Language.FrequencyUncommon },
+				{ Language.Name : { Language.NameNative : 'Latviešu', Language.NameEnglish : 'Latvian', Language.NameFrench : 'Letton', Language.NameSpanish : 'Letón', Language.NamePortuguese : 'Letão', Language.NameItalian : 'Lettone', Language.NameGerman : 'Lettisch', Language.NameDutch : 'Letland', Language.NameRussian : 'Латышский' }, Language.Code : ('lv', 'lav', 'lav'), Language.Country : 'lv', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Gaelg', Language.NameEnglish : 'Manx', Language.NameFrench : 'Manx', Language.NameSpanish : 'Manx', Language.NamePortuguese : 'Manx', Language.NameItalian : 'Manx', Language.NameGerman : 'Manx', Language.NameDutch : 'Manx', Language.NameRussian : 'Манс' }, Language.Code : ('gv', 'glv', 'glv'), Language.Country : 'im', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Mакедонски', Language.NameEnglish : 'Macedonian', Language.NameFrench : 'Macédonien', Language.NameSpanish : 'Macedónio', Language.NamePortuguese : 'Macedônio', Language.NameItalian : 'Macedone', Language.NameGerman : 'Mazedonisch', Language.NameDutch : 'Macedonisch', Language.NameRussian : 'Македонский' }, Language.Code : ('mk', 'mac', 'mkd'), Language.Country : 'mk', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Malagasy', Language.NameEnglish : 'Malagasy', Language.NameFrench : 'Malgache', Language.NameSpanish : 'Madagascarí', Language.NamePortuguese : 'Malgaxe', Language.NameItalian : 'Malgascio', Language.NameGerman : 'Malagassisch', Language.NameDutch : 'Madagaskar', Language.NameRussian : 'Малагасия' }, Language.Code : ('mg', 'mlg', 'mlg'), Language.Country : 'mg', Language.Frequency : Language.FrequencyUncommon },
@@ -1536,7 +1539,7 @@ class Language(object):
 				{ Language.Name : { Language.NameNative : 'དབུས་སྐད', Language.NameEnglish : 'Tibetan', Language.NameFrench : 'Tibétain', Language.NameSpanish : 'Tibetano', Language.NamePortuguese : 'Tibetano', Language.NameItalian : 'Tibetano', Language.NameGerman : 'Tibetanisch', Language.NameDutch : 'Tibetaans', Language.NameRussian : 'Тибетский' }, Language.Code : ('bo', 'tib', 'bod'), Language.Country : 'cn', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Türkmençe', Language.NameEnglish : 'Turkmen', Language.NameFrench : 'Turkmène', Language.NameSpanish : 'Turkmen', Language.NamePortuguese : 'Turkmen', Language.NameItalian : 'Turkmen', Language.NameGerman : 'Turkmen', Language.NameDutch : 'Turkmen', Language.NameRussian : 'Туркменский' }, Language.Code : ('tk', 'tuk', 'tuk'), Language.Country : 'tm', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Tagalog', Language.NameEnglish : 'Tagalog', Language.NameFrench : 'Tagalog', Language.NameSpanish : 'Tagalo', Language.NamePortuguese : 'Tagalog', Language.NameItalian : 'Tagalog', Language.NameGerman : 'Tagalog', Language.NameDutch : 'Tagalog', Language.NameRussian : 'Тагалог' }, Language.Code : ('tl', 'tgl', 'tgl'), Language.Country : 'ph', Language.Frequency : Language.FrequencyOccasional },
-				{ Language.Name : { Language.NameNative : 'Setswana', Language.NameEnglish : 'Tswana', Language.NameFrench : 'Tswana', Language.NameSpanish : 'Tswana', Language.NamePortuguese : 'Tswana', Language.NameItalian : 'Tswana', Language.NameGerman : 'Tswana', Language.NameDutch : 'Tswana', Language.NameRussian : 'Твана' }, Language.Code : ('tn', 'tsn', 'tsn'), Language.Country : 'za', Language.Frequency : Language.FrequencyUncommon },
+				{ Language.Name : { Language.NameNative : 'Setswana', Language.NameEnglish : 'Tswana', Language.NameFrench : 'Tswana', Language.NameSpanish : 'Tswana', Language.NamePortuguese : 'Tswana', Language.NameItalian : 'Tswana', Language.NameGerman : 'Tswana', Language.NameDutch : 'Tswana', Language.NameRussian : 'Твана' }, Language.Code : ('tn', 'tsn', 'tsn'), Language.Country : 'za', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Faka-Tonga', Language.NameEnglish : 'Tongan', Language.NameFrench : 'Tongan', Language.NameSpanish : 'Tongan', Language.NamePortuguese : 'Tongania', Language.NameItalian : 'Tongan', Language.NameGerman : 'Tanganer', Language.NameDutch : 'Tongan', Language.NameRussian : 'Тонган' }, Language.Code : ('to', 'ton', 'ton'), Language.Country : 'to', Language.Frequency : Language.FrequencyUncommon },
 				{ Language.Name : { Language.NameNative : 'Türkçe', Language.NameEnglish : 'Turkish', Language.NameFrench : 'Turc', Language.NameSpanish : 'Turco', Language.NamePortuguese : 'Turco', Language.NameItalian : 'Turco', Language.NameGerman : 'Türkisch', Language.NameDutch : 'Turks', Language.NameRussian : 'Турецкий' }, Language.Code : ('tr', 'tur', 'tur'), Language.Country : 'tr', Language.Frequency : Language.FrequencyOccasional },
 				{ Language.Name : { Language.NameNative : 'Xitsonga', Language.NameEnglish : 'Tsonga', Language.NameFrench : 'Tsonga', Language.NameSpanish : 'Tsonga', Language.NamePortuguese : 'Tsonga', Language.NameItalian : 'Tsonga', Language.NameGerman : 'Tsonga', Language.NameDutch : 'Tsonga', Language.NameRussian : 'Цонга' }, Language.Code : ('ts', 'tso', 'tso'), Language.Country : 'za', Language.Frequency : Language.FrequencyUncommon },
@@ -1694,6 +1697,7 @@ class Language(object):
 					if languages[i] == var[Language.Original]:
 						countries.insert(i + 1, var[Language.Country])
 			countries = Tools.listUnique(countries)
+
 		if single: return countries[0]
 		else: return countries
 
@@ -1782,17 +1786,21 @@ class Language(object):
 			choice = Dialog.select(title = title if title else 33787, items = names, selection = current)
 		if choice < 0: return None
 
-		if result == Language.Name: choice = names[choice]
-		elif result == Language.Code: choice = codes[choice]
+		choiceName = names[choice]
+		choiceCode = codes[choice]
 
 		if update:
-			if id == Language.SettingPrimary and not choice == Language.EnglishName:
-				if Dialog.option(title = 32356, message = 35285, labelConfirm = 33048, labelDeny = 33065):
-					choice = Language.EnglishName
+			if id == Language.SettingPrimary and not choiceCode == Language.EnglishCode:
+				if not Dialog.option(title = 32356, message = Translation.string(35285) % (choiceName, choiceName), labelConfirm = choiceName, labelDeny = Language.EnglishName):
+					choiceName = Language.EnglishName
+					choiceCode = Language.EnglishCode
 
-			Settings.set(id, choice)
+			Settings.set(id, choiceCode if result == Language.Code else choiceName)
 			Language.Settings = None # Reset so that new settings are read.
-		return choice
+
+		if result == Language.Name: return choiceName
+		elif result == Language.Code: return choiceCode
+		else: return choiceValue
 
 	@classmethod
 	def settingsSelectPrimary(self, set = None):
@@ -1823,9 +1831,18 @@ class Language(object):
 		self._prepare()
 		if universal: result = Language.Languages
 		else: result = Language.Languages[1:]
-		if not frequency is None: result = [i for i in result if i[Language.Frequency] >= frequency]
+		if not frequency is None:
+			if frequency is True: frequency = [Language.FrequencyCommon, Language.FrequencyOccasional]
+			elif frequency is False: frequency = [Language.FrequencyUncommon]
+			if Tools.isArray(frequency): result = [i for i in result if i[Language.Frequency] in frequency]
+			elif Tools.isInteger(frequency): result = [i for i in result if i[Language.Frequency] >= frequency]
 		if not country is None: result = [i for i in result if i[Language.Country] == country]
 		return result
+
+	@classmethod
+	def codes(self, code = CodeDefault, universal = True, frequency = None, country = None):
+		result = self.languages(universal = universal, frequency = frequency, country = country)
+		return [i[Language.Code][code] for i in result]
 
 	@classmethod
 	def variations(self):
@@ -2008,6 +2025,7 @@ class Country(object):
 
 	Code				= 'code'
 	Name				= 'name'
+	Frequency			= 'frequency'
 	Language			= 'language'
 
 	Disabled			= 'none'
@@ -2023,6 +2041,13 @@ class Country(object):
 	CodeQuaternary		= 3 # ISO Numeric
 	CodeDefault			= CodePrimary
 
+	CodeUnitedStates	= 'us'
+
+	FrequencyCommon		= 3		# Big countries that are independent.
+	FrequencyOccasional	= 2		# Smaller countries that are still independent.
+	FrequencyUncommon	= 1		# Minor territories, islands, principalities, commonwealth, or other states that or not fully independent.
+	FrequencyNone		= 0		# Not an official country or not a country anymore.
+
 	LanguagePrimary		= 0
 	LanguageSecondary	= 1
 	LanguageTertiary	= 2
@@ -2036,265 +2061,273 @@ class Country(object):
 	UniversalNumber		= -1
 
 	Countries			= (
-		{ Name : [UniversalName],									Code : [UniversalCode, UniversalCode, UniversalCode, UniversalNumber],	Language : [UniversalLanguage] },
-		{ Name : ['Andorra'],										Code : ['ad', 'and', 'an', 20],		Language : ['ca'] },
-		{ Name : ['United Arab Emirates'],							Code : ['ae', 'are', 'ae', 784],	Language : ['ar', 'fa', 'en', 'hi', 'ur'] },
-		{ Name : ['Afghanistan'],									Code : ['af', 'afg', 'af', 4],		Language : ['fa', 'ps', 'uz', 'tk'] },
-		{ Name : ['Antigua and Barbuda'],							Code : ['ag', 'atg', 'ac', 28],		Language : ['en'] },
-		{ Name : ['Anguilla'],										Code : ['ai', 'aia', 'av', 660],	Language : ['en'] },
-		{ Name : ['Albania'],										Code : ['al', 'alb', 'al', 8],		Language : ['sq', 'el'] },
-		{ Name : ['Armenia'],										Code : ['am', 'arm', 'am', 51],		Language : ['hy'] },
-		{ Name : ['Angola'],										Code : ['ao', 'ago', 'ao', 24],		Language : ['pt'] },
-		{ Name : ['Antarctica'],									Code : ['aq', 'ata', 'ay', 10],		Language : [] },
-		{ Name : ['Argentina'],										Code : ['ar', 'arg', 'ar', 32],		Language : ['es', 'en', 'it', 'de', 'fr', 'gn'] },
-		{ Name : ['American Samoa'],								Code : ['as', 'asm', 'aq', 16],		Language : ['en', 'sm', 'to'] },
-		{ Name : ['Austria'],										Code : ['at', 'aut', 'au', 40],		Language : ['de', 'hr', 'hu', 'sl'] },
-		{ Name : ['Australia'],										Code : ['au', 'aus', 'as', 36],		Language : ['en'] },
-		{ Name : ['Aruba'],											Code : ['aw', 'abw', 'aa', 533],	Language : ['nl', 'es', 'en'] },
-		{ Name : ['Aland Islands'],									Code : ['ax', 'ala', None, 248],	Language : ['sv'] },
-		{ Name : ['Azerbaijan'],									Code : ['az', 'aze', 'aj', 31],		Language : ['az', 'ru', 'hy'] },
-		{ Name : ['Bosnia and Herzegovina'],						Code : ['ba', 'bih', 'bk', 70],		Language : ['bs', 'hr', 'sr'] },
-		{ Name : ['Barbados'],										Code : ['bb', 'brb', 'bb', 52],		Language : ['en'] },
-		{ Name : ['Bangladesh'],									Code : ['bd', 'bgd', 'bg', 50],		Language : ['bn', 'en'] },
-		{ Name : ['Belgium'],										Code : ['be', 'bel', 'be', 56],		Language : ['nl', 'fr', 'de'] },
-		{ Name : ['Burkina Faso'],									Code : ['bf', 'bfa', 'uv', 854],	Language : ['fr'] },
-		{ Name : ['Bulgaria'],										Code : ['bg', 'bgr', 'bu', 100],	Language : ['bg', 'tr'] },
-		{ Name : ['Bahrain'],										Code : ['bh', 'bhr', 'ba', 48],		Language : ['ar', 'en', 'fa', 'ur'] },
-		{ Name : ['Burundi'],										Code : ['bi', 'bdi', 'by', 108],	Language : ['fr', 'rn'] },
-		{ Name : ['Benin'],											Code : ['bj', 'ben', 'bn', 204],	Language : ['fr'] },
-		{ Name : ['Saint Barthelemy'],								Code : ['bl', 'blm', 'tb', 652],	Language : ['fr'] },
-		{ Name : ['Bermuda'],										Code : ['bm', 'bmu', 'bd', 60],		Language : ['en', 'pt'] },
-		{ Name : ['Brunei'],										Code : ['bn', 'brn', 'bx', 96],		Language : ['ms', 'en'] },
-		{ Name : ['Bolivia'],										Code : ['bo', 'bol', 'bl', 68],		Language : ['es', 'qu', 'ay'] },
-		{ Name : ['Bonaire, Saint Eustatius and Saba'],				Code : ['bq', 'bes', None, 535],	Language : ['nl', 'en'] },
-		{ Name : ['Brazil'],										Code : ['br', 'bra', 'br', 76],		Language : ['pt', 'es', 'en', 'fr'] },
-		{ Name : ['Bahamas'],										Code : ['bs', 'bhs', 'bf', 44],		Language : ['en'] },
-		{ Name : ['Bhutan'],										Code : ['bt', 'btn', 'bt', 64],		Language : ['dz'] },
-		{ Name : ['Bouvet Island'],									Code : ['bv', 'bvt', 'bv', 74],		Language : [] },
-		{ Name : ['Botswana'],										Code : ['bw', 'bwa', 'bc', 72],		Language : ['en', 'tn'] },
-		{ Name : ['Belarus'],										Code : ['by', 'blr', 'bo', 112],	Language : ['be', 'ru'] },
-		{ Name : ['Belize'],										Code : ['bz', 'blz', 'bh', 84],		Language : ['en', 'es'] },
-		{ Name : ['Canada'],										Code : ['ca', 'can', 'ca', 124],	Language : ['en', 'fr', 'iu'] },
-		{ Name : ['Cocos Islands'],									Code : ['cc', 'cck', 'ck', 166],	Language : ['ms', 'en'] },
-		{ Name : ['Democratic Republic of the Congo'],				Code : ['cd', 'cod', 'cg', 180],	Language : ['fr', 'ln', 'kg'] },
-		{ Name : ['Central African Republic'],						Code : ['cf', 'caf', 'ct', 140],	Language : ['fr', 'sg', 'ln', 'kg'] },
-		{ Name : ['Republic of the Congo'],							Code : ['cg', 'cog', 'cf', 178],	Language : ['fr', 'kg', 'ln'] },
-		{ Name : ['Switzerland'],									Code : ['ch', 'che', 'sz', 756],	Language : ['de', 'fr', 'it', 'rm'] },
-		{ Name : ['Ivory Coast'],									Code : ['ci', 'civ', 'iv', 384],	Language : ['fr'] },
-		{ Name : ['Cook Islands'],									Code : ['ck', 'cok', 'cw', 184],	Language : ['en', 'mi'] },
-		{ Name : ['Chile'],											Code : ['cl', 'chl', 'ci', 152],	Language : ['es'] },
-		{ Name : ['Cameroon'],										Code : ['cm', 'cmr', 'cm', 120],	Language : ['en', 'fr'] },
-		{ Name : ['China'],											Code : ['cn', 'chn', 'ch', 156],	Language : ['zh', 'ug', 'za'] },
-		{ Name : ['Colombia'],										Code : ['co', 'col', 'co', 170],	Language : ['es'] },
-		{ Name : ['Costa Rica'],									Code : ['cr', 'cri', 'cs', 188],	Language : ['es', 'en'] },
-		{ Name : ['Cuba'],											Code : ['cu', 'cub', 'cu', 192],	Language : ['es'] },
-		{ Name : ['Cape Verde'],									Code : ['cv', 'cpv', 'cv', 132],	Language : ['pt'] },
-		{ Name : ['Curacao'],										Code : ['cw', 'cuw', 'uc', 531],	Language : ['nl'] },
-		{ Name : ['Christmas Island'],								Code : ['cx', 'cxr', 'kt', 162],	Language : ['en', 'zh', 'ms'] },
-		{ Name : ['Cyprus'],										Code : ['cy', 'cyp', 'cy', 196],	Language : ['el', 'tr', 'en'] },
-		{ Name : ['Czech Republic'],								Code : ['cz', 'cze', 'ez', 203],	Language : ['cs', 'sk'] },
-		{ Name : ['Germany'],										Code : ['de', 'deu', 'gm', 276],	Language : ['de'] },
-		{ Name : ['Djibouti'],										Code : ['dj', 'dji', 'dj', 262],	Language : ['fr', 'ar', 'so', 'aa'] },
-		{ Name : ['Denmark'],										Code : ['dk', 'dnk', 'da', 208],	Language : ['da', 'en', 'fo', 'de'] },
-		{ Name : ['Dominica'],										Code : ['dm', 'dma', 'do', 212],	Language : ['en'] },
-		{ Name : ['Dominican Republic'],							Code : ['do', 'dom', 'dr', 214],	Language : ['es'] },
-		{ Name : ['Algeria'],										Code : ['dz', 'dza', 'ag', 12],		Language : ['ar'] },
-		{ Name : ['Ecuador'],										Code : ['ec', 'ecu', 'ec', 218],	Language : ['es'] },
-		{ Name : ['Estonia'],										Code : ['ee', 'est', 'en', 233],	Language : ['et', 'ru'] },
-		{ Name : ['Egypt'],											Code : ['eg', 'egy', 'eg', 818],	Language : ['ar', 'en', 'fr'] },
-		{ Name : ['Western Sahara'],								Code : ['eh', 'esh', 'wi', 732],	Language : ['ar'] },
-		{ Name : ['Eritrea'],										Code : ['er', 'eri', 'er', 232],	Language : ['aa', 'ar', 'ti'] },
-		{ Name : ['Spain'],											Code : ['es', 'esp', 'sp', 724],	Language : ['es', 'ca', 'gl', 'eu', 'oc'] },
-		{ Name : ['Ethiopia'],										Code : ['et', 'eth', 'et', 231],	Language : ['am', 'en', 'om', 'ti', 'so'] },
-		{ Name : ['Finland'],										Code : ['fi', 'fin', 'fi', 246],	Language : ['fi', 'sv'] },
-		{ Name : ['Fiji'],											Code : ['fj', 'fji', 'fj', 242],	Language : ['en', 'fj'] },
-		{ Name : ['Falkland Islands'],								Code : ['fk', 'flk', 'fk', 238],	Language : ['en'] },
-		{ Name : ['Micronesia'],									Code : ['fm', 'fsm', 'fm', 583],	Language : ['en'] },
-		{ Name : ['Faroe Islands'],									Code : ['fo', 'fro', 'fo', 234],	Language : ['fo', 'da'] },
-		{ Name : ['France'],										Code : ['fr', 'fra', 'fr', 250],	Language : ['fr', 'br', 'co', 'ca', 'eu', 'oc'] },
-		{ Name : ['Gabon'],											Code : ['ga', 'gab', 'gb', 266],	Language : ['fr'] },
-		{ Name : ['United Kingdom'],								Code : ['gb', 'gbr', 'uk', 826],	Language : ['en', 'cy', 'gd'] },
-		{ Name : ['Grenada'],										Code : ['gd', 'grd', 'gj', 308],	Language : ['en'] },
-		{ Name : ['Georgia'],										Code : ['ge', 'geo', 'gg', 268],	Language : ['ka', 'ru', 'hy', 'az'] },
-		{ Name : ['French Guiana'],									Code : ['gf', 'guf', 'fg', 254],	Language : ['fr'] },
-		{ Name : ['Guernsey'],										Code : ['gg', 'ggy', 'gk', 831],	Language : ['en', 'fr'] },
-		{ Name : ['Ghana'],											Code : ['gh', 'gha', 'gh', 288],	Language : ['en', 'ak', 'ee', 'tw'] },
-		{ Name : ['Gibraltar'],										Code : ['gi', 'gib', 'gi', 292],	Language : ['en', 'es', 'it', 'pt'] },
-		{ Name : ['Greenland'],										Code : ['gl', 'grl', 'gl', 304],	Language : ['kl', 'da', 'en'] },
-		{ Name : ['Gambia'],										Code : ['gm', 'gmb', 'ga', 270],	Language : ['en', 'wo', 'ff'] },
-		{ Name : ['Guinea'],										Code : ['gn', 'gin', 'gv', 324],	Language : ['fr'] },
-		{ Name : ['Guadeloupe'],									Code : ['gp', 'glp', 'gp', 312],	Language : ['fr'] },
-		{ Name : ['Equatorial Guinea'],								Code : ['gq', 'gnq', 'ek', 226],	Language : ['es', 'fr'] },
-		{ Name : ['Greece'],										Code : ['gr', 'grc', 'gr', 300],	Language : ['el', 'en', 'fr'] },
-		{ Name : ['South Georgia and the South Sandwich Islands'],	Code : ['gs', 'sgs', 'sx', 239],	Language : ['en'] },
-		{ Name : ['Guatemala'],										Code : ['gt', 'gtm', 'gt', 320],	Language : ['es'] },
-		{ Name : ['Guam'],											Code : ['gu', 'gum', 'gq', 316],	Language : ['en', 'ch'] },
-		{ Name : ['Guinea-Bissau'],									Code : ['gw', 'gnb', 'pu', 624],	Language : ['pt'] },
-		{ Name : ['Guyana'],										Code : ['gy', 'guy', 'gy', 328],	Language : ['en'] },
-		{ Name : ['Hong Kong'],										Code : ['hk', 'hkg', 'hk', 344],	Language : ['zh', 'zh', 'en'] },
-		{ Name : ['Heard Island and McDonald Islands'],				Code : ['hm', 'hmd', 'hm', 334],	Language : [] },
-		{ Name : ['Honduras'],										Code : ['hn', 'hnd', 'ho', 340],	Language : ['es'] },
-		{ Name : ['Croatia'],										Code : ['hr', 'hrv', 'hr', 191],	Language : ['hr', 'sr'] },
-		{ Name : ['Haiti'],											Code : ['ht', 'hti', 'ha', 332],	Language : ['ht', 'fr'] },
-		{ Name : ['Hungary'],										Code : ['hu', 'hun', 'hu', 348],	Language : ['hu'] },
-		{ Name : ['Indonesia'],										Code : ['id', 'idn', 'id', 360],	Language : ['id', 'en', 'nl', 'jv'] },
-		{ Name : ['Ireland'],										Code : ['ie', 'irl', 'ei', 372],	Language : ['en', 'ga'] },
-		{ Name : ['Israel'],										Code : ['il', 'isr', 'is', 376],	Language : ['he', 'ar', 'en'] },
-		{ Name : ['Isle of Man'],									Code : ['im', 'imn', 'im', 833],	Language : ['en', 'gv'] },
-		{ Name : ['India'],											Code : ['in', 'ind', 'in', 356],	Language : ['en', 'hi', 'bn', 'te', 'mr', 'ta', 'ur', 'gu', 'kn', 'ml', 'or', 'pa', 'as', 'bh', 'ks', 'ne', 'sd', 'sa', 'fr'] },
-		{ Name : ['British Indian Ocean Territory'],				Code : ['io', 'iot', 'io', 86],		Language : ['en'] },
-		{ Name : ['Iraq'],											Code : ['iq', 'irq', 'iz', 368],	Language : ['ar', 'ku', 'hy'] },
-		{ Name : ['Iran'],											Code : ['ir', 'irn', 'ir', 364],	Language : ['fa', 'ku'] },
-		{ Name : ['Iceland'],										Code : ['is', 'isl', 'ic', 352],	Language : ['is', 'en', 'de', 'da', 'sv', 'no'] },
-		{ Name : ['Italy'],											Code : ['it', 'ita', 'it', 380],	Language : ['it', 'de', 'fr', 'sc', 'ca', 'co', 'sl'] },
-		{ Name : ['Jersey'],										Code : ['je', 'jey', 'je', 832],	Language : ['en', 'pt'] },
-		{ Name : ['Jamaica'],										Code : ['jm', 'jam', 'jm', 388],	Language : ['en'] },
-		{ Name : ['Jordan'],										Code : ['jo', 'jor', 'jo', 400],	Language : ['ar', 'en'] },
-		{ Name : ['Japan'],											Code : ['jp', 'jpn', 'ja', 392],	Language : ['ja'] },
-		{ Name : ['Kenya'],											Code : ['ke', 'ken', 'ke', 404],	Language : ['en', 'sw'] },
-		{ Name : ['Kyrgyzstan'],									Code : ['kg', 'kgz', 'kg', 417],	Language : ['ky', 'uz', 'ru'] },
-		{ Name : ['Cambodia'],										Code : ['kh', 'khm', 'cb', 116],	Language : ['km', 'fr', 'en'] },
-		{ Name : ['Kiribati'],										Code : ['ki', 'kir', 'kr', 296],	Language : ['en'] },
-		{ Name : ['Comoros'],										Code : ['km', 'com', 'cn', 174],	Language : ['ar', 'fr'] },
-		{ Name : ['Saint Kitts and Nevis'],							Code : ['kn', 'kna', 'sc', 659],	Language : ['en'] },
-		{ Name : ['North Korea'],									Code : ['kp', 'prk', 'kn', 408],	Language : ['ko'] },
-		{ Name : ['South Korea'],									Code : ['kr', 'kor', 'ks', 410],	Language : ['ko', 'en'] },
-		{ Name : ['Kosovo'],										Code : ['xk', 'xkx', 'kv', 0],		Language : ['sq', 'sr'] },
-		{ Name : ['Kuwait'],										Code : ['kw', 'kwt', 'ku', 414],	Language : ['ar', 'en'] },
-		{ Name : ['Cayman Islands'],								Code : ['ky', 'cym', 'cj', 136],	Language : ['en'] },
-		{ Name : ['Kazakhstan'],									Code : ['kz', 'kaz', 'kz', 398],	Language : ['kk', 'ru'] },
-		{ Name : ['Laos'],											Code : ['la', 'lao', 'la', 418],	Language : ['lo', 'fr', 'en'] },
-		{ Name : ['Lebanon'],										Code : ['lb', 'lbn', 'le', 422],	Language : ['ar', 'fr', 'en', 'hy'] },
-		{ Name : ['Saint Lucia'],									Code : ['lc', 'lca', 'st', 662],	Language : ['en'] },
-		{ Name : ['Liechtenstein'],									Code : ['li', 'lie', 'ls', 438],	Language : ['de'] },
-		{ Name : ['Sri Lanka'],										Code : ['lk', 'lka', 'ce', 144],	Language : ['si', 'ta', 'en'] },
-		{ Name : ['Liberia'],										Code : ['lr', 'lbr', 'li', 430],	Language : ['en'] },
-		{ Name : ['Lesotho'],										Code : ['ls', 'lso', 'lt', 426],	Language : ['en', 'st', 'zu', 'xh'] },
-		{ Name : ['Lithuania'],										Code : ['lt', 'ltu', 'lh', 440],	Language : ['lt', 'ru', 'pl'] },
-		{ Name : ['Luxembourg'],									Code : ['lu', 'lux', 'lu', 442],	Language : ['lb', 'de', 'fr'] },
-		{ Name : ['Latvia'],										Code : ['lv', 'lva', 'lg', 428],	Language : ['lv', 'ru', 'lt'] },
-		{ Name : ['Libya'],											Code : ['ly', 'lby', 'ly', 434],	Language : ['ar', 'it', 'en'] },
-		{ Name : ['Morocco'],										Code : ['ma', 'mar', 'mo', 504],	Language : ['ar', 'fr'] },
-		{ Name : ['Monaco'],										Code : ['mc', 'mco', 'mn', 492],	Language : ['fr', 'en', 'it'] },
-		{ Name : ['Moldova'],										Code : ['md', 'mda', 'md', 498],	Language : ['ro', 'ru', 'tr'] },
-		{ Name : ['Montenegro'],									Code : ['me', 'mne', 'mj', 499],	Language : ['sr', 'hu', 'bs', 'sq', 'hr'] },
-		{ Name : ['Saint Martin'],									Code : ['mf', 'maf', 'rn', 663],	Language : ['fr'] },
-		{ Name : ['Madagascar'],									Code : ['mg', 'mdg', 'ma', 450],	Language : ['fr', 'mg'] },
-		{ Name : ['Marshall Islands'],								Code : ['mh', 'mhl', 'rm', 584],	Language : ['mh', 'en'] },
-		{ Name : ['Macedonia'],										Code : ['mk', 'mkd', 'mk', 807],	Language : ['mk', 'sq', 'tr', 'sr'] },
-		{ Name : ['Mali'],											Code : ['ml', 'mli', 'ml', 466],	Language : ['fr', 'bm'] },
-		{ Name : ['Myanmar'],										Code : ['mm', 'mmr', 'bm', 104],	Language : ['my'] },
-		{ Name : ['Mongolia'],										Code : ['mn', 'mng', 'mg', 496],	Language : ['mn', 'ru'] },
-		{ Name : ['Macao'],											Code : ['mo', 'mac', 'mc', 446],	Language : ['zh', 'zh', 'pt'] },
-		{ Name : ['Northern Mariana Islands'],						Code : ['mp', 'mnp', 'cq', 580],	Language : ['tl', 'zh', 'ch', 'en'] },
-		{ Name : ['Martinique'],									Code : ['mq', 'mtq', 'mb', 474],	Language : ['fr'] },
-		{ Name : ['Mauritania'],									Code : ['mr', 'mrt', 'mr', 478],	Language : ['ar', 'fr', 'wo'] },
-		{ Name : ['Montserrat'],									Code : ['ms', 'msr', 'mh', 500],	Language : ['en'] },
-		{ Name : ['Malta'],											Code : ['mt', 'mlt', 'mt', 470],	Language : ['mt', 'en'] },
-		{ Name : ['Mauritius'],										Code : ['mu', 'mus', 'mp', 480],	Language : ['en', 'fr'] },
-		{ Name : ['Maldives'],										Code : ['mv', 'mdv', 'mv', 462],	Language : ['dv', 'en'] },
-		{ Name : ['Malawi'],										Code : ['mw', 'mwi', 'mi', 454],	Language : ['ny'] },
-		{ Name : ['Mexico'],										Code : ['mx', 'mex', 'mx', 484],	Language : ['es'] },
-		{ Name : ['Malaysia'],										Code : ['my', 'mys', 'my', 458],	Language : ['ms', 'en', 'zh', 'ta', 'te', 'ml', 'pa', 'th'] },
-		{ Name : ['Mozambique'],									Code : ['mz', 'moz', 'mz', 508],	Language : ['pt'] },
-		{ Name : ['Namibia'],										Code : ['na', 'nam', 'wa', 516],	Language : ['en', 'af', 'de', 'hz'] },
-		{ Name : ['New Caledonia'],									Code : ['nc', 'ncl', 'nc', 540],	Language : ['fr'] },
-		{ Name : ['Niger'],											Code : ['ne', 'ner', 'ng', 562],	Language : ['fr', 'ha', 'kr'] },
-		{ Name : ['Norfolk Island'],								Code : ['nf', 'nfk', 'nf', 574],	Language : ['en'] },
-		{ Name : ['Nigeria'],										Code : ['ng', 'nga', 'ni', 566],	Language : ['en', 'ha', 'yo', 'ig', 'ff'] },
-		{ Name : ['Nicaragua'],										Code : ['ni', 'nic', 'nu', 558],	Language : ['es', 'en'] },
-		{ Name : ['Netherlands'],									Code : ['nl', 'nld', 'nl', 528],	Language : ['nl', 'fy'] },
-		{ Name : ['Norway'],										Code : ['no', 'nor', 'no', 578],	Language : ['no', 'nb', 'nn', 'se', 'fi'] },
-		{ Name : ['Nepal'],											Code : ['np', 'npl', 'np', 524],	Language : ['ne', 'en'] },
-		{ Name : ['Nauru'],											Code : ['nr', 'nru', 'nr', 520],	Language : ['na', 'en'] },
-		{ Name : ['Niue'],											Code : ['nu', 'niu', 'ne', 570],	Language : ['en'] },
-		{ Name : ['New Zealand'],									Code : ['nz', 'nzl', 'nz', 554],	Language : ['en', 'mi'] },
-		{ Name : ['Oman'],											Code : ['om', 'omn', 'mu', 512],	Language : ['ar', 'en', 'ur'] },
-		{ Name : ['Panama'],										Code : ['pa', 'pan', 'pm', 591],	Language : ['es', 'en'] },
-		{ Name : ['Peru'],											Code : ['pe', 'per', 'pe', 604],	Language : ['es', 'qu', 'ay'] },
-		{ Name : ['French Polynesia'],								Code : ['pf', 'pyf', 'fp', 258],	Language : ['fr', 'ty'] },
-		{ Name : ['Papua New Guinea'],								Code : ['pg', 'png', 'pp', 598],	Language : ['en', 'ho'] },
-		{ Name : ['Philippines'],									Code : ['ph', 'phl', 'rp', 608],	Language : ['tl', 'en'] },
-		{ Name : ['Pakistan'],										Code : ['pk', 'pak', 'pk', 586],	Language : ['ur', 'en', 'pa', 'sd', 'ps'] },
-		{ Name : ['Poland'],										Code : ['pl', 'pol', 'pl', 616],	Language : ['pl'] },
-		{ Name : ['Saint Pierre and Miquelon'],						Code : ['pm', 'spm', 'sb', 666],	Language : ['fr'] },
-		{ Name : ['Pitcairn'],										Code : ['pn', 'pcn', 'pc', 612],	Language : ['en'] },
-		{ Name : ['Puerto Rico'],									Code : ['pr', 'pri', 'rq', 630],	Language : ['en', 'es'] },
-		{ Name : ['Palestinian Territory'],							Code : ['ps', 'pse', 'we', 275],	Language : ['ar'] },
-		{ Name : ['Portugal'],										Code : ['pt', 'prt', 'po', 620],	Language : ['pt'] },
-		{ Name : ['Palau'],											Code : ['pw', 'plw', 'ps', 585],	Language : ['en', 'ja', 'zh'] },
-		{ Name : ['Paraguay'],										Code : ['py', 'pry', 'pa', 600],	Language : ['es', 'gn'] },
-		{ Name : ['Qatar'],											Code : ['qa', 'qat', 'qa', 634],	Language : ['ar', 'es'] },
-		{ Name : ['Reunion'],										Code : ['re', 'reu', 're', 638],	Language : ['fr'] },
-		{ Name : ['Romania'],										Code : ['ro', 'rou', 'ro', 642],	Language : ['ro', 'hu'] },
-		{ Name : ['Serbia'],										Code : ['rs', 'srb', 'ri', 688],	Language : ['sr', 'hu', 'bs'] },
-		{ Name : ['Russia'],										Code : ['ru', 'rus', 'rs', 643],	Language : ['ru', 'tt', 'kv', 'ce', 'cv', 'ba'] },
-		{ Name : ['Rwanda'],										Code : ['rw', 'rwa', 'rw', 646],	Language : ['rw', 'en', 'fr', 'sw'] },
-		{ Name : ['Saudi Arabia'],									Code : ['sa', 'sau', 'sa', 682],	Language : ['ar'] },
-		{ Name : ['Solomon Islands'],								Code : ['sb', 'slb', 'bp', 90],		Language : ['en'] },
-		{ Name : ['Seychelles'],									Code : ['sc', 'syc', 'se', 690],	Language : ['en', 'fr'] },
-		{ Name : ['Sudan'],											Code : ['sd', 'sdn', 'su', 729],	Language : ['ar', 'en'] },
-		{ Name : ['South Sudan'],									Code : ['ss', 'ssd', 'od', 728],	Language : ['en'] },
-		{ Name : ['Sweden'],										Code : ['se', 'swe', 'sw', 752],	Language : ['sv', 'se', 'fi'] },
-		{ Name : ['Singapore'],										Code : ['sg', 'sgp', 'sn', 702],	Language : ['en', 'ms', 'ta', 'zh'] },
-		{ Name : ['Saint Helena'],									Code : ['sh', 'shn', 'sh', 654],	Language : ['en'] },
-		{ Name : ['Slovenia'],										Code : ['si', 'svn', 'si', 705],	Language : ['sl', 'sh'] },
-		{ Name : ['Svalbard and Jan Mayen'],						Code : ['sj', 'sjm', 'sv', 744],	Language : ['no', 'ru'] },
-		{ Name : ['Slovakia'],										Code : ['sk', 'svk', 'lo', 703],	Language : ['sk', 'hu'] },
-		{ Name : ['Sierra Leone'],									Code : ['sl', 'sle', 'sl', 694],	Language : ['en'] },
-		{ Name : ['San Marino'],									Code : ['sm', 'smr', 'sm', 674],	Language : ['it'] },
-		{ Name : ['Senegal'],										Code : ['sn', 'sen', 'sg', 686],	Language : ['fr', 'wo'] },
-		{ Name : ['Somalia'],										Code : ['so', 'som', 'so', 706],	Language : ['so', 'ar', 'it', 'en'] },
-		{ Name : ['Suriname'],										Code : ['sr', 'sur', 'ns', 740],	Language : ['nl', 'en', 'jv'] },
-		{ Name : ['Sao Tome and Principe'],							Code : ['st', 'stp', 'tp', 678],	Language : ['pt'] },
-		{ Name : ['El Salvador'],									Code : ['sv', 'slv', 'es', 222],	Language : ['es'] },
-		{ Name : ['Sint Maarten'],									Code : ['sx', 'sxm', 'nn', 534],	Language : ['nl', 'en'] },
-		{ Name : ['Syria'],											Code : ['sy', 'syr', 'sy', 760],	Language : ['ar', 'ku', 'hy', 'fr', 'en'] },
-		{ Name : ['Eswatini'],										Code : ['sz', 'swz', 'wz', 748],	Language : ['en', 'ss'] },
-		{ Name : ['Turks and Caicos Islands'],						Code : ['tc', 'tca', 'tk', 796],	Language : ['en'] },
-		{ Name : ['Chad'],											Code : ['td', 'tcd', 'cd', 148],	Language : ['fr', 'ar'] },
-		{ Name : ['French Southern Territories'],					Code : ['tf', 'atf', 'fs', 260],	Language : ['fr'] },
-		{ Name : ['Togo'],											Code : ['tg', 'tgo', 'to', 768],	Language : ['fr', 'ee', 'ha'] },
-		{ Name : ['Thailand'],										Code : ['th', 'tha', 'th', 764],	Language : ['th', 'en'] },
-		{ Name : ['Tajikistan'],									Code : ['tj', 'tjk', 'ti', 762],	Language : ['tg', 'ru'] },
-		{ Name : ['Tokelau'],										Code : ['tk', 'tkl', 'tl', 772],	Language : ['en'] },
-		{ Name : ['East Timor'],									Code : ['tl', 'tls', 'tt', 626],	Language : ['pt', 'id', 'en'] },
-		{ Name : ['Turkmenistan'],									Code : ['tm', 'tkm', 'tx', 795],	Language : ['tk', 'ru', 'uz'] },
-		{ Name : ['Tunisia'],										Code : ['tn', 'tun', 'ts', 788],	Language : ['ar', 'fr'] },
-		{ Name : ['Tonga'],											Code : ['to', 'ton', 'tn', 776],	Language : ['to', 'en'] },
-		{ Name : ['Turkey'],										Code : ['tr', 'tur', 'tu', 792],	Language : ['tr', 'ku', 'az', 'av'] },
-		{ Name : ['Trinidad and Tobago'],							Code : ['tt', 'tto', 'td', 780],	Language : ['en', 'fr', 'es', 'zh'] },
-		{ Name : ['Tuvalu'],										Code : ['tv', 'tuv', 'tv', 798],	Language : ['en', 'sm'] },
-		{ Name : ['Taiwan'],										Code : ['tw', 'twn', 'tw', 158],	Language : ['zh', 'zh'] },
-		{ Name : ['Tanzania'],										Code : ['tz', 'tza', 'tz', 834],	Language : ['sw', 'en', 'ar'] },
-		{ Name : ['Ukraine'],										Code : ['ua', 'ukr', 'up', 804],	Language : ['uk', 'ru', 'pl', 'hu'] },
-		{ Name : ['Uganda'],										Code : ['ug', 'uga', 'ug', 800],	Language : ['en', 'lg', 'sw', 'ar'] },
-		{ Name : ['United States Minor Outlying Islands'],			Code : ['um', 'umi', None, 581],	Language : ['en'] },
-		{ Name : ['United States'],									Code : ['us', 'usa', 'us', 840],	Language : ['en', 'es', 'fr'] },
-		{ Name : ['Uruguay'],										Code : ['uy', 'ury', 'uy', 858],	Language : ['es'] },
-		{ Name : ['Uzbekistan'],									Code : ['uz', 'uzb', 'uz', 860],	Language : ['uz', 'ru', 'tg'] },
-		{ Name : ['Vatican'],										Code : ['va', 'vat', 'vt', 336],	Language : ['la', 'it', 'fr'] },
-		{ Name : ['Saint Vincent and the Grenadines'],				Code : ['vc', 'vct', 'vc', 670],	Language : ['en', 'fr'] },
-		{ Name : ['Venezuela'],										Code : ['ve', 'ven', 've', 862],	Language : ['es'] },
-		{ Name : ['British Virgin Islands'],						Code : ['vg', 'vgb', 'vi', 92],		Language : ['en'] },
-		{ Name : ['US Virgin Islands'],								Code : ['vi', 'vir', 'vq', 850],	Language : ['en'] },
-		{ Name : ['Vietnam'],										Code : ['vn', 'vnm', 'vm', 704],	Language : ['vi', 'en', 'fr', 'zh', 'km'] },
-		{ Name : ['Vanuatu'],										Code : ['vu', 'vut', 'nh', 548],	Language : ['bi', 'en', 'fr'] },
-		{ Name : ['Wallis and Futuna'],								Code : ['wf', 'wlf', 'wf', 876],	Language : ['fr'] },
-		{ Name : ['Samoa'],											Code : ['ws', 'wsm', 'ws', 882],	Language : ['sm', 'en'] },
-		{ Name : ['Yemen'],											Code : ['ye', 'yem', 'ym', 887],	Language : ['ar'] },
-		{ Name : ['Mayotte'],										Code : ['yt', 'myt', 'mf', 175],	Language : ['fr'] },
-		{ Name : ['South Africa'],									Code : ['za', 'zaf', 'sf', 710],	Language : ['zu', 'xh', 'af', 'en', 'tn', 'st', 'ts', 'ss', 've', 'nr'] },
-		{ Name : ['Zambia'],										Code : ['zm', 'zmb', 'za', 894],	Language : ['en', 'ny'] },
-		{ Name : ['Zimbabwe'],										Code : ['zw', 'zwe', 'zi', 716],	Language : ['en', 'sn', 'nr', 'nd'] },
-		{ Name : ['Serbia and Montenegro'],							Code : ['cs', 'scg', 'yi', 891],	Language : ['cu', 'hu', 'sq', 'sr'] },
-		{ Name : ['Netherlands Antilles'],							Code : ['an', 'ant', 'nt', 530],	Language : ['nl', 'en', 'es'] },
+		{ Name : [UniversalName],									Code : [UniversalCode, UniversalCode, UniversalCode, UniversalNumber], Language : [UniversalLanguage],	Frequency : FrequencyNone },
+		{ Name : ['Andorra'],										Code : ['ad', 'and', 'an', 20],		Language : ['ca'],										Frequency : FrequencyOccasional },
+		{ Name : ['United Arab Emirates'],							Code : ['ae', 'are', 'ae', 784],	Language : ['ar', 'fa', 'en', 'hi', 'ur'],				Frequency : FrequencyCommon },
+		{ Name : ['Afghanistan'],									Code : ['af', 'afg', 'af', 4],		Language : ['fa', 'ps', 'uz', 'tk'],					Frequency : FrequencyCommon },
+		{ Name : ['Antigua and Barbuda'],							Code : ['ag', 'atg', 'ac', 28],		Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Anguilla'],										Code : ['ai', 'aia', 'av', 660],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Albania'],										Code : ['al', 'alb', 'al', 8],		Language : ['sq', 'el'],								Frequency : FrequencyCommon },
+		{ Name : ['Armenia'],										Code : ['am', 'arm', 'am', 51],		Language : ['hy'],										Frequency : FrequencyCommon },
+		{ Name : ['Angola'],										Code : ['ao', 'ago', 'ao', 24],		Language : ['pt'],										Frequency : FrequencyCommon },
+		{ Name : ['Argentina'],										Code : ['ar', 'arg', 'ar', 32],		Language : ['es', 'en', 'it', 'de', 'fr', 'gn'],		Frequency : FrequencyCommon },
+		{ Name : ['American Samoa'],								Code : ['as', 'asm', 'aq', 16],		Language : ['en', 'sm', 'to'],							Frequency : FrequencyUncommon },
+		{ Name : ['Austria'],										Code : ['at', 'aut', 'au', 40],		Language : ['de', 'hr', 'hu', 'sl'],					Frequency : FrequencyCommon },
+		{ Name : ['Australia'],										Code : ['au', 'aus', 'as', 36],		Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['Aruba'],											Code : ['aw', 'abw', 'aa', 533],	Language : ['nl', 'es', 'en'],							Frequency : FrequencyUncommon },
+		{ Name : ['Aland Islands'],									Code : ['ax', 'ala', None, 248],	Language : ['sv'],										Frequency : FrequencyUncommon },
+		{ Name : ['Azerbaijan'],									Code : ['az', 'aze', 'aj', 31],		Language : ['az', 'ru', 'hy'],							Frequency : FrequencyCommon },
+		{ Name : ['Bosnia and Herzegovina'],						Code : ['ba', 'bih', 'bk', 70],		Language : ['bs', 'hr', 'sr'],							Frequency : FrequencyCommon },
+		{ Name : ['Barbados'],										Code : ['bb', 'brb', 'bb', 52],		Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Bangladesh'],									Code : ['bd', 'bgd', 'bg', 50],		Language : ['bn', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Belgium'],										Code : ['be', 'bel', 'be', 56],		Language : ['nl', 'fr', 'de'],							Frequency : FrequencyCommon },
+		{ Name : ['Burkina Faso'],									Code : ['bf', 'bfa', 'uv', 854],	Language : ['fr'],										Frequency : FrequencyCommon },
+		{ Name : ['Bulgaria'],										Code : ['bg', 'bgr', 'bu', 100],	Language : ['bg', 'tr'],								Frequency : FrequencyCommon },
+		{ Name : ['Bahrain'],										Code : ['bh', 'bhr', 'ba', 48],		Language : ['ar', 'en', 'fa', 'ur'],					Frequency : FrequencyOccasional },
+		{ Name : ['Burundi'],										Code : ['bi', 'bdi', 'by', 108],	Language : ['fr', 'rn'],								Frequency : FrequencyCommon },
+		{ Name : ['Benin'],											Code : ['bj', 'ben', 'bn', 204],	Language : ['fr'],										Frequency : FrequencyCommon },
+		{ Name : ['Saint Barthelemy'],								Code : ['bl', 'blm', 'tb', 652],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Bermuda'],										Code : ['bm', 'bmu', 'bd', 60],		Language : ['en', 'pt'],								Frequency : FrequencyUncommon },
+		{ Name : ['Brunei'],										Code : ['bn', 'brn', 'bx', 96],		Language : ['ms', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Bolivia'],										Code : ['bo', 'bol', 'bl', 68],		Language : ['es', 'qu', 'ay'],							Frequency : FrequencyCommon },
+		{ Name : ['Caribbean Netherlands'],							Code : ['bq', 'bes', None, 535],	Language : ['nl', 'en'],								Frequency : FrequencyUncommon },
+		{ Name : ['Brazil'],										Code : ['br', 'bra', 'br', 76],		Language : ['pt', 'es', 'en', 'fr'],					Frequency : FrequencyCommon },
+		{ Name : ['Bahamas'],										Code : ['bs', 'bhs', 'bf', 44],		Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['Bhutan'],										Code : ['bt', 'btn', 'bt', 64],		Language : ['dz'],										Frequency : FrequencyOccasional },
+		{ Name : ['Bouvet Island'],									Code : ['bv', 'bvt', 'bv', 74],		Language : [],											Frequency : FrequencyUncommon },
+		{ Name : ['Botswana'],										Code : ['bw', 'bwa', 'bc', 72],		Language : ['en', 'tn'],								Frequency : FrequencyCommon },
+		{ Name : ['Belarus'],										Code : ['by', 'blr', 'bo', 112],	Language : ['be', 'ru'],								Frequency : FrequencyCommon },
+		{ Name : ['Belize'],										Code : ['bz', 'blz', 'bh', 84],		Language : ['en', 'es'],								Frequency : FrequencyOccasional },
+		{ Name : ['Canada'],										Code : ['ca', 'can', 'ca', 124],	Language : ['en', 'fr', 'iu'],							Frequency : FrequencyCommon },
+		{ Name : ['Cocos Islands'],									Code : ['cc', 'cck', 'ck', 166],	Language : ['ms', 'en'],								Frequency : FrequencyUncommon },
+		{ Name : ['Democratic Republic of the Congo'],				Code : ['cd', 'cod', 'cg', 180],	Language : ['fr', 'ln', 'kg'],							Frequency : FrequencyCommon },
+		{ Name : ['Central African Republic'],						Code : ['cf', 'caf', 'ct', 140],	Language : ['fr', 'sg', 'ln', 'kg'],					Frequency : FrequencyCommon },
+		{ Name : ['Republic of the Congo'],							Code : ['cg', 'cog', 'cf', 178],	Language : ['fr', 'kg', 'ln'],							Frequency : FrequencyCommon },
+		{ Name : ['Switzerland'],									Code : ['ch', 'che', 'sz', 756],	Language : ['de', 'fr', 'it', 'rm'],					Frequency : FrequencyCommon },
+		{ Name : ['Ivory Coast'],									Code : ['ci', 'civ', 'iv', 384],	Language : ['fr'],										Frequency : FrequencyCommon },
+		{ Name : ['Cook Islands'],									Code : ['ck', 'cok', 'cw', 184],	Language : ['en', 'mi'],								Frequency : FrequencyUncommon },
+		{ Name : ['Chile'],											Code : ['cl', 'chl', 'ci', 152],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Cameroon'],										Code : ['cm', 'cmr', 'cm', 120],	Language : ['en', 'fr'],								Frequency : FrequencyCommon },
+		{ Name : ['China'],											Code : ['cn', 'chn', 'ch', 156],	Language : ['zh', 'ug', 'za'],							Frequency : FrequencyCommon },
+		{ Name : ['Colombia'],										Code : ['co', 'col', 'co', 170],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Costa Rica'],									Code : ['cr', 'cri', 'cs', 188],	Language : ['es', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Cuba'],											Code : ['cu', 'cub', 'cu', 192],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Cape Verde'],									Code : ['cv', 'cpv', 'cv', 132],	Language : ['pt'],										Frequency : FrequencyOccasional },
+		{ Name : ['Curacao'],										Code : ['cw', 'cuw', 'uc', 531],	Language : ['nl'],										Frequency : FrequencyUncommon },
+		{ Name : ['Christmas Island'],								Code : ['cx', 'cxr', 'kt', 162],	Language : ['en', 'zh', 'ms'],							Frequency : FrequencyUncommon },
+		{ Name : ['Cyprus'],										Code : ['cy', 'cyp', 'cy', 196],	Language : ['el', 'tr', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Czech Republic'],								Code : ['cz', 'cze', 'ez', 203],	Language : ['cs', 'sk'],								Frequency : FrequencyCommon },
+		{ Name : ['Germany'],										Code : ['de', 'deu', 'gm', 276],	Language : ['de'],										Frequency : FrequencyCommon },
+		{ Name : ['Djibouti'],										Code : ['dj', 'dji', 'dj', 262],	Language : ['fr', 'ar', 'so', 'aa'],					Frequency : FrequencyCommon },
+		{ Name : ['Denmark'],										Code : ['dk', 'dnk', 'da', 208],	Language : ['da', 'en', 'fo', 'de'],					Frequency : FrequencyCommon },
+		{ Name : ['Dominica'],										Code : ['dm', 'dma', 'do', 212],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Dominican Republic'],							Code : ['do', 'dom', 'dr', 214],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Algeria'],										Code : ['dz', 'dza', 'ag', 12],		Language : ['ar'],										Frequency : FrequencyCommon },
+		{ Name : ['Ecuador'],										Code : ['ec', 'ecu', 'ec', 218],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Estonia'],										Code : ['ee', 'est', 'en', 233],	Language : ['et', 'ru'],								Frequency : FrequencyCommon },
+		{ Name : ['Egypt'],											Code : ['eg', 'egy', 'eg', 818],	Language : ['ar', 'en', 'fr'],							Frequency : FrequencyCommon },
+		{ Name : ['Western Sahara'],								Code : ['eh', 'esh', 'wi', 732],	Language : ['ar'],										Frequency : FrequencyUncommon },
+		{ Name : ['Eritrea'],										Code : ['er', 'eri', 'er', 232],	Language : ['aa', 'ar', 'ti'],							Frequency : FrequencyCommon },
+		{ Name : ['Spain'],											Code : ['es', 'esp', 'sp', 724],	Language : ['es', 'ca', 'gl', 'eu', 'oc'],				Frequency : FrequencyCommon },
+		{ Name : ['Ethiopia'],										Code : ['et', 'eth', 'et', 231],	Language : ['am', 'en', 'om', 'ti', 'so'],				Frequency : FrequencyCommon },
+		{ Name : ['Finland'],										Code : ['fi', 'fin', 'fi', 246],	Language : ['fi', 'sv'],								Frequency : FrequencyCommon },
+		{ Name : ['Fiji'],											Code : ['fj', 'fji', 'fj', 242],	Language : ['en', 'fj'],								Frequency : FrequencyOccasional },
+		{ Name : ['Falkland Islands'],								Code : ['fk', 'flk', 'fk', 238],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Faroe Islands'],									Code : ['fo', 'fro', 'fo', 234],	Language : ['fo', 'da'],								Frequency : FrequencyUncommon },
+		{ Name : ['France'],										Code : ['fr', 'fra', 'fr', 250],	Language : ['fr', 'br', 'co', 'ca', 'eu', 'oc'],		Frequency : FrequencyCommon },
+		{ Name : ['Gabon'],											Code : ['ga', 'gab', 'gb', 266],	Language : ['fr'],										Frequency : FrequencyCommon },
+		{ Name : ['United Kingdom'],								Code : ['gb', 'gbr', 'uk', 826],	Language : ['en', 'cy', 'gd'],							Frequency : FrequencyCommon },
+		{ Name : ['Grenada'],										Code : ['gd', 'grd', 'gj', 308],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Georgia'],										Code : ['ge', 'geo', 'gg', 268],	Language : ['ka', 'ru', 'hy', 'az'],					Frequency : FrequencyCommon },
+		{ Name : ['French Guiana'],									Code : ['gf', 'guf', 'fg', 254],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Guernsey'],										Code : ['gg', 'ggy', 'gk', 831],	Language : ['en', 'fr'],								Frequency : FrequencyUncommon },
+		{ Name : ['Ghana'],											Code : ['gh', 'gha', 'gh', 288],	Language : ['en', 'ak', 'ee', 'tw'],					Frequency : FrequencyCommon },
+		{ Name : ['Gibraltar'],										Code : ['gi', 'gib', 'gi', 292],	Language : ['en', 'es', 'it', 'pt'],					Frequency : FrequencyUncommon },
+		{ Name : ['Greenland'],										Code : ['gl', 'grl', 'gl', 304],	Language : ['kl', 'da', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Gambia'],										Code : ['gm', 'gmb', 'ga', 270],	Language : ['en', 'wo', 'ff'],							Frequency : FrequencyCommon },
+		{ Name : ['Guinea'],										Code : ['gn', 'gin', 'gv', 324],	Language : ['fr'],										Frequency : FrequencyCommon },
+		{ Name : ['Guadeloupe'],									Code : ['gp', 'glp', 'gp', 312],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Equatorial Guinea'],								Code : ['gq', 'gnq', 'ek', 226],	Language : ['es', 'fr'],								Frequency : FrequencyCommon },
+		{ Name : ['Greece'],										Code : ['gr', 'grc', 'gr', 300],	Language : ['el', 'en', 'fr'],							Frequency : FrequencyCommon },
+		{ Name : ['South Georgia and the South Sandwich Islands'],	Code : ['gs', 'sgs', 'sx', 239],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Guatemala'],										Code : ['gt', 'gtm', 'gt', 320],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Guam'],											Code : ['gu', 'gum', 'gq', 316],	Language : ['en', 'ch'],								Frequency : FrequencyUncommon },
+		{ Name : ['Guinea-Bissau'],									Code : ['gw', 'gnb', 'pu', 624],	Language : ['pt'],										Frequency : FrequencyOccasional },
+		{ Name : ['Guyana'],										Code : ['gy', 'guy', 'gy', 328],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Hong Kong'],										Code : ['hk', 'hkg', 'hk', 344],	Language : ['zh', 'zh', 'en'],							Frequency : FrequencyUncommon },
+		{ Name : ['Heard Island and McDonald Islands'],				Code : ['hm', 'hmd', 'hm', 334],	Language : [],											Frequency : FrequencyUncommon },
+		{ Name : ['Honduras'],										Code : ['hn', 'hnd', 'ho', 340],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Croatia'],										Code : ['hr', 'hrv', 'hr', 191],	Language : ['hr', 'sr'],								Frequency : FrequencyCommon },
+		{ Name : ['Haiti'],											Code : ['ht', 'hti', 'ha', 332],	Language : ['ht', 'fr'],								Frequency : FrequencyCommon },
+		{ Name : ['Hungary'],										Code : ['hu', 'hun', 'hu', 348],	Language : ['hu'],										Frequency : FrequencyCommon },
+		{ Name : ['Indonesia'],										Code : ['id', 'idn', 'id', 360],	Language : ['id', 'en', 'nl', 'jv'],					Frequency : FrequencyCommon },
+		{ Name : ['Ireland'],										Code : ['ie', 'irl', 'ei', 372],	Language : ['en', 'ga'],								Frequency : FrequencyCommon },
+		{ Name : ['Israel'],										Code : ['il', 'isr', 'is', 376],	Language : ['he', 'ar', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Isle of Man'],									Code : ['im', 'imn', 'im', 833],	Language : ['en', 'gv'],								Frequency : FrequencyUncommon },
+		{ Name : ['India'],											Code : ['in', 'ind', 'in', 356],	Language : ['en', 'hi', 'bn', 'te', 'mr', 'ta', 'ur', 'gu', 'kn', 'ml', 'or', 'pa', 'as', 'bh', 'ks', 'ne', 'sd', 'sa'],	Frequency : FrequencyCommon },
+		{ Name : ['British Indian Ocean Territory'],				Code : ['io', 'iot', 'io', 86],		Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Iraq'],											Code : ['iq', 'irq', 'iz', 368],	Language : ['ar', 'ku', 'hy'],							Frequency : FrequencyCommon },
+		{ Name : ['Iran'],											Code : ['ir', 'irn', 'ir', 364],	Language : ['fa', 'ku'],								Frequency : FrequencyCommon },
+		{ Name : ['Iceland'],										Code : ['is', 'isl', 'ic', 352],	Language : ['is', 'en', 'de', 'da', 'sv', 'no'],		Frequency : FrequencyCommon },
+		{ Name : ['Italy'],											Code : ['it', 'ita', 'it', 380],	Language : ['it', 'de', 'fr', 'sc', 'ca', 'co', 'sl'],	Frequency : FrequencyCommon },
+		{ Name : ['Jersey'],										Code : ['je', 'jey', 'je', 832],	Language : ['en', 'pt'],								Frequency : FrequencyUncommon },
+		{ Name : ['Jamaica'],										Code : ['jm', 'jam', 'jm', 388],	Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['Jordan'],										Code : ['jo', 'jor', 'jo', 400],	Language : ['ar', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Japan'],											Code : ['jp', 'jpn', 'ja', 392],	Language : ['ja'],										Frequency : FrequencyCommon },
+		{ Name : ['Kenya'],											Code : ['ke', 'ken', 'ke', 404],	Language : ['en', 'sw'],								Frequency : FrequencyCommon },
+		{ Name : ['Kyrgyzstan'],									Code : ['kg', 'kgz', 'kg', 417],	Language : ['ky', 'uz', 'ru'],							Frequency : FrequencyCommon },
+		{ Name : ['Cambodia'],										Code : ['kh', 'khm', 'cb', 116],	Language : ['km', 'fr', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Kiribati'],										Code : ['ki', 'kir', 'kr', 296],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Comoros'],										Code : ['km', 'com', 'cn', 174],	Language : ['ar', 'fr'],								Frequency : FrequencyOccasional },
+		{ Name : ['Saint Kitts and Nevis'],							Code : ['kn', 'kna', 'sc', 659],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['North Korea'],									Code : ['kp', 'prk', 'kn', 408],	Language : ['ko'],										Frequency : FrequencyCommon },
+		{ Name : ['South Korea'],									Code : ['kr', 'kor', 'ks', 410],	Language : ['ko', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Kosovo'],										Code : ['xk', 'xkx', 'kv', 0],		Language : ['sq', 'sr'],								Frequency : FrequencyOccasional },
+		{ Name : ['Kuwait'],										Code : ['kw', 'kwt', 'ku', 414],	Language : ['ar', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Cayman Islands'],								Code : ['ky', 'cym', 'cj', 136],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Kazakhstan'],									Code : ['kz', 'kaz', 'kz', 398],	Language : ['kk', 'ru'],								Frequency : FrequencyCommon },
+		{ Name : ['Laos'],											Code : ['la', 'lao', 'la', 418],	Language : ['lo', 'fr', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Lebanon'],										Code : ['lb', 'lbn', 'le', 422],	Language : ['ar', 'fr', 'en', 'hy'],					Frequency : FrequencyCommon },
+		{ Name : ['Saint Lucia'],									Code : ['lc', 'lca', 'st', 662],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Liechtenstein'],									Code : ['li', 'lie', 'ls', 438],	Language : ['de'],										Frequency : FrequencyOccasional },
+		{ Name : ['Sri Lanka'],										Code : ['lk', 'lka', 'ce', 144],	Language : ['si', 'ta', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Liberia'],										Code : ['lr', 'lbr', 'li', 430],	Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['Lesotho'],										Code : ['ls', 'lso', 'lt', 426],	Language : ['en', 'st', 'zu', 'xh'],					Frequency : FrequencyCommon },
+		{ Name : ['Lithuania'],										Code : ['lt', 'ltu', 'lh', 440],	Language : ['lt', 'ru', 'pl'],							Frequency : FrequencyCommon },
+		{ Name : ['Luxembourg'],									Code : ['lu', 'lux', 'lu', 442],	Language : ['lb', 'de', 'fr'],							Frequency : FrequencyCommon },
+		{ Name : ['Latvia'],										Code : ['lv', 'lva', 'lg', 428],	Language : ['lv', 'ru', 'lt'],							Frequency : FrequencyCommon },
+		{ Name : ['Libya'],											Code : ['ly', 'lby', 'ly', 434],	Language : ['ar', 'it', 'en'],							Frequency : FrequencyCommon },
+		{ Name : ['Morocco'],										Code : ['ma', 'mar', 'mo', 504],	Language : ['ar', 'fr'],								Frequency : FrequencyCommon },
+		{ Name : ['Monaco'],										Code : ['mc', 'mco', 'mn', 492],	Language : ['fr', 'en', 'it'],							Frequency : FrequencyOccasional },
+		{ Name : ['Moldova'],										Code : ['md', 'mda', 'md', 498],	Language : ['ro', 'ru', 'tr'],							Frequency : FrequencyCommon },
+		{ Name : ['Montenegro'],									Code : ['me', 'mne', 'mj', 499],	Language : ['sr', 'hu', 'bs', 'sq', 'hr'],				Frequency : FrequencyCommon },
+		{ Name : ['Saint Martin'],									Code : ['mf', 'maf', 'rn', 663],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Madagascar'],									Code : ['mg', 'mdg', 'ma', 450],	Language : ['fr', 'mg'],								Frequency : FrequencyCommon },
+		{ Name : ['Marshall Islands'],								Code : ['mh', 'mhl', 'rm', 584],	Language : ['mh', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Macedonia'],										Code : ['mk', 'mkd', 'mk', 807],	Language : ['mk', 'sq', 'tr', 'sr'],					Frequency : FrequencyCommon },
+		{ Name : ['Mali'],											Code : ['ml', 'mli', 'ml', 466],	Language : ['fr', 'bm'],								Frequency : FrequencyCommon },
+		{ Name : ['Myanmar'],										Code : ['mm', 'mmr', 'bm', 104],	Language : ['my'],										Frequency : FrequencyCommon },
+		{ Name : ['Mongolia'],										Code : ['mn', 'mng', 'mg', 496],	Language : ['mn', 'ru'],								Frequency : FrequencyCommon },
+		{ Name : ['Macao'],											Code : ['mo', 'mac', 'mc', 446],	Language : ['zh', 'zh', 'pt'],							Frequency : FrequencyUncommon },
+		{ Name : ['Northern Mariana Islands'],						Code : ['mp', 'mnp', 'cq', 580],	Language : ['tl', 'zh', 'ch', 'en'],					Frequency : FrequencyUncommon },
+		{ Name : ['Martinique'],									Code : ['mq', 'mtq', 'mb', 474],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Mauritania'],									Code : ['mr', 'mrt', 'mr', 478],	Language : ['ar', 'fr', 'wo'],							Frequency : FrequencyCommon },
+		{ Name : ['Montserrat'],									Code : ['ms', 'msr', 'mh', 500],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Malta'],											Code : ['mt', 'mlt', 'mt', 470],	Language : ['mt', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Mauritius'],										Code : ['mu', 'mus', 'mp', 480],	Language : ['en', 'fr'],								Frequency : FrequencyOccasional },
+		{ Name : ['Maldives'],										Code : ['mv', 'mdv', 'mv', 462],	Language : ['dv', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Malawi'],										Code : ['mw', 'mwi', 'mi', 454],	Language : ['ny'],										Frequency : FrequencyCommon },
+		{ Name : ['Mexico'],										Code : ['mx', 'mex', 'mx', 484],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Malaysia'],										Code : ['my', 'mys', 'my', 458],	Language : ['ms', 'en', 'zh', 'ta', 'te', 'ml', 'pa', 'th'],	Frequency : FrequencyCommon },
+		{ Name : ['Micronesia'],									Code : ['fm', 'fsm', 'fm', 583],	Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Mozambique'],									Code : ['mz', 'moz', 'mz', 508],	Language : ['pt'],										Frequency : FrequencyCommon },
+		{ Name : ['Namibia'],										Code : ['na', 'nam', 'wa', 516],	Language : ['en', 'af', 'de', 'hz'],					Frequency : FrequencyCommon },
+		{ Name : ['New Caledonia'],									Code : ['nc', 'ncl', 'nc', 540],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Niger'],											Code : ['ne', 'ner', 'ng', 562],	Language : ['fr', 'ha', 'kr'],							Frequency : FrequencyCommon },
+		{ Name : ['Norfolk Island'],								Code : ['nf', 'nfk', 'nf', 574],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Nigeria'],										Code : ['ng', 'nga', 'ni', 566],	Language : ['en', 'ha', 'yo', 'ig', 'ff'],				Frequency : FrequencyCommon },
+		{ Name : ['Nicaragua'],										Code : ['ni', 'nic', 'nu', 558],	Language : ['es', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Netherlands'],									Code : ['nl', 'nld', 'nl', 528],	Language : ['nl', 'fy'],								Frequency : FrequencyCommon },
+		{ Name : ['Norway'],										Code : ['no', 'nor', 'no', 578],	Language : ['no', 'nb', 'nn', 'se', 'fi'],				Frequency : FrequencyCommon },
+		{ Name : ['Nepal'],											Code : ['np', 'npl', 'np', 524],	Language : ['ne', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Nauru'],											Code : ['nr', 'nru', 'nr', 520],	Language : ['na', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Niue'],											Code : ['nu', 'niu', 'ne', 570],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['New Zealand'],									Code : ['nz', 'nzl', 'nz', 554],	Language : ['en', 'mi'],								Frequency : FrequencyCommon },
+		{ Name : ['Oman'],											Code : ['om', 'omn', 'mu', 512],	Language : ['ar', 'en', 'ur'],							Frequency : FrequencyCommon },
+		{ Name : ['Panama'],										Code : ['pa', 'pan', 'pm', 591],	Language : ['es', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Peru'],											Code : ['pe', 'per', 'pe', 604],	Language : ['es', 'qu', 'ay'],							Frequency : FrequencyCommon },
+		{ Name : ['French Polynesia'],								Code : ['pf', 'pyf', 'fp', 258],	Language : ['fr', 'ty'],								Frequency : FrequencyUncommon },
+		{ Name : ['Papua New Guinea'],								Code : ['pg', 'png', 'pp', 598],	Language : ['en', 'ho'],								Frequency : FrequencyOccasional },
+		{ Name : ['Philippines'],									Code : ['ph', 'phl', 'rp', 608],	Language : ['tl', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Pakistan'],										Code : ['pk', 'pak', 'pk', 586],	Language : ['ur', 'en', 'pa', 'sd', 'ps'],				Frequency : FrequencyCommon },
+		{ Name : ['Poland'],										Code : ['pl', 'pol', 'pl', 616],	Language : ['pl'],										Frequency : FrequencyCommon },
+		{ Name : ['Saint Pierre and Miquelon'],						Code : ['pm', 'spm', 'sb', 666],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Pitcairn'],										Code : ['pn', 'pcn', 'pc', 612],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Puerto Rico'],									Code : ['pr', 'pri', 'rq', 630],	Language : ['en', 'es'],								Frequency : FrequencyUncommon },
+		{ Name : ['Portugal'],										Code : ['pt', 'prt', 'po', 620],	Language : ['pt'],										Frequency : FrequencyCommon },
+		{ Name : ['Palau'],											Code : ['pw', 'plw', 'ps', 585],	Language : ['en', 'ja', 'zh'],							Frequency : FrequencyOccasional },
+		{ Name : ['Paraguay'],										Code : ['py', 'pry', 'pa', 600],	Language : ['es', 'gn'],								Frequency : FrequencyCommon },
+		{ Name : ['Qatar'],											Code : ['qa', 'qat', 'qa', 634],	Language : ['ar', 'es'],								Frequency : FrequencyCommon },
+		{ Name : ['Reunion'],										Code : ['re', 'reu', 're', 638],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Romania'],										Code : ['ro', 'rou', 'ro', 642],	Language : ['ro', 'hu'],								Frequency : FrequencyCommon },
+		{ Name : ['Serbia'],										Code : ['rs', 'srb', 'ri', 688],	Language : ['sr', 'hu', 'bs'],							Frequency : FrequencyCommon },
+		{ Name : ['Russia'],										Code : ['ru', 'rus', 'rs', 643],	Language : ['ru', 'tt', 'kv', 'ce', 'cv', 'ba'],		Frequency : FrequencyCommon },
+		{ Name : ['Rwanda'],										Code : ['rw', 'rwa', 'rw', 646],	Language : ['rw', 'en', 'fr', 'sw'],					Frequency : FrequencyCommon },
+		{ Name : ['Saudi Arabia'],									Code : ['sa', 'sau', 'sa', 682],	Language : ['ar'],										Frequency : FrequencyCommon },
+		{ Name : ['Solomon Islands'],								Code : ['sb', 'slb', 'bp', 90],		Language : ['en'],										Frequency : FrequencyOccasional },
+		{ Name : ['Seychelles'],									Code : ['sc', 'syc', 'se', 690],	Language : ['en', 'fr'],								Frequency : FrequencyOccasional },
+		{ Name : ['Sudan'],											Code : ['sd', 'sdn', 'su', 729],	Language : ['ar', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['South Sudan'],									Code : ['ss', 'ssd', 'od', 728],	Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['Sweden'],										Code : ['se', 'swe', 'sw', 752],	Language : ['sv', 'se', 'fi'],							Frequency : FrequencyCommon },
+		{ Name : ['Singapore'],										Code : ['sg', 'sgp', 'sn', 702],	Language : ['en', 'ms', 'ta', 'zh'],					Frequency : FrequencyOccasional },
+		{ Name : ['Saint Helena'],									Code : ['sh', 'shn', 'sh', 654],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Slovenia'],										Code : ['si', 'svn', 'si', 705],	Language : ['sl', 'sh'],								Frequency : FrequencyCommon },
+		{ Name : ['Svalbard and Jan Mayen'],						Code : ['sj', 'sjm', 'sv', 744],	Language : ['no', 'ru'],								Frequency : FrequencyUncommon },
+		{ Name : ['Slovakia'],										Code : ['sk', 'svk', 'lo', 703],	Language : ['sk', 'hu'],								Frequency : FrequencyCommon },
+		{ Name : ['Sierra Leone'],									Code : ['sl', 'sle', 'sl', 694],	Language : ['en'],										Frequency : FrequencyCommon },
+		{ Name : ['San Marino'],									Code : ['sm', 'smr', 'sm', 674],	Language : ['it'],										Frequency : FrequencyOccasional },
+		{ Name : ['Senegal'],										Code : ['sn', 'sen', 'sg', 686],	Language : ['fr', 'wo'],								Frequency : FrequencyCommon },
+		{ Name : ['Somalia'],										Code : ['so', 'som', 'so', 706],	Language : ['so', 'ar', 'it', 'en'],					Frequency : FrequencyCommon },
+		{ Name : ['Suriname'],										Code : ['sr', 'sur', 'ns', 740],	Language : ['nl', 'en', 'jv'],							Frequency : FrequencyOccasional },
+		{ Name : ['Sao Tome and Principe'],							Code : ['st', 'stp', 'tp', 678],	Language : ['pt'],										Frequency : FrequencyOccasional },
+		{ Name : ['El Salvador'],									Code : ['sv', 'slv', 'es', 222],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Sint Maarten'],									Code : ['sx', 'sxm', 'nn', 534],	Language : ['nl', 'en'],								Frequency : FrequencyUncommon },
+		{ Name : ['Syria'],											Code : ['sy', 'syr', 'sy', 760],	Language : ['ar', 'ku', 'hy', 'fr', 'en'],				Frequency : FrequencyCommon },
+		{ Name : ['Eswatini'],										Code : ['sz', 'swz', 'wz', 748],	Language : ['en', 'ss'],								Frequency : FrequencyCommon },
+		{ Name : ['Turks and Caicos Islands'],						Code : ['tc', 'tca', 'tk', 796],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Chad'],											Code : ['td', 'tcd', 'cd', 148],	Language : ['fr', 'ar'],								Frequency : FrequencyCommon },
+		{ Name : ['French Southern Territories'],					Code : ['tf', 'atf', 'fs', 260],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Togo'],											Code : ['tg', 'tgo', 'to', 768],	Language : ['fr', 'ee', 'ha'],							Frequency : FrequencyCommon },
+		{ Name : ['Thailand'],										Code : ['th', 'tha', 'th', 764],	Language : ['th', 'en'],								Frequency : FrequencyCommon },
+		{ Name : ['Tajikistan'],									Code : ['tj', 'tjk', 'ti', 762],	Language : ['tg', 'ru'],								Frequency : FrequencyCommon },
+		{ Name : ['Tokelau'],										Code : ['tk', 'tkl', 'tl', 772],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['East Timor'],									Code : ['tl', 'tls', 'tt', 626],	Language : ['pt', 'id', 'en'],							Frequency : FrequencyOccasional },
+		{ Name : ['Turkmenistan'],									Code : ['tm', 'tkm', 'tx', 795],	Language : ['tk', 'ru', 'uz'],							Frequency : FrequencyCommon },
+		{ Name : ['Tunisia'],										Code : ['tn', 'tun', 'ts', 788],	Language : ['ar', 'fr'],								Frequency : FrequencyCommon },
+		{ Name : ['Tonga'],											Code : ['to', 'ton', 'tn', 776],	Language : ['to', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Turkey'],										Code : ['tr', 'tur', 'tu', 792],	Language : ['tr', 'ku', 'az', 'av'],					Frequency : FrequencyCommon },
+		{ Name : ['Trinidad and Tobago'],							Code : ['tt', 'tto', 'td', 780],	Language : ['en', 'fr', 'es', 'zh'],					Frequency : FrequencyOccasional },
+		{ Name : ['Tuvalu'],										Code : ['tv', 'tuv', 'tv', 798],	Language : ['en', 'sm'],								Frequency : FrequencyOccasional },
+		{ Name : ['Taiwan'],										Code : ['tw', 'twn', 'tw', 158],	Language : ['zh', 'zh'],								Frequency : FrequencyCommon },
+		{ Name : ['Tanzania'],										Code : ['tz', 'tza', 'tz', 834],	Language : ['sw', 'en', 'ar'],							Frequency : FrequencyCommon },
+		{ Name : ['Ukraine'],										Code : ['ua', 'ukr', 'up', 804],	Language : ['uk', 'ru', 'pl', 'hu'],					Frequency : FrequencyCommon },
+		{ Name : ['Uganda'],										Code : ['ug', 'uga', 'ug', 800],	Language : ['en', 'lg', 'sw', 'ar'],					Frequency : FrequencyCommon },
+		{ Name : ['United States Minor Outlying Islands'],			Code : ['um', 'umi', None, 581],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['United States'],									Code : ['us', 'usa', 'us', 840],	Language : ['en', 'es', 'fr'],							Frequency : FrequencyCommon },
+		{ Name : ['Uruguay'],										Code : ['uy', 'ury', 'uy', 858],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['Uzbekistan'],									Code : ['uz', 'uzb', 'uz', 860],	Language : ['uz', 'ru', 'tg'],							Frequency : FrequencyCommon },
+		{ Name : ['Vatican'],										Code : ['va', 'vat', 'vt', 336],	Language : ['la', 'it', 'fr'],							Frequency : FrequencyOccasional },
+		{ Name : ['Saint Vincent and the Grenadines'],				Code : ['vc', 'vct', 'vc', 670],	Language : ['en', 'fr'],								Frequency : FrequencyOccasional },
+		{ Name : ['Venezuela'],										Code : ['ve', 'ven', 've', 862],	Language : ['es'],										Frequency : FrequencyCommon },
+		{ Name : ['British Virgin Islands'],						Code : ['vg', 'vgb', 'vi', 92],		Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['United States Virgin Islands'],					Code : ['vi', 'vir', 'vq', 850],	Language : ['en'],										Frequency : FrequencyUncommon },
+		{ Name : ['Vietnam'],										Code : ['vn', 'vnm', 'vm', 704],	Language : ['vi', 'en', 'fr', 'zh', 'km'],				Frequency : FrequencyCommon },
+		{ Name : ['Vanuatu'],										Code : ['vu', 'vut', 'nh', 548],	Language : ['bi', 'en', 'fr'],							Frequency : FrequencyOccasional },
+		{ Name : ['Wallis and Futuna'],								Code : ['wf', 'wlf', 'wf', 876],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['Samoa'],											Code : ['ws', 'wsm', 'ws', 882],	Language : ['sm', 'en'],								Frequency : FrequencyOccasional },
+		{ Name : ['Yemen'],											Code : ['ye', 'yem', 'ym', 887],	Language : ['ar'],										Frequency : FrequencyCommon },
+		{ Name : ['Mayotte'],										Code : ['yt', 'myt', 'mf', 175],	Language : ['fr'],										Frequency : FrequencyUncommon },
+		{ Name : ['South Africa'],									Code : ['za', 'zaf', 'sf', 710],	Language : ['zu', 'xh', 'af', 'en', 'tn', 'st', 'ts', 'ss', 've', 'nr'],	Frequency : FrequencyCommon },
+		{ Name : ['Zambia'],										Code : ['zm', 'zmb', 'za', 894],	Language : ['en', 'ny'],								Frequency : FrequencyCommon },
+		{ Name : ['Zimbabwe'],										Code : ['zw', 'zwe', 'zi', 716],	Language : ['en', 'sn', 'nr', 'nd'],					Frequency : FrequencyCommon },
+
+		{ Name : ['Serbia and Montenegro'],							Code : ['cs', 'scg', 'yi', 891],	Language : ['cu', 'hu', 'sq', 'sr'],					Frequency : FrequencyNone },
+		{ Name : ['Netherlands Antilles'],							Code : ['an', 'ant', 'nt', 530],	Language : ['nl', 'en', 'es'],							Frequency : FrequencyNone },
+		{ Name : ['Palestinia'],									Code : ['ps', 'pse', 'we', 275],	Language : ['ar'],										Frequency : FrequencyNone },
+		{ Name : ['Antarctica'],									Code : ['aq', 'ata', 'ay', 10],		Language : [],											Frequency : FrequencyNone },
 	)
 
 	@classmethod
-	def countries(self, universal = True, sort = None):
+	def countries(self, universal = True, frequency = None, sort = None):
 		if universal: result = Country.Countries
 		else: result = Country.Countries[1:]
+
+		if not frequency is None:
+			if frequency is True: frequency = [Country.FrequencyCommon, Country.FrequencyOccasional]
+			elif frequency is False: frequency = [Country.FrequencyUncommon]
+
+			if Tools.isArray(frequency): result = [i for i in result if i[Country.Frequency] in frequency]
+			elif Tools.isInteger(frequency): result = [i for i in result if i[Country.Frequency] >= frequency]
 
 		if sort:
 			if sort is True: sort = Country.Name
@@ -2374,11 +2407,11 @@ class Country(object):
 		else: return self.code(data = setting, code = code)
 
 	@classmethod
-	def settingsSelect(self, id = None, type = None, title = None, automatic = None, none = None):
+	def settingsSelect(self, id = None, type = None, title = None, automatic = None, none = None, frequency = None):
 		from lib.modules.interface import Dialog
 
 		current = Settings.getString(id)
-		countries = self.countries(universal = False, sort = Country.Name)
+		countries = self.countries(universal = False, frequency = frequency, sort = Country.Name)
 
 		countries = [i[Country.Name][Country.NameDefault] for i in countries]
 		if automatic: countries.insert(0, Country.Automatic.capitalize())
@@ -2411,11 +2444,12 @@ class Identifier(object):
 
 	@classmethod
 	def base(self, value, base = Base):
+		# https://stackoverflow.com/questions/2267362/how-to-convert-an-integer-to-a-string-in-any-base
 		if value == 0: return Identifier.Alphabet[0]
 		digits = []
 		while value:
 			digits.append(Identifier.Alphabet[int(value % base)])
-			value = int(value / base)
+			value //= base
 		digits.reverse()
 		return ''.join(digits)
 
@@ -3121,100 +3155,6 @@ class Thumbnail(object):
 		if not file == None:
 			File.delete(file, force = True)
 
-class Selection(object):
-
-	# Must be integers
-	TypeExclude = -1
-	TypeUndefined = 0
-	TypeInclude = 1
-
-class Kids(object):
-
-	Restriction7 = 0
-	Restriction13 = 1
-	Restriction16 = 2
-	Restriction18 = 3
-
-	@classmethod
-	def enabled(self):
-		return Settings.getBoolean('general.kids.enabled')
-
-	@classmethod
-	def restriction(self):
-		return Settings.getInteger('general.kids.restriction')
-
-	@classmethod
-	def password(self, hash = True):
-		password = Settings.getString('general.kids.password')
-		if hash and not(password == None or password == ''): password = Hash.md5(password).lower()
-		return password
-
-	@classmethod
-	def passwordEmpty(self):
-		password = self.password()
-		return password == None or password == ''
-
-	@classmethod
-	def verify(self, password):
-		return not self.enabled() or self.passwordEmpty() or password.lower() == self.password().lower()
-
-	@classmethod
-	def locked(self):
-		return Settings.getBoolean('general.kids.locked', cached = False) # Do not use the cached setting.
-
-	@classmethod
-	def lockable(self):
-		return not self.passwordEmpty() and not self.locked()
-
-	@classmethod
-	def unlockable(self):
-		return not self.passwordEmpty() and self.locked()
-
-	@classmethod
-	def lock(self):
-		if self.locked():
-			return True
-		else:
-			from lib.modules.interface import Dialog
-			Settings.set('general.kids.locked', True)
-			Dialog.confirm(title = 33438, message = 33445)
-			System.restart() # Kodi still keeps the old menus in cache (when going BACK). Clear them by restarting the addon. Must be AFTER showing the dialog.
-			return True
-
-	@classmethod
-	def unlock(self, internal = False):
-		if self.locked():
-			from lib.modules.interface import Dialog
-			password = self.password()
-			if password and not password == '':
-				match = Dialog.inputPassword(title = 33440, verify = password)
-				if not match:
-					Dialog.confirm(title = 33440, message = 33441)
-					return False
-			Settings.set('general.kids.locked', False)
-			if not internal: Dialog.confirm(title = 33438, message = 33444)
-			System.restart() # Kodi still keeps the old menus in cache (when going BACK). Clear them by restarting the addon. Must be AFTER showing the dialog.
-			return True
-		else:
-			return True
-
-	@classmethod
-	def allowed(self, certificate):
-		if certificate == None or certificate == '':
-			return False
-
-		certificate = certificate.lower().replace(' ', '').replace('-', '').replace('_', '').strip()
-		restriction = self.restriction()
-
-		if (certificate  == 'g' or certificate  == 'tvy'):
-			return True
-		elif (certificate == 'pg' or certificate == 'tvy7') and restriction >= 1:
-			return True
-		elif (certificate == 'pg13' or certificate == 'tvpg') and restriction >= 2:
-			return True
-		elif (certificate == 'r' or certificate == 'tv14') and restriction >= 3:
-			return True
-		return False
 
 class Converter(object):
 
@@ -3242,7 +3182,7 @@ class Converter(object):
 		return ''.join(numbers)
 
 	@classmethod
-	def boolean(self, value, string = False, none = False):
+	def boolean(self, value, string = False, none = False, default = False):
 		if none and value is None:
 			return value
 		elif string:
@@ -3253,10 +3193,15 @@ class Converter(object):
 			elif Tools.isInteger(value):
 				return value > 0
 			elif Tools.isString(value):
-				value = value.lower()
-				return value == 'true' or value == 'yes' or value == 't' or value == 'y' or value == '1'
+				lower = value.lower()
+				if default:
+					if lower == 'true' or lower == 'yes' or lower == 't' or lower == 'y' or lower == '1': return True
+					elif lower == 'false' or lower == 'no' or lower == 'f' or lower == 'n' or lower == '0': return False
+					else: return value
+				else:
+					return lower == 'true' or lower == 'yes' or lower == 't' or lower == 'y' or lower == '1'
 			else:
-				return False
+				return value if default else False
 
 	@classmethod
 	def dictionary(self, jsonData):
@@ -3458,6 +3403,85 @@ class Converter(object):
 			return data
 
 
+class Csv(object):
+
+	@classmethod
+	def decode(self, data = None, path = None, structured = False, header = False, delimiterColumn = ',', delimiterRow = None, delimiterQuote = '"', convertBoolean = True, convertInteger = True, convertFloat = True, convertList = True):
+		try:
+			# Do not use the native Python csv module.
+			# There are too many problems with IMDb exported lists:
+			#	1. Cannot deal with spaces in a single column (treats it like a delimiter).
+			#	2. IMDb only quotes a column if the data contains a comma itself. But a string with spaces that does not contain a comma, is not quoted.
+
+			replaceComma = '[GAIACOMMA]'
+			replaceQuote = '[GAIAQUOTE]'
+			replaceBreak = '[GAIABREAK]'
+
+			if path: data = File.readNow(path)
+
+			# Columns that are inside quotes and contain commas, should not be split.
+			# Eg: 2023,"Animation, Adventure, Comedy",90662,2023-05-27
+			# NB: Do this BEFORE splitting into rows, since there might be multiline columns, containing newlines and commas.
+			if delimiterQuote:
+				# Quotes within a column that is quoted are represented as double quotes.
+				# Also exclude if the double quotes are at the start/end of the column.
+				# Eg: 1,Action,123,"He made a ""reboot""",987
+				# Ignore internal BBcode brackets followed by quotes.
+				# Eg: 2011 short film ""[link=/title/tt2049400/]Beau[/link],"" which inspi
+				data = Regex.replace(data = data, expression = '(?<![^\]],)(%s%s)(?!,)' % (delimiterQuote, delimiterQuote), replacement = replaceQuote, group = None, all = True, cache = True)
+
+				# Both FlagMultiLines and FlagAllLines
+				# Eg: https://imdb.com/list/ls566661486/export
+				entries = Regex.extract(data = data, expression = '(?:^|(?<=,))\s*(\".*?\")(?:$|(?<=\"),)' , group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines | Regex.FlagAllLines, cache = True)
+				if entries:
+					for entry in entries:
+						data = data.replace(entry, entry.strip(delimiterQuote).replace(',', replaceComma).replace('\n', replaceBreak))
+
+			rows = data.splitlines() if delimiterRow is None else data.splitlines(delimiterRow)
+			rows = [row for row in rows if row] # Remove empty lines.
+			rows = [row.split(delimiterColumn) for row in rows]
+
+			multiline = set()
+			for row in rows:
+				for i in range(len(row)):
+					if replaceBreak in row[i]: multiline.add(i)
+
+			for row in rows:
+				for i in range(len(row)):
+					value = row[i].strip()
+					if convertInteger and value.isnumeric():
+						try: value = int(value)
+						except: pass
+					elif convertFloat and '.' in value and value.replace('.', '').isnumeric():
+						try: value = float(value)
+						except: pass
+					elif replaceComma in value and not i in multiline: # Do not split multiline descriptions, which might also contain commas.
+						if convertList: value = [j.strip() for j in value.split(replaceComma)]
+						else: value = value.replace(replaceComma, ',')
+					elif convertBoolean:
+						try: value = Converter.boolean(value = value, string = False, none = False, default = True)
+						except: pass
+					if Tools.isString(value): value = value.replace(replaceComma, ',').replace(replaceQuote, delimiterQuote).replace(replaceBreak, '\n')
+					row[i] = value
+
+			if structured:
+				if rows:
+					if Tools.isList(header): headers = header
+					else: headers = rows[0]
+					rows = rows[1:]
+					for i in range(len(rows)):
+						entry = {}
+						row = rows[i]
+						for j in range(len(row)):
+							entry[headers[j]] = row[j]
+						rows[i] = entry
+			elif header:
+				rows = rows[1 if header is True else header:]
+
+			return rows
+		except: Logger.error()
+		return None
+
 class Logger(object):
 
 	try: TypeInfo		= xbmc.LOGINFO
@@ -3657,16 +3681,42 @@ class Logger(object):
 		try:
 			if not self.levelAllow(level): return
 
+			from lib.modules.concurrency import Pool
+
 			items = []
 
 			platform = Platform.data(refresh = True)
 			hardware = Hardware.data(full = full, refresh = True)
+			concurrency = Pool.settingData()
 
 			# Identifier
 			items.append({
 				'section' : 'Identifier',
 				'items' : [
 					{'label' : 'Id', 'value' : platform['identifier']},
+				],
+			})
+
+			# Gaia
+			items.append({
+				'section' : 'Gaia',
+				'items' : [
+					{'label' : 'ID', 'value' : platform['addon']['id']},
+					{'label' : 'Name', 'value' : platform['addon']['name']},
+					{'label' : 'Version', 'value' : platform['addon']['version']},
+					{'label' : 'Author', 'value' : platform['addon']['author']},
+				],
+			})
+
+			# Kodi
+			items.append({
+				'section' : 'Kodi',
+				'items' : [
+					{'label' : 'Name', 'value' : platform['kodi']['name']},
+					{'label' : 'Build', 'value' : platform['kodi']['build']},
+					{'label' : 'Version', 'value' : platform['kodi']['version']['label']},
+					{'label' : 'Release', 'value' : platform['kodi']['release']['label']},
+					{'label' : 'Uptime', 'value' : platform['kodi']['uptime']},
 				],
 			})
 
@@ -3679,6 +3729,7 @@ class Logger(object):
 					{'label' : 'Distribution', 'value' : platform['distribution']['name']},
 					{'label' : 'Version', 'value' : platform['version']['label']},
 					{'label' : 'Architecture', 'value' : platform['architecture']['label']},
+					{'label' : 'Environment', 'value' : platform['environment']['label']},
 				],
 			})
 
@@ -3706,26 +3757,30 @@ class Logger(object):
 				],
 			})
 
-			# Kodi
+			# Compression
+			subitems = [
+				{'label' : 'Global', 'value' : platform['compression']['global']},
+				{'label' : 'Database', 'value' : platform['compression']['database']},
+			]
+			if platform['compression']['algorithm']:
+				 for algorithm in platform['compression']['algorithm']:
+					 subitems.append({'label' : algorithm['label'], 'value' : algorithm['description']})
 			items.append({
-				'section' : 'Kodi',
-				'items' : [
-					{'label' : 'Name', 'value' : platform['kodi']['name']},
-					{'label' : 'Build', 'value' : platform['kodi']['build']},
-					{'label' : 'Version', 'value' : platform['kodi']['version']['label']},
-					{'label' : 'Release', 'value' : platform['kodi']['release']['label']},
-					{'label' : 'Uptime', 'value' : platform['kodi']['uptime']},
-				],
+				'section' : 'Compression',
+				'items' : subitems,
 			})
 
-			# Gaia
+			# Concurrency
 			items.append({
-				'section' : 'Gaia',
+				'section' : 'Concurrency',
 				'items' : [
-					{'label' : 'ID', 'value' : platform['addon']['id']},
-					{'label' : 'Name', 'value' : platform['addon']['name']},
-					{'label' : 'Version', 'value' : platform['addon']['version']},
-					{'label' : 'Author', 'value' : platform['addon']['author']},
+					{'label' : 'Level', 'value' : concurrency['label']},
+					{'label' : 'Global', 'value' : concurrency['global']['label']},
+					{'label' : 'Metadata', 'value' : concurrency['metadata']['label']},
+					{'label' : 'Scrape', 'value' : concurrency['scrape']['label']},
+					{'label' : 'Binge', 'value' : concurrency['binge']['label']},
+					{'label' : 'Connection', 'value' : concurrency['connection']['label']},
+					{'label' : 'Mode', 'value' : concurrency['mode']['label']},
 				],
 			})
 
@@ -3985,7 +4040,10 @@ class File(object):
 
 	@classmethod
 	def size(self, path):
-		return xbmcvfs.File(path).size()
+		file = xbmcvfs.File(path)
+		size = file.size()
+		file.close()
+		return size
 
 	@classmethod
 	def sizeDirectory(self, path, limit = None):
@@ -4016,7 +4074,7 @@ class File(object):
 		return self.writeNow(path, '')
 
 	@classmethod
-	def readNow(self, path, bytes = False, native = False):
+	def readNow(self, path, bytes = False, native = False, exists = False):
 		try:
 			if not path:
 				try:
@@ -4025,6 +4083,8 @@ class File(object):
 				except: trace = None
 				Logger.log('Invalid file path: ' + str(trace))
 				return None
+
+			if exists and not self.exists(path = path): return None
 
 			result = None
 			if native:
@@ -4205,9 +4265,18 @@ class System(object):
 	KodiVersionFull = None
 	KodiVersionNew = None
 
-	OriginPlugin = False # Do not use None, since it can mean that the origin cannot be detected.
-	OriginGaia = None
-	OriginParameter = 'gaia'
+	OriginGaia = 'gaia' # The call came from within the Gaia plugin.
+	OriginPlaylist = 'playlist' # The call came from an item added to the playlist.
+	OriginLibrary = 'library' # The call came from an item added to the Kodi library, using Gaia's local library feature.
+	OriginGaia = 'gaia' # The call came from within the Gaia addon.
+	OriginWidget = 'widget' # The call came from an external skin widget. This will only work if "&origin=widget" was manually added to the widget's command.
+	OriginAddon = 'addon' # The call came from an external addon. This will only work if "&origin=addon" was manually added to the command by the external addon.
+	OriginExternal = 'external' # The call came from some other external source. This will only work if "&origin=external" was manually added to the command by the external source.
+
+	OriginsParameter = 'origin'
+	OriginsAddon = False # Do not use None, since it can mean that the origin cannot be detected.
+	OriginsFixed = False # Do not use None, since it can mean that the origin cannot be detected.
+	OriginsGaia = None
 
 	PowerPowerdown = 'powerdown'		# Power down the system.
 	PowerShutdown = 'shutdown'			# Default shutdown action defined in system settings.
@@ -4224,9 +4293,11 @@ class System(object):
 	PowerRefresh = 'refresh'			# Refresh the Kodi skin (reloads changes to the skin XML).
 	PowerRelaunch = 'relaunch'			# Relaunch the Gaia addon.
 
+	Navigation = []
+	NavigationParameter = 'navigation'
+
 	Monitor = None
 	Arguments = None
-	Menu = []
 
 	##############################################################################
 	# RESET
@@ -4234,8 +4305,9 @@ class System(object):
 
 	@classmethod
 	def reset(self, settings = True):
-		System.OriginPlugin = False
-		System.OriginGaia = None
+		System.OriginsAddon = False
+		System.OriginsFixed = False
+		System.OriginsGaia = None
 
 	##############################################################################
 	# GENERAL
@@ -4256,6 +4328,11 @@ class System(object):
 		# This will fail if Gaia is called externally, eg through a widget that opens the Gaia context menu.
 		try: return int(self.arguments(1))
 		except: return None
+
+	@classmethod
+	def handleValid(self):
+		handle = self.handle()
+		return not handle is None and handle > 0
 
 	@classmethod
 	def query(self, parse = False):
@@ -4408,22 +4485,38 @@ class System(object):
 		return None
 
 	@classmethod
-	def menu(self, name = None):
-		if name: return System.Menu + [name]
-		else: return System.Menu
+	def navigation(self, name = None, more = False):
+		if name:
+			# Ignore the "More" menu entry, but only if it is
+			# Eg allow: Movies - Discover - Years - More
+			# Eg disallow: Movies - Discover - Years - More - 1925
+			if not more and System.Navigation and System.Navigation[-1] == self.addon().getLocalizedString(33432): del System.Navigation[-1]
+			return System.Navigation + [name]
+		return System.Navigation
 
 	@classmethod
-	def menuParameter(self, name = None):
+	def navigationParameter(self, navigation = None, name = None):
+		return System.NavigationParameter + '=' + self.navigationEncode(navigation = navigation, name = name)
+
+	@classmethod
+	def navigationEncode(self, navigation = None, name = None, link = True):
 		from lib.modules.network import Networker
-		return 'menu=' + Networker.linkQuote(Converter.jsonTo(self.menu(name = name)))
+		if navigation is None: navigation = self.navigation(name = name)
+		navigation = ','.join(navigation)
+		return Networker.linkQuote(navigation) if link else navigation
 
 	@classmethod
-	def menuDescription(self, name = None):
+	def navigationDecode(self, navigation):
+		from lib.modules.network import Networker
+		return Networker.linkUnquote(navigation).split(',')
+
+	@classmethod
+	def navigationDescription(self, name = None):
 		from lib.modules.interface import Format
-		return Format.iconJoin(self.menu(name = name))
+		return Format.iconJoin(self.navigation(name = name))
 
 	@classmethod
-	def menuResolve(self, action = None, menu = None, initialize = True):
+	def navigationResolve(self, action = None, navigation = None, parameters = None, initialize = True):
 		# If the context menu is launched, the handle is -1 and pluginPropertySet() does not work.
 		# Attempt to use invalid handle -1
 		handle = self.handle()
@@ -4432,44 +4525,54 @@ class System(object):
 		# For Gaia Eminence.
 		addon = self.addon()
 
+		if navigation is None and parameters: navigation = parameters.get(System.NavigationParameter)
+
 		# When the skin directly launches a submenu without opening the main menu first.
-		if not menu:
-			if action == 'movies': menu = 32001
-			elif action == 'shows': menu = 32002
-			elif action == 'documentaries': menu = 33470
-			elif action == 'shorts': menu = 33471
-			elif action == 'kids': menu = 33429
-			elif action == 'search': menu = 32010
-			elif action == 'navigatorFavourites': menu = 33000
-			elif action == 'navigatorArrivals': menu = 33490
-			elif action == 'navigatorTools': menu = 32008
-			else: menu = 35639
-			menu = [addon.getLocalizedString(menu)]
+		if not navigation:
+			from lib.meta.menu import MetaMenu
 
-		if menu:
-			if menu and Tools.isString(menu): menu = Converter.jsonFrom(menu)
-			if menu:
-				if len(menu) > 1 and menu[0] == addon.getLocalizedString(35639): menu.pop(0)
-				self.pluginPropertySet(property = 'GaiaMenuCategory', value = menu[0])
-				submenu = menu[1:]
-				self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = '  •  '.join(submenu) if submenu else addon.getLocalizedString(33102))
+			if action == MetaMenu.ContentSearch:
+				navigation = 32010
+			elif action == MetaMenu.Action:
+				content = parameters.get(MetaMenu.ParameterContent)
+				if content:
+					if content == MetaMenu.ContentSearch: navigation = 32010
+					elif content == MetaMenu.ContentQuick: navigation = 35550
+					elif content == MetaMenu.ContentProgress: navigation = 32037
+					elif content == MetaMenu.ContentArrival: navigation = 33490
+					elif content == MetaMenu.ContentFavorite: navigation = 33000
+
+			if not navigation:
+				media = parameters.get('media')
+				if media:
+					if Media.isFilm(media): navigation = 32001
+					elif Media.isShow(media): navigation = 32002
+
+			if not navigation: navigation = 35639
+			navigation = [addon.getLocalizedString(navigation)]
+
+		if navigation:
+			if navigation and Tools.isString(navigation): navigation = self.navigationDecode(navigation = navigation)
+			if navigation:
+				if len(navigation) > 1 and navigation[0] == addon.getLocalizedString(35639): navigation.pop(0)
+				self.pluginPropertySet(property = 'GaiaNavigationCategory', value = navigation[0])
+				subnavigation = navigation[1:]
+				self.pluginPropertySet(property = 'GaiaNavigationSubcategory', value = '  •  '.join(subnavigation) if subnavigation else addon.getLocalizedString(33102))
 		elif action is None or action == 'home':
-			self.pluginPropertySet(property = 'GaiaMenuCategory', value = 'Gaia')
-			self.pluginPropertySet(property = 'GaiaMenuSubcategory', value = addon.getLocalizedString(33102))
+			self.pluginPropertySet(property = 'GaiaNavigationCategory', value = 'Gaia')
+			self.pluginPropertySet(property = 'GaiaNavigationSubcategory', value = addon.getLocalizedString(33102))
 
-		if menu and self.originGaia():
+		if navigation and self.originGaia():
 			media = ''
-			menuType = menu[0]
-			if menuType:
-				if menuType == addon.getLocalizedString(32001): media = Media.TypeMovie
-				elif menuType == addon.getLocalizedString(32002): media = Media.TypeShow
-				elif menuType == addon.getLocalizedString(33470): media = Media.TypeDocumentary
-				elif menuType == addon.getLocalizedString(33471): media = Media.TypeShort
-			self.windowPropertySet(property = 'GaiaMenuType', value = media)
+			navigationType = navigation[0]
+			if navigationType:
+				if navigationType == addon.getLocalizedString(32001): media = Media.Movie
+				elif navigationType == addon.getLocalizedString(32002): media = Media.Show
+			self.windowPropertySet(property = 'GaiaNavigationType', value = media)
 
-		if initialize: System.Menu = menu
+		if initialize: System.Navigation = navigation
 
-		return menu
+		return navigation
 
 	@classmethod
 	def versionKodi(self, full = False):
@@ -4590,58 +4693,114 @@ class System(object):
 	def plugin(self, id = GaiaAddon):
 		return System.PluginPrefix + str(id)
 
+	# Detect the origin based on the container info.
 	@classmethod
-	def origin(self, extended = True):
-		# If called multiple times within a single execution, this can make things slower.
-		# Detect once and reuse the value.
-		if System.OriginPlugin is False:
-			# When originGaia() is called from player.py, sometimes in sporadic cases, the info label returns "".
-			# This makes the stream window not reload in a few cases.
-			# Waiting and retying then typically return the addon path.
-			origin = self.infoLabel('Container.PluginName', empty = True, wait = True)
+	def origin(self, extended = True, quick = True):
+		try:
+			# If called multiple times within a single execution, this can make things slower.
+			# Detect once and reuse the value.
+			if System.OriginsAddon is False:
+				# When originGaia() is called from player.py, sometimes in sporadic cases, the info label returns "".
+				# This makes the stream window not reload in a few cases.
+				# Waiting and retying then typically return the addon path.
 
-			# If Gaia is launched from the addon menu, PluginName is None.
-			if not origin and extended:
-				if not self.query() and self.infoLabel('Container.FolderPath', empty = True, wait = True) == 'addons://sources/video':
-					origin = self.plugin()
+				# Set wait to a low number (percentage of the normal infoLabel() timeout).
+				# Otherwise, this makes the addon take long to open if launched from Addons -> Video Addons -> Gaia, since there is no PluginName.
+				# This was previously 2.5 secs each of the infoLabel() calls below (50 iterations of 0.05secs each).
+				# If this new adaptation is too short for player.py, increase again.
+				wait1 = 0.3 if quick else 1.0 # 0.45 secs and 1.5secs (wait1*30 iterations of 0.05secs each)
+				wait2 = 0.3 # 0.45 secs (wait2*30 iterations of 0.05secs each)
 
-			System.OriginPlugin = origin
-		return System.OriginPlugin
+				origin = self.infoLabel('Container.PluginName', empty = True, wait = wait1)
+
+				# If Gaia is launched from the addon menu, PluginName is None.
+				if not origin and extended:
+					if not self.query() and self.infoLabel('Container.FolderPath', empty = True, wait = wait2) == 'addons://sources/video':
+						origin = self.plugin()
+
+				System.OriginsAddon = origin
+		except: Logger.error()
+		return System.OriginsAddon
+
+	# Determine the origin based on the fixed parameters passed in.
+	@classmethod
+	def originFixed(self):
+		try:
+			if System.OriginsFixed is False:
+				query = self.query(parse = True)
+				System.OriginsFixed = query.get(System.OriginsParameter) if query else None
+		except: Logger.error()
+		return System.OriginsFixed
 
 	@classmethod
-	def originGaia(self, strict = True):
+	def originGaia(self, strict = True, quick = True):
 		if strict:
-			if System.OriginGaia is None:
-				if strict:
-					query = self.query(parse = True)
-					if query:
-						query = self.query(parse = True).get(System.OriginParameter)
-						if not query is None: System.OriginGaia = Converter.boolean(query)
-				if System.OriginGaia is None: System.OriginGaia = self.originIs(origin = self.origin(), plugin = System.GaiaAddon)
-			return System.OriginGaia
+			if System.OriginsGaia is None:
+				if strict and self.originFixed() == System.OriginGaia: System.OriginsGaia = True
+				if System.OriginsGaia is None: System.OriginsGaia = self.originIs(origin = self.origin(quick = quick), addon = System.GaiaAddon)
+			return System.OriginsGaia
 		else:
-			return self.originIs(origin = self.origin(), plugin = System.GaiaAddon)
+			return self.originIs(origin = self.origin(), addon = System.GaiaAddon)
 
 	@classmethod
-	def originPlugin(self, gaia = True):
-		origin = self.origin()
-		if not gaia and self.originIs(origin = origin, plugin = System.GaiaAddon): return False
-		else: return origin and origin.startswith('plugin.')
+	def originAddon(self, strict = True, quick = True, gaia = True):
+		if strict and self.originFixed() == System.OriginAddon: return True
+		origin = self.origin(quick = quick)
+		if not gaia and self.originIs(origin = origin, addon = System.GaiaAddon): return False
+		else: return origin and Tools.stringRemovePrefix(origin, System.PluginPrefix).startswith('plugin.')
 
 	@classmethod
-	def originExternal(self):
-		origin = self.origin()
+	def originExternal(self, strict = True, quick = True):
+		if strict and self.originFixed() == System.OriginExternal: return True
+		origin = self.origin(quick = quick)
 		if not origin: return True # Widgets return None.
-		else: return not self.originIs(origin = origin, plugin = System.GaiaAddon)
+		else: return not self.originIs(origin = origin, addon = System.GaiaAddon)
 
 	@classmethod
-	def originWidget(self):
-		return not self.origin()
+	def originWidget(self, strict = True, quick = True):
+		# Note that widgets (and other external addons) can use the URL created by Gaia, which already has an "origin" parameter.
+		# So a wdiget might have "origin=gaia".
+		# Only check if originFixed() is postivley matched. If it contains any other origin parameter, do not return False, but use other means of detection.
+		if strict and self.originFixed() == System.OriginWidget: return True
+		return not self.origin(quick = quick)
 
 	@classmethod
-	def originIs(self, origin, plugin):
-		if origin: return origin.replace(System.PluginPrefix, '') == plugin
-		else: return origin == plugin
+	def originPlaylist(self):
+		return self.originFixed() == System.OriginPlaylist
+
+	@classmethod
+	def originLibrary(self):
+		return self.originFixed() == System.OriginLibrary
+
+	@classmethod
+	def originIs(self, origin, addon):
+		if origin: return Tools.stringRemovePrefix(origin, System.PluginPrefix) == addon
+		else: return origin == addon
+
+	@classmethod
+	def originSet(self, origin = True, command = None, parameters = None):
+		if origin is True: origin = System.OriginGaia if self.originGaia() else None
+		if parameters:
+			if origin: parameters[System.OriginsParameter] = origin
+			return parameters
+		elif command:
+			if origin: command += '&%s=%s' % (System.OriginsParameter, origin)
+			return command
+
+	@classmethod
+	def originMenu(self):
+		return System.visible('Window.IsActive(videos)')
+
+	# The container ID that called the addon URL.
+	# Might not always be available, but should be available from widgets.
+	# Sometimes it does not return an ID if the container is still updating. Wait some time.
+	@classmethod
+	def originContainer(self, wait = True):
+		try:
+			id = System.infoLabel('System.CurrentControlID', empty = True, wait = wait)
+			if id: id = int(id)
+			return id
+		except: return None
 
 	# action: None = selection from dialog, Specific = execute a specific action.
 	@classmethod
@@ -4703,7 +4862,7 @@ class System(object):
 				Time.sleep(delay / 4.0)
 
 		def _power(action, warning, notification, sound):
-			timeout = 30
+			timeout = 10
 			delay = 15
 			choice = True
 			thread = None
@@ -4741,7 +4900,7 @@ class System(object):
 		return action['action']
 
 	@classmethod
-	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, gaia = True, optimize = True):
+	def command(self, action = None, parameters = None, encoded = None, query = None, id = GaiaAddon, origin = None, optimize = True):
 		'''
 			The URL encoding and quote functions in urllib are very slow.
 			This is not an issue if we only have to encode a few small commands.
@@ -4754,15 +4913,29 @@ class System(object):
 		'''
 
 		if query is None:
-			if parameters is None: parameters = {}
-			if not action is None: parameters['action'] = action
+			# We do this to force an order of the parameters.
+			# This is useful for a non-optimized/encoded URL, making it easier to read by users and utilize and manipulate in skin shortcuts.
+			from lib.modules.external import Importer
+			data = Importer.moduleOrderedDict()()
+			if not action is None: data['action'] = action
+			if parameters:
+				if 'media' in parameters: data['media'] = parameters['media']
+				if 'link' in parameters: data['link'] = parameters['link']
+				data.update(parameters)
+				if 'action' in parameters and not action is None: data['action'] = action # In case "action" was replaced by the value in parameters.
+			parameters = data
 
 			# This is to indicate wether or not the command is executed from within Gaia or from an external addon or widget.
 			# When we add a Gaia list to an external widget, and then click an item in the widget (eg: Show Arrivals with submenus), calling System.originGaia() will always be true.
 			# It seems the only way to make sure we can detect the origin correctly, is to add this parameter when we select the path of the widget from the Skin settings.
 			# When selecting the list from the Skin settings, the origin is correctly None.
 			# Used from addon.py -> episodesSubmenu.
-			if gaia: parameters[System.OriginParameter] = self.originGaia()
+			if origin is None: origin = False if parameters.get(System.OriginsParameter) else True
+			if origin: parameters = self.originSet(origin = origin, parameters = parameters)
+
+			# Just makes it easier to ready without the URL-encoded JSON brackets.
+			if System.NavigationParameter in parameters and Tools.isArray(parameters[System.NavigationParameter]):
+				parameters[System.NavigationParameter] = self.navigationEncode(navigation = parameters[System.NavigationParameter], link = False)
 
 			# Make it even faster by encoding the entire parameters.
 			# Besides being faster, we can also keep data types without having to convert them (eg bools or None).
@@ -4775,29 +4948,49 @@ class System(object):
 			query = '&'.join(query)'''
 
 			# Only do this with Gaia commands.
-			# Otyherwise call to eg ResolveUrl authentication fails if base64 encoded.
+			# Otherwise call to eg ResolveUrl authentication fails if base64 encoded.
 			if optimize and id == System.GaiaAddon:
 				data = [self.commandEncode(parameters)]
 				if encoded:
 					if Tools.isArray(encoded): data.extend(encoded)
 					else: data.append(encoded)
-				if len(data) == 1: query = 'data=' + data[0]
-				else: query = '&'.join(['data[]=' + i for i in data])
-			else:
-				from lib.modules.network import Networker
-				query = Networker.linkEncode(parameters)
+				parameters = {'data' : data}
+
+			from lib.modules.network import Networker
+			query = Networker.linkEncode(self.commandFormat(parameters))
 
 		return '%s/?%s' % (self.plugin(id = id), query)
 
 	@classmethod
 	def commandEncode(self, parameters):
-		# Make the command URL-safe, since base64 can also contain +/= characters.
-		# Without this, in the very rare case that the base64-encoded data has a +/=, Networker.linkDecode() in commandResolve() will assume the + as part of the URL instead of the data base64-encoded parameter, decode it, and then later Converter.base64From() fails, since the + is gone.
-		return Converter.base64To(Converter.jsonTo(parameters)).replace('+', '%2B').replace('/', '%2F').replace('=', '%3D')
+		return Converter.base64To(Converter.jsonTo(parameters))
 
 	@classmethod
 	def commandDecode(self, data):
 		return Converter.jsonFrom(Converter.base64From(data))
+
+	@classmethod
+	def commandFormat(self, parameters):
+		# NB: Encode arrays as JSON objects.
+		# Kodi has problems with URL arrays ("val[]=1&val[]=2", or "val=1&val=2" for the Python version of URL arrays).
+		# Kodi always just picks 1 of the parameters and does not interpret it as an array ("val=2").
+		# This ONLY happens if the command URL is used in a Kodi menu/directory.
+		# When the URL is called from System.executePlugin() or from a custom window, this does not happen.
+		# This is also not a problem if we base64 encode the parameters in the URL, only if we use a raw unencoded URL.
+		from lib.modules.network import Networker
+		for key, value in parameters.items():
+			if Tools.isBoolean(value): parameters[key] = Converter.boolean(value, string = True).lower()
+			elif Tools.isStructure(value): parameters[key] = Converter.jsonTo(value)
+		return parameters
+
+	@classmethod
+	def commandUnformat(self, parameters):
+		for key, value in parameters.items():
+			if value and Tools.isString(value):
+				lower = value.lower()
+				if lower == 'true' or lower == 'false': parameters[key] = Converter.boolean(value)
+				elif lower.startswith('[') or lower.startswith('{'): parameters[key] = Converter.jsonFrom(value)
+		return parameters
 
 	@classmethod
 	def commandResolve(self, command = None, initialize = False):
@@ -4805,18 +4998,20 @@ class System(object):
 
 		from lib.modules.network import Networker
 		if command is None: command = self.arguments(2)
-		command = dict(Networker.linkDecode(command.replace(self.plugin() + '/', '').replace('?', ''), multi = 'data[]=' in command))
 
-		if 'data' in command:
-			if Tools.isArray(command['data']):
+		parameters = dict(Networker.linkDecode(command.replace(self.plugin() + '/', '').replace('?', '')))
+		parameters = self.commandUnformat(parameters)
+
+		if 'data' in parameters:
+			if Tools.isArray(parameters['data']):
 				data = {}
-				for i in command['data']:
+				for i in parameters['data']:
 					data.update(self.commandDecode(i))
-				command = data
+				parameters = data
 			else:
-				command = self.commandDecode(command['data'])
+				parameters = self.commandDecode(parameters['data'])
 
-		return command
+		return parameters
 
 	@classmethod
 	def commandPlugin(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True):
@@ -4831,6 +5026,20 @@ class System(object):
 		if command is None: command = self.command(action = action, parameters = parameters, id = id, optimize = optimize)
 		if call: command = 'Container.Update(%s%s)' % (command, ',replace' if replace else '')
 		return command
+
+	@classmethod
+	def commandWindow(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True, parent = None):
+		if id is None: id = System.GaiaAddon
+		if command is None: command = self.command(action = action, parameters = parameters, id = id, optimize = optimize)
+		if call: command = 'ActivateWindow(videos,%s%s)' % (command, (',' + parent) if parent else '')
+		return command
+
+	@classmethod
+	def commandIsMenu(self):
+		parameters = System.commandResolve()
+		if not parameters: return False
+		action = parameters.get('action')
+		return action and (action.startswith('movie') or action.startswith('show') or action.startswith('season') or action.startswith('episode'))
 
 	@classmethod
 	def commandIsScrape(self):
@@ -5008,7 +5217,8 @@ class System(object):
 		# Some values (eg: System.CpuUsage) will return "Busy" when called first. Wait for Kodi to load the value.
 		if wait:
 			counter = 0
-			interations = 50 if empty else 100
+			interations = 30 if empty else 100
+			if Tools.isFloat(wait): interations = int(interations * wait)
 			while True:
 				result = xbmc.getInfoLabel(value)
 
@@ -5060,6 +5270,14 @@ class System(object):
 		except: pass
 		return False
 
+	@classmethod
+	def addonDetails(self, id = GaiaAddon, properties = None):
+		try:
+			if not properties: properties = ['name', 'version', 'enabled', 'installed']
+			return System.executeJson(addon = id, method = 'Addons.GetAddonDetails', parameters = {'properties' : properties})['result']['addon']
+		except: pass
+		return None
+
 	# Checks if an addon is enabled.
 	@classmethod
 	def enabled(self, id = GaiaAddon, native = False):
@@ -5097,6 +5315,10 @@ class System(object):
 	@classmethod
 	def executeContainer(self, action = None, parameters = None, command = None, replace = False, id = GaiaAddon, optimize = True, wait = False):
 		return self.execute(self.commandContainer(id = id, action = action, parameters = parameters, command = command, replace = replace, optimize = optimize, call = True), wait = wait)
+
+	@classmethod
+	def executeWindow(self, action = None, parameters = None, command = None, parent = None, id = GaiaAddon, optimize = True, wait = False):
+		return self.execute(self.commandWindow(id = id, action = action, parameters = parameters, command = command, parent = parent, optimize = optimize, call = True), wait = wait)
 
 	# Either query OR all the other parameters.
 	@classmethod
@@ -5186,7 +5408,11 @@ class System(object):
 
 	@classmethod
 	def launchAddon(self, wait = True):
-		System.execute('RunAddon(%s)' % self.id())
+		from lib.modules.interface import Loader
+		Loader.hide() # Must hide loader, otherwise for some weird reason RunAddon(...) does not work, at least from the widgets.
+
+		id = self.id()
+		System.execute('RunAddon(%s)' % id)
 		if wait:
 			for i in range(0, 150):
 				if self.originGaia():
@@ -5195,7 +5421,8 @@ class System(object):
 					# Check NumItems, because the addon might have been launched, but the container/directory is still loading.
 					# The container must be done loading, otherwise if a container update is executed right afterwards, the main menu items and the container update items might be mixed and displayed as the same list.
 					if items > 0: break
-				Time.sleep(0.2)
+				if id in str(self.infoLabel('Container.PluginName')): break
+				Time.sleep(0.05)
 
 	@classmethod
 	def launchDataGet(self):
@@ -5212,13 +5439,17 @@ class System(object):
 		if full: self.windowPropertyClear(System.PropertyInitial)
 
 	@classmethod
-	def launched(self, default = None):
+	def launchStatus(self, default = None):
 		try: return int(self.windowPropertyGet(System.PropertyInitial))
 		except: return default
 
 	@classmethod
+	def launchFinished(self, default = None, status = 3):
+		return self.launchStatus(default = 0) >= status
+
+	@classmethod
 	def launch(self, hidden = None):
-		if self.launched(default = 0) >= 5: return False # More efficient than always calling self.launchDataGet().
+		if self.launchStatus(default = 0) >= 5: return False # More efficient than always calling self.launchDataGet().
 		observe = False
 		if hidden is None: hidden = not self.originGaia() # Do not show the launch window if requests come from widgets or any other addon that is not Gaia.
 
@@ -5228,7 +5459,7 @@ class System(object):
 			data = self.launchDataGet()
 
 		if data:
-			launched = self.launched(default = 0)
+			launched = self.launchStatus(default = 0)
 			if launched == 3: self.windowPropertySet(System.PropertyInitial, '4')
 
 			if self.originExternal():
@@ -5252,7 +5483,7 @@ class System(object):
 
 	@classmethod
 	def _launch(self, hidden = False, observe = False):
-		if not hidden and self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '1')
+		if not hidden and self.launchStatus(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '1')
 
 		# Sequential non-threaded and parallel threaded execution seems to take more or less the same time.
 		# Sometimes sequential execution is actually faster.
@@ -5265,6 +5496,7 @@ class System(object):
 		self.tStatus = ['Initializing Gaia Launch']
 		self.tProgress = 1
 		self.tInitial = False
+		self.tWizard = False
 
 		def _launchObserve():
 			if not hidden:
@@ -5329,7 +5561,7 @@ class System(object):
 			if not hidden:
 				try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
 				except: pass
-			if not hidden and self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '2')
+			if not hidden and self.launchStatus(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '2')
 
 			Loader.enable()
 
@@ -5355,7 +5587,7 @@ class System(object):
 
 			# Final
 			if not hidden:
-				Time.sleep(0.2) # Wait a little to not immediately pop up new dialogs.
+				Time.sleep(0.5) # Wait a little to not immediately pop up new dialogs.
 				Splash.popupClose()
 
 				Donations.popup(wait = True)
@@ -5367,20 +5599,18 @@ class System(object):
 					Announcements.storage(wait = True)
 				Pool.thread(target = _launchAnnouncement).start()
 
-				# Preload Menus
-				# This preloads some menus so that menu navigation is not too slow on first use.
-				# NB: Do this AFTER the wizard is finished, so that Trakt is authenticated and Trakt menus (eg: Progress) can be loaded.
-				if self.tInitial: System.executePlugin(action = 'metadataPreload')
-
 			# Backup - Export
 			if not hidden or changed:
-				def _launchBackup():
-					Time.sleep(2)
-					Backup.automaticImport() # Check again, in case the initialization corrupted the settings.
-					Backup.automaticExport()
-				Pool.thread(target = _launchBackup, start = True)
+				#gaiaremove - the if-statement check can be removed at a later stage. This is just to prevent backup imports between v6 and v7.
+				if not(version['old']['number'] and version['old']['number'] < 70000000.0 and version['new']['number'] >= 70000000.0):
+					if not self.tWizard:
+						def _launchBackup():
+							Time.sleep(2)
+							Backup.automaticImport() # Check again, in case the initialization corrupted the settings.
+							Backup.automaticExport()
+						Pool.thread(target = _launchBackup, start = True)
 
-			if self.launched(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '3' if hidden else '5')
+			if self.launchStatus(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '3' if hidden else '5')
 
 		self.tInitial = not Settings.getBoolean('internal.initial.launch')
 		update = System.windowPropertyGet(System.PropertyUpdate)
@@ -5389,6 +5619,10 @@ class System(object):
 		else:
 			update = not Settings.getString('internal.version') == self.version()
 			System.windowPropertySet(System.PropertyUpdate, str(int(update)))
+
+		# Wizard
+		from lib.modules.window import WindowWizard
+		self.tWizard = Settings.getInteger(WindowWizard.PropertyInitial) == WindowWizard.StatusUncompleted
 
 		# Splash
 		from lib.modules.interface import Splash, Loader
@@ -5443,9 +5677,6 @@ class System(object):
 		self.versionDataSet(version)
 		_launchProgress(1) # 20%
 
-		# Initial
-		self.tInitial = not Settings.getBoolean('internal.initial.launch')
-
 		# Version changed.
 		if not version['old']['number'] == version['new']['number']:
 			Settings.interpreterSelect(notification = True, silent = True)
@@ -5458,65 +5689,15 @@ class System(object):
 			except: Logger.error()
 
 		# Do not do this if Gaia was installed from scratch without having and old version.
-		if version['old']['number'] and version['old']['number'] >= 50000009.0:
-			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.2.0') and version['new']['number'] >= self.versionNumber(version = '6.3.0'):
-				Settings.default(id = 'navigation.show.interleave.unofficial')
-				Settings.default(id = 'navigation.show.interleave.supplementary')
-				Settings.default(id = 'navigation.show.interleave.duration')
-
-				from lib.modules.search import Search
-				Search()._deleteFile()
-
-			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.3.5') and version['new']['number'] >= self.versionNumber(version = '6.3.6'):
-				from lib.providers.core.base import ProviderBase
-
-				def scale(rating, minimum, maximum, base = None):
-					result = int(Math.round(Math.scale(value = rating, fromMinimum = 0, fromMaximum = 1, toMinimum = minimum, toMaximum = maximum), places = 0))
-					if not base is None: result = Math.roundClosest(value = result, base = base)
-					return result
-
-				performance = Hardware.performance()
-				rating = performance['rating']
-
-				concurrencyMode = ProviderBase.ConcurrencyThread
-				concurrencyBinge = scale(rating = rating, minimum = 50, maximum = 100) / 100.0
-				concurrencyConnection = 0
-				if performance['processor']['rating'] >= ProviderBase.Performance7:
-					concurrencyLimit = 0
-				else:
-					threads = Hardware.processorCountThread() or 0
-					threads = min(max(threads, 3), 5)
-					concurrencyLimit = scale(rating = rating, minimum = max(2, threads * 1.5), maximum = max(8, threads * 4) + 1)
-
-				ProviderBase.settingsGlobalConcurrencyModeSet(concurrencyMode)
-				ProviderBase.settingsGlobalConcurrencyLimitSet(concurrencyLimit)
-				ProviderBase.settingsGlobalConcurrencyBingeSet(concurrencyBinge)
-				ProviderBase.settingsGlobalConcurrencyConnectionSet(concurrencyConnection)
-
-			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.3.8') and version['new']['number'] >= self.versionNumber(version = '6.3.9'):
-				try:
-					from lib.providers.core.manager import Manager
-					Manager.streamsDatabaseClear()
-				except: Logger.error()
-
-			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.3.11') and version['new']['number'] >= self.versionNumber(version = '6.3.12'):
-				try:
-					from lib.providers.core.manager import Manager
-					database = Manager._database(database = Manager.DatabaseProviders)
-					database._close()
-					database._deleteFile()
-				except: Logger.error()
-
-			#gaiaremove
-			if version['old']['number'] <= self.versionNumber(version = '6.4.2') and version['new']['number'] >= self.versionNumber(version = '6.4.3'):
-				try:
-					from lib.providers.core.manager import Manager
-					Manager.streamsDatabaseClear()
-				except: Logger.error()
+		if version['old']['number']:
+			if version['old']['number'] < 70000000.0 and version['new']['number'] >= 70000000.0:
+				# Clear everything between v6 and v7.
+				#gaiaremove - this can be removed in a later version.
+				directories, files = File.listDirectory(System.profile())
+				for i in directories:
+					if not 'download' in i.lower(): File.deleteDirectory(i)
+				for i in files:
+					File.delete(i)
 
 		_launchProgress(4) # 25%
 
@@ -5526,27 +5707,43 @@ class System(object):
 		def _launchSettings():
 			from lib.modules.view import View
 			from lib.meta.tools import MetaTools
-			Buffer.initialize()
-			Timeout.initialize()
-			Playlist.initialize()
-			YouTube.qualityUpdate()
-			View.settingsInitialize()
-			MetaTools.settingsInitialize()
+			try: Buffer.initialize()
+			except: Logger.error()
+			try: Timeout.initialize()
+			except: Logger.error()
+			try: Playlist.initialize()
+			except: Logger.error()
+			try: YouTube.qualityUpdate()
+			except: Logger.error()
+			try: View.settingsInitialize()
+			except: Logger.error()
+			try: MetaTools.settingsInitialize()
+			except: Logger.error()
 		_launchAdd(1, 'Initializing Settings Data', _launchSettings) # 26%
+
+		# Compression
+		def _launchCompression():
+			# Wait up to 120 seconds for the benchmark to finish, otherwise just continue and let it finish in the background.
+			# 120 seconds seems a lot, but this is only on the 1st run after a new installation. And the benchmarking has a sleep delay to wait for other CPU-intensive stuff to finish.
+			# This allows the compression algorithm to be determined, before we might use them, like for metadata.db when we preload Arrivals/Progress menus.
+			# The thread will wait for launch to finish before starting the benchmark.
+			from lib.modules.compression import Compressor
+			Pool.thread(target = Compressor.benchmark, kwargs = {'settings' : True, 'background' : True, 'wait' : 120, 'delay' : True}, start = True)
+		_launchAdd(2, 'Initializing Compression Algorithms', _launchCompression) # 28%
 
 		# Context Menu
 		def _launchContext():
 			from lib.modules.interface import Context
 			Context.initialize()
-		_launchAdd(3, 'Initializing Context Menu', _launchContext) # 29%
+		_launchAdd(3, 'Initializing Context Menu', _launchContext) # 31%
 
 		# Promotions
-		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 30%
+		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 32%
 
 		# Window
 		if version['change']['full']:
 			from lib.modules.window import Window
-			_launchAdd(4, 'Initializing Custom Windows', Window.clean) # 34%
+			_launchAdd(4, 'Initializing Custom Windows', Window.clean) # 36%
 		else: _launchProgress(4)
 
 		# Copy the select theme background as fanart to the root folder.
@@ -5560,64 +5757,74 @@ class System(object):
 				File.delete(fanartTo) # Delete old fanart.
 				fanartFrom = Theme.fanart()
 				if fanartFrom: File.copy(fanartFrom, fanartTo, overwrite = True)
-		_launchAdd(1, 'Initializing Image Files', _launchImage) # 35%
+		_launchAdd(1, 'Initializing Image Files', _launchImage) # 37%
 
 		# Clear Temporary
-		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 36%
+		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 38%
 
 		# Cache
 		def _launchCache():
 			from lib.modules.cache import Cache
 			Cache.instance().expressionClean()
-		_launchAdd(2, 'Initializing Expression Cache', _launchCache) # 38%
+		_launchAdd(2, 'Initializing Expression Cache', _launchCache) # 40%
 
 		# Externals
 		def _launchExternals():
-			from lib.modules.external import Psutil, Ujson
+			from lib.modules.external import Importer, Psutil, Ujson
+
+			# This occasionally removes semi-temporary directories for external libraries based on a probability.
+			# These semi-temporary directories are too "permanent" to use the Kodi temp dir, since that one gets cleared every time Kodi is launched.
+			# We need another directory that does not get cleared when Kodi is launched.
+			# However, we still need to sometimes clear this semi-temporary directory, to remove possible problems, force re-retrieval of temp data, or remove code that might have changed with a Gaia update.
+			Importer.update()
+
 			threads = [
 				Pool.thread(target = Psutil().moduleDetect, start = True),
 				Pool.thread(target = Ujson().moduleDetect, start = True),
 			]
 			[thread.join() for thread in threads]
-		_launchAdd(3, 'Initializing External Modules', _launchExternals) # 41%
+		_launchAdd(2, 'Initializing External Modules', _launchExternals) # 42%
 
 		# Cloudflare
 		def _launchCloudflare():
 			from lib.modules.cloudflare import Cloudflare
 			Cloudflare.initialize()
-		_launchAdd(3, 'Initializing Cloudflare Bypasser', _launchCloudflare) # 44%
+		_launchAdd(2, 'Initializing Cloudflare Bypasser', _launchCloudflare) # 44%
 
 		# Elementum & Quasar
-		_launchAdd(2, 'Initializing Elementum Handler', Elementum.connect, install = False, background = True, wait = False) # 46%
-		_launchAdd(2, 'Initializing Quasar Handler', Quasar.connect, install = False, background = True, wait = False) # 48%
+		_launchAdd(1, 'Initializing Elementum Handler', Elementum.connect, install = False, background = True, wait = False) # 45%
+		_launchAdd(1, 'Initializing Quasar Handler', Quasar.connect, install = False, background = True, wait = False) # 46%
 
 		# Premium
 		from lib import debrid
 		from lib.modules.orionoid import Orionoid
-		_launchAdd(3, 'Initializing Orion Service', Orionoid().initialize) # 51%
-		_launchAdd(2, 'Initializing Premiumize Service', debrid.premiumize.Core().initialize) # 53%
-		_launchAdd(2, 'Initializing Premiumize Service', debrid.premiumize.Core().deleteLaunch) # 55%
-		_launchAdd(2, 'Initializing OffCloud Service', debrid.offcloud.Core().deleteLaunch) # 57%
-		_launchAdd(2, 'Initializing RealDebrid Service', debrid.realdebrid.Core().deleteLaunch) # 59%
+		_launchAdd(3, 'Initializing Orion Service', Orionoid().initialize) # 49%
+		_launchAdd(1, 'Initializing Premiumize Service', debrid.premiumize.Core().initialize) # 50%
+		_launchAdd(1, 'Initializing Premiumize Service', debrid.premiumize.Core().deleteLaunch) # 51%
+		_launchAdd(1, 'Initializing OffCloud Service', debrid.offcloud.Core().deleteLaunch) # 52%
+		_launchAdd(1, 'Initializing RealDebrid Service', debrid.realdebrid.Core().deleteLaunch) # 53%
 
 		# External
 		def _launchExternal():
 			Resolver.authenticationCheck()
-		_launchAdd(3, 'Initializing External Resolvers', _launchExternal) # 62%
-
-		# Trakt
-		# Update playback history and progress, in case the user changed values on  Trakt's website or from another addon.
-		def _launchTrakt():
-			from lib.modules import trakt
-			trakt.refresh(wait = True)
-		_launchAdd(15, 'Initializing Trakt History', _launchTrakt) # 77%
+		_launchAdd(3, 'Initializing External Resolvers', _launchExternal) # 56%
 
 		# Providers
 		def _launchProviders():
 			from lib.providers.core.manager import Manager
 			Manager.check(progress = False, load = True, wait = True) # load = True: Load them here already. Should decrease the provider initializtion time on first scrape.
 			if self.tInitial: Manager.optimizeInternal()
-		_launchAdd(17, 'Initializing Provider Structure', _launchProviders) # 94%
+		_launchAdd(15, 'Initializing Provider Structure', _launchProviders) # 71%
+
+		# Playback + Trakt
+		def _launchPlayback():
+			# This allows for faster navigation and updated metadata for Quick/Progress/Arrivals menus.
+			# This does an internal Trakt refresh if necessary.
+			# Do not do this the first time Gaia is launched after a fresh install. Do this at the end of the wizard.
+			if not self.tWizard and not self.tInitial:
+				from lib.modules.playback import Playback
+				Playback.instance().launch(refresh = True, reload = True, delay = True, wait = None)
+		_launchAdd(19, 'Initializing Playback History', _launchPlayback) # 90%
 
 		# Clean Old Settings
 		# Place this last, since it can take very long, and we do not want to show this status from the start until close to the end of the progress.
@@ -5716,6 +5923,7 @@ class System(object):
 	@classmethod
 	def information(self, full = True):
 		from lib.modules.interface import Dialog, Loader
+		from lib.modules.concurrency import Pool
 		Loader.show()
 
 		items = []
@@ -5724,6 +5932,23 @@ class System(object):
 		# Otherwise Hardware will use non-full cached data.
 		hardware = Hardware.data(full = full, refresh = True)
 		platform = Platform.data(refresh = True)
+		concurrency = Pool.settingData()
+
+		# Addon
+		subitems = []
+		if platform['addon']['id']: subitems.append({'title' : 'Id', 'value' : platform['addon']['id']})
+		if platform['addon']['name']: subitems.append({'title' : 'Name', 'value' : platform['addon']['name']})
+		if platform['addon']['author']: subitems.append({'title' : 'Author', 'value' : platform['addon']['author']})
+		if platform['addon']['version']: subitems.append({'title' : 'Version', 'value' : platform['addon']['version']})
+		items.append({'title' : 'Addon', 'items' : subitems})
+
+		# Kodi
+		subitems = []
+		if platform['kodi']['name']: subitems.append({'title' : 'Name', 'value' : platform['kodi']['name']})
+		if platform['kodi']['build']: subitems.append({'title' : 'Build', 'value' : platform['kodi']['build']})
+		if platform['kodi']['version']['label']: subitems.append({'title' : 'Version', 'value' : platform['kodi']['version']['label']})
+		if platform['kodi']['release']['label']: subitems.append({'title' : 'Release', 'value' : platform['kodi']['release']['label']})
+		items.append({'title' : 'Kodi', 'items' : subitems})
 
 		# Platform
 		subitems = []
@@ -5732,6 +5957,7 @@ class System(object):
 		if platform['distribution']['name']: subitems.append({'title' : 'Distribution', 'value' : platform['distribution']['name']})
 		if platform['version']['label']: subitems.append({'title' : 'Version', 'value' : platform['version']['label']})
 		if platform['architecture']['label']: subitems.append({'title' : 'Architecture', 'value' : platform['architecture']['label']})
+		if platform['environment']['label']: subitems.append({'title' : 'Environment', 'value' : platform['environment']['label']})
 		items.append({'title' : 'Platform', 'items' : subitems})
 
 		# Python
@@ -5752,21 +5978,25 @@ class System(object):
 		if platform['module']['image']: subitems.append({'title' : 'Image', 'value' : platform['module']['image']})
 		items.append({'title' : 'Modules', 'items' : subitems})
 
-		# Kodi
+		# Compression
 		subitems = []
-		if platform['kodi']['name']: subitems.append({'title' : 'Name', 'value' : platform['kodi']['name']})
-		if platform['kodi']['build']: subitems.append({'title' : 'Build', 'value' : platform['kodi']['build']})
-		if platform['kodi']['version']['label']: subitems.append({'title' : 'Version', 'value' : platform['kodi']['version']['label']})
-		if platform['kodi']['release']['label']: subitems.append({'title' : 'Release', 'value' : platform['kodi']['release']['label']})
-		items.append({'title' : 'Kodi', 'items' : subitems})
+		if platform['compression']['global']: subitems.append({'title' : 'Global', 'value' : platform['compression']['global']})
+		if platform['compression']['database']: subitems.append({'title' : 'Database', 'value' : platform['compression']['database']})
+		if platform['compression']['algorithm']:
+			 for algorithm in platform['compression']['algorithm']:
+				 subitems.append({'title' : algorithm['label'], 'value' : algorithm['description']})
+		items.append({'title' : 'Compression', 'items' : subitems})
 
-		# Addon
+		# Concurrency
 		subitems = []
-		if platform['addon']['id']: subitems.append({'title' : 'Id', 'value' : platform['addon']['id']})
-		if platform['addon']['name']: subitems.append({'title' : 'Name', 'value' : platform['addon']['name']})
-		if platform['addon']['author']: subitems.append({'title' : 'Author', 'value' : platform['addon']['author']})
-		if platform['addon']['version']: subitems.append({'title' : 'Version', 'value' : platform['addon']['version']})
-		items.append({'title' : 'Addon', 'items' : subitems})
+		if concurrency['label']: subitems.append({'title' : 'Level', 'value' : concurrency['label']})
+		if concurrency['global']['label']: subitems.append({'title' : 'Global', 'value' : concurrency['global']['label']})
+		if concurrency['metadata']['label']: subitems.append({'title' : 'Metadata', 'value' : concurrency['metadata']['label']})
+		if concurrency['scrape']['label']: subitems.append({'title' : 'Scrape', 'value' : concurrency['scrape']['label']})
+		if concurrency['binge']['label']: subitems.append({'title' : 'Binge', 'value' : concurrency['binge']['label']})
+		if concurrency['connection']['label']: subitems.append({'title' : 'Connection', 'value' : concurrency['connection']['label']})
+		if concurrency['mode']['label']: subitems.append({'title' : 'Mode', 'value' : concurrency['mode']['label']})
+		items.append({'title' : 'Concurrency', 'items' : subitems})
 
 		# Hardware
 		subitems = []
@@ -5794,9 +6024,8 @@ class Eminence(object):
 
 	PropertyWidget = 'GaiaWidgetReload'
 	PropertyWidgetMovie = 'GaiaWidgetReloadMovie'
-	PropertyWidgetDocu = 'GaiaWidgetReloadDocu'
-	PropertyWidgetShort = 'GaiaWidgetReloadShort'
 	PropertyWidgetShow = 'GaiaWidgetReloadShow'
+	PropertyWidgetMixed = 'GaiaWidgetReloadMixed'
 
 	@classmethod
 	def widgetReload(self, media = None):
@@ -5807,13 +6036,9 @@ class Eminence(object):
 		time = str(Time.timestamp())
 		properties = [Eminence.PropertyWidget]
 
-		# From trakt.py, there is no docu/short refresh.
-		'''if media is None or media == Media.TypeMovie: properties.append(Eminence.PropertyWidgetMovie)
-		if media is None or media == Media.TypeDocumentary: properties.append(Eminence.PropertyWidgetDocu)
-		if media is None or media == Media.TypeShort: properties.append(Eminence.PropertyWidgetShort)
-		if media is None or Media.typeTelevision(media): properties.append(Eminence.PropertyWidgetShow)'''
-		if media is None or Media.typeMovie(media): properties.extend([Eminence.PropertyWidgetMovie, Eminence.PropertyWidgetDocu, Eminence.PropertyWidgetShort])
-		if media is None or Media.typeTelevision(media): properties.append(Eminence.PropertyWidgetShow)
+		if media is None or Media.isFilm(media): properties.extend(Eminence.PropertyWidgetMovie)
+		if media is None or Media.isSerie(media): properties.append(Eminence.PropertyWidgetShow)
+		if media is None or Media.isMixed(media): properties.append(Eminence.PropertyWidgetMixed)
 
 		for property in properties: System.windowPropertySet(property, time)
 
@@ -5886,7 +6111,6 @@ class Settings(object):
 	CategoryMetadata = 'metadata'
 	CategoryImage = 'image'
 	CategoryMenu = 'menu'
-	CategoryNavigation = 'navigation'
 	CategoryInterface = 'interface'
 	CategoryTheme = 'theme'
 	CategoryView = 'view'
@@ -6038,67 +6262,74 @@ class Settings(object):
 				'default' : 'FF922B21',
 			},
 		},
-		'general.concurrency.task' : {
+		'general.concurrency.global.limit' : {
 			'type' : CustomNumber,
-			'title' : 36037,
-			'label' : {
-				'suffix' : 32012,
-			},
-			'value' : {
-				'minimum' : 1,
-				'maximum' : 50,
-			},
-			'special' : {
-				'zero' : SpecialAutomatic,
-				'none' : SpecialAutomatic,
-			},
-		},
-		'general.concurrency.instance' : {
-			'type' : CustomNumber,
-			'title' : 36037,
+			'title' : 36620,
 			'label' : {
 				'suffix' : 35413,
 			},
 			'value' : {
-				'minimum' : 100,
+				'default' : None,
+				'minimum' : 50,
 				'maximum' : 10000,
 			},
 			'special' : {
 				'zero' : SpecialUnlimited,
-				'none' : SpecialUnlimited,
+				'none' : SpecialAutomatic,
 			},
 		},
-		'provider.concurrency.limit' : {
+		'general.concurrency.metadata.limit' : {
 			'type' : CustomNumber,
-			'title' : 36037,
+			'title' : 36621,
 			'label' : {
-				'singular' : 33681,
-				'plural' : 32345,
+				'singular' : 36169,
+				'plural' : 32012,
 			},
 			'value' : {
-				'default' : 0,
+				'default' : None,
 				'minimum' : 1,
 				'maximum' : 100,
 			},
 			'special' : {
 				'zero' : SpecialUnlimited,
-				'none' : SpecialUnlimited,
+				'none' : SpecialAutomatic,
 			},
 		},
-		'provider.concurrency.binge' : {
-			'type' : CustomPercent,
-			'title' : 36400,
+		'general.concurrency.scrape.limit' : {
+			'type' : CustomNumber,
+			'title' : 36621,
+			'label' : {
+				'singular' : 36169,
+				'plural' : 32012,
+			},
 			'value' : {
-				'default' : 0,
+				'default' : None,
 				'minimum' : 1,
 				'maximum' : 100,
 			},
 			'special' : {
 				'zero' : SpecialUnlimited,
-				'none' : SpecialUnlimited,
+				'none' : SpecialAutomatic,
 			},
 		},
-		'provider.concurrency.connection' : {
+		'general.concurrency.scrape.binge' : {
+			'type' : CustomNumber,
+			'title' : 36624,
+			'label' : {
+				'singular' : 36169,
+				'plural' : 32012,
+			},
+			'value' : {
+				'default' : None,
+				'minimum' : 1,
+				'maximum' : 100,
+			},
+			'special' : {
+				'zero' : SpecialUnlimited,
+				'none' : SpecialAutomatic,
+			},
+		},
+		'general.concurrency.scrape.connection' : {
 			'type' : CustomNumber,
 			'title' : 32038,
 			'label' : {
@@ -6112,7 +6343,7 @@ class Settings(object):
 			},
 			'special' : {
 				'zero' : SpecialUnlimited,
-				'none' : SpecialDefault,
+				'none' : SpecialAutomatic,
 			},
 		},
 		'provider.failure.detection.time' : {
@@ -6199,7 +6430,7 @@ class Settings(object):
 			'title' : 33887,
 			'value' : {
 				'unit' : UnitHour,
-				'default' : 192,
+				'default' : 360, # 15 days. We can keep more data, since the data is now compressed and will not take up too much extra space.
 				'minimum' : 0,
 				'maximum' : 2190,
 			},
@@ -6300,7 +6531,7 @@ class Settings(object):
 			'title' : 36498,
 			'value' : {
 				'unit' : UnitSecond,
-				'default' : 30,
+				'default' : 20,
 				'minimum' : 5,
 				'maximum' : 600,
 			},
@@ -6328,7 +6559,7 @@ class Settings(object):
 			'title' : 33660,
 			'value' : {
 				'unit' : UnitSecond,
-				'default' : 30,
+				'default' : 40, # 20 secs is too little.
 				'minimum' : 5,
 				'maximum' : 600,
 			},
@@ -6571,22 +6802,16 @@ class Settings(object):
 		'download.manual.location.combined' 		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/',
 		'download.manual.location.movie'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Movies/',
 		'download.manual.location.show'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Shows/',
-		'download.manual.location.documentary'		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Documentaries/',
-		'download.manual.location.short'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Shorts/',
 		'download.manual.location.other'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Manual/Other/',
 
 		'download.cache.location.combined'			: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/',
 		'download.cache.location.movie'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Movies/',
 		'download.cache.location.show'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Shows/',
-		'download.cache.location.documentary'		: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Documentaries/',
-		'download.cache.location.short'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Shorts/',
 		'download.cache.location.other'				: 'special://userdata/addon_data/plugin.video.gaia/Downloads/Cache/Other/',
 
 		'library.location.combined'					: 'special://userdata/addon_data/plugin.video.gaia/Library/',
 		'library.location.movie'					: 'special://userdata/addon_data/plugin.video.gaia/Library/Movies/',
 		'library.location.show'						: 'special://userdata/addon_data/plugin.video.gaia/Library/Shows/',
-		'library.location.documentary'				: 'special://userdata/addon_data/plugin.video.gaia/Library/Documentaries/',
-		'library.location.short'					: 'special://userdata/addon_data/plugin.video.gaia/Library/Shorts/',
 	}
 
 	@classmethod
@@ -6686,29 +6911,49 @@ class Settings(object):
 			settings = interpreter == Settings.InterpreterStandard
 
 			from lib.meta.tools import MetaTools
+			from lib.meta.menu import MetaMenu
+			from lib.meta.pack import MetaPack
+			from lib.meta.cache import MetaCache
+			from lib.meta.image import MetaImage
+			from lib.meta.manager import MetaManager
+			from lib.meta.provider import MetaProvider
+			from lib.meta.service import MetaService
+			from lib.meta.providers.fanart import MetaFanart
+			from lib.meta.services.tvdb import MetaTvdb
 			from lib.providers.core.manager import Manager
+			from lib.providers.core.base import ProviderBase
+			from lib.providers.core.debrid import ProviderDebrid
+			from lib.providers.core.external import ProviderExternal
+			from lib.providers.core.web import ProviderWeb
 			from lib.debrid.debrid import Debrid
 			from lib.modules.stream import Stream
 			from lib.modules.cache import Cache, Memory
 			from lib.modules.concurrency import Pool
 			from lib.modules.account import Account
 			from lib.modules.cloudflare import Cloudflare
+			from lib.modules.menu import Menu
 			from lib.modules.core import Core
 			from lib.modules.handler import Handler
 			from lib.modules.playback import Playback
+			from lib.modules.search import Search
+			from lib.modules.shortcut import Shortcut
 			from lib.modules.interface import Font, Icon, Format, Core as CoreDialog, Dialog, Context
-			from lib.modules.player import Player, Streamer, Subtitle as SubtitlePlayer
-			from lib.modules.subtitle import Subtitle
+			from lib.modules.player import Player, Streamer, Subtitle
 			from lib.modules.window import Window
+			from lib.modules.environment import Environment
+			from lib.modules.external import Importer, Loader
 			from lib.modules import trakt as Trakt
 
 			classes = [
-				MetaTools, Debrid, Stream, Manager,
-				Account, Cloudflare, Core, Handler, Playback, Subtitle, Window, Trakt,
+				MetaTools, MetaMenu, MetaPack, MetaCache, MetaImage, MetaManager, MetaProvider, MetaService, MetaTvdb, MetaFanart,
+				Debrid, Stream,
+				Manager, ProviderBase, ProviderDebrid, ProviderExternal, ProviderWeb,
+				Account, Cloudflare, Search, Shortcut, Menu, Core, Handler, Playback, Window, Trakt,
 				Font, Icon, Format, CoreDialog, Dialog, Context,
-				Player, Streamer, SubtitlePlayer,
+				Player, Streamer, Subtitle,
 				Cache, Memory, Pool,
-				Language, Media, System,
+				Language, Title, Audience, System, Time, Environment,
+				#Importer, Loader, # Do not reset these. They do not rely on any settings. And it is actually more efficient to not reset, so we can reuse imported modules between invokers, which typically take long to import.
 			]
 			for i in classes:
 				try: i.reset(settings = settings)
@@ -6750,11 +6995,15 @@ class Settings(object):
 	# Hence, if this function was not able to write to file during this time, the old settings will remain in the file. On the next launch this will be retried.
 	@classmethod
 	def clean(self, reload = False, retry = True, background = True):
-		if background: Pool.thread(target = self._clean, kwargs = {'reload' : reload, 'retry' : retry}, start = True)
+		if background: Pool.thread(target = self._clean, kwargs = {'reload' : reload, 'retry' : retry, 'delay' : True}, start = True)
 		else: self._clean(reload = reload, retry = retry)
 
 	@classmethod
-	def _clean(self, reload = False, retry = True):
+	def _clean(self, reload = False, retry = True, delay = False):
+		# Important when called from service.py after Kodi is freshly booted.
+		# Otherwise Koldi might not have loaded the addon settings yet, causing many "Resetting to default value" calls below.
+		if delay: Time.sleep(3)
+
 		dataMain = self.cacheDataMain()
 		idsMain = Regex.extract(data = dataMain, expression = '<setting\s*id\s*=\s*"(.*?)"', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
@@ -6766,12 +7015,12 @@ class Settings(object):
 		]
 		for id in idsMain:
 			if not id in exceptions and self.idDataLabel(id) in idsMain:
-				if not self.defaultIs(id = id) and self._getDatabase(id = self.idDataValue(id)) is None:
+				if not self.defaultIs(id = self.idDataLabel(id)) and self._getDatabase(id = self.idDataValue(id)) is None: # Check defaultIs() on the label, not on "id".
 					Logger.log('CLEAN SETTINGS - Resetting to default value (%s)' % id)
 					self.defaultData(id = id)
 					change = True
 
-		# Only do this here, since some values might bbe reset to default above.
+		# Only do this here, since some values might be reset to default above.
 		self.cacheClear()
 		dataUser = self.cacheDataUser()
 		idsUser = Regex.extract(data = dataUser, expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"(.*?)".*?(?:<\/setting>|\/>)(?:\r|\n|$))', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
@@ -6820,6 +7069,28 @@ class Settings(object):
 	def pathDatabase(self):
 		return File.joinPath(System.profile(), 'settings.db')
 
+	# Get a Kodi setting.
+	# A list of setting IDs can be found in: .kodi/data/userdata/guisettings.xml
+	@classmethod
+	def kodi(self, id):
+		try: return System.executeJson(method = 'Settings.GetSettingValue', parameters = {'setting' : id})['result']['value']
+		except: Logger.error()
+		return None
+
+	# Set a Kodi setting.
+	@classmethod
+	def kodiSet(self, id, value):
+		try: return System.executeJson(method = 'Settings.SetSettingValue', parameters = {'setting' : id, 'value' : value})['result']
+		except: Logger.error()
+		return False
+
+	# Reset a Kodi setting to its default setting.
+	@classmethod
+	def kodiDefault(self, id):
+		try: return System.executeJson(method = 'Settings.ResetSettingValue', parameters = {'setting' : id})['result']
+		except: Logger.error()
+		return False
+
 	@classmethod
 	def clear(self, initialize = False):
 		File.delete(self.pathProfile())
@@ -6840,6 +7111,12 @@ class Settings(object):
 			Settings.Lock.acquire()
 
 			if not Settings.CacheInitialized:
+				# These should be initialized before calling System.windowPropertySet() below.
+				# Otherwise we sometimes get sporadic errors during Kodi boot when calling Service.settingAutomatic(), since Settings.cache() is still busy initializing while we try to read the settings.
+				#	tools.py, cacheGet]: File "tools.py", in cacheGet\n    if id in values:, "TypeError: argument of type 'NoneType' is not iterable"
+				Settings.CacheValuesMain = {}
+				Settings.CacheValuesUser = {}
+
 				try: cacheGlobal = int(System.windowPropertyGet(Settings.PropertyCacheInitialized))
 				except: cacheGlobal = False
 
@@ -6864,9 +7141,6 @@ class Settings(object):
 
 					System.windowPropertySet(Settings.PropertyCacheInitialized, int(Settings.CacheInitialized))
 					System.windowPropertySet(Settings.PropertyCacheEnabled, int(Settings.CacheEnabled))
-
-				Settings.CacheValuesMain = {}
-				Settings.CacheValuesUser = {}
 
 			Settings.Lock.release()
 
@@ -6940,7 +7214,7 @@ class Settings(object):
 		return Settings.CacheEnabled
 
 	@classmethod
-	def cacheGet(self, id, raw, database = False, retry = True):
+	def cacheGet(self, id, raw, database = False):
 		try:
 			self.cache()
 			if raw:
@@ -6952,10 +7226,6 @@ class Settings(object):
 				values = Settings.CacheValuesUser
 				parameter = Settings.ParameterValue
 
-			# Sometimes during first launch, "values" can be None if the setting's cache was cleared between the "self.cache()" and "self.cacheDataUser()" statements.
-			# In such a case, just retry.
-			if values is None and retry: return self.cacheGet(id = id, raw = raw, database = database, retry = False)
-
 			if id in values: # Already looked-up previously.
 				return values[id]
 			elif database:
@@ -6964,13 +7234,14 @@ class Settings(object):
 				return result
 			else:
 				result = self.raw(id = id, parameter = parameter, data = data)
-				if result is None: # Not in the userdata settings yet. Fallback to normal Kodi lookup.
-					result = self._addon().getSetting(Converter.unicode(id))
+				if result is None: result = self._addon().getSetting(Converter.unicode(id)) # Not in the userdata settings yet. Fallback to normal Kodi lookup.
 				values[id] = result
 				return result
 		except:
 			# When the settings cache is cleared (eg: in clean()), the global dictionaries/data might be set to None while this function is busy executing from another thread.
 			Logger.error()
+
+		return None
 
 	@classmethod
 	def cacheSet(self, id, value):
@@ -7757,13 +8028,13 @@ class Cleanup(object):
 
 	@classmethod
 	def databaseShortcutSize(self):
-		from lib.modules.shortcuts import Shortcuts
-		return Shortcuts()._size()
+		from lib.modules.shortcut import Shortcut
+		return Shortcut.instance()._size()
 
 	@classmethod
 	def databaseShortcutClean(self):
-		from lib.modules.shortcuts import Shortcuts
-		Shortcuts().clear(confirm = False)
+		from lib.modules.shortcut import Shortcut
+		Shortcut.instance().clear(confirm = False)
 
 	@classmethod
 	def settingSize(self):
@@ -7923,21 +8194,1499 @@ class Cleanup(object):
 
 class Media(object):
 
-	TypeNone = None
-	TypeMovie = 'movie'
-	TypeSet = 'set'
-	TypeDocumentary = 'documentary'
-	TypeShort = 'short'
-	TypeShow = 'show'
-	TypeSeason = 'season'
-	TypeEpisode = 'episode'
-	TypePerson = 'person'
-	TypeMultiple = 'multiple' # List containing episodes from different shows.
-	TypeMixed = 'mixed' # List containing a mixture of movies and shows.
-	TypeSpecialSeason = 'specialseason'
-	TypeSpecialEpisode = 'specialepisode'
-	TypeSpecialRecap = 'specialrecap'
-	TypeSpecialExtra = 'specialextra'
+	Unknown		= None
+
+	# BASE TYPES
+	# Default types also used by Kodi directly.
+	Movie			= 'movie'
+	Set				= 'set'
+	Show			= 'show'
+	Season			= 'season'
+	Episode			= 'episode'
+	Person			= 'person'
+	Mixed			= 'mixed' 			# Mixture of movies and shows.
+	Pack			= 'pack' 			# Show season/episode pack.
+
+	# ADDITIONAL TYPES
+	# Custom types not used by Kodi directly.
+	Recap 			= 'recap'			# Season or set recaps.
+	Extra			= 'extra'			# Extra season or set content.
+	List			= 'list'			# List containing any of the other types.
+	Company			= 'company'			# Studio, network, or other company.
+
+	# DERIVED TYPES
+	# A subtype to the base types.
+	Feature			= 'feature'			# Feature full-length movies.
+	Short			= 'short'			# Short films. IMDb: full support (through type) | TMDb: limited support (through keywords or duration) | TVDb: no support (cannot filter by duration) | Trakt: limited support (through genre or duration).
+	Special			= 'special'			# Special films and TV specials. IMDb: full support (through type) | TMDb: limited support (through genre, although only TV movies) | TVDb: limited support (through genre, although only TV movies) | Trakt: limited support (through keywords, although not great).
+	Multi			= 'multi'			# Series with mutiple seasons.
+	Mini			= 'mini'			# Mini-series with a single season. IMDb: full support (through type) | TMDb: full support (through type) | TVDb: full support (through genre) | Trakt: no support (has a mini-series genre, but nothing labeled as such).
+
+	# SERIE TYPES
+	# Season and episode types.
+	Standard		= 'standard'		# A standard season or episode.
+	Exclusive		= 'exclusive'		# A special season (S0) or episode (E0). Do not use "special", since that is reserved for TV specials.
+	Premiere		= 'premiere'		# A first season of a show or a first episode of a season.
+	Finale			= 'finale'			# A last season of a show or a last episode of a season.
+	Outer			= 'outer'			# A first or last episode of a show.
+	Inner			= 'inner'			# A first or last episode of a season.
+	Middle			= 'middle'			# A first or last episode in the middle of a season that is split into mutiple parts.
+
+	# RELEASE TYPES
+	# How the media was released.
+	Cinema			= 'cinema'			# Released in theaters.
+	Television		= 'television'		# Released for TV or home streaming. IMDb: full support (through type) | TMDb: full support (through genre) | TVDb: full support (through genre) | Trakt: limited support (through keywords, although not great).
+
+	# TOPIC TYPES
+	# Content of the media as a subtype to the base types, or genres.
+	Anima			= 'anima'			# Animation of all types.
+	Anime			= 'anime'			# Japanese anime. IMDb: limited support (through keywords, but very few) | TMDb: full support (through keywords) | TVDb: full support (through genre) | Trakt: full support (through genre).
+	Donghua			= 'donghua'			# Chinese donghua. IMDb: limited support (through keywords, but very few) | TMDb: full support (through keywords) | TVDb: limited support (listed as Anime genre with China as the country/language) | Trakt: full support (through genre).
+	Docu			= 'docu'			# Documentaries.
+	Family			= 'family'			# Family and children genres.
+	Music			= 'music'			# Music and musical genres.
+	Sport			= 'sport'			# Sports and sporting events genres.
+	Telly			= 'telly'			# Reality-TV, talk-shows, games-shows, award-shows, news, travel, food, and home-and-garden.
+	Soap			= 'soap'			# Soap operas.
+
+	# MOOD TYPES
+	# Combination of genres.
+	Loved 			= 'loved'			# Romance
+	Relaxed			= 'relaxed'			# Drama, Family
+	Cheerful 		= 'cheerful'		# Comedy
+	Imaginary		= 'imaginary'		# Fantasy, Science-Fiction, Superhero
+	Suspicious		= 'suspicious'		# Thriller, Mystery, Suspense
+	Adventurous		= 'adventurous'		# Adventure, Action
+	Aggressive		= 'aggressive'		# Action, Crime, War, Martial, Western, Eastern
+	Frightened		= 'frightened'		# Horror, Disaster
+	Curious			= 'curious'			# History, Documentary, Biography, Politics
+	Energetic		= 'energetic'		# Sport, Sporting, Travel, Holiday, Music, Musical
+	Indifferent		= 'indifferent'		# Reality, Soap, Talk, Game, Home, Food, Award
+	Experimental	= 'experimental'	# Noir, Short, Indie, Special, Fan, Television
+
+	# AGE TYPES
+	Future			= 'future'			# Released in the future.
+	Recent			= 'recent'			# Released over the past 2 years.
+	Modern			= 'modern'			# Released between 2010 and now.
+	Mature			= 'mature'			# Released between 1990 and 2010.
+	Vintage			= 'vintage'			# Released between 1960 and 1990.
+	Ancient			= 'ancient'			# Released before 1960.
+
+	# QUALITY TYPES
+	Great			= 'great'			# Rating above 8.0.
+	Good			= 'good'			# Rating between 7.0 and 8.0.
+	Fair			= 'fair'			# Rating between 6.0 and 7.0.
+	Poor			= 'poor'			# Rating between 4.0 and 6.0.
+	Bad				= 'bad'				# Rating below 4.0.
+
+	# AUDIENCE TYPES
+	Kid				= 'kid'				# Content for kids as specified by the age settings.
+	Teen			= 'teen'			# Content for teens as specified by the age settings.
+	Adult			= 'adult'			# Content for adults as specified by the age settings.
+
+	# ENTERPRISE TYPES
+	Studio			= 'studio'			# Studios only.
+	Network			= 'network'			# Networks only.
+	Vendor			= 'vendor'			# Vendors only.
+	Producer		= 'producer'		# Studios only at the moment.
+	Broadcaster		= 'broadcaster'		# Studios and networks.
+	Distributor		= 'distributor'		# Studios, networks, and vendors.
+	Original		= 'original'		# Studios and networks, excluding other major companies.
+
+	# REGION TYPES
+	# Content from a specific country or language.
+	# Check MetaTools for which countries and languages are included.
+	Local			= 'local'			# Local cinema according to the user's settings.
+	American		= 'american'		# Hollywood, US, and Canadian cinema.
+	Oceanic			= 'oceanic'			# Australian and New Zealand cinema.
+	British			= 'british'			# British cinema.
+	French			= 'french'			# French cinema. Might include other countries than France, like Canada.
+	Germanic		= 'germanic'		# German cinema. Might include other countries than Germany, like Austria and Switzerland.
+	Spanish			= 'spanish'			# Spanish cinema. Might include other countries than Spain, like latin american countries.
+	Portuguese		= 'portuguese'		# Portuguese cinema. Might include other countries than Portugal, like latin american countries.
+	Italian			= 'italian'			# Italian cinema.
+	Russian			= 'russian'			# Russian cinema.
+	Turkish			= 'turkish'			# Turkish cinema.
+	Benelux			= 'benelux'			# Netherlands, Belgium, and Luxembourg cinema.
+	Nordic 			= 'nordic'			# Scandinavia cinema.
+	Slavic 			= 'slavic'			# Slavic cinema.
+	Balkan 			= 'balkan'			# Balkan cinema.
+	Baltic			= 'baltic'			# Baltic cinema.
+	Mexican 		= 'mexican'			# Mexican cinema.
+	Latin 			= 'latin'			# Latin american cinema.
+	Indian			= 'indian'			# Bollywood and other Indian cinema. Might include other countries than India, like Sri Lanka.
+	Chinese			= 'chinese'			# Chinese cinema. Might include other countries than China, like Taiwan and Hong Kong.
+	Japanese		= 'japanese'		# Japanese cinema.
+	Korean			= 'korean'			# Korean cinema. Mostly South Korean, but might also include North Korea.
+	Eastern			= 'eastern'			# Southeast Asia cinema.
+	Arabian			= 'arabian'			# Arabic cinema.
+	African			= 'african'			# African cinema. Includes all african countries.
+
+	# PLEASURE TYPES
+
+	Drug			= 'drug'
+	Cannabis		= 'cannabis'
+	Psychedelic		= 'psychedelic'
+	Cocaine			= 'cocaine'
+	Alcohol			= 'alcohol'
+	Pill			= 'pill'
+
+	Love			= 'love'
+	Romance			= 'romance'
+	Kiss			= 'kiss'
+	Lgbtq			= 'lgbtq'
+	Gay				= 'gay'
+	Lesbian			= 'lesbian'
+
+	Sex				= 'sex'
+	Nudity			= 'nudity'
+	Erotica			= 'erotica'
+	Pornography		= 'pornography'
+	Prostitution	= 'prostitution'
+	Orgy			= 'orgy'
+
+	Violence		= 'violence'
+	Robbery			= 'robbery'
+	Smuggle			= 'smuggle'
+	Hostage			= 'hostage'
+	Torture			= 'torture'
+	Murder			= 'murder'
+
+	Religion		= 'religion'
+	Cult			= 'cult'
+	Secret			= 'secret'
+	Terrorism		= 'terrorism'
+	Psycho			= 'psycho'
+	Sadism			= 'sadism'
+
+	Profanity		= 'profanity'
+	Blasphemy		= 'blasphemy'
+	Sarcasm			= 'sarcasm'
+	Parody			= 'parody'
+	Satire			= 'satire'
+	Humor			= 'humor'
+
+	# EXPLORE TYPES
+	# These types are not used to label media, but to retrieve subsections in the discover menus, filtered and/or sorted by a specific attributes.
+	All				= 'all'				# All unfiltered releases.
+	New				= 'new'				# New releases. Typically sorted descending by release date.
+	Home			= 'home'			# Home releases for movies. Typically sorted descending by release date.
+	Best			= 'best'			# Best rated titles. Typically sorted descending by rating.
+	Worst			= 'worst'			# Worst rated titles. Typically sorted ascending by rating.
+	Prestige		= 'prestige'		# High quality releases. Typically filtered by a minimum rating and minimum number of votes.
+	Popular			= 'popular'			# Most popular titles. Typically sorted descending by number of watches or votes.
+	Unpopular		= 'unpopular'		# Least popular titles. Typically sorted ascending by number of watches or votes.
+	Viewed			= 'viewed'			# Widely  viewed titles. Typically filtered by a minimum number of votes.
+	Gross			= 'gross'			# Highest grossing box office hits. Typically sorted descending by gross income.
+	Award			= 'award'			# Award winners.
+	Trend			= 'trend'			# Currently trending titles. Typically filtered/sorted by current temporary trendiness or popularity.
+
+	class _Bonus():
+		def __eq__(self, media):
+			return (
+				media == Media.Recap or
+				media == Media.Extra
+			)
+
+	class _Film():
+		def __eq__(self, media):
+			return (
+				media == Media.Movie or
+				media == Media.Feature or
+				media == Media.Short or
+				media == Media.Special
+			)
+
+	class _Serie():
+		def __eq__(self, media):
+			return (
+				media == Media.Show or
+				media == Media.Season or
+				media == Media.Episode or
+
+				media == Media.Standard or
+				media == Media.Exclusive or
+				media == Media.Premiere or
+				media == Media.Finale or
+				media == Media.Outer or
+				media == Media.Inner or
+				media == Media.Middle or
+
+				media == Media.Multi or
+				media == Media.Mini or
+
+				media == Media.Telly or
+				media == Media.Soap
+			)
+
+	class _Topic():
+		def __eq__(self, media):
+			return (
+				media == Media.Anima or
+				media == Media.Anime or
+				media == Media.Donghua or
+				media == Media.Docu or
+				media == Media.Family or
+				media == Media.Music or
+				media == Media.Sport or
+				media == Media.Telly or
+				media == Media.Soap
+			)
+
+	class _Mood():
+		def __eq__(self, media):
+			return (
+				media == Media.Loved or
+				media == Media.Relaxed or
+				media == Media.Cheerful or
+				media == Media.Imaginary or
+				media == Media.Suspicious or
+				media == Media.Adventurous or
+				media == Media.Aggressive or
+				media == Media.Frightened or
+				media == Media.Curious or
+				media == Media.Energetic or
+				media == Media.Indifferent or
+				media == Media.Experimental
+			)
+
+	class _Age():
+		def __eq__(self, media):
+			return (
+				media == Media.Future or
+				media == Media.Recent or
+				media == Media.Modern or
+				media == Media.Mature or
+				media == Media.Vintage or
+				media == Media.Ancient
+			)
+
+	class _Quality():
+		def __eq__(self, media):
+			return (
+				media == Media.Great or
+				media == Media.Good or
+				media == Media.Fair or
+				media == Media.Poor or
+				media == Media.Bad
+			)
+
+	class _Audience():
+		def __eq__(self, media):
+			return (
+				media == Media.Kid or
+				media == Media.Teen or
+				media == Media.Adult
+			)
+
+	class _Enterprise():
+		def __eq__(self, media):
+			return (
+				media == Media.Studio or
+				media == Media.Network or
+				media == Media.Vendor or
+				media == Media.Producer or
+				media == Media.Broadcaster or
+				media == Media.Distributor or
+				media == Media.Original
+			)
+
+	class _Region():
+		def __eq__(self, media):
+			return (
+				media == Media.Local or
+				media == Media.American or
+				media == Media.Oceanic or
+				media == Media.British or
+				media == Media.French or
+				media == Media.Germanic or
+				media == Media.Spanish or
+				media == Media.Portuguese or
+				media == Media.Italian or
+				media == Media.Russian or
+				media == Media.Turkish or
+				media == Media.Benelux or
+				media == Media.Nordic or
+				media == Media.Slavic or
+				media == Media.Balkan or
+				media == Media.Baltic or
+				media == Media.Mexican or
+				media == Media.Latin or
+				media == Media.Indian or
+				media == Media.Chinese or
+				media == Media.Japanese or
+				media == Media.Korean or
+				media == Media.Eastern or
+				media == Media.Arabian or
+				media == Media.African
+			)
+
+	class _Substance():
+		def __eq__(self, media):
+			return (
+				media == Media.Drug or
+				media == Media.Cannabis or
+				media == Media.Psychedelic or
+				media == Media.Cocaine or
+				media == Media.Alcohol or
+				media == Media.Pill
+			)
+
+	class _Relation():
+		def __eq__(self, media):
+			return (
+				media == Media.Love or
+				media == Media.Romance or
+				media == Media.Kiss or
+				media == Media.Lgbtq or
+				media == Media.Gay or
+				media == Media.Lesbian
+			)
+
+	class _Intimacy():
+		def __eq__(self, media):
+			return (
+				media == Media.Sex or
+				media == Media.Nudity or
+				media == Media.Erotica or
+				media == Media.Pornography or
+				media == Media.Prostitution or
+				media == Media.Orgy
+			)
+
+	class _Felony():
+		def __eq__(self, media):
+			return (
+				media == Media.Violence or
+				media == Media.Robbery or
+				media == Media.Smuggle or
+				media == Media.Hostage or
+				media == Media.Torture or
+				media == Media.Murder
+
+			)
+
+	class _Society():
+		def __eq__(self, media):
+			return (
+				media == Media.Religion or
+				media == Media.Cult or
+				media == Media.Secret or
+				media == Media.Terrorism or
+				media == Media.Psycho or
+				media == Media.Sadism
+			)
+
+	class _Lingual():
+		def __eq__(self, media):
+			return (
+				media == Media.Profanity or
+				media == Media.Blasphemy or
+				media == Media.Sarcasm or
+				media == Media.Parody or
+				media == Media.Satire or
+				media == Media.Humor
+			)
+
+	class _Explore():
+		def __eq__(self, media):
+			return (
+				media == Media.All or
+				media == Media.New or
+				media == Media.Home or
+				media == Media.Best or
+				media == Media.Worst or
+				media == Media.Prestige or
+				media == Media.Popular or
+				media == Media.Unpopular or
+				media == Media.Viewed or
+				media == Media.Gross or
+				media == Media.Award or
+				media == Media.Trend
+			)
+
+	# Can be used as follows:
+	# if media == Media.Serie: ...
+	Bonus		= _Bonus()
+	Film		= _Film()
+	Serie		= _Serie()
+	Topic		= _Topic()
+	Mood		= _Mood()
+	Age			= _Age()
+	Quality		= _Quality()
+	Audience	= _Audience()
+	Enterprise	= _Enterprise()
+	Region		= _Region()
+	Substance	= _Substance()
+	Relation	= _Relation()
+	Intimacy	= _Intimacy()
+	Felony		= _Felony()
+	Society		= _Society()
+	Lingual		= _Lingual()
+	Explore		= _Explore()
+
+	class _Pleasure():
+		def __eq__(self, media):
+			return (
+				media == Media.Substance or
+				media == Media.Relation or
+				media == Media.Intimacy or
+				media == Media.Felony or
+				media == Media.Society or
+				media == Media.Lingual
+			)
+
+	Pleasure	= _Pleasure()
+
+	class _Niche():
+		def __eq__(self, media):
+			return (
+				media == Media.Short or
+				media == Media.Special or
+				media == Media.Mini or
+				media == Media.Television or
+
+				media == Media.Topic or
+				media == Media.Mood or
+				media == Media.Age or
+				media == Media.Quality or
+				media == Media.Audience or
+				media == Media.Enterprise or
+				media == Media.Region or
+				media == Media.Pleasure
+			)
+	Niche		= _Niche()
+
+	Separator	= '-'
+
+	##############################################################################
+	# GENERAL
+	##############################################################################
+
+	@classmethod
+	def index(self, media, type):
+		media = self.stringFrom(media = media)
+		try: return media.index(type)
+		except: return None
+
+	@classmethod
+	def type(self, media, type):
+		media = self.stringFrom(media = media)
+		try: return media[media.index(type)]
+		except: return None
+
+	@classmethod
+	def remove(self, media, type):
+		media = self.stringFrom(media = media)
+		try: return [i for i in media if not i == type]
+		except: return media # media is None.
+
+	@classmethod
+	def add(self, media, type, copy = False):
+		media = self.stringFrom(media = media)
+		if not media: media = []
+		elif copy: media = Tools.copy(media)
+		if type:
+			if Tools.isArray(type): media.extend(type)
+			else: media.append(type)
+		return media
+
+	##############################################################################
+	# STRING
+	##############################################################################
+
+	@classmethod
+	def stringTo(self, media):
+		if not media: return None
+		elif Tools.isArray(media): return Media.Separator.join(media)
+		else: return str(media)
+
+	@classmethod
+	def stringFrom(self, media, single = False):
+		if media is None: return Media.Unknown
+		elif not Tools.isString(media): return media
+		media = media.split(Media.Separator)
+		if single and len(media) == 1: return media[0]
+		else: return media
+
+	##############################################################################
+	# IS - GENERAL
+	##############################################################################
+
+	@classmethod
+	def isMedia(self, media, type, full = False):
+		if not type: return True
+		if Tools.isArray(media):
+			if Tools.isArray(type): return all(i in type for i in media) if full else any(i in type for i in media)
+			else: return all(i == type for i in media) if full else any(i == type for i in media)
+		else:
+			return media == type
+
+	@classmethod
+	def isSingle(self, media):
+		if Tools.isArray(media): return len(media) <= 1
+		elif media: return not Media.Separator in media
+		else: return True
+
+	@classmethod
+	def isBonus(self, media):
+		return self.isMedia(media = media, type = Media.Bonus)
+
+	@classmethod
+	def isFilm(self, media):
+		return self.isMedia(media = media, type = Media.Film)
+
+	@classmethod
+	def isSerie(self, media):
+		return self.isMedia(media = media, type = Media.Serie)
+
+	@classmethod
+	def isTopic(self, media):
+		return self.isMedia(media = media, type = Media.Topic)
+
+	@classmethod
+	def isMood(self, media):
+		return self.isMedia(media = media, type = Media.Mood)
+
+	@classmethod
+	def isAge(self, media):
+		return self.isMedia(media = media, type = Media.Age)
+
+	@classmethod
+	def isQuality(self, media):
+		return self.isMedia(media = media, type = Media.Quality)
+
+	@classmethod
+	def isAudience(self, media):
+		return self.isMedia(media = media, type = Media.Audience)
+
+	@classmethod
+	def isEnterprise(self, media):
+		return self.isMedia(media = media, type = Media.Enterprise)
+
+	@classmethod
+	def isRegion(self, media):
+		return self.isMedia(media = media, type = Media.Region)
+
+	@classmethod
+	def isPleasure(self, media):
+		return self.isMedia(media = media, type = Media.Pleasure)
+
+	@classmethod
+	def isExplore(self, media):
+		return self.isMedia(media = media, type = Media.Explore)
+
+	@classmethod
+	def isNiche(self, media):
+		return self.isMedia(media = media, type = Media.Niche)
+
+	##############################################################################
+	# IS - BASE
+	##############################################################################
+
+	@classmethod
+	def isMovie(self, media):
+		return self.isMedia(media = media, type = Media.Movie)
+
+	@classmethod
+	def isSet(self, media):
+		return self.isMedia(media = media, type = Media.Set)
+
+	@classmethod
+	def isShow(self, media):
+		return self.isMedia(media = media, type = Media.Show)
+
+	@classmethod
+	def isSeason(self, media):
+		return self.isMedia(media = media, type = Media.Season)
+
+	@classmethod
+	def isEpisode(self, media):
+		return self.isMedia(media = media, type = Media.Episode)
+
+	@classmethod
+	def isPerson(self, media):
+		return self.isMedia(media = media, type = Media.Person)
+
+	@classmethod
+	def isMixed(self, media):
+		return self.isMedia(media = media, type = Media.Mixed)
+
+	@classmethod
+	def isPack(self, media):
+		return self.isMedia(media = media, type = Media.Pack)
+
+	##############################################################################
+	# IS - ADDITIONAL
+	##############################################################################
+
+	@classmethod
+	def isRecap(self, media):
+		return self.isMedia(media = media, type = Media.Recap)
+
+	@classmethod
+	def isExtra(self, media):
+		return self.isMedia(media = media, type = Media.Extra)
+
+	@classmethod
+	def isList(self, media):
+		return self.isMedia(media = media, type = Media.List)
+
+	@classmethod
+	def isCompany(self, media):
+		return self.isMedia(media = media, type = Media.Company)
+
+	##############################################################################
+	# IS - DERIVED
+	##############################################################################
+
+	@classmethod
+	def isFeature(self, media):
+		return self.isMedia(media = media, type = Media.Feature)
+
+	@classmethod
+	def isShort(self, media):
+		return self.isMedia(media = media, type = Media.Short)
+
+	@classmethod
+	def isSpecial(self, media):
+		return self.isMedia(media = media, type = Media.Special)
+
+	@classmethod
+	def isMulti(self, media):
+		return self.isMedia(media = media, type = Media.Multi)
+
+	@classmethod
+	def isMini(self, media):
+		return self.isMedia(media = media, type = Media.Mini)
+
+	##############################################################################
+	# IS - SERIE
+	##############################################################################
+
+	@classmethod
+	def isStandard(self, media):
+		return self.isMedia(media = media, type = Media.Standard)
+
+	@classmethod
+	def isExclusive(self, media):
+		return self.isMedia(media = media, type = Media.Exclusive)
+
+	@classmethod
+	def isPremiere(self, media):
+		return self.isMedia(media = media, type = Media.Premiere)
+
+	@classmethod
+	def isFinale(self, media):
+		return self.isMedia(media = media, type = Media.Finale)
+
+	@classmethod
+	def isOuter(self, media):
+		return self.isMedia(media = media, type = Media.Outer)
+
+	@classmethod
+	def isInner(self, media):
+		return self.isMedia(media = media, type = Media.Inner)
+
+	@classmethod
+	def isMiddle(self, media):
+		return self.isMedia(media = media, type = Media.Middle)
+
+	##############################################################################
+	# IS - RELEASE
+	##############################################################################
+
+	@classmethod
+	def isCinema(self, media):
+		return self.isMedia(media = media, type = Media.Cinema)
+
+	@classmethod
+	def isTelevision(self, media):
+		return self.isMedia(media = media, type = Media.Television)
+
+	##############################################################################
+	# IS - TOPIC
+	##############################################################################
+
+	@classmethod
+	def isAnima(self, media):
+		return self.isMedia(media = media, type = Media.Anima)
+
+	@classmethod
+	def isAnime(self, media):
+		return self.isMedia(media = media, type = Media.Anime)
+
+	@classmethod
+	def isDonghua(self, media):
+		return self.isMedia(media = media, type = Media.Donghua)
+
+	@classmethod
+	def isDocu(self, media):
+		return self.isMedia(media = media, type = Media.Docu)
+
+	@classmethod
+	def isFamily(self, media):
+		return self.isMedia(media = media, type = Media.Family)
+
+	@classmethod
+	def isMusic(self, media):
+		return self.isMedia(media = media, type = Media.Music)
+
+	@classmethod
+	def isSport(self, media):
+		return self.isMedia(media = media, type = Media.Sport)
+
+	@classmethod
+	def isTelly(self, media):
+		return self.isMedia(media = media, type = Media.Telly)
+
+	@classmethod
+	def isSoap(self, media):
+		return self.isMedia(media = media, type = Media.Soap)
+
+	##############################################################################
+	# IS - MOOD
+	##############################################################################
+
+	@classmethod
+	def isLoved(self, media):
+		return self.isMedia(media = media, type = Media.Loved)
+
+	@classmethod
+	def isRelaxed(self, media):
+		return self.isMedia(media = media, type = Media.Relaxed)
+
+	@classmethod
+	def isCheerful(self, media):
+		return self.isMedia(media = media, type = Media.Cheerful)
+
+	@classmethod
+	def isImaginary(self, media):
+		return self.isMedia(media = media, type = Media.Imaginary)
+
+	@classmethod
+	def isSuspicious(self, media):
+		return self.isMedia(media = media, type = Media.Suspicious)
+
+	@classmethod
+	def isAdventurous(self, media):
+		return self.isMedia(media = media, type = Media.Adventurous)
+
+	@classmethod
+	def isAggressive(self, media):
+		return self.isMedia(media = media, type = Media.Aggressive)
+
+	@classmethod
+	def isFrightened(self, media):
+		return self.isMedia(media = media, type = Media.Frightened)
+
+	@classmethod
+	def isCurious(self, media):
+		return self.isMedia(media = media, type = Media.Curious)
+
+	@classmethod
+	def isEnergetic(self, media):
+		return self.isMedia(media = media, type = Media.Energetic)
+
+	@classmethod
+	def isIndifferent(self, media):
+		return self.isMedia(media = media, type = Media.Indifferent)
+
+	@classmethod
+	def isExperimental(self, media):
+		return self.isMedia(media = media, type = Media.Experimental)
+
+	##############################################################################
+	# IS - AGE
+	##############################################################################
+
+	@classmethod
+	def isFuture(self, media):
+		return self.isMedia(media = media, type = Media.Future)
+
+	@classmethod
+	def isRecent(self, media):
+		return self.isMedia(media = media, type = Media.Recent)
+
+	@classmethod
+	def isModern(self, media):
+		return self.isMedia(media = media, type = Media.Modern)
+
+	@classmethod
+	def isMature(self, media):
+		return self.isMedia(media = media, type = Media.Mature)
+
+	@classmethod
+	def isVintage(self, media):
+		return self.isMedia(media = media, type = Media.Vintage)
+
+	@classmethod
+	def isAncient(self, media):
+		return self.isMedia(media = media, type = Media.Ancient)
+
+	##############################################################################
+	# IS - QUALITY
+	##############################################################################
+
+	@classmethod
+	def isGreat(self, media):
+		return self.isMedia(media = media, type = Media.Great)
+
+	@classmethod
+	def isGood(self, media):
+		return self.isMedia(media = media, type = Media.Good)
+
+	@classmethod
+	def isFair(self, media):
+		return self.isMedia(media = media, type = Media.Fair)
+
+	@classmethod
+	def isPoor(self, media):
+		return self.isMedia(media = media, type = Media.Poor)
+
+	@classmethod
+	def isBad(self, media):
+		return self.isMedia(media = media, type = Media.Bad)
+
+	##############################################################################
+	# IS - AUDIENCE
+	##############################################################################
+
+	@classmethod
+	def isKid(self, media):
+		return self.isMedia(media = media, type = Media.Kid)
+
+	@classmethod
+	def isTeen(self, media):
+		return self.isMedia(media = media, type = Media.Teen)
+
+	@classmethod
+	def isAdult(self, media):
+		return self.isMedia(media = media, type = Media.Adult)
+
+	##############################################################################
+	# IS - ENTERPRISE
+	##############################################################################
+
+	@classmethod
+	def isStudio(self, media):
+		return self.isMedia(media = media, type = Media.Studio)
+
+	@classmethod
+	def isNetwork(self, media):
+		return self.isMedia(media = media, type = Media.Network)
+
+	@classmethod
+	def isVendor(self, media):
+		return self.isMedia(media = media, type = Media.Vendor)
+
+	@classmethod
+	def isProducer(self, media):
+		return self.isMedia(media = media, type = Media.Producer)
+
+	@classmethod
+	def isBroadcaster(self, media):
+		return self.isMedia(media = media, type = Media.Broadcaster)
+
+	@classmethod
+	def isDistributor(self, media):
+		return self.isMedia(media = media, type = Media.Distributor)
+
+	@classmethod
+	def isOriginal(self, media):
+		return self.isMedia(media = media, type = Media.Original)
+
+	##############################################################################
+	# IS - REGION
+	##############################################################################
+
+	@classmethod
+	def isLocal(self, media):
+		return self.isMedia(media = media, type = Media.Local)
+
+	@classmethod
+	def isAmerican(self, media):
+		return self.isMedia(media = media, type = Media.American)
+
+	@classmethod
+	def isOceanic(self, media):
+		return self.isMedia(media = media, type = Media.Oceanic)
+
+	@classmethod
+	def isBritish(self, media):
+		return self.isMedia(media = media, type = Media.British)
+
+	@classmethod
+	def isFrench(self, media):
+		return self.isMedia(media = media, type = Media.French)
+
+	@classmethod
+	def isGermanic(self, media):
+		return self.isMedia(media = media, type = Media.Germanic)
+
+	@classmethod
+	def isSpanish(self, media):
+		return self.isMedia(media = media, type = Media.Spanish)
+
+	@classmethod
+	def isPortuguese(self, media):
+		return self.isMedia(media = media, type = Media.Portuguese)
+
+	@classmethod
+	def isItalian(self, media):
+		return self.isMedia(media = media, type = Media.Italian)
+
+	@classmethod
+	def isRussian(self, media):
+		return self.isMedia(media = media, type = Media.Russian)
+
+	@classmethod
+	def isTurkish(self, media):
+		return self.isMedia(media = media, type = Media.Turkish)
+
+	@classmethod
+	def isBenelux(self, media):
+		return self.isMedia(media = media, type = Media.Benelux)
+
+	@classmethod
+	def isNordic(self, media):
+		return self.isMedia(media = media, type = Media.Nordic)
+
+	@classmethod
+	def isSlavic(self, media):
+		return self.isMedia(media = media, type = Media.Slavic)
+
+	@classmethod
+	def isBalkan(self, media):
+		return self.isMedia(media = media, type = Media.Balkan)
+
+	@classmethod
+	def isBaltic(self, media):
+		return self.isMedia(media = media, type = Media.Baltic)
+
+	@classmethod
+	def isMexican(self, media):
+		return self.isMedia(media = media, type = Media.Mexican)
+
+	@classmethod
+	def isLatin(self, media):
+		return self.isMedia(media = media, type = Media.Latin)
+
+	@classmethod
+	def isIndian(self, media):
+		return self.isMedia(media = media, type = Media.Indian)
+
+	@classmethod
+	def isChinese(self, media):
+		return self.isMedia(media = media, type = Media.Chinese)
+
+	@classmethod
+	def isJapanese(self, media):
+		return self.isMedia(media = media, type = Media.Japanese)
+
+	@classmethod
+	def isKorean(self, media):
+		return self.isMedia(media = media, type = Media.Korean)
+
+	@classmethod
+	def isEastern(self, media):
+		return self.isMedia(media = media, type = Media.Eastern)
+
+	@classmethod
+	def isArabian(self, media):
+		return self.isMedia(media = media, type = Media.Arabian)
+
+	@classmethod
+	def isAfrican(self, media):
+		return self.isMedia(media = media, type = Media.African)
+
+	##############################################################################
+	# IS - PLEASURE
+	##############################################################################
+
+	@classmethod
+	def isSubstance(self, media):
+		return self.isMedia(media = media, type = Media.Substance)
+
+	@classmethod
+	def isDrug(self, media):
+		return self.isMedia(media = media, type = Media.Drug)
+
+	@classmethod
+	def isCannabis(self, media):
+		return self.isMedia(media = media, type = Media.Cannabis)
+
+	@classmethod
+	def isPsychedelic(self, media):
+		return self.isMedia(media = media, type = Media.Psychedelic)
+
+	@classmethod
+	def isCocaine(self, media):
+		return self.isMedia(media = media, type = Media.Cocaine)
+
+	@classmethod
+	def isAlcohol(self, media):
+		return self.isMedia(media = media, type = Media.Alcohol)
+
+	@classmethod
+	def isPill(self, media):
+		return self.isMedia(media = media, type = Media.Pill)
+
+	@classmethod
+	def isRelation(self, media):
+		return self.isMedia(media = media, type = Media.Relation)
+
+	@classmethod
+	def isLove(self, media):
+		return self.isMedia(media = media, type = Media.Love)
+
+	@classmethod
+	def isRomance(self, media):
+		return self.isMedia(media = media, type = Media.Romance)
+
+	@classmethod
+	def isKiss(self, media):
+		return self.isMedia(media = media, type = Media.Kiss)
+
+	@classmethod
+	def isLgbtq(self, media):
+		return self.isMedia(media = media, type = Media.Lgbtq)
+
+	@classmethod
+	def isGay(self, media):
+		return self.isMedia(media = media, type = Media.Gay)
+
+	@classmethod
+	def isLesbian(self, media):
+		return self.isMedia(media = media, type = Media.Lesbian)
+
+	@classmethod
+	def isIntimacy(self, media):
+		return self.isMedia(media = media, type = Media.Intimacy)
+
+	@classmethod
+	def isSex(self, media):
+		return self.isMedia(media = media, type = Media.Sex)
+
+	@classmethod
+	def isNudity(self, media):
+		return self.isMedia(media = media, type = Media.Nudity)
+
+	@classmethod
+	def isErotica(self, media):
+		return self.isMedia(media = media, type = Media.Erotica)
+
+	@classmethod
+	def isPornography(self, media):
+		return self.isMedia(media = media, type = Media.Pornography)
+
+	@classmethod
+	def isProstitution(self, media):
+		return self.isMedia(media = media, type = Media.Prostitution)
+
+	@classmethod
+	def isOrgy(self, media):
+		return self.isMedia(media = media, type = Media.Orgy)
+
+	@classmethod
+	def isFelony(self, media):
+		return self.isMedia(media = media, type = Media.Felony)
+
+	@classmethod
+	def isViolence(self, media):
+		return self.isMedia(media = media, type = Media.Violence)
+
+	@classmethod
+	def isRobbery(self, media):
+		return self.isMedia(media = media, type = Media.Robbery)
+
+	@classmethod
+	def isSmuggle(self, media):
+		return self.isMedia(media = media, type = Media.Smuggle)
+
+	@classmethod
+	def isHostage(self, media):
+		return self.isMedia(media = media, type = Media.Hostage)
+
+	@classmethod
+	def isTorture(self, media):
+		return self.isMedia(media = media, type = Media.Torture)
+
+	@classmethod
+	def isMurder(self, media):
+		return self.isMedia(media = media, type = Media.Murder)
+
+	@classmethod
+	def isSociety(self, media):
+		return self.isMedia(media = media, type = Media.Society)
+
+	@classmethod
+	def isReligion(self, media):
+		return self.isMedia(media = media, type = Media.Religion)
+
+	@classmethod
+	def isCult(self, media):
+		return self.isMedia(media = media, type = Media.Cult)
+
+	@classmethod
+	def isSecret(self, media):
+		return self.isMedia(media = media, type = Media.Secret)
+
+	@classmethod
+	def isTerrorism(self, media):
+		return self.isMedia(media = media, type = Media.Terrorism)
+
+	@classmethod
+	def isPsycho(self, media):
+		return self.isMedia(media = media, type = Media.Psycho)
+
+	@classmethod
+	def isSadism(self, media):
+		return self.isMedia(media = media, type = Media.Sadism)
+
+	@classmethod
+	def isLingual(self, media):
+		return self.isMedia(media = media, type = Media.Lingual)
+
+	@classmethod
+	def isProfanity(self, media):
+		return self.isMedia(media = media, type = Media.Profanity)
+
+	@classmethod
+	def isBlasphemy(self, media):
+		return self.isMedia(media = media, type = Media.Blasphemy)
+
+	@classmethod
+	def isSarcasm(self, media):
+		return self.isMedia(media = media, type = Media.Sarcasm)
+
+	@classmethod
+	def isParody(self, media):
+		return self.isMedia(media = media, type = Media.Parody)
+
+	@classmethod
+	def isSatire(self, media):
+		return self.isMedia(media = media, type = Media.Satire)
+
+	@classmethod
+	def isHumor(self, media):
+		return self.isMedia(media = media, type = Media.Humor)
+
+	##############################################################################
+	# IS - EXPLORE
+	##############################################################################
+
+	@classmethod
+	def isAll(self, media):
+		return self.isMedia(media = media, type = Media.All)
+
+	@classmethod
+	def isNew(self, media):
+		return self.isMedia(media = media, type = Media.New)
+
+	@classmethod
+	def isHome(self, media):
+		return self.isMedia(media = media, type = Media.Home)
+
+	@classmethod
+	def isBest(self, media):
+		return self.isMedia(media = media, type = Media.Best)
+
+	@classmethod
+	def isWorst(self, media):
+		return self.isMedia(media = media, type = Media.Worst)
+
+	@classmethod
+	def isPrestige(self, media):
+		return self.isMedia(media = media, type = Media.Prestige)
+
+	@classmethod
+	def isPopular(self, media):
+		return self.isMedia(media = media, type = Media.Popular)
+
+	@classmethod
+	def isUnpopular(self, media):
+		return self.isMedia(media = media, type = Media.Unpopular)
+
+	@classmethod
+	def isViewed(self, media):
+		return self.isMedia(media = media, type = Media.Viewed)
+
+	@classmethod
+	def isGross(self, media):
+		return self.isMedia(media = media, type = Media.Gross)
+
+	@classmethod
+	def isAward(self, media):
+		return self.isMedia(media = media, type = Media.Award)
+
+	@classmethod
+	def isTrend(self, media):
+		return self.isMedia(media = media, type = Media.Trend)
+
+
+###################################################################
+# AUDIENCE
+###################################################################
+
+class Audience(object):
+
+	TypeKid				= 'kid'
+	TypeTeen			= 'teen'
+	TypeAdult			= 'adult'
+
+	AgeAll				= 0		# 0+
+	AgeToddler 			= 2		# 2+
+	AgeMinor			= 7		# 7+
+	AgeChild			= 8		# 8+
+	AgeTeen				= 13	# 13+
+	AgeYouth			= 14	# 14+
+	AgeAdult			= 17	# 17+
+	AgeUnlimited		= 99
+
+	CertificateNr		= 'nr'		# Not rated yet.
+	CertificateG		= 'g'		# General Audience (All- Age: Any)
+	CertificatePg 		= 'pg'		# Parental Guidance Suggested (Kids - Age: 8+)
+	CertificatePg13		= 'pg13'	# Parents Strongly Cautioned (Teens - Age: 13+)
+	CertificateR		= 'r'		# Restricted (Teens - Age: 14+)
+	CertificateNc17		= 'nc17'	# Adults Only (Adults - Age: 17+)
+	CertificateTvg		= 'tvg'		# General Audience (All - Age: Any)
+	CertificateTvy		= 'tvy'		# All Children (Kids - Age: 2+)
+	CertificateTvy7		= 'tvy7'	# Directed to Older Children (Kids - Age: 7+)
+	CertificateTvpg		= 'tvpg'	# Parental Guidance Suggested (Kids - Age: 8+)
+	CertificateTv13		= 'tv13'	# Parents Strongly Cautioned (Teens - Age: 13+)
+	CertificateTv14		= 'tv14'	# Parents Strongly Cautioned (Teens - Age: 14+)
+	CertificateTvma		= 'tvma'	# Mature Audiences Only (Adults - Age: 17+)
+
+	CertificatesMedia	= {
+		CertificateNr	: CertificateNr,
+
+		CertificateG	: CertificateTvg,
+		CertificatePg	: CertificateTvpg,
+		CertificatePg13	: CertificateTv13,
+		CertificateR	: CertificateTv14,
+		CertificateNc17	: CertificateTvma,
+
+		CertificateTvg	: CertificateG,
+		CertificateTvy	: CertificateG,
+		CertificateTvy7	: CertificateG,
+		CertificateTvpg	: CertificatePg,
+		CertificateTv13	: CertificatePg13,
+		CertificateTv14	: CertificateR,
+		CertificateTvma	: CertificateNc17,
+	}
+
+	SelectAll			= True		# All certificates allowed for the type. Eg: for teens, include certificates for teens and kids, but exclude adults.
+	SelectExclusive		= None		# Only certificates exclusive for the type. Eg: for teens, include certificates for teens, but exclude kids and adults.
+	SelectSingle		= False		# Only the highest certificate for the type. Eg: for teens, only the maximum certificate, eg AgeYouth.
+
+	Default				= {
+		TypeKid			: AgeChild,
+		TypeTeen		: AgeYouth,
+		TypeAdult		: AgeUnlimited,
+	}
+
+	Certificates		= {}
+	Expressions			= None
+
+	@classmethod
+	def reset(self, settings = True):
+		if settings: Audience.Certificates = {}
+
+	@classmethod
+	def clean(self, certificate):
+		if not certificate: return certificate
+		return certificate.lower().replace(' ', '').replace('-', '').replace('_', '').replace('us:', '').strip()
+
+	@classmethod
+	def format(self, certificate):
+		if not certificate: return certificate
+		return Tools.stringSplit(value = certificate.upper(), length = 2, join = '-')
+
+	@classmethod
+	def enabled(self):
+		return Settings.getBoolean('metadata.general.audience')
+
+	@classmethod
+	def age(self, type):
+		if self.enabled(): return Settings.getInteger('metadata.general.audience.%s' % type)
+		else: return Audience.Default.get(type)
+
+	@classmethod
+	def ageKid(self, type):
+		return self.age(type = Audience.TypeKid)
+
+	@classmethod
+	def ageTeen(self, type):
+		return self.age(type = Audience.TypeTeen)
+
+	@classmethod
+	def ageAdult(self, type):
+		return self.age(type = Audience.TypeAdult)
+
+	@classmethod
+	def allowed(self, certificate, certificates = None, type = None, invalid = None, unrated = None, select = SelectAll):
+		if certificates is None:
+			if unrated is None: unrated = type == Audience.TypeAdult
+			certificates = self.certificate(type = type, age = True, unrated = unrated, select = select)
+		else:
+			certificates = [self.clean(certificate = i) for i in certificates]
+			if unrated is None: unrated = Audience.CertificateNr in certificates or Audience.CertificateNc17 in certificates or Audience.CertificateTvma in certificates
+
+		if not certificate: return unrated if invalid is None else invalid
+
+		certificate = self.clean(certificate = certificate)
+		if certificate in certificates: return True
+
+		# TV movies and TV specials often have a TV MPAA (https://imdb.com/title/tt0385690).
+		certificate = Audience.CertificatesMedia.get(certificate)
+		if certificate and certificate in certificates: return True
+
+		return False
+
+	@classmethod
+	def allowedKid(self, certificate, invalid = None, unrated = None, select = SelectAll):
+		return self.allowed(certificate = certificate, type = Audience.TypeKid, invalid = invalid, unrated = unrated, select = select)
+
+	@classmethod
+	def allowedTeen(self, certificate, invalid = None, unrated = None, select = SelectAll):
+		return self.allowed(certificate = certificate, type = Audience.TypeTeen, invalid = invalid, unrated = unrated, select = select)
+
+	@classmethod
+	def allowedAdult(self, certificate, invalid = None, unrated = None, select = SelectAll):
+		return self.allowed(certificate = certificate, type = Audience.TypeAdult, invalid = invalid, unrated = unrated, select = select)
+
+	@classmethod
+	def certificate(self, type = None, age = None, media = None, unrated = None, select = SelectAll):
+		if unrated is None: unrated = type == Audience.TypeAdult and not select == Audience.SelectExclusive
+		key = (type, age, media, unrated, select)
+
+		if not key in Audience.Certificates:
+			minimum = -1
+			maximum = age
+
+			if age is None or age is True: maximum = self.age(type = type)
+			elif age is False: maximum = Audience.AgeAll
+
+			if select == Audience.SelectExclusive:
+				# If any of the values here are changed, make sure that the Progress/Arrivals menus under the Audience niche menus load the correct stuff, and not eg PG titles under the Kids menu.
+				if type == Audience.TypeKid: maximum -= 1 # Everything below a certain age for children. Otherwise TV-PG (8+) is added to the kids niche menu, which are mostly adult shows..
+				elif type == Audience.TypeTeen: minimum = self.age(type = Audience.TypeKid) # Not +1, since we want to include PG/TV-PG.
+				elif type == Audience.TypeAdult: minimum = self.age(type = Audience.TypeTeen) # Not +1, since otherwise it is only TV-MA, which might return too few for the niche menus.
+
+			result = []
+			isMovie = media is None or Media.isMovie(media)
+			isSerie = media is None or Media.isSerie(media)
+
+			if maximum >= Audience.AgeAll:
+				if minimum <= Audience.AgeAll:
+					if isMovie: result.append(Audience.CertificateG)
+					if isSerie: result.append(Audience.CertificateTvg)
+
+				if maximum >= Audience.AgeToddler:
+					if minimum <= Audience.AgeToddler:
+						if isSerie: result.append(Audience.CertificateTvy)
+
+					if maximum >= Audience.AgeMinor:
+						if minimum <= Audience.AgeMinor:
+							if isSerie: result.append(Audience.CertificateTvy7)
+
+						if maximum >= Audience.AgeChild:
+							if minimum <= Audience.AgeChild:
+								if isMovie: result.append(Audience.CertificatePg)
+								if isSerie: result.append(Audience.CertificateTvpg)
+
+							if maximum >= Audience.AgeTeen:
+								if minimum <= Audience.AgeTeen:
+									if isMovie: result.append(Audience.CertificatePg13)
+									if isSerie: result.append(Audience.CertificateTv13)
+
+								if maximum >= Audience.AgeYouth:
+									if minimum <= Audience.AgeYouth:
+										if isMovie: result.append(Audience.CertificateR)
+										if isSerie: result.append(Audience.CertificateTv14)
+
+									if maximum >= Audience.AgeAdult:
+										if minimum <= Audience.AgeAdult:
+											if isMovie: result.append(Audience.CertificateNc17)
+											if isSerie: result.append(Audience.CertificateTvma)
+
+			if result: result = list(reversed(result))
+			if unrated: result.append(Audience.CertificateNr)
+			if select == Audience.SelectSingle: result = result[0] if result else None
+			Audience.Certificates[key] = result
+
+		return Audience.Certificates[key]
+
+	@classmethod
+	def certificateKid(self, media = None, unrated = None, select = SelectAll):
+		return self.certificate(type = Audience.TypeKid, media = media, unrated = unrated, select = select)
+
+	@classmethod
+	def certificateTeen(self, media = None, unrated = None, select = SelectAll):
+		return self.certificate(type = Audience.TypeTeen, media = media, unrated = unrated, select = select)
+
+	@classmethod
+	def certificateAdult(self, media = None, unrated = None, select = SelectAll):
+		return self.certificate(type = Audience.TypeAdult, media = media, unrated = unrated, select = select)
+
+	@classmethod
+	def convert(self, certificate, media = None):
+		if not certificate or certificate in Audience.CertificatesMedia: return certificate
+
+		# Should add more for toher countries.
+		# https://help.imdb.com/article/contribution/titles/certificates/GU757M8ZJ9ZPXB39#
+		if Audience.Expressions is None:
+			Audience.Expressions = {
+				# International Age Rating Coalition
+				'^3'								: Audience.CertificateG,	# 3+
+				'^7'								: Audience.CertificatePg,	# 7+
+				'^12'								: Audience.CertificatePg13,	# 12+
+				'^16'								: Audience.CertificateR,	# 16+
+				'^18'								: Audience.CertificateNc17,	# 18+
+
+				# United Kingdom
+				'^u$'								: Audience.CertificateG,	# U
+				'^r18'								: Audience.CertificateNc17,	# R18
+
+				# Canada
+				'^e$'								: Audience.CertificateG,	# E
+				'^14a'								: Audience.CertificateR,	# 14A
+				'^18a'								: Audience.CertificateNc17,	# 18A
+				'^a$'								: Audience.CertificateNc17,	# A
+
+				# Australia
+				#'^e$'								: Audience.CertificateG,	# E - same as Canada
+				'^g[\s\-]*8'						: Audience.CertificatePg,	# G8+
+				'^m(?:$|a?[\s\-]?15)'				: Audience.CertificateR,	# M, M15+, MA15+
+				'^(?:[rx][\s\-]?18|rc)'				: Audience.CertificateNc17,	# X18+, R18+, RC
+				'^ctc$'								: Audience.CertificateNr,	# CTC
+
+				# Spain
+				'^al?(?:$|\/)'						: Audience.CertificateG,	# A, AL, A/fig, A/i, A/i/fig (this clashes with Canada's A)
+				'^tp$'								: Audience.CertificateG,	# TP
+				'^x$'								: Audience.CertificateNc17,	# X
+
+				# Generic
+				'(?<!\d)(?:0|1|2|3|4|5|6|7)(?!\d)'	: Audience.CertificateG,
+				'(?<!\d)(?:8|9|10|11)(?!\d)'		: Audience.CertificatePg,
+				'(?<!\d)(?:12|13)(?!\d)'			: Audience.CertificatePg13,
+				'(?<!\d)(?:14|15|16)(?!\d)'			: Audience.CertificateR,
+				'(?<!\d)(?:17|18|19|20|21)(?!\d)'	: Audience.CertificateNc17,
+			}
+
+		for k, v in Audience.Expressions.items():
+			if Regex.match(data = certificate, expression = k, cache = True):
+				if Media.isSerie(media) and not 'tv' in v: v = Audience.CertificatesMedia.get(v)
+				return v
+
+		return certificate # Otherwise just return whatever certificate there is.
+
+###################################################################
+# TITLE
+###################################################################
+
+class Title(object):
 
 	OrderTitle = 0
 	OrderTitleYear = 1
@@ -7952,15 +9701,11 @@ class Media(object):
 	Native = 1
 
 	DefaultMovie = 0
-	DefaultDocumentary = 0
-	DefaultShort = 0
 	DefaultShow = 0
 	DefaultSeason = 0
 	DefaultEpisode = 11
 
 	DefaultAeonMovie = 0
-	DefaultAeonDocumentary = 0
-	DefaultAeonShort = 0
 	DefaultAeonShow = 0
 	DefaultAeonSeason = 0
 	DefaultAeonEpisode = 11
@@ -7972,12 +9717,12 @@ class Media(object):
 	NameEpisodeLong = None
 	NameEpisodeShort = None
 
-	FormatsTitle = None
-	FormatsSeason = None
-	FormatsEpisode = None
+	FormatTitle = None
+	FormatSeason = None
+	FormatEpisode = None
 
-	FormatsSkin = None
-	FormatsDefault = None
+	FormatSkin = None
+	FormatDefault = None
 
 	##############################################################################
 	# RESET
@@ -7986,19 +9731,19 @@ class Media(object):
 	@classmethod
 	def reset(self, settings = True):
 		if settings:
-			Media.NameSeasonSeries = None
-			Media.NameSeasonSpecial = None
-			Media.NameSeasonLong = None
-			Media.NameSeasonShort = None
-			Media.NameEpisodeLong = None
-			Media.NameEpisodeShort = None
+			Title.NameSeasonSeries = None
+			Title.NameSeasonSpecial = None
+			Title.NameSeasonLong = None
+			Title.NameSeasonShort = None
+			Title.NameEpisodeLong = None
+			Title.NameEpisodeShort = None
 
-			Media.FormatsTitle = None
-			Media.FormatsSeason = None
-			Media.FormatsEpisode = None
+			Title.FormatTitle = None
+			Title.FormatSeason = None
+			Title.FormatEpisode = None
 
-			Media.FormatsSkin = None
-			Media.FormatsDefault = None
+			Title.FormatSkin = None
+			Title.FormatDefault = None
 
 	##############################################################################
 	# GENERAL
@@ -8009,23 +9754,23 @@ class Media(object):
 		order = format[0]
 		format = format[1]
 		if title is None: title = ''
-		if order == Media.OrderTitle:
+		if order == Title.OrderTitle:
 			result = format % (title)
-		elif order == Media.OrderTitleYear:
+		elif order == Title.OrderTitleYear:
 			result = format % (title, year)
-		elif order == Media.OrderYearTitle:
+		elif order == Title.OrderYearTitle:
 			result = format % (year, title)
-		elif order == Media.OrderSeason:
-			if season is None and series: result = Media.NameSeasonSeries
-			elif season == 0 and special and len(format) > 5: result = Media.NameSeasonSpecial
+		elif order == Title.OrderSeason:
+			if season is None and series: result = Title.NameSeasonSeries
+			elif season == 0 and special and len(format) > 5: result = Title.NameSeasonSpecial
 			else: result = format % (season)
-		elif order == Media.OrderEpisode:
+		elif order == Title.OrderEpisode:
 			result = format % (episode)
-		elif order == Media.OrderSeasonEpisode:
+		elif order == Title.OrderSeasonEpisode:
 			result = format % (season, episode)
-		elif order == Media.OrderEpisodeTitle:
+		elif order == Title.OrderEpisodeTitle:
 			result = format % (episode, title)
-		elif order == Media.OrderSeasonEpisodeTitle:
+		elif order == Title.OrderSeasonEpisodeTitle:
 			result = format % (season, episode, title)
 		else:
 			result = title
@@ -8058,149 +9803,141 @@ class Media(object):
 
 	@classmethod
 	def _initialize(self, skin = True):
-		if Media.NameSeasonSpecial is None:
+		if Title.NameSeasonSpecial is None:
 			from lib.modules.interface import Translation
 
-			Media.NameSeasonSeries = Translation.string(32003)
-			Media.NameSeasonSpecial = Translation.string(35637)
-			Media.NameSeasonLong = Translation.string(32055)
-			Media.NameSeasonShort = Media.NameSeasonLong[0].upper()
-			Media.NameEpisodeLong = Translation.string(33028)
-			Media.NameEpisodeShort = Media.NameEpisodeLong[0].upper()
+			Title.NameSeasonSeries = Translation.string(32003)
+			Title.NameSeasonSpecial = Translation.string(35637)
+			Title.NameSeasonLong = Translation.string(32055)
+			Title.NameSeasonShort = Title.NameSeasonLong[0].upper()
+			Title.NameEpisodeLong = Translation.string(33028)
+			Title.NameEpisodeShort = Title.NameEpisodeLong[0].upper()
 
-			Media.FormatsTitle = [
-				(Media.OrderTitle,		'%s'),
-				(Media.OrderTitleYear,	'%s %d'),
-				(Media.OrderTitleYear,	'%s. %d'),
-				(Media.OrderTitleYear,	'%s - %d'),
-				(Media.OrderTitleYear,	'%s (%d)'),
-				(Media.OrderTitleYear,	'%s [%d]'),
-				(Media.OrderYearTitle,	'%d %s'),
-				(Media.OrderYearTitle,	'%d. %s'),
-				(Media.OrderYearTitle,	'%d - %s'),
-				(Media.OrderYearTitle,	'(%d) %s'),
-				(Media.OrderYearTitle,	'[%d] %s'),
+			Title.FormatTitle = [
+				(Title.OrderTitle,		'%s'),
+				(Title.OrderTitleYear,	'%s %d'),
+				(Title.OrderTitleYear,	'%s. %d'),
+				(Title.OrderTitleYear,	'%s - %d'),
+				(Title.OrderTitleYear,	'%s (%d)'),
+				(Title.OrderTitleYear,	'%s [%d]'),
+				(Title.OrderYearTitle,	'%d %s'),
+				(Title.OrderYearTitle,	'%d. %s'),
+				(Title.OrderYearTitle,	'%d - %s'),
+				(Title.OrderYearTitle,	'(%d) %s'),
+				(Title.OrderYearTitle,	'[%d] %s'),
 			]
 
-			Media.FormatsSeason = [
-				(Media.OrderSeason,		Media.NameSeasonLong + ' %01d'),
-				(Media.OrderSeason,		Media.NameSeasonLong + ' %02d'),
-				(Media.OrderSeason,		Media.NameSeasonShort + '%01d'),
-				(Media.OrderSeason,		Media.NameSeasonShort + '%02d'),
-				(Media.OrderSeason,		'%01d ' + Media.NameSeasonLong),
-				(Media.OrderSeason,		'%02d ' + Media.NameSeasonLong),
-				(Media.OrderSeason,		'%01d. ' + Media.NameSeasonLong),
-				(Media.OrderSeason,		'%02d. ' + Media.NameSeasonLong),
-				(Media.OrderSeason,		'%01d'),
-				(Media.OrderSeason,		'%02d'),
+			Title.FormatSeason = [
+				(Title.OrderSeason,		Title.NameSeasonLong + ' %01d'),
+				(Title.OrderSeason,		Title.NameSeasonLong + ' %02d'),
+				(Title.OrderSeason,		Title.NameSeasonShort + '%01d'),
+				(Title.OrderSeason,		Title.NameSeasonShort + '%02d'),
+				(Title.OrderSeason,		'%01d ' + Title.NameSeasonLong),
+				(Title.OrderSeason,		'%02d ' + Title.NameSeasonLong),
+				(Title.OrderSeason,		'%01d. ' + Title.NameSeasonLong),
+				(Title.OrderSeason,		'%02d. ' + Title.NameSeasonLong),
+				(Title.OrderSeason,		'%01d'),
+				(Title.OrderSeason,		'%02d'),
 			]
 
-			Media.FormatsEpisode = [
-				(Media.OrderTitle,					'%s'),
-				(Media.OrderEpisodeTitle,			'%01d %s'),
-				(Media.OrderEpisodeTitle,			'%02d %s'),
-				(Media.OrderEpisodeTitle,			'%01d. %s'),
-				(Media.OrderEpisodeTitle,			'%02d. %s'),
-				(Media.OrderEpisodeTitle,			'%01d - %s'),
-				(Media.OrderEpisodeTitle,			'%02d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%01dx%01d %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%01dx%02d %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%02dx%02d %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%01dx%01d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%01dx%02d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		'%02dx%02d - %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%01d %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%02d %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%01d. %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%02d. %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%01d - %s'),
-				(Media.OrderEpisodeTitle,			Media.NameEpisodeShort + '%02d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%01d %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%02d %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%02d' + Media.NameEpisodeShort + '%02d %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%01d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%02d - %s'),
-				(Media.OrderSeasonEpisodeTitle,		Media.NameSeasonShort + '%02d' + Media.NameEpisodeShort + '%02d - %s'),
-				(Media.OrderEpisode,				'%01d'),
-				(Media.OrderEpisode,				'%02d'),
-				(Media.OrderSeasonEpisode,			'%01dx%01d'),
-				(Media.OrderSeasonEpisode,			'%01dx%02d'),
-				(Media.OrderSeasonEpisode,			'%02dx%02d'),
-				(Media.OrderEpisode,				Media.NameEpisodeShort + '%01d'),
-				(Media.OrderEpisode,				Media.NameEpisodeShort + '%02d'),
-				(Media.OrderSeasonEpisode,			Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%01d'),
-				(Media.OrderSeasonEpisode,			Media.NameSeasonShort + '%01d' + Media.NameEpisodeShort + '%02d'),
-				(Media.OrderSeasonEpisode,			Media.NameSeasonShort + '%02d' + Media.NameEpisodeShort + '%02d'),
+			Title.FormatEpisode = [
+				(Title.OrderTitle,					'%s'),
+				(Title.OrderEpisodeTitle,			'%01d %s'),
+				(Title.OrderEpisodeTitle,			'%02d %s'),
+				(Title.OrderEpisodeTitle,			'%01d. %s'),
+				(Title.OrderEpisodeTitle,			'%02d. %s'),
+				(Title.OrderEpisodeTitle,			'%01d - %s'),
+				(Title.OrderEpisodeTitle,			'%02d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%01dx%01d %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%01dx%02d %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%02dx%02d %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%01dx%01d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%01dx%02d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		'%02dx%02d - %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%01d %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%02d %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%01d. %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%02d. %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%01d - %s'),
+				(Title.OrderEpisodeTitle,			Title.NameEpisodeShort + '%02d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%01d %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%02d %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%02d' + Title.NameEpisodeShort + '%02d %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%01d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%02d - %s'),
+				(Title.OrderSeasonEpisodeTitle,		Title.NameSeasonShort + '%02d' + Title.NameEpisodeShort + '%02d - %s'),
+				(Title.OrderEpisode,				'%01d'),
+				(Title.OrderEpisode,				'%02d'),
+				(Title.OrderSeasonEpisode,			'%01dx%01d'),
+				(Title.OrderSeasonEpisode,			'%01dx%02d'),
+				(Title.OrderSeasonEpisode,			'%02dx%02d'),
+				(Title.OrderEpisode,				Title.NameEpisodeShort + '%01d'),
+				(Title.OrderEpisode,				Title.NameEpisodeShort + '%02d'),
+				(Title.OrderSeasonEpisode,			Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%01d'),
+				(Title.OrderSeasonEpisode,			Title.NameSeasonShort + '%01d' + Title.NameEpisodeShort + '%02d'),
+				(Title.OrderSeasonEpisode,			Title.NameSeasonShort + '%02d' + Title.NameEpisodeShort + '%02d'),
 			]
 
-		data = Media.FormatsSkin if skin else Media.FormatsDefault
+		data = Title.FormatSkin if skin else Title.FormatDefault
 		if data is None:
 			from lib.modules.interface import Skin
 			aeon = Skin.isAeon() if skin else False
 			data = {}
 
-			enabled = Settings.getBoolean('metadata.label.layout')
+			enabled = Settings.getBoolean('menu.label.layout')
 
-			setting = Settings.getInteger('metadata.label.layout.movie') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting = Media.DefaultAeonMovie if aeon else Media.DefaultMovie
+			setting = Settings.getInteger('menu.label.layout.movie') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonMovie if aeon else Title.DefaultMovie
 			else: setting -= 2
-			data[Media.TypeMovie] = Media.FormatsTitle[setting]
+			data[Media.Movie] = Title.FormatTitle[setting]
 
-			setting = Settings.getInteger('metadata.label.layout.documentary') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting =Media.DefaultAeonDocumentary if aeon else Media.DefaultDocumentary
+			setting = Settings.getInteger('menu.label.layout.show') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonShow if aeon else Title.DefaultShow
 			else: setting -= 2
-			data[Media.TypeDocumentary] = Media.FormatsTitle[setting]
+			data[Media.Show] = data[Media.Mini] = Title.FormatTitle[setting]
 
-			setting = Settings.getInteger('metadata.label.layout.short') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting = Media.DefaultAeonShort if aeon else Media.DefaultShort
+			setting = Settings.getInteger('menu.label.layout.season') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonSeason if aeon else Title.DefaultSeason
 			else: setting -= 2
-			data[Media.TypeShort] = Media.FormatsTitle[setting]
+			data[Media.Season] = Title.FormatSeason[setting]
 
-			setting = Settings.getInteger('metadata.label.layout.show') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting = Media.DefaultAeonShow if aeon else Media.DefaultShow
-			else: setting -= 2
-			data[Media.TypeShow] = Media.FormatsTitle[setting]
-
-			setting = Settings.getInteger('metadata.label.layout.season') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting = Media.DefaultAeonSeason if aeon else Media.DefaultSeason
-			else: setting -= 2
-			data[Media.TypeSeason] = Media.FormatsSeason[setting]
-
-			setting = Settings.getInteger('metadata.label.layout.episode') if enabled else Media.Default
-			if setting == Media.Native: setting = Media.Default
-			if setting == Media.Default: setting = Media.DefaultAeonEpisode if aeon else Media.DefaultEpisode
+			setting = Settings.getInteger('menu.label.layout.episode') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonEpisode if aeon else Title.DefaultEpisode
 			else: setting -= 2
 
-			data[Media.TypeEpisode] = Media.FormatsEpisode[setting]
+			data[Media.Episode] = Title.FormatEpisode[setting]
 
-			if skin: Media.FormatsSkin = data
-			else: Media.FormatsDefault = data
+			if skin: Title.FormatSkin = data
+			else: Title.FormatDefault = data
 
 		return data
 
 	@classmethod
-	def title(self, type = TypeNone, metadata = None, title = None, year = None, season = None, episode = None, encode = False, pack = False, series = False, special = False, skin = True):
+	def title(self, media = Media.Unknown, metadata = None, title = None, year = None, season = None, episode = None, encode = False, pack = False, series = False, special = False, skin = True):
 		if metadata: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = title, year = year, season = season, episode = episode, encode = encode)
 
-		if type == Media.TypeSet:
-			type = Media.TypeMovie
-		elif type == Media.TypeNone:
+		if media == Media.Extra or media == Media.Recap: media = Media.Unknown
+
+		if media == Media.List:
+			return title
+		elif media == Media.Set:
+			media = Media.Movie
+		elif media == Media.Unknown:
 			pack = (pack and packs)
 			if not season is None and not episode is None and not pack:
-				type = Media.TypeEpisode
+				media = Media.Episode
 			elif not season is None:
-				type = Media.TypeSeason
+				media = Media.Season
 			else:
-				type = Media.TypeMovie
+				media = Media.Movie
 
 		formats = self._initialize(skin = skin)
-		format = formats[type]
+		format = formats[media]
 
 		result = self._format(format = format, title = title, year = year, season = season, episode = episode, series = series, special = special)
 		if not title: result = Regex.remove(data = result, expression = '(\s*[\-\.]\s*)$') # For episode titles for the History streams window.
@@ -8223,34 +9960,26 @@ class Media(object):
 			return title
 
 	@classmethod
-	def number(self, type = TypeNone, metadata = None, title = None, season = None, episode = None, encode = False, pack = False, special = False, skin = True):
+	def number(self, media = Media.Unknown, metadata = None, title = None, season = None, episode = None, encode = False, pack = False, special = False, skin = True):
 		if not metadata is None: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = None, year = None, season = season, episode = episode, encode = encode)
 
-		if type == Media.TypeNone:
+		if media == Media.Unknown:
 			pack = (pack and packs)
 			if not season is None and not episode is None and not pack:
-				type = Media.TypeEpisode
+				media = Media.Episode
 			elif not season is None:
-				type = Media.TypeSeason
+				media = Media.Season
 
 		formats = self._initialize(skin = skin)
-		format = formats[type]
+		format = formats[media]
 		return self._format(format = format, title = title, season = season, episode = episode, special = special)
 
 	@classmethod
-	def numberUniversal(self, type = TypeNone, metadata = None, season = None, episode = None, encode = False):
+	def numberUniversal(self, media = Media.Unknown, metadata = None, season = None, episode = None, encode = False):
 		if not metadata is None: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = None, year = None, season = season, episode = episode, encode = encode)
 		return 'S%02dE%02d' % (season, episode)
-
-	@classmethod
-	def typeMovie(self, type):
-		return type == Media.TypeMovie or type == Media.TypeDocumentary or type == Media.TypeShort
-
-	@classmethod
-	def typeTelevision(self, type):
-		return type == Media.TypeShow or type == Media.TypeSeason or type == Media.TypeEpisode or type == Media.TypeSpecialSeason or type == Media.TypeSpecialEpisode or type == Media.TypeSpecialRecap or type == Media.TypeSpecialExtra
 
 ########################################
 # SUBPROCESS
@@ -8273,25 +10002,33 @@ class Subprocess(object):
 		return True
 
 	@classmethod
-	def command(self, command):
+	def command(self, command, environment = True):
 		# NB: When using "shell", the command cannot be a list, it must be a string.
 		# https://stackoverflow.com/questions/26417658/subprocess-call-arguments-ignored-when-using-shell-true-w-list
 		if Tools.isArray(command): command = ' '.join(command)
+
+		if environment:
+			from lib.modules.environment import Environment
+			command = Environment.command(command = command)
+
 		return command
 
 	@classmethod
 	def output(self, command):
 		try:
 			# Use "shell", otherwise Windows will show a CMD window popup.
-			from subprocess import check_output, CalledProcessError
-			return Converter.unicode(check_output(self.command(command), shell = True))
-		except CalledProcessError:
+			from subprocess import check_output, CalledProcessError, STDOUT
+			return Converter.unicode(check_output(self.command(command), shell = True, stderr = STDOUT))
+		except CalledProcessError as exception:
 			# On Android this exception is thrown:
 			#	subprocess.CalledProcessError: Command 'lscpu' returned non-zero exit status 127.
 			# Do not print the error.
-			pass
+			# Update: This happens to valid programs as well, if the program returns a non-valid exit code (eg: "ping -h")..
+			if System.developer(): Logger.error()
+			try: return Converter.unicode(exception.output) # Important for environment.py - returning output even if the exit code is wrong.
+			except: pass
 		except Exception as exception:
-			if self._error(exception = exception): Logger.error()
+			if self._error(exception = exception) or System.developer(): Logger.error()
 			return False
 
 	@classmethod
@@ -8316,7 +10053,7 @@ class Subprocess(object):
 					break
 			process.poll()
 		except Exception as exception:
-			if self._error(exception = exception): Logger.error()
+			if self._error(exception = exception) or System.developer(): Logger.error()
 			return False
 
 	@classmethod
@@ -8344,7 +10081,7 @@ class Subprocess(object):
 				Logger.error()
 				return False
 		except Exception as exception:
-			if not timeout and self._error(exception = exception): Logger.error()
+			if (not timeout and self._error(exception = exception)) or System.developer(): Logger.error()
 			return False
 
 	@classmethod
@@ -8368,7 +10105,7 @@ class Subprocess(object):
 					result = Converter.unicode(File.readNow(path))
 					File.delete(path)
 			except Exception as exception:
-				if self._error(exception = exception): Logger.error()
+				if self._error(exception = exception) or System.developer(): Logger.error()
 				return False
 		return result
 
@@ -8636,6 +10373,22 @@ class Platform(object):
 	@classmethod
 	def versionLabel(self, refresh = False, full = True):
 		return self.version(refresh = refresh, full = full)['label']
+
+	@classmethod
+	def environment(self, refresh = False, full = True):
+		return self.data(refresh = refresh, full = full)['environment']
+
+	@classmethod
+	def environmentType(self, refresh = False, full = True):
+		return self.environment(refresh = refresh, full = full)['type']
+
+	@classmethod
+	def environmentName(self, refresh = False, full = True):
+		return self.environment(refresh = refresh, full = full)['name']
+
+	@classmethod
+	def environmentLabel(self, refresh = False, full = True):
+		return self.environment(refresh = refresh, full = full)['label']
 
 	@classmethod
 	def python(self, refresh = False, full = True):
@@ -9158,6 +10911,10 @@ class Platform(object):
 		versionNumber = None
 		versionLabel = None
 
+		environmentType = None
+		environmentName = None
+		environmentLabel = None
+
 		try:
 			import platform
 
@@ -9249,6 +11006,13 @@ class Platform(object):
 
 		except: Logger.error()
 
+		try:
+			from lib.modules.environment import Environment
+			environmentType = Environment.type()
+			environmentName = Environment.name()
+			environmentLabel = Environment.label()
+		except: Logger.error()
+
 		result = {
 			'family' : {
 				'type' : familyType,
@@ -9273,6 +11037,11 @@ class Platform(object):
 				'name' : versionName,
 				'label' : versionLabel,
 			},
+			'environment' : {
+				'type' : environmentType,
+				'name' : environmentName,
+				'label' : environmentLabel,
+			},
 			'python' : self.detectPython(),
 			'kodi' : self.detectKodi(),
 			'addon' : self.detectAddon(),
@@ -9281,6 +11050,7 @@ class Platform(object):
 
 		if full:
 			from lib.modules.external import Importer, Psutil, Ujson
+			from lib.modules.compression import Compressor
 			result['identifier'] = self.detectIdentifier()
 			result['module'] = {
 				'cloudscraper' : Importer.moduleCloudScraper(label = True),
@@ -9288,6 +11058,7 @@ class Platform(object):
 				'ujson' : Ujson().moduleLabel(),
 				'image' : Importer.moduleQrImage(label = True),
 			}
+			result['compression'] = Compressor.details()
 
 		return result
 
@@ -9403,6 +11174,58 @@ class Hardware(object):
 	@classmethod
 	def _labelProcessor(self, cores, threads = None):
 		return '%d%s Core%s' % (cores, '' if (not threads or cores == threads) else ('(%d)' % threads), '' if cores == 1 else 's')
+
+	########################################
+	# THREAD
+	########################################
+
+	@classmethod
+	def threadSize(self, default = True):
+		# New threads that are created have a default stack size.
+		# This is the maximum memory the thread can use, not necessarily the real used memory.
+		# These limits are just estimates. They can differ on different OSs, different versions of the same OS, 32bit vs 64bit, and is also subject to OS and user settings.
+		# Hence, there is a theoretical upper limit for the number of thread objects that can be created and executed at the SAME time, since the system might run out of memory.
+
+		base = 1048576 # 1MB
+		sizes = {
+			Platform.SystemWindows : 1048576, # 1MB
+			Platform.SystemLinux : 8388608, # 8MB (ulimit -a)
+			Platform.SystemMacintosh : 524288, # 512KB
+			Platform.SystemAndroid : 1048576, # 1MB
+		}
+
+		size = sizes.get(Platform.systemType(), default)
+		if size: size = max(size, base) # For smaller stack sizes, assume it is at least 1MB.
+		else: size = default
+
+		return size
+
+	@classmethod
+	def threadLimit(self, memory = False, adjust = True, minimum = None, maximum = None, default = None):
+		# Estimate the number of threads that can be created and executed at the SAME time, due to system memory restrictions.
+
+		free = False
+		if not Tools.isInteger(memory):
+			if memory:
+				free = True
+				memory = self.memoryUsageFreeBytes()
+			else:
+				memory = self.memoryBytes()
+		if adjust is True: adjust = 0.8 if free else 0.7
+
+		limit = None
+		size = self.threadSize()
+
+		if size and memory:
+			limit = memory / float(size)
+			if adjust: limit *= adjust
+			limit = int(Math.roundDown(limit))
+		if limit:
+			if minimum: limit = max(limit, minimum)
+			if maximum: limit = min(limit, maximum)
+		if not limit: limit = default
+
+		return limit
 
 	########################################
 	# DATA
@@ -11227,6 +13050,7 @@ class Extension(object):
 	IdAddonSignals = 'script.module.addon.signals'
 	IdTmdbHelper = 'plugin.video.themoviedb.helper'
 	IdVpnManager = 'service.vpn.manager'
+	IdStudioIcons = 'resource.images.studios.white'
 
 	ConfirmDisabled = 0 # Do not show a confirmation dialog.
 	ConfirmBasic = 1 # Show a confirmation dialog with basic info.
@@ -11516,6 +13340,13 @@ class Extension(object):
 				'icon' : 'extensionsorion.png',
 			},
 			{
+				'id' : Extension.IdCreScrapers,
+				'name' : 'Crew Scrapers',
+				'type' : Extension.TypeOptional,
+				'description' : 33963,
+				'icon' : 'extensionscrescrapers.png',
+			},
+			{
 				'id' : Extension.IdOpeScrapers,
 				'name' : 'Open Scrapers',
 				'type' : Extension.TypeOptional,
@@ -11535,13 +13366,6 @@ class Extension(object):
 				'type' : Extension.TypeOptional,
 				'description' : 33963,
 				'icon' : 'extensionsfenscrapers.png',
-			},
-			{
-				'id' : Extension.IdCreScrapers,
-				'name' : 'Crew Scrapers',
-				'type' : Extension.TypeOptional,
-				'description' : 33963,
-				'icon' : 'extensionscrescrapers.png',
 			},
 			{
 				'id' : Extension.IdLamScrapers,
@@ -11649,6 +13473,13 @@ class Extension(object):
 				'type' : Extension.TypeOptional,
 				'description' : 34211,
 				'icon' : 'extensionsvpnmanager.png',
+			},
+			{
+				'id' : Extension.IdStudioIcons,
+				'name' : 'StudioIcons',
+				'type' : Extension.TypeRecommended,
+				'description' : 34243,
+				'icon' : 'extensionsstudioicons.png',
 			},
 		]
 
@@ -12725,22 +14556,22 @@ class YouTube(object):
 
 	@classmethod
 	def quality(self):
-		addon = System.addon(Extension.IdYouTube)
 		quality = None
 
-		# Check addon if not installed.
-		if addon and addon.getSettingBool('kodion.video.quality.mpd') and addon.getSettingBool('kodion.mpd.videos'):
-			selection = addon.getSettingInt('kodion.mpd.quality.selection')
-			if selection == 0: quality = 'SD240'
-			elif selection == 1: quality = 'SD360'
-			elif selection == 2: quality = 'SD480'
-			elif selection == 3: quality = 'HD720'
-			elif selection == 4: quality = 'HD1080'
-			elif selection == 5: quality = 'HD2K'
-			elif selection == 6: quality = 'HD4K'
-			elif selection == 7: quality = 'HD8K'
-			elif selection == 8: quality = 'Adaptive MP4'
-			elif selection == 9: quality = 'Adaptive WEBM'
+		try:
+			# Check addon if not installed.
+			addon = System.addon(Extension.IdYouTube)
+			if addon and addon.getSettingBool('kodion.mpd.videos'):
+				selection = addon.getSettingInt('kodion.mpd.quality.selection')
+				if selection == 0: quality = 'SD240'
+				elif selection == 1: quality = 'SD360'
+				elif selection == 2: quality = 'SD480'
+				elif selection == 3: quality = 'HD720'
+				elif selection == 4: quality = 'HD1080'
+				elif selection == 5: quality = 'HD2K'
+				elif selection == 6: quality = 'HD4K'
+				elif selection == 7: quality = 'HD8K'
+		except: Logger.error()
 
 		if not quality:
 			from lib.modules.interface import Translation
@@ -12750,13 +14581,13 @@ class YouTube(object):
 
 	@classmethod
 	def qualityUpdate(self):
-		Settings.set('metadata.video.quality', self.quality())
+		Settings.set('stream.youtube.quality', self.quality())
 
 	@classmethod
 	def qualitySelect(self, settings = False):
-		Extension.settings(id = Extension.IdYouTube, category = 1, wait = True)
+		Extension.settings(id = Extension.IdYouTube, category = 0, wait = True)
 		self.qualityUpdate()
-		if settings: Settings.launch('metadata.video.quality')
+		if settings: Settings.launch('stream.youtube.quality')
 
 ###################################################################
 # UPNEXT
@@ -12924,7 +14755,7 @@ class TmdbHelper(object):
 
 		if action == 'scrape':
 			parameters = {'action' : action, 'media' : media, 'imdb' : '{imdb}', 'tmdb' : '{tmdb}', 'tvdb' : '{tvdb}', 'trakt' : '{trakt}', 'title' : '{title_url}', 'year' : '{year}', 'premiered' : '{premiered}'}
-			if Media.typeTelevision(media):
+			if Media.isSerie(media):
 				parameters.update({
 					'season' : '{season}',
 					'episode' : '{episode}',
@@ -12935,7 +14766,7 @@ class TmdbHelper(object):
 			parameters = {'action' : action, 'media' : media, 'query' : '{clearname_url}'}
 
 		for key, value in parameters.items(): parameters[key] = value.replace('{', prefix).replace('}', suffix)
-		command = System.command(parameters = parameters, optimize = False)
+		command = System.command(parameters = parameters, origin = 'themoviedbhelper', optimize = False)
 		command = command.replace(prefix, '{').replace(suffix, '}')
 
 		return command
@@ -12990,10 +14821,10 @@ class TmdbHelper(object):
 					'plugin' : plugin,
 					'priority' : 200,
 					'is_resolvable' : 'false',
-					'play_movie' : self.command(action = 'scrape', media = Media.TypeMovie),
-					'play_episode' : self.command(action = 'scrape', media = Media.TypeShow),
-					'search_movie' : self.command(action = 'search', media = Media.TypeMovie),
-					'search_episode' : self.command(action = 'search', media = Media.TypeShow),
+					'play_movie' : self.command(action = 'scrape', media = Media.Movie),
+					'play_episode' : self.command(action = 'scrape', media = Media.Show),
+					'search_movie' : self.command(action = 'search', media = Media.Movie),
+					'search_episode' : self.command(action = 'search', media = Media.Show),
 				}
 
 				File.writeNow(path, Converter.jsonPrettify(data))
@@ -13349,21 +15180,21 @@ class Donations(object):
 			WindowQr.show(donations = donations, symbol = type, wait = wait)
 
 	@classmethod
-	def popup(self, wait = False):
+	def popup(self, full = True, wait = False):
 		if wait:
-			self._popup(wait = wait)
+			self._popup(full = full, wait = wait)
 		else:
-			thread = Pool.thread(target = self._popup)
+			thread = Pool.thread(target = self._popup, kwargs = {'full' : full})
 			thread.start()
 
 	@classmethod
-	def _popup(self, increment = False, wait = False):
+	def _popup(self, full = True, increment = False, wait = False):
 		from lib.modules import interface
 		if not self.donor():
 			counter = self.increment(update = increment)
 			if counter >= Donations.PopupThreshold:
 				self.reset()
-				if not interface.Dialog.option(title = 33505, message = interface.Translation.string(35014), labelConfirm = 35015, labelDeny = 33505):
+				if full or not interface.Dialog.option(title = 33505, message = interface.Translation.string(35014), labelConfirm = 35015, labelDeny = 33505):
 					self.show(wait = wait)
 					interface.Loader.hide()
 					return True
@@ -13464,6 +15295,10 @@ class Playlist(object):
 		except: return []
 
 	@classmethod
+	def size(self):
+		return len(self.items())
+
+	@classmethod
 	def empty(self):
 		return len(self.items()) == 0
 
@@ -13477,25 +15312,43 @@ class Playlist(object):
 		except: return -1
 
 	@classmethod
-	def add(self, link = None, label = None, metadata = None, images = None, context = None, notification = True):
+	def add(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, metadata = None, link = None, label = None, images = None, context = None, notification = True):
 		if link is None:
 			System.execute('Action(Queue)')
+			return None
 		else:
-			# Do not add the context, rather use the global context menu instead.
-			from lib.meta.tools import MetaTools
-			item = MetaTools.instance().item(label = label, metadata = metadata, context = False, content = False)
+			if not metadata:
+				from lib.meta.manager import MetaManager
+				metadata = MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 
-			self.playlist().add(url = link, listitem = item['item'])
-			if notification:
+			if metadata:
 				from lib.modules import interface
-				interface.Dialog.notification(title = 35515, message = 35519, icon = interface.Dialog.IconSuccess)
+
+				# These skins add their own labels using the title and season/episode numbers.
+				label = not(interface.Skin.isEstuary() or interface.Skin.isEstouchy())
+
+				# Do not add the context, rather use the global context menu instead.
+				from lib.meta.tools import MetaTools
+				item = MetaTools.instance().item(label = label, metadata = metadata, context = False, content = False, extend = MetaTools.ExtendNone)
+
+				link = System.originSet(origin = System.OriginPlaylist, command = link) # Helps to identify calls coming from the playlist, especially for the "scrape" endpoint.
+				self.playlist().add(url = link, listitem = item['item'])
+				if notification: interface.Dialog.notification(title = 35515, message = 35519, icon = interface.Dialog.IconSuccess)
+
+				return True
+		return False
 
 	@classmethod
 	def remove(self, label, notification = True):
 		#self.playlist().remove(link) # This doesn't seem to work all the time.
 		position = self.position(label = label)
 		if position >= 0:
-			System.executeJson(method = 'Playlist.Remove', parameters = {'playlistid' : Playlist.Id, 'position' : position})
+			# The first item in the playlist cannot be removed using Playlist.Remove().
+			#	https://forum.kodi.tv/showthread.php?tid=236016
+			# If there is only 1 item in the playlist, clear it instead.
+			if self.size() == 1: self.clear(notification = False)
+			else: System.executeJson(method = 'Playlist.Remove', parameters = {'playlistid' : Playlist.Id, 'position' : position})
+
 			if notification:
 				from lib.modules import interface
 				interface.Dialog.notification(title = 35515, message = 35520, icon = interface.Dialog.IconSuccess)
@@ -14355,11 +16208,11 @@ class Promotions(object):
 	@classmethod
 	def _update(self, refresh = True):
 		try:
-			from lib.modules import api
+			from lib.modules.api import Api
 			self._cache()
 			enabled = self.enabled()
 			result = []
-			promotions = api.Api.promotion()
+			promotions = Api.promotion()
 			for i in promotions:
 				i['viewed'] = False
 				for j in Promotions.Cache:
@@ -14386,16 +16239,16 @@ class Promotions(object):
 	@classmethod
 	def _fixed(self):
 		try:
-			from lib.modules import interface
-			from lib.modules import orionoid
-			orion = orionoid.Orionoid()
+			from lib.modules.interface import Translation
+			from lib.modules.orionoid import Orionoid
+			orion = Orionoid()
 			return [{
 				'id' : Promotions.OrionAnonymous,
 				'viewed' : not orion.accountPromotionEnabled(),
 				'provider' : 'Orion',
 				'start' : Time.timestamp(),
 				'expiration' : None,
-				'title' : interface.Translation.string(35428),
+				'title' : Translation.string(35428),
 			}]
 		except: Logger.error()
 
@@ -14403,7 +16256,7 @@ class Promotions(object):
 	def enabled(self):
 		try:
 			from lib.modules import orionoid
-			if not Settings.getBoolean('menu.root.promotion'): return False
+			if not Settings.getBoolean('menu.main.promotion'): return False
 			elif orionoid.Orionoid().accountPromotionEnabled(): return True
 			current = Time.timestamp()
 			for i in self._cache():
@@ -14413,16 +16266,16 @@ class Promotions(object):
 		return False
 
 	@classmethod
-	def navigator(self, force = False):
-		from lib.modules import interface
+	def menu(self, force = False):
+		from lib.modules.interface import Loader, Dialog, Directory, Icon
 
 		if force:
-			interface.Loader.show()
+			Loader.show()
 			self.update(wait = True, refresh = False)
-			interface.Loader.hide()
+			Loader.hide()
 		elif not Settings.getBoolean('internal.initial.promotions'):
 			Settings.set('internal.initial.promotions', True)
-			interface.Dialog.confirm(title = 35442, message = 35445)
+			Dialog.confirm(title = 35442, message = 35445)
 
 		items = []
 		promotions = [i['provider'] for i in self._fixed()]
@@ -14433,7 +16286,7 @@ class Promotions(object):
 				lower.append(i['provider'].lower())
 
 		if len(promotions) == 0:
-			interface.Dialog.notification(title = 35443, message = 35444, icon = interface.Dialog.IconNativeInformation)
+			Dialog.notification(title = 35443, message = 35444, icon = Dialog.IconNativeInformation)
 		else:
 			# Use a specific order.
 			for i in ['orion', 'premiumize', 'offcloud', 'realdebrid']:
@@ -14445,15 +16298,14 @@ class Promotions(object):
 				except: pass
 			items.extend(promotions)
 
-			directory = interface.Directory()
-			for i in items:
-				directory.add(label = i, action = 'promotionsSelect', parameters = {'provider' : i}, icon = '%s.png' % (i.lower() if interface.Icon.exists(i.lower()) else 'promotion'), iconDefault = 'DefaultAddonProgram.png')
+			directory = Directory()
+			for i in items: directory.add(label = i, action = 'promotionsSelect', parameters = {'provider' : i}, icon = '%s.png' % (i.lower() if Icon.exists(i.lower()) else 'promotion'), iconDefault = 'DefaultAddonProgram.png')
 			directory.finish()
 
 	@classmethod
 	def select(self, provider):
-		from lib.modules import interface
-		from lib.modules import convert
+		from lib.modules.interface import Translation, Format, Dialog
+		from lib.modules.convert import ConverterDuration, ConverterTime
 
 		current = Time.timestamp()
 		promotions = []
@@ -14467,13 +16319,13 @@ class Promotions(object):
 				if i['expiration']:
 					timer = i['expiration'] - current
 					if timer < 0: continue
-					timer = convert.ConverterDuration(value = timer, unit = convert.ConverterDuration.UnitSecond).string(format = convert.ConverterDuration.FormatWordMinimal).title()
-					timer += ' ' + interface.Translation.string(35449)
+					timer = ConverterDuration(value = timer, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordMinimal).title()
+					timer += ' ' + Translation.string(35449)
 				else:
-					timer = interface.Translation.string(35446)
-				status = interface.Translation.string(35448 if i['viewed'] else 35447)
+					timer = Translation.string(35446)
+				status = Translation.string(35448 if i['viewed'] else 35447)
 				status = '[%s]' % status
-				status = interface.Format.font(status, bold = True, color = interface.Format.colorPoor() if i['viewed'] else interface.Format.colorExcellent())
+				status = Format.font(status, bold = True, color = Format.colorPoor() if i['viewed'] else Format.colorExcellent())
 				promotions.append({
 					'id' : i['id'],
 					'title' : '%s %s: %s' % (status, i['title'], timer),
@@ -14481,25 +16333,25 @@ class Promotions(object):
 				})
 		promotions = sorted(promotions, key = lambda i : i['time'], reverse = True)
 
-		choice = interface.Dialog.select(title = provider + ' ' + interface.Translation.string(provider), items = [i['title'] for i in promotions])
+		choice = Dialog.select(title = provider + ' ' + Translation.string(provider), items = [i['title'] for i in promotions])
 		if choice >= 0:
 			choice = promotions[choice]['id']
 			if choice == Promotions.OrionAnonymous:
 				try:
-					from lib.modules import orionoid
-					orionoid.Orionoid().accountPromotion()
+					from lib.modules.orionoid import Orionoid
+					Orionoid().accountPromotion()
 				except: Logger.error()
 			else:
 				for i in range(len(Promotions.Cache)):
 					if Promotions.Cache[i]['id'] == choice:
 						Promotions.Cache[i]['viewed'] = True
 						self._cacheUpdate()
-						message = interface.Format.fontBold(Promotions.Cache[i]['title']) + interface.Format.newline()
-						if Promotions.Cache[i]['expiration']: message += interface.Format.newline() + interface.Format.fontBold('Expiration: ') + convert.ConverterTime(Promotions.Cache[i]['expiration']).string(format = convert.ConverterTime.FormatDateTime)
-						if Promotions.Cache[i]['link']: message += interface.Format.newline() + interface.Format.fontBold('Link: ') + interface.Format.fontItalic(Promotions.Cache[i]['link'])
-						if Promotions.Cache[i]['expiration'] or Promotions.Cache[i]['link']: message += interface.Format.newline()
-						message += interface.Format.newline() + Promotions.Cache[i]['description'] + interface.Format.newline()
-						interface.Dialog.text(title = Promotions.Cache[i]['provider'] +' ' + interface.Translation.string(35442), message = message)
+						message = Format.fontBold(Promotions.Cache[i]['title']) + Format.newline()
+						if Promotions.Cache[i]['expiration']: message += Format.newline() + Format.fontBold('Expiration: ') + ConverterTime(Promotions.Cache[i]['expiration']).string(format = ConverterTime.FormatDateTime)
+						if Promotions.Cache[i]['link']: message += Format.newline() + inteace.Format.fontBold('Link: ') + Format.fontItalic(Promotions.Cache[i]['link'])
+						if Promotions.Cache[i]['expiration'] or Promotions.Cache[i]['link']: message += Format.newline()
+						message += Format.newline() + Promotions.Cache[i]['description'] + Format.newline()
+						Dialog.text(title = Promotions.Cache[i]['provider'] +' ' + interfe.Translation.string(35442), message = message)
 						break
 
 ###################################################################
@@ -14789,16 +16641,20 @@ class Link(object):
 
 	@classmethod
 	def _extract(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None):
+		if not metadata:
+			from lib.meta.manager import MetaManager
+			metadata = MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, pack = False)
+
 		if metadata:
 			if not media:
 				if 'tvshowtitle' in metadata:
-					if 'episode' in metadata: media = Media.TypeEpisode
-					elif 'season' in metadata: media = Media.TypeSeason
-					else: media = Media.TypeShow
+					if 'episode' in metadata: media = Media.Episode
+					elif 'season' in metadata: media = Media.Season
+					else: media = Media.Show
 				elif 'set' in metadata and not 'collection' in metadata:
-					media = Media.TypeSet
+					media = Media.Set
 				else:
-					media = Media.TypeMovie
+					media = Media.Movie
 
 			if not imdb and 'id' in metadata and 'imdb' in metadata['id']: imdb = metadata['id']['imdb']
 			if not tmdb and 'id' in metadata and 'tmdb' in metadata['id']: tmdb = metadata['id']['tmdb']
@@ -14806,7 +16662,7 @@ class Link(object):
 			if not trakt and 'id' in metadata and 'trakt' in metadata['id']: trakt = metadata['id']['trakt']
 			if not slug and 'id' in metadata and 'slug' in metadata['id']: slug = metadata['id']['slug']
 
-			if not title and media == Media.TypeSet and 'collection' in metadata and 'title' in metadata['collection']: title = metadata['collection']['title']
+			if not title and media == Media.Set and 'collection' in metadata and 'title' in metadata['collection']: title = metadata['collection']['title']
 			if not title and 'tvshowtitle' in metadata: title = metadata['tvshowtitle']
 			if not title and 'title' in metadata: title = metadata['title']
 			if not year and 'year' in metadata: year = metadata['year']
@@ -14814,10 +16670,10 @@ class Link(object):
 			if season is None and 'season' in metadata: season = metadata['season']
 			if episode is None and 'episode' in metadata: episode = metadata['episode']
 
-		if media == Media.TypeShow:
+		if media == Media.Show:
 			episode = None
 			season = None
-		elif media == Media.TypeSeason:
+		elif media == Media.Season:
 			episode = None
 
 		return {
@@ -14831,6 +16687,7 @@ class Link(object):
 			'year' : year,
 			'season' : season,
 			'episode' : episode,
+			'metadata' : metadata,
 		}
 
 	@classmethod
@@ -14840,8 +16697,9 @@ class Link(object):
 		if loader: Loader.show()
 
 		data = self._extract(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata)
+		metadata = data.get('metadata')
 
-		if data['media'] == Media.TypeSet:
+		if data['media'] == Media.Set:
 			types = [
 				{'type' : Link.TypeTmdb,		'name' : 33508,	'condition' : bool(data['tmdb'])},
 				{'type' : Link.TypeGoogle,		'name' : 36414,	'condition' : bool(data['title'])},
@@ -14855,11 +16713,11 @@ class Link(object):
 				{'type' : Link.TypeTvdb,		'name' : 35668,	'condition' : bool(data['tvdb'] or data['title'])},
 
 				{'type' : Link.TypeSimkl,		'name' : 36473,	'condition' : bool(data['imdb'] or data['tmdb'] or data['tvdb'] or data['title'])},
-				{'type' : Link.TypeTvmaze,		'name' : 35669,	'condition' : bool(Media.typeTelevision(data['media']) and data['title'])},
+				{'type' : Link.TypeTvmaze,		'name' : 35669,	'condition' : bool(Media.isSerie(data['media']) and data['title'])},
 				{'type' : Link.TypeTomatoes,	'name' : 36474,	'condition' : bool(data['title'])},
 				{'type' : Link.TypeMetacritic,	'name' : 35719,	'condition' : bool(data['title'])},
 				{'type' : Link.TypeCommonsense,	'name' : 36475,	'condition' : bool(data['title'])},
-				{'type' : Link.TypeLetterboxd,	'name' : 36476,	'condition' : bool(Media.typeMovie(data['media']) and data['title'])},
+				{'type' : Link.TypeLetterboxd,	'name' : 36476,	'condition' : bool(Media.isFilm(data['media']) and data['title'])},
 				{'type' : Link.TypeCriticker,	'name' : 36477,	'condition' : bool(data['title'])},
 
 				{'type' : Link.TypeFanart,		'name' : 35260,	'condition' : bool(data['tmdb'] or data['tvdb'] or data['title'])},
@@ -14922,30 +16780,30 @@ class Link(object):
 
 	@classmethod
 	def linkImdb(self, media = None, id = None, imdb = None, title = None, year = None, season = None, metadata = None, search = False):
-		from lib.meta.processors.imdb import MetaImdb
+		from lib.meta.providers.imdb import MetaImdb
 		return MetaImdb.link(media = media, id = imdb or id, title = title, year = year, season = season, metadata = metadata, search = search)
 
 	@classmethod
 	def linkTmdb(self, media = None, id = None, tmdb = None, title = None, year = None, season = None, episode = None, metadata = None, search = False):
-		from lib.meta.processors.tmdb import MetaTmdb
+		from lib.meta.providers.tmdb import MetaTmdb
 		return MetaTmdb.link(media = media, id = tmdb or id, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search)
 
 	@classmethod
 	def linkTvdb(self, media = None, id = None, tvdb = None, slug = None, title = None, year = None, season = None, metadata = None, search = False, test = False):
-		from lib.meta.providers.tvdb import MetaTvdb
+		from lib.meta.services.tvdb import MetaTvdb
 		return MetaTvdb.link(media = media, id = tvdb or id, slug = slug, title = title, year = year, season = season, metadata = metadata, search = search, test = test)
 
 	@classmethod
 	def linkTrakt(self, media = None, id = None, imdb = None, trakt = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, search = False, test = False):
-		from lib.modules import trakt as Trakt
-		return Trakt.link(media = media, id = trakt or imdb or id, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
+		from lib.meta.providers.trakt import MetaTrakt
+		return MetaTrakt.link(media = media, id = trakt or imdb or id, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata, search = search, test = test)
 
 	@classmethod
 	def linkSimkl(self, media = None, imdb = None, tmdb = None, tvdb = None, slug = None, title = None, year = None, season = None, episode = None, metadata = None, search = False):
 		data = self._extract(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata)
 		if data:
 			link = 'https://api.simkl.com/redirect?to=Simkl'
-			if data['media']: link += '&type=' + ('show' if Media.typeTelevision(data['media']) else 'movie')
+			if data['media']: link += '&type=' + ('show' if Media.isSerie(data['media']) else 'movie')
 			if data['imdb']: link += '&imdb=' + data['imdb']
 			elif data['tmdb']: link += '&tmdb=' + data['tmdb']
 			elif data['tvdb']: link += '&tvdb=' + data['tvdb']
@@ -14973,7 +16831,7 @@ class Link(object):
 			search = (base + '/search?search=' + self._query(query = data['title'], plus = False)) if search else None
 			slug1 = self._slug(title = data['title'], year = data['year'], separator = '_', symbol = None, lower = True)
 			slug2 = self._slug(title = data['title'], separator = '_', symbol = None, lower = True)
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				base += '/tv/'
 				if test:
 					link = base + slug1
@@ -15005,7 +16863,7 @@ class Link(object):
 			link = 'https://metacritic.com'
 			search = (link + '/search/%s/%s/results') if search else None
 			slug = self._slug(title = data['title'], separator = '-', symbol = None, lower = True) # Does not seem to use year.
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				link += '/tv/' + slug
 				if data['season']: link += '/season-' + str(data['season'])
 				# The episode part contains the episode number + episode title. But even with the title, sometimes Metacritic adds some random number at the end (GoT S08). Not not add the episode number.
@@ -15024,7 +16882,7 @@ class Link(object):
 			base = 'https://commonsensemedia.org'
 			search = (base + '/search/category/%s/' + self._query(query = data['title'], plus = True)) if search else None
 			slug = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				link = base + '/tv-reviews/' + slug
 				if test:
 					if self._test(link = link): return link
@@ -15046,7 +16904,7 @@ class Link(object):
 			search = (base + '/search/' + self._query(query = data['title'], plus = True)) if search else None
 			slug1 = self._slug(title = data['title'], year = data['year'], separator = '-', symbol = None, lower = True)
 			slug2 = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				return None # Does not contain shows.
 			else:
 				base += '/film/'
@@ -15068,7 +16926,7 @@ class Link(object):
 			search = (base + '/?type=films&search=%s' + self._query(query = data['title'], plus = False)) if search else None
 			slug1 = self._slug(title = data['title'], year = data['year'], separator = '-', symbol = None, lower = True)
 			slug2 = self._slug(title = data['title'], separator = '-', symbol = None, lower = True)
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				base += '/tv/'
 				if test:
 					link = base + slug1
@@ -15096,7 +16954,7 @@ class Link(object):
 		data = self._extract(media = media, tmdb = tmdb, tvdb = tvdb, title = title, metadata = metadata)
 		if data:
 			link = 'https://fanart.tv'
-			if Media.typeTelevision(data['media']):
+			if Media.isSerie(data['media']):
 				if data['tvdb']: return link + '/series/' + data['tvdb']
 				elif data['title'] and search: return link + '/?sect=1&s=' + self._query(query = data['title'], plus = False)
 			else:
@@ -15112,7 +16970,7 @@ class Link(object):
 			data = self._extract(media = media, title = title, year = year, metadata = metadata)
 			if data and data['title']:
 				query = data['title']
-				if Media.typeMovie(data['media']) and data['year']: query += ' ' + str(data['year'])
+				if data['media'] == Media.Movie and data['year']: query += ' ' + str(data['year'])
 				query += ' homepage'
 				link = self.linkGoogle(media = data['media'], title = data['title'], year = data['year'], metadata = metadata, query = query, search = search)
 		return link
@@ -15125,7 +16983,7 @@ class Link(object):
 			data = self._extract(media = media, title = title, year = year, metadata = metadata)
 			if data and data['title']:
 				query = data['title']
-				if Media.typeMovie(data['media']) and data['year']: query += ' ' + str(data['year'])
+				if data['media'] == Media.Movie and data['year']: query += ' ' + str(data['year'])
 				query += ' trailer'
 				link = 'https://youtube.com/results?search_query=' + self._query(query = query, plus = True)
 		return link
@@ -15136,12 +16994,12 @@ class Link(object):
 			data = self._extract(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata)
 			if data and data['title']:
 				query = [data['title']]
-				if Media.typeTelevision(data['media']):
+				if Media.isSerie(data['media']):
 					if not data['season'] is None: query.extend(['Season', data['season']])
 					if not data['episode'] is None: query.extend(['Episode', data['episode']])
-				elif data['media'] == Media.TypeSet:
+				elif data['media'] == Media.Set:
 					if not 'collection' in data['title'].lower(): query.append('Collection')
-				elif Media.typeMovie(data['media']):
+				elif data['media'] == Media.Movie:
 					if data['year']: query.append(data['year'])
 				query = [Converter.unicode(i) for i in query if not i is None]
 			else:
@@ -15158,12 +17016,12 @@ class Link(object):
 			data = self._extract(media = media, title = title, year = year, season = season, episode = episode, metadata = metadata)
 			if data and data['title']:
 				query = [data['title']]
-				if Media.typeTelevision(data['media']):
+				if Media.isSerie(data['media']):
 					if not data['season'] is None: query.extend(['Season', data['season']])
 					if not data['episode'] is None: query.extend(['Episode', data['episode']])
-				elif data['media'] == Media.TypeSet:
+				elif data['media'] == Media.Set:
 					if not 'collection' in data['title'].lower(): query.append('Collection')
-				elif Media.typeMovie(data['media']):
+				elif data['media'] == Media.Movie:
 					if data['year']: query.append(data['year'])
 				query = [Converter.unicode(i) for i in query if not i is None]
 			else:

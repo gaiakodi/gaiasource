@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://pypi.org/project/requests/#files
-Current Version:	2.27.1 (2022-04-28)
+Current Version:		2.32.3 (2024-10-09)
 Used By:			Gaia, TldExtract, CfScrape, CloudScraper, SpeedTest
 
 #########################################################################################################################
@@ -9,14 +9,19 @@ Used By:			Gaia, TldExtract, CfScrape, CloudScraper, SpeedTest
 find ./ -type f -exec sed -i -e 's/from urllib3/from externals.urllib3/g' {} \;
 find ./ -type f -exec sed -i -e 's/import urllib3/from externals import urllib3/g' {} \;
 
-find ./ -type f -exec sed -i -e 's/import chardet/from externals import chardet/g' {} \;
-find ./ -type f -exec sed -i -e 's/from chardet/from externals.chardet/g' {} \;
-
 find ./ -type f -exec sed -i -e 's/import idna/from externals import idna/g' {} \;
 find ./ -type f -exec sed -i -e 's/from certifi import where/from externals.certifi import where/g' {} \;
 
 find ./ -type f -exec sed -i -e 's/from six/from externals.six.six/g' {} \;
 find ./ -type f -exec sed -i -e 's/import six/from externals.six import six/g' {} \;
+
+#########################################################################################################################
+
+# Otherwise when calling xbmc.execbuiltin('LoadProfile(...)'), and Kodi reloads Kodi and all addons, this errors might be thrown:
+#	SystemError -> ['Traceback (most recent call last):\n', '  File "plugin.video.gaia/lib/modules/external.py", line 64, in module\n    raise exception\n', '  File "plugin.video.gaia/lib/modules/external.py", line 57, in module\n    package = import_module(module)\n', '  File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n', '  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import\n', '  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load\n', '  File "<frozen importlib._bootstrap>", line 992, in _find_and_load_unlocked\n', '  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed\n', '  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import\n', '  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load\n', '  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked\n', '  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked\n', '  File "<frozen importlib._bootstrap_external>", line 883, in exec_module\n', '  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed\n', '  File "script.gaia.externals/lib/externals/requests/__init__.py", line 48, in <module>\n    from charset_normalizer import __version__ as charset_normalizer_version\n', '  File "~/.local/lib/python3.10/site-packages/charset_normalizer/__init__.py", line 24, in <module>\n    from .api import from_bytes, from_fp, from_path, is_binary\n', '  File "~/.local/lib/python3.10/site-packages/charset_normalizer/api.py", line 5, in <module>\n    from .cd import (\n', '  File "~/.local/lib/python3.10/site-packages/charset_normalizer/cd.py", line 14, in <module>\n    from .md import is_suspiciously_successive_range\n', 'SystemError: initialization of md__mypyc did not return an extension module\n']
+# Which is a "SystemError" and not an "ImportError" error. 
+
+find ./__init__.py -type f -exec sed -i -e 's/except ImportError:/except:/g' {} \;
 
 #########################################################################################################################
 
@@ -28,10 +33,14 @@ And add this to the top of the file:
 
 	from externals import urllib3
 	from externals import idna
-	from externals import chardet
 	locals()['urllib3'] = urllib3
 	locals()['idna'] = idna
-	locals()['chardet'] = chardet
 
 #########################################################################################################################
 
+In compat.py, add this to the top of _resolve_char_detection():
+
+	from externals import chardet
+	return chardet
+
+#########################################################################################################################

@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Hash, System, File, Tools, Regex, Logger
+from lib.modules.tools import Hash, System, File, Tools, Regex, Logger, Time
 from lib.modules.interface import Format
 from lib.modules.network import Networker
 from lib.modules.concurrency import Pool
@@ -127,9 +127,16 @@ class Qr(object):
 	@classmethod
 	def generate(self, *args, **kwargs):
 		wait = True
-		if kwargs and 'wait' in kwargs:
-			wait = kwargs['wait']
-			del kwargs['wait']
+		slow = False
+		if kwargs:
+			if 'wait' in kwargs:
+				wait = kwargs['wait']
+				del kwargs['wait']
+			if 'slow' in kwargs:
+				slow = kwargs['slow']
+				del kwargs['slow']
+
+		if slow: Time.sleep(0.2)
 
 		if kwargs or (args and not Tools.isDictionary(args[0])):
 			if wait: return self._generate(*args, **kwargs)
@@ -140,6 +147,7 @@ class Qr(object):
 				i['result'] = result
 				if wait: self._generate(**i)
 				else: Pool.thread(target = self._generate, kwargs = i, start = True)
+				if slow: Time.sleep(0.1)
 
 		return None
 

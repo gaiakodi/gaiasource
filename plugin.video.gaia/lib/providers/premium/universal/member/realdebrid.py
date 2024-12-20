@@ -34,7 +34,7 @@ class Provider(ProviderDebrid):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		sources = []
 		self.items = [] # NB: The same object of the provider is used for both normal episodes and season packs. Make sure it is cleared from the previous run.
 		try:
@@ -45,14 +45,14 @@ class Provider(ProviderDebrid):
 					try:
 						if item['transfer']['progress']['completed']['value'] == 1: # Only finished downloads.
 							if self.searchValidName(name = item['name']):
-								threads.append(self.thread(self.searchRetrieve, item['id'], media, titles, years, numberSeason, numberEpisode, language))
+								threads.append(self.thread(self.searchRetrieve, item['id'], media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio))
 					except: self.logError()
 
 				if self.verifyBusy(): self.verifyCore()
 				else: self.threadExecute(threads, limit = self.concurrencyTasks(level = 3))
 		except: self.logError()
 
-	def searchRetrieve(self, id, media, titles, years, numberSeason, numberEpisode, language):
+	def searchRetrieve(self, id, media, titles, years, numberSeason, numberEpisode, numberPack, language, country, network, studio):
 		try:
 			result = self.cacheRequest(function = 'item', id = id)
 			if result:

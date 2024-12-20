@@ -10,3 +10,11 @@ Add "shell = True" to all "subprocess" calls, otherwise a CMD window pops up in 
 Commands must be a string, not a list, when shell=True.
 
 #########################################################################################################################
+
+Change the detection of "HAS_DISPLAY", since on Ubuntu 24+ "DISPLAY" is not detected when using Wayland instead of X11.
+
+#########################################################################################################################
+
+Add the various gaiaCommand() calls
+
+#########################################################################################################################

@@ -43,14 +43,14 @@ class Provider(ProviderDebrid):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media, titles, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, numberSeason = None, numberEpisode = None, language = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
+	def search(self, media = None, niche = None, titles = None, years = None, time = None, idImdb = None, idTmdb = None, idTvdb = None, idTrakt = None, numberSeason = None, numberEpisode = None, numberPack = None, language = None, country = None, network = None, studio = None, pack = None, exact = None, silent = False, cacheLoad = True, cacheSave = True, hostersAll = None, hostersPremium = None):
 		try:
 			titlesAll = titles['processed']['all']
 			titlesMain = titles['processed']['main']
 
 			folderGaia = self.core().folderName()
 			folderFeeds = self.core().folderFeeds()
-			folderExclude = ['root', folderGaia, folderFeeds, 'Movies', 'Shows', 'Documentaries', 'Shorts']
+			folderExclude = ['root', folderGaia, folderFeeds, 'Movies', 'Shows']
 
 			items = self.cacheRequest(function = 'items')
 
