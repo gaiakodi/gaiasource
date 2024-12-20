@@ -772,7 +772,7 @@ class MetaMenu(object):
 		try:
 			def _notificationCached(delay):
 				stats = self.mManager._metadataSmartStats()
-				if stats:
+				if stats and MetaMenu.ContentProgress in stats:
 					if (Time.timestamp() - stats['time']['notification']) > 21600: # 6 hours.
 						if delay: Time.sleep(5) # Wait for the intro splash to finish.
 

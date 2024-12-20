@@ -7318,7 +7318,7 @@ class WindowWizard(object):
 	@classmethod
 	def showGeneralContent(self):
 		WindowWizard.Window = WindowWizardContent
-		WindowWizard.Window.show(progress = 15, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showGeneralLanguage, callbackNext = self.showAccountInfo)
+		WindowWizard.Window.show(progress = 15, stepper = True, callbackClose = self.close, callbackCancel = self.cancel, callbackBack = self.showGeneralLanguage, callbackNext = self.showExtensionInfo)
 		WindowWizardLanguage.close()
 		WindowWizardInfo.close()
 

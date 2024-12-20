@@ -1343,6 +1343,7 @@ class Opensubtitles(Account):
 		return Subtitle.verify(username = username, password = password)
 
 	def authenticate(self, settings = True):
+		# NB: When a password containing a hash "#" was used, authentication failed. When the hash was removed, authentication succeeded.
 		return Account.authenticate(self, functionVerify = self._verify, settings = settings, messageNew = {
 			'type' : Dialog.TypeDetails, 'text' : False, 'items' : [
 				{'type' : 'text', 'value' : 'Authenticate with your OpenSubtitles username and password:'},

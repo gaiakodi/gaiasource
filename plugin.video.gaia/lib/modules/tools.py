@@ -697,6 +697,10 @@ class Tools(object):
 			else:
 				return data.pop(random.randint(0, len(data) - 1))
 		else:
+			# If the weight total is 0, choices() throws an exception.
+			# ValueError: Total of weights must be greater than zero
+			if not weights or sum(weights) == 0: weights = None
+
 			if count > 1 or weights: return random.choices(data, k = count, weights = weights)
 			else: return random.choice(data)
 
