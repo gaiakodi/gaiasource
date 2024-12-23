@@ -14063,8 +14063,8 @@ class Resolver(object):
 			'realdebrid' : {
 				'authentication' : {
 					'bool' : ['RealDebridResolver_enabled'],
-					'string' : ['AllDebridResolver_token'],
-					'action' : 'ad',
+					'string' : ['RealDebridResolver_token'],
+					'action' : 'rd',
 				},
 				'offset' : 60,
 			},
