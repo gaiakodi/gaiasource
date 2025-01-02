@@ -734,9 +734,13 @@ class MetaCache(Database):
 			# Instead we count the number of ID matches using the IFF clause below and do the following:
 			#	SELECT queries: match any ID, but sort based on how many IDs match, and then pick the one with most ID matches.
 			#	DELETE queries: delete a row only if all IDs match. If one or more IDs do not match, do not delete, and insert the item a second time with the alternative IDs. This should not happen very often and therefore not waste too much extra disk space.
+			# UPDATE (2025-01): Many Windows devices seem to still use an old SQLite version (prior to 3.32.0) that does not have IFF function, causing the error:
+			#	GAIA ERROR [Database Query]: no such function: IIF -- SELECT data ...
+			# https://stackoverflow.com/questions/4874285/if-statement-alternative-in-sqlite/61826915#61826915
 			if best:
 				parameters += base
-				query = (query, '(%s)' % ' + '.join(['IIF(%s = ?, 1, 0)' % i for i in values]))
+				#query = (query, '(%s)' % ' + '.join(['IIF(%s = ?, 1, 0)' % i for i in values]))
+				query = (query, '(%s)' % ' + '.join(['(CASE WHEN %s = ? THEN 1 ELSE 0 END)' % i for i in values]))
 
 			return query, parameters
 

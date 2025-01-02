@@ -213,7 +213,12 @@ class Time(object):
 	@classmethod
 	def format(self, timestamp = None, format = FormatDateTime, local = None):
 		if timestamp is None: timestamp = self.timestamp()
-		date = datetime.datetime.utcfromtimestamp(timestamp)
+
+		# Windows cannot handle negative timestamps.
+		# https://github.com/arrow-py/arrow/issues/675
+		if timestamp < 0: date = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds = timestamp)
+		else: date = datetime.datetime.utcfromtimestamp(timestamp)
+
 		if local:
 			from lib.modules.external import Importer
 			pytz = Importer.modulePytz()

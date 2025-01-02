@@ -16584,7 +16584,9 @@ class MetaTools(object):
 		clean = True,
 		images = True,
 	):
-		folder = None if media == Media.Mixed else bool((submenu and not media == Media.Episode) or (media == Media.Set or media == Media.Show or media == Media.Season))
+		# Important that lists (eg: Favorites -> Trakt -> Lists -> Personal Lists) are marked as folders.
+		# Otherwise the lists cannot be used for skin widgets.
+		folder = None if media == Media.Mixed else bool((submenu and not media == Media.Episode) or (media == Media.List or media == Media.Set or media == Media.Show or media == Media.Season))
 
 		seasons = []
 		items = []

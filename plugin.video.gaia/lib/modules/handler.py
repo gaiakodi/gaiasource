@@ -18,9 +18,6 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-#gaiaremove - play-with option does not show ResolveURL options.
-#gaiaremove - does RD play-with through O work?
-
 from lib.modules import tools
 from lib.modules import cache
 from lib.modules import network
