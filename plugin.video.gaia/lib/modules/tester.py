@@ -25644,12 +25644,7 @@ class Tester(object):
 		self.streamTimeValid(titles = titles)
 		self.streamTime(titles = titles)'''
 
-		#self.metadataPack()
-		#self.metadataNext()
-
-		#self.streamValid(direct = True)
-
-		self.streamShowValid(full = full)
+		self.metadataNext()
 
 	##############################################################################
 	# METADATA

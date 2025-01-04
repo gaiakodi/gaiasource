@@ -805,7 +805,13 @@ class Handle(object):
 	def debrids(self, all = False):
 		if all:
 			from lib.debrid.debrid import Debrid
-			return [i.id() for i in Debrid.handles()]
+			from lib.debrid.external import External
+			result = []
+			temp = [i.id() for i in Debrid.handles()]
+			if temp: result.extend(temp)
+			temp = [i.id() for i in External.instances()]
+			if temp: result.extend(temp)
+			return result
 		return None
 
 	def handle(self, link, item, download = False, popups = False, close = True, select = False, cloud = False, strict = False):

@@ -24,7 +24,9 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderJson, ProviderHtml):
 
-	_Link					= ['https://solidtorrents.to', 'https://solidtorrents.eu', 'https://solidtorrents.net']
+	# Update (2025-01): .net domain is completely down. .eu domain loads a semi-broken website.
+	# https://solidtorrents.net
+	_Link					= ['https://solidtorrents.to', 'https://solidtorrents.eu']
 	_Path					= {
 								ProviderHtml.Version1 : 'search',
 								ProviderHtml.Version2 : 'api/v1/search',

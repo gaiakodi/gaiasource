@@ -60,6 +60,12 @@ class Stream(Serializer):
 	Debug		= None
 
 	##############################################################################
+	# PERFORMANCE
+	##############################################################################
+
+	Performance	= None
+
+	##############################################################################
 	# LOCK
 	##############################################################################
 
@@ -294,6 +300,8 @@ class Stream(Serializer):
 	TitleCollection	= 'collection'
 	TitleEpisode	= 'episode'
 	TitleDefault	= TitleAll
+	TitleLimit		= [125, 75, 50]
+	TitleMatches	= {}
 
 	##############################################################################
 	# DURATION
@@ -14819,6 +14827,7 @@ class Stream(Serializer):
 	def reset(self, settings = True, full = True, invalid = True):
 		self._cacheClear()
 		self._statisticsClear()
+		self._titleMatchClear()
 
 		if settings:
 			Stream.ExclusionData = None
@@ -14833,6 +14842,15 @@ class Stream(Serializer):
 			Layout.reset(settings = settings)
 
 		if invalid: self.invalidClear()
+
+	##############################################################################
+	# PERFORMANCE
+	##############################################################################
+
+	@classmethod
+	def performance(self):
+		if Stream.Performance is None: Stream.Performance = tools.Hardware.performanceRating()
+		return Stream.Performance
 
 	##############################################################################
 	# STATISTICS
@@ -15298,6 +15316,23 @@ class Stream(Serializer):
 			except: metaTitleCollection = None
 			try: metaTitleEpisode = metaTitle[Stream.TitleEpisode]
 			except: metaTitleEpisode = None
+
+			# Some movies have 150+ aliases which drastically increases scraping time to match all the titles.
+			# Most of the aliases are similar and will not add much to the title-filename matching.
+			# Eg: All movies from "The Lord of the Rings" or "The Hobbit".
+			performance = self.performance()
+			if performance >= 0.7: titleLimit = Stream.TitleLimit[0]
+			elif performance >= 0.4: titleLimit = Stream.TitleLimit[1]
+			else: titleLimit = Stream.TitleLimit[2]
+			try:
+				if tools.Tools.isArray(metaTitleAll): metaTitleAll = metaTitleAll[:titleLimit]
+			except: pass
+			try:
+				if tools.Tools.isArray(metaTitleCollection): metaTitleCollection = metaTitleCollection[:titleLimit]
+			except: pass
+			try:
+				if tools.Tools.isArray(metaTitleEpisode): metaTitleEpisode = metaTitleEpisode[:titleLimit]
+			except: pass
 
 			metaTitleCombined = []
 			if metaTitleMain: metaTitleCombined.append(metaTitleMain)
@@ -18917,6 +18952,22 @@ class Stream(Serializer):
 			return concatenated
 
 		def __titleMatch(threshold, titles, name, number, strict = False, adjust = 1, obfuscated = False, result = None):
+			# Speed up scraping by not redoing the matching already done previously.
+			# More info under self._titleMatch().
+			id = 'generic_' + str(len(titles)) + '_'
+			if tools.Tools.isArray(titles): id += str(titles[:3]) + '_' + str(titles[-1])
+			else: id += str(titles)
+			id += '_' + str(name) + '_' + str(threshold) + '_' + str(number) + '_' + str(strict) + '_' + str(adjust) + '_' + str(obfuscated)
+			try:
+				match = Stream.TitleMatches[id]
+				result.update(match['result'])
+				return match['match']
+			except:
+				match = __titleMatchExecute(threshold = threshold, titles = titles, name = name, number = number, strict = strict, adjust = adjust, obfuscated = obfuscated, result = result)
+				Stream.TitleMatches[id] = {'match' : match, 'result' : result}
+				return match
+
+		def __titleMatchExecute(threshold, titles, name, number, strict = False, adjust = 1, obfuscated = False, result = None):
 			try:
 				if not tools.Tools.isArray(titles): titles = [titles]
 
@@ -18935,7 +18986,7 @@ class Stream(Serializer):
 						thresholdNew = thresholdStrict
 						if strict == 1 and len(title) <= thresholdShortLength and len(name) < thresholdShortLength2: thresholdNew = thresholdBase
 
-						ratio = tools.Matcher.jaro(title, name)
+						ratio = self._titleMatchJaro(title, name)
 						if ratio >= thresholdNew:
 							if not result is None: result.update({'index' : i, 'title' : title})
 							return True
@@ -18986,14 +19037,14 @@ class Stream(Serializer):
 
 						# Very short titles (eg: "9 (2009)")
 						if length <= thresholdShortLength:
-							ratio = tools.Matcher.levenshtein(title, name)
+							ratio = self._titleMatchLevenshtein(title, name)
 							if ratio >= min(thresholdMaximum, thresholdBase * (thresholdShortMultiplier + (length * thresholdShortLetter))):
 								if not result is None: result.update({'index' : i, 'title' : title})
 								return True
 
 						# Very long titles (eg: Il cacciatore e la regina di ghiaccio).
 						elif length >= thresholdLongLength and length >= thresholdLongLength:
-							ratio = tools.Matcher.levenshtein(title, name)
+							ratio = self._titleMatchLevenshtein(title, name)
 							if ratio >= thresholdLongSingle:
 								# We could increase the global thresholdLongSingle threshold (eg: 1.05 - 1.1), but this affects other titles as well. Eg: "mkvCinemas live - Hotel Transylvania 3 Summer Vacation 2018"
 								if ratio >= (thresholdLongSingle * 1.1):
@@ -19006,14 +19057,14 @@ class Stream(Serializer):
 							elif not titles[0].startswith(title) and not titles[0].endswith(title) and ratio >= thresholdLongDouble:
 								titleConcatenated = __titleConcatenate(titles[0], title)
 								if titleConcatenated:
-									ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+									ratio = self._titleMatchLevenshtein(titleConcatenated, name)
 									if ratio >= thresholdLongConcatenated:
 										if not result is None: result.update({'index' : i, 'title' : title})
 										return True
 
 								titleConcatenated = __titleConcatenate(title, titles[0])
 								if titleConcatenated:
-									ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+									ratio = self._titleMatchLevenshtein(titleConcatenated, name)
 									if ratio >= thresholdLongConcatenated:
 										if not result is None: result.update({'index' : i, 'title' : title})
 										return True
@@ -19023,10 +19074,10 @@ class Stream(Serializer):
 							if exception:
 								ratio = 0
 							elif obfuscated:
-								ratio = tools.Matcher.levenshtein(title, name)
+								ratio = self._titleMatchLevenshtein(title, name)
 								if length < 5: ratio *= 1.1 # Short titles, eg: "Dune" vs "Du00ne".
 							else:
-								ratio = tools.Matcher.jaccard(title, name)
+								ratio = self._titleMatchJaccard(title, name)
 
 							if ratio >= thresholdBase:
 								allow = obfuscated or ratio >= (thresholdBase * 1.3)
@@ -19041,7 +19092,7 @@ class Stream(Serializer):
 										common = set(titleSorted) & set(nameSorted)
 										titleBasic = ' '.join(list(common) + list(set(titleSorted) - set(common)))
 										nameBasic = ' '.join(list(common) + list(set(nameSorted) - set(common)))
-										allow = tools.Matcher.levenshtein(titleBasic, nameBasic) > (thresholdBase * 1.1)
+										allow = self._titleMatchLevenshtein(titleBasic, nameBasic) > (thresholdBase * 1.1)
 									else:
 										# Long titles.
 										# Eg: "xma xtreme martial arts" vs "xma xtreme martial arts docdvdrip"
@@ -19070,12 +19121,12 @@ class Stream(Serializer):
 									if nameStripped and not nameStripped == nameOriginal:
 										thresholdConcatenated = thresholdShortDouble
 										if len(nameStripped) < 300: thresholdConcatenated *= 1.3
-										allow = tools.Matcher.levenshtein(title, nameStripped) >= thresholdConcatenated
+										allow = self._titleMatchLevenshtein(title, nameStripped) >= thresholdConcatenated
 
 								# Do not concatenated very similar titles, as it might lead to too many false positives with Levenshtein.
 								# Eg: "star wars the last jedi" + "star wars 8 the last jedi"
 								# Eg: Film Theory: How Star Wars Theories KILLED Star Wars: The Last Jedi!
-								if allow and tools.Matcher.levenshtein(titles[0], title) < 0.8:
+								if allow and self._titleMatchLevenshtein(titles[0], title) < 0.8:
 									titleConcatenated = __titleConcatenate(titles[0], title, suffix = True)
 
 									if titleConcatenated:
@@ -19089,14 +19140,14 @@ class Stream(Serializer):
 										elif 'serie' in title: thresholdExtra = 1.3
 
 										# Eg (Love & Death): Love.Death.and.Robots.S01.1080p.WEBRip.x265-RARBM
-										ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+										ratio = self._titleMatchLevenshtein(titleConcatenated, name)
 										if ratio >= thresholdLongConcatenated * thresholdExtra:
 											if not result is None: result.update({'index' : i, 'title' : title})
 											return True
 
 									titleConcatenated = __titleConcatenate(title, titles[0], suffix = True)
 									if titleConcatenated:
-										ratio = tools.Matcher.levenshtein(titleConcatenated, name)
+										ratio = self._titleMatchLevenshtein(titleConcatenated, name)
 										if ratio >= thresholdLongConcatenated:
 											if not result is None: result.update({'index' : i, 'title' : title})
 											return True
@@ -19305,7 +19356,6 @@ class Stream(Serializer):
 							# If the title is not the collection title, ignore the range.
 							# Eg: Star.Wars.The.Last.Jedi.2017.1-3.HDCAM.Rip.x264.AC3-DTOne-Exclusive.mkv
 							if titlesCleaned[0] == titlesCollection or not __titleMatch(threshold = threshold, titles = titlesCleaned[0], name = nameStripped, number = number, adjust = adjust, result = result): return False
-
 
 					# Number that is part of the collection keywords.
 					# Eg: Terminator 5-Film Collection (1984-2015) ~ TombDoc
@@ -19879,6 +19929,41 @@ class Stream(Serializer):
 					break
 
 		return match
+
+	@classmethod
+	def _titleMatch(self, function, value1, value2):
+		# Doing string matching can take a lot of processing power.
+		# Especially if the titles are long and there are many alias titles to match against.
+		# Eg: "Lord of the Rings" or "The Hobbit" can take 10+ mins on low-end devices with 25 providers and 1000+ links, with most time spend on title-filename matching, typically providers also time out due to the scrape time limit.
+		# On high-end devices this is a lot less noticeable. Although slower, it is still fast enough to not cause a scrape timeout.
+		# These functions are called multiple times with the same values.
+		# Cache them so that they only have to be calculated once.
+		# This is also heavily impacted by many invalid filenames having to be matched, only to be rejected afterwards.
+		# Caching these values can easily save 50%+ on the total scraping time.
+
+		id = str(function) + '_' + str(value1) + '_' + str(value2)
+		try:
+			return Stream.TitleMatches[id]
+		except:
+			value = function(value1, value2)
+			Stream.TitleMatches[id] = value
+			return value
+
+	@classmethod
+	def _titleMatchLevenshtein(self, value1, value2):
+		return self._titleMatch(function = tools.Matcher.levenshtein, value1 = value1, value2 = value2)
+
+	@classmethod
+	def _titleMatchJaccard(self, value1, value2):
+		return self._titleMatch(function = tools.Matcher.jaccard, value1 = value1, value2 = value2)
+
+	@classmethod
+	def _titleMatchJaro(self, value1, value2):
+		return self._titleMatch(function = tools.Matcher.jaro, value1 = value1, value2 = value2)
+
+	@classmethod
+	def _titleMatchClear(self):
+		Stream.TitleMatches = {}
 
 	'''
 		FUNCTION:

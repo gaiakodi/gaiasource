@@ -1471,6 +1471,7 @@ class Core(object):
 				titles = []
 				titleAlias = None
 				processedMain = []
+				processedAlias = []
 				processedCollection = []
 				processedEpisode = []
 				processedBasic = []
@@ -1538,7 +1539,32 @@ class Core(object):
 					# English or user-language titles should be placed before eg Chinese titles.
 					processedMain.extend(aliases)
 
-					for value in self.titles['alias'].values(): processedMain.extend(value)
+					# Some movies can have 150+ aliases, which makes title matching slow during scraping.
+					# Eg: "The Lord of the Rings" or "The Hobbit" - same for all the movies in the collections.
+					# During scraping, we only pick the first N titles for matching.
+					# Move similar and unrelated aliases to the end, which will later get cut away.
+					# Eg: Lord of the Rings 1 - The Fellowship of the Ring - Extended Edition Part 2
+					# Eg: The  Lord of the Rings: The Fellowship of the Ring (Theatrical Edition)
+					# Eg: El Señor de los Anillos: La Comunidad del Anillo (Versión extendida)
+					# Eg: Der Herr der Ringe - Die Gefährten (Special Extended Edition) - Teil 1"
+					# Eg: Ringenes Herre: Ringens Brorskap (Extended Edition Part 1)
+					# Eg: IL SIGNORE DEGLI ANELLI La compagnia dell'anello dvd1
+					# Eg: The Lord of the Rings- The Fellowship of the Ring (2001) Disk 1
+					#for value in self.titles['alias'].values(): processedMain.extend(value)
+					temp = []
+					for value in self.titles['alias'].values(): temp.append(value)
+					temp = tools.Tools.listInterleave(*temp) # Interleave to pick at least some alaises for each country.
+					temp1 = []
+					temp2 = []
+					temp3 = []
+					for i in temp:
+						if tools.Regex.match(data = i, expression = '(d[iy]s[ck]|dvd|edition.*(?:part|teil))[^a-z\d]*\d', cache = True): temp3.append(i)
+						elif tools.Regex.match(data = i, expression = '((?:extended|special|theatrical).*edition|see(?:$|[^a-z])|versi.n.*(?:longue|extend))', cache = True): temp2.append(i)
+						else: temp1.append(i)
+					processedAlias.extend(temp1)
+					processedAlias.extend(temp2)
+					processedAlias.extend(temp3)
+					processedAlias = tools.Tools.listUnique(processedAlias)
 
 				titles = tools.Tools.listUnique(titles)
 				processedMain = tools.Tools.listUnique(processedMain)
@@ -1895,47 +1921,50 @@ class Core(object):
 					if count <= 0: count = 1
 					self.titles['search']['episode'] = self.titles['search']['episode'][:count]
 
-				# This is important for matching titles in stream.py.
-				# Eg: The title "Amélie", but most file names contain "Amelie".
-				processedExtra = []
-				expression = re.compile('^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
-				seen = set()
-				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
-				for title in processedMain:
-					titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = False).strip()
-					if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
-						processedExtra.append(titleNew)
-					if settingCharacter:
-						titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = True).strip()
+				for processed in [processedMain, processedAlias]:
+					# This is important for matching titles in stream.py.
+					# Eg: The title "Amélie", but most file names contain "Amelie".
+					processedExtra = []
+					expression = re.compile('^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
+					seen = set()
+					processed = [i for i in processed if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
+					for title in processed:
+						titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = False).strip()
 						if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
 							processedExtra.append(titleNew)
-				for i in range(len(processedExtra)):
-					try: processedExtra[i] = processedExtra[i].decode('utf-8')
-					except: pass
-				processedMain.extend(processedExtra)
+						if settingCharacter:
+							titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = True).strip()
+							if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
+								processedExtra.append(titleNew)
+					for i in range(len(processedExtra)):
+						try: processedExtra[i] = processedExtra[i].decode('utf-8')
+						except: pass
+					processed.extend(processedExtra)
 
-				# Sometimes there are weird aliases, which hinders metadata extraction (eg keywords like "1080p", "BluRay", etc).
-				#	The Terminator BluRay 1080p REMASTERED
-				#	The Terminator (1984) [BluRay] [1080p] REMASTERED
-				for i in ['2160p?', '1080p?', '720p?', '4k', '(?:hd.*?)?dvd', 'bluray', 'vhs']:
-					expression = '(?:^|\s)(%s?%s%s?)(?:$|\s)' % (tools.Regex.Symbol, i, tools.Regex.Symbol)
-					if not tools.Regex.match(data = self.titles['main'], expression = expression):
-						for j in range(len(processedMain)):
-							processedNew = tools.Regex.remove(data = processedMain[j], expression = expression, group = 1, all = True)
-							if not processedNew == processedMain[j]: processedMain[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
+					# Sometimes there are weird aliases, which hinders metadata extraction (eg keywords like "1080p", "BluRay", etc).
+					#	The Terminator BluRay 1080p REMASTERED
+					#	The Terminator (1984) [BluRay] [1080p] REMASTERED
+					for i in ['2160p?', '1080p?', '720p?', '4k', '(?:hd.*?)?dvd', 'bluray', 'vhs']:
+						expression = '(?:^|\s)(%s?%s%s?)(?:$|\s)' % (tools.Regex.Symbol, i, tools.Regex.Symbol)
+						if not tools.Regex.match(data = self.titles['main'], expression = expression):
+							for j in range(len(processed)):
+								processedNew = tools.Regex.remove(data = processed[j], expression = expression, group = 1, all = True)
+								if not processedNew == processed[j]: processed[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
 
-				# Exclude network/studio prefixes.
-				# Eg: "FX's 将軍" -> "FX's"
-				processedMain = [i for i in processedMain if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
+					# Exclude network/studio prefixes.
+					# Eg: "FX's 将軍" -> "FX's"
+					processed = [i for i in processed if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
 
 				seen = set()
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))]
 				seen = set()
 				processedCollection = [i for i in processedCollection if i and not(i.lower() in seen or seen.add(i.lower()))]
 				seen = set()
+				processedAlias = [i for i in processedAlias if i and not(i.lower() in seen or seen.add(i.lower()))]
+				seen = set()
 				processedEpisode = [i for i in processedEpisode if i and not(i.lower() in seen or seen.add(i.lower()))]
 				seen = set()
-				processedAll = processedMain + processedCollection + processedEpisode
+				processedAll = processedMain + processedCollection + processedAlias + processedEpisode
 				processedAll = [i for i in processedAll if i and not(i.lower() in seen or seen.add(i.lower()))]
 
 				self.titles['processed'] = {}

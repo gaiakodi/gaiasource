@@ -32,13 +32,14 @@ class Provider(ProviderSpotJson):
 		ProviderSpotJson.initialize(self,
 			name					= 'NZBServer',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
-			rank					= 4,
+			rank					= 2, # Because of the continuous VPN block below.
 
 			# NZBserver still works, however, the download link/button now displays a Dutch notifcation saying you need a VPN to access NZBserver.
 			# Even with a Netherland VPN, the message remains.
 			# They probably want to force people to use the advertised VPN, because they earn comission for it, and then block any other VPN IP.
 			# 2023-07-10 - check this in a few weeks/months again to see if they removed this restriction.
 			# 2023-08-18 - VPN restriction still in place.
+			# 2025-01-02 - VPN restriction still in place.
 			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,
