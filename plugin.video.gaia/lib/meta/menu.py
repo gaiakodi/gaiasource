@@ -23,6 +23,7 @@ from lib.modules.interface import Dialog, Loader, Directory, Translation, Format
 from lib.modules.network import Networker
 from lib.modules.concurrency import Pool
 from lib.modules.shortcut import Shortcut
+from lib.modules.cache import Memory
 
 from lib.meta.tools import MetaTools
 from lib.meta.manager import MetaManager
@@ -511,7 +512,7 @@ class MetaMenu(object):
 	# EMPTY
 	##############################################################################
 
-	def _empty(self, content = None, resolve = True, loader = True):
+	def _empty(self, content = None, notification = True, resolve = True, loader = True):
 		# NB: This is very important when <reuselanguageinvoker> is enabled.
 		# Otherwise if an empty menu is opened and the "Nothing Found" notification is shown, no other menus work afterwards.
 		# There is no new Python process being started for any new action/menu afterwards.
@@ -521,7 +522,7 @@ class MetaMenu(object):
 		System.pluginResolvedSet(success = False, dummy = True)
 
 		if loader: Loader.hide()
-		self._notificationEmpty(content = content)
+		if notification: self._notificationEmpty(content = content)
 
 	##############################################################################
 	# NOTIFICATION
@@ -868,7 +869,8 @@ class MetaMenu(object):
 				# Otherwise if an empty menu is opened, not subsequent menu loads anymore.
 				# Check False for cancelled search dialog, season extras, or history streams.
 				# Update: Also do if search dialog is cancelled.
-				self._empty(content = parameters.get(MetaMenu.ParameterContent))
+				notification = False if parameters.get(MetaMenu.ParameterContent) == MetaMenu.ContentSearch and items is False else True # Do not show the notification if the search dialog was canceled.
+				self._empty(content = parameters.get(MetaMenu.ParameterContent), notification = notification)
 			elif load == MetaMenu.LoadRefresh:
 				# Check Context commandRefreshList() for more info.
 				Loader.hide()
@@ -2320,13 +2322,30 @@ class MetaMenu(object):
 		query = parameters.get(MetaMenu.ParameterQuery)
 		provider = parameters.get(MetaMenu.ParameterProvider)
 
-		if search == MetaMenu.SearchAdvanced: query, extra = self._searchAdvanced(query = query, provider = provider)
-		elif search == MetaMenu.SearchSet: query = self._searchSet(query = query)
-		elif search == MetaMenu.SearchList: query = self._searchList(query = query)
-		elif search == MetaMenu.SearchPerson: query = self._searchPerson(query = query)
-		elif search == MetaMenu.SearchOracle: query = self._searchOracle(query = query)
-		elif search == MetaMenu.SearchExact: query = self._searchExact(query = query)
-		else: query = self._searchTitle(query = query, provider = provider)
+		# This is needed to prevent the search dialog from popping up again when the container is refreshed later.
+		# To replicate: Movies -> Search -> Title -> search a title -> scrape the movie -> play one of the streams -> if playback starts, stop playback -> in the reload-streams dialog, click cancel -> the search dialog shows again asking for input.
+		# Save the query as a global variable. If the container containing search results is refreshed, instead of showing the input dialog again, just use the saved query to reload the container.
+		id = 'GaiaSearch'
+		reload = False
+		path = System.infoLabel('Container.FolderPath')
+		if path:
+			path = Networker.linkDecode(path)
+			if path and path.get(MetaMenu.ParameterMenu) == MetaMenu.MenuMedia:
+				memory = Memory.get(id = id, local = False, kodi = True)
+				if memory:
+					reload = True
+					query = memory.get('query')
+					extra = memory.get('extra')
+
+		if not reload:
+			if search == MetaMenu.SearchAdvanced: query, extra = self._searchAdvanced(query = query, provider = provider)
+			elif search == MetaMenu.SearchSet: query = self._searchSet(query = query)
+			elif search == MetaMenu.SearchList: query = self._searchList(query = query)
+			elif search == MetaMenu.SearchPerson: query = self._searchPerson(query = query)
+			elif search == MetaMenu.SearchOracle: query = self._searchOracle(query = query)
+			elif search == MetaMenu.SearchExact: query = self._searchExact(query = query)
+			else: query = self._searchTitle(query = query, provider = provider)
+			Memory.set(id = id, value = {'query' : query, 'extra' : extra}, local = False, kodi = True)
 
 		if extra: parameters.update(extra)
 		parameters[MetaMenu.ParameterQuery] = query

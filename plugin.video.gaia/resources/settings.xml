@@ -95,6 +95,21 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
+				<setting id="general.launch.delay" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>2</level></setting>
+				<setting id="general.launch.delay.label" type="string" label="33807" help="34484" parent="general.launch.service">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=general.launch.delay&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33112]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="general.launch.service">0</dependency>
+					</dependencies>
+				</setting>
 				<setting id="general.launch.acceleration" type="boolean" label="33944" help="34453" parent="general.launch.service">
 					<control type="toggle"/>
 					<default>true</default>
@@ -4025,6 +4040,22 @@ The label is then added to the action element:
 							<option label="33930">2</option>
 						</options>
 					</constraints>
+				</setting>
+				<setting id="playback.details.description.production" type="integer" label="35429" help="34563" parent="playback.details.description">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="36092">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.details.description" operator="gt">0</dependency>
+					</dependencies>
 				</setting>
 				<setting id="playback.details.description.speed" type="integer" label="35418" help="34532" parent="playback.details.description">
 					<control type="spinner" format="string"/>

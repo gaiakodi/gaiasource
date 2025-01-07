@@ -840,8 +840,9 @@ class Playback(Database):
 
 		return result
 
-	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, binge = False, internal = None, external = None, indication = False, refresh = True, timeout = False, power = False, qr = True, continues = False):
-		Loader.show()
+	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, binge = False, internal = None, external = None, indication = False, refresh = True, timeout = False, loader = None, power = False, qr = True, continues = False):
+		if loader is None: loader = not binge
+		if loader: Loader.show()
 		Sound.executeRatingStart()
 
 		result = {}
@@ -873,7 +874,9 @@ class Playback(Database):
 						Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation, sound = sound)
 					else:
 						Dialog.notification(title = title, message = Translation.string(35347 if alternative else 35044) % label, icon = Dialog.IconWarning, sound = sound)
-					if not result is None: result['result'] = rated
+					if not result is None:
+						result['result'] = rated
+						result['rating'] = rating
 					return rated
 			return None
 
@@ -887,7 +890,7 @@ class Playback(Database):
 			Sound.executeRatingFinish()
 		else:
 			from lib.modules.window import WindowRating
-			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = not binge, refresh = not binge), wait = True)
+			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = loader, refresh = not binge), wait = True)
 			if rating:
 				if 'timeout' in rating and rating['timeout'] and 'interacted' in rating and not rating['interacted']: autoclosed = True
 				elif 'action' in rating and rating['action'] == WindowRating.ActionPower: return False
@@ -898,8 +901,8 @@ class Playback(Database):
 
 		if rating is None: return True if autoclosed else None
 		if result: result = result['result']
-		if not result and not result is False: result = _dialogRate(rating = rating, loader = not binge, refresh = not binge)
-		return True if autoclosed else (result or None)
+		if not result and not result is False: result = _dialogRate(rating = rating, loader = loader, refresh = not binge)
+		return True if autoclosed else (rating or result or None)
 
 	def dialogUnrate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, internal = None, external = None, refresh = True):
 		Loader.show()
@@ -986,6 +989,7 @@ class Playback(Database):
 
 			multiple = len(rate) > 1
 			for i in rate:
+				i['loader'] = False
 				i['power'] = power
 				i['qr'] = qr
 				if multiple:

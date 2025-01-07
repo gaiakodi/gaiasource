@@ -8556,6 +8556,13 @@ class MetaManager(object):
 			# Filter out items marked as "removed".
 			items = [item for item in items if not (item.get(MetaManager.Smart) or {}).get('removed')]
 
+			# Some items have an episode number, which causes them to be displayed as an episode in the Arrivals menu, instead of a season.
+			# This happens spordically with only a few items in the menu, and only the first time the shows Arrivals menu is opened after Kodi launch. If the menu is opened a second time, all are displayed as seasons.
+			# Not sure what causes this, maybe some items are getting cached in MetaCache's memory from smart-loading during boot, which are then reused the first time the shows Arrivals menu is opened.
+			# Setting the episode number to None seems to solve the problem.
+			if Media.isSerie(media):
+				for item in items: item['episode'] = None
+
 			# Filter directly by niche, and not the filters create from the niche.
 			# Because the cache porgress list has reduced metadata, and not all prarameters might be available here, although most should.
 			# Not all items can be filtered out here, if they have not detailed metadata yet.

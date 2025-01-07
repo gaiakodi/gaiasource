@@ -6271,6 +6271,20 @@ class Settings(object):
 				'default' : 'FF922B21',
 			},
 		},
+		'general.launch.delay' : {
+			'type' : CustomDuration,
+			'title' : 33807,
+			'value' : {
+				'unit' : UnitSecond,
+				'default' : 0,
+				'minimum' : 0,
+				'maximum' : 300,
+			},
+			'special' : {
+				'zero' : SpecialNone,
+				'none' : SpecialNone,
+			},
+		},
 		'general.concurrency.global.limit' : {
 			'type' : CustomNumber,
 			'title' : 36620,

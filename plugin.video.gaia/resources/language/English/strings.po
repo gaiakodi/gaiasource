@@ -3867,7 +3867,7 @@ msgid "Gaia Startup"
 msgstr ""
 
 msgctxt "#33807"
-msgid "[GAIA-NO-LABEL]"
+msgid "Service Delay"
 msgstr ""
 
 msgctxt "#33808"
@@ -6535,7 +6535,7 @@ msgid "Set the level at which debug information is written to the Kodi log. The 
 msgstr ""
 
 msgctxt "#34484"
-msgid "[GAIA-NO-LABEL]"
+msgid "Delay the Gaia background service by a certain amount of time. This allows other addons and services to finish before the Gaia service is executed. This can be useful for a variety of reasons, like allowing your VPN to connect before Gaia make any network requests."
 msgstr ""
 
 msgctxt "#34485"
@@ -6851,7 +6851,7 @@ msgid "Change the limit, preferred and fallback selections for different set ima
 msgstr ""
 
 msgctxt "#34563"
-msgid "[GAIA-NO-LABEL]"
+msgid "Show the companies and people involved in the production in the player's description. The [I]Essential[/I] option only shows the directors. The [I]Standard[/I] option shows the directors, writers, and creators. The [I]Extended[/I] option shows the directors, writers, creators, studios, and networks."
 msgstr ""
 
 msgctxt "#34564"
@@ -8938,7 +8938,7 @@ msgid "Free Account"
 msgstr ""
 
 msgctxt "#35429"
-msgid "[GAIA-NO-LABEL]"
+msgid "Media Production"
 msgstr ""
 
 msgctxt "#35430"
@@ -9958,11 +9958,11 @@ msgid "OpenSubtitles"
 msgstr ""
 
 msgctxt "#35684"
-msgid "[GAIA-NO-LABEL]"
+msgid "Writer"
 msgstr ""
 
 msgctxt "#35685"
-msgid "[GAIA-NO-LABEL]"
+msgid "Creator"
 msgstr ""
 
 msgctxt "#35686"
@@ -10466,7 +10466,7 @@ msgid "Pages"
 msgstr ""
 
 msgctxt "#35811"
-msgid "[GAIA-NO-LABEL]"
+msgid "Studio"
 msgstr ""
 
 msgctxt "#35812"

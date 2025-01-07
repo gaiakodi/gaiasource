@@ -449,6 +449,8 @@ class Player(xbmc.Player):
 	def _detailsUpdate(self):
 		try:
 			threads = []
+			if tools.Settings.getInteger('playback.details.description.production') > 0:
+				threads.append(Pool.thread(target = self._detailsUpdateProduction, start = True))
 			if tools.Settings.getInteger('playback.details.description.service') > 0:
 				threads.append(Pool.thread(target = self._detailsUpdateService, start = True))
 			if tools.Settings.getInteger('playback.details.description.device') > 0:
@@ -461,6 +463,25 @@ class Player(xbmc.Player):
 				threads.append(Pool.thread(target = self._detailsUpdateLink, start = True))
 			[self.join(thread) for thread in threads]
 			self.detailsSet()
+		except: tools.Logger.error()
+
+	def _detailsUpdateProduction(self):
+		try:
+			setting = tools.Settings.getInteger('playback.details.description.production')
+			details = {}
+
+			if setting >= 1:
+				details['director'] = self.metadata.get('director')
+			if setting >= 2:
+				details['writer'] = self.metadata.get('writer')
+				details['creator'] = self.metadata.get('creator')
+			if setting >= 3:
+				details['network'] = self.metadata.get('network')
+				details['studio'] = self.metadata.get('studio')
+
+			if details:
+				for k, v in details.items():
+					if v: self.details[k] = interface.Format.iconJoin(v[:4])
 		except: tools.Logger.error()
 
 	def _detailsUpdateService(self):
@@ -538,12 +559,20 @@ class Player(xbmc.Player):
 				newline = interface.Format.newline()
 
 				details = []
+
+				if 'creator' in self.details: details.append((35685, self.details['creator']))
+				if 'director' in self.details: details.append((35377, self.details['director']))
+				if 'writer' in self.details: details.append((35684, self.details['writer']))
+				if 'network' in self.details: details.append((33719, self.details['network']))
+				if 'studio' in self.details: details.append((35811, self.details['studio']))
+
 				if 'speed' in self.details: details.append((35418, self.details['speed']))
 				if 'service' in self.details: details.append((35420, self.details['service']))
 				if 'device' in self.details: details.append((35419, self.details['device']))
 				if 'server' in self.details: details.append((35207, self.details['server']))
 				if 'name' in self.details: details.append((35724, self.details['name']))
 				if 'link' in self.details: details.append((33702, self.details['link']))
+
 				details = newline.join([interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1] for i in details])
 
 				# There is a weird sporadic error in the Kore remote app.
