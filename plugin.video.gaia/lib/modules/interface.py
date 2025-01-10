@@ -1690,6 +1690,7 @@ class Dialog(object):
 	PrefixNext = '» '
 
 	IdNone = 9999
+	IdHome = 10000
 	IdDialogText = 10147
 	IdDialogProgress = 10101
 	IdDialogOk = 12002
@@ -1813,6 +1814,10 @@ class Dialog(object):
 	@classmethod
 	def windowVisible(self, id):
 		return self.windowId() == id
+
+	@classmethod
+	def windowVisibleHome(self):
+		return self.windowId() == Dialog.IdHome
 
 	# Current dialog ID
 	@classmethod

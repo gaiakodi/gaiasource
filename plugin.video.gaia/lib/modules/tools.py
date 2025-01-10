@@ -5037,10 +5037,10 @@ class System(object):
 		return command
 
 	@classmethod
-	def commandWindow(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True, parent = None):
+	def commandWindow(self, action = None, parameters = None, command = None, id = GaiaAddon, optimize = True, call = True, parent = None, replace = False):
 		if id is None: id = System.GaiaAddon
 		if command is None: command = self.command(action = action, parameters = parameters, id = id, optimize = optimize)
-		if call: command = 'ActivateWindow(videos,%s%s)' % (command, (',' + parent) if parent else '')
+		if call: command = '%s(videos,%s%s)' % ('ReplaceWindow' if replace else 'ActivateWindow', command, (',' + parent) if parent else '')
 		return command
 
 	@classmethod
@@ -5326,8 +5326,8 @@ class System(object):
 		return self.execute(self.commandContainer(id = id, action = action, parameters = parameters, command = command, replace = replace, optimize = optimize, call = True), wait = wait)
 
 	@classmethod
-	def executeWindow(self, action = None, parameters = None, command = None, parent = None, id = GaiaAddon, optimize = True, wait = False):
-		return self.execute(self.commandWindow(id = id, action = action, parameters = parameters, command = command, parent = parent, optimize = optimize, call = True), wait = wait)
+	def executeWindow(self, action = None, parameters = None, command = None, parent = None, replace = False, id = GaiaAddon, optimize = True, wait = False):
+		return self.execute(self.commandWindow(id = id, action = action, parameters = parameters, command = command, parent = parent, replace = replace, optimize = optimize, call = True), wait = wait)
 
 	# Either query OR all the other parameters.
 	@classmethod

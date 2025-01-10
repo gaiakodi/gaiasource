@@ -6580,9 +6580,15 @@ class MetaManager(object):
 			}
 
 			if pack and number in [MetaPack.NumberSequential, MetaPack.NumberAbsolute]:
-				numberStart = pack.numberEpisode(number = number, season = seasonStart, episode = episodeStart)
-				numberEnd = pack.numberEpisode(number = number, season = seasonEnd, episode = episodeEnd)
-				numberLast = pack.numberEpisode(number = number, season = seasonLast, episode = episodeLast)
+				# Check the Absolute menu for GoT.
+				# If the episode is not extracted first, the numberEnd/numberLast values are None, causing the Absolute menu for GoT to go to the next page after S01E73, starting back at S01E01.
+				#numberStart = pack.numberEpisode(number = number, season = seasonStart, episode = episodeStart)
+				#numberEnd = pack.numberEpisode(number = number, season = seasonEnd, episode = episodeEnd)
+				#numberLast = pack.numberEpisode(number = number, season = seasonLast, episode = episodeLast)
+				numberStart = pack.numberEpisode(number = number, item = pack.episode(season = seasonStart, episode = episodeStart))
+				numberEnd = pack.numberEpisode(number = number, item = pack.episode(season = seasonEnd, episode = episodeEnd))
+				numberLast = pack.numberEpisode(number = number, item = pack.episode(season = seasonLast, episode = episodeLast))
+
 				result[number] = {'start' : numberStart, 'end' : numberEnd, 'last' : numberLast}
 
 			return result

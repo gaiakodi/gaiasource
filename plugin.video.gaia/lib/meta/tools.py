@@ -17471,7 +17471,8 @@ class MetaTools(object):
 				if not 'time' in metadata: metadata['time'] = {}
 
 				adjust = playbacker.AdjustSettings
-				if progressed or progressed is None: adjust = False
+				if progression and progression[1] is True: adjust = True
+				elif progressed or progressed is None: adjust = False
 				elif media == Media.Episode: adjust = True
 
 				# NB: Use "quick=True" to avoid pack retrieval for show menus, which can take very long, and is not needed here.
@@ -17507,7 +17508,7 @@ class MetaTools(object):
 					if not count: count = 1
 				elif media == Media.Extra:
 					progress = None
-
+					
 			# Do not use overlay/watched attribute, since Kodi (or maybe the Kodi skin) resets the playcount to 1, even if playcount is higher than 1.
 			# https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/GUIListItem.h
 			#metadata['overlay'] = 5 if count else 4
@@ -17541,6 +17542,9 @@ class MetaTools(object):
 
 				# Used by the context menu to add a "Clear Progress" option.
 				if not media == Media.Show and not media == Media.Season: metadata['progress'] = progress
+			else:
+				# If the progress was adjusted (eg: ignore if above 95%), reset the value, otherwise the progress is still added to the label.
+				metadata['progress'] = None
 
 			if rating:
 				try: tag.setUserRating(rating) # Kodi 20+

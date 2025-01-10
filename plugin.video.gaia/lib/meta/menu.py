@@ -843,7 +843,8 @@ class MetaMenu(object):
 			Eg: From MetaTools._items()
 		'''
 		exception = parameters.get(MetaMenu.ParameterSearch) in [MetaMenu.SearchOracle, MetaMenu.SearchExact] # Add all non-folder actions here.
-		if (load == MetaMenu.LoadAutomatic and System.handle() < 0 and not exception) or load == MetaMenu.LoadExternal:
+
+		if self.menuExternal(menu = menu, **parameters):
 			# Important for episode submenus that are executed in a separate process.
 			# Otherwise on slow devices the loader might take too long to show up when an episode is clicked that opens the submenu.
 			# The user might then think nothing is happening and click again, only slowing down things more.
@@ -879,10 +880,25 @@ class MetaMenu(object):
 		return items or None
 
 	@classmethod
-	def menuExternal(self, **parameters):
+	def menuExternal(self, menu = None, **parameters):
 		load = parameters.get(MetaMenu.ParameterLoad)
 		if load == MetaMenu.LoadExternal: return True
-		elif load == MetaMenu.LoadAutomatic and System.handle() < 0 and not parameters.get(MetaMenu.ParameterSearch) in [MetaMenu.SearchOracle, MetaMenu.SearchExact]: return True
+		elif load == MetaMenu.LoadAutomatic:
+			# When clicking on a show in a widget, it should open the Gaia season/episode menu, unlike movies which immediately start scraping.
+			# However, it is almost impossible to distinguish between calls coming in from widgets and calls coming internally from Gaia.
+			# InfoLabels are mostly useless for this.
+			# For instance, "Container.FolderPath" is empty when a call comes from a widget, while it has a value when it comes from Gaia or other addons.
+			# 	if System.handle() < 0 or (not System.infoLabel('Container.FolderPath') and menu == MetaMenu.MenuMedia and parameters.get(MetaMenu.ParameterContent)):
+			# However, when CREATING the widget from Kodi's skin settings, the folder path is also empty when using the dialog to select a path within an addon, and can therefore not be used.
+			# The best alternative is to check if the call is made when the Kodi Home window is visible.
+			# Do not use the InfoLabel "System.CurrentWindow", since sometimes its value is empty. Use Python to check this instead.
+			# Also only do this if the content is "season"/"episode".
+			# Do not do this if the content is "show", since otherwise the list inside the widget will itself cause a Gaia window to be opened when the widget is loaded during boot.
+			seriesWidget = Dialog.windowVisibleHome() and menu == MetaMenu.MenuMedia and parameters.get(MetaMenu.ParameterContent) in [MetaMenu.ContentSeason, MetaMenu.ContentEpisode]
+
+			if System.handle() < 0 or seriesWidget:
+				if not parameters.get(MetaMenu.ParameterSearch) in [MetaMenu.SearchOracle, MetaMenu.SearchExact]: # Add all non-folder actions here.
+					return True
 		return False
 
 	def _menuExecute(self, action = None, **parameters):
@@ -899,8 +915,15 @@ class MetaMenu(object):
 		# If the call is initiated externally, especially from a widget, no addon/container is opened, and Container.Update(...) will have no effect.
 		# We first have to open the addon and then update the container, which can be done in one go using ActivateWindow(...).
 		# Do not optimzie to keep the URL clean and readable, so it can be easily edited for eg widgets.
-		if System.originMenu(): return System.executeContainer(action = action or MetaMenu.Action, parameters = parameters, optimize = False)
-		else: return System.executeWindow(action = action or MetaMenu.Action, parameters = parameters, optimize = False)
+		if System.originMenu():
+			return System.executeContainer(action = action or MetaMenu.Action, parameters = parameters, optimize = False)
+		else:
+			# NB: Important when a season/episode menu is opened from show widgets.
+			# Otherwise Kodi logs: Activate of window '10025' refused because there are active modal dialogs
+			Loader.hide()
+
+			# Add 'return', so that navigating back from a window opened by a widget, goes back to the Kodi home menu and not the Gaia main menu.
+			return System.executeWindow(action = action or MetaMenu.Action, parameters = parameters, optimize = False, parent = 'return')
 
 	def _menuItem(self, label = None, image = None, media = None, niche = None, menu = None, content = None, category = None, explore = None, context = None, condition = True, default = None, **parameters):
 		if not condition: return default() if Tools.isFunction(default) else default
@@ -2482,7 +2505,8 @@ class MetaMenu(object):
 
 		progress = base.get('progress')
 		if progress:
-			isProgress = [False, 0.98] # Only show progress percentage in the label if 0 <= progress <= 97%.
+			if progress == MetaMenu.ProgressDefault: isProgress = [False, True]
+			else: isProgress = [False, 0.98] # Only show progress percentage in the label if 0 <= progress <= 97%.
 			if progress == MetaMenu.ProgressRewatch:
 				if Media.isSerie(media): media = Media.Show
 				isProgress = False # Do not show progress percentage in the label at all.

@@ -59,7 +59,7 @@ class MetaCache(Database):
 	StatusValid			= [StatusCurrent, StatusMemory, StatusOutdated, StatusObsolete]
 
 	# When the data outdated and should be refreshed in the background while the old cached data is still returned and displayed.
-	TimeOutdated		= 2678400		# 1 Month.
+	TimeOutdated		= 5256000		# 2 Months. 1 Month causes too many refreshes, especially from the smart menus. Newer releases are in any case refreshed more often using TimeRelease.
 	TimeOutdatedMovie	= TimeOutdated
 	TimeOutdatedSet		= TimeOutdated
 	TimeOutdatedShow	= TimeOutdated
@@ -100,6 +100,8 @@ class MetaCache(Database):
 							604800		: 86400,	# 7 days : 1 day.
 							1209600		: 172800,	# 14 days : 2 days.
 							1814400		: 259200,	# 21 days : 3 days.
+							2419200		: 345600,	# 28 days : 4 days.
+							3628800		: 432000,	# 42 days : 5 days.
 						}
 	TimeReleaseMovie	= TimeRelease
 	TimeReleaseSet		= TimeRelease
