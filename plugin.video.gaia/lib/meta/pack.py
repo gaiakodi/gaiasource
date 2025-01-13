@@ -1921,8 +1921,9 @@ class MetaPack(object):
 						if number in types and not(self._extractType(episode, MetaPack.NumberOfficial) or self._extractType(episode, MetaPack.NumberAutomatic)): continue
 
 						# Exclude specials that are a normal episode on Trakt, but a special on TVDb.
-						# Eg: One Piece S15E590 (Trakt) vs S00E39 (TVDb): The titles are different, but the release dateis the same and Trakt has S00E39's TVDb ID under its episode.
-						if number == MetaPack.NumberStandard and numberSeason > 0 and self._extractType(episode, MetaPack.NumberSpecial): continue
+						# Eg: One Piece S15E590 (Trakt) vs S00E39 (TVDb): The titles are different, but the release date is the same and Trakt has S00E39's TVDb ID under its episode.
+						# Update: Do this now via existsSpecial below.
+						#if number == MetaPack.NumberStandard and numberSeason > 0 and self._extractType(episode, MetaPack.NumberSpecial): continue
 
 						if number == MetaPack.NumberUniversal or number in types or self._extractType(episode, number) or (number == MetaPack.NumberStandard and self._extractType(episode, MetaPack.NumberSpecial)):
 							numberLookup = MetaPack.NumberStandard if number == MetaPack.NumberUniversal else number
@@ -1959,7 +1960,25 @@ class MetaPack(object):
 										try: exists = lookupEpisode[i][numberSeason2][numberEpisode2]
 										except: exists = False
 
-										if not exists or (self._extractType(exists, MetaPack.NumberUnofficial) and self._extractType(item, MetaPack.NumberOfficial)):
+										# Some episodes exists multipl;e times.
+										# Eg: One Piece: S15E10 (Gaia), S15E590 (Trakt/TMDb), S00E39 (TVDb).
+										# This can cause the suboptimal episode to be picked in MetaManager._metadataEpisodeUpdate().
+										# Eg: For Trakt/TMDb S15E590, it will pick the special episode (S00E39) instead of season episode (S15E10/S15E590).
+										# This will make S01E590 in the Absolute menu show up as S01E00 (since it is seen as a special).
+										# If we detect an existing entry in the lookup that is from S0, replace it with a later episode.
+										# Only do this for specials, not S1+, since there can be season-overlapping.
+										# Eg: One Piece S01E25 (Trakt/TMDb) vs S02E17 (TVDb).
+										existsSpecial = False
+										if exists and exists.get(MetaPack.NumberStandard)[MetaPack.PartSeason] == 0:
+											existsFound = False
+											existsNumber = [numberSeason, numberEpisode]
+											for j in numbers + ids:
+												if exists.get(j) == existsNumber:
+													existsFound = True
+													break
+											if not existsFound: existsSpecial = True
+
+										if not exists or existsSpecial or (self._extractType(exists, MetaPack.NumberUnofficial) and self._extractType(item, MetaPack.NumberOfficial)):
 											item[i] = [numberSeason2, numberEpisode2]
 											if not numberSeason2 in lookupEpisode[i]: lookupEpisode[i][numberSeason2] = {}
 

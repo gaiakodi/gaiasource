@@ -52,8 +52,8 @@ class Playback(Database):
 	ProgressInitiate	= 0.00001
 	ProgressStart		= 0.01
 	ProgressConclude	= 0.75
-	ProgressEndMovie	= 0.94
-	ProgressEndShow		= 0.96
+	ProgressEndMovie	= 0.93 # 94% is too low. "LOTR The Return of the King" has credits already rolling at just above 93%.
+	ProgressEndShow		= 0.95 # 96% is too low. "American Primeval S01E03" has credits already rolling at 96%.
 
 	# History
 	HistoryEndDefault	= 80

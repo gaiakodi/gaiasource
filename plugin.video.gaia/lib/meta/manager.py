@@ -5558,6 +5558,7 @@ class MetaManager(object):
 				# Create default numbering, in case something is not available in the pack.
 				if not 'number' in episode: episode['number'] = {}
 				number = episode['number']
+
 				if not MetaPack.NumberStandard in number: number[MetaPack.NumberStandard] = [numberSeason, numberEpisode]
 				if not MetaPack.NumberSequential in number: number[MetaPack.NumberSequential] = [1, episode.get('sequential') or 0] # "or 0" for IMDb specials.
 				if not MetaPack.NumberAbsolute in number: number[MetaPack.NumberAbsolute] = [1, episode.get('absolute') or 0]
@@ -5581,6 +5582,7 @@ class MetaManager(object):
 							episode['episode'] = numberEpisode = numberStandard[1]
 						try: del episode['absolute'] # Delete the absolute number, to force extracting it from the "number" dictionary.
 						except: pass
+
 						Tools.update(episode['number'], numbers, none = False, lists = False, unique = False)
 
 					idsEpisode = pack.id(season = numberSeason, episode = numberEpisode)

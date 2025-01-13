@@ -17508,7 +17508,7 @@ class MetaTools(object):
 					if not count: count = 1
 				elif media == Media.Extra:
 					progress = None
-					
+
 			# Do not use overlay/watched attribute, since Kodi (or maybe the Kodi skin) resets the playcount to 1, even if playcount is higher than 1.
 			# https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/GUIListItem.h
 			#metadata['overlay'] = 5 if count else 4
@@ -17594,7 +17594,8 @@ class MetaTools(object):
 
 				# For shows and seasons, only mark as watched if all episodes were watched.
 				# If some episodes are watched and some are unwatched, add a resume time to indicate there are still some unwatched episodes.
-				if media == Media.Show or media == Media.Season:
+				# Do not do this for Progress menus that are episodes, but are listed as shows.
+				if (media == Media.Show or media == Media.Season) and not(media == Media.Show and not episode is None and progressed):
 					if episodesUnwatched and episodesUnwatched > 0:
 						metadata['playcount'] = None
 					else:
@@ -20549,6 +20550,20 @@ class MetaTools(object):
 					elif votes < 15000: special -= 0.10
 					elif votes < 20000: special -= 0.05
 
+				# Some series have very few votes when released, causing them not to show up on the first page of Arrivals, although they are good shows that should be listed at the top.
+				# Eg: Netflix's "American Primeval" had less than 20 votes in the first 2 days. Since it was smart-loaded early on, the updated metadata with a higher vote count was not retrieved over the next few days.
+				# If it is a new release published by one of the major networks, increase the rank to force those titles to be moved higher up.
+				if niche and seconds < 604800:
+					if serie:
+						primary = summary['special']['network'][0]
+						secondary = summary['special']['network'][1]
+						if any(i in primary for i in niche):
+							special += 0.2 if seconds < 345600 else 0.1
+						elif any(i in secondary for i in niche):
+							special += 0.1 if seconds < 345600 else 0.05
+					else:
+						special += 0.15 if seconds < 345600 else 0.08
+
 				# Reduce the votes requirement if there is no IMDb rating.
 				# NB: Items not smart-loaded yet, do not have a "voting" dict.
 				adjust = 1.0
@@ -20664,6 +20679,11 @@ class MetaTools(object):
 				genreExclude.append(MetaTools.GenreNews)
 				nicheExclude.append(Media.Soap)
 
+				network = [
+					[MetaTools.CompanyAmazon, MetaTools.CompanyApple, MetaTools.CompanyDisney, MetaTools.CompanyFox, MetaTools.CompanyFx, MetaTools.CompanyHbo, MetaTools.CompanyHulu, MetaTools.CompanyNetflix, MetaTools.CompanyParamount, MetaTools.CompanyPeacock],
+					[MetaTools.CompanyAbc, MetaTools.CompanyAe, MetaTools.CompanyAmc, MetaTools.CompanyBbc, MetaTools.CompanyCbs, MetaTools.CompanyChannel4, MetaTools.CompanyCw, MetaTools.CompanyDiscovery, MetaTools.CompanyHistory, MetaTools.CompanyItv, MetaTools.CompanyMgm, MetaTools.CompanyNbc, MetaTools.CompanyShowtime, MetaTools.CompanySky, MetaTools.CompanySony, MetaTools.CompanyStarz, MetaTools.CompanySyfy, MetaTools.CompanyTbs, MetaTools.CompanyTnt, MetaTools.CompanyUsa],
+				]
+
 				return {
 					'language' : languages,
 					'rating' : rating,
@@ -20675,6 +20695,7 @@ class MetaTools(object):
 					'special' : {
 						'country' : country,
 						'language' : language,
+						'network' : network,
 						'genre' : {
 							'boost' : genreBoost,
 							'include' : genreInclude,

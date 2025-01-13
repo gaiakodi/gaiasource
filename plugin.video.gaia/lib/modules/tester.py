@@ -25582,7 +25582,7 @@ class Tester(object):
 		full = False
 		titles = None if full else 5
 
-		'''self.metadataPack()
+		self.metadataPack()
 		self.metadataNext()
 
 		self.containerMagnet()
@@ -25638,13 +25638,14 @@ class Tester(object):
 
 		# Make sure that the tester call "Stream(...).valid()" and the scraper call "Stream.load(...)" return the same results.
 		self.streamValid(direct = True)
-		self.streamValid(direct = False)'''
+		self.streamValid(direct = False)
 
 		'''self.streamTimeExtract(titles = titles)
 		self.streamTimeValid(titles = titles)
 		self.streamTime(titles = titles)'''
 
-		self.metadataNext()
+		#self.metadataPack()
+		#self.metadataNext()
 
 	##############################################################################
 	# METADATA
@@ -26331,6 +26332,21 @@ class Tester(object):
 						'tvdb'			: {'id' : '10696195',	'standard' : [22, 35],		'sequential' : [1, 1119],	'absolute' : [1, 1120]},
 						'trakt'			: {'id' : '12244765',	'standard' : [22, 1120],	'sequential' : [1, 1120],	'absolute' : [1, 1120]},
 					},
+					{
+						'standard'		: [15, 10],
+						'sequential'	: [1, 590],
+						'absolute'		: [1, 590],
+
+						'title'			: ['History\'s Strongest Collaboration vs. Glutton of the Sea (II)'],
+						'support'		: ['trakt', 'tvdb', 'tmdb'],
+						'type'			: {'official' : True, 'unofficial' : None, 'universal' : True, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : True},
+
+						'number'		: {						'standard' : [15, 10],		'sequential' : [1, 590],	'absolute' : [1, 590]},
+						'imdb'			: {'id' : 'tt3183576',	'standard' : None,			'sequential' : None,		'absolute' : None},
+						'tmdb'			: {'id' : '1154317',	'standard' : [15, 590],		'sequential' : [1, 590],	'absolute' : [1, 590]},
+						'tvdb'			: {'id' : '4543896',	'standard' : [0, 39],		'sequential' : [1, 0],		'absolute' : [1, 590]},
+						'trakt'			: {'id' : '3577329',	'standard' : [15, 590],		'sequential' : [1, 590],	'absolute' : [1, 590]},
+					},
 				],
 
 				'lookup' : [
@@ -26677,6 +26693,78 @@ class Tester(object):
 					},
 
 					####################################################################################################
+					# S15E10
+					####################################################################################################
+
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ValueIndex, 'season' : 15, 'episode' : 9},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberSequential, 'season' : 1, 'episode' : 590},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTrakt, 'season' : 15, 'episode' : 590},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTvdb, 'season' : 0, 'episode' : 39},
+					},
+
+					{
+						'input' : {'number' : MetaPack.NumberUniversal, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberSequential, 'season' : 1, 'episode' : 590},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.ProviderTrakt, 'season' : 15, 'episode' : 590},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.ProviderTrakt, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTrakt, 'season' : None, 'episode' : None},
+					},
+					{
+						'input' : {'number' : MetaPack.ProviderTvdb, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 14, 'episode' : 4},
+					},
+					{
+						'input' : {'number' : MetaPack.ProviderTvdb, 'season' : 0, 'episode' : 39},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.ProviderTvdb, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTvdb, 'season' : 15, 'episode' : 10},
+					},
+
+
+					{
+						'input' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.NumberSequential, 'season' : 1, 'episode' : 590},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTrakt, 'season' : 15, 'episode' : 590},
+					},
+					{
+						'input' : {'number' : MetaPack.NumberStandard, 'season' : 15, 'episode' : 10},
+						'output' : {'number' : MetaPack.ProviderTvdb, 'season' : 0, 'episode' : 39},
+					},
+
+					####################################################################################################
 					# S21E197
 					####################################################################################################
 
@@ -26735,7 +26823,7 @@ class Tester(object):
 					},
 
 					####################################################################################################
-					# S20E01
+					# S22E01
 					####################################################################################################
 
 					{

@@ -90,6 +90,12 @@ class Service(object):
 
 		kodi = mode == Service.ModeKodi
 
+		if kodi:
+			delay = Settings.getCustom('general.launch.delay')
+			if delay:
+				Logger.log('SERVICE DELAY: %d Seconds' % delay)
+				Time.sleep(delay)
+
 		# Reset possible old modules after the addon was updated.
 		# Otherwise after upgrade, Gaia throws errors about copied modules under the __gaia__ directory.
 		Importer.reset()
