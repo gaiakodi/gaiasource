@@ -35,7 +35,7 @@ class Provider(ProviderJson, ProviderHtml):
 	# On the other hand, the live search is SUPER slow. Especially when many queries/pages are retrieved, Knaben ends up the last provider in the scrape.
 	# So rather use the API with non-live cached results. Might return fewer results for new releases, but other providers have more up-to-date results.
 
-	_Link					= ['https://knaben.eu', 'https://knaben.xyz', 'https://knaben.cc', 'https://knaben.org']
+	_Link					= ['https://knaben.org', 'https://knaben.eu', 'https://knaben.xyz', 'https://knaben.cc']
 	_Api					= 'api'
 
 	_Path					= {

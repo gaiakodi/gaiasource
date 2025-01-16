@@ -2447,8 +2447,21 @@ class MetaPack(object):
 				all = [custom, standard, sequential, absolute, trakt, tmdb, tvdb]
 				all = Tools.listUnique([i for i in all if i])
 
+				# Numbers that are within the same season.
+				# Eg: One Piece S03E01
+				# Include Trakt, since it has season-absolute numbers for some anime, and many filenames use that number.
+				# Eg: One Piece S03E78
+				# Do not include TVDb, since it often has very different numbering to standard/Trakt/TMDb.
+				# Sometimes there are some filenames that use TVDb numbers, but they are very rare and would result in too many false-positives during scraping.
+				# Eg: One Piece S06E09
+				# Even if TVDb's number falls into the same season (eg: S03), the numbers are probably too far off, resulting in too many false-positives.
+				seasoned = [standard]
+				if trakt and trakt[MetaPack.PartSeason] == season: seasoned.append(trakt) # Some shows are not on Trakt.
+				seasoned = Tools.listUnique([i for i in seasoned if i])
+
 				return {
 					'all' : all,
+					'season' : seasoned,
 
 					MetaPack.NumberCustom : custom,
 					MetaPack.NumberStandard : standard,

@@ -61,7 +61,7 @@ class Provider(ProviderJson):
 			description				= '{name} is a new and less-known {container} site. The site contains results in various languages, but most of them are in English. {name} does not support paging and sorting and might therefore have few results.',
 			rank					= 3,
 			performance				= ProviderJson.PerformanceMedium,
-			status					= ProviderJson.StatusDead, # Updatye (2024-12): domain is down. https://torrentify.org exists, but is a different site.
+			status					= ProviderJson.StatusDead, # Update (2024-12): domain is down. https://torrentify.org exists, but is a different site.
 
 			link					= Provider._Link,
 

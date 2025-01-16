@@ -18,61 +18,6 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-#gaiaremove - add proper number extraction/validation for abolsute numbers and season-absolute numbers, and other numberings, like TVDb.
-#gaiaremove - One Piece S03E01 (absolute S01E78, Trakt/TMDb S03E78, TVDb S06E09)
-#gaiaremove - Also check S01, there are too many links from the NEW 2023 ONE PIECE show.
-# VALID
-#	ONE PIECE S03 5TH VOYAGE
-#	One Piece S03 (2001) (english sub)
-#	One Piece S03 eng dub
-#	One Piece S03 (dub)
-#	ONE PIECE S03 3RD VOYAGE
-#	one piece S03 (63-92)
-#	[waka] One Piece S03 - (078-091) [480p][x265][AAC][Multi Sub]
-#	ONE PIECE S03 4TH VOYAGE
-#	One Piece S03 (078-092) 480p PirateBoy Silver RG
-#	[Sogeking20]One Piece s3 vostfr hevc 1080p 4:3 10 bits
-#	[ARRG] One Piece S3 (078-092) [Dual Audio] 720P (Sehjada)
-#	S03.One.Piece.PT
-#	One Piece S03 MULTI WebDl1080p x264 (V2) - Chris44
-#	One Piece S03 VF WebDl1080p ''Chris44''
-#	One Piece.S03.1080p.NF.WEB-DL.DDP2.0.x264-KQRM
-#	One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece
-#		One Piece Collection 1-648 + 4 Movies
-# INVALID
-#	One Piece Season 1 - 3rd Voyage [SE][720p][x264][JPN][SUB]
-#	One Piece Season 1 - 4th Voyage [SE][720p][x264][JPN][SUB]
-#	One Piece Season 2 - 3rd Voyage [SE][720p][x264][JPN][SUB]
-#	One_Piece_157_(118)_Is_Escape_Possible_Eneru's_IQ_Test_Is_Set_In_Motion_[C-W]
-# UNSURE
-#	One Piece Season 3 Complete 031: 047 720p HDTV X264 [i C]
-#	[S^M] ONE PIECE 301 RAW
-#
-# VALID (TVDb S06E09 - first one uses TVDb numbering, listed as S06, but episode numbers are in line with Trakt/TMDb's S03)
-#	One Piece Season 6 Complete 070: 091 720p HDTV X264 [i C]
-#	One Piece Collection 1-648 + 4 Movies
-# INVALID (TVDb S06E09 - these are Trakt/TMDb's S06 numbers E144+.)
-#	One Piece S06 (144-195) 480p PirateBoy Silver RG
-#	[ARRG] One Piece S6 (144-195) [Dual Audio] 720P (Sehjada)
-# PROBABLY INVALID (TVDb S06E09 - these S06 names probably refer to Trakt/TMDb's S06)
-#	One.Piece.S06.1080p.NF.WEB-DL.DDP2.0.x264-KQRM
-#	One Piece S06 1080p NF WEB-DL DDP2.0 x264-KQRM
-#	One Piece S06 MULTI WebDl1080p x264 - Chris44
-#	One Piece S06 Voyage 3 DVDRip [StaticX]
-#	One Piece S06 VF Arc 2 Skypiéa WebDl720p By Chris44
-#	One Piece S06 VF Arc 2 Skypiea WebDl720p By Chris44
-#	One Piece S06 VF Arc 2 Skypiéa WebDl720p By Chris44
-#	[Erai-raws] One Piece - S06 [1080p][Multiple Subtitle][566D453A].mkv
-#	One Piece S6 V1
-#	[Sogeking20]One Piece s6 vostfr hevc 1080p 4:3 10 bits
-# UNSURE (TVDb S06E09 - not even sure what these numbers are E373+. Something even different to Trakt/TMDb/TVDb)
-#	[Pn8] One Piece S06 Voyage 4 (373-384) [Funi-DL] [720p] [Dub]
-#	[Pn8] One Piece S06 Voyage 4 (373-384) [Funi-DL] [1080p] [Dub]
-#	One Piece - S06 Voyage 1,2,3 (337-372) English Dub
-
-
-
-
 import re
 import copy
 import random
@@ -25547,11 +25492,425 @@ class Tester(object):
 				'S W A T Season 2 Complete - Downloader.exe',
 			],
 		},
-	)
 
+		{
+			'media' : tools.Media.Show,
+			'niche' : ['anime'],
+			'id' : {'imdb': 'tt0388629', 'tmdb': '37854', 'tvdb': '81797', 'trakt': '37696'},
+			'year' : 1999,
+			'show' : {'season' : 1, 'episode' : 1},
+			'title' : {'main': 'One Piece', 'episode': "I'm Luffy! The Man Who Will Become the Pirate King!", 'abbreviation': 'ワンピース', 'search': {'main': ['One Piece', 'ワンピース'], 'native': {'un': ['ワンピース']}, 'collection': [], 'episode': ['Im Luffy The Man Who Will Become the Pirate King', 'I Luffy The Man Who Will Become the Pirate King'], 'original': ['ワンピース']}, 'processed': {'all': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King', 'Wan Piisu', 'one piece arc1 east blue', 'O Ντρέικ και το Κυνήγι του Θησαυρού', 'Ek Tukda', 'Budak Getah', 'Большой Куш', 'Lastik Çocuk', 'وَن پِیس', 'Єдиний Скарб', '海贼王 (1999)', '海賊王', 'One Piece: Đảo Hải Tặc', "Tutti All'arrembaggio", 'Drake, the Hunting of the Treasure', 'Rubber Boy', 'Jackpot', 'ВЕЛИКИЙ КУШ', 'Sailing King', 'One Piece: Pirate Island', "One Piece: Tutti All'arrembaggio!", 'วันพีช', 'ONE PIECE FAN LETTER', 'one_piece', 'One Piece: All Boarding!', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編', '海盗王', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版', "I'm Luffy! The Man Who Will Become the Pirate King!"], 'main': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King'], 'collection': [], 'episode': ["I'm Luffy! The Man Who Will Become the Pirate King!"], 'original': ['ワンピース']}, 'original': 'ワンピース', 'extra': {'un': ['ワンピース'], 'zh': ['航海王', '海贼王', '海贼王TV'], 'vi': ['Đảo Hải Tặc'], 'ja': ['ワンピース', 'Wan Pisu'], 'it': ['One Piece', "One Piece - All'arrembaggio!", "All'arrembaggio!"], 'ne': ['वान पिस', 'वान पीस'], 'ar': ['وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة'], 'en': ['One Piece'], 'de': ['One Piece'], 'fr': ['One Piece'], 'he': ['וואן פיס'], 'ko': ['원피스'], 'nl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Ван-Пис'], 'es': ['One Piece'], 'ca': ['One Piece'], 'ms': ['One Piece'], 'tr': ['One Piece'], 'sr': ['One Piece'], 'th': ['วันพีซ'], 'pl': ['One Piece'], 'id': ['One Piece'], 'fi': ['One Piece'], 'uk': ['ВАН ПІС (ЄДИНИЙ СКАРБ)']}, 'local': 'One Piece', 'native': {'un': ['ワンピース']}, 'alias': {'jp': ['Wan Piisu', 'Wan Pisu', 'ONE PIECE', 'ワンピース', 'ONE PIECE FAN LETTER', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編'], 'kr': ['원피스', 'One Piece (1999)', 'One Piece'], 'es': ['One Piece'], 'cn': ['海贼王', '海贼王 (1999)', '海贼王 1999', 'one piece', 'one_piece', '航海王', 'Sailing King', '海盗王', 'Pirate King', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', '海賊王', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版'], 'tw': ['航海王', '海賊王', 'Sailing King', 'Pirate King', 'One Piece 1999'], 'fr': ['one piece arc1 east blue', 'One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'sa': ['one piece', 'ون بيس'], 'vn': ['Đảo Hải Tặc', 'One Piece: Đảo Hải Tặc', 'One Piece: Pirate Island', 'Pirate Island'], 'it': ['One Piece', "Tutti All'arrembaggio", "All'arrembaggio!", "One Piece: Tutti All'arrembaggio!", 'One Piece: All Boarding!', "Tutti All'arrembaggio!"], 'mx': ['One piece'], 'be': ['One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'br': ['One Piece'], 'us': ['One Piece (1999)', 'One Piece', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', 'Log: Fish-Man Island Saga', 'Pirate King'], 'de': ['One Piece (1999)'], 'ae': ['ون بيس'], 'ar': ['One Piece'], 'au': ['One Piece'], 'ca': ['One Piece'], 'gb': ['One Piece'], 'gr': ['O Ντρέικ και το Κυνήγι του Θησαυρού', 'Drake, the Hunting of the Treasure', 'One Piece'], 'hk': ['One Piece'], 'id': ['One Piece'], 'il': ['וואן פיס'], 'in': ['Ek Tukda', 'One Piece'], 'my': ['Budak Getah', 'Rubber Boy'], 'ph': ['One Piece'], 'pl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Большой Куш', 'Jackpot', 'One Piece'], 'sg': ['One Piece'], 'th': ['วันพีซ', 'One Piece', 'One Piece (1999)', 'วันพีช'], 'tr': ['Lastik Çocuk', 'Rubber Boy'], 'ad': ['One Piece'], 'pk': ['وَن پِیس'], 'ua': ['Єдиний Скарб', 'ВЕЛИКИЙ КУШ']}},
+			'valid' : [
+				'One.Piece.S01E01-30.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+				'One.Piece.S01-S15.1999-2012.FRENCH.720p.WEB-DL.H264-CR',
+				'One.Piece.S01-S15.1999-2012.FRENCH.1080p.WEB-DL.H264-CR',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1093集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1090集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+
+				# These are probably all from the 2023 series. But cannot distinguish.
+				'[Retr0] One Piece S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'One.Piece.S01E01-08.1080p.WEBMux.ITA.ENG.DDP5.1.H.264-BlackBit',
+				'One.Piece.S01E01-08.WEB-DL.1080p.E-AC3-AC3.ATMOS.ITA.ENG.SUBS.HEVC',
+				'One.Piece.S01.1080p.ENG.And.ESP.LATINO.DDP5.1.Atmos.MKV-BEN.THE.MEN',
+				'One.Piece.S01E01-08.WEBMux.ITA.ENG.x264-BlackBit',
+				'One.Piece.S01E01-08.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.HDR.H.265-BlackBit',
+				'[Sogeking20]One Piece s1 vostfr hevc 1080p 4:3 10 bits',
+				'One Piece.S01E01.1080p.dual-lat.cinecalidad.com.mx.mp4',
+				'One.Piece.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-SOFCJ',
+				'One.Piece.S01.SweSub-EngSub.1080p.x264-Justiso',
+			],
+			'invalid' : [
+				# Different show (tt33992229), a condensed version of the One Piece anime adaptation of the Fish-Man Island Saga.
+				# But there a mutiple alias titles for "One Piece" that are "Log Fish-Man Island Saga".
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				#'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN).mkv',
+
+				# Has "Fan Letter" alias titles.
+				#'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR)',
+				#'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				#'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR)',
+				#'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.264 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.265 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+
+				# From the 2023 series. But cannot distinguish.
+				#'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL',
+				#'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[EZTVx.to].mkv',
+				#'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[eztv]',
+				#'One.Piece.S01E01.Romance.Dawn.L.alba.di.una.grande.avventura.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.H.265-BlackBit.mkv',
+				#'ONE PIECE S01 1080p NF WEB-DL DDP5.1 H 264-VARYG (Dual-audio, Multi-Subs)',
+				#'ONE PIECE - A Serie S01 720p FULL DUAL 5.1 [COMANDO.LA]',
+				#'ONE PIECE - A Serie S01 1080p FULL HD DUAL 5.1 [COMANDO.LA]',
+				#'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.H.264-VARYG',
+				#'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-GST',
+				#'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版[全8集][简繁英字幕].ONE.PIECE.S01.1080p.NF.WEB-DL.DDP.5.1.Atmos.H.264-BlackTV',
+
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x264-CMRG[TGx]',
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x',
+				'One Piece 2023 S01E01 Romance Dawn 720p NF WEB-DL DDP5 1 Atmos x264-CMRG',
+				'One.Piece.2023.S01E01.WEB.x264-PHOENiX',
+				'One.Piece.2023.S01E01.WEB.x264-TORRENTGALAXY',
+				'海贼王.真人版.One.Piece.2023.S01E01-08.HD1080P.X264.AAC.English.CHS-ENG.BDYS',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB[TGx]',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV[TGx]',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.720p.10bit.WEBRip.2CH.x265.HEVC-PSA',
+				'[Retr0] One Piece (2023) S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'ONE PIECE Season 1 S01 2023 1080p NF WEBRip AAC5.1 10bits x265-Rapta',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD+5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA',
+				'One.Piece.2023.S01.COMPLETE.SPANiSH.LATiNO.1080p.NF.WEB-DL.DDP5.1.H.264-dem3nt3',
+				'One.Piece.2023.S01.ITA.ENG.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-MeM.GP',
+				'One.Piece.2023.S01.COMPLETE.720p.WEB-DL.x264.Dual.YG',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.AAC2.0.H.264-TheBiscuitMan',
+				'One Piece (2023) Season 1 S01 (1080p DS4K NF WEB-DL x265 HEVC 10bit DDP 5.1 Vyndros)',
+				'One.Piece.2023.S01.1080p.10bit.NF.DDP5.1.HEVC.x265-Vyndros',
+				'One.Piece.2023.S01E01-08.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.x264-UBi',
+				'One.Piece.2023.S01.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-MeM.GP',
+				'One Piece 2023 S01 1080p NF WEBrip x265 DDP Atmos 5.1 D0ct0rLew[SEV]',
+				'One Piece S01 (2023) 1080p WEBDL x265 10bit iTA ENG EAC3 5.1 Sub ita eng - iDN_CreW',
+				'One.Piece.2023.S01.2160p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One Piece 2023 S01 COMPLETE 720p NF WEBRip x264',
+				'ONE PIECE (2023) - S01 - 1080p WEB H.264 -NanDesuKa (NF)',
+				'ONE PIECE (2023) - S01 - MULTi 1080p WEB H.264 -NanDesuKa (NF)',
+				'One.Piece.S01e01.2023.1080P-Dual-Lat',
+				'One Piece (2023) S01 1080p 10bit WEBRip x265 HEVC MSub [Hindi NF DDP5.1 + Englis',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp)',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp) [QxR]',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.WEBRip.x264-T911',
+				'[ Torrent911.io ] One.Piece.2023.S01.REPACK.MULTi.1080p.WEB.DDP5.1.Atmos.x264-TFA',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.720p.WEB.x264-HiggsBoson',
+				'One.Piece.2023.S01.1080p',
+				'넷플릭스 원피스.One.Piece.2023.S01.E01~E08 완결. [자체자막] 2023.1080p',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.WEB.1080p.DDP5.1.x264',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.HDTV',
+				'ONE.PIECE.(S01)(2023)(1080p)(Webdl)(x264)(17.lang-5.1-Atmos).PHDTeam',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版.第一季[全8集][国英多音轨+简繁英字幕].One.Piece.S01.2023.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-LelveTV',
+			],
+		},
+
+		{
+			'media' : tools.Media.Show,
+			'niche' : ['anime'],
+			'id' : {'imdb': 'tt0388629', 'tmdb': '37854', 'tvdb': '81797', 'trakt': '37696'},
+			'year' : 1999,
+			'show' : {'season' : 3, 'episode' : 1},
+			'title' : {'main': 'One Piece', 'episode': "I'm Luffy! The Man Who Will Become the Pirate King!", 'abbreviation': 'ワンピース', 'search': {'main': ['One Piece', 'ワンピース'], 'native': {'un': ['ワンピース']}, 'collection': [], 'episode': ['Im Luffy The Man Who Will Become the Pirate King', 'I Luffy The Man Who Will Become the Pirate King'], 'original': ['ワンピース']}, 'processed': {'all': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King', 'Wan Piisu', 'one piece arc1 east blue', 'O Ντρέικ και το Κυνήγι του Θησαυρού', 'Ek Tukda', 'Budak Getah', 'Большой Куш', 'Lastik Çocuk', 'وَن پِیس', 'Єдиний Скарб', '海贼王 (1999)', '海賊王', 'One Piece: Đảo Hải Tặc', "Tutti All'arrembaggio", 'Drake, the Hunting of the Treasure', 'Rubber Boy', 'Jackpot', 'ВЕЛИКИЙ КУШ', 'Sailing King', 'One Piece: Pirate Island', "One Piece: Tutti All'arrembaggio!", 'วันพีช', 'ONE PIECE FAN LETTER', 'one_piece', 'One Piece: All Boarding!', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編', '海盗王', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版', "I'm Luffy! The Man Who Will Become the Pirate King!"], 'main': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King'], 'collection': [], 'episode': ["I'm Luffy! The Man Who Will Become the Pirate King!"], 'original': ['ワンピース']}, 'original': 'ワンピース', 'extra': {'un': ['ワンピース'], 'zh': ['航海王', '海贼王', '海贼王TV'], 'vi': ['Đảo Hải Tặc'], 'ja': ['ワンピース', 'Wan Pisu'], 'it': ['One Piece', "One Piece - All'arrembaggio!", "All'arrembaggio!"], 'ne': ['वान पिस', 'वान पीस'], 'ar': ['وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة'], 'en': ['One Piece'], 'de': ['One Piece'], 'fr': ['One Piece'], 'he': ['וואן פיס'], 'ko': ['원피스'], 'nl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Ван-Пис'], 'es': ['One Piece'], 'ca': ['One Piece'], 'ms': ['One Piece'], 'tr': ['One Piece'], 'sr': ['One Piece'], 'th': ['วันพีซ'], 'pl': ['One Piece'], 'id': ['One Piece'], 'fi': ['One Piece'], 'uk': ['ВАН ПІС (ЄДИНИЙ СКАРБ)']}, 'local': 'One Piece', 'native': {'un': ['ワンピース']}, 'alias': {'jp': ['Wan Piisu', 'Wan Pisu', 'ONE PIECE', 'ワンピース', 'ONE PIECE FAN LETTER', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編'], 'kr': ['원피스', 'One Piece (1999)', 'One Piece'], 'es': ['One Piece'], 'cn': ['海贼王', '海贼王 (1999)', '海贼王 1999', 'one piece', 'one_piece', '航海王', 'Sailing King', '海盗王', 'Pirate King', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', '海賊王', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版'], 'tw': ['航海王', '海賊王', 'Sailing King', 'Pirate King', 'One Piece 1999'], 'fr': ['one piece arc1 east blue', 'One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'sa': ['one piece', 'ون بيس'], 'vn': ['Đảo Hải Tặc', 'One Piece: Đảo Hải Tặc', 'One Piece: Pirate Island', 'Pirate Island'], 'it': ['One Piece', "Tutti All'arrembaggio", "All'arrembaggio!", "One Piece: Tutti All'arrembaggio!", 'One Piece: All Boarding!', "Tutti All'arrembaggio!"], 'mx': ['One piece'], 'be': ['One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'br': ['One Piece'], 'us': ['One Piece (1999)', 'One Piece', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', 'Log: Fish-Man Island Saga', 'Pirate King'], 'de': ['One Piece (1999)'], 'ae': ['ون بيس'], 'ar': ['One Piece'], 'au': ['One Piece'], 'ca': ['One Piece'], 'gb': ['One Piece'], 'gr': ['O Ντρέικ και το Κυνήγι του Θησαυρού', 'Drake, the Hunting of the Treasure', 'One Piece'], 'hk': ['One Piece'], 'id': ['One Piece'], 'il': ['וואן פיס'], 'in': ['Ek Tukda', 'One Piece'], 'my': ['Budak Getah', 'Rubber Boy'], 'ph': ['One Piece'], 'pl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Большой Куш', 'Jackpot', 'One Piece'], 'sg': ['One Piece'], 'th': ['วันพีซ', 'One Piece', 'One Piece (1999)', 'วันพีช'], 'tr': ['Lastik Çocuk', 'Rubber Boy'], 'ad': ['One Piece'], 'pk': ['وَن پِیس'], 'ua': ['Єдиний Скарб', 'ВЕЛИКИЙ КУШ']}},
+			'valid' : [
+				'[Sogeking20]One Piece s3 vostfr hevc 1080p 4:3 10 bits',
+				'One Piece.S03.1080p.NF.WEB-DL.DDP2.0.x264-KQRM',
+				'[ARRG] One Piece S3 (078-092) [Dual Audio] 720P (Sehjada)',
+				'One Piece Collection 1-648 + 4 Movies',
+				'[waka] One Piece S03 - (078-091) [480p][x265][AAC][Multi Sub]',
+
+				'One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+
+				'ONE PIECE S03 5TH VOYAGE',
+				'One Piece S03 (2001) (english sub)',
+				'One Piece S03 eng dub',
+				'One Piece S03 (dub)',
+				'ONE PIECE S03 3RD VOYAGE',
+				'one piece S03 (63-92)',
+				'[waka] One Piece S03 - (078-091) [480p][x265][AAC][Multi Sub]',
+				'ONE PIECE S03 4TH VOYAGE',
+				'One Piece S03 (078-092) 480p PirateBoy Silver RG',
+				'[Sogeking20]One Piece s3 vostfr hevc 1080p 4:3 10 bits',
+				'[ARRG] One Piece S3 (078-092) [Dual Audio] 720P (Sehjada)',
+				'S03.One.Piece.PT',
+				'One Piece S03 MULTI WebDl1080p x264 (V2) - Chris44',
+				'One Piece S03 VF WebDl1080p \'\'Chris44\'\'',
+				'One Piece.S03.1080p.NF.WEB-DL.DDP2.0.x264-KQRM',
+				'One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+
+				'[waka] One Piece S03 - (078-091) [480p][x265][AAC][Multi Sub]',
+				'One Piece S03 (078-092) 480p PirateBoy Silver RG',
+				'one piece S03 (63-92)',
+				'ONE PIECE S03 3RD VOYAGE',
+				'ONE PIECE S03 4TH VOYAGE',
+				'ONE PIECE S03 5TH VOYAGE',
+				'One Piece S03 eng dub',
+				'One Piece S03 (dub)',
+				'One Piece S03 (2001) (english sub)',
+				'[Sogeking20]One Piece s3 vostfr hevc 1080p 4:3 10 bits',
+
+				'One.Piece.S01-S15.1999-2012.FRENCH.720p.WEB-DL.H264-CR',
+				'One.Piece.S01-S15.1999-2012.FRENCH.1080p.WEB-DL.H264-CR',
+
+				# Allow absolute numbers for single episodes, but not packs.
+				'One.Piece.S01E78.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+
+				#'One Piece Season 3 Complete 031: 047 720p HDTV X264 [i C]',
+				#'[S^M] ONE PIECE 301 RAW',
+			],
+			'invalid' : [
+				 # Probably uses TVDb numbering.
+				'One Piece Season 3 Complete 031: 047 720p HDTV X264 [i C]',
+
+				# Allow absolute numbers for single episodes, but not packs.
+				'One.Piece.S01.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+
+				'One.Piece.S03E93-130.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+
+				'One Piece Season 1 - 3rd Voyage [SE][720p][x264][JPN][SUB]',
+				'One Piece Season 1 - 4th Voyage [SE][720p][x264][JPN][SUB]',
+				'One Piece Season 2 - 3rd Voyage [SE][720p][x264][JPN][SUB]',
+				'One_Piece_157_(118)_Is_Escape_Possible_Eneru\'s_IQ_Test_Is_Set_In_Motion_[C-W]',
+
+				'One.Piece.S01E01-30.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1093集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1090集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+
+				'[Retr0] One Piece S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'One.Piece.S01E01-08.1080p.WEBMux.ITA.ENG.DDP5.1.H.264-BlackBit',
+				'One.Piece.S01E01-08.WEB-DL.1080p.E-AC3-AC3.ATMOS.ITA.ENG.SUBS.HEVC',
+				'One.Piece.S01.1080p.ENG.And.ESP.LATINO.DDP5.1.Atmos.MKV-BEN.THE.MEN',
+				'One.Piece.S01E01-08.WEBMux.ITA.ENG.x264-BlackBit',
+				'One.Piece.S01E01-08.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.HDR.H.265-BlackBit',
+				'[Sogeking20]One Piece s1 vostfr hevc 1080p 4:3 10 bits',
+				'One Piece.S01E01.1080p.dual-lat.cinecalidad.com.mx.mp4',
+				'One.Piece.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-SOFCJ',
+				'One.Piece.S01.SweSub-EngSub.1080p.x264-Justiso',
+
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN).mkv',
+
+				'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR)',
+				'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR)',
+				'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.264 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.265 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL',
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[EZTVx.to].mkv',
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[eztv]',
+				'One.Piece.S01E01.Romance.Dawn.L.alba.di.una.grande.avventura.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.H.265-BlackBit.mkv',
+				'ONE PIECE S01 1080p NF WEB-DL DDP5.1 H 264-VARYG (Dual-audio, Multi-Subs)',
+				'ONE PIECE - A Serie S01 720p FULL DUAL 5.1 [COMANDO.LA]',
+				'ONE PIECE - A Serie S01 1080p FULL HD DUAL 5.1 [COMANDO.LA]',
+				'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.H.264-VARYG',
+				'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-GST',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版[全8集][简繁英字幕].ONE.PIECE.S01.1080p.NF.WEB-DL.DDP.5.1.Atmos.H.264-BlackTV',
+
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x264-CMRG[TGx]',
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x',
+				'One Piece 2023 S01E01 Romance Dawn 720p NF WEB-DL DDP5 1 Atmos x264-CMRG',
+				'One.Piece.2023.S01E01.WEB.x264-PHOENiX',
+				'One.Piece.2023.S01E01.WEB.x264-TORRENTGALAXY',
+				'海贼王.真人版.One.Piece.2023.S01E01-08.HD1080P.X264.AAC.English.CHS-ENG.BDYS',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB[TGx]',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV[TGx]',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.720p.10bit.WEBRip.2CH.x265.HEVC-PSA',
+				'[Retr0] One Piece (2023) S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'ONE PIECE Season 1 S01 2023 1080p NF WEBRip AAC5.1 10bits x265-Rapta',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD+5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA',
+				'One.Piece.2023.S01.COMPLETE.SPANiSH.LATiNO.1080p.NF.WEB-DL.DDP5.1.H.264-dem3nt3',
+				'One.Piece.2023.S01.ITA.ENG.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-MeM.GP',
+				'One.Piece.2023.S01.COMPLETE.720p.WEB-DL.x264.Dual.YG',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.AAC2.0.H.264-TheBiscuitMan',
+				'One Piece (2023) Season 1 S01 (1080p DS4K NF WEB-DL x265 HEVC 10bit DDP 5.1 Vyndros)',
+				'One.Piece.2023.S01.1080p.10bit.NF.DDP5.1.HEVC.x265-Vyndros',
+				'One.Piece.2023.S01E01-08.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.x264-UBi',
+				'One.Piece.2023.S01.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-MeM.GP',
+				'One Piece 2023 S01 1080p NF WEBrip x265 DDP Atmos 5.1 D0ct0rLew[SEV]',
+				'One Piece S01 (2023) 1080p WEBDL x265 10bit iTA ENG EAC3 5.1 Sub ita eng - iDN_CreW',
+				'One.Piece.2023.S01.2160p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One Piece 2023 S01 COMPLETE 720p NF WEBRip x264',
+				'ONE PIECE (2023) - S01 - 1080p WEB H.264 -NanDesuKa (NF)',
+				'ONE PIECE (2023) - S01 - MULTi 1080p WEB H.264 -NanDesuKa (NF)',
+				'One.Piece.S01e01.2023.1080P-Dual-Lat',
+				'One Piece (2023) S01 1080p 10bit WEBRip x265 HEVC MSub [Hindi NF DDP5.1 + Englis',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp)',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp) [QxR]',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.WEBRip.x264-T911',
+				'[ Torrent911.io ] One.Piece.2023.S01.REPACK.MULTi.1080p.WEB.DDP5.1.Atmos.x264-TFA',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.720p.WEB.x264-HiggsBoson',
+				'One.Piece.2023.S01.1080p',
+				'넷플릭스 원피스.One.Piece.2023.S01.E01~E08 완결. [자체자막] 2023.1080p',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.WEB.1080p.DDP5.1.x264',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.HDTV',
+				'ONE.PIECE.(S01)(2023)(1080p)(Webdl)(x264)(17.lang-5.1-Atmos).PHDTeam',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版.第一季[全8集][国英多音轨+简繁英字幕].One.Piece.S01.2023.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-LelveTV',
+			],
+		},
+
+		{
+			'media' : tools.Media.Show,
+			'niche' : ['anime'],
+			'id' : {'imdb': 'tt0388629', 'tmdb': '37854', 'tvdb': '81797', 'trakt': '37696'},
+			'year' : 1999,
+			'show' : {'season' : 6, 'episode' : 9}, # TVDb's S06E09 is Trakt/TMDb's S03E78 (S03E01).
+			'title' : {'main': 'One Piece', 'episode': "Take to the Sky! Ride the Knockup Stream!", 'abbreviation': 'ワンピース', 'search': {'main': ['One Piece', 'ワンピース'], 'native': {'un': ['ワンピース']}, 'collection': [], 'episode': ['Take to the Sky! Ride the Knockup Stream!'], 'original': ['ワンピース']}, 'processed': {'all': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King', 'Wan Piisu', 'one piece arc1 east blue', 'O Ντρέικ και το Κυνήγι του Θησαυρού', 'Ek Tukda', 'Budak Getah', 'Большой Куш', 'Lastik Çocuk', 'وَن پِیس', 'Єдиний Скарб', '海贼王 (1999)', '海賊王', 'One Piece: Đảo Hải Tặc', "Tutti All'arrembaggio", 'Drake, the Hunting of the Treasure', 'Rubber Boy', 'Jackpot', 'ВЕЛИКИЙ КУШ', 'Sailing King', 'One Piece: Pirate Island', "One Piece: Tutti All'arrembaggio!", 'วันพีช', 'ONE PIECE FAN LETTER', 'one_piece', 'One Piece: All Boarding!', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編', '海盗王', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版', "Take to the Sky! Ride the Knockup Stream!"], 'main': ['One Piece', 'ワンピース', '航海王', '海贼王', '海贼王TV', 'Đảo Hải Tặc', 'Wan Pisu', "One Piece - All'arrembaggio!", "All'arrembaggio!", 'वान पिस', 'वान पीस', 'وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة', 'וואן פיס', '원피스', 'Ван-Пис', 'วันพีซ', 'ВАН ПІС (ЄДИНИЙ СКАРБ)', 'One Piece (1999)', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', '海贼王 1999', 'Pirate Island', "Tutti All'arrembaggio!", 'Log: Fish-Man Island Saga', 'Pirate King'], 'collection': [], 'episode': ["Take to the Sky! Ride the Knockup Stream!"], 'original': ['ワンピース']}, 'original': 'ワンピース', 'extra': {'un': ['ワンピース'], 'zh': ['航海王', '海贼王', '海贼王TV'], 'vi': ['Đảo Hải Tặc'], 'ja': ['ワンピース', 'Wan Pisu'], 'it': ['One Piece', "One Piece - All'arrembaggio!", "All'arrembaggio!"], 'ne': ['वान पिस', 'वान पीस'], 'ar': ['وان بيس', 'ون بيس', 'القطعة الواحدة', 'القطعة النادرة'], 'en': ['One Piece'], 'de': ['One Piece'], 'fr': ['One Piece'], 'he': ['וואן פיס'], 'ko': ['원피스'], 'nl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Ван-Пис'], 'es': ['One Piece'], 'ca': ['One Piece'], 'ms': ['One Piece'], 'tr': ['One Piece'], 'sr': ['One Piece'], 'th': ['วันพีซ'], 'pl': ['One Piece'], 'id': ['One Piece'], 'fi': ['One Piece'], 'uk': ['ВАН ПІС (ЄДИНИЙ СКАРБ)']}, 'local': 'One Piece', 'native': {'un': ['ワンピース']}, 'alias': {'jp': ['Wan Piisu', 'Wan Pisu', 'ONE PIECE', 'ワンピース', 'ONE PIECE FAN LETTER', 'SPECIAL EDITED VERSION『ONE PIECE』魚人島編'], 'kr': ['원피스', 'One Piece (1999)', 'One Piece'], 'es': ['One Piece'], 'cn': ['海贼王', '海贼王 (1999)', '海贼王 1999', 'one piece', 'one_piece', '航海王', 'Sailing King', '海盗王', 'Pirate King', '海贼王1999', 'One.Piece', '海贼王S01：东海篇', '海贼王S02：伟大航路突入篇', '海贼王S03：冬岛篇', '海贼王S04：阿拉巴斯坦篇', '海賊王', 'ONE PIECE 海賊王', '海贼王：东海篇', '海贼王：阿拉巴斯坦篇', '海贼王：伟大航路突入篇', '海贼王：冬岛篇', '海贼王：人鱼岛篇特别编辑版'], 'tw': ['航海王', '海賊王', 'Sailing King', 'Pirate King', 'One Piece 1999'], 'fr': ['one piece arc1 east blue', 'One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'sa': ['one piece', 'ون بيس'], 'vn': ['Đảo Hải Tặc', 'One Piece: Đảo Hải Tặc', 'One Piece: Pirate Island', 'Pirate Island'], 'it': ['One Piece', "Tutti All'arrembaggio", "All'arrembaggio!", "One Piece: Tutti All'arrembaggio!", 'One Piece: All Boarding!', "Tutti All'arrembaggio!"], 'mx': ['One piece'], 'be': ['One Piece', 'One Piece 1999', 'Wan Pisu', 'One Piece (1999)'], 'br': ['One Piece'], 'us': ['One Piece (1999)', 'One Piece', 'One Piece 1999', 'One Pisu', 'One Piece Log: Fish-Man Island Saga', 'One Piece: Pirate King', 'Log: Fish-Man Island Saga', 'Pirate King'], 'de': ['One Piece (1999)'], 'ae': ['ون بيس'], 'ar': ['One Piece'], 'au': ['One Piece'], 'ca': ['One Piece'], 'gb': ['One Piece'], 'gr': ['O Ντρέικ και το Κυνήγι του Θησαυρού', 'Drake, the Hunting of the Treasure', 'One Piece'], 'hk': ['One Piece'], 'id': ['One Piece'], 'il': ['וואן פיס'], 'in': ['Ek Tukda', 'One Piece'], 'my': ['Budak Getah', 'Rubber Boy'], 'ph': ['One Piece'], 'pl': ['One Piece'], 'pt': ['One Piece'], 'ru': ['Большой Куш', 'Jackpot', 'One Piece'], 'sg': ['One Piece'], 'th': ['วันพีซ', 'One Piece', 'One Piece (1999)', 'วันพีช'], 'tr': ['Lastik Çocuk', 'Rubber Boy'], 'ad': ['One Piece'], 'pk': ['وَن پِیس'], 'ua': ['Єдиний Скарб', 'ВЕЛИКИЙ КУШ']}},
+			'valid' : [
+				'One Piece Collection 1-648 + 4 Movies',
+
+				'One Piece Season 6 Complete 144: 195 720p HDTV X264 [i C]',
+				'One Piece S06 (144-195) 480p PirateBoy Silver RG',
+				'[ARRG] One Piece S6 (144-195) [Dual Audio] 720P (Sehjada)',
+
+				'One.Piece.S06.1080p.NF.WEB-DL.DDP2.0.x264-KQRM',
+				'One Piece S06 1080p NF WEB-DL DDP2.0 x264-KQRM',
+				'One Piece S06 MULTI WebDl1080p x264 - Chris44',
+				'One Piece S06 Voyage 3 DVDRip [StaticX]',
+				'One Piece S06 VF Arc 2 Skypiéa WebDl720p By Chris44',
+				'[Erai-raws] One Piece - S06 [1080p][Multiple Subtitle][566D453A].mkv',
+				'One Piece S6 V1',
+				'[Sogeking20]One Piece s6 vostfr hevc 1080p 4:3 10 bits',
+			],
+			'invalid' : [
+				# TVDb numbers.
+				'One Piece Season 6 Complete 070: 091 720p HDTV X264 [i C]',
+
+				# Not sure which numbers these are?
+				# On Trakt this is S10.
+				# On TVDb this is S12.
+				'[Pn8] One Piece S06 Voyage 4 373-384 [Funi-DL] [720p] [Dub]',
+				'[Pn8] One Piece S06 Voyage 4 (373-384) [Funi-DL] [1080p] [Dub]',
+				'One Piece - S06 Voyage 1,2,3 (337-372) English Dub',
+
+				'[Pn8] One Piece S06(373-384) [Funi-DL] [720p] [Dub]',
+				'[Pn8] One Piece S06 (373-384) [Funi-DL] [1080p] [Dub]',
+				'One Piece - S06 (337-372) English Dub',
+
+				'One Piece Season 3 Complete 031: 047 720p HDTV X264 [i C]',
+				'One.Piece.S01.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+				'One.Piece.S03E93-130.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+				'One Piece Season 1 - 3rd Voyage [SE][720p][x264][JPN][SUB]',
+				'One Piece Season 1 - 4th Voyage [SE][720p][x264][JPN][SUB]',
+				'One Piece Season 2 - 3rd Voyage [SE][720p][x264][JPN][SUB]',
+				'One_Piece_157_(118)_Is_Escape_Possible_Eneru\'s_IQ_Test_Is_Set_In_Motion_[C-W]',
+
+				'One.Piece.S01E01-30.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1092集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1093集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1090集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.2160p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.B-Global.WEB-DL.x264.AAC-ZeroTV',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王[第1098集][简繁英字幕].One.Piece.S01.1999.1080p.CR.WEB-DL.x264.AAC-ZeroTV',
+
+				'[Retr0] One Piece S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'One.Piece.S01E01-08.1080p.WEBMux.ITA.ENG.DDP5.1.H.264-BlackBit',
+				'One.Piece.S01E01-08.WEB-DL.1080p.E-AC3-AC3.ATMOS.ITA.ENG.SUBS.HEVC',
+				'One.Piece.S01.1080p.ENG.And.ESP.LATINO.DDP5.1.Atmos.MKV-BEN.THE.MEN',
+				'One.Piece.S01E01-08.WEBMux.ITA.ENG.x264-BlackBit',
+				'One.Piece.S01E01-08.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.HDR.H.265-BlackBit',
+				'[Sogeking20]One Piece s1 vostfr hevc 1080p 4:3 10 bits',
+				'One Piece.S01E01.1080p.dual-lat.cinecalidad.com.mx.mp4',
+				'One.Piece.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-SOFCJ',
+				'One.Piece.S01.SweSub-EngSub.1080p.x264-Justiso',
+
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN) (One Piece: Gyojin Tou-hen)',
+				'One Piece Log Fish-Man Island Saga S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (ADN).mkv',
+
+				'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR)',
+				'One Piece Fan Letter S01E01 VOSTFR 720p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+				'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR)',
+				'One Piece Fan Letter S01E01 VOSTFR 1080p WEB x264 AAC -Tsundere-Raws (CR).mkv',
+
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.264 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+				'[ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.265 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)',
+
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL',
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[EZTVx.to].mkv',
+				'ONE PIECE S01E01 ROMANCE DAWN 720p NF WEB-DL AAC5 1 H 264-NINJACENTRAL[eztv]',
+				'One.Piece.S01E01.Romance.Dawn.L.alba.di.una.grande.avventura.2160p.WEBMux.ITA.ENG.DDP5.1.Atmos.DV.H.265-BlackBit.mkv',
+				'ONE PIECE S01 1080p NF WEB-DL DDP5.1 H 264-VARYG (Dual-audio, Multi-Subs)',
+				'ONE PIECE - A Serie S01 720p FULL DUAL 5.1 [COMANDO.LA]',
+				'ONE PIECE - A Serie S01 1080p FULL HD DUAL 5.1 [COMANDO.LA]',
+				'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.H.264-VARYG',
+				'ONE.PIECE.S01.1080p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-GST',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版[全8集][简繁英字幕].ONE.PIECE.S01.1080p.NF.WEB-DL.DDP.5.1.Atmos.H.264-BlackTV',
+
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x264-CMRG[TGx]',
+				'One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x',
+				'One Piece 2023 S01E01 Romance Dawn 720p NF WEB-DL DDP5 1 Atmos x264-CMRG',
+				'One.Piece.2023.S01E01.WEB.x264-PHOENiX',
+				'One.Piece.2023.S01E01.WEB.x264-TORRENTGALAXY',
+				'海贼王.真人版.One.Piece.2023.S01E01-08.HD1080P.X264.AAC.English.CHS-ENG.BDYS',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB[TGx]',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV',
+				'One.Piece.2023.S01.COMPLETE.720p.NF.WEBRip.x264-GalaxyTV[TGx]',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.720p.10bit.WEBRip.2CH.x265.HEVC-PSA',
+				'[Retr0] One Piece (2023) S01 (1080p NF WEB-DL AV1 Opus) [Dual-Audio]',
+				'ONE PIECE Season 1 S01 2023 1080p NF WEBRip AAC5.1 10bits x265-Rapta',
+				'One.Piece.2023.S01.COMPLETE.1080p.NF.WEB-DL.DD5.1.Atmos.H.264-playWEB',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD+5.1.Atmos.HDR.H.265-TheBiscuitMan',
+				'One.Piece.2023.SEASON.01.S01.COMPLETE.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA',
+				'One.Piece.2023.S01.COMPLETE.SPANiSH.LATiNO.1080p.NF.WEB-DL.DDP5.1.H.264-dem3nt3',
+				'One.Piece.2023.S01.ITA.ENG.2160p.NF.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-MeM.GP',
+				'One.Piece.2023.S01.COMPLETE.720p.WEB-DL.x264.Dual.YG',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.AAC2.0.H.264-TheBiscuitMan',
+				'One Piece (2023) Season 1 S01 (1080p DS4K NF WEB-DL x265 HEVC 10bit DDP 5.1 Vyndros)',
+				'One.Piece.2023.S01.1080p.10bit.NF.DDP5.1.HEVC.x265-Vyndros',
+				'One.Piece.2023.S01E01-08.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.x264-UBi',
+				'One.Piece.2023.S01.ITA.ENG.1080p.NF.WEB-DL.DDP5.1.Atmos.H.264-MeM.GP',
+				'One Piece 2023 S01 1080p NF WEBrip x265 DDP Atmos 5.1 D0ct0rLew[SEV]',
+				'One Piece S01 (2023) 1080p WEBDL x265 10bit iTA ENG EAC3 5.1 Sub ita eng - iDN_CreW',
+				'One.Piece.2023.S01.2160p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One.Piece.2023.S01.1080p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.265-TheBiscuitMan',
+				'One.Piece.2023.S01.720p.NF.WEB-DL.MULTi.DD 5.1.Atmos.H.264-TheBiscuitMan',
+				'One Piece 2023 S01 COMPLETE 720p NF WEBRip x264',
+				'ONE PIECE (2023) - S01 - 1080p WEB H.264 -NanDesuKa (NF)',
+				'ONE PIECE (2023) - S01 - MULTi 1080p WEB H.264 -NanDesuKa (NF)',
+				'One.Piece.S01e01.2023.1080P-Dual-Lat',
+				'One Piece (2023) S01 1080p 10bit WEBRip x265 HEVC MSub [Hindi NF DDP5.1 + Englis',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp)',
+				'One Piece (2023) Season 1 S01 (1080p NF WEB-DL x265 HEVC 10bit EAC3 Atmos 5.1 Garshasp) [QxR]',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.WEBRip.x264-T911',
+				'[ Torrent911.io ] One.Piece.2023.S01.REPACK.MULTi.1080p.WEB.DDP5.1.Atmos.x264-TFA',
+				'[ Torrent911.io ] One.Piece.2023.S01.FRENCH.720p.WEB.x264-HiggsBoson',
+				'One.Piece.2023.S01.1080p',
+				'넷플릭스 원피스.One.Piece.2023.S01.E01~E08 완결. [자체자막] 2023.1080p',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.WEB.1080p.DDP5.1.x264',
+				'[ Torrent911.io ] One.Piece.2023.S01.VOSTFR.HDTV',
+				'ONE.PIECE.(S01)(2023)(1080p)(Webdl)(x264)(17.lang-5.1-Atmos).PHDTeam',
+				'【高清剧集网发布.www.DDHDTV.com】海贼王.真人版.第一季[全8集][国英多音轨+简繁英字幕].One.Piece.S01.2023.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-LelveTV',
+			],
+		},
+	)
 
 	#gaiaremove
 	'''Tests = (
+
 	)'''
 
 	Prepared = {}
@@ -25643,9 +26002,7 @@ class Tester(object):
 		'''self.streamTimeExtract(titles = titles)
 		self.streamTimeValid(titles = titles)
 		self.streamTime(titles = titles)'''
-
-		#self.metadataPack()
-		#self.metadataNext()
+		
 
 	##############################################################################
 	# METADATA
@@ -31273,7 +31630,7 @@ class Tester(object):
 							except:
 								try: title = test['title']['processed'][0]
 								except: title = test['title']['processed']['all'][0]
-						fails[0].append('[%s]: %s' % (title, ((item if (not item or tools.Tools.isString(item)) else item['fileName']) or '').replace('', ' ')))
+						fails[0].append('[%s]: %s' % (title, ((item if (not item or tools.Tools.isString(item)) else item['fileName'] if tools.Tools.isDictionary(item) else item.fileName()) or '').replace('', ' ')))
 				else:
 					if not item.valid(
 						validateRelease = True,
@@ -31404,7 +31761,7 @@ class Tester(object):
 			{'result' : {'season' : [2], 'episode' : []},								'data' : 'Westworld (2016) Season 2 S02 (1080p AMZN WEB-DL x265 HEVC 10bit AAC 5 1 ...'},
 			{'result' : {'season' : [2], 'episode' : []},								'data' : 'Crionics Post buS LN 01-6 562x.1.5.piRRB.p0801.2.nosaeS.dlrowtseW[01/36] - "Westworld.Season.2.1080p.BRRip.5.1.x265 6-10 NL Sub.par2" yEnc'},
 			{'result' : {'season' : [1], 'episode' : [1]},								'data' : 'Lost S01E01 Pilot (1) by KnightHiryuu [h33t] [KnightHiryuu] » TV shows'},
-			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Second Chance Season 1 S01 (1-9) 1080p WEB-DL DD5.1 HEVC x265-LGC'},
+			{'result' : {'season' : [1], 'episode' : [1, 2, 3, 4, 5, 6, 7, 8, 9]},		'data' : 'Second Chance Season 1 S01 (1-9) 1080p WEB-DL DD5.1 HEVC x265-LGC'},
 
 			{'result' : {'season' : [2], 'episode' : [10]},								'data' : 'MONK s2e10'},
 			{'result' : {'season' : [2], 'episode' : [10, 11]},							'data' : 'MONK season 2 episode 10 to 11'},
@@ -31418,8 +31775,6 @@ class Tester(object):
 			{'result' : {'season' : [1, 2], 'episode' : []},							'data' : '[Lael] Sword Art Online Saison 1 & Saison 2 [Multi] {Fr-Jap} {Subs_Fr} [BDRiP 1080p] [x264_AAC]'},
 			{'result' : {'season' : [1, 2, 3, 4, 5, 6, 7], 'episode' : []},				'data' : 'Faites Entrer l\'Accusé | INTEGRALE | Saison 01 à 7 | WEB-DL | x264 [AMIRAL]'},
 			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Bob vous dit Toute La Vérité - BTLV Saison 1 (2012-2013) - MP3'},
-			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 [97-150] VF 720p'},
-			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 64 episodes VF 720p'},
 			{'result' : {'season' : [1, 2, 3, 4], 'episode' : []},						'data' : 'Dans une galaxie près de chez vous - Serie TV - INTEGRAL - Saisons 1 à 4 - EXTRAS - QUEBEC'},
 			{'result' : {'season' : [1, 2], 'episode' : []},							'data' : 'Batman série TV 1966 - intégrale saisons 1 et 2 - VF'},
 			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Wakfu 1-26 intégrale saison 1 + bonus [DVDrip HQ x264]'},
@@ -31476,7 +31831,25 @@ class Tester(object):
 
 			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Star Trek Original Series: Season 1: 30 Episodes 5 GB File Size:..'},
 
-			{'result' : {'season' : [3], 'episode' : [78,79,80,81,82,83,84,85,86,87,88,89,90,91,92]}, 'data' : 'One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece', 'niche' : ['anime', 'good', 'testing']},
+			{'result' : {'season' : [3], 'episode' : [97, 98, 99, 100, 101, 102, 103]},	'data' : 'Fairy Tail Saison 3 [97-103] VF 720p',		'niche' : ['anime']}, # Fairy Tail Saison 3 [97-150] VF 720p
+			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 64 episodes VF 720p',		'niche' : ['anime']},
+
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92]}, 'data' : 'One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece', 'niche' : ['anime', 'good', 'testing']},
+
+			{'result' : {'season' : [3], 'episode' : []},								'data' : 'S03.One.Piece.PT',											'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : []},								'data' : '[Sogeking20]One Piece s3 vostfr hevc 1080p 4:3 10 bits',		'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : []},								'data' : 'ONE PIECE S03 5TH VOYAGE',									'niche' : ['anime']},
+
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92]},																'data' : '[ARRG] One Piece S3 (078-092) [Dual Audio] 720P (Sehjada)',		'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92]},																'data' : 'One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece',		'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92]},	'data' : 'one piece S03 (63-92)',											'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92]},																'data' : 'One Piece S03 (078-092) 480p PirateBoy Silver RG',				'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84]},																								'data' : '[waka] One Piece S03 - (E078-E084) [480p][x265][AAC][Multi Sub]',	'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84]},																								'data' : '[waka] One Piece S03 - (E078-084) [480p][x265][AAC][Multi Sub]',	'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [78, 79, 80, 81, 82, 83, 84]},																								'data' : '[waka] One Piece S03 - (078-084) [480p][x265][AAC][Multi Sub]',	'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]},														'data' : 'One Piece Season 3 Complete 031: 047 720p HDTV X264 [i C]',		'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47]},														'data' : 'One Piece Season 3 Complete 031 - 047 720p HDTV x264 [i_c]',		'niche' : ['anime']},
+			{'result' : {'season' : [], 'episode' : [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,480,481,482,483,484,485,486,487,488,489,490,491,492,493,494,495,496,497,498,499,500,501,502,503,504,505,506,507,508,509,510,511,512,513,514,515,516,517,518,519,520,521,522,523,524,525,526,527,528,529,530,531,532,533,534,535,536,537,538,539,540,541,542,543,544,545,546,547,548,549,550,551,552,553,554,555,556,557,558,559,560,561,562,563,564,565,566,567,568,569,570,571,572,573,574,575,576,577,578,579,580,581,582,583,584,585,586,587,588,589,590,591,592,593,594,595,596,597,598,599,600,601,602,603,604,605,606,607,608,609,610,611,612,613,614,615,616,617,618,619,620,621,622,623,624,625,626,627,628,629,630,631,632,633,634,635,636,637,638,639,640,641,642,643,644,645,646,647,648]},	'data' : 'One Piece Collection 1-648 + 4 Movies',	'niche' : ['anime']},
 		)
 
 		testsSpecial = (
@@ -31537,13 +31910,13 @@ class Tester(object):
 		for i in range(len(tests)):
 			test = tests[i]
 			if test['result']['episode']:
-				for episode in test['result']['episode']:
+				for episode in test['result']['episode'][:20]:
 					total += 1
 					if not Stream.numberEpisodeValid(data = test['data'], episode = episode, niche = test.get('niche')):
 						fails[0].append(test['data'])
 				for episode in range(1, 12 if full else 3):
 					if not 'collection' in test or not test['collection']:
-						if not episode in test['result']['episode']:
+						if not episode in test['result']['episode'][:20]:
 							total += 1
 							if Stream.numberEpisodeValid(data = test['data'], episode = episode, niche = test.get('niche')):
 								fails[1].append(test['data'])
@@ -31556,7 +31929,7 @@ class Tester(object):
 			test = testsSpecial[i]
 			if test['result']['season'] and test['result']['episode']:
 				for season in test['result']['season']:
-					for episode in test['result']['episode']:
+					for episode in test['result']['episode'][:20]:
 						total += 1
 						if 'invalid' in test:
 							if Stream.numberSpecialValid(data = test['data'], title = test['title'], season = season, episode = episode, niche = test.get('niche')):
@@ -31564,7 +31937,7 @@ class Tester(object):
 						else:
 							if not Stream.numberSpecialValid(data = test['data'], title = test['title'], season = season, episode = episode, niche = test.get('niche')):
 								fails[0].append(test['data'])
-		self._results('SHOW SPECIAL VALIDATION', total, fails, timer)
+		self._results('SPECIAL NUMBER VALIDATION', total, fails, timer)
 
 	@classmethod
 	def streamShow(self):
@@ -31646,7 +32019,7 @@ class Tester(object):
 			{'result' : {'season' : [2], 'episode' : []},								'data' : 'Westworld (2016) Season 2 S02 (1080p AMZN WEB-DL x265 HEVC 10bit AAC 5 1 ...'},
 			{'result' : {'season' : [2], 'episode' : []},								'data' : 'Crionics Post buS LN 01-6 562x.1.5.piRRB.p0801.2.nosaeS.dlrowtseW[01/36] - "Westworld.Season.2.1080p.BRRip.5.1.x265 6-10 NL Sub.par2" yEnc'},
 			{'result' : {'season' : [1], 'episode' : [1]},								'data' : 'Lost S01E01 Pilot (1) by KnightHiryuu [h33t] [KnightHiryuu] » TV shows'},
-			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Second Chance Season 1 S01 (1-9) 1080p WEB-DL DD5.1 HEVC x265-LGC'},
+			{'result' : {'season' : [1], 'episode' : [1, 2, 3, 4, 5, 6, 7, 8, 9]},		'data' : 'Second Chance Season 1 S01 (1-9) 1080p WEB-DL DD5.1 HEVC x265-LGC'},
 
 			{'result' : {'season' : [2], 'episode' : [10]},								'data' : 'MONK s2e10'},
 			{'result' : {'season' : [2], 'episode' : [10, 11]},							'data' : 'MONK season 2 episode 10 to 11'},
@@ -31654,14 +32027,15 @@ class Tester(object):
 			{'result' : {'season' : [2], 'episode' : [10, 11]},							'data' : 'MONK staffel 2 folge 10 und 11'},
 			{'result' : {'season' : [], 'episode' : [10, 11]},							'data' : 'MONK Folge 10 und 11'},
 
-			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Dragon Ball Z Kai VOST 1080p Bluray x264 - Saison 3'},
-			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Digimon Adventure 01 (saison 1) | Complet Francais vf'},
+			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Dragon Ball Z Kai VOST 1080p Bluray x264 - Saison 3',			'niche' : ['anime']},
+			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Digimon Adventure 01 (saison 1) | Complet Francais vf',		'niche' : ['anime']},
+			{'result' : {'season' : [3], 'episode' : [97, 98, 99, 100, 101, 102, 103]},	'data' : 'Fairy Tail Saison 3 [97-103] VF 720p',						'niche' : ['anime']}, # Fairy Tail Saison 3 [97-150] VF 720p
+			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 64 episodes VF 720p',						'niche' : ['anime']},
+
 			{'result' : {'season' : [2], 'episode' : []},								'data' : 'Like Moi - Saison 2 (Saison complète) - Quebec'},
 			{'result' : {'season' : [1, 2], 'episode' : []},							'data' : '[Lael] Sword Art Online Saison 1 & Saison 2 [Multi] {Fr-Jap} {Subs_Fr} [BDRiP 1080p] [x264_AAC]'},
 			{'result' : {'season' : [1, 2, 3, 4, 5, 6, 7], 'episode' : []},				'data' : 'Faites Entrer l\'Accusé | INTEGRALE | Saison 01 à 7 | WEB-DL | x264 [AMIRAL]'},
 			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Bob vous dit Toute La Vérité - BTLV Saison 1 (2012-2013) - MP3'},
-			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 [97-150] VF 720p'},
-			{'result' : {'season' : [3], 'episode' : []},								'data' : 'Fairy Tail Saison 3 64 episodes VF 720p'},
 			{'result' : {'season' : [1, 2, 3, 4], 'episode' : []},						'data' : 'Dans une galaxie près de chez vous - Serie TV - INTEGRAL - Saisons 1 à 4 - EXTRAS - QUEBEC'},
 			{'result' : {'season' : [1, 2], 'episode' : []},							'data' : 'Batman série TV 1966 - intégrale saisons 1 et 2 - VF'},
 			{'result' : {'season' : [1], 'episode' : []},								'data' : 'Wakfu 1-26 intégrale saison 1 + bonus [DVDrip HQ x264]'},
@@ -31711,7 +32085,7 @@ class Tester(object):
 			test = tests[i]
 			if test['result']['season'] and test['result']['episode']:
 				total += 1
-				if not test['result'] == Stream.numberShowExtract(data = test['data'], show = True, season = False, episode = False):
+				if not test['result'] == Stream.numberShowExtract(data = test['data'], show = True, season = False, episode = False, niche = test.get('niche')):
 					fails[0].append(test['data'])
 		self._results('SHOW NUMBER EXTRACTION', total, fails, timer)
 
@@ -31721,7 +32095,7 @@ class Tester(object):
 		for i in range(len(tests)):
 			test = tests[i]
 			total += 1
-			if not test['result']['season'] == Stream.numberSeasonExtract(data = test['data']):
+			if not test['result']['season'] == Stream.numberSeasonExtract(data = test['data'], niche = test.get('niche')):
 				fails[0].append(test['data'])
 		self._results('SEASON NUMBER EXTRACTION', total, fails, timer)
 
@@ -31731,7 +32105,7 @@ class Tester(object):
 		for i in range(len(tests)):
 			test = tests[i]
 			total += 1
-			if not test['result']['episode'] == Stream.numberEpisodeExtract(data = test['data']):
+			if not test['result']['episode'] == Stream.numberEpisodeExtract(data = test['data'], niche = test.get('niche')):
 				fails[0].append(test['data'])
 		self._results('EPISODE NUMBER EXTRACTION', total, fails, timer)
 
@@ -38678,6 +39052,7 @@ class Tester(object):
 				pack = None
 				time = None
 				duration = None
+				number = None
 				country = []
 				language = []
 				network = []
@@ -38687,6 +39062,8 @@ class Tester(object):
 				if tools.Media.isSerie(tests[i]['media']):
 					data1 = manager.metadataEpisode(imdb = ids.get('imdb'), tmdb = ids.get('tmdb'), tvdb = ids.get('tvdb'), trakt = ids.get('trakt'), season = tests[i]['show']['season'] if 'show' in tests[i] else None, episode = tests[i]['show']['episode'] if 'show' in tests[i] else None)
 					data2 = manager.metadataShow(imdb = ids.get('imdb'), tmdb = ids.get('tmdb'), tvdb = ids.get('tvdb'), trakt = ids.get('trakt'))
+
+					number = MetaPack.reduceNumber(data = data1.get('number'), pack = data2.get('pack') if data2 else data1.get('pack'), season = tests[i]['show']['season'] if 'show' in tests[i] else None, episode = tests[i]['show']['episode'] if 'show' in tests[i] else None)
 				else:
 					data1 = manager.metadataMovie(imdb = ids.get('imdb'), tmdb = ids.get('tmdb'), tvdb = ids.get('tvdb'), trakt = ids.get('trakt'))
 				if data1:
@@ -38717,6 +39094,7 @@ class Tester(object):
 				studio = tools.Tools.listUnique(studio)
 
 				tests[i]['item'] = {'valid' : [], 'invalid' : []}
+
 				for j in range(len(tests[i]['valid'])):
 					metaTitle = tests[i]['title']
 					try: metaTitle = metaTitle['processed']
@@ -38726,13 +39104,14 @@ class Tester(object):
 							metaTitle[key] = value[:titles]
 
 					if direct:
-						if tools.Tools.isDictionary(tests[i]['valid'][j]): stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), **tests[i]['valid'][j])
-						else: stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), fileName = tests[i]['valid'][j])
+						if tools.Tools.isDictionary(tests[i]['valid'][j]): stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, **tests[i]['valid'][j])
+						else: stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, fileName = tests[i]['valid'][j])
 
 						tests[i]['item']['valid'].append(stream if stream else tests[i]['valid'][j])
 					else:
-						if tools.Tools.isDictionary(tests[i]['valid'][j]): tests[i]['item']['valid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), **tests[i]['valid'][j]))
-						else: tests[i]['item']['valid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), fileName = tests[i]['valid'][j]))
+						if tools.Tools.isDictionary(tests[i]['valid'][j]): tests[i]['item']['valid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, **tests[i]['valid'][j]))
+						else: tests[i]['item']['valid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, fileName = tests[i]['valid'][j]))
+
 				for j in range(len(tests[i]['invalid'])):
 					metaTitle = tests[i]['title']
 					try: metaTitle = metaTitle['processed']
@@ -38742,13 +39121,13 @@ class Tester(object):
 							metaTitle[key] = value[:titles]
 
 					if direct:
-						if tools.Tools.isDictionary(tests[i]['invalid'][j]): stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), **tests[i]['invalid'][j])
-						else: stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), fileName = tests[i]['invalid'][j])
+						if tools.Tools.isDictionary(tests[i]['invalid'][j]): stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, **tests[i]['invalid'][j])
+						else: stream = Stream.load(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, fileName = tests[i]['invalid'][j])
 
 						tests[i]['item']['invalid'].append(stream if stream else tests[i]['invalid'][j])
 					else:
-						if tools.Tools.isDictionary(tests[i]['invalid'][j]): tests[i]['item']['invalid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), **tests[i]['invalid'][j]))
-						else: tests[i]['item']['invalid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), fileName = tests[i]['invalid'][j]))
+						if tools.Tools.isDictionary(tests[i]['invalid'][j]): tests[i]['item']['invalid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, **tests[i]['invalid'][j]))
+						else: tests[i]['item']['invalid'].append(Stream(validate = validate, metaMedia = tests[i]['media'], metaNiche = tests[i].get('niche'), metaTitle = metaTitle, metaYear = tests[i]['year'], metaTime = tests[i]['time'] if 'time' in tests[i] else time, metaDuration = tests[i]['duration'] if 'duration' in tests[i] else duration, metaSeason = tests[i]['show']['season'] if 'show' in tests[i] else None, metaEpisode = tests[i]['show']['episode'] if 'show' in tests[i] else None, metaLanguage = tests[i]['language'] if 'language' in tests[i] else language, metaCountry = tests[i]['country'] if 'country' in tests[i] else country, metaNetwork = tests[i]['network'] if 'network' in tests[i] else network, metaStudio = tests[i]['studio'] if 'studio' in tests[i] else studio, metaPack = MetaPack.instance(pack = tests[i]['pack'] if 'pack' in tests[i] else pack).reduceStream(), metaNumber = number, fileName = tests[i]['invalid'][j]))
 
 		if duplicates:
 			if duplicates is True: duplicates = 3

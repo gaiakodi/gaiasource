@@ -392,8 +392,10 @@ class Stream(Serializer):
 	NumberPack				= -1	# Season/episode number used to indicate an entire pack.
 	NumberSpecial			= 0		# Episode number used to indicate special episodes.
 
-	ExpressionNumberRange	= '{symbol_start}(?<![^\d]\d{separator})(?<![^\d]\d{separator})(?<![^\d]\d{separator}{{2}})(?:(%s){separator}?[\-\–\/]{separator}?(%s))(?!{separator}+\d{separator})(?!{separator}\d[^\d])(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
-	ExpressionNumberList	= '{symbol_start}(?:(%s){separator}+)(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}*)?(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
+	# Exclude numbers if it is a disk.
+	# Eg: Avatar Extended Cut - Disk 2 [DVD9 PAL - Ita Eng] MIRCrew
+	ExpressionNumberRange	= '(?<!dis[ck]){symbol_start}(?<![^\d]\d{separator})(?<![^\d]\d{separator})(?<![^\d]\d{separator}{{2}})(?:(%s){separator}?[\-\–\/]{separator}?(%s))(?!{separator}+\d{separator})(?!{separator}\d[^\d])(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
+	ExpressionNumberList	= '(?<!dis[ck]){symbol_start}(?:(%s){separator}+)(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}+)?(?:(%s){separator}*)?(?!\.{{2}}){symbol_end}(?<!\.{{2}})'
 
 	##############################################################################
 	# EXPRESSIONS
@@ -481,20 +483,26 @@ class Stream(Serializer):
 	# (?!(?:1[56789]|2[01])\d{{2}}): Do not detect years (eg: "S01.1966-1967" or "1883.S01E02").
 	ExpressionShow = {
  		'groups'		: 15, # NB: Python's regex only supports a maximum of 100 groups. This value might need to be lowered if more groups are added.
-		'number'		: u'(?![5789]\.1(?!\d)|(?:1[56789]|2[01])\d{2})(?:\d+(?!\.0(?!\d)))', # Exclude audio channels (eg: 7.1 or 2.0, or ddp5.1) and years.
+		'number'		: u'(?![5789]\.1(?!\d)|(?:1[56789]|2[01])\d{2})(?:\d+(?!\.0(?!\d))(?!\d*[ipbkmg]))', # Exclude audio channels (eg: 7.1 or 2.0, or ddp5.1) and years. Also not followed by a letter (eg: 1080p or 100MB).
 		'exclude'		: u'(s[789]\d(?!\d)|007)', # Some movie file names contain various Sxx words (eg S74, S83, S92, etc). Not sure what they are. Eg Toy Story 4 2019 (2160p x265 10bit S82 Joy). Also exclude "007" since that is often James Bond stuff, otherwise it might be detected as a season number (in titleValid() -> numberShowIndex()).
 		'special'		: ExpressionSymbolStart + u'(?!26(?:\d|$))(\d)(0[1-9]|[1-9][0-9])' + ExpressionSymbolEnd, # Special episode number (eg: "101" for S01E01).
 		'disc'			: u'(?:' + ExpressionSeparatorExtra + '*d' + ExpressionSeparatorExtra + '*\d{1,2})?', # Disk number (eg: S01D5).
 		'prefix'		: u'(?:\d|' + ExpressionSymbol + '|^)',
 		'divider'		: u'[x×]', # × used by ElliteTorrent
 		'ordinal'		: u'(?:\s*%s(?=\W|\d|_|x\d))?', # Contains {nonalphabet}, but hardcode it here, since it is not replaced.
+		'unordinal'		: u'(?!%s)', # Also exclude 1st/2nd/3rd/etc (One Piece Season 1 - 3rd Voyage [SE][720p][x264][JPN][SUB]).
 		'nonalphabet'	: u'(?=\W|\d|_|x\d)', # Ordinals and episode labels need to be followed by numbers/symbols, otherwise "Generation Kill (2008) Season 1 S01 Extras ..." the "E" in "Extras" is seen as an episode label.
 		'description'	: u'(?!\s*episodes)', # Eg: Star Trek Original Series: Season 1: 30 Episodes 5 GB File Size:..
 		'duration'		: u'(?<!\dm)(?<!\dm\d)', # Eg: Avatar(ExtendedCollectorsEdition)(2h58m09s)(3D inserts2D)2009.halfOU(TopGun)
 
+		# Eg: One Piece S03 - (078-091)" and "One Piece Season 3 Complete 031 - 047 720p HDTV x264 [i_c]
+		# Eg: One Piece - S06 Voyage 1,2,3 (337-372) English Dub
+		# Eg: [Pn8] One Piece S06 Voyage 4 (373-384) [Funi-DL] [720p] [Dub]
+		'custom'		: u'(?:(?<!^)(?<!season' + ExpressionSeparator + ')\s*[\(\[]\s*|' + ExpressionSeparator + '*(?:complett?e?|komplett|pack|collecti(?:on|e)s?|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|sammlung|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный|int(?:e|é)grale?|voyage' + ExpressionSeparator + '*(?:\d+' + ExpressionSeparator + '*)+[\(\[]?)' + ExpressionSeparator + '*)',
+
 		'show_forward' : { # Both season and episode number (season_label season_number episode_label episode_number).
 			'group'		: {'season' : (0, 2), 'episode' : None}, # Groups to extract. None = all groups. Not present = no groups.
-			'main'		: u'{prefix}(?:0*({season_number}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})|{season_label}{separator}*0*({season_number}){ordinal}{separator}*{episode_label}{nonalphabet}{separator}*0*({episode_number}){ordinal})',
+			'main'		: u'{prefix}(?:0*({season_number}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})|{season_label}{separator}*0*({season_number}){ordinal}{separator}*(?:{custom}?{episode_label}|{custom}){nonalphabet}{separator}*0*({episode_number}){ordinal})',
 			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:0*(?:{season_number})?{divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})|(?:{season_label}{separator}*0*(?:{season_number}{ordinal}){separator}*)?{episode_label}?{nonalphabet}{separator}*0*({episode_number}){ordinal}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)))?',
 		},
 		'show_backward' : { # Both season and episode number (season_number season_label episode_number episode_label).
@@ -502,10 +510,11 @@ class Stream(Serializer):
 			'main'		: u'{prefix}(?:0*({season_number}){separator}*{season_label}{separator}*0*({episode_number}){separator}*(?={episode_label}{nonalphabet}|{separator}*(?:&|{range}|{conjunction}|-){separator}*\d+{separator}*{episode_label}))',
 			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:(?:0*(?:{season_number}){separator}*{season_label}{separator}*)?0*({episode_number}){separator}*{episode_label}{nonalphabet}(?!{separator}*{season_label})(?={separator}*\d+{separator}*{episode_label}{nonalphabet}|{symbol}|$)))?',
 		},
+		# Ignore a season number if followed by "joy". Eg: the huntsman winters war 2016 extended (1080p x265 10bit s91 joy).mkv
 		'season_forward' : { # Only season number (season_label season_number).
 			'group'		: {'season' : None}, # Groups to extract. None = all groups. Not present = no groups.
-			'main'		: u'{prefix}(?:(?<=[^1-9])0*({season_number}){divider}\d(?!\d{{2,3}})|{season_label}{separator_extra}*(?!(?:19|2[01])\d{{2}})0*({season_number}){ordinal}{disc}(?={season_label}{separator_extra}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$))',
-			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:(?<=[^1-9])0*({season_number})?{divider}\d(?!\d{{2,3}})|(?:{season_label}|{separator}){separator}*(?!(?:19|2[01])\d{{2}})0*({season_number}){description}{ordinal}{disc}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)))?',
+			'main'		: u'{prefix}(?:(?<=[^1-9])0*({season_number}){divider}\d(?!\d{{2,3}})|{season_label}{separator_extra}*(?!(?:19|2[01])\d{{2}})0*({season_number})(?!{separator}joy){ordinal}{disc}(?={season_label}{separator_extra}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$))',
+			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:(?<=[^1-9])0*({season_number})?{divider}\d(?!\d{{2,3}})|(?:{season_label}|{separator}){separator}*(?!(?:19|2[01])\d{{2}})0*({season_number}){unordinal}{description}{ordinal}{disc}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)))?',
 		},
 		'season_backward' : { # Only season number (season_number season_label).
 			'group'		: {'season' : None}, # Groups to extract. None = all groups. Not present = no groups.
@@ -514,8 +523,8 @@ class Stream(Serializer):
 		},
 		'episode_forward' : { # Only episode number (episode_label episode_number).
 			'group'		: {'episode' : None}, # Groups to extract. None = all groups. Not present = no groups.
-			'main'		: u'{prefix}(?:(?:^|\d+|{separator}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)|{episode_label}{nonalphabet}{separator}*0*({episode_number}){ordinal}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$))',
-			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:(?:^|\d+|{separator}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})|(?:{season_label}{separator}*0*(?:\d+){separator}*)?{episode_label}?{nonalphabet}{separator}*0*({episode_number}){ordinal}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)))?',
+			'main'		: u'{prefix}(?:(?:^|\d+|{separator}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number})(?={season_label}{separator}*\d+|(?:{custom}?{episode_label}|{custom}){nonalphabet}{separator}*\d+|{symbol}|$)|{episode_label}{nonalphabet}{separator}*0*({episode_number}){ordinal}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$))',
+			'repeat'	: u'(?:{separator}*(?:&|{range}|{conjunction})*{separator}*(?:(?:^|\d+|{separator}){divider}0*(?!26(?:\d|$))(?!\d{{3,4}})({episode_number}){unordinal}|(?:{season_label}{separator}*0*(?:\d+){separator}*)?{episode_label}?{nonalphabet}{separator}*0*({episode_number}){unordinal}(?={season_label}{separator}*\d+|{episode_label}{nonalphabet}{separator}*\d+|{symbol}|$)))?',
 		},
 		'episode_backward' : { # Only episode number (episode_number episode_label).
 			'group'		: {'episode' : None}, # Groups to extract. None = all groups. Not present = no groups.
@@ -15779,12 +15788,6 @@ class Stream(Serializer):
 				if numberSeason: number['season'] = numberSeason if tools.Tools.isArray(numberSeason) else [numberSeason]
 				if numberEpisode: number['episode'] = numberEpisode if tools.Tools.isArray(numberEpisode) else [numberEpisode]
 
-			if validate and metaMediaShow and validateShow and (validateSeason or validateEpisode) and fileNameExtra:
-				if not self.__numberSpecialValid(data = fileNameExtra, title = metaTitleEpisode, niche = metaNiche, real = number, season = metaSeason if validateSeason else None, episode = metaEpisode if validateEpisode else None, number = metaNumber, pack = metaPack):
-					self.__invalidate(id = idOrionStream, link = link, hash = hashes, name = fileName, provider = sourceProvider, invalid = Stream.InvalidNumber)
-					self.debug(reason = 'Invalid Show Number', link = link, name = fileNameExtra, extra = 'Expected: %s x %s' % ('Pack' if metaSeason is None else str(metaSeason), 'Pack' if metaEpisode is None else str(metaEpisode)))
-					return cacheInvalid(id, cache, lock)
-
 			# File Pack
 			if not filePack is None:
 				processed['file']['pack'] = True
@@ -15792,6 +15795,13 @@ class Stream(Serializer):
 			if filePack is None and extract:
 				processed['file']['pack'] = True
 				filePack = self.filePackExtract(data = fileNameExtra, number = number, pack = metaPack, exclude = metaTitleAll, encode = False, clean = False)
+
+			# Requires the file pack.
+			if validate and metaMediaShow and validateShow and (validateSeason or validateEpisode) and fileNameExtra:
+				if not self.__numberSpecialValid(data = fileNameExtra, title = metaTitleEpisode, niche = metaNiche, real = number, season = metaSeason if validateSeason else None, episode = metaEpisode if validateEpisode else None, number = metaNumber, pack = metaPack, filePack = filePack):
+					self.__invalidate(id = idOrionStream, link = link, hash = hashes, name = fileName, provider = sourceProvider, invalid = Stream.InvalidNumber)
+					self.debug(reason = 'Invalid Show Number', link = link, name = fileNameExtra, extra = 'Expected: %s x %s' % ('Pack' if metaSeason is None else str(metaSeason), 'Pack' if metaEpisode is None else str(metaEpisode)))
+					return cacheInvalid(id, cache, lock)
 
 			# Collection Number
 			if metaMediaMovie and fileNameExtra:
@@ -15805,7 +15815,7 @@ class Stream(Serializer):
 
 			# Validation
 			# Do here, so filePack is available for more accurate year validation of movie collections.
-			if validate and validateYear and fileName and self.__yearValid(year = metaYear, data = fileName, pack = metaPack, filePack = filePack, deviation = True) is False:
+			if validate and validateYear and fileName and self.__yearValid(media = metaMedia, year = metaYear, data = fileName, pack = metaPack, filePack = filePack, deviation = True) is False:
 				self.__invalidate(id = idOrionStream, link = link, hash = hashes, name = fileName, provider = sourceProvider, invalid = Stream.InvalidYear)
 				self.debug(reason = 'Invalid Year', link = link, name = fileNameExtra, extra = sourceProvider)
 				return cacheInvalid(id, cache, lock)
@@ -17281,13 +17291,13 @@ class Stream(Serializer):
 		# Show Number
 		if tools.Media.isSerie(media):
 			if validateShow and (validateSeason or validateEpisode):
-				if not self.__numberSpecialValid(data = data, title = titleEpisode, niche = niche, real = guidance['number'] if guidance else None, season = season if validateSeason else None, episode = episode if validateEpisode else None, number = number, pack = pack):
+				if not self.__numberSpecialValid(data = data, title = titleEpisode, niche = niche, real = guidance['number'] if guidance else None, season = season if validateSeason else None, episode = episode if validateEpisode else None, number = number, pack = pack, filePack = filePack):
 					self.unlock(lock)
 					return False
 
 		# Year
 		if validateYear:
-			if self.__yearValid(year = year, data = data, pack = pack, filePack = filePack, deviation = deviation) is False:
+			if self.__yearValid(media = media, year = year, data = data, pack = pack, filePack = filePack, deviation = deviation) is False:
 				self.unlock(lock)
 				return False
 
@@ -18503,6 +18513,11 @@ class Stream(Serializer):
 	def metaNicheDonghua(self):
 		return tools.Media.isDonghua(self.mData['meta']['niche'])
 
+	@classmethod
+	def metaNicheIs(self, niche):
+		if niche: return tools.Media.isAnime(niche) or tools.Media.isDonghua(niche)
+		return False
+
 	##############################################################################
 	# META TITLE
 	##############################################################################
@@ -19225,10 +19240,19 @@ class Stream(Serializer):
 				found = __titleMatch(threshold = threshold, titles = titlesCleaned, name = nameYear, number = None, adjust = adjust, result = result)
 				if found: return found
 
+			# Some titles include the "3D" keyword, which gets removed by cleanKeyword().
+			# This can cause the title length to be reduced to a point where false positive matches happen.
+			# Eg: [ToonsHub] ONE PIECE 3D! Trap Coaster S01E01 1080p B-Global WEB-DL AAC2.0 H.264 (ONE PIECE 3D: Gekisou! Trap Coaster, Multi-Subs)
+			# Reduces to: "one piece 3d trap coaster" and after cleanKeyword() to "one piece", which will now be allowed for the main "One Piece" series.
+			_3d = '[GAIA3D]'
+			nameStripped = self._expressionReplace(id = 'titleValid_3d', data = nameCleaned, expression = u'.{0,25}(\s3d\s)[a-z\d\s]{0,25}(?:season|episode|s\d+|\d+|$)', replace = _3d)
+			if len(nameStripped) == len(nameCleaned): _3d = None # Avoid replacement below if it does not contain the 3D keyword.
+
 			# full = False:
 			#  1. Do not remove release groups, since they can match an invalid title (eg: pheonix or legend).
 			#  2. Do not remove languages, since codes can be confused with words (eg: the word "no" should not be considered Norwegian).
-			nameStripped = self.cleanKeyword(nameCleaned, exclude = titlesCleaned, encode = False, split = Stream.SplitRight, pack = pack, full = False, guidance = guidance, native = native)
+			nameStripped = self.cleanKeyword(nameStripped, exclude = titlesCleaned, encode = False, split = Stream.SplitRight, pack = pack, full = False, guidance = guidance, native = native)
+			if _3d: nameStripped = nameStripped.replace(_3d, ' 3d ')
 
 			# If the file name starts with the release network.
 			#	Eg: Discovery.Channel.Xtreme.Martial.Arts.720p.HDTV.x264-DHD
@@ -19243,7 +19267,7 @@ class Stream(Serializer):
 
 			# Remove prefixes with a "name/domain presents ..."
 			# Eg: Vectronic Presents Ava (2020) 1080p.WEB-DL.EVO x264.NL Subs Ingebakken
-			nameStripped = self._expressionReplace(id = '_titleValid_prefix', data = nameStripped, expression = u'^(.{1,30}' + Stream.ExpressionSymbol + u'presents?' + Stream.ExpressionSymbol + u').*', exclude = titlesCleaned)
+			nameStripped = self._expressionReplace(id = 'titleValid_prefix', data = nameStripped, expression = u'^(.{1,30}' + Stream.ExpressionSymbol + u'presents?' + Stream.ExpressionSymbol + u').*', exclude = titlesCleaned)
 
 			# Important to only remove the ignore words AFTER the name was stripped.
 			# Otherwise words that appear both in the ignore list and in the metadata/guidance, and are before the year or season number, are removed too early.
@@ -20238,21 +20262,39 @@ class Stream(Serializer):
 			True if the year is correct. False if the year is incorrect. None if no year is in the file name.
 	'''
 	@classmethod
-	def yearValid(self, data, year, pack = None, filePack = None, deviation = False):
-		return self.__yearValid(data = data, year = year, pack = pack, filePack = filePack, deviation = deviation)
+	def yearValid(self, data, year, media = None, pack = None, filePack = None, deviation = False):
+		return self.__yearValid(data = data, year = year, media = media, pack = pack, filePack = filePack, deviation = deviation)
 
 	def _yearValid(self, deviation = False):
 		year = None
 		if self.metaMediaShow():
 			year = self._metaPackList(self.metaPack(), 'year', 'values')
 		if not year: year = self.metaYear()
-		return self.__yearValid(data = self.fileName(), year = year, pack = self.metaPack(), filePack = self.filePack(), deviation = deviation)
+		return self.__yearValid(data = self.fileName(), year = year, media = self.metaMedia(), pack = self.metaPack(), filePack = self.filePack(), deviation = deviation)
 
 	@classmethod
-	def __yearValid(self, data, year, pack = None, filePack = None, deviation = False):
+	def __yearValid(self, data, year, media = None, pack = None, filePack = None, deviation = False):
 		if not data: return None
 		extract = self.yearExtract(data = data)
 		if not year: return True
+
+		def __yearValid(extract, years):
+			# Do not always accept a year simply because it falls into the range.
+			# Another show with the same title might be released years apart.
+			# Eg: One Piece (1999 - 2025+)
+			# Eg: One Piece (2023 - ?)
+			# Eg (invalid for the 1999 show): One.Piece.2023.S01E01.Romance.Dawn.720p.NF.WEB-DL.DDP5.1.Atmos.x264-CMRG[TGx]
+			# If the difference between the extracted year and the show's year range is too great, assume it is a different show.
+			# Only do this for shows. Movie collections can deviate.
+			# Eg (No Time to Die 2021): James Bond Daniel Craig Collection (2006-2025) BluRay 1080p x264
+			if tools.Media.isSerie(media):
+				if len(extract) == 1:
+					if abs(extract[0] - years[0]) < 10: return True
+				else:
+					if abs(extract[0] - years[0]) < 10 and abs(extract[-1] - years[-1]) < 10: return True
+					elif abs(extract[0] - years[0]) <= 3 or abs(extract[-1] - years[-1]) <= 3: return True
+				return False
+			return True
 
 		if extract:
 			# Year range for shows.
@@ -20260,12 +20302,12 @@ class Stream(Serializer):
 				yearStart = year[0]
 				yearEnd = year[-1]
 
-				if yearStart in extract or yearEnd in extract: return True
-				elif not pack and deviation and ((yearStart + 1) in extract or (yearStart - 1) in extract or (yearEnd + 1) in extract or (yearEnd - 1) in extract): return True
-				elif pack and min(extract) >= yearStart and max(extract) <= yearEnd: return True # Year ranges for file packs.
+				if yearStart in extract or yearEnd in extract: return __yearValid(extract, year)
+				elif not pack and deviation and ((yearStart + 1) in extract or (yearStart - 1) in extract or (yearEnd + 1) in extract or (yearEnd - 1) in extract): return __yearValid(extract, year)
+				elif pack and min(extract) >= yearStart and max(extract) <= yearEnd: return __yearValid(extract, year) # Year ranges for file packs.
 			else:
-				if year in extract: return True
-				elif not pack and deviation and ((year + 1) in extract or (year - 1) in extract): return True
+				if year in extract: return __yearValid(extract, [year])
+				elif not pack and deviation and ((year + 1) in extract or (year - 1) in extract): return __yearValid(extract, [year])
 				elif pack: # Year ranges for file packs.
 					# Only do for shows.
 					# Use the start/end date, instead of the years list, since the years list can contain the special season year, which might be dated years after the actual release.
@@ -20277,16 +20319,16 @@ class Stream(Serializer):
 					# Add "and show" and (show or not years) for S.W.A.T. movies/shows/collections (check tester.py).
 					if years and years[0] and show:
 						if not years[1] or max(extract) <= years[1]:
-							if min(extract) >= years[0]: return True # Continuing shows to not have an end year.
-							elif deviation and min(extract) >= (years[0] - 1): return True # Only add deviation for start year. Eg (released in 1966): Star Trek S01E01 (1965) BDRip x264 [=Faith=]
+							if min(extract) >= years[0]: return __yearValid(extract, years) # Continuing shows to not have an end year.
+							elif deviation and min(extract) >= (years[0] - 1): return __yearValid(extract, years) # Only add deviation for start year. Eg (released in 1966): Star Trek S01E01 (1965) BDRip x264 [=Faith=]
 					else:
 						single = len(extract) == 1
 						if single and (show or not years or filePack):
-							if year <= extract[0]: return True # Single year. Eg: "Title Collection 2021".
+							if year <= extract[0]: return __yearValid(extract, years) # Single year. Eg: "Title Collection 2021".
 						elif single and not filePack and deviation and ((year + 1) == extract[0] or (year - 1) == extract[0]):
-							return True
+							return __yearValid(extract, years)
 						else: # Year range. Eg: "Title Collection 1964-2021"
-							if year >= min(extract) and year <= max(extract): return True
+							if year >= min(extract) and year <= max(extract): return __yearValid(extract, years)
 			return False
 
 		return None
@@ -20583,7 +20625,7 @@ class Stream(Serializer):
 					# Otherwise this would detect S03, E07-E42.
 					# Do not do this for anime, otherwise season-absolute numbers will not work.
 					# Eg: One.Piece.S03E78-92.1999-2011.Mkv.WEBDLMux.1080p.Ita.Jap.Aac.Subs.ProgettoOnePiece
-					if len(result['episode']) == 2 and (not niche or not(tools.Media.isAnime(niche) or tools.Media.isDonghua(niche))):
+					if len(result['episode']) == 2 and (not niche or not self.metaNicheIs(niche = niche)):
 						difference = abs(result['episode'][0] - result['episode'][1])
 						if (result['episode'][0] > 1 and difference > 3) or (difference > 100): del result['episode'][-1]
 
@@ -20615,8 +20657,8 @@ class Stream(Serializer):
 				if len(sub['season']) > 0: break
 				if len(sub['episode']) > 0: break
 
-			result['season'] = self._numberShowProcess(values = result['season'], data = data)
-			result['episode'] = self._numberShowProcess(values = result['episode'], data = data)
+			result['season'] = self._numberShowProcess(values = result['season'], data = data, niche = niche)
+			result['episode'] = self._numberShowProcess(values = result['episode'], data = data, niche = niche)
 
 			if not basic:
 				if not result['season'] and not result['episode']:
@@ -20706,22 +20748,14 @@ class Stream(Serializer):
 			True if the number is correct. False if the number is incorrect. None if no number is in the file name.
 	'''
 	@classmethod
-	def numberShowValid(self, data = None, niche = None, real = None, season = None, episode = None, number = None, pack = None, alternative = None, single = False, clean = True):
-		return self.__numberShowValid(data = data, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, alternative = alternative, single = single, clean = clean)
+	def numberShowValid(self, data = None, niche = None, real = None, season = None, episode = None, number = None, pack = None, filePack = None, alternative = None, single = False, clean = True):
+		return self.__numberShowValid(data = data, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, filePack = filePack, alternative = alternative, single = single, clean = clean)
 
 	def _numberShowValid(self, alternative = None, single = False):
-		return self.__numberShowValid(data = self.fileName(), niche = self.metaNiche(), real = self.numberShow(), season = self.metaSeason(), episode = self.metaEpisode(), number = self.metaNumber(), pack = self.metaPack(), alternative = alternative, single = single, clean = False)
+		return self.__numberShowValid(data = self.fileName(), niche = self.metaNiche(), real = self.numberShow(), season = self.metaSeason(), episode = self.metaEpisode(), number = self.metaNumber(), pack = self.metaPack(), filePack = self.filePack(), alternative = alternative, single = single, clean = False)
 
 	@classmethod
-	def __numberShowValid(self, data = None, niche = None, real = None, season = None, episode = None, number = None, pack = None, alternative = None, single = False, clean = True):
-		#gaiaremove - if "alternative is True" or "alternative is None and (Media.isAnime(niche) or Media.isDonghua(niche))", validate all numbers in number['all']
-		#gaiaremove - or would this cause too many incorrect links from other seasons? Rather let the user scrape other numbers in a separate scrape?
-		# Eg: One Piece S03E01
-		#	Gaia: S03E01
-		#	Trakt/TMDb: S03E78
-		#	TVDb: S06E09 (one scraped link was valid for E78, but the rest is for Trakt/TMDb's later S06)
-		#	Absolute: S01E78
-
+	def __numberShowValid(self, data = None, niche = None, real = None, season = None, episode = None, number = None, pack = None, filePack = None, alternative = None, single = False, clean = True):
 		if not data and not real: return None
 		if data and clean and not real: data = self.cleanBasic(data)
 		if not season is None and not episode is None:
@@ -20741,6 +20775,7 @@ class Stream(Serializer):
 			elif season in real['season'] and (episode in real['episode'] or (not real['episode'] and not single)): return True
 			elif not real['season'] and season == 1 and episode in real['episode']: return True # If there is not season number, only episode numbers. Eg: Novela Jesus [Capítulo 001 ao 042].
 			elif not real['season'] and not real['episode']: return None
+
 		elif not season is None:
 			if not real:
 				for type in ['season_forward', 'season_backward']:
@@ -20757,6 +20792,7 @@ class Stream(Serializer):
 			elif Stream.NumberPack in real['season']: return True
 			elif season in real['season'] and not real['episode']: return True # not real['episode']: Exclude incorrect episode numbers when searching for packs where the episode is set to None. Eg: S01E01 or S01E00 when searching S01 packs for S01E02.
 			elif not real['season']: return None
+
 		elif not episode is None:
 			if not real:
 				for type in ['episode_forward', 'episode_backward']:
@@ -20766,6 +20802,7 @@ class Stream(Serializer):
 			if Stream.NumberPack in real['season'] and not single: return True
 			elif episode in real['episode']: return True
 			elif not real['episode']: return None
+
 		else:
 			if not real:
 				for type in ['show_forward', 'show_backward']:
@@ -20773,6 +20810,25 @@ class Stream(Serializer):
 					if self._expressionMatch(id = 'numberShowValid4', data = data, expression = expression): return True
 				real = self.numberShowExtract(data = data, niche = niche, show = True, season = False, episode = False) # For ranges.
 			if Stream.NumberPack in real['season']: return True
+
+		if ((alternative is True) or (alternative is None and self.metaNicheIs(niche = niche))) and number:
+			# Try alternative season numbers, such as the season-absolute numbers used by Trakt.
+			# Eg: One Piece S03E01 (standard) vs S03E78 (Trakt)
+			# Do not use the TVDb numbers, since they can be far off and result in too many false-positives.
+			# Eg: One Piece S06E09
+			seasoned = number.get('season')
+			if seasoned:
+				for i in seasoned:
+					if not(i[0] == season and i[1] == episode):
+						if self.__numberShowValid(data = data, niche = niche, real = real, season = i[0], episode = i[1], number = number, pack = pack, filePack = filePack, single = single, alternative = False, clean = False): return True
+
+			# Only accept sequential/absolute numbers for individual episodes, but not S01 season packs.
+			# S01 packs are essentially always a normal season pack, not an absolute season pack that contains all episodes for the show.
+			if not filePack:
+				sequential = number.get('sequential')
+				if sequential:
+					if self.__numberShowValid(data = data, niche = niche, real = real, season = sequential[0], episode = sequential[1], number = number, pack = pack, filePack = filePack, single = single, alternative = False, clean = False): return True
+
 		return False
 
 	'''
@@ -20801,16 +20857,22 @@ class Stream(Serializer):
 			result = []
 
 			# NB: Add (?!\d) to fixed numbers. Otherwise 12x3 will match possibility for S2 or S2E3.
-			season = Stream.ExpressionShow['number'] if season is None else (str(season) + Stream.ExpressionNumberSucceed)
-			episode = Stream.ExpressionShow['number'] if episode is None else (str(episode) + Stream.ExpressionNumberSucceed)
+			if season is None: season = Stream.ExpressionShow['number']
+			elif tools.Tools.isArray(season): season = ('(?:%s)' % '|'.join(season)) + Stream.ExpressionNumberSucceed
+			else: season = str(season) + Stream.ExpressionNumberSucceed
+			if episode is None: episode = Stream.ExpressionShow['number']
+			elif tools.Tools.isArray(episode): episode = ('(?:%s)' % '|'.join(episode)) + Stream.ExpressionNumberSucceed
+			else: episode = str(episode) + Stream.ExpressionNumberSucceed
 
 			disc = Stream.ExpressionShow['disc']
 			prefix = Stream.ExpressionShow['prefix'] if prefix else ''
 			divider = Stream.ExpressionShow['divider']
 			ordinal = Stream.ExpressionShow['ordinal']
+			unordinal = Stream.ExpressionShow['unordinal']
 			nonalphabet = Stream.ExpressionShow['nonalphabet']
 			description = Stream.ExpressionShow['description']
 			duration = Stream.ExpressionShow['duration']
+			custom = Stream.ExpressionShow['custom']
 			if count is None: count = Stream.ExpressionShow['groups']
 
 			if type == 'show': type = ['show_forward', 'show_backward']
@@ -20832,12 +20894,14 @@ class Stream(Serializer):
 						'season_number' : season,
 						'episode_number' : episode,
 						'ordinal' : ordinal % language[1]['ordinal'],
+						'unordinal' : unordinal % language[1]['ordinal'],
 						'disc' : disc,
 						'prefix' : prefix,
 						'divider' : divider,
 						'nonalphabet' : nonalphabet,
 						'description' : description,
 						'duration' : duration,
+						'custom' : custom,
 					}
 					mainPart = self._expressionFormatCommon(expression = main, keyword = keyword)
 					repeatPart = self._expressionFormatCommon(expression = repeat, keyword = keyword) * count
@@ -20847,7 +20911,7 @@ class Stream(Serializer):
 		return self._cache(__numberShowExpression, type = type, season = season, episode = episode, count = count, prefix = prefix, basic = basic)
 
 	@classmethod
-	def _numberShowProcess(self, values, data):
+	def _numberShowProcess(self, values, data, niche = None):
 		# Remove invalid values.
 		values = [i for i in values if not i is None]
 
@@ -20867,8 +20931,11 @@ class Stream(Serializer):
 					consecutive = False
 					break
 			if not consecutive:
+				limit = 150
+				if self.metaNicheIs(niche = niche): limit = 3000 # Eg: One Piece Collection 1-648 + 4 Movies
+
 				for i in range(1, len(values)):
-					if abs(values[i] - values[i - 1]) > 150: # Exclude excessive ranges.
+					if abs(values[i] - values[i - 1]) > limit: # Exclude excessive ranges.
 						values = values[:i - 1]
 						break
 					if bool(re.search('%d[\s\.\(\[\{]%d' % (values[i - 1], values[i]), data, flags = Stream.ExpressionFlags)):
@@ -20920,14 +20987,14 @@ class Stream(Serializer):
 			True if the number is correct. False if the number is incorrect. None if no number is in the file name.
 	'''
 	@classmethod
-	def numberSpecialValid(self, data, title, niche = None, real = None, season = None, episode = None, number = None, pack = None, alternative = None, clean = True):
-		return self.__numberSpecialValid(data = data, title = title, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, alternative = alternative, clean = clean)
+	def numberSpecialValid(self, data, title, niche = None, real = None, season = None, episode = None, number = None, pack = None, filePack = None, alternative = None, clean = True):
+		return self.__numberSpecialValid(data = data, title = title, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, filePack = filePack, alternative = alternative, clean = clean)
 
 	def _numberSpecialValid(self, alternative = None):
-		return self.__numberSpecialValid(data = self.fileName(), title = self.metaTitle(title = Stream.TitleEpisode), niche = self.metaNiche(), real = self.numberShow(), season = self.metaSeason(), episode = self.metaEpisode(), number = self.metaNumber(), pack = self.metaPack(), alternative = alternative, clean = False)
+		return self.__numberSpecialValid(data = self.fileName(), title = self.metaTitle(title = Stream.TitleEpisode), niche = self.metaNiche(), real = self.numberShow(), season = self.metaSeason(), episode = self.metaEpisode(), number = self.metaNumber(), pack = self.metaPack(), filePack = self.filePack(), alternative = alternative, clean = False)
 
 	@classmethod
-	def __numberSpecialValid(self, data, title, niche, real, season, episode, number = None, pack = None, alternative = None, none = True, clean = True):
+	def __numberSpecialValid(self, data, title, niche, real, season, episode, number = None, pack = None, filePack = None, alternative = None, none = True, clean = True):
 		if not real:
 			if clean: data = self.cleanBasic(data)
 			if not season is None and not episode is None:
@@ -20940,7 +21007,7 @@ class Stream(Serializer):
 				real = self.numberShowExtract(data = data, niche = niche, show = False, season = False, episode = False)
 
 		# First try the season/episode number.
-		if self.__numberShowValid(data = data, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, alternative = alternative, clean = clean): return True
+		if self.__numberShowValid(data = data, niche = niche, real = real, season = season, episode = episode, number = number, pack = pack, filePack = filePack, alternative = alternative, clean = clean): return True
 
 		# Then try the episode title.
 		if title and season == 0 and (0 in real['season'] or 0 in real['episode'] or not real['season'] or not real['episode']):
@@ -21006,7 +21073,7 @@ class Stream(Serializer):
 		PARAMETERS:
 			data (string): The file name.
 			season (integer): Match a specific season number.
-			number (None/dictionary): Match altewrntive/pack numbers.
+			number (None/dictionary): Match alternative/pack numbers.
 			pack (None/dictionary): The show pack details.
 			alternative (boolean): Check alternative episode numbers.
 			clean (boolean): Clean the data string before processing.
@@ -21014,15 +21081,15 @@ class Stream(Serializer):
 			 True if the number is correct. False if the number is incorrect. None if no number is in the file name.
 	'''
 	@classmethod
-	def numberSeasonValid(self, data, season, number = None, pack = None, niche = None, alternative = None, clean = True):
-		return self.__numberSeasonValid(data = data, season = season, number = number, pack = pack, niche = niche, alternative = alternative, clean = clean)
+	def numberSeasonValid(self, data, season, number = None, pack = None, filePack = None, niche = None, alternative = None, clean = True):
+		return self.__numberSeasonValid(data = data, season = season, number = number, pack = pack, filePack = filePack, niche = niche, alternative = alternative, clean = clean)
 
 	def _numberSeasonValid(self, season, alternative = None):
-		return self.__numberSeasonValid(data = self.fileName(), season = season, number = self.metaNumber(), pack = self.metaPack(), niche = self.metaNiche(), alternative = alternative, clean = False)
+		return self.__numberSeasonValid(data = self.fileName(), season = season, number = self.metaNumber(), pack = self.metaPack(), filePack = self.filePack(), niche = self.metaNiche(), alternative = alternative, clean = False)
 
 	@classmethod
-	def __numberSeasonValid(self, data, season, number = None, pack = None, niche = None, alternative = None, clean = True):
-		return self.__numberShowValid(data = data, season = season, number = number, pack = pack, niche = niche, alternative = alternative, clean = clean)
+	def __numberSeasonValid(self, data, season, number = None, pack = None, filePack = None, niche = None, alternative = None, clean = True):
+		return self.__numberShowValid(data = data, season = season, number = number, pack = pack, filePack = filePack, niche = niche, alternative = alternative, clean = clean)
 
 	##############################################################################
 	# NUMBER EPISODE
@@ -21071,7 +21138,7 @@ class Stream(Serializer):
 		PARAMETERS:
 			data (string): The file name.
 			episode (integer): Match a specific episode number.
-			number (None/dictionary): Match altewrntive/pack numbers.
+			number (None/dictionary): Match alternative/pack numbers.
 			pack (None/dictionary): The show pack details.
 			alternative (boolean): Check alternative episode numbers.
 			clean (boolean): Clean the data string before processing.
@@ -21079,15 +21146,15 @@ class Stream(Serializer):
 			 True if the number is correct. False if the number is incorrect. None if no number is in the file name.
 	'''
 	@classmethod
-	def numberEpisodeValid(self, data, episode, number = None, pack = None, niche = None, alternative = None, clean = True):
-		return self.__numberEpisodeValid(data = data, episode = episode, number = number, pack = pack, niche = niche, alternative = alternative, clean = clean)
+	def numberEpisodeValid(self, data, episode, number = None, pack = None, filePack = None, niche = None, alternative = None, clean = True):
+		return self.__numberEpisodeValid(data = data, episode = episode, number = number, pack = pack, filePack = filePack, niche = niche, alternative = alternative, clean = clean)
 
 	def _numberEpisodeValid(self, episode, alternative = None):
-		return self.__numberEpisodeValid(data = self.fileName(), episode = episode, number = self.metaNumber(), pack = self.metaPack(), niche = self.metaNiche(), alternative = alternative, clean = False)
+		return self.__numberEpisodeValid(data = self.fileName(), episode = episode, number = self.metaNumber(), pack = self.metaPack(), filePack = self.filePack(), niche = self.metaNiche(), alternative = alternative, clean = False)
 
 	@classmethod
-	def __numberEpisodeValid(self, data, episode, number = None, pack = None, niche = None, alternative = None, clean = True):
-		return self.__numberShowValid(data = data, episode = episode, number = number, pack = pack, niche = niche, alternative = alternative, clean = clean)
+	def __numberEpisodeValid(self, data, episode, number = None, pack = None, filePack = None, niche = None, alternative = None, clean = True):
+		return self.__numberShowValid(data = data, episode = episode, number = number, pack = pack, filePack = filePack, niche = niche, alternative = alternative, clean = clean)
 
 	##############################################################################
 	# LANGUAGE
@@ -24491,6 +24558,7 @@ class Stream(Serializer):
 		try:
 			if title and pack and tools.Media.isFilm(media):
 				numbers = [j for j in numberCollection if not j == Stream.NumberPack] if numberCollection else None
+
 				if numbers:
 					titleFull = title
 					try: title = title[Stream.TitleAll]
@@ -24524,7 +24592,7 @@ class Stream(Serializer):
 					if number and not number in numbers:
 						# Sometimes a number range is added to the filename that only has a single title.
 						# Eg: Star Wars The Last Jedi (2017) 1-3 HDCAM Rip: X264 AC3: DTOne
-						if self.__yearValid(data = data, year = year, pack = pack, filePack = filePack) and self.__titleValidQuick(data = data, title = titleFull): return True
+						if self.__yearValid(data = data, media = media, year = year, pack = pack, filePack = filePack) and self.__titleValidQuick(data = data, title = titleFull): return True
 						else: return False
 				else:
 					# Sometimes episodes and show/season packs are returned for movie collections, which might not be filtered out with the title and/or year.
@@ -24611,6 +24679,10 @@ class Stream(Serializer):
 					# Eg: The Office Season 1 SE NO DK FI
 					check = '(?:%s)' % check
 					check += '(?!%s[a-z]{2}(?:$|%s))' % (Stream.ExpressionSeparatorBasic, Stream.ExpressionSeparatorBasic)
+
+					# Ignore single language at the end.
+					# Eg: S03.One.Piece.PT
+					check += '(?!$)'
 
 					expression1 = '^%s*%s%s*%s' % (Stream.ExpressionSymbol, check, Stream.ExpressionSymbol, lookup)
 
