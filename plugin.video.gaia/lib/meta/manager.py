@@ -2325,6 +2325,7 @@ class MetaManager(object):
 				itemsRelease = [[], []] # Items recently premiered. More important.
 				itemsQueue = [] # Items already in the list, but not smart-loaded before. Medium important.
 				itemsDone = [] # Items already in the list, and smart-loaded before. Least important.
+				itemsRenew = [[], [], []] # Items already smart-loaded, but that are recently released and should be reloaded to get more up-to-date ratings/votes.
 				itemsRemoved = [] # Items removed because they are too old or other reasons.
 				itemsLoad = []
 
@@ -2377,6 +2378,13 @@ class MetaManager(object):
 						elif smart == 0:
 							itemsQueue.append(item)
 						else:
+							debut = self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True)
+							if debut:
+								age = time - debut
+								if age < 604800: itemsRenew[0].append(item) # Released in the past week.
+								elif age < 1209600: itemsRenew[1].append(item) # Released in the past 2 weeks.
+								elif age < 1814400: itemsRenew[2].append(item) # Released in the past 3 weeks.
+
 							itemsDone.append(item)
 
 				# Add to the other items.
@@ -2397,7 +2405,7 @@ class MetaManager(object):
 				# This should also not be a lot of metadata, since we only retrieve new items that we are not yet aware of have detailed metadata.
 				# Those we do know have detailed metadata are not loaded, since they are in "itemsDone".
 				itemsCache = itemsNew + itemsQueue
-				if itemsCache:
+				if itemsCache or (arrival and itemsRenew):
 					# Limit the number of items to retrieve from the cache. Retrieve the rest during the next execution.
 					# Otherwise, if the user has loaded many menu pages since the last time this function was called, there might be too much new metadata to retrieve from disk, which might take too long.
 					# Especially for the episode Progress menu, which will also retrieve large pack data from disk.
@@ -2409,9 +2417,22 @@ class MetaManager(object):
 					# Plus the Arrivals menu is not refreshed that often. So the extra retrievals should not matter.
 					if arrival:
 						helper = {} # Use a helper, since it is considerably faster if filterContains() is called multiple times in a loop.
-						itemsCache2 = Tools.listShuffle(itemsNew + itemsQueue)
+						itemsCache2 = []
+
+						# Also reload titles that were released recently.
+						# When a new show comes out, it is mostly smart-loaded on the first day from itemsNew.
+						# However, on the first day there are very few votes. Even for popular shows, on the first 2 days there are often less than 20 votes.
+						# Eg: American Primeval only had 14 votes and a low rating 2-3 days after release. Even after a week there were only 400 votes on Trakt.
+						# Now that the title is smart-loaded, it might end up on page 2 or later, therefore not loading the detailed metadata, and MetaTools._sortGlobal() will only use the early votes (less than 20).
+						# Now the title is stuck on page 2+ and might take very very long to get reloaded, since there are so many other titles in the queue. Even if it is finally reloaded, it is so old by then, that it ends up on a later page anyways.
+						# Therefore, reload recent releases more frequently.
+						itemsCache2 += Tools.listShuffle(itemsRenew[0][:20])
+						itemsCache2 += Tools.listShuffle(itemsRenew[1][:15 + (20 - len(itemsCache2))])
+						itemsCache2 += Tools.listShuffle(itemsRenew[2][:10 + (35 - len(itemsCache2))])
+
+						itemsCache2 = Tools.listShuffle(itemsNew[:15]) + itemsCache2 + Tools.listShuffle(itemsNew[15:] + itemsQueue)
 						itemsCache2 = [i for i in itemsCache2 if not self.mTools.filterContains(items = itemsCache, item = i, helper = helper)]
-						itemsCache += self._metadataSmartChunk(items = itemsCache2, limit = 100)
+						itemsCache += self._metadataSmartChunk(items = itemsCache2, limit = 100) # If the limit is changed, also change itemsRenew above.
 
 					itemsCache = self._metadataSmartRetrieve(items = itemsCache, pack = pack, quick = False) # Retrieve from cache and the rest not at all.
 					if itemsCache:
@@ -2757,9 +2778,6 @@ class MetaManager(object):
 				pack = content == MetaManager.ContentProgress
 				arrival = content == MetaManager.ContentArrival
 
-				# Move the new and queued items to the front.
-				items = Tools.listSort(items, key = lambda i : -1 if i.get(MetaManager.Smart).get('time') is None else i.get(MetaManager.Smart).get('time'))
-
 				# Only retrieve a few items, since this function is called quite often:
 				#	1. When Gaia is launched.
 				#	2. When the smart menu is opened by the user.
@@ -2795,6 +2813,67 @@ class MetaManager(object):
 				elif usage > 0.25: limit = max(1, int(limit * (1.0 - usage)))
 
 				limit = int(max(1, min(50, limit)))
+				limit1 = max(1, int(limit / 2.0))
+				limit2 = max(1, int(limit / 5.0))
+				limit3 = max(1, int(limit / 10.0))
+
+				# Move the new and queued items to the front.
+				lookup = [[], [[], [], []], []]
+				time = Time.timestamp()
+				items = Tools.listShuffle(items)
+
+				for item in items:
+					smarted = item.get(MetaManager.Smart).get('time')
+
+					# Firstly, add new releases that were not smart-loaded yet.
+					if smarted is None:
+						lookup[0].append(item)
+						continue
+
+					# Secondly, add recent releases that were already smart-loaded.
+					# Check _metadataSmartLoad() with the "American Primeval" comment.
+					# More recent releases should be reloaded more frequently, since the rating/votes are very low the first few days after release.
+					# This causes important recent releases to be only listed on page 2+.
+					debut = self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True)
+					if debut:
+						age = time - debut
+						if age < 604800:
+							lookup[1][0].append(item)
+							continue
+						elif age < 1209600:
+							lookup[1][1].append(item)
+							continue
+						elif age < 1814400:
+							lookup[1][2].append(item)
+							continue
+
+					# Thirdly, add older releases that were already smart-loaded.
+					lookup[2].append(item)
+
+				# Titles not smart-loaded yet.
+				# Prefer those that were recently released.
+				lookup[0] = Tools.listSort(lookup[0], key = lambda i : time - (self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True) or 0))
+				items1 = lookup[0][:limit1]
+				items2 = lookup[0][limit1:]
+
+				# Only use 10 items released in the past week, 10 items released in the past 2 weeks, and 5 items released in the past 3 weeks.
+				# Only 50 items are retrieved, and we do not always want to use recent releases only. So cap them at 25.
+				# Add the rest to lookup[2].
+				items3 = []
+				items3 += lookup[1][0][:limit2]
+				lookup[2] += lookup[1][0][limit2:]
+				extra = limit2 + (limit2 - len(items3))
+				items3 += lookup[1][1][:extra]
+				lookup[2] += lookup[1][1][extra:]
+				extra = limit3 + ((2 * limit2) - len(items3))
+				items3 += lookup[1][2][:extra]
+				lookup[2] += lookup[1][2][extra:]
+
+				items = []
+				items += items1 # Retrieve up to 25 titles that were not smart-loaded yet.
+				items += items3 # Re-retrieve up to 25 titles released in the past 3 weeks.
+				items += items2 # Retrieve the remainder of the titles that were not smart-loaded yet.
+				items += Tools.listSort(lookup[2], key = lambda i : i.get(MetaManager.Smart).get('time')) # Fill the remainder with already smart-loaded titles, starting with those smart-loaded the longest time ago.
 
 				count = 0
 				total = len(items)

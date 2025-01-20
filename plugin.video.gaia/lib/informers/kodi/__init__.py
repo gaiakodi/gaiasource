@@ -94,7 +94,7 @@ class Informer(InformerBase):
 			item = Directory(cache = False, lock = False).item()
 			if metadata:
 				metatools = MetaTools.instance()
-				item = metatools.item(item = item, metadata = metadata, extendLabel = MetaTools.ExtendTitle, cleanStudio = False) # Do not decorate the title with the season/episode number, progress percentage, etc, since it looks ugly.
+				item = metatools.item(item = item, metadata = metadata, extendLabel = MetaTools.ExtendTitle, cleanStudio = False, cleanIcon = False) # Do not decorate the title with the season/episode number, progress percentage, etc, since it looks ugly.
 				try: background = item['images'][MetaImage.TypeFanart]
 				except: pass
 				item = item['item']

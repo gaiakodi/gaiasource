@@ -381,7 +381,7 @@ msgid "Prefer %s image if available"
 msgstr ""
 
 msgctxt "#32323"
-msgid "[GAIA-NO-LABEL]"
+msgid "Interface Icons"
 msgstr ""
 
 msgctxt "#32324"
@@ -397,11 +397,11 @@ msgid "Episodes"
 msgstr ""
 
 msgctxt "#32327"
-msgid "[GAIA-NO-LABEL]"
+msgid "Watched Icon"
 msgstr ""
 
 msgctxt "#32328"
-msgid "[GAIA-NO-LABEL]"
+msgid "Progress Icon"
 msgstr ""
 
 msgctxt "#32329"
@@ -659,7 +659,7 @@ msgid "New Releases"
 msgstr ""
 
 msgctxt "#33005"
-msgid "[GAIA-NO-LABEL]"
+msgid "Counter Icons"
 msgstr ""
 
 msgctxt "#33006"
@@ -675,7 +675,7 @@ msgid "Award Winners"
 msgstr ""
 
 msgctxt "#33009"
-msgid "[GAIA-NO-LABEL]"
+msgid "Duration Icons"
 msgstr ""
 
 msgctxt "#33010"
@@ -1415,7 +1415,7 @@ msgid "Toggle Best"
 msgstr ""
 
 msgctxt "#33194"
-msgid "[GAIA-NO-LABEL]"
+msgid "Date Icons"
 msgstr ""
 
 msgctxt "#33195"
@@ -2079,7 +2079,7 @@ msgid "Version"
 msgstr ""
 
 msgctxt "#33360"
-msgid "[GAIA-NO-LABEL]"
+msgid "Studio Icons"
 msgstr ""
 
 msgctxt "#33361"
@@ -2259,7 +2259,7 @@ msgid "Connection"
 msgstr ""
 
 msgctxt "#33405"
-msgid "[GAIA-NO-LABEL]"
+msgid "Rating Icons"
 msgstr ""
 
 msgctxt "#33406"
@@ -5295,11 +5295,11 @@ msgid "Change the label layout of episodes. The [I]Default[/I] option automatica
 msgstr ""
 
 msgctxt "#34164"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display watched icons in menus for titles that were played at least once. This is typically a checkmark icon added next to the title. The icon is supported by most Kodi skins."
 msgstr ""
 
 msgctxt "#34165"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display progress icons in menus for titles that were started, but not fully watched yet. This is typically a stopwatch icon added next to the title. The icon is supported by most Kodi skins."
 msgstr ""
 
 msgctxt "#34166"
@@ -5315,7 +5315,7 @@ msgid "Automatically delete transfers and files from your account on the RealDeb
 msgstr ""
 
 msgctxt "#34169"
-msgid "[GAIA-NO-LABEL]"
+msgid "Show various icons in the menus which are added by the Kodi skin."
 msgstr ""
 
 msgctxt "#34170"
@@ -5715,7 +5715,7 @@ msgid "Change the font style for new releases to [B]bold[/B], upcoming releases 
 msgstr ""
 
 msgctxt "#34269"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display season and episode counter icons in menus. This is typically a number added next to the title or a label added to the menu bar. The icon is only supported by some Kodi skins."
 msgstr ""
 
 msgctxt "#34270"
@@ -5783,7 +5783,7 @@ msgid "Specify the server location for instant streaming. Changing to a fixed se
 msgstr ""
 
 msgctxt "#34286"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display duration icons in menus. This is typically a clock label added next to the title or a label added to the menu bar. The icon is supported by most Kodi skins."
 msgstr ""
 
 msgctxt "#34287"
@@ -6083,7 +6083,7 @@ msgid "Adjust the threshold for matching filenames against titles. Higher values
 msgstr ""
 
 msgctxt "#34361"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display release date icons in menus. This is typically a date label added to the menu bar. The icon is supported by most Kodi skins."
 msgstr ""
 
 msgctxt "#34362"
@@ -6883,7 +6883,7 @@ msgid "Add a [I]Trakt[/I], [I]YouTube[/I], and [I]Orion[/I]  account for the bes
 msgstr ""
 
 msgctxt "#34571"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display studio and network icons in menus. This is typically a icon added to the menu bar. The icon is only supported by some Kodi skins and requires the third-party [I]StudioIcons[/I]  addon."
 msgstr ""
 
 msgctxt "#34572"
@@ -6903,7 +6903,7 @@ msgid "Install the [I]YouTube[/I]  and [I]StudioIcons[/I]  addons for the best e
 msgstr ""
 
 msgctxt "#34576"
-msgid "[GAIA-NO-LABEL]"
+msgid "Display rating icons in menus. This is typically a number added next to the title or a label added to the menu bar. The icon is supported by most Kodi skins."
 msgstr ""
 
 msgctxt "#34577"

@@ -709,6 +709,22 @@ class MetaTools(object):
 		self.mLabelAirFormatDay = Settings.getInteger('menu.detail.air.format.day') if self.mLabelAirEnabled else None
 		self.mLabelAirFormatTime = Settings.getInteger('menu.detail.air.format.time') if self.mLabelAirEnabled else None
 
+		self.mIconEnabled = Settings.getBoolean('interface.icon.enabled')
+		self.mIconPlay = self.mIconEnabled and Settings.getBoolean('interface.icon.play')
+		self.mIconProgress = self.mIconEnabled and Settings.getBoolean('interface.icon.progress')
+		self.mIconRating = self.mIconEnabled and Settings.getBoolean('interface.icon.rating')
+		self.mIconCount = self.mIconEnabled and self.mShowCountEnabled and Settings.getBoolean('interface.icon.count')
+		self.mIconDuration = self.mIconEnabled and Settings.getBoolean('interface.icon.duration')
+		self.mIconDate = self.mIconEnabled and Settings.getBoolean('interface.icon.date')
+		self.mIconStudio = self.mIconEnabled and Settings.getBoolean('interface.icon.studio')
+
+		self.mIconExclude = []
+		if not self.mIconPlay: self.mIconExclude.append('playcount')
+		if not self.mIconRating: self.mIconExclude.append('rating')
+		if not self.mIconDuration: self.mIconExclude.append('duration')
+		if not self.mIconDate: self.mIconExclude.extend(['premiered', 'aired'])
+		if not self.mIconStudio: self.mIconExclude.append('studio')
+
 		self.mDirectory = Directory()
 
 		self.mThemeFanart = Theme.fanart()
@@ -16812,6 +16828,7 @@ class MetaTools(object):
 
 		cleanStudio = True,
 		cleanExclude = False,
+		cleanIcon = True,
 	):
 		mediaOriginal = media
 		if not media: media = mediaOriginal = self.media(metadata = metadata)
@@ -16858,7 +16875,7 @@ class MetaTools(object):
 
 			if hide:
 				if not hideSearch: # Always show watched items in the search menu.
-					try: watched = metadata['playcount'] > 0
+					try: watched = (metadata.get('playcount') or 0) > 0
 					except: watched = False
 					if watched:
 						if (hideRelease and self.mHideRelease) or self.mHideAll: return None
@@ -16870,7 +16887,7 @@ class MetaTools(object):
 		elif not command: command = None
 		elif command: item.setPath(command)
 
-		if clean is True: cleaned = self.clean(media = media, metadata = metadata, studio = cleanStudio, exclude = cleanExclude)
+		if clean is True: cleaned = self.clean(media = media, metadata = metadata, studio = cleanStudio, exclude = cleanExclude, icon = cleanIcon)
 		elif Tools.isDictionary(clean): cleaned = clean
 		else: cleaned = metadata
 
@@ -17010,9 +17027,7 @@ class MetaTools(object):
 				elif self.mLabelDetailColor == 3: color = True
 
 				if self.mLabelPlayEnabled:
-					try: playcount = metadata['playcount']
-					except: playcount = None
-					if not playcount: playcount = 0
+					playcount = metadata.get('playcount') or 0
 					if playcount >= self.mLabelPlayThreshold:
 						values.append((32006, Font.IconWatched, Format.colorExcellent() if color is True else color, str(playcount)))
 
@@ -17526,7 +17541,7 @@ class MetaTools(object):
 				# Do not add, since Kodi throws a warning in the log: Unknown Video Info Key "percentplayed"
 				#metadata['percentplayed'] = progress * 100
 
-				if not media == Media.Show and not media == Media.Season:
+				if self.mIconProgress and (not media == Media.Show and not media == Media.Season):
 					duration = metadata.get('duration')
 					if not duration: duration = 3600 if Media.isSerie(media) else 7200
 					resume = progress * duration
@@ -17578,19 +17593,19 @@ class MetaTools(object):
 				if not episodesWatched: episodesWatched = 0
 				if episodesTotal: episodesUnwatched = episodesTotal - episodesWatched
 
-				if self.mShowCountEnabled:
+				# Set this to allow the context menu to add "Mark As Unwatched" for partially watched shows/seasons.
+				metadata['count'] = {
+					'season' : {'total' : seasonsTotal},
+					'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched},
+				}
+
+				if self.mShowCountEnabled and self.mIconCount:
 					if not seasonsTotal is None: item.setProperty('TotalSeasons', str(seasonsTotal))
 					if not episodesTotal is None: item.setProperty('TotalEpisodes', str(episodesTotal))
 					if not episodesWatched is None: item.setProperty('WatchedEpisodes', str(episodesWatched))
 					if not episodesUnwatched is None and self.mShowCountUnwatched:
 						if self.mShowCountLimit: episodesUnwatched = min(99, episodesUnwatched)
 						item.setProperty('UnWatchedEpisodes', str(episodesUnwatched))
-
-					# Set this to allow the context menu to add "Mark As Unwatched" for partially watched shows/seasons.
-					metadata['count'] = {
-						'season' : {'total' : seasonsTotal},
-						'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched},
-					}
 
 				# For shows and seasons, only mark as watched if all episodes were watched.
 				# If some episodes are watched and some are unwatched, add a resume time to indicate there are still some unwatched episodes.
@@ -17603,15 +17618,16 @@ class MetaTools(object):
 						count, remaining = playbacker.count(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, specials = True if season == 0 else self.mShowCountSpecial, metadata = metadata, history = playback['history'], quick = True)
 						metadata['playcount'] = count
 
-					if (episodesWatched and episodesUnwatched) or progress:
-						try:
-							# Kodi 20+ now requires the total time, otherwise the progress icon is not shown in the menus.
-							# However, when specifying the total time, Kodi adds a "resume" entry to the context menu.
-							# When using a very small time (eg: 0.1), it seems Kodi adds the progress icon without adding an entry to the context menu.
-							#tag.setResumePoint(1)
-							#tag.setResumePoint(1, 100)
-							tag.setResumePoint(0.1, 1)
-						except: item.setProperty('ResumeTime', str(1))
+					if self.mIconProgress:
+						if (episodesWatched and episodesUnwatched) or progress:
+							try:
+								# Kodi 20+ now requires the total time, otherwise the progress icon is not shown in the menus.
+								# However, when specifying the total time, Kodi adds a "resume" entry to the context menu.
+								# When using a very small time (eg: 0.1), it seems Kodi adds the progress icon without adding an entry to the context menu.
+								#tag.setResumePoint(1)
+								#tag.setResumePoint(1, 100)
+								tag.setResumePoint(0.1, 1)
+							except: item.setProperty('ResumeTime', str(1))
 
 	def itemContext(self,
 		item,
@@ -18089,7 +18105,7 @@ class MetaTools(object):
 			True: If no studio is specified in the metadata, add an empty string as the studio. This prevents some skins (eg: Aeon Nox) from showing thumbnails instead of of the studio logo for certain views. Also reduces it down to a single studio, since the studio icon addon does not display anything if mutiple studios are specified.
 			False: If no studio is specified in the metadata, leave it as is and do not add an empty string. Also allows multiple studios.
 	'''
-	def clean(self, metadata, media = None, exclude = False, studio = True):
+	def clean(self, metadata, media = None, exclude = False, studio = True, icon = True):
 		if not metadata: return None
 		if Tools.isString(metadata): metadata = Converter.jsonFrom(metadata)
 		else: metadata = self.copy(metadata) # Create a copy, since we do not want to edit the outside dictionary passed to this function.
@@ -18137,7 +18153,11 @@ class MetaTools(object):
 		if exclude:
 			if not Tools.isArray(exclude): exclude = self.mMetaExclude
 			allowed = [i for i in allowed if not i in exclude]
-		metadata = {k : v for k, v in metadata.items() if k in allowed}
+
+		# Icons and labels disabled in the settings.
+		remove = self.mIconExclude if icon else []
+
+		metadata = {k : v for k, v in metadata.items() if k in allowed and not k in remove}
 
 		return metadata
 

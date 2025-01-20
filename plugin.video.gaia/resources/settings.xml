@@ -5586,18 +5586,6 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
-				<setting id="menu.general.watched" type="integer" label="35672" help="34439">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>3</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="35164">1</option>
-							<option label="33029">2</option>
-						</options>
-					</constraints>
-				</setting>
 				<setting id="menu.general.notification" type="integer" label="33679" help="34158">
 					<control type="spinner" format="string"/>
 					<default>2</default>
@@ -5608,6 +5596,18 @@ The label is then added to the action element:
 							<option label="36090">1</option>
 							<option label="36091">2</option>
 							<option label="36092">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="menu.general.watched" type="integer" label="35672" help="34439">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35164">1</option>
+							<option label="33029">2</option>
 						</options>
 					</constraints>
 				</setting>
@@ -7306,6 +7306,72 @@ The label is then added to the action element:
 								<condition setting="premium.easynews.authentication">true</condition>
 							</and>
 						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## MENU - ICON ########## -->
+			<group id="interface.icon" label="35367">
+				<setting id="interface.icon.enabled" type="boolean" label="32323" help="34169">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="interface.icon.play" type="boolean" label="32327" help="34164" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.progress" type="boolean" label="32328" help="34165" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.rating" type="boolean" label="33405" help="34576" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.count" type="boolean" label="33005" help="34269" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+						<dependency type="enable" setting="menu.show.count">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.duration" type="boolean" label="33009" help="34286" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.date" type="boolean" label="33194" help="34361" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="interface.icon.studio" type="boolean" label="33360" help="34571" parent="interface.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
