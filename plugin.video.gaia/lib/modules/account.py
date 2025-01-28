@@ -160,8 +160,8 @@ class Account(object):
 	def headerBearer(self, token):
 		return {'Authorization' : 'Bearer ' + token}
 
-	def settings(self):
-		id = Settings.idDataLabel(self.settingsIdAuthentication()) if self.enabled() else self.settingsIdEnabled()
+	def settings(self, enabled = True):
+		id = Settings.idDataLabel(self.settingsIdAuthentication()) if (self.enabled() or not enabled) else self.settingsIdEnabled()
 		Settings.launch(id)
 
 	def settingsId(self, attribute):
@@ -335,6 +335,7 @@ class Account(object):
 			Settings.setData(id = self.settingsIdAuthentication(), value = data, label = label)
 		else:
 			self.clear()
+		return data
 
 	def register(self):
 		link = self.linkRedirect()
@@ -525,7 +526,7 @@ class Account(object):
 
 		# Function executed to check if the authentication was completed. Must return None on not completed yet, False on failures, or a dictionary on success.
 		# For OAuth: Return False, None, or dictionary: {AttributeToken : <required>, AttributeRefresh : <optional>, AttributeUsername : <optional>, AttributeEmail : <optional>}.
-		# For Basic: Return True, False, None, or dictinary {AttributeUsername : <optional>, AttributeEmail : <optional>}.
+		# For Basic: Return True, False, None, or dictionary {AttributeUsername : <optional>, AttributeEmail : <optional>}.
 		functionVerify = None,
 
 		# Shows a message dialog, similarly to the functions above.
@@ -1675,7 +1676,7 @@ class Realdebrid(Premium):
 			linkRedirect = 'internal.link.realdebrid',
 
 			level = 0,
-			rank = 4,
+			rank = 3,
 			color = 'FFB8D995',
 		)
 
@@ -1774,7 +1775,7 @@ class Debridlink(Resolver):
 		Resolver.__init__(self,
 			id = 'debridlink',
 			name = 'DebridLink',
-			rank = 3,
+			rank = 2,
 			color = 'FF264E70',
 		)
 
@@ -1788,7 +1789,7 @@ class Alldebrid(Resolver):
 		Resolver.__init__(self,
 			id = 'alldebrid',
 			name = 'AllDebrid',
-			rank = 3,
+			rank = 2,
 			color = 'FFFCC933',
 		)
 
@@ -1802,7 +1803,7 @@ class Linksnappy(Resolver):
 		Resolver.__init__(self,
 			id = 'linksnappy',
 			name = 'LinkSnappy',
-			rank = 2,
+			rank = 1,
 			color = 'FF343434',
 		)
 
@@ -1816,7 +1817,7 @@ class Megadebrid(Resolver):
 		Resolver.__init__(self,
 			id = 'megadebrid',
 			name = 'MegaDebrid',
-			rank = 2,
+			rank = 1,
 			color = 'FF232323',
 		)
 
@@ -1830,7 +1831,7 @@ class Rapidpremium(Resolver):
 		Resolver.__init__(self,
 			id = 'rapidpremium',
 			name = 'RapidPremium',
-			rank = 2,
+			rank = 1,
 			color = 'FF222C3C',
 		)
 
@@ -1844,7 +1845,7 @@ class Simplydebrid(Resolver):
 		Resolver.__init__(self,
 			id = 'simplydebrid',
 			name = 'SimplyDebrid',
-			rank = 2,
+			rank = 1,
 			color = 'FF00ACC1',
 		)
 
@@ -1858,9 +1859,83 @@ class Smoozed(Resolver):
 		Resolver.__init__(self,
 			id = 'smoozed',
 			name = 'Smoozed',
-			rank = 2,
+			rank = 1,
 			color = 'FFDD1F1F',
 		)
+
+###################################################################
+# TORBOX
+###################################################################
+
+class Torbox(Resolver):
+
+	def __init__(self):
+		Resolver.__init__(self,
+			id = 'torbox',
+			name = 'TorBox',
+			rank = 3,
+			color = 'FF04BF8A',
+		)
+
+###################################################################
+# EASYDEBRID
+###################################################################
+
+class Easydebrid(Premium):
+
+	Link	= 'https://paradise-cloud.com'
+
+	def __init__(self):
+		Premium.__init__(self,
+			id = 'easydebrid',
+			mode = Premium.ModeKey,
+
+			name = 36024,
+
+			linkDirect = Easydebrid.Link,
+
+			level = 0,
+			rank = 3,
+
+			color = 'FF3B82F6',
+			icon = {'small' : True},
+		)
+
+	def _default(self):
+		return Translation.string(33216)
+
+	def _label(self):
+		return Settings.idDataLabel(self.settingsIdAuthentication())
+
+	def settings(self, enabled = False):
+		return Premium.settings(self, enabled = enabled) # False by default, since the value was not updated yet.
+
+	def enabled(self):
+		return Settings.getString(id = self._label()) == self._default()
+
+	def _verify(self, data = None):
+		from lib.debrid.external import Easydebrid
+		if Easydebrid.accountVerify(data = data): return {Account.AttributeLabel : self._default()}
+		return False
+
+	def _authenticate(self):
+		Dialog.confirm(title = self.name(), message = 'EasyDebrid is currently only supported through Orion. In order to stream, you also have to authenticate your EasyDebrid account on Orion\'s website.')
+		if not Orion().authenticated(): return False
+		self._authenticateMessage({
+			'type' : Dialog.TypeDetails, 'text' : False, 'items' : [
+				{'type' : 'text', 'value' : 'Authenticate with your API key which can be found on EasyDebrid\'s website after you subscribed:'},
+				{'type' : 'link', 'value' : Easydebrid.Link},
+			]})
+
+	def authenticate(self, help = True, settings = True):
+		Premium.authenticate(self, functionNew = self._authenticate, functionVerify = self._verify, functionHelp = self.help if help else None, settings = settings)
+
+	def update(self, token = None, refresh = None, label = None, username = None, email = None, password = None, key = None, pin = None, secret = None, cookie = None, id = None, type = None, version = None, data = None):
+		data = Premium.update(self, token = token, refresh = refresh, label = label, username = username, email = email, password = password, key = key, pin = pin, secret = secret, cookie = cookie, id = id, type = type, version = version, data = data)
+		if data:
+			label = data[Account.AttributeLabel]
+			Settings.set(id = self._label(), value = label)
+		return data
 
 ###################################################################
 # OPENAI

@@ -21,7 +21,7 @@
 from lib.modules.concurrency import Pool, Lock
 from lib.modules.network import Networker
 from lib.modules.cache import Cache
-from lib.modules.tools import Logger, System, Tools, Settings, Resolver
+from lib.modules.tools import Logger, System, Tools, Settings, Resolver, Hash
 from lib.debrid.core import Core
 
 class External(object):
@@ -61,11 +61,11 @@ class External(object):
 		return [id[i:i + limit] for i in range(0, len(id), limit)]
 
 	@classmethod
-	def _process(self, id, callback, function, result, limit = None, timeout = None):
+	def _process(self, id, sources, callback, function, result, limit = None, timeout = None):
 		chunks = self._chunks(id = id, limit = limit)
 		threads = []
 		for chunk in chunks:
-			threads.append(Pool.thread(target = function, kwargs = {'id' : chunk, 'callback' : callback, 'result' : result, 'timeout' : timeout}, start = True))
+			threads.append(Pool.thread(target = function, kwargs = {'id' : chunk, 'sources' : sources, 'callback' : callback, 'result' : result, 'timeout' : timeout}, start = True))
 		[thread.join() for thread in threads]
 
 	##############################################################################
@@ -74,7 +74,7 @@ class External(object):
 
 	@classmethod
 	def instances(self, authenticated = True):
-		instances = [Debridlink, Alldebrid]
+		instances = [Torbox, Easydebrid, Debridlink, Alldebrid]
 		if authenticated: instances = [i for i in instances if i.authenticated()]
 		return instances
 
@@ -104,7 +104,10 @@ class External(object):
 
 		if not id in External.Authentication:
 			self._lock()
-			if not id in External.Authentication: External.Authentication[id] = Resolver.authenticationData(type = id)
+			if not id in External.Authentication:
+				data = self.authenticationData()
+				if data is None: data = Resolver.authenticationData(type = id)
+				External.Authentication[id] = data
 			self._unlock()
 
 		return External.Authentication[id]
@@ -114,6 +117,10 @@ class External(object):
 		data = self.authentication(id = id)
 		try: return data['enabled'] and data['valid']
 		except: return False
+
+	@classmethod
+	def authenticationData(self):
+		return None
 
 	##############################################################################
 	# RESOLVER
@@ -162,9 +169,9 @@ class External(object):
 	##############################################################################
 
 	@classmethod
-	def cached(self, id, timeout = None, callback = None, sources = None):
+	def cached(self, id, sources = None, timeout = None, callback = None):
 		result = []
-		self._process(id = id, callback = callback, function = self._cached, result = result, limit = self.cachedLimit(), timeout = timeout)
+		self._process(id = id, sources = sources, callback = callback, function = self._cached, result = result, limit = self.cachedLimit(), timeout = timeout)
 		return result
 
 	@classmethod
@@ -176,7 +183,7 @@ class External(object):
 		return {}
 
 	@classmethod
-	def _cached(self, id, callback, result, timeout):
+	def _cached(self, id, sources, callback, result, timeout):
 		pass
 
 
@@ -200,6 +207,8 @@ class Orion(External):
 			ids = []
 			if Settings.getInteger('scrape.cache.inspection.premiumize') == 2: ids.append(Orionoid.DebridPremiumize)
 			if Settings.getInteger('scrape.cache.inspection.offcloud') == 2: ids.append(Orionoid.DebridOffcloud)
+			if Settings.getInteger('scrape.cache.inspection.torbox') == 2: ids.append(Orionoid.DebridTorbox)
+			if Settings.getInteger('scrape.cache.inspection.easydebrid') == 2: ids.append(Orionoid.DebridEasydebrid)
 			if Settings.getInteger('scrape.cache.inspection.realdebrid') == 2: ids.append(Orionoid.DebridRealdebrid)
 			if Settings.getInteger('scrape.cache.inspection.debridlink') == 2: ids.append(Orionoid.DebridDebridlink)
 			if Settings.getInteger('scrape.cache.inspection.alldebrid') == 2: ids.append(Orionoid.DebridAlldebrid)
@@ -219,7 +228,7 @@ class Orion(External):
 		return {Core.ModeTorrent, Core.ModeUsenet, Core.ModeHoster}
 
 	@classmethod
-	def _cached(self, id, callback, result, timeout):
+	def _cached(self, id, sources, callback, result, timeout):
 		from lib.modules.orionoid import Orionoid
 		data = None
 		try:
@@ -297,7 +306,7 @@ class Debridlink(External):
 		return {Core.ModeTorrent}
 
 	@classmethod
-	def _cached(self, id, callback, result, timeout):
+	def _cached(self, id, sources, callback, result, timeout):
 		data = None
 		try:
 			data = self._request(mode = 'seedbox', action = 'cached', data = {'url' : ','.join(id)}, timeout = timeout)
@@ -364,7 +373,7 @@ class Alldebrid(External):
 		return {Core.ModeTorrent}
 
 	@classmethod
-	def _cached(self, id, callback, result, timeout):
+	def _cached(self, id, sources, callback, result, timeout):
 		data = None
 		try:
 			data = self._request(mode = 'magnet', action = 'instant', data = {'magnets[]' : id}, timeout = timeout)
@@ -376,3 +385,188 @@ class Alldebrid(External):
 		except:
 			if data and 'error' in data and 'message' in data['error']: Logger.log('AllDebrid Cache Lookup Failure: ' + str(data['error']['message']), type = Logger.TypeError)
 			else: Logger.error()
+
+class Torbox(External):
+
+	Id = 'torbox'
+	Name = 'TorBox'
+	Abbreviation = 'T'
+	Acronym = 'TB'
+
+	##############################################################################
+	# REQUEST
+	##############################################################################
+
+	@classmethod
+	def _request(self, mode, action, data = None, method = None, timeout = None):
+		return Networker().requestJson(
+			link = 'https://api.torbox.app/v1/api/%s/%s' % (mode, action),
+			method = method or Networker.MethodGet,
+			type = Networker.DataForm,
+			timeout = timeout,
+			headers = {'Authorization' : 'Bearer %s' % self.authentication()['apikey']},
+			data = data,
+		)
+
+	##############################################################################
+	# SERVICES
+	##############################################################################
+
+	@classmethod
+	def _services(self):
+		try:
+			data = self._request('webdl', 'hosters')
+			data = data['data']
+			result = [Core.ModeTorrent, Core.ModeUsenet]
+			if data:
+				for i in data:
+					if i.get('status'): result.extend(i['domains'])
+			return result
+		except:
+			Logger.error()
+			return []
+
+	##############################################################################
+	# CACHE
+	##############################################################################
+
+	@classmethod
+	def cachedLimit(self):
+		return External.LimitGet
+
+	@classmethod
+	def cachedModes(self):
+		return {Core.ModeTorrent, Core.ModeUsenet, Core.ModeHoster}
+
+	@classmethod
+	def _cached(self, id, sources, callback, result, timeout):
+		data = None
+		try:
+			found = {}
+			lookup = {}
+
+			torrent = []
+			usenet = []
+			hoster = []
+			for i in range(len(id)):
+				source = sources[i]['stream']
+
+				if source.sourceTypeTorrent(): value = id[i].lower()
+				else: value = Hash.md5(id[i]).lower()
+
+				if source.sourceTypeTorrent(): torrent.append(value)
+				elif source.sourceTypeUsenet(): usenet.append(value)
+				elif source.sourceTypeHoster(): hoster.append(value)
+
+				lookup[value] = id[i]
+
+			values = {}
+			if torrent: values['torrents'] = torrent
+			if usenet: values['usenet'] = usenet
+			if hoster: values['webdl'] = hoster
+
+			for k, v in values.items():
+				try:
+					data = self._request(mode = k, action = 'checkcached', data = {'hash' : ','.join(v), 'format' : 'list'}, timeout = timeout)
+					if data and 'data' in data:
+						data = data['data']
+						for i in data:
+							hash = i['hash'].lower()
+							if callback: callback(self.id(), lookup[hash], True)
+							result.append({'id' : lookup[hash], 'hash' : hash, 'cached' : True})
+							found[hash] = True
+					for i in v:
+						if not i in found:
+							if callback: callback(self.id(), lookup[i], False)
+							result.append({'id' : lookup[i], 'hash' : i, 'cached' : False})
+							found[i] = True
+				except:
+					if data and ('error' in data or 'detail' in data): Logger.log('TorBox Cache Lookup Failure: ' + str(data.get('detail') or data.get('error')), type = Logger.TypeError)
+					else: Logger.error()
+		except:
+			if data and ('error' in data or 'detail' in data): Logger.log('TorBox Cache Lookup Failure: ' + str(data.get('detail') or data.get('error')), type = Logger.TypeError)
+			else: Logger.error()
+
+class Easydebrid(External):
+
+	Id = 'easydebrid'
+	Name = 'EasyDebrid'
+	Abbreviation = 'E'
+	Acronym = 'ED'
+
+	##############################################################################
+	# REQUEST
+	##############################################################################
+
+	@classmethod
+	def _request(self, mode, action, data = None, method = None, timeout = None, key = None):
+		return Networker().requestJson(
+			link = 'https://easydebrid.com/api/v1/%s/%s' % (mode, action),
+			method = method or Networker.MethodGet,
+			type = Networker.DataJson if method == Networker.MethodPost else Networker.DataForm,
+			timeout = timeout,
+			headers = {'Authorization' : 'Bearer %s' % (key or self.authentication()['key'])},
+			data = data,
+		)
+
+	##############################################################################
+	# AUTHENTICATION
+	##############################################################################
+
+	@classmethod
+	def authenticationData(self):
+		from lib.modules.account import Easydebrid as Account
+		key = Account().dataKey()
+		return {
+			'enabled' : bool(key),
+			'valid' : bool(key),
+			'key' : key,
+		}
+
+	##############################################################################
+	# ACCOUNT
+	##############################################################################
+
+	@classmethod
+	def accountEnabled(self):
+		return self.authenticationData().get('enabled')
+
+	@classmethod
+	def accountVerify(self, data = None):
+		data = self._request(mode = 'user', action = 'details', key = data.get('key') if data else None)
+		return bool(data and data.get('id'))
+
+	##############################################################################
+	# SERVICES
+	##############################################################################
+
+	@classmethod
+	def _services(self):
+		try:
+			return [Core.ModeTorrent]
+		except:
+			Logger.error()
+			return []
+
+	##############################################################################
+	# CACHE
+	##############################################################################
+
+	@classmethod
+	def cachedLimit(self):
+		return External.LimitPost
+
+	@classmethod
+	def cachedModes(self):
+		return {Core.ModeTorrent}
+
+	@classmethod
+	def _cached(self, id, sources, callback, result, timeout):
+		try:
+			data = self._request(mode = 'link', action = 'lookup', data = {'urls' : id}, method = Networker.MethodPost, timeout = timeout)
+			if data and 'cached' in data:
+				data = data['cached']
+				for i in range(len(data)):
+					if callback: callback(self.id(), id[i], data[i])
+					result.append({'id' : id[i], 'hash' : id[i], 'cached' : data[i]})
+		except: Logger.error()

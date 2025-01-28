@@ -849,19 +849,19 @@ elif action.startswith('play') and not action.startswith('playback') and not act
 			episode = parameters.get('episode')
 			if not episode is None: episode = int(episode)
 
-			try: binge = int(parameters.get('binge'))
+			try: binge = int(parameters['binge'])
 			except: binge = None
-			try: resume = int(parameters.get('resume'))
+			try: resume = int(parameters['resume'])
 			except: resume = None
-			try: autoplay = tools.Converter.boolean(parameters.get('autoplay'))
+			try: autoplay = tools.Converter.boolean(parameters['autoplay'])
 			except: autoplay = False
-			try: library = tools.Converter.boolean(parameters.get('library'))
+			try: library = tools.Converter.boolean(parameters['library'])
 			except: library = False
-			try: new = tools.Converter.boolean(parameters.get('new'))
+			try: new = tools.Converter.boolean(parameters['new'])
 			except: new = False
-			try: add = tools.Converter.boolean(parameters.get('add'))
+			try: add = tools.Converter.boolean(parameters['add'])
 			except: add = False
-			try: reload = tools.Converter.boolean(parameters.get('reload'))
+			try: reload = tools.Converter.boolean(parameters['reload'])
 			except: reload = True
 			downloadType = parameters.get('downloadType')
 			downloadId = parameters.get('downloadId')
@@ -1543,6 +1543,18 @@ elif action.startswith('realdebrid'):
 
 	elif action == 'realdebridSettings':
 		tools.Settings.launch(id = 'premium.realdebrid.enabled')
+
+####################################################
+# EASYDEBRID
+####################################################
+
+elif action.startswith('easydebrid'):
+
+	if action == 'easydebridAuthentication':
+		from lib.modules.account import Easydebrid
+		help = tools.Converter.boolean(parameters.get('help'))
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Easydebrid().authenticate(help = help, settings = settings)
 
 ####################################################
 # EASYNEWS
@@ -2470,7 +2482,8 @@ elif action.startswith('orion'):
 			from lib.modules import orionoid
 			settings = parameters.get('settings')
 			if settings and not '.' in settings: settings = tools.Converter.boolean(settings)
-			orionoid.Orionoid().initialize(settings = settings)
+			debrid = tools.Converter.boolean(parameters.get('debrid'))
+			orionoid.Orionoid().initialize(settings = settings, debrid = debrid)
 		except: pass
 
 	elif action == 'orionSettings':
@@ -2518,6 +2531,15 @@ elif action.startswith('orion'):
 			from lib.modules import orionoid
 			settings = tools.Converter.boolean(parameters.get('settings'))
 			orionoid.Orionoid().accountAuthenticate(settings = settings)
+		except: pass
+
+	elif action == 'orionDebrid':
+		try:
+			from lib.modules import orionoid
+			type = parameters.get('type')
+			help = tools.Converter.boolean(parameters.get('help'))
+			settings = tools.Converter.boolean(parameters.get('settings'))
+			orionoid.Orionoid().debridAuthenticate(type = type, help = help, settings = settings)
 		except: pass
 
 	elif action == 'orionAccount':

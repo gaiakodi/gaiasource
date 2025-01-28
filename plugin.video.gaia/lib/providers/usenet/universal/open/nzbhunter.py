@@ -37,6 +37,7 @@ class Provider(ProviderSpotHtml):
 			name					= 'NZBhunter',
 			description				= '{name} is a usenet indexer. The API contains many English titles, but is also a great source for other European languages. {name} has various bugs, incomplete metadata, missing {containers} and file sizes, and should therefore not be the first choice for a usenet indexer.',
 			rank					= 2,
+			status					= ProviderSpotHtml.StatusDead, # Update (2025-01): Redirects to a Plesk site.
 
 			link					= Provider._Link,
 		)

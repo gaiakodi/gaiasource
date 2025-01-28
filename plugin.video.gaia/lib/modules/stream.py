@@ -1116,6 +1116,8 @@ class Stream(Serializer):
 
 	AccessDebridPremiumize		= 'premiumize'
 	AccessDebridOffcloud		= 'offcloud'
+	AccessDebridTorbox			= 'torbox'
+	AccessDebridEasydebrid		= 'easydebrid'
 	AccessDebridRealdebrid		= 'realdebrid'
 	AccessDebridDebridlink		= 'debridlink'
 	AccessDebridAlldebrid		= 'alldebrid'
@@ -1132,16 +1134,21 @@ class Stream(Serializer):
 	OrderAccessDebrid = {
 		AccessDebridPremiumize		: { OrderInterface : 1,		OrderSorting : 1 },
 		AccessDebridOffcloud		: { OrderInterface : 2,		OrderSorting : 2 },
-		#AccessDebridRealdebrid		: { OrderInterface : 3,		OrderSorting : 3 },
-		AccessDebridDebridlink		: { OrderInterface : 4,		OrderSorting : 4 },
-		AccessDebridAlldebrid		: { OrderInterface : 5,		OrderSorting : 5 },
-		AccessDebridLinksnappy		: { OrderInterface : 6,		OrderSorting : 6 },
-		AccessDebridMegadebrid		: { OrderInterface : 7,		OrderSorting : 7 },
-		AccessDebridRapidpremium	: { OrderInterface : 8,		OrderSorting : 8 },
-		AccessDebridSimplydebrid	: { OrderInterface : 9,		OrderSorting : 9 },
-		AccessDebridSmoozed			: { OrderInterface : 10,	OrderSorting : 10 },
+		AccessDebridTorbox			: { OrderInterface : 3,		OrderSorting : 3 },
+		AccessDebridEasydebrid		: { OrderInterface : 4,		OrderSorting : 4 },
+		#AccessDebridRealdebrid		: { OrderInterface : 5,		OrderSorting : 5 },
+		#AccessDebridDebridlink		: { OrderInterface : 6,		OrderSorting : 6 },
+		#AccessDebridAlldebrid		: { OrderInterface : 7,		OrderSorting : 7 },
+		AccessDebridLinksnappy		: { OrderInterface : 8,		OrderSorting : 8 },
+		AccessDebridMegadebrid		: { OrderInterface : 9,		OrderSorting : 9 },
+		AccessDebridRapidpremium	: { OrderInterface : 10,	OrderSorting : 10 },
+		AccessDebridSimplydebrid	: { OrderInterface : 11,	OrderSorting : 11 },
+		AccessDebridSmoozed			: { OrderInterface : 12,	OrderSorting : 12 },
 
-		AccessDebridRealdebrid		: { OrderInterface : 11,	OrderSorting : 11 }, # Add last, since it does not support cache lookups anymore.
+		# Add last, since it does not support cache lookups anymore.
+		AccessDebridRealdebrid		: { OrderInterface : 21,	OrderSorting : 21 },
+		AccessDebridDebridlink		: { OrderInterface : 22,	OrderSorting : 22 },
+		AccessDebridAlldebrid		: { OrderInterface : 23,	OrderSorting : 23 },
 	}
 
 	LabelAccessDebrid = {
@@ -14709,6 +14716,8 @@ class Stream(Serializer):
 				'debrid' : {
 					Stream.AccessDebridPremiumize : None,
 					Stream.AccessDebridOffcloud : None,
+					Stream.AccessDebridTorbox : None,
+					Stream.AccessDebridEasydebrid : None,
 					Stream.AccessDebridRealdebrid : None,
 					Stream.AccessDebridDebridlink : None,
 					Stream.AccessDebridAlldebrid : None,
@@ -14725,6 +14734,16 @@ class Stream(Serializer):
 						'time' : None,
 					},
 					Stream.AccessDebridOffcloud : {
+						'exact' : None,
+						'inexact' : None,
+						'time' : None,
+					},
+					Stream.AccessDebridTorbox : {
+						'exact' : None,
+						'inexact' : None,
+						'time' : None,
+					},
+					Stream.AccessDebridEasydebrid : {
 						'exact' : None,
 						'inexact' : None,
 						'time' : None,
@@ -27869,6 +27888,24 @@ class Stream(Serializer):
 
 	'''
 		FUNCTION:
+			Checks if the access is available through TorBox.
+		RETURNS:
+			If it is debrid access (boolean).
+	'''
+	def accessDebridTorbox(self):
+		return self.mData['access']['debrid'][Stream.AccessDebridTorbox]
+
+	'''
+		FUNCTION:
+			Checks if the access is available through EasyDebrid.
+		RETURNS:
+			If it is debrid access (boolean).
+	'''
+	def accessDebridEasydebrid(self):
+		return self.mData['access']['debrid'][Stream.AccessDebridEasydebrid]
+
+	'''
+		FUNCTION:
 			Checks if the access is available through RealDebrid.
 		RETURNS:
 			If it is debrid access (boolean).
@@ -28186,6 +28223,28 @@ class Stream(Serializer):
 	'''
 	def accessCacheOffcloud(self, exact = ExactAuto):
 		return self.exact(exact = exact, data = self.mData['access']['cache'][Stream.AccessDebridOffcloud])
+
+	'''
+		FUNCTION:
+			Checks if the access is cached on TorBox.
+		PARAMETERS:
+			exact (enumeration): Wether or not the stauts is the latests or outdated.
+		RETURNS:
+			If it is cached access (boolean/None).
+	'''
+	def accessCacheTorbox(self, exact = ExactAuto):
+		return self.exact(exact = exact, data = self.mData['access']['cache'][Stream.AccessDebridTorbox])
+
+	'''
+		FUNCTION:
+			Checks if the access is cached on EasyDebrid.
+		PARAMETERS:
+			exact (enumeration): Wether or not the stauts is the latests or outdated.
+		RETURNS:
+			If it is cached access (boolean/None).
+	'''
+	def accessCacheEasydebrid(self, exact = ExactAuto):
+		return self.exact(exact = exact, data = self.mData['access']['cache'][Stream.AccessDebridEasydebrid])
 
 	'''
 		FUNCTION:

@@ -7068,6 +7068,21 @@ class MetaManager(object):
 	def content(self, media = None, niche = None, content = None, progress = None, page = None, limit = None, refresh = None, reload = None, internal = None, **parameters):
 		if not niche: niche = None # Can be [].
 
+		# Do not retrieve full pack data when loading show menus.
+		# This requires more and longer API calls to providers, and more local processing to generate the packs.
+		# For most of the shows in the menu, the user is not interested in them and it would be a waste to retrieve packs for them.
+		# Only if a season/episode is opened underneath a show, or other calls such as scraping or the context menu, will the full pack data be retrieved.
+		# That is: only retrieve/generate packs if they will actually be used.
+		# More info at MetaManager.metadata().
+		# Update: This was moved from MetaMenu._menuMedia() to here.
+		# Otherwise when the mixed Quick menu is opened, it has parameters = {'pack' : False}
+		# But when we call MetaManager.reload() after an episode was watched, this function is called with parameters = {}
+		# Hence, the _cache() call below is different, since the parameters are different.
+		# This makes the main Quick menu not refresh with the latests watched episode.
+		if (not media or Media.isMixed(media) or Media.isShow(media)) and not content == MetaManager.ContentProgress:
+			pack = parameters.get('pack')
+			if pack is None: parameters['pack'] = False
+
 		# Cache the Quick, Progress, and Arrivals menu to make them faster.
 		# This reduces menu loading time by +-50%, since the cached data already contains the detailed metadata, filtered and sorted.
 		# Only do this for certain menus, only for the first page, and not for niche menus, since each of these calls has to be manually refreshed from reload().

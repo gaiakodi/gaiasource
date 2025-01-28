@@ -1319,7 +1319,7 @@ class Player(xbmc.Player):
 
 	def keepPlaybackProgress(self, initialize = False, update = False, progress = 75):
 		title = interface.Translation.string(33451)
-		status = interface.Translation.string(33452)
+		status = interface.Translation.string(33460)
 		substatus1 = interface.Translation.string(35474)
 		substatus2 = interface.Translation.string(35303)
 		message = self.retryMessage

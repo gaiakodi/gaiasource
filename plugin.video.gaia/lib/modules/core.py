@@ -23,7 +23,7 @@ import sys
 import re
 
 from lib import debrid
-from lib.debrid.external import External, Orion, Alldebrid, Debridlink
+from lib.debrid.external import External, Orion, Torbox, Easydebrid, Alldebrid, Debridlink
 
 from lib.modules import trakt as traktx
 from lib.modules import network
@@ -2669,6 +2669,8 @@ class Core(object):
 			self.cacheEnabled = tools.Settings.getBoolean('scrape.cache.inspection')
 			self.cacheEnabledPremiumize = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.premiumize') == 1
 			self.cacheEnabledOffcloud = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.offcloud') == 1
+			self.cacheEnabledTorbox = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.torbox') == 1
+			self.cacheEnabledEasydebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.easydebrid') == 1
 			self.cacheEnabledRealdebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.realdebrid') == 1
 			self.cacheEnabledDebridlink = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debridlink') == 1
 			self.cacheEnabledAlldebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.alldebrid') == 1
@@ -2728,6 +2730,24 @@ class Core(object):
 							self.cacheObjects.append(offcloudCore)
 					else:
 						self.cacheEnabledOffcloud = False
+				if self.cacheEnabledTorbox:
+					if resolverTorrent and Torbox.authenticated():
+						self.cacheTypes.append(handler.Handler.TypeTorrent)
+						self.cacheObjects.append(Torbox)
+
+						self.cacheTypes.append(handler.Handler.TypeUsenet)
+						self.cacheObjects.append(Torbox)
+
+						self.cacheTypes.append(handler.Handler.TypeHoster)
+						self.cacheObjects.append(Torbox)
+					else:
+						self.cacheEnabledTorbox = False
+				if self.cacheEnabledEasydebrid:
+					if Easydebrid.authenticated():
+						self.cacheTypes.append(handler.Handler.TypeTorrent)
+						self.cacheObjects.append(Easydebrid)
+					else:
+						self.cacheEnabledEasydebrid = False
 				if self.cacheEnabledRealdebrid:
 					realdebridCore = debrid.realdebrid.Core()
 					if realdebridCore.accountValid() and realdebridCore.streamingTorrent():
@@ -3256,6 +3276,8 @@ class Core(object):
 				cacheTimeLabel = tools.Settings.customLabel(id = 'scrape.cache.inspection.time', value = tools.Settings.getCustom('scrape.cache.inspection.time'))
 			cacheEnabledPremiumize = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.premiumize')
 			cacheEnabledOffcloud = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.offcloud')
+			cacheEnabledTorbox = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.torbox')
+			cacheEnabledEasydebrid = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.easydebrid')
 			cacheEnabledRealdebrid = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.realdebrid')
 			cacheEnabledDebridlink = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debridlink')
 			cacheEnabledAlldebrid = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.alldebrid')
@@ -3464,6 +3486,8 @@ class Core(object):
 				{'label' : 'Time Limit', 'value' : cacheTimeLabel} if cacheEnabled else None,
 				{'label' : 'Premiumize Inspection', 'value' : orion if cacheEnabledPremiumize == 2 else native if cacheEnabledPremiumize == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'OffCloud Inspection', 'value' : orion if cacheEnabledOffcloud == 2 else native if cacheEnabledOffcloud == 1 else disabled} if cacheEnabled else None,
+				{'label' : 'TorBox Inspection', 'value' : orion if cacheEnabledTorbox == 2 else native if cacheEnabledTorbox == 1 else disabled} if cacheEnabled else None,
+				{'label' : 'EasyDebrid Inspection', 'value' : orion if cacheEnabledEasydebrid == 2 else native if cacheEnabledEasydebrid == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'RealDebrid Inspection', 'value' : orion if cacheEnabledRealdebrid == 2 else native if cacheEnabledRealdebrid == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'DebridLink Inspection', 'value' : orion if cacheEnabledDebridlink == 2 else native if cacheEnabledDebridlink == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'AllDebrid Inspection', 'value' : orion if cacheEnabledAlldebrid == 2 else native if cacheEnabledAlldebrid == 1 else disabled} if cacheEnabled else None,
@@ -4987,7 +5011,22 @@ class Core(object):
 							added = False
 							torrentOrUsenet = source['stream'].sourceTypeTorrent() or source['stream'].sourceTypeUsenet()
 							hash = source['stream'].hashContainer()
-							if torrentOrUsenet and modeHash and hash:
+							if debridId == Stream.AccessDebridTorbox:
+								# TorBox uses the MD5 of the usenet/hoster link, instead of a hash generated otherwise.
+								if source['stream'].sourceTypeTorrent():
+									if hash:
+										added = True
+										times.append(source['time'])
+										hashes.append(hash)
+										sources.append(source)
+								elif source['stream'].sourceTypeUsenet() or source['stream'].sourceTypeHoster():
+									link = source['stream'].linkPrimary()
+									if link:
+										added = True
+										times.append(source['time'])
+										hashes.append(link)
+										sources.append(source)
+							elif torrentOrUsenet and modeHash and hash:
 								added = True
 								times.append(source['time'])
 								hashes.append(hash)

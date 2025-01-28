@@ -2479,7 +2479,7 @@ msgid "No Metadata Found For This Title"
 msgstr ""
 
 msgctxt "#33460"
-msgid "[GAIA-NO-LABEL]"
+msgid "Initiating Stream Playback"
 msgstr ""
 
 msgctxt "#33461"
@@ -5027,7 +5027,7 @@ msgid "Specify a custom wrapper for executing system commands. This should be a 
 msgstr ""
 
 msgctxt "#34097"
-msgid "[GAIA-NO-LABEL]"
+msgid "Authenticate a TorBox account with an external resolver addon. Only cache lookups and basic streaming is available. Advanced features are not supported. Either the ResolveUrl or the UrlResolver addon must be installed and enabled."
 msgstr ""
 
 msgctxt "#34098"
@@ -5091,7 +5091,7 @@ msgid "Play sound effects at various places throughout the addon."
 msgstr ""
 
 msgctxt "#34113"
-msgid "[GAIA-NO-LABEL]"
+msgid "Inspect the TorBox cache to determine if files are instantly available. The [I]Native[/I] option looks up the cache from your local device, which is unrestricted, generally faster, and requires your debrid account to be authenticated with ResolveUrl or UrlResolver. The [I]Orion[/I] option uses Orion for lookups, which is subject to daily limits and requires your debrid account to be authenticated with Orion."
 msgstr ""
 
 msgctxt "#34114"
@@ -7218,6 +7218,17 @@ msgctxt "#34654"
 msgid "Create an automated observer that executes specific actions under certain conditions once playback has finished. This allows custom actions to be executed once a certain number of episodes have been watched, a certain amount of time has elapsed, or you have not interacted with Gaia for a while, probably because you fell asleep."
 msgstr ""
 
+msgctxt "#34655"
+msgid "Use a debrid account authenticated on Orion as an alternative to the native Gaia resolver, ResolveUrl and UrlResolver."
+msgstr ""
+
+msgctxt "#34656"
+msgid "Inspect the EasyDebrid cache to determine if files are instantly available. The [I]Native[/I] option looks up the cache from your local device, which is unrestricted and generally faster. The [I]Orion[/I] option uses Orion for lookups, which is subject to daily limits and requires your debrid account to be authenticated with Orion."
+msgstr ""
+
+msgctxt "#34657"
+msgid "Authenticate a EasyDebrid account with an external resolver addon. Only cache lookups and basic streaming is available. Advanced features are not supported."
+msgstr ""
 
 # [/GAIACODE]
 
@@ -9646,11 +9657,11 @@ msgid "Could Not Unwatch %s On Trakt"
 msgstr ""
 
 msgctxt "#35606"
-msgid "[GAIA-NO-LABEL]"
+msgid "TorBox"
 msgstr ""
 
 msgctxt "#35607"
-msgid "[GAIA-NO-LABEL]"
+msgid "TorBox Inspection"
 msgstr ""
 
 msgctxt "#35608"
@@ -10847,11 +10858,11 @@ msgid "Short Films And Series"
 msgstr ""
 
 msgctxt "#36024"
-msgid "[GAIA-NO-LABEL]"
+msgid "EasyDebrid"
 msgstr ""
 
 msgctxt "#36025"
-msgid "[GAIA-NO-LABEL]"
+msgid "EasyDebrid Inspection"
 msgstr ""
 
 msgctxt "#36026"
@@ -11719,7 +11730,7 @@ msgid "Please relaunch the provider settings for the authentication to take effe
 msgstr ""
 
 msgctxt "#36242"
-msgid "[GAIA-NO-LABEL]"
+msgid "Authenticate debrid accounts on Orion's website, which can be used for cache lookups and link resolving as alternatives to the native Gaia debrid functions or the external ResolveUrl and UrlResolver addons."
 msgstr ""
 
 msgctxt "#36243"
@@ -11963,7 +11974,7 @@ msgid "Search Language"
 msgstr ""
 
 msgctxt "#36305"
-msgid "[GAIA-NO-LABEL]"
+msgid "Orion Debrid"
 msgstr ""
 
 msgctxt "#36305"

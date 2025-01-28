@@ -54,7 +54,10 @@ class Provider(ProviderUsenetHtml):
 			name						= 'NZBKing',
 			description					= '{name} is a popular open usenet indexer. The site contains many English titles, but is also a great source for other European languages. {name} has a lot more results than most other open usenet indexers.',
 			rank						= 5,
-			performance					= ProviderUsenetHtml.PerformanceGood,
+
+			# Update (2025-01): main page loads, but search page returns an error "Page unavailable".
+			#performance				= ProviderUsenetHtml.PerformanceGood,
+			performance					= ProviderUsenetHtml.PerformanceMedium,
 
 			# Website is down since the start of Nov 2022, but admins said they have to take down the server "for a while", so might come back up.
 			# Mark only as Impaired. If offline for a few months, change the status to Dead.

@@ -1101,6 +1101,118 @@ The label is then added to the action element:
 						<dependency type="visible" setting="premium.orion.enabled">true</dependency>
 					</dependencies>
 				</setting>
+				<setting id="premium.orion.authentication.premiumize" type="string" label="33566" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=premiumize&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.offcloud" type="string" label="35200" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=offcloud&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.torbox" type="string" label="35606" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=torbox&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.easydebrid" type="string" label="36024" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=easydebrid&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.realdebrid" type="string" label="33567" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=realdebrid&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.debridlink" type="string" label="35263" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=debridlink&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="premium.orion.authentication.alldebrid" type="string" label="33568" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=alldebrid&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
 				<setting id="premium.orion.filters" type="string" label="35363" help="34230">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionFilters&settings=true)</data>
@@ -1604,6 +1716,46 @@ The label is then added to the action element:
 					</control>
 					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
 					<level>0</level>
+				</setting>
+
+				<!-- ########## PREMIUM - EXTERNAL - TORBOX ########## -->
+				<!-- Only supported by ResolveUrl, but not UrlResolver. -->
+				<setting id="premium.external.torbox.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://torbox.app</default>
+					<level>0</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+				</setting>
+				<setting id="premium.external.torbox" type="string" label="35606" help="34097">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=resolverAuthentication&type=torbox&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+				</setting>
+
+				<!-- ########## PREMIUM - EXTERNAL - EASYDEBRID ########## -->
+				<!-- Not supported by ResolveUrl or UrlResolver. -->
+				<setting id="premium.easydebrid.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://paradise-cloud.com</default>
+					<level>0</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+				</setting>
+				<setting id="premium.easydebrid.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="premium.easydebrid.authentication.label" type="string" label="36024" help="34657">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=easydebridAuthentication&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
 				</setting>
 
 				<!-- ########## PREMIUM - EXTERNAL - REALDEBRID ########## -->
@@ -2301,6 +2453,36 @@ The label is then added to the action element:
 					</dependencies>
 				</setting>
 				<setting id="scrape.cache.inspection.offcloud" type="integer" label="33960" help="34279" parent="scrape.cache.inspection">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35022">1</option>
+							<option label="35400">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.cache.inspection">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.cache.inspection.torbox" type="integer" label="35607" help="34113" parent="scrape.cache.inspection">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35022">1</option>
+							<option label="35400">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.cache.inspection">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.cache.inspection.easydebrid" type="integer" label="36025" help="34656" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>1</level>

@@ -13983,26 +13983,38 @@ class Resolver(object):
 					# Revert back to the original.
 					if fileOriginal: File.writeNow(path, fileOriginal)
 				else:
+					settingKey = None
 					settingUsername = None
 					settingPassword = None
 					for i in data[type]['authentication']['string']:
-						if 'username' in i: settingUsername = i
+						if 'apikey' in i: settingKey = i
+						elif 'username' in i: settingUsername = i
 						elif 'password' in i: settingPassword = i
 
 					if authenticate:
 						for key in data[type]['authentication']['bool']:
 							addon.setSetting(key, 'true')
-						username = Dialog.input(title = 33267, default = addon.getSetting(settingUsername))
-						if username:
-							password = Dialog.input(title = 32307, default = addon.getSetting(settingPassword))
-							if password:
-								addon.setSetting(settingUsername, username)
-								addon.setSetting(settingPassword, password)
+
+						if settingKey:
+							key = Dialog.input(title = 33100, default = addon.getSetting(settingKey))
+							if key:
+								addon.setSetting(settingKey, key)
+						else:
+							username = Dialog.input(title = 33267, default = addon.getSetting(settingUsername))
+							if username:
+								password = Dialog.input(title = 32307, default = addon.getSetting(settingPassword))
+								if password:
+									addon.setSetting(settingUsername, username)
+									addon.setSetting(settingPassword, password)
 					else:
 						for key in data[type]['authentication']['bool']:
 							addon.setSetting(key, 'false')
-						addon.setSetting(settingUsername, '')
-						addon.setSetting(settingPassword, '')
+
+						if settingKey:
+							addon.setSetting(settingKey, '')
+						else:
+							addon.setSetting(settingUsername, '')
+							addon.setSetting(settingPassword, '')
 			else:
 				Settings.launch(addon = resolver.Addon, category = 1, idOld = data[type]['offset'], wait = True)
 
@@ -14138,6 +14150,13 @@ class Resolver(object):
 					'string' : ['SmoozedResolver_username', 'SmoozedResolver_password'],
 				},
 				'offset' : 83,
+			},
+			'torbox' : {
+				'authentication' : {
+					'bool' : ['TorBoxResolver_enabled'],
+					'string' : ['TorBoxResolver_apikey'],
+				},
+				'offset' : 92,
 			},
 		}
 		try: data = Tools.update(data, self.Authentication)
@@ -16315,7 +16334,7 @@ class Promotions(object):
 			Dialog.notification(title = 35443, message = 35444, icon = Dialog.IconNativeInformation)
 		else:
 			# Use a specific order.
-			for i in ['orion', 'premiumize', 'offcloud', 'realdebrid']:
+			for i in ['orion', 'premiumize', 'offcloud', 'torbox', 'easydebrid', 'realdebrid', 'debridlink', 'alldebrid']:
 				try:
 					i = lower.index(i)
 					items.append(promotions[i])

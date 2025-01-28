@@ -23,6 +23,7 @@ try:
 	from lib.modules.interface import Translation, Directory, Format, Dialog, Loader
 	from lib.modules.network import Networker
 	from lib.modules.stream import Stream
+	from lib.modules.cache import Cache
 	from lib.modules.concurrency import Pool, Lock
 
 	if not System.id() == System.id(None):
@@ -48,6 +49,8 @@ try:
 
 		DebridPremiumize = Orion.DebridPremiumize
 		DebridOffcloud = Orion.DebridOffcloud
+		DebridTorbox = Orion.DebridTorbox
+		DebridEasydebrid = Orion.DebridEasydebrid
 		DebridRealdebrid = Orion.DebridRealdebrid
 		DebridAlldebrid = Orion.DebridAlldebrid
 		DebridDebridlink = Orion.DebridDebridlink
@@ -93,23 +96,26 @@ try:
 		# INITIALIZE
 		##############################################################################
 
-		def initialize(self, background = False, refresh = False, settings = False, external = False):
+		def initialize(self, background = False, refresh = False, settings = False, external = False, debrid = False):
 			if background:
 				# Kodi caches addon settings.
 				# If the Orion settings dialog is opened and a settings is cached (eg: enable/disable app-specific filters), the old cached settings are returned (eg: settingsFiltersGlobal).
 				# Launch a new process so that the newest settings can be retrieved after the Orion settings dialog was closed.
-				System.executePlugin(action = 'orionInitialize', parameters = {'settings' : settings})
+				System.executePlugin(action = 'orionInitialize', parameters = {'settings' : settings, 'debrid' : debrid})
 			else:
 				# Only (re-)enable the settings if not previously set (aka first launch).
 				# If the user manually disables Orion in the settings, it shoulds stay disabled, and not automatically re-enable on next launch.
 				if not Settings.getBoolean(Orionoid.SettingsEnabled) and Settings.getBoolean(Orionoid.SettingsAuthentication):
-					pass # User has manually disabled Orion.
+					# User has manually disabled Orion.
+					if not self.accountEnabled(): Settings.defaultData(Orionoid.SettingsAuthentication)
 				else:
 					valid = self.accountValid(external = external)
 					if not external: Settings.set(Orionoid.SettingsEnabled, valid)
 					if valid: Settings.setData(Orionoid.SettingsAuthentication, value = valid, label = Format.fontBold(self.accountLabel()))
 					else: Settings.defaultData(Orionoid.SettingsAuthentication)
 					Settings.set(Orionoid.SettingsFilters, Translation.string(33509 if self.mOrion.settingsFiltersGlobal() else 35233))
+
+				if debrid: self.debridSupport(cache = False, update = None)
 
 				if refresh: Directory.refresh() # When executed from the Tools menu, hide the entry if a an account was authenticated above.
 				if settings: self.settingsLocal(settings)
@@ -280,14 +286,15 @@ try:
 			# In that case, just pull in the Orion account, instead of showing the authentication dialog and requiring the user to authenticate again.
 			if self.accountAvailable():
 				Loader.show()
-				self.initialize(settings = Orionoid.SettingsAuthentication if settings is True else settings, background = background, external = True)
+				self.initialize(settings = Orionoid.SettingsAuthentication if settings is True else settings, background = background, external = True, debrid = True)
 				result = self.accountVerify()
 			else:
 				result = self.accountLogin()
 				Loader.show()
-				self.initialize(settings = Orionoid.SettingsAuthentication if settings is True else settings, background = background, external = True)
+				self.initialize(settings = Orionoid.SettingsAuthentication if settings is True else settings, background = background, external = True, debrid = True)
 
 			if not result: Settings.set(Orionoid.SettingsEnabled, False)
+
 			System.windowPropertyClear(Orionoid.PropertyAuthentication)
 			Loader.hide()
 			return result
@@ -813,6 +820,8 @@ try:
 				data['access']['direct'] = stream.accessTypeDirect()
 				data['access']['premiumize'] = stream.accessCachePremiumize(exact = Stream.ExactYes)
 				data['access']['offcloud'] = stream.accessCacheOffcloud(exact = Stream.ExactYes)
+				data['access']['torbox'] = stream.accessCacheTorbox(exact = Stream.ExactYes)
+				data['access']['easydebrid'] = stream.accessCacheEasydebrid(exact = Stream.ExactYes)
 				data['access']['realdebrid'] = stream.accessCacheRealdebrid(exact = Stream.ExactYes)
 				data['access']['alldebrid'] = stream.accessCacheAlldebrid(exact = Stream.ExactYes)
 
@@ -1189,25 +1198,94 @@ try:
 		# DEBRID
 		##############################################################################
 
-		def debridSupport(self, type = None, status = None):
+		def debridSupport(self, type = None, status = None, cache = True, update = None):
 			# Exclude RealDebrid status checking, since RealDebrid often says hosters are down (eg: NitroFlare, RuTube, etc), although they correctly resolve.
 			# UPDATE: Seems to be the same case with AllDebrid and dropapk.to/drop.download.
 			# Just retrieve all services and ignore the status.
 			# If a service is truely down, resolving will fail and the user will just have to select another debrid or link and try again.
 			#if status is None: status = '-realdebrid'
 
-			return self.mOrion.debridSupport(type = type, status = status, details = False)
+			# Do not cache for too long, in case the user authenticates a new account on Orion and the Gaia cache still has the old unauthenticated data.
+			# This function is called multiple times during scraping, so do not use cacheRefreshXXX().
+			#data =  self.mOrion.debridSupport(type = type, status = status, details = False)
+			# Check the account, otherwise Orion throws an "Invalid user API key" error when this function is called without an Orion account authenticated.
+			data = None
+			if self.accountEnabled(): data = Tools.executeFunction(Cache.instance(), 'cacheShort' if cache is True else 'cacheClear' if not cache else cache, self.mOrion.debridSupport, type = type, status = status, details = False)
+
+			if update is True or update is None:
+				def _debridSupport(services):
+					if update is True: Time.sleep(0.1)
+					label = Translation.string(33216)
+					setting = Orionoid.SettingsAuthentication + '.%s'
+					for service in services:
+						Settings.set(setting % service, label)
+					for service in self.mOrion.debridAvailable():
+						if not service in services:
+							Settings.default(setting % service)
+
+				services = data.keys() if data else []
+				if update is None: _debridSupport(services = services)
+				else: Pool.thread(target = _debridSupport, kwargs = {'services' : services}, start = True)
+
+			return data
+
+		def debridAuthenticate(self, type = None, help = False, settings = False, cache = None, update = True, loader = True):
+			if help:
+				if Dialog.option(title = 36305, message = 36242, labelConfirm = 33239, labelDeny = 33821):
+					Dialog.details(title = 36305, items = [
+						{'type' : 'text', 'value' : 'Authenticate debrid accounts on Orion\'s website which can be used for cache lookups and link resolving as alternatives to the native Gaia debrid functions or the external ResolveUrl and UrlResolver addons. ', 'break' : 2},
+						{'type' : 'text', 'value' : 'Debrid services can be utilized in Gaia in three different and alternative ways:', 'break' : 2},
+
+						{'type' : 'title', 'value' : '1. Native'},
+						{'type' : 'text', 'value' : 'Use the native debrid features built into Gaia. This is the best and fastest option, fully supporting all features in debrid APIs.'},
+						{'type' : 'list', 'number' : False, 'value' : [
+							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, RealDebrid'},
+							{'title' : 'Stream Types', 'value' : 'Full (Torrents, Usenet, Hosters)'},
+							{'title' : 'Cache Lookups', 'value' : 'Full (Native)'},
+							{'title' : 'File Selection', 'value' : 'Full (Native)'},
+							{'title' : 'Additional Features', 'value' : 'Full (Native)'},
+						]},
+
+						{'type' : 'title', 'value' : '2. Orion'},
+						{'type' : 'text', 'value' : 'Use the debrid features through the Orion API. This is the second-best option, supporting most features in the debrid APIs.'},
+						{'type' : 'list', 'number' : False, 'value' : [
+							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, EasyDebrid, RealDebrid, DebridLink, AllDebrid'},
+							{'title' : 'Stream Types', 'value' : 'Full (Torrents, Usenet, Hosters)'},
+							{'title' : 'Cache Lookups', 'value' : 'Full (External)'},
+							{'title' : 'File Selection', 'value' : 'Full (External)'},
+							{'title' : 'Additional Features', 'value' : 'None'},
+						]},
+
+						{'type' : 'title', 'value' : '3. External'},
+						{'type' : 'text', 'value' : 'Use debrid features through an external addon, such as ResolveUrl and UrlResolver. Use this if there is no native or Orion support for your debrid service. These addons have limited functionality.'},
+						{'type' : 'list', 'number' : False, 'value' : [
+							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, EasyDebrid, RealDebrid, DebridLink, AllDebrid, LinkSnappy, MegaDebrid, RapidPremium, SimplyDebrid, Smoozed'},
+							{'title' : 'Stream Types', 'value' : 'Limited (Torrents, Hosters)'},
+							{'title' : 'Cache Lookups', 'value' : 'Limited (Native)'},
+							{'title' : 'File Selection', 'value' : 'Limited (External)'},
+							{'title' : 'Additional Features', 'value' : 'None'},
+						]},
+					])
+
+			if loader: Loader.show()
+			self.debridSupport(cache = cache, update = update)
+			if loader: Loader.hide()
+
+			if settings: Settings.launch(id = Orionoid.SettingsAuthentication + (('.' + type) if type else ''))
 
 		def debridLookup(self, item, type = None):
 			return self.mOrion.debridLookup(item = item, type = type)
 
-		def debridResolve(self, link = None, type = None, container = None, containerData = None, containerName = None, containerType = None, containerSize = None, file = Orion.FileOriginal, output = Orion.OutputList, details = True):
+		def debridResolve(self, link = None, type = None, container = None, containerData = None, containerName = None, containerType = None, containerSize = None, file = Orion.FileOriginal, output = Orion.OutputList, ip = None, details = True):
 			# By default try to fully resolve the original file.
 			# Some debrid services, like AllDebrid and DebridLink, can return a unique Orion link with data to further resolve the link (especially hoster links).
 			# On AllDebrid, when accessing this Orion link, it will resolve hoster links and process them, which can take some time (AllDebrid has a "delayed" attribute).
 			# Kodi's player's cURL has a default timeout of 30 seconds, which might not be enough to handle this final AllDebrid resolving. then the player times out and fails to play.
 			# Instead, try to do this final resolving here already (while the playback loading window shows), in order to reduce the time needed when Kodi's cURL tries to establish the connection.
-			return self.mOrion.debridResolve(link = link, type = type, container = container, containerData = containerData, containerName = containerName, containerType = containerType, containerSize = containerSize, file = file, output = output, details = details)
+			return self.mOrion.debridResolve(link = link, type = type, container = container, containerData = containerData, containerName = containerName, containerType = containerType, containerSize = containerSize, file = file, output = output, ip = ip, details = details)
+
+		def debridStream(self, link = None, output = Orion.OutputData, ip = None, details = True):
+			return self.mOrion.debridStream(link = link, output = output, ip = ip, details = details)
 
 except ImportError:
 

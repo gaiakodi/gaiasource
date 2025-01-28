@@ -991,11 +991,12 @@ class MetaMenu(object):
 		# This requires more and longer API calls to providers, and more local processing to generate the packs.
 		# For most of the shows in the menu, the user is not interested in them and it would be a waste to retrieve packs for them.
 		# Only if a season/episode is opened underneath a show, or other calls such as scraping or the context menu, will the full pack data be retrieved.
-		# That is: only retireve/generate packs if they will actually be used.
+		# That is: only retrieve/generate packs if they will actually be used.
 		# More info at MetaManager.metadata().
-		if (Media.isShow(self._mediaSerie()) or self._mediaMixed()) and not content == MetaMenu.ContentProgress:
-			pack = parameters.get('pack')
-			if pack is None: parameters['pack'] = False
+		# Update: Moved to MetaManager.content() - more info there.
+		#if (Media.isShow(self._media()) or self._mediaMixed()) and not content == MetaMenu.ContentProgress:
+		#	pack = parameters.get('pack')
+		#	if pack is None: parameters['pack'] = False
 
 		busy = {'busy' : True}
 		self._notificationJob(busy = busy)
@@ -1154,6 +1155,8 @@ class MetaMenu(object):
 	def _menuMain(self):
 		provider = self._provider(content = MetaManager.ContentSearch) # Add provider for context menu options.
 		menu = [
+			#self._menuItem(label = 'XXX',	image = 'oracle',		action = MetaMenu.SearchOracle,		folder = False),#gaiaremove
+
 			self._menuItem(label = 35550,	image = 'quick',	menu = MetaMenu.MenuMedia,	content = MetaMenu.ContentQuick,														condition = self._settingsLevel(content = MetaMenu.ContentQuick)),
 			self._menuItem(label = 32037,	image = 'progress',	menu = MetaMenu.MenuMedia,	content = MetaMenu.ContentProgress,	progress = MetaMenu.ProgressDefault,				condition = self._settingsLevel(content = MetaMenu.ContentProgress)),
 			self._menuItem(label = 33490,	image = 'arrival',	menu = MetaMenu.MenuMedia,	content = MetaMenu.ContentArrival,														condition = self._settingsLevel(content = MetaMenu.ContentArrival)),

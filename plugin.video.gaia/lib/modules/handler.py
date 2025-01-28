@@ -207,26 +207,30 @@ class Handler(object):
 				'id' : 'gaia',
 				Handler.TypeAll : {3 : 'premiumize', 4 : 'offcloud', 5 : 'realdebrid'},
 				Handler.TypeTorrent : {2 : 'premiumize', 3 : 'offcloud', 4 : 'realdebrid'},
-				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud', 4 : 'realdebrid'},
+				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud'},
 				Handler.TypeHoster : {2 : 'premiumize', 3 : 'offcloud', 4 : 'realdebrid'},
 			},
 			4 : {
 				'id' : 'orion',
-				Handler.TypeAll : {3 : 'premiumize', 4 : 'offcloud', 5 : 'realdebrid', 6 : 'debridlink', 7 : 'alldebrid'},
-				Handler.TypeTorrent : {2 : 'premiumize', 3 : 'offcloud', 4 : 'realdebrid', 5 : 'debridlink', 6 : 'alldebrid'},
-				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud'},
-				Handler.TypeHoster : {2 : 'premiumize', 3 : 'offcloud', 4 : 'realdebrid', 5 : 'debridlink', 6 : 'alldebrid'},
+				Handler.TypeAll : {3 : 'premiumize', 4 : 'offcloud', 5 : 'torbox', 6 : 'easydebrid', 7 : 'realdebrid', 8 : 'debridlink', 9 : 'alldebrid'},
+				Handler.TypeTorrent : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'easydebrid', 6 : 'realdebrid', 7 : 'debridlink', 8 : 'alldebrid'},
+				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox'},
+				Handler.TypeHoster : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'realdebrid', 6 : 'debridlink', 7 : 'alldebrid'},
 			},
 		}
 
+		# Only has torrent support for TorBox.
+		# Does not have EasyDebrid support (yet).
 		resolveurl = {5 : {
 			'id' : 'resolveurl',
-			Handler.TypeAll : {3 : 'premiumize', 4 : 'realdebrid', 5 : 'debridlink', 6 : 'alldebrid', 7 : 'linksnappy', 8 : 'megadebrid', 9 : 'rapidpremium', 10 : 'simplydebrid', 11 : 'smoozed'},
-			Handler.TypeTorrent : {2 : 'premiumize', 3 : 'realdebrid', 4 : 'debridlink', 5 : 'alldebrid', 6 : 'linksnappy'},
+			Handler.TypeAll : {3 : 'premiumize', 4 : 'torbox', 5 : 'realdebrid', 6 : 'debridlink', 7 : 'alldebrid', 8 : 'linksnappy', 9 : 'megadebrid', 10 : 'rapidpremium', 11 : 'simplydebrid', 12 : 'smoozed'},
+			Handler.TypeTorrent : {2 : 'premiumize', 3 : 'torbox', 4 : 'realdebrid', 5 : 'debridlink', 6 : 'alldebrid', 7 : 'linksnappy'},
 			Handler.TypeUsenet : {},
 			Handler.TypeHoster : {2 : 'premiumize', 3 : 'realdebrid', 4 : 'debridlink', 5 : 'alldebrid', 6 : 'linksnappy', 7 : 'megadebrid', 8 : 'rapidpremium', 9 : 'simplydebrid', 10 : 'smoozed'},
 		}}
 
+		# Does not have TorBox support (yet).
+		# Does not have EasyDebrid support (yet).
 		urlresolver = {6 : {
 			'id' : 'urlresolver',
 			Handler.TypeAll : {3 : 'premiumize', 4 : 'realdebrid', 5 : 'debridlink', 6 : 'alldebrid', 7 : 'linksnappy', 8 : 'megadebrid', 9 : 'rapidpremium', 10 : 'simplydebrid', 11 : 'smoozed'},
@@ -893,7 +897,7 @@ class HandleDirect(Handle):
 class HandleResolver(Handle):
 
 	# Order of appearance in the selection dialog.
-	Debrids = ['premiumize', 'offcloud', 'realdebrid', 'debridlink', 'alldebrid', 'linksnappy', 'megadebrid', 'rapidpremium', 'simplydebrid', 'smoozed']
+	Debrids = ['premiumize', 'offcloud', 'torbox', 'realdebrid', 'debridlink', 'alldebrid', 'linksnappy', 'megadebrid', 'rapidpremium', 'simplydebrid', 'smoozed']
 
 	Support = {}
 	Services = {}
@@ -952,16 +956,22 @@ class HandleResolver(Handle):
 						try: hosts = i.get_hosts()
 						except:
 							try: hosts = i.get_all_hosters()
-							except: hosts = i.get_hosters()
-						if hosts and tools.Tools.isArray(hosts) and tools.Tools.isArray(hosts[0]): hosts = hosts[0]
-						if type is None:
-							result.append(i)
-						elif type == Handler.TypeTorrent:
-							if 'torrent' in hosts or 'magnet' in hosts: result.append(i)
-						elif type == Handler.TypeUsenet:
-							if 'usenet' in hosts or 'nzb' in hosts: result.append(i)
-						elif type == Handler.TypeHoster:
-							result.append(i)
+							except:
+								try: hosts = i.get_hosters()
+								except:
+									# TorBox supports hosters, but ResolveURL only supports torrents for TorBox.
+									try: hosts = i.hosts # Member variable.
+									except: hosts = None
+						if hosts:
+							if tools.Tools.isArray(hosts) and tools.Tools.isArray(hosts[0]): hosts = hosts[0]
+							if type is None:
+								result.append(i)
+							elif type == Handler.TypeTorrent:
+								if 'torrent' in hosts or 'magnet' in hosts: result.append(i)
+							elif type == Handler.TypeUsenet:
+								if 'usenet' in hosts or 'nzb' in hosts: result.append(i)
+							elif type == Handler.TypeHoster:
+								result.append(i)
 
 				# Sort resolvers to have the same order as Gaia.
 				sort = []
@@ -1445,6 +1455,24 @@ class HandleOrion(Handle):
 				interface.Dialog.notification(title = 35321, message = 35322, icon = interface.Dialog.IconInformation, duplicates = True)
 				return core.Core.addResult(error = 'Remote Downloading', notification = True)
 
+		# Some debrid services (eg: Premiumize) immediately return the streaming/download URLs for all files with the first request.
+		# Hence, the URL returned by the first API call can be directly passed to Kodi's player.
+		# Eg: https://1.energycdn.com/id/file.mkv
+		# Other services (eg: TorBox, AllDebrid, etc) require the selection of a file before a streaming/download URL is generated.
+		# Hence, the URL returned by the first API call is an Orion link that needs to be accessed to do the final resolving and then redirect to the streaming/download URL.
+		# Eg: https://orionoid.com/stream/someid
+		# The Orion link can be passed to Kodi's player and will will play correctly. Kodi will call the Orion link, which will do the resolving and then have a HTTP redirect to the URL on the debrid server.
+		# However, this might put an unnecessary burden on Orion. If playback fails and then reconnects, or if the playback progress is changed, Kodi will call the Orion link again before using the actual redirected URL.
+		# Instead, we do the final resolving here already, so that the link send to Kodi's player is the final streaming URL pointing to the debrid server.
+		if result and network.Networker.linkIs(result):
+			data = Orionoid().debridStream(link = result)
+			if data:
+				if 'error' in data:
+					interface.Dialog.notification(title = 35325, message = data['error'], icon = interface.Dialog.IconError, duplicates = True)
+					return core.Core.addResult(error = data['error'], notification = True)
+				elif 'link' in data:
+					result = data['link']
+
 		return core.Core.addResult(link = result, error = error)
 
 	def enabled(self, type):
@@ -1491,7 +1519,8 @@ class HandleOrion(Handle):
 			try:
 				# Do not cache for too long, in case the user authenticates a new account on Orion and the Gaia cache still has the old unauthenticated data.
 				# This function is called multiple times during scraping, so do not use cacheRefreshXXX().
-				data = cache.Cache.instance().cacheShort(Orionoid().debridSupport)
+				#data = cache.Cache.instance().cacheShort(Orionoid().debridSupport)
+				data = Orionoid().debridSupport()
 
 				# data can be {} if no services were debrid authenticated on Orion.
 				# Set the values in this case.
