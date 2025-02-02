@@ -2248,7 +2248,6 @@ class MetaManager(object):
 				# Load existing metadata from the cache.
 				# Over time more and more detailed metadata will be available for improved sorting.
 				items, stats = self._metadataSmartLoad(media = media, items = items, content = content, stats = True)
-
 				# Filter and sort using the more detailed metadata retrieved prior.
 				if filter or sort or order: items = self._process(media = media, items = items, filter = filter, sort = sort, order = order, page = False, limit = False)
 
@@ -2272,7 +2271,6 @@ class MetaManager(object):
 						# This makes the same items stuck in "new" for a very long time, always getting smart-loaded and then removed, instead of spending the time on smart-loading other titles.
 						# Instead of removing the titles older than 1 year, leave them in the list for another year (2 years total) so that they can be used to filter out old items from the "new" list.
 						# These "removed" items only have IDs, but all other metadata gets removed to save disk space.
-
 						delete = current - remove
 						remove1 = current - remove
 						remove2 = current - (4 * remove)
@@ -7627,6 +7625,7 @@ class MetaManager(object):
 		try:
 			timer = Time(start = True)
 			result = []
+			helper = {}
 
 			def _add(count, items, items2 = None):
 				counter = 0
@@ -7647,6 +7646,13 @@ class MetaManager(object):
 							result.append(item)
 							counter += 1
 							if counter >= count: break
+
+			# The same show can appear mutiple times with different episode numbers.
+			# Eg: the show is added from "itemsProgress" and from "itemsArrival" or in rare cases "itemsRandom".
+			# Filter out titles that are already in "result".
+			def _duplicate(items):
+				# serie=True: some items are shows, while others are episodes, and both should be treated as the same media.
+				return [i for i in items if not self.mTools.filterContains(items = result, item = i, serie = True, helper = helper)]
 
 			from lib.modules.playback import Playback
 			playback = Playback.instance()
@@ -7770,6 +7776,7 @@ class MetaManager(object):
 
 			# New arrivals.
 			if itemsArrival:
+				itemsArrival = _duplicate(itemsArrival)
 				items = Tools.listShuffle(itemsArrival[:20]) + itemsArrival[20:]
 				_add(countArrival, items, itemsArrival)
 
@@ -7779,11 +7786,13 @@ class MetaManager(object):
 				# Remove already watched items.
 				itemsRecommend = [i for i in itemsRecommend if not Tools.get(playback.history(media = media, imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), quick = True), 'count', 'total')]
 				if itemsRecommend:
+					itemsRecommend = _duplicate(itemsRecommend)
 					itemsRecommend = Tools.listShuffle(itemsRecommend)
 					_add(countRecommend, itemsRecommend)
 
 			# Random titles.
 			if itemsRandom:
+				itemsRandom = _duplicate(itemsRandom)
 				itemsRandom = Tools.listShuffle(itemsRandom)
 				_add(countRandom, itemsRandom)
 
@@ -7793,6 +7802,7 @@ class MetaManager(object):
 			if itemsRecommend: items += itemsRecommend
 			if itemsRandom: items += itemsRandom
 			if items:
+				items = _duplicate(items)
 				count = countTotal - len(result)
 				if count > 0: _add(count, items)
 
@@ -7871,6 +7881,8 @@ class MetaManager(object):
 						# Saves a lot of time and is not needed for the menu, is it?
 						# Previously MetaTools.submenuNumber() needed the pack to calculate the negative history number offset, but this is now only done once the episode is actually opened in the menu.
 						# Maybe there is some other function in MetaTools or elsewhere that requires the pack - keep your eyes open for things that do not work.
+						# Update (2025-01): We actually need the season/episode counts for MetaTools.itemPlayback() to show the correct watched/progress icons for Progress menus where episodes are listed as shows.
+						# But instead we use the summarized pack data added to the "smart" dictionary.
 						'pack'		: False,
 					})
 					return result

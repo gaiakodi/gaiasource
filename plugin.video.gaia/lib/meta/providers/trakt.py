@@ -2321,7 +2321,17 @@ class MetaTrakt(MetaProvider):
 									if value and not j in resultSeason: resultSeason[j] = Tools.copy(value)
 								if resultEpisode.get('episode') == 1:
 									value = resultEpisode.get('premiered') or resultEpisode.get('aired')
-									if value: resultSeason['premiered'] = resultSeason['aired'] = value
+									if value:
+										resultSeason['premiered'] = resultSeason['aired'] = value
+
+										# Important when retrieving new seasons beyond S01 (S02+) from release().
+										# Otherwise the show premiere (aka S01E01 premiere) is used for the season (copied by the above for-lop), instead of the date for the later season.
+										# Without this, S02+ releases in the Arrivals menu get quickly smart-removed, since the release date of S01 is very old.
+										value = resultEpisode.get('time')
+										if value:
+											if resultSeason.get('time'): resultSeason['time'].update(value)
+											else: resultSeason['time'] = Tools.copy(value)
+
 								self._tempSet(item = resultSeason)
 							break
 

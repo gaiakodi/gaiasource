@@ -5738,6 +5738,644 @@ The label is then added to the action element:
 
 		</category>
 
+		<!-- ########## LABEL ########## -->
+		<category id="label" label="35546" help="34665">
+
+			<!-- ########## LABEL - GENERAL ########## -->
+			<group id="label.general" label="32310">
+				<setting id="label.general.force" type="integer" label="33106" help="34408">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32301">1</option>
+							<option label="33800">2</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="label.general.style" type="integer" label="36676" help="34268">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33564">1</option>
+							<option label="33766">2</option>
+							<option label="33028">3</option>
+						</options>
+					</constraints>
+				</setting>
+				<setting id="label.general.style.future" type="boolean" label="35505" help="34666" parent="label.general.style">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible">
+							<or>
+								<condition setting="label.general.format">1</condition>
+								<condition setting="label.general.format">2</condition>
+							</or>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## LABEL - TITLE ########## -->
+			<group id="label.title" label="33881">
+				<setting id="label.title.layout" type="boolean" label="33107" help="34182">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="label.title.layout.movie" type="integer" label="33634" help="34160" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>33634</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33589">3</option>
+							<option label="33590">4</option>
+							<option label="33591">5</option>
+							<option label="33592">6</option>
+							<option label="33593">7</option>
+							<option label="33594">8</option>
+							<option label="33595">9</option>
+							<option label="33596">10</option>
+							<option label="33597">11</option>
+							<option label="33598">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.title.layout.show" type="integer" label="33635" help="34161" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>33635</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33589">3</option>
+							<option label="33590">4</option>
+							<option label="33591">5</option>
+							<option label="33592">6</option>
+							<option label="33593">7</option>
+							<option label="33594">8</option>
+							<option label="33595">9</option>
+							<option label="33596">10</option>
+							<option label="33597">11</option>
+							<option label="33598">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.title.layout.season" type="integer" label="33636" help="34162" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>33636</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33599">2</option>
+							<option label="33600">3</option>
+							<option label="33601">4</option>
+							<option label="33602">5</option>
+							<option label="33603">6</option>
+							<option label="33604">7</option>
+							<option label="33605">8</option>
+							<option label="33606">9</option>
+							<option label="33607">10</option>
+							<option label="33608">11</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.title.layout.episode" type="integer" label="33637" help="34163" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>33637</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33609">3</option>
+							<option label="33610">4</option>
+							<option label="33611">5</option>
+							<option label="33612">6</option>
+							<option label="33172">7</option>
+							<option label="33173">8</option>
+							<option label="33613">9</option>
+							<option label="33614">10</option>
+							<option label="33615">11</option>
+							<option label="33174">12</option>
+							<option label="33175">13</option>
+							<option label="33176">14</option>
+							<option label="33616">15</option>
+							<option label="33617">16</option>
+							<option label="33618">17</option>
+							<option label="33619">18</option>
+							<option label="33177">19</option>
+							<option label="33178">20</option>
+							<option label="33620">21</option>
+							<option label="33621">22</option>
+							<option label="33622">23</option>
+							<option label="33179">24</option>
+							<option label="33180">25</option>
+							<option label="33181">26</option>
+							<option label="33623">27</option>
+							<option label="33624">28</option>
+							<option label="33625">29</option>
+							<option label="33626">30</option>
+							<option label="33627">31</option>
+							<option label="33628">32</option>
+							<option label="33629">33</option>
+							<option label="33630">34</option>
+							<option label="33631">35</option>
+							<option label="33632">36</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## LABEL - DETAIL ########## -->
+			<group id="label.detail" label="33379">
+				<setting id="label.detail.enabled" type="boolean" label="32359" help="34319">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+				</setting>
+				<setting id="label.detail.placement" type="integer" label="32358" help="34320" parent="label.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32051">0</option>
+							<option label="32050">1</option>
+							<option label="32053">2</option>
+							<option label="32052">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.decoration" type="integer" label="32407" help="34410" parent="label.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35049">1</option>
+							<option label="35050">2</option>
+							<option label="35367">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.style" type="integer" label="32406" help="34409" parent="label.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35644">1</option>
+							<option label="36027">2</option>
+							<option label="36028">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.color" type="integer" label="32408" help="34541" parent="label.detail.enabled">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33112">0</option>
+							<option label="35486">1</option>
+							<option label="35487">2</option>
+							<option label="36052">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level" type="integer" label="32531" help="34542">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="36090">0</option>
+							<option label="36091">1</option>
+							<option label="36092">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level.quick" type="boolean" label="36016" help="34660" parent="label.detail.level">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level.progress" type="boolean" label="36017" help="34661" parent="label.detail.level">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level.arrival" type="boolean" label="36018" help="34662" parent="label.detail.level">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level.mixed" type="boolean" label="35538" help="34663" parent="label.detail.level">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.level.other" type="boolean" label="35540" help="34664" parent="label.detail.level">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.play" type="boolean" label="35021" help="34218">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.play.threshold" type="integer" label="35039" help="34539" parent="label.detail.play">
+					<control type="slider" format="integer">
+						<heading>35039</heading>
+						<popup>true</popup>
+					</control>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.play">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.progress" type="boolean" label="35040" help="34540">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.progress.format" type="integer" label="36094" help="34659" parent="label.detail.progress">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32306">0</option>
+							<option label="32060">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.progress">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.rating" type="boolean" label="35020" help="34215">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.rating.format" type="integer" label="36093" help="34658" parent="label.detail.rating">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32060">0</option>
+							<option label="32061">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.rating">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.air" type="boolean" label="35017" help="34213">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.air.zone" type="integer" label="35018" help="34214" parent="label.detail.air">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32314">0</option>
+							<option label="35022">1</option>
+							<option label="35023">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.air">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.air.format" type="integer" label="35019" help="34216" parent="label.detail.air">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="35029">0</option>
+							<option label="35028">1</option>
+							<option label="35030">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.air">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.air.format.day" type="integer" label="35031" help="34217" parent="label.detail.air">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35049">0</option>
+							<option label="35050">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.air">true</condition>
+								<condition setting="label.detail.air.format" operator="!is">0</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.air.format.time" type="integer" label="35048" help="34228" parent="label.detail.air">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="35049">0</option>
+							<option label="35050">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.air">true</condition>
+								<condition setting="label.detail.air.format" operator="!is">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## LABEL - STREAM ########## -->
+			<group id="label.stream" label="33481">
+				<setting id="label.stream.layout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.stream.layout.label" type="string" label="35430" help="34025">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLayout)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="label.stream.style" type="boolean" label="35567" help="34334">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="label.stream.style.color" type="boolean" label="35169" help="34255" parent="label.stream.style">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.style">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.style.bold" type="boolean" label="35398" help="34330" parent="label.stream.style">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.style">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.language" type="boolean" label="35034" help="34220">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+				</setting>
+				<setting id="label.stream.language.limit" type="integer" label="33296" help="34339" parent="label.stream.language">
+					<control type="slider" format="integer">
+						<heading>35034</heading>
+						<popup>true</popup>
+					</control>
+					<default>5</default>
+					<level>2</level>
+					<constraints>
+						<minimum>2</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.language">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.premiumize" type="boolean" label="33225" help="34338">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="enable">
+							<and>
+								<condition setting="premium.premiumize.enabled">true</condition>
+								<condition setting="premium.premiumize.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.premiumize.cost" type="integer" label="33205" help="34011" parent="label.stream.premiumize">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33226">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.premiumize">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="premium.premiumize.enabled">true</condition>
+								<condition setting="premium.premiumize.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.premiumize.usage" type="integer" label="35749" help="34122" parent="label.stream.premiumize">
+					<control type="spinner" format="string"/>
+					<default>4</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33868">1</option>
+							<option label="33207">2</option>
+							<option label="33871">3</option>
+							<option label="33867">4</option>
+							<option label="33208">5</option>
+							<option label="33870">6</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.premiumize">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="premium.premiumize.enabled">true</condition>
+								<condition setting="premium.premiumize.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.easynews" type="boolean" label="33866" help="34199">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>false</default>
+					<dependencies>
+						<dependency type="enable">
+							<and>
+								<condition setting="premium.easynews.enabled">true</condition>
+								<condition setting="premium.easynews.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.stream.easynews.usage" type="integer" label="35749" help="34136" parent="label.stream.easynews">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33868">1</option>
+							<option label="33871">2</option>
+							<option label="33867">3</option>
+							<option label="33870">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.stream.easynews">true</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="premium.easynews.enabled">true</condition>
+								<condition setting="premium.easynews.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+		</category>
+
 		<!-- ########## MENU ########## -->
 		<category id="menu" label="32319" help="33951">
 
@@ -6291,383 +6929,68 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## MENU - LABEL ########## -->
-			<group id="menu.label" label="35546">
-				<setting id="menu.label.force" type="integer" label="33106" help="34408">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="32301">1</option>
-							<option label="33800">2</option>
-						</options>
-					</constraints>
-				</setting>
-				<setting id="menu.label.layout" type="boolean" label="33107" help="34182">
+			<!-- ########## MENU - ICON ########## -->
+			<group id="menu.icon" label="35367">
+				<setting id="menu.icon.enabled" type="boolean" label="32323" help="34169">
 					<control type="toggle"/>
 					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="menu.label.layout.movie" type="integer" label="33634" help="34160" parent="menu.label.layout">
-					<control type="list" format="string">
-						<heading>33634</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.label.layout.show" type="integer" label="33635" help="34161" parent="menu.label.layout">
-					<control type="list" format="string">
-						<heading>33635</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33589">3</option>
-							<option label="33590">4</option>
-							<option label="33591">5</option>
-							<option label="33592">6</option>
-							<option label="33593">7</option>
-							<option label="33594">8</option>
-							<option label="33595">9</option>
-							<option label="33596">10</option>
-							<option label="33597">11</option>
-							<option label="33598">12</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.label.layout.season" type="integer" label="33636" help="34162" parent="menu.label.layout">
-					<control type="list" format="string">
-						<heading>33636</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33599">2</option>
-							<option label="33600">3</option>
-							<option label="33601">4</option>
-							<option label="33602">5</option>
-							<option label="33603">6</option>
-							<option label="33604">7</option>
-							<option label="33605">8</option>
-							<option label="33606">9</option>
-							<option label="33607">10</option>
-							<option label="33608">11</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.label.layout.episode" type="integer" label="33637" help="34163" parent="menu.label.layout">
-					<control type="list" format="string">
-						<heading>33637</heading>
-					</control>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33564">0</option>
-							<option label="35022">1</option>
-							<option label="33588">2</option>
-							<option label="33609">3</option>
-							<option label="33610">4</option>
-							<option label="33611">5</option>
-							<option label="33612">6</option>
-							<option label="33172">7</option>
-							<option label="33173">8</option>
-							<option label="33613">9</option>
-							<option label="33614">10</option>
-							<option label="33615">11</option>
-							<option label="33174">12</option>
-							<option label="33175">13</option>
-							<option label="33176">14</option>
-							<option label="33616">15</option>
-							<option label="33617">16</option>
-							<option label="33618">17</option>
-							<option label="33619">18</option>
-							<option label="33177">19</option>
-							<option label="33178">20</option>
-							<option label="33620">21</option>
-							<option label="33621">22</option>
-							<option label="33622">23</option>
-							<option label="33179">24</option>
-							<option label="33180">25</option>
-							<option label="33181">26</option>
-							<option label="33623">27</option>
-							<option label="33624">28</option>
-							<option label="33625">29</option>
-							<option label="33626">30</option>
-							<option label="33627">31</option>
-							<option label="33628">32</option>
-							<option label="33629">33</option>
-							<option label="33630">34</option>
-							<option label="33631">35</option>
-							<option label="33632">36</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.label.layout">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## MENU - DETAIL ########## -->
-			<group id="menu.detail" label="33379">
-				<setting id="menu.detail.enabled" type="boolean" label="32359" help="34319">
-					<control type="toggle"/>
-					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="menu.detail.level" type="integer" label="32531" help="34542" parent="menu.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="36090">0</option>
-							<option label="36091">1</option>
-							<option label="36092">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.placement" type="integer" label="32358" help="34320" parent="menu.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32051">0</option>
-							<option label="32050">1</option>
-							<option label="32053">2</option>
-							<option label="32052">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.decoration" type="integer" label="32407" help="34410" parent="menu.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35049">1</option>
-							<option label="35050">2</option>
-							<option label="35367">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.style" type="integer" label="32406" help="34409" parent="menu.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35644">1</option>
-							<option label="36027">2</option>
-							<option label="36028">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.color" type="integer" label="32408" help="34541" parent="menu.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35486">1</option>
-							<option label="35487">2</option>
-							<option label="36052">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.release" type="boolean" label="36676" help="34268">
+				<setting id="menu.icon.play" type="boolean" label="32327" help="34164" parent="menu.icon.enabled">
 					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.play" type="boolean" label="35021" help="34218">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.play.threshold" type="integer" label="35039" help="34539" parent="menu.detail.play">
-					<control type="slider" format="integer">
-						<heading>35039</heading>
-						<popup>true</popup>
-					</control>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<minimum>0</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="menu.detail.enabled">true</condition>
-								<condition setting="menu.detail.play">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.progress" type="boolean" label="35040" help="34540">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.rating" type="boolean" label="35020" help="34215">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.air" type="boolean" label="35017" help="34213">
-					<control type="toggle"/>
-					<level>1</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="visible" setting="menu.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.air.zone" type="integer" label="35018" help="34214" parent="menu.detail.air">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32314">0</option>
-							<option label="35022">1</option>
-							<option label="35023">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="menu.detail.enabled">true</condition>
-								<condition setting="menu.detail.air">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.air.format" type="integer" label="35019" help="34216" parent="menu.detail.air">
-					<control type="spinner" format="string"/>
-					<default>2</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="35029">0</option>
-							<option label="35028">1</option>
-							<option label="35030">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="menu.detail.enabled">true</condition>
-								<condition setting="menu.detail.air">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="menu.detail.air.format.day" type="integer" label="35031" help="34217" parent="menu.detail.air">
-					<control type="spinner" format="string"/>
-					<default>1</default>
 					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35049">0</option>
-							<option label="35050">1</option>
-						</options>
-					</constraints>
+					<default>true</default>
 					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="menu.detail.enabled">true</condition>
-								<condition setting="menu.detail.air">true</condition>
-								<condition setting="menu.detail.air.format" operator="!is">0</condition>
-							</and>
-						</dependency>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="menu.detail.air.format.time" type="integer" label="35048" help="34228" parent="menu.detail.air">
-					<control type="spinner" format="string"/>
-					<default>1</default>
+				<setting id="menu.icon.progress" type="boolean" label="32328" help="34165" parent="menu.icon.enabled">
+					<control type="toggle"/>
 					<level>3</level>
-					<constraints>
-						<options>
-							<option label="35049">0</option>
-							<option label="35050">1</option>
-						</options>
-					</constraints>
+					<default>true</default>
 					<dependencies>
-						<dependency type="visible">
-							<and>
-								<condition setting="menu.detail.enabled">true</condition>
-								<condition setting="menu.detail.air">true</condition>
-								<condition setting="menu.detail.air.format" operator="!is">1</condition>
-							</and>
-						</dependency>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.icon.rating" type="boolean" label="33405" help="34576" parent="menu.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.icon.count" type="boolean" label="33005" help="34269" parent="menu.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
+						<dependency type="enable" setting="menu.show.count">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.icon.duration" type="boolean" label="33009" help="34286" parent="menu.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.icon.date" type="boolean" label="33194" help="34361" parent="menu.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.icon.studio" type="boolean" label="33360" help="34571" parent="menu.icon.enabled">
+					<control type="toggle"/>
+					<level>3</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -7067,7 +7390,7 @@ The label is then added to the action element:
 						<dependency type="visible" setting="interface.dialog.interface">0</dependency>
 					</dependencies>
 				</setting>
-				<setting id="interface.dialog.interface.label" type="integer" label="36480" help="34645" parent="interface.dialog.interface">
+				<setting id="interface.dialog.label.stream" type="integer" label="36480" help="34645" parent="interface.dialog.interface">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>3</level>
@@ -7340,224 +7663,6 @@ The label is then added to the action element:
 				</setting>
 			</group>
 
-			<!-- ########## INTERFACE - LABEL ########## -->
-			<group id="interface.label" label="35546">
-				<setting id="interface.label.layout" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
-				<setting id="interface.label.layout.label" type="string" label="35055" help="34025">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLayout)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>1</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="interface.label.language" type="boolean" label="35034" help="34220">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="interface.label.language.limit" type="integer" label="33296" help="34339" parent="interface.label.language">
-					<control type="slider" format="integer">
-						<heading>35034</heading>
-						<popup>true</popup>
-					</control>
-					<default>5</default>
-					<level>2</level>
-					<constraints>
-						<minimum>2</minimum>
-						<step>1</step>
-						<maximum>10</maximum>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.language">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.style" type="boolean" label="35567" help="34334">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="interface.label.style.color" type="boolean" label="35169" help="34255" parent="interface.label.style">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.style">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.style.bold" type="boolean" label="35398" help="34330" parent="interface.label.style">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.style">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.premiumize" type="boolean" label="33225" help="34338">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="enable">
-							<and>
-								<condition setting="premium.premiumize.enabled">true</condition>
-								<condition setting="premium.premiumize.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.premiumize.cost" type="integer" label="33205" help="34011" parent="interface.label.premiumize">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33226">1</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.premiumize">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="premium.premiumize.enabled">true</condition>
-								<condition setting="premium.premiumize.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.premiumize.usage" type="integer" label="35749" help="34122" parent="interface.label.premiumize">
-					<control type="spinner" format="string"/>
-					<default>4</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33868">1</option>
-							<option label="33207">2</option>
-							<option label="33871">3</option>
-							<option label="33867">4</option>
-							<option label="33208">5</option>
-							<option label="33870">6</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.premiumize">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="premium.premiumize.enabled">true</condition>
-								<condition setting="premium.premiumize.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.easynews" type="boolean" label="33866" help="34199">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
-					<dependencies>
-						<dependency type="enable">
-							<and>
-								<condition setting="premium.easynews.enabled">true</condition>
-								<condition setting="premium.easynews.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.label.easynews.usage" type="integer" label="35749" help="34136" parent="interface.label.easynews">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32302">0</option>
-							<option label="33868">1</option>
-							<option label="33871">2</option>
-							<option label="33867">3</option>
-							<option label="33870">4</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="interface.label.easynews">true</dependency>
-						<dependency type="enable">
-							<and>
-								<condition setting="premium.easynews.enabled">true</condition>
-								<condition setting="premium.easynews.authentication">true</condition>
-							</and>
-						</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
-			<!-- ########## MENU - ICON ########## -->
-			<group id="interface.icon" label="35367">
-				<setting id="interface.icon.enabled" type="boolean" label="32323" help="34169">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-				</setting>
-				<setting id="interface.icon.play" type="boolean" label="32327" help="34164" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.progress" type="boolean" label="32328" help="34165" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.rating" type="boolean" label="33405" help="34576" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.count" type="boolean" label="33005" help="34269" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-						<dependency type="enable" setting="menu.show.count">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.duration" type="boolean" label="33009" help="34286" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.date" type="boolean" label="33194" help="34361" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="interface.icon.studio" type="boolean" label="33360" help="34571" parent="interface.icon.enabled">
-					<control type="toggle"/>
-					<level>3</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="interface.icon.enabled">true</dependency>
-					</dependencies>
-				</setting>
-			</group>
-
 		</category>
 
 
@@ -7692,6 +7797,20 @@ The label is then added to the action element:
 						<close>true</close>
 					</control>
 					<default>[COLOR FF777777]FF777777[/COLOR]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="theme.color.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="theme.color.disabled" type="string" label="32302" help="34300" parent="theme.color.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=theme.color.disabled&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[COLOR FF888888]FF888888[/COLOR]</default>
 					<level>2</level>
 					<constraints>
 						<allowempty>true</allowempty>
@@ -7840,7 +7959,7 @@ The label is then added to the action element:
 						<dependency type="visible" setting="theme.color.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="theme.color.transparent" type="integer" label="36451" help="34641" parent="oracle.chatgpt.model">
+				<setting id="theme.color.transparent" type="integer" label="36451" help="34641">
 					<control type="slider" format="percentage">
 						<heading>36451</heading>
 						<popup>true</popup>

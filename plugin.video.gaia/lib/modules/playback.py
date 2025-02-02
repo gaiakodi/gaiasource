@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Settings, Time, Hash, Media, System, File, Tools, Logger, Converter, Regex, Sound, Binge, Math
+from lib.modules.tools import Settings, Time, Hash, Media, System, File, Tools, Title, Logger, Converter, Regex, Sound, Binge, Math
 from lib.modules.interface import Translation, Format, Loader, Dialog, Directory
 from lib.modules.database import Database
 from lib.modules.concurrency import Pool, Lock
@@ -594,6 +594,16 @@ class Playback(Database):
 						if 'episode' in packed: packed = packed.get('episode')
 						countOfficial = packed.get(MetaPack.NumberOfficial)
 						countSpecial = packed.get(MetaPack.NumberSpecial)
+					else:
+						# For Progress menu where only summarized smart pack data is available for episodes.
+						packed = metadata.get('smart').get('pack')
+						if packed:
+							packed = packed.get('count')
+							if packed:
+								packed = packed.get(MetaPack.NumberOfficial)
+								if packed:
+									countOfficial = packed.get(MetaPack.ValueEpisode)
+									countSpecial = packed.get(MetaPack.ValueSpecial)
 
 			if plays or countOfficial:
 				if not plays: plays = {}
@@ -678,6 +688,10 @@ class Playback(Database):
 		time = None
 		selection = None
 		ranged = None
+
+		media, season, episode = self.dialogHierarchy(title = title, message = 33397, media = media, season = season, episode = episode, loader = True)
+		if media is False: return result
+
 		specials = Playback.SpecialsNone
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
@@ -782,6 +796,10 @@ class Playback(Database):
 		alternative = None
 		title = 35485
 		selection = True
+
+		media, season, episode = self.dialogHierarchy(title = title, message = 33398, media = media, season = season, episode = episode, loader = True)
+		if media is False: return result
+
 		hierarchy = (media == Media.Show or media == Media.Season) and episode is None
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
@@ -847,6 +865,10 @@ class Playback(Database):
 
 		result = {}
 		title = 35041
+
+		media, season, episode = self.dialogHierarchy(title = title, message = 33399, media = media, season = season, episode = episode, loader = loader)
+		if media is False: return None
+
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
 
@@ -890,7 +912,13 @@ class Playback(Database):
 			Sound.executeRatingFinish()
 		else:
 			from lib.modules.window import WindowRating
-			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = loader, refresh = not binge), wait = True)
+
+			# Execute in a thread during binging.
+			# Otherwise submitting the rating to Trakt holds up the process before going to the next-episode binge dialog.
+			if binge: callback = lambda input : Pool.thread(target = _dialogRate, kwargs = {'rating' : input, 'current' : rating, 'result' : result, 'loader' : loader, 'refresh' : not binge}, start = True)
+			else: callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = loader, refresh = not binge)
+
+			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = callback, wait = True)
 			if rating:
 				if 'timeout' in rating and rating['timeout'] and 'interacted' in rating and not rating['interacted']: autoclosed = True
 				elif 'action' in rating and rating['action'] == WindowRating.ActionPower: return False
@@ -906,8 +934,13 @@ class Playback(Database):
 
 	def dialogUnrate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, internal = None, external = None, refresh = True):
 		Loader.show()
+
 		result = None
 		title = 35041
+
+		media, season, episode = self.dialogHierarchy(title = title, message = 33399, media = media, season = season, episode = episode, loader = True)
+		if media is False: return result
+
 		label = self.label(media = media)
 		alternative = not external is False and internal is False
 		Sound.executeRatingStart()
@@ -1100,6 +1133,26 @@ class Playback(Database):
 			else:
 				result['action'] = choice['action']
 			return result
+
+	def dialogHierarchy(self, title, message, media, season = None, episode = None, loader = True):
+		# If an episode from the Progress menu is marked as watched, the media is "show", but there is also a season/episode number.
+		# Ask the user if a single episode, a season, or the full show should be marked as watched.
+		if not episode is None and media and not media == Media.Episode:
+			message = Translation.string(message) % (Title.numberUniversal(media = Media.Episode, season = season, episode = episode), Title.numberUniversal(media = Media.Season, season = season))
+			choice = Dialog.options(title = title, message = message, labelConfirm = 33028, labelDeny = 32055, labelCustom = 35498)
+			if choice == Dialog.ChoiceCanceled:
+				if loader: Loader.hide()
+				return False, False, False
+			elif choice == Dialog.ChoiceYes:
+				media = Media.Episode
+			elif choice == Dialog.ChoiceNo:
+				media = Media.Season
+				episode = None
+			elif choice == Dialog.ChoiceCustom:
+				media = Media.Show
+				season = None
+				episode = None
+		return media, season, episode
 
 	##############################################################################
 	# COMBINED
@@ -2501,7 +2554,7 @@ class Playback(Database):
 
 							# Items coming from the internal database have a timestmap for ['time']['watched'] even if the item was not fully watched, but just started the playback progress.
 							# Only replace a higher-numbered episode with a lower-numbered episode if it has a higher play count, even if its watched time is earlier.
-							elif not externalOther or countCurrent > countOther:
+							elif not externalOther or ((countCurrent or 0) > (countOther or 0)):
 
 								# Replace if the watched time is later.
 								if timeCurrent > timeOther: replace = True

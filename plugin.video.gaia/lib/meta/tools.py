@@ -61,6 +61,11 @@ class MetaTools(object):
 	ContentRegular				= 2
 	ContentFrequent				= 3
 
+	ContentSearch				= 'search'		# Internal. Must be the same as the MetaMenu enum.
+	ContentQuick				= 'quick'		# Internal. Must be the same as the MetaMenu enum.
+	ContentProgress				= 'progress'	# Internal. Must be the same as the MetaMenu enum.
+	ContentArrival				= 'arrival'		# Internal. Must be the same as the MetaMenu enum.
+
 	StreamVideo					= 'video'
 	StreamAudio					= 'audio'
 	StreamSubtitle				= 'subtitle'
@@ -685,38 +690,51 @@ class MetaTools(object):
 
 		self.mShowDiscrepancy = Settings.getInteger('menu.show.discrepancy')
 
-		self.mLabelForce = Settings.getInteger('menu.label.force')
-		if self.mLabelForce == 2: self.mLabelForce = not Skin.supportLabelCustom(default = True)
+		self.mLabelStyle = Settings.getInteger('label.general.style')
+		self.mLabelStyleRelease = self.mLabelStyle == 1 or self.mLabelStyle == 2
+		self.mLabelStyleEpisode = self.mLabelStyle == 1 or self.mLabelStyle == 3
+		self.mLabelStyleFuture = Format.colorDisabled() if Settings.getBoolean('label.general.style.future') else None
+
+		self.mLabelForce = Settings.getInteger('label.general.force')
+		if self.mLabelForce == 2: self.mLabelForce = not Skin.supportLabelCustom() # Do not use Skin.supportLabelCustom(default = True), since essentially all skins use the title instead of the label.
 		else: self.mLabelForce = bool(self.mLabelForce)
 
-		self.mLabelDetailEnabled = Settings.getBoolean('menu.detail.enabled')
-		self.mLabelDetailLevel = Settings.getInteger('menu.detail.level')
-		self.mLabelDetailPlacement = Settings.getInteger('menu.detail.placement')
-		self.mLabelDetailDecoration = Settings.getInteger('menu.detail.decoration')
-		self.mLabelDetailStyle = Settings.getInteger('menu.detail.style')
-		self.mLabelDetailColor = Settings.getInteger('menu.detail.color')
+		self.mLabelDetailEnabled = Settings.getBoolean('label.detail.enabled')
+		self.mLabelDetailPlacement = Settings.getInteger('label.detail.placement')
+		self.mLabelDetailDecoration = Settings.getInteger('label.detail.decoration')
+		self.mLabelDetailStyle = Settings.getInteger('label.detail.style')
+		self.mLabelDetailColor = Settings.getInteger('label.detail.color')
 
-		self.mLabelPlayEnabled = Settings.getBoolean('menu.detail.play')
-		self.mLabelPlayThreshold = Settings.getInteger('menu.detail.play.threshold')
+		self.mLabelDetailLevel = Settings.getInteger('label.detail.level')
+		self.mLabelDetailQuick = Settings.getBoolean('label.detail.level.quick')
+		self.mLabelDetailProgress = Settings.getBoolean('label.detail.level.progress')
+		self.mLabelDetailArrival = Settings.getBoolean('label.detail.level.arrival')
+		self.mLabelDetailMixed = Settings.getBoolean('label.detail.level.mixed')
+		self.mLabelDetailOther = Settings.getBoolean('label.detail.level.other')
 
-		self.mLabelReleaseEnabled = Settings.getBoolean('menu.detail.release')
-		self.mLabelProgressEnabled = Settings.getBoolean('menu.detail.progress')
-		self.mLabelRatingEnabled = Settings.getBoolean('menu.detail.rating')
+		self.mLabelPlayEnabled = Settings.getBoolean('label.detail.play')
+		self.mLabelPlayThreshold = Settings.getInteger('label.detail.play.threshold')
 
-		self.mLabelAirEnabled = Settings.getBoolean('menu.detail.air')
-		self.mLabelAirZone = Settings.getInteger('menu.detail.air.zone') if self.mLabelAirEnabled else None
-		self.mLabelAirFormat = Settings.getInteger('menu.detail.air.format') if self.mLabelAirEnabled else None
-		self.mLabelAirFormatDay = Settings.getInteger('menu.detail.air.format.day') if self.mLabelAirEnabled else None
-		self.mLabelAirFormatTime = Settings.getInteger('menu.detail.air.format.time') if self.mLabelAirEnabled else None
+		self.mLabelProgressEnabled = Settings.getBoolean('label.detail.progress')
+		self.mLabelProgressFormat = Settings.getInteger('label.detail.progress.format')
 
-		self.mIconEnabled = Settings.getBoolean('interface.icon.enabled')
-		self.mIconPlay = self.mIconEnabled and Settings.getBoolean('interface.icon.play')
-		self.mIconProgress = self.mIconEnabled and Settings.getBoolean('interface.icon.progress')
-		self.mIconRating = self.mIconEnabled and Settings.getBoolean('interface.icon.rating')
-		self.mIconCount = self.mIconEnabled and self.mShowCountEnabled and Settings.getBoolean('interface.icon.count')
-		self.mIconDuration = self.mIconEnabled and Settings.getBoolean('interface.icon.duration')
-		self.mIconDate = self.mIconEnabled and Settings.getBoolean('interface.icon.date')
-		self.mIconStudio = self.mIconEnabled and Settings.getBoolean('interface.icon.studio')
+		self.mLabelRatingEnabled = Settings.getBoolean('label.detail.rating')
+		self.mLabelRatingFormat = Settings.getInteger('label.detail.rating.format')
+
+		self.mLabelAirEnabled = Settings.getBoolean('label.detail.air')
+		self.mLabelAirZone = Settings.getInteger('label.detail.air.zone') if self.mLabelAirEnabled else None
+		self.mLabelAirFormat = Settings.getInteger('label.detail.air.format') if self.mLabelAirEnabled else None
+		self.mLabelAirFormatDay = Settings.getInteger('label.detail.air.format.day') if self.mLabelAirEnabled else None
+		self.mLabelAirFormatTime = Settings.getInteger('label.detail.air.format.time') if self.mLabelAirEnabled else None
+
+		self.mIconEnabled = Settings.getBoolean('menu.icon.enabled')
+		self.mIconPlay = self.mIconEnabled and Settings.getBoolean('menu.icon.play')
+		self.mIconProgress = self.mIconEnabled and Settings.getBoolean('menu.icon.progress')
+		self.mIconRating = self.mIconEnabled and Settings.getBoolean('menu.icon.rating')
+		self.mIconCount = self.mIconEnabled and self.mShowCountEnabled and Settings.getBoolean('menu.icon.count')
+		self.mIconDuration = self.mIconEnabled and Settings.getBoolean('menu.icon.duration')
+		self.mIconDate = self.mIconEnabled and Settings.getBoolean('menu.icon.date')
+		self.mIconStudio = self.mIconEnabled and Settings.getBoolean('menu.icon.studio')
 
 		self.mIconExclude = []
 		if not self.mIconPlay: self.mIconExclude.append('playcount')
@@ -1033,7 +1051,7 @@ class MetaTools(object):
 	# MEDIA
 	###################################################################
 
-	def media(self, metadata, media = None):
+	def media(self, metadata, media = None, mixed = False):
 		try:
 			if media: return media # Avoid length code below.
 			elif not metadata and not media: return Media.Unknown
@@ -1041,14 +1059,18 @@ class MetaTools(object):
 			if Tools.isArray(metadata): metadata = metadata[0]
 
 			if not media: media = metadata.get('media') or metadata.get('temp', {}).get('media')
-			if media: return media # Avoid length code below.
+			if media:
+				if mixed and Media.isSerie(media): return Media.Show
+				else: return media # Avoid length code below.
 
 			if metadata.get('tvshowtitle') or not metadata.get('season') is None or not metadata.get('episode') is None:
-				if not metadata.get('episode') is None: return Media.Episode
+				if mixed: return Media.Show
+				elif not metadata.get('episode') is None: return Media.Episode
 				elif not metadata.get('season') is None: return Media.Season
 				else: return Media.Show
 			elif metadata.get('title') and (metadata.get('mpaa') or '').lower().startswith('tv'):
-				if not metadata.get('episode') is None: return Media.Episode
+				if mixed: return Media.Show
+				elif not metadata.get('episode') is None: return Media.Episode
 				elif not metadata.get('season') is None: return Media.Season
 				else: return Media.Show
 			elif metadata.get('title') and metadata.get('part') and not Media.isMovie(media):
@@ -16012,6 +16034,7 @@ class MetaTools(object):
 			else: extend = MetaTools.ExtendFull
 		basic = multiple or extend == MetaTools.ExtendNone
 
+		pack = None
 		prefix = None
 		suffix = None
 		label = None
@@ -16075,10 +16098,11 @@ class MetaTools(object):
 			label = title
 
 		if extend and not special: # Do not do this for the Series/Absolute menus.
-			if (extend == MetaTools.ExtendFull or extend == MetaTools.ExtendBasic) and self.mLabelReleaseEnabled:
+			if (extend == MetaTools.ExtendFull or extend == MetaTools.ExtendBasic) and self.mLabelStyle:
 				fontBold = False
 				fontItalic = False
 				fontLight = False
+				fontColor = None
 
 				current = Time.timestamp()
 				plays = metadata.get('playcount') or 0
@@ -16086,7 +16110,7 @@ class MetaTools(object):
 				age = current - time
 
 				# Mark "important" titles, namely unwatched titles that were recently released and have at certain rating and number of votes.
-				if not plays and (media == Media.Movie and age > -MetaTools.TimeNewMovie) or (media == Media.Show and age > -MetaTools.TimeNewShow): # Allow releases slightly into the future, especially for shows (early episode leaks or timezone differences).
+				if self.mLabelStyleRelease and not plays and ((media == Media.Movie and age > -MetaTools.TimeNewMovie) or (media == Media.Show and age > -MetaTools.TimeNewShow)): # Allow releases slightly into the future, especially for shows (early episode leaks or timezone differences).
 					important = False
 					progress = metadata.get('progress') or 0
 					played = current - (self.time(type = MetaTools.TimePaused, metadata = metadata, estimate = False, fallback = False) or 0)
@@ -16140,7 +16164,7 @@ class MetaTools(object):
 
 					# Mark "unofficial" seasons/episodes as light (typically seasons/episodes that are on TVDb or IMDb, but not on Trakt).
 					# Eg: Dragon Ball Super S02+.
-					if pack and (media == Media.Season or media == Media.Episode) and not submenu:
+					if self.mLabelStyleEpisode and pack and (media == Media.Season or media == Media.Episode) and not submenu:
 						if not season is None:
 							# Do not directly retrieve the type, since it can point to a sequential episode number.
 							# Eg: Star Wars: Young Jedi Adventures S01E26-S01E50.
@@ -16154,16 +16178,20 @@ class MetaTools(object):
 							elif media == Media.Episode: fontItalic = True # Eg: Downtonw Abbey S02E09 (IMDb).
 
 					# Do not decorate if it is from Releases (New Shows / New Seasons / New Episodes), since these are obviously all new.
-					if decorate and not future is None and not future is True:
-						if future > 0 and future <= MetaTools.TimeNewShow: fontItalic = True
-						if future >= MetaTools.TimeFuture and metadata.get('time'): fontLight = True # Not if a season does not have a release date.
+					if self.mLabelStyleRelease and decorate and not future is None and not future is True:
+						if future > 0 and future <= MetaTools.TimeNewShow:
+							fontItalic = True
+							fontColor = self.mLabelStyleFuture
+						if future >= MetaTools.TimeFuture and metadata.get('time'):
+							fontLight = True # Not if a season does not have a release date.
+							fontColor = self.mLabelStyleFuture
 
-					if decorate and media == Media.Episode and season == 0:
+					if self.mLabelStyleEpisode and decorate and media == Media.Episode and season == 0:
 						if not 'special' in metadata or not metadata['special'] or not 'story' in metadata['special'] or not metadata['special']['story']:
 							fontLight = True
 
 					# Mark new episodes/seasons in multiple menus as bold.
-					if decorate and (media == Media.Season or media == Media.Episode or (media == Media.Show and not season is None)) and (not future or future < MetaTools.TimeNewShow):
+					if self.mLabelStyleRelease and decorate and (media == Media.Season or media == Media.Episode or (media == Media.Show and not season is None)) and (not future or future < MetaTools.TimeNewShow):
 						new = False
 
 						# New episode.
@@ -16212,6 +16240,11 @@ class MetaTools(object):
 											history = playback.history(media = Media.Episode, imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = season, episode = episode, metadata = metadata, pack = pack, quick = True)
 											if not history or not history['count']['total']:
 												new = True
+										elif metadata.get('count') and (media == Media.Show or media == Media.Season):
+											# Only mark new shows/seasons with bold if they were not fully watched yet.
+											# If a new show/season was fully watched, it should not show as bold anymore.
+											unwatched = (metadata.get('count').get('episode') or {}).get('unwatched')
+											if unwatched: new = True
 										else:
 											new = True
 
@@ -16225,6 +16258,7 @@ class MetaTools(object):
 				if fontBold: label = Format.fontBold(label)
 				if fontItalic: label = Format.fontItalic(label)
 				if fontLight: label = Format.fontLight(label)
+				if fontColor: label = Format.fontColor(label, color = fontColor)
 
 			# Do this last, after Format.fontBold(label).
 			# Otherwise the labelBefore/labelAfter, which might have its own bold formatting, is formatted a second time.
@@ -16394,6 +16428,7 @@ class MetaTools(object):
 		playable = None,
 		multiple = None,
 		mixed = None,
+		menu = None,
 		submenu = None,
 		more = None,
 		recap = None,
@@ -16497,6 +16532,12 @@ class MetaTools(object):
 		else:
 			chunks = [metadatas]
 
+		if menu:
+			menu['media'] = media
+			menu['mixed'] = mixed
+			menu['multiple'] = multiple
+			menu['submenu'] = submenu
+
 		for chunk in chunks:
 			items.append(self._items(
 				metadatas = chunk,
@@ -16510,6 +16551,7 @@ class MetaTools(object):
 				playable = playable,
 				multiple = multiple,
 				mixed = mixed,
+				menu = menu,
 				submenu = submenu,
 				recap = recap,
 				extra = extra,
@@ -16577,6 +16619,7 @@ class MetaTools(object):
 		playable = None,
 		multiple = None,
 		mixed = None,
+		menu = None,
 		submenu = None,
 		recap = None,
 		extra = None,
@@ -16614,7 +16657,9 @@ class MetaTools(object):
 				item = self.item(
 					metadata = metadata,
 
-					media = self.media(metadata = metadata) if mixed else media,
+					# Add "mixed = True" so that episodes in the main Progress/Quick are listed as shows, just the the show Progress/Quick menus.
+					# This is also important for Playback.dialogWatch() to ask if the entire show/season should be marked, or only the single episode.
+					media = self.media(metadata = metadata, mixed = True) if mixed else media,
 					niche = self.niche(metadata = metadata) if mixed else niche,
 
 					stream = stream,
@@ -16622,6 +16667,7 @@ class MetaTools(object):
 					playable = playable,
 					multiple = multiple,
 					mixed = mixed,
+					menu = menu,
 					submenu = submenu,
 					progress = progress,
 					decorate = decorate,
@@ -16797,6 +16843,7 @@ class MetaTools(object):
 		video = None,
 		multiple = False,
 		mixed = False,
+		menu = None,
 		submenu = False,
 		progress = False,
 		decorate = None,
@@ -16861,11 +16908,11 @@ class MetaTools(object):
 			self.itemShow(media = media, item = item, metadata = metadata)
 
 			# Must be before clean() and setInfo().
-			self.itemPlayback(media = media, item = item, tag = tag, metadata = metadata, progress = progress)
+			self.itemPlayback(media = media, item = item, tag = tag, metadata = metadata, mixed = mixed, progress = progress)
 
 			# Must be before setInfo() and itemPlot().
 			# Must be after itemPlayback().
-			self.itemDetail(media = media, item = item, metadata = metadata, mixed = mixed, progress = progress)
+			self.itemDetail(media = media, item = item, metadata = metadata, mixed = mixed, progress = progress, menu = menu, submenu = submenu)
 
 			# Must be before setInfo().
 			self.itemDate(media = media, item = item, metadata = metadata)
@@ -17011,7 +17058,7 @@ class MetaTools(object):
 			elif media == Media.Extra or media == Media.Recap:
 				item.setProperty('GaiaShowExtra', '1')
 
-	def itemDetail(self, media, metadata, item, mixed = False, progress = False):
+	def itemDetail(self, media, metadata, item, mixed = False, progress = False, menu = None, submenu = None):
 		if metadata and self.mLabelDetailEnabled:
 			details = False
 			if self.mLabelDetailLevel == 0: details = media == Media.Movie or media == Media.Episode
@@ -17019,6 +17066,17 @@ class MetaTools(object):
 			elif self.mLabelDetailLevel == 2: details = media == Media.Movie or media == Media.Show or media == Media.Season or media == Media.Episode
 
 			if details:
+				if mixed and not self.mLabelDetailMixed:
+					details = False
+				elif menu:
+					content = menu.get('content')
+					if content == MetaTools.ContentQuick: details = self.mLabelDetailQuick
+					elif content == MetaTools.ContentProgress and menu.get('progress') == MetaTools.ProgressDefault: details = self.mLabelDetailProgress
+					elif content == MetaTools.ContentArrival: details = self.mLabelDetailArrival
+					else: details = self.mLabelDetailOther
+
+			if details:
+				serie = Media.isSerie(media)
 				values = []
 
 				color = None
@@ -17028,32 +17086,70 @@ class MetaTools(object):
 
 				if self.mLabelPlayEnabled:
 					playcount = metadata.get('playcount') or 0
-					if playcount >= self.mLabelPlayThreshold:
+
+					# Also show a playcount label if the titles is being rewatched.
+					# Otherwise during rewatch, the watched checkmark icon is replaced with a progress icon, and the user cannot see that the show was fully watched already.
+					rewatch = None
+					if self.mLabelPlayThreshold >= 2 and playcount >= (self.mLabelPlayThreshold - 1):
+						if serie:
+							try: rewatch = metadata['count']['episode']['rewatched']
+							except: pass
+						if rewatch is None:
+							progression = metadata.get('progress')
+							if progression:
+								playback = self._playback()
+								if progression < (playback.ProgressEndShow if serie else playback.ProgressEndMovie): rewatch = True
+
+					if playcount >= self.mLabelPlayThreshold or rewatch:
 						values.append((32006, Font.IconWatched, Format.colorExcellent() if color is True else color, str(playcount)))
 
 				# For mixed menus, do not add the progress if it is <= 1% or >= 99%.
 				# Still show the progress for unfinished lists.
 				if self.mLabelProgressEnabled:
-					progression = metadata.get('progress')
-					if not progression is None:
+					if not metadata.get('busy') is False: # Set by itemPlayback() to not show progress labels in the lower 90% if the title was marked as watched recently.
+						progression = None
 						progressMinimum = 0.01
 						progressMaximum = 0.99
 						if Tools.isArray(progress): # Used from MetaMenu.buildMedia().
 							if progress[0] is False: progressMinimum = -1.0
 							elif Tools.isNumber(progress[0]): progressMinimum = progress[0]
-							if progress[1] is False: progressMinimum = 2.0
+							if progress[1] is False: progressMaximum = 2.0
 							elif Tools.isNumber(progress[1]): progressMaximum = progress[1]
 							progress = None
 
-						if progress or (not mixed and not progress is None) or (progression > progressMinimum and progression < progressMaximum):
-							if progression >= 0.0 and progression < 0.01: progression = 0.01 # If progress is eg 0.4%, show as 1%.
-							elif progression >= 0.99: progression = 1.0
-							values.append((32037, Font.IconProgress, Format.colorPoor() if color is True else color, '%.0f%%' % (progression * 100.0)))
+						# For shows and seasons, display the progress percentage as the number of episodes watched.
+						if media == Media.Show or media == Media.Season:
+							try: watched = metadata['count']['episode']['rewatched']
+							except: watched = 0
+							if not watched:
+								try: watched = metadata['count']['episode']['watched']
+								except: watched = 0
+							if watched:
+								try:
+									progression = watched / float(metadata['count']['episode']['total'])
+									if progression == 1: progression = None
+									progressMinimum = -1.0
+									progressMaximum = 2.0
+								except: pass
+							else:
+								# No episode fully watched. Only an episode in progress.
+								try: progression = metadata.get('progress') / float(metadata['count']['episode']['total'])
+								except: pass
+						else:
+							progression = metadata.get('progress')
+
+						if not progression is None:
+							if progress or (not mixed and not progress is None) or (progression > progressMinimum and progression < progressMaximum):
+								if progression >= 0.0 and progression < 0.01: progression = 0.01 # If progress is eg 0.4%, show as 1%.
+								elif progression >= 0.99: progression = 1.0
+								format = '%.0f%%' if self.mLabelProgressFormat == 0 else '%d'
+								values.append((32037, Font.IconProgress, Format.colorPoor() if color is True else color, format % (progression * 100.0)))
 
 				if self.mLabelRatingEnabled and 'userrating' in metadata and not metadata['userrating'] is None:
-					values.append((35187, Font.IconRating, Format.colorMedium() if color is True else color, '%.1f' % metadata['userrating']))
+					format = '%d' if self.mLabelRatingFormat == 0 else '%.1f'
+					values.append((35187, Font.IconRating, Format.colorMedium() if color is True else color, format % metadata['userrating']))
 
-				if Media.isSerie(media) and self.mLabelAirEnabled and 'airs' in metadata:
+				if serie and self.mLabelAirEnabled and 'airs' in metadata:
 					try: airTime = metadata['airs']['time']
 					except: airTime = None
 					try: airDay = metadata['airs']['day'][0]
@@ -17151,7 +17247,7 @@ class MetaTools(object):
 					except: pass
 					try: description.append([32515, metadata['temp'][provider]['count']['items']])
 					except: pass
-					try: description.append([33400, metadata['temp'][provider]['count']['likes']])
+					try: description.append([33444, metadata['temp'][provider]['count']['likes']])
 					except: pass
 					try: description.append([33403, metadata['temp'][provider]['count']['comments']])
 					except: pass
@@ -17432,7 +17528,7 @@ class MetaTools(object):
 			properties['IsPlayable'] = 'true' if playable else 'false'
 		item.setProperties(properties)
 
-	def itemPlayback(self, media, metadata, item, tag = None, progress = False):
+	def itemPlayback(self, media, metadata, item, tag = None, mixed = False, progress = False):
 		# Do not do for sets, since it will try to retrieve the playback history/progress/rating for sets which does not exist.
 		# Do not do for lists. Eg: Movies -> Favorites -> Trakt -> Lists -> Liked Lists.
 		if metadata and not media == Media.Set and not media == Media.Person and not media == Media.List:
@@ -17471,12 +17567,16 @@ class MetaTools(object):
 
 			# Series menu.
 			if media == Media.Season and not 'season' in metadata: media = Media.Show
+			special = media == Media.Show and not episode is None # Progress/Arrivals menu where episodes are listed as shows.
 
+			busy = True
 			count = None
 			time = None
 			progress = None
 			rating = None
 			playback = None
+			playback2 = None
+			playback3 = None
 			playbacker = None
 
 			# NB: Also do this for Recap/Extra, since they use the first/last episode for the playback indicators.
@@ -17531,6 +17631,19 @@ class MetaTools(object):
 
 			if time: metadata['lastplayed'] = Time.format(time, format = Time.FormatDateTime)
 
+			# Some shows have very long credits that already start at 92%-94%.
+			# If an episodes was marked as watched, but playback was stopped (or binge continued) at eg 93%, the menu will show a progress icon, instead of a watched checkmark.
+			# This can be confusing, as it looks like the episode was not finished yet.
+			# Playback.ProgressEndShow was already reduced from 96% to 95%, which is still not enough for these special cases.
+			# We could reduce Playback.ProgressEndShow, but this would then cause false-positives for episodes that were paused/stopped at these percentages, although playback was not finished.
+			# Instead, do not add the progress icon, if the progress timestamp is AFTER (or close to) the watched timestamp.
+			# Eg: If an episode progress is at 93%, but it was marked as watched 10 minutes before, assumed it was fully watched and do not add the progress.
+			if media == Media.Movie or media == Media.Episode:
+				if count and progress and progress > 0.85 and time and progressed and Tools.isInteger(progressed):
+					if time > progressed or abs(time - progressed) < (3600 if media == Media.Movie else 1800): # 1 hour or 30 mins.
+						busy = False
+						metadata['busy'] = False # Used by itemDetail() ot also remove the progress from the label.
+
 			# Resume/Progress
 			# Do not set TotalTime, otherwise Kodi shows a resume popup dialog when clicking on the item, instead of going directly to scraping.
 			# item.setProperty('TotalTime', str(metadata['duration']))
@@ -17541,7 +17654,7 @@ class MetaTools(object):
 				# Do not add, since Kodi throws a warning in the log: Unknown Video Info Key "percentplayed"
 				#metadata['percentplayed'] = progress * 100
 
-				if self.mIconProgress and (not media == Media.Show and not media == Media.Season):
+				if busy and self.mIconProgress and (special or (not media == Media.Show and not media == Media.Season)):
 					duration = metadata.get('duration')
 					if not duration: duration = 3600 if Media.isSerie(media) else 7200
 					resume = progress * duration
@@ -17556,7 +17669,7 @@ class MetaTools(object):
 					item.setProperty(MetaTools.PropertyProgress, str(progress)) # Used by select().
 
 				# Used by the context menu to add a "Clear Progress" option.
-				if not media == Media.Show and not media == Media.Season: metadata['progress'] = progress
+				if special or (not media == Media.Show and not media == Media.Season): metadata['progress'] = progress
 			else:
 				# If the progress was adjusted (eg: ignore if above 95%), reset the value, otherwise the progress is still added to the label.
 				metadata['progress'] = None
@@ -17571,32 +17684,85 @@ class MetaTools(object):
 				episodesTotal = None
 				episodesWatched = None
 				episodesUnwatched = None
+				episodesRewatched = None
+				episodesReunwatched = None
 
-				pack = metadata.get('pack') or metadata.get('packed') # Either full pack, or reduced pack.
-				if pack:
-					pack = MetaPack.instance(pack = pack)
-					if season is None and episode is None:
+				pack = metadata.get('pack')
+				if pack: pack = MetaPack.instance(pack = pack)
+
+				# Progress menu where episodes are listed as shows.
+				# These do not load full pack data and also do not have the necessary values in the summarized "packed".
+				if special:
+					if pack: # This will probably never happen, since the full pack is never set.
 						seasonsTotal = pack.countSeasonOfficial()
 						episodesTotal = pack.countEpisodeOfficial()
 						if self.mShowCountSpecial:
 							seasonsTotal += pack.countSeasonSpecial()
 							episodesTotal += pack.countEpisodeOfficial()
-					elif episode is None:
-						seasonsTotal = 1
-						if season == 1 and pack.typeUnofficial(season = season + 1): episodesTotal = pack.countEpisodeUniversal(season = season) # If Trakt has a single absolute season, while TVDB has additional seasons (eg: Dragon Ball Super S02+).
-						else: episodesTotal = pack.countEpisodeOfficial(season = season) or pack.countEpisodeUnofficial(season = season) # Use unoffical count for seasons not on Trakt (eg: Dragon Ball Super S02+).
 					else:
-						seasonsTotal = 1
-						episodesTotal = 1
+						smart = Tools.get(metadata, 'smart', 'pack', MetaPack.ValueCount)
+						if smart:
+							# Retrieve the show's playback to get episode watc hed/unwatched counts.
+							playback2 = playbacker.retrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, metadata = metadata, adjust = adjust, quick = True)
 
-				episodesWatched = playback['history']['count']['main']['unique'] if ('main' in playback['history']['count'] and not self.mShowCountSpecial) else playback['history']['count']['unique']
+							total = smart.get(MetaPack.ValueTotal) or {}
+							official = smart.get(MetaPack.NumberOfficial) or {}
+							if self.mShowCountSpecial:
+								seasonsTotal = total.get(MetaPack.ValueSeason) or 1
+								episodesTotal = (official.get(MetaPack.ValueEpisode) or 1) + (official.get(MetaPack.ValueSpecial) or 0)
+							else:
+								seasonsTotal = official.get(MetaPack.ValueSeason) or 1
+								episodesTotal = official.get(MetaPack.ValueEpisode) or 1
+						else:
+							seasonsTotal = 1
+							episodesTotal = 1
+
+				if seasonsTotal is None or episodesTotal is None:
+					if not pack:
+						pack = metadata.get('packed') # Either full pack, or reduced pack.
+						if pack: pack = MetaPack.instance(pack = pack)
+
+					if pack:
+						if media == Media.Show or (season is None and episode is None): # Arrivals menu has items with season numbers, but they are shows.
+							seasonsTotal = pack.countSeasonOfficial()
+							episodesTotal = pack.countEpisodeOfficial()
+							if self.mShowCountSpecial:
+								seasonsTotal += pack.countSeasonSpecial()
+								episodesTotal += pack.countEpisodeOfficial()
+						elif episode is None:
+							seasonsTotal = 1
+							if season == 1 and pack.typeUnofficial(season = season + 1): episodesTotal = pack.countEpisodeUniversal(season = season) # If Trakt has a single absolute season, while TVDB has additional seasons (eg: Dragon Ball Super S02+).
+							else: episodesTotal = pack.countEpisodeOfficial(season = season) or pack.countEpisodeUnofficial(season = season) # Use unoffical count for seasons not on Trakt (eg: Dragon Ball Super S02+).
+						else:
+							seasonsTotal = 1
+							episodesTotal = 1
+
+				playback3 = playback2 or playback
+
+				if 'main' in playback3['history']['count'] and not self.mShowCountSpecial:
+					episodesWatched = playback3['history']['count']['main']['unique']
+					episodesRewatched = playback3['history']['count']['main']['total']
+				else:
+					episodesWatched = playback3['history']['count']['unique']
+					episodesRewatched = playback3['history']['count']['total']
+
 				if not episodesWatched: episodesWatched = 0
-				if episodesTotal: episodesUnwatched = episodesTotal - episodesWatched
+				if not episodesUnwatched: episodesUnwatched = 0
+				if not episodesRewatched: episodesRewatched = 0
+				if not episodesReunwatched: episodesReunwatched = 0
+				if episodesTotal:
+					episodesUnwatched = episodesTotal - episodesWatched
+					if episodesRewatched > episodesTotal:
+						episodesRewatched = episodesRewatched % episodesTotal
+						episodesReunwatched = episodesTotal - episodesRewatched
+					else:
+						episodesRewatched = 0
+						episodesReunwatched = 0
 
 				# Set this to allow the context menu to add "Mark As Unwatched" for partially watched shows/seasons.
 				metadata['count'] = {
 					'season' : {'total' : seasonsTotal},
-					'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched},
+					'episode' : {'total' : episodesTotal, 'watched' : episodesWatched, 'unwatched' : episodesUnwatched, 'rewatched' : episodesRewatched, 'reunwatched' : episodesReunwatched},
 				}
 
 				if self.mShowCountEnabled and self.mIconCount:
@@ -17610,24 +17776,67 @@ class MetaTools(object):
 				# For shows and seasons, only mark as watched if all episodes were watched.
 				# If some episodes are watched and some are unwatched, add a resume time to indicate there are still some unwatched episodes.
 				# Do not do this for Progress menus that are episodes, but are listed as shows.
-				if (media == Media.Show or media == Media.Season) and not(media == Media.Show and not episode is None and progressed):
+				# Update (2025-01): Now also do this for the Progress menus.
+				#if (media == Media.Show or media == Media.Season) and not(media == Media.Show and not episode is None and progressed):
+				if media == Media.Show or media == Media.Season:
 					if episodesUnwatched and episodesUnwatched > 0:
 						metadata['playcount'] = None
 					else:
 						# NB: Use "quick=True" to avoid pack retrieval for show menus, which can take very long, and is not needed here.
-						count, remaining = playbacker.count(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, specials = True if season == 0 else self.mShowCountSpecial, metadata = metadata, history = playback['history'], quick = True)
+						count, remaining = playbacker.count(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, specials = True if season == 0 else self.mShowCountSpecial, metadata = metadata, history = playback3['history'], quick = True)
 						metadata['playcount'] = count
 
+					# Icons should be displayed as follows:
+					#	1. Checkmark icon: if a show was fully watched, show the checkmark icon.
+					#	   The show will still be listed in the Progress menu for a few days after being fully watched (to allow rewatching the last episode), until it will be moved down the list.
+					#	   The checmark indicates to the user that the show was finished/watched.
+					#	2. Progress icon: If at least one episode of the current season was watched, or one episode has progress without being finished, show a progress icon.
+					#	   The icon indicates to the user that he is still busy watching the show, or rather the current season.
+					#	3. Progress icon: If a show was fully watched, and at least one episode was rewatched, show a progress icon.
+					#	   The icon indicates to the user that he is busy with a rewatch.
+					#	   The icon indicates to the user that he is still busy watching the show, or rather the current season.
+					#	4. No icon: If the show has no watched orbusy/progress episodes, do not show any icon.
+					#	   Also do not show an icon if the user fully watched the previous season, but has not started to watch the next season. Eg: a new season is released.
+					#	5. Progress icon: For all non-Progress menus, including Arrivals, always show a progress icon if at least one episode was started.
 					if self.mIconProgress:
-						if (episodesWatched and episodesUnwatched) or progress:
-							try:
-								# Kodi 20+ now requires the total time, otherwise the progress icon is not shown in the menus.
-								# However, when specifying the total time, Kodi adds a "resume" entry to the context menu.
-								# When using a very small time (eg: 0.1), it seems Kodi adds the progress icon without adding an entry to the context menu.
-								#tag.setResumePoint(1)
-								#tag.setResumePoint(1, 100)
-								tag.setResumePoint(0.1, 1)
-							except: item.setProperty('ResumeTime', str(1))
+						allow = False
+						if progress: allow = True # The current episode is still busy with playback progress.
+						elif episodesWatched and episodesUnwatched: allow = True # The show is watched for the first time with some episodes watched and others unwatched.
+						else:
+							# The show is was fully watched and is now being rewatched.
+							# Mod instead of just checking if total > unique, in case the show was fully watched twice.
+							try: allow = playback3['history']['count']['main']['total'] % playback3['history']['count']['main']['unique'] > 0
+							except:
+								try: allow = playback3['history']['count']['total'] % playback3['history']['count']['unique'] > 0 # Season menus.
+								except: pass
+
+						if allow:
+							started = True
+
+							# For the Arrivals and other menus besides Progress, always show the progress icon if at least one episode was started.
+							# So that the user can quickly see in the Arrivals menu which shows he is watching, even if it is a newly released season that would not be marked with progress in the Progress menu.
+							unspecial = not progressed and (episodesWatched or progress)
+
+							# At least one episode in the current season was watched.
+							# Do not check if there is playback progress for the current episode.
+							if (media == Media.Show and not season is None) and not progress and not unspecial:
+								started = False
+								try:
+									for i in playback3['history']['seasons']:
+										if i['season'] == season:
+											started = True
+											break
+								except: pass # "seasons" might not be available.
+
+							if started:
+								try:
+									# Kodi 20+ now requires the total time, otherwise the progress icon is not shown in the menus.
+									# However, when specifying the total time, Kodi adds a "resume" entry to the context menu.
+									# When using a very small time (eg: 0.1), it seems Kodi adds the progress icon without adding an entry to the context menu.
+									#tag.setResumePoint(1)
+									#tag.setResumePoint(1, 100)
+									tag.setResumePoint(0.1, 1)
+								except: item.setProperty('ResumeTime', str(1))
 
 	def itemContext(self,
 		item,
@@ -19049,8 +19258,9 @@ class MetaTools(object):
 			# Firstly, try to pick the exact time as requested.
 			times = metadata.get('time')
 			if times:
-				# For New seasons/episode releases menu. The show object contains a more accurate season or episode date.
-				if type == MetaTools.TimeLaunch or type == MetaTools.TimeHome:
+				# For New seasons/episode releases menu from S02+. The show object contains a more accurate season or episode date.
+				# Important, otherwise new seasons S02+ from Arrivals will be sorted to the back, since the premiere date is the show's premiere (S01E01), instead of the premiere of a later season that was just released.
+				if type == MetaTools.TimeLaunch or type == MetaTools.TimeHome or type == MetaTools.TimePremiere:
 					value = times.get(MetaTools.TimeSerie)
 					if not value is None: return value
 
@@ -19472,7 +19682,8 @@ class MetaTools(object):
 	# Do not pass in a helper if this function is only called once, since it is more efficient without it.
 	# key: try to extract the season/episode number from a nested dictionary, before trying the numbers from the root dictionary.
 	# number='extended': also use sequential and Trakt alternative numbers.
-	def filterContains(self, items, item, number = False, result = False, key = None, helper = None):
+	# serie=True: treat shows/seasons/episodes as the same media. Otherwise they are seen as separate media, hence a show with the same ID as an episode would be seen as different items.
+	def filterContains(self, items, item, number = False, result = False, key = None, serie = False, helper = None):
 		try:
 			def _number(item, type, key):
 				value = None
@@ -19485,6 +19696,9 @@ class MetaTools(object):
 				return 'z' if value is None else str(value)
 
 			def _numbers(item, id, key, extended = False):
+				mediad = item.get('media')
+				if serie and Media.isSerie(mediad): mediad = Media.Show
+
 				# Add the media type, since movies and episodes can have the same TMDb ID.
 				#	https://www.themoviedb.org/movie/1891
 				#	https://www.themoviedb.org/tv/1891
@@ -19498,10 +19712,10 @@ class MetaTools(object):
 						if trakt:
 							numbers.append(trakt.get(MetaPack.NumberStandard))
 							numbers.append(trakt.get(MetaPack.NumberSequential))
-					base = str(item.get('media')) + '_' + str(id) + '_%s_%s'
+					base = str(mediad) + '_' + str(id) + '_%s_%s'
 					return Tools.listUnique([base % (str(i[0]), str(i[1])) for i in numbers if i])
 				else:
-					return '%s_%s_%s_%s' % (str(item.get('media')), str(id), _number(item, 'season', key), _number(item, 'episode', key))
+					return '%s_%s_%s_%s' % (str(mediad), str(id), _number(item, 'season', key), _number(item, 'episode', key))
 
 			extended = number == 'extended'
 
@@ -19593,7 +19807,8 @@ class MetaTools(object):
 
 	# merge=True: merge duplicate items. Later items will replace earlier items.
 	# merge="number": merge duplicate items. Items with a higher season/episode number will replace items with a lower number.
-	def filterDuplicate(self, items, id = True, title = False, number = False, key = None, last = False, merge = False):
+	# serie=True: treat shows/seasons/episodes as the same media. Otherwise they are seen as separate media, hence a show with the same ID as an episode would be seen as different items.
+	def filterDuplicate(self, items, id = True, title = False, number = False, key = None, last = False, serie = False, merge = False):
 		try:
 			if last: items = reversed(items)
 			custom = Tools.isString(number)
@@ -19620,7 +19835,9 @@ class MetaTools(object):
 							# Add the media type, since movies and episodes can have the same TMDb ID.
 							#	https://www.themoviedb.org/movie/1891
 							#	https://www.themoviedb.org/tv/1891
-							j = '%s_%s' % (str(entry.get('media')), entry[i])
+							mediad = entry.get('media')
+							if serie and Media.isSerie(mediad): mediad = Media.Show
+							j = '%s_%s' % (str(mediad), entry[i])
 
 							if number:
 								if custom:
@@ -19689,7 +19906,9 @@ class MetaTools(object):
 							# Add the media type, in case a movie and show/episode have the same name.
 							# Important to use lower case, since sometimes the titles between IMDb and TMDb do not use the sasme case.
 							# Eg: "Operation Fortune: Ruse de guerre" vs Operation Fortune: Ruse de Guerre
-							j = '%s_%s' % (str(entry.get('media')), Regex.remove(data = entry[i].lower(), expression = Regex.Symbol, all = True, cache = True).replace('  ', ' '))
+							mediad = entry.get('media')
+							if serie and Media.isSerie(mediad): mediad = Media.Show
+							j = '%s_%s' % (str(mediad), Regex.remove(data = entry[i].lower(), expression = Regex.Symbol, all = True, cache = True).replace('  ', ' '))
 
 							if number:
 								if custom:
@@ -20583,6 +20802,18 @@ class MetaTools(object):
 							special += 0.1 if seconds < 345600 else 0.05
 					else:
 						special += 0.15 if seconds < 345600 else 0.08
+
+				# For new S02+ releases, move them slightly to the back, since they are less important than new S01 releases.
+				# Especially long-running shows with eg S32 is irrelevant for the Arrivals menu.
+				# S02 and S03, even up to S05, might still be of interest for the Arrivals menu.
+				if serie:
+					season = metadata.get('season')
+					if season:
+						if season >= 30: special -= 0.9
+						elif season >= 20: special -= 0.7
+						elif season >= 10: special -= 0.4
+						elif season > 5: special -= 0.2
+						elif season > 3: special -= 0.05
 
 				# Reduce the votes requirement if there is no IMDb rating.
 				# NB: Items not smart-loaded yet, do not have a "voting" dict.

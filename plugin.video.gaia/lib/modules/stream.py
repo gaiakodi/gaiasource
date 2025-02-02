@@ -16662,9 +16662,9 @@ class Stream(Serializer):
 	def settingsFormat(self):
 		layoutColor = True
 		layoutBold = True
-		if tools.Settings.getBoolean('interface.label.style'):
-			layoutColor = tools.Settings.getBoolean('interface.label.style.color')
-			layoutBold = tools.Settings.getBoolean('interface.label.style.bold')
+		if tools.Settings.getBoolean('label.stream.style'):
+			layoutColor = tools.Settings.getBoolean('label.stream.style.color')
+			layoutBold = tools.Settings.getBoolean('label.stream.style.bold')
 		if layoutColor and layoutBold: return Stream.FormatDecorate
 		elif layoutColor: return Stream.FormatColor
 		elif layoutBold: return Stream.FormatBold
@@ -21266,7 +21266,7 @@ class Stream(Serializer):
 
 		if multiple:
 			if Stream.SettingsLanguage is None:
-				Stream.SettingsLanguage = tools.Settings.getInteger('interface.label.language.limit') if tools.Settings.getBoolean('interface.label.language') else 0
+				Stream.SettingsLanguage = tools.Settings.getInteger('label.stream.language.limit') if tools.Settings.getBoolean('label.stream.language') else 0
 			if Stream.SettingsLanguage > 1 and len(value) >= Stream.SettingsLanguage:
 				return interface.Translation.string(35035)
 
@@ -28363,13 +28363,13 @@ class Stream(Serializer):
 			if Stream.SettingsUsage is None:
 				Stream.SettingsUsage = {
 					'premiumize' : {
-						'enabled' : tools.Settings.getBoolean('interface.label.premiumize'),
-						'cost' : tools.Settings.getInteger('interface.label.premiumize.cost'),
-						'usage' : tools.Settings.getInteger('interface.label.premiumize.usage'),
+						'enabled' : tools.Settings.getBoolean('label.stream.premiumize'),
+						'cost' : tools.Settings.getInteger('label.stream.premiumize.cost'),
+						'usage' : tools.Settings.getInteger('label.stream.premiumize.usage'),
 					},
 					'easynews' : {
-						'enabled' : tools.Settings.getBoolean('interface.label.easynews'),
-						'usage' : tools.Settings.getInteger('interface.label.easynews.usage'),
+						'enabled' : tools.Settings.getBoolean('label.stream.easynews'),
+						'usage' : tools.Settings.getInteger('label.stream.easynews.usage'),
 					},
 				}
 
@@ -34894,7 +34894,7 @@ class Layout(object):
 
 	Instance = None
 
-	SettingLayout		= 'interface.label.layout'
+	SettingLayout		= 'label.stream.layout'
 	SettingInterface	= 'interface.stream.interface'
 
 	SettingData			= {}

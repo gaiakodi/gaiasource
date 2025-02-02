@@ -430,6 +430,7 @@ class View(object):
 			Directory.ContentSeasons,
 			Directory.ContentEpisodes,
 		]
+
 		try: return order[0 if self.settingsGet(media = media) == View.ModeFixed else Settings.getInteger(self.settingsLayoutId(media = media))]
 		except: return Directory.ContentDefault
 

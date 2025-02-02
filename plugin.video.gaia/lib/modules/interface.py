@@ -57,6 +57,8 @@ class Skin(object):
 	TypeXonfluence = 'skin.xonfluence'
 
 	TypeArcticHorizon = 'skin.arctic.horizon'
+	TypeArcticReloaded = 'skin.arctic.zephyr.mod'
+	TypeArcticResurrection = 'skin.arctic.zephyr.2.resurrection.mod'
 
 	TypeAeon = 'skin.aeon'
 	TypeAeonNox = 'skin.aeon.nox'
@@ -74,6 +76,8 @@ class Skin(object):
 		TypeConfluence : True,
 		TypeXonfluence : True,
 		TypeArcticHorizon : True,
+		TypeArcticReloaded : True,
+		TypeArcticResurrection : True,
 		TypeAeonNox : False, # Not sure, but at least the Silvo skin does not support it.
 		TypeAeonNoxSilvo : False, # Shows a normal list dialog, just with the icon on the side. But does not show label2 on the 2nd line.
 		TypeAeonViper : False,
@@ -89,6 +93,8 @@ class Skin(object):
 		TypeConfluence : False,
 		TypeXonfluence : False,
 		TypeArcticHorizon : True,
+		TypeArcticReloaded : True,
+		TypeArcticResurrection : True,
 		TypeAeonNox : True,
 		TypeAeonNoxSilvo : True,
 		TypeAeonViper : True,
@@ -104,6 +110,8 @@ class Skin(object):
 		TypeConfluence : False,
 		TypeXonfluence : False,
 		TypeArcticHorizon : True,
+		TypeArcticReloaded : True,
+		TypeArcticResurrection : True,
 		TypeAeonNox : True,
 		TypeAeonNoxSilvo : True,
 		TypeAeonViper : True,
@@ -119,6 +127,8 @@ class Skin(object):
 		TypeConfluence : False,
 		TypeXonfluence : False,
 		TypeArcticHorizon : False,
+		TypeArcticReloaded : False,
+		TypeArcticResurrection : False,
 		TypeAeonNox : False,
 		TypeAeonNoxSilvo : False,
 		TypeAeonViper : False,
@@ -1122,6 +1132,7 @@ class Format(object):
 			Format.ColorMedium = self._colorSettings(Format.ColorCustom, 'medium', Format.ColorMedium)
 			Format.ColorPoor = self._colorSettings(Format.ColorCustom, 'poor', Format.ColorPoor)
 			Format.ColorBad = self._colorSettings(Format.ColorCustom, 'bad', Format.ColorBad)
+			Format.ColorDisabled = self._colorSettings(Format.ColorCustom, 'disabled', Format.ColorDisabled)
 
 			try: Format.ColorTransparent = self.colorToHex([((100.0 - tools.Settings.getInteger('theme.color.transparent')) / 100.0) * 255.0])
 			except: tools.Logger.error()
@@ -1267,6 +1278,7 @@ class Format(object):
 
 	@classmethod
 	def colorDisabled(self):
+		self._colorIninitialize()
 		return Format.ColorDisabled
 
 	@classmethod

@@ -22,8 +22,6 @@
 # https://myds.cloud/%E8%B5%84%E6%96%99/%E7%A3%81%E5%8A%9B%E6%90%9C%E7%B4%A2
 # https://github.com/fmhy/FMHY/wiki/%F0%9F%8C%80-Torrenting
 
-#gaiaremove - add https://animetosho.org/search
-
 import os
 import sys
 

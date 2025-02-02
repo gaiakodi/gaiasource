@@ -241,11 +241,11 @@ msgid "Select To Save View"
 msgstr ""
 
 msgctxt "#32060"
-msgid "[GAIA-NO-LABEL]"
+msgid "Integer"
 msgstr ""
 
 msgctxt "#32061"
-msgid "[GAIA-NO-LABEL]"
+msgid "Decimal"
 msgstr ""
 
 msgctxt "#32062"
@@ -313,7 +313,7 @@ msgid "ID"
 msgstr ""
 
 msgctxt "#32306"
-msgid "[GAIA-NO-LABEL]"
+msgid "Percent"
 msgstr ""
 
 msgctxt "#32307"
@@ -381,7 +381,7 @@ msgid "Prefer %s image if available"
 msgstr ""
 
 msgctxt "#32323"
-msgid "Interface Icons"
+msgid "Menu Icons"
 msgstr ""
 
 msgctxt "#32324"
@@ -397,11 +397,11 @@ msgid "Episodes"
 msgstr ""
 
 msgctxt "#32327"
-msgid "Watched Icon"
+msgid "Watched Icons"
 msgstr ""
 
 msgctxt "#32328"
-msgid "Progress Icon"
+msgid "Progress Icons"
 msgstr ""
 
 msgctxt "#32329"
@@ -525,7 +525,7 @@ msgid "Details Placement"
 msgstr ""
 
 msgctxt "#32359"
-msgid "Detailed Labels"
+msgid "Label Details"
 msgstr ""
 
 msgctxt "#32401"
@@ -1063,11 +1063,11 @@ msgid "Special"
 msgstr ""
 
 msgctxt "#33106"
-msgid "Force Label"
+msgid "Force Labels"
 msgstr ""
 
 msgctxt "#33107"
-msgid "Custom Layout"
+msgid "Custom Titles"
 msgstr ""
 
 msgctxt "#33108"
@@ -2227,19 +2227,19 @@ msgid "Update Notifications"
 msgstr ""
 
 msgctxt "#33397"
-msgid "[GAIA-NO-LABEL]"
+msgid "Do you want to mark the single [B]episode[/B] (%s), the full [B]season[/B] (%s), or the entire [B]show[/B] as watched?"
 msgstr ""
 
 msgctxt "#33398"
-msgid "[GAIA-NO-LABEL]"
+msgid "Do you want to mark the single [B]episode[/B] (%s), the full [B]season[/B] (%s), or the entire [B]show[/B] as unwatched?"
 msgstr ""
 
 msgctxt "#33399"
-msgid "[GAIA-NO-LABEL]"
+msgid "Do you want to rate the single [B]episode[/B] (%s), the full [B]season[/B] (%s), or the entire [B]show[/B]?"
 msgstr ""
 
 msgctxt "#33400"
-msgid "Likes"
+msgid "Do you want to unrate the single [B]episode[/B] (%s), the full [B]season[/B] (%s), or the entire [B]show[/B]?"
 msgstr ""
 
 msgctxt "#33401"
@@ -2248,6 +2248,10 @@ msgstr ""
 
 msgctxt "#33402"
 msgid "[GAIA-NO-LABEL]"
+msgstr ""
+
+msgctxt "#33407"
+msgid ""
 msgstr ""
 
 msgctxt "#33403"
@@ -2415,7 +2419,7 @@ msgid "Voting"
 msgstr ""
 
 msgctxt "#33444"
-msgid "[GAIA-NO-LABEL]"
+msgid "Likes"
 msgstr ""
 
 msgctxt "#33445"
@@ -4443,7 +4447,7 @@ msgid "Please restart Kodi if this error persists."
 msgstr ""
 
 msgctxt "#33951"
-msgid "Settings related to menus, navigation, and paging."
+msgid "Settings related to menus, navigation, paging, and icons."
 msgstr ""
 
 msgctxt "#33952"
@@ -4979,7 +4983,7 @@ msgid "Select the tertiary subtitle language to use if available. The [I]Automat
 msgstr ""
 
 msgctxt "#34085"
-msgid "Settings related to the interface, layout, and appearance."
+msgid "Settings related to menus, paging, and navigation."
 msgstr ""
 
 msgctxt "#34086"
@@ -5367,7 +5371,7 @@ msgid "Filter streams according to the release group."
 msgstr ""
 
 msgctxt "#34182"
-msgid "Change the layout of titles that are used in the menus, interface, and other internal features."
+msgid "Change the layout of titles that are used in menu labels and other places in the interface."
 msgstr ""
 
 msgctxt "#34183"
@@ -5491,7 +5495,7 @@ msgid "Automatically optimize the scraping timeout, limits, and parameters based
 msgstr ""
 
 msgctxt "#34213"
-msgid "Show the airing time of episodes if available."
+msgid "Show the airing time of episodes in the menu labels if available."
 msgstr ""
 
 msgctxt "#34214"
@@ -5499,7 +5503,7 @@ msgid "Convert the airing time to your local timezone, the native timezone where
 msgstr ""
 
 msgctxt "#34215"
-msgid "Show your own rating if available."
+msgid "Show your own rating in the menu labels if available."
 msgstr ""
 
 msgctxt "#34216"
@@ -5511,7 +5515,7 @@ msgid "Change the format of the weekday, either as full name or as abbreviation.
 msgstr ""
 
 msgctxt "#34218"
-msgid "Show the number of plays if available."
+msgid "Show the number of plays in the menu labels if available."
 msgstr ""
 
 msgctxt "#34219"
@@ -5711,7 +5715,7 @@ msgid "Change the library directory for shows."
 msgstr ""
 
 msgctxt "#34268"
-msgid "Change the font style for new releases to [B]bold[/B], upcoming releases to [B]light[/B], and future releases to [B]italic[/B]."
+msgid "Format the menu labels with [B]bold[/B], [I]italics[/I], and [LIGHT]light[/LIGHT] fonts to indicate special attributes. The [I]Disabled[/I] option removes formatting completely. The [I]Release[/I] option adds formatting based on the release date, where [B]bold[/B] indicates recent and popular releases, while [I]italics[/I] and [LIGHT]light[/LIGHT] indicate future releases. The [I]Episode[/I] option adds formatting based on the episode type, where [I]italics[/I] and [LIGHT]light[/LIGHT] indicate specials, unofficial episode, or discrepancies with episode numbering. The [I]Default[/I] option adds both release and episode formatting."
 msgstr ""
 
 msgctxt "#34269"
@@ -5915,7 +5919,7 @@ msgid "Change the provider, decor, and language for different episode image type
 msgstr ""
 
 msgctxt "#34319"
-msgid "Add additional info to menus that are not by default supported by Kodi or most skins. For most skins, this requires changing the [B]Force Label[/B] setting under the [B]Menus[/B] section to be enabled."
+msgid "Add additional info that is not natively supported by Kodi and skins to the menu labels. For most custom skins, this requires changing the [B]Force Label[/B] setting under the [B]Menus[/B] section to be enabled."
 msgstr ""
 
 msgctxt "#34320"
@@ -6235,11 +6239,11 @@ msgid "Force customly generated labels to be used as titles. Menu entries have a
 msgstr ""
 
 msgctxt "#34409"
-msgid "Style the details label. Either apply [B]no[/B] style or use a [B]bold[/B], [B]italic[/B], or [B]light[/B] font. Note that some light fonts are not distinguishable from the normal fonts."
+msgid "Style the details label. Either apply no style or use a [B]bold[/B], [I]italics[/I], or [LIGHT]light[/LIGHT] font. Note that some light fonts are not distinguishable from the normal fonts."
 msgstr ""
 
 msgctxt "#34410"
-msgid "Decorate the details label. Either apply [B]no[/B] decoration, add a [B]full[/B] or [B]abbreviated[/B] label, or add an [B]icon[/B]. Note that icons depend on the font you are using and most fonts to not contain icon characters."
+msgid "Decorate the details label. Either apply no decoration, add a [B]full[/B] or [B]abbreviated[/B] label, or add an [B]icon[/B]. Note that icons depend on the font you are using and most fonts to not contain icon characters."
 msgstr ""
 
 msgctxt "#34411"
@@ -6759,7 +6763,7 @@ msgid "Only show the play count if the number is greater or equal to this thresh
 msgstr ""
 
 msgctxt "#34540"
-msgid "Show the current playback progress if available."
+msgid "Show the current playback progress in the menu labels if available."
 msgstr ""
 
 msgctxt "#34541"
@@ -6767,7 +6771,7 @@ msgid "Color the details label. Either apply [B]no[/B] color, use the [B]primary
 msgstr ""
 
 msgctxt "#34542"
-msgid "Adjust the level at which details are shown. The [B]Essential[/B] option only displays details for movies and episodes. The [B]Standard[/B] option displays details for movies, shows, and episodes. The [B]Extended[/B] option displays details for movies, shows, seasons, and episodes."
+msgid "Adjust the level at which details are shown. The [B]Essential[/B] option only displays details for movies and episodes. The [B]Standard[/B] option displays details for movies, shows, and episodes. The [B]Extended[/B] option displays details for movies, shows, seasons, and episodes. The [B]Disabled[/B] option removes all extra labels and only uses label formatting for releases."
 msgstr ""
 
 msgctxt "#34543"
@@ -7228,6 +7232,42 @@ msgstr ""
 
 msgctxt "#34657"
 msgid "Authenticate a EasyDebrid account with an external resolver addon. Only cache lookups and basic streaming is available. Advanced features are not supported."
+msgstr ""
+
+msgctxt "#34658"
+msgid "Format the rating as an integer or decimal."
+msgstr ""
+
+msgctxt "#34659"
+msgid "Format the progress as an percentage or integer."
+msgstr ""
+
+msgctxt "#34660"
+msgid "Add label details for Quick menus."
+msgstr ""
+
+msgctxt "#34661"
+msgid "Add label details for Progress menus."
+msgstr ""
+
+msgctxt "#34662"
+msgid "Add label details for Arrivals menus."
+msgstr ""
+
+msgctxt "#34663"
+msgid "Add label details for mixed media menus."
+msgstr ""
+
+msgctxt "#34664"
+msgid "Add label details for all other menus."
+msgstr ""
+
+msgctxt "#34665"
+msgid "Settings related to menu and stream label customization."
+msgstr ""
+
+msgctxt "#34666"
+msgid "Change the label color for future unreleased titles. This is useful if your skin does not support [I]italics[/I] fonts. The [B]Disabled[/B] custom color under the [B]Theme[/B] section is used for this."
 msgstr ""
 
 # [/GAIACODE]
@@ -8953,7 +8993,7 @@ msgid "Media Production"
 msgstr ""
 
 msgctxt "#35430"
-msgid "[GAIA-NO-LABEL]"
+msgid "Stream Labels"
 msgstr ""
 
 msgctxt "#35431"
@@ -9253,7 +9293,7 @@ msgid "CivitasScrapers"
 msgstr ""
 
 msgctxt "#35505"
-msgid "[GAIA-NO-LABEL]"
+msgid "Future Color"
 msgstr ""
 
 msgctxt "#35506"
@@ -9385,7 +9425,7 @@ msgid "Processing Remote Download"
 msgstr ""
 
 msgctxt "#35538"
-msgid "[GAIA-NO-LABEL]"
+msgid "Mixed Menu"
 msgstr ""
 
 msgctxt "#35539"
@@ -9393,7 +9433,7 @@ msgid "Scraping"
 msgstr ""
 
 msgctxt "#35540"
-msgid "[GAIA-NO-LABEL]"
+msgid "Other Menu"
 msgstr ""
 
 msgctxt "#35541"
@@ -10441,7 +10481,7 @@ msgid "English Providers"
 msgstr ""
 
 msgctxt "#35802"
-msgid "Do you want to mark [B]all[/B] episodes as watched, only the [B]remaining[/B] unwatched episodes, or episode within a [B]custom[/B] range?"
+msgid "Do you want to mark [B]all[/B] episodes, only the [B]remaining[/B] unwatched episodes, or episode within a [B]custom[/B] range as watched?"
 msgstr ""
 
 msgctxt "#35803"
@@ -11134,11 +11174,11 @@ msgid "Extended"
 msgstr ""
 
 msgctxt "#36093"
-msgid "[GAIA-NO-LABEL]"
+msgid "Rating Format"
 msgstr ""
 
 msgctxt "#36094"
-msgid "[GAIA-NO-LABEL]"
+msgid "Progress Format"
 msgstr ""
 
 msgctxt "#36095"
@@ -13462,7 +13502,7 @@ msgid "Psycho"
 msgstr ""
 
 msgctxt "#36676"
-msgid "Release Details"
+msgid "Label Style"
 msgstr ""
 
 msgctxt "#36677"

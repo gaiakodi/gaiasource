@@ -6271,6 +6271,13 @@ class Settings(object):
 				'default' : 'FF922B21',
 			},
 		},
+		'theme.color.disabled' : {
+			'type' : CustomColor,
+			'title' : 32302,
+			'value' : {
+				'default' : 'FF888888',
+			},
+		},
 		'general.launch.delay' : {
 			'type' : CustomDuration,
 			'title' : 33807,
@@ -9910,27 +9917,27 @@ class Title(object):
 			aeon = Skin.isAeon() if skin else False
 			data = {}
 
-			enabled = Settings.getBoolean('menu.label.layout')
+			enabled = Settings.getBoolean('label.title.layout')
 
-			setting = Settings.getInteger('menu.label.layout.movie') if enabled else Title.Default
+			setting = Settings.getInteger('label.title.layout.movie') if enabled else Title.Default
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonMovie if aeon else Title.DefaultMovie
 			else: setting -= 2
 			data[Media.Movie] = Title.FormatTitle[setting]
 
-			setting = Settings.getInteger('menu.label.layout.show') if enabled else Title.Default
+			setting = Settings.getInteger('label.title.layout.show') if enabled else Title.Default
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonShow if aeon else Title.DefaultShow
 			else: setting -= 2
 			data[Media.Show] = data[Media.Mini] = Title.FormatTitle[setting]
 
-			setting = Settings.getInteger('menu.label.layout.season') if enabled else Title.Default
+			setting = Settings.getInteger('label.title.layout.season') if enabled else Title.Default
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonSeason if aeon else Title.DefaultSeason
 			else: setting -= 2
 			data[Media.Season] = Title.FormatSeason[setting]
 
-			setting = Settings.getInteger('menu.label.layout.episode') if enabled else Title.Default
+			setting = Settings.getInteger('label.title.layout.episode') if enabled else Title.Default
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonEpisode if aeon else Title.DefaultEpisode
 			else: setting -= 2
@@ -10005,7 +10012,8 @@ class Title(object):
 	def numberUniversal(self, media = Media.Unknown, metadata = None, season = None, episode = None, encode = False):
 		if not metadata is None: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = None, year = None, season = season, episode = episode, encode = encode)
-		return 'S%02dE%02d' % (season, episode)
+		if media == Media.Episode or not episode is None: return 'S%02dE%02d' % (season, episode)
+		else: return 'S%02d' % season
 
 ########################################
 # SUBPROCESS

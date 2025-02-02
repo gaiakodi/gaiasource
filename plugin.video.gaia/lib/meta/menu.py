@@ -2484,6 +2484,7 @@ class MetaMenu(object):
 		isArrival = content == MetaMenu.ContentArrival
 		isRelease = content == MetaMenu.ContentDiscover and base.get(MetaMenu.ParameterRelease)
 
+		niche = self._niche(niche = niche)
 		if media is None:
 			mediad = items[0].get('media') if items else None
 			if mediad == Media.Set or content == MetaMenu.ContentSet:
@@ -2528,15 +2529,35 @@ class MetaMenu(object):
 		# For Trakt History/Progress menus.
 		if submenu is None and isEpisode and not content == MetaMenu.ContentEpisode and not content == MetaMenu.ContentProgress and not content == MetaMenu.ContentQuick: submenu = False
 
+		#gaiafuture - in a future version, maybe clean this up.
+		#gaiafuture - Pass all attributes that might be needed by MetaTools to construct the menu, items, and labels, as one dictionary.
+		#gaiafuture - This makes it easier than passing in mutiple parameters to each subfunction and interpret their values to determine which eg type of menu it is.
+		menu = {
+			'media' : media,
+			'niche' : niche,
+
+			'mixed' : self._mediaMixed(),
+			'multiple' : multiple,
+
+			'content' : content,
+			'submenu' : submenu,
+			'progress' : progress,
+
+			'decorate' : decorate,
+			'page' : page,
+			'more' : more,
+		}
+
 		#gaiafuture - this call takes 400-500ms for an episode page of GoT underneath a season. That is half the time of the entire Python execution. Can anything be improved? Any specific function maybe that causes the slowness?e
 		items = self.mTools.items(
 			media = media,
-			niche = self._niche(niche = niche),
+			niche = niche,
 			metadatas = items,
 			progress = isProgress,
 			decorate = decorate,
 			more = more,
 			multiple = multiple,
+			menu = menu,
 			submenu = submenu,
 			recap = bonus,
 			extra = bonus,
