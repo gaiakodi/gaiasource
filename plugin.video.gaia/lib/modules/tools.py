@@ -5836,7 +5836,7 @@ class System(object):
 				#gaiaremove - this can be removed a few weeks after v7.1.2 was released.
 				#gaiaremove - also remove in MetaManager.
 				try:
-					if version['old']['number'] and version['old']['number'] <= 70010010.0 and version['new']['number'] > 70010010.0:
+					if version['old']['number'] and version['old']['number'] <= 70010029.0 and version['new']['number'] > 70010029.0:
 						from lib.meta.manager import MetaManager
 						manager = MetaManager.instance()
 						manager.mFix = True
