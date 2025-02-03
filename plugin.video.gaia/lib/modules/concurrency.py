@@ -36,10 +36,11 @@ class Concurrency(object):
 	StatusInitial	= 1	# Initialized, but not started yet.
 	StatusStarted	= 2	# Started, but not running yet.
 	StatusQueued	= 3	# Queued and waiting for later execution. Previously started, but because no new thread could be created, never moved into running state. In can switch between started and queued multiple times.
-	StatusRunning	= 4	# Running, that is, executing the target code.
-	StatusFinished	= 5	# Finished executing.
-	StatusFailed	= 6	# Failed executing.
-	StatusBusy		= [StatusStarted, StatusQueued, StatusRunning]
+	StatusDelaying	= 4	# Sleeping for a while in the run() function to allow other code to start executing before the thread's code starts to execute.
+	StatusRunning	= 5	# Running, that is, executing the target code.
+	StatusFinished	= 6	# Finished executing.
+	StatusFailed	= 7	# Failed executing.
+	StatusBusy		= [StatusStarted, StatusQueued, StatusDelaying, StatusRunning]
 
 	ErrorNone		= None
 	ErrorUnknown	= 'unknown'
@@ -50,7 +51,7 @@ class Concurrency(object):
 
 	Property		= 'GaiaConcurrency%s'
 
-	def __init__(self, target = None, group = None, name = None, daemon = None, synchronizer = None, args = (), kwargs = {}):
+	def __init__(self, target = None, group = None, name = None, daemon = None, synchronizer = None, delay = None, args = (), kwargs = {}):
 		self._statusSet(Concurrency.StatusUnknown)
 		base = self.base()
 		if base:
@@ -60,6 +61,7 @@ class Concurrency(object):
 		self.mParent = self.current()
 		self.mRank = self.currentRank() + 1
 		self.mSynchronizer = synchronizer
+		self.mDelay = delay
 
 	@classmethod
 	def initialize(self):
@@ -213,6 +215,10 @@ class Concurrency(object):
 				Logger.error()
 
 	def run(self):
+		if self.mDelay:
+			self._statusSet(Concurrency.StatusDelaying)
+			from lib.modules.tools import Time
+			Time.sleep(self.mDelay)
 		self._statusSet(Concurrency.StatusRunning)
 		self.base().run(self)
 		self._finish(Concurrency.StatusFinished) # Read comment in _finish().
@@ -438,6 +444,13 @@ class Pool(object):
 	ModeAutomatic			= 0
 	ModeThread				= 1
 	ModeProcess				= 2
+
+	DelayNone				= None
+	DelayShort				= 0.01	# 10ms
+	DelayMedium				= 0.05	# 50ms
+	DelayLong				= 0.1	# 100ms
+	DelayExtended			= 0.5	# 500ms
+	DelayDefault			= DelayMedium
 
 	SettingLevel			= 'general.concurrency.level'
 	SettingNotification		= 'general.concurrency.notification'
@@ -1091,10 +1104,18 @@ class Pool(object):
 					if Pool.Joining: break
 					Time.sleep(interval)
 
-	# synchronizer: if Semaphore/Premaphore, it is aqcuired BEFORE creating a thread object and BEFORE starting execution.
-	# synchronizer: if Postmaphore, it is aqcuired AFTER creating a thread object, but BEFORE starting execution.
+	# synchronizer: If Semaphore/Premaphore, it is aqcuired BEFORE creating a thread object and BEFORE starting execution.
+	# synchronizer: If Postmaphore, it is aqcuired AFTER creating a thread object, but BEFORE starting execution.
+	# delay:	Let the thread sleep for a while before executing its code.
+	#			This is useful for running threads in the background while executing more important code in the foreground first.
+	#			If a thread is started, Python immediatly starts executing the thread's code (for a while), until switching over to other code.
+	#			If we therefore want to execute some code in the background using a thread, it will actually start executing in the foreground, and not immediatly continue with the outer code.
+	#			By adding a delay/sleep in the thread's execution, Python is forced to continue with other (more important) code, until the sleep is done and Python executes the thread.
+	#	True:	Default delay.
+	#	Float:	Custom number of seconds to delay.
+	#	start:	The delay can also be passed in as the "start" parameter.
 	@classmethod
-	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
+	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False, delay = None):
 		try:
 			Pool.Lock.acquire()
 
@@ -1123,7 +1144,10 @@ class Pool(object):
 				try: Pool.Lock.acquire()
 				except: pass
 
-			instance = type(target = target, name = name, synchronizer = synchronizer, args = args, kwargs = kwargs)
+			if start and isinstance(start, (int, float)): delay = start
+			if delay is True: delay = Pool.DelayDefault
+
+			instance = type(target = target, name = name, synchronizer = synchronizer, delay = delay, args = args, kwargs = kwargs)
 			Pool.Instances[instance.id()] = instance
 
 			# On high-end Intel/AMD devices with a lot of memory, we can create a ton of threads without a problem.
@@ -1227,8 +1251,8 @@ class Pool(object):
 		Pool.GlobalLock = Lock()
 
 	@classmethod
-	def thread(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
-		return self.instance(type = Thread, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join)
+	def thread(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False, delay = None):
+		return self.instance(type = Thread, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join, delay = delay)
 
 	@classmethod
 	def threads(self):
@@ -1265,8 +1289,8 @@ class Pool(object):
 		self.initialize()
 
 	@classmethod
-	def process(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False):
-		return self.instance(type = Process, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join)
+	def process(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False, delay = None):
+		return self.instance(type = Process, target = target, args = args, kwargs = kwargs, synchronizer = synchronizer, start = start, join = join, delay = delay)
 
 	@classmethod
 	def processes(self):

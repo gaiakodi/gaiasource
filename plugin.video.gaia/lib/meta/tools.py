@@ -15221,6 +15221,12 @@ class MetaTools(object):
 						'^film4\s*productions?$' : 'Film4', # Film4 Productions
 					},
 
+					# In v0.0.32 there are a number of issues with lower and upper case letter that make certain icons not being detected.
+					'new' : {
+						'^itv.?1' : 'Itv1', # "ITV1" (icon has the 2nd two letters lower case, while ITV2, etc all have upper case)
+						'^mgm' : 'Mgm', # "MGM" (icon has the 2nd two letters lower case)
+					},
+
 					'full' : {
 						'(?:^prime\s*video)' : 'Amazon Prime Video', # "Prime Video"
 						'^itv.?x' : 'ITV', # "ITVX"
@@ -15379,8 +15385,8 @@ class MetaTools(object):
 	def companyExclude(self):
 		return self.companyHelper('exclude')
 
-	def companyReplacement(self, partial = False, old = False):
-		return self.companyHelper('replacement', 'partial' if partial else 'old' if old else 'full')
+	def companyReplacement(self, partial = False, old = False, new = False):
+		return self.companyHelper('replacement', 'partial' if partial else 'old' if old else 'new' if new else 'full')
 
 	def companyPreference(self):
 		return self.companyHelper('preference')
@@ -18566,8 +18572,9 @@ class MetaTools(object):
 								values[i] = Regex.replace(data = values[i], expression = key, replacement = value, group = 1, cache = True)
 
 						found = False
-						if icon['old']:
-							for key, value in self.companyReplacement(old = True).items():
+						companies = self.companyReplacement(old = True) if icon['old'] else self.companyReplacement(new = True)
+						if companies:
+							for key, value in companies.items():
 								for i in range(len(values)):
 									if Regex.match(data = values[i], expression = key, cache = True):
 										found = True

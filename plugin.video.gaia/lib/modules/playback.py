@@ -915,7 +915,8 @@ class Playback(Database):
 
 			# Execute in a thread during binging.
 			# Otherwise submitting the rating to Trakt holds up the process before going to the next-episode binge dialog.
-			if binge: callback = lambda input : Pool.thread(target = _dialogRate, kwargs = {'rating' : input, 'current' : rating, 'result' : result, 'loader' : loader, 'refresh' : not binge}, start = True)
+			# delay=True: let the thread wait to force Python to start executing other code before the thread's code.
+			if binge: callback = lambda input : Pool.thread(target = _dialogRate, kwargs = {'rating' : input, 'current' : rating, 'result' : result, 'loader' : loader, 'refresh' : not binge}, start = True, delay = True)
 			else: callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = loader, refresh = not binge)
 
 			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = callback, wait = True)

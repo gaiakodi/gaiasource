@@ -72,6 +72,13 @@ class MetaManager(object):
 	##############################################################################
 
 	def __init__(self, mode = None):
+		#gaiaremove - #gaiafix
+		#gaiaremove - this can be removed a few weeks after v7.1.2 was released.
+		#gaiaremove - this is used to fix shows in the Arrivals menu that have a S02+ release, instead of S01.
+		#gaiaremove - remove all code marked with "gaiafix"
+		#gaiaremove - also remove in modules/tools.py.
+		self.mFix = False
+
 		self.mTools = MetaTools.instance()
 		self.mLanguage = self.mTools.settingsLanguage()
 
@@ -2248,6 +2255,7 @@ class MetaManager(object):
 				# Load existing metadata from the cache.
 				# Over time more and more detailed metadata will be available for improved sorting.
 				items, stats = self._metadataSmartLoad(media = media, items = items, content = content, stats = True)
+
 				# Filter and sort using the more detailed metadata retrieved prior.
 				if filter or sort or order: items = self._process(media = media, items = items, filter = filter, sort = sort, order = order, page = False, limit = False)
 
@@ -8066,6 +8074,16 @@ class MetaManager(object):
 		itemsCurrent = self._cacheRetrieve(self._arrivalAssemble, media = media, niche = niche)
 		itemsCurrent = itemsCurrent.get('items') if itemsCurrent else None
 
+		#gaiaremove - #gaiafix - this can be removed a few weeks after v7.1.2 was released.
+		if self.mFix and Media.isSerie(media) and itemsCurrent:
+			itemsFixed = []
+			for item in itemsCurrent:
+				try:
+					if not item.get('season') or item.get('season') <= 1:
+						itemsFixed.append(item)
+				except: pass
+			itemsCurrent = itemsFixed
+
 		# NB: Do not remove based on the smart list length. Eg: 1000.
 		# Otherwise, every time _metadataSmart() is called, a bunch of "new" items are added.
 		# At the end of _metadataSmart(), most of these items get removed again, because they are sorted to the bottom of the list (eg: olderish release or low rating/votes) and then get removed by the eg 1000 limit.
@@ -8125,7 +8143,7 @@ class MetaManager(object):
 		############################################
 
 		# MOVIES
-		#	Items: +-2500 (+-5000 with duplicates)
+		#	Items: +-3000 (+-5000 with duplicates)
 		#	Requests: 122 + niche requests
 		# SHOWS
 		#	Items: +-2000 (+-4500 with duplicates)
@@ -8342,7 +8360,10 @@ class MetaManager(object):
 
 		if show:
 			# TRAKT
-			#	Shows:	1000-1400 items (12 requests - 50-180 per request)
+			#	Shows:	650-750 items (12 requests - 50-180 per request - with 50 votes)
+			#	Shows:	900-1100 items (12 requests - 50-180 per request - with 30 votes)
+			#	Shows:	1000-1200 items (12 requests - 50-180 per request - with 25 votes)
+			#	Shows:	1000-1400 items (12 requests - 50-180 per request - with 20 votes)
 			date1 = _forward(year = year, month = month)
 			date2 = _backward(year = year, month = month)
 			base = {
@@ -8350,7 +8371,7 @@ class MetaManager(object):
 				'timeout'	: timeout,
 				'media'		: Media.Season,
 				'rating'	: best,
-				'votes'		: _votes(20), # Not too low, otherwise 1000+ titles are returned per month.
+				'votes'		: _votes(25),
 			}
 			for i in range(12):
 				_increase(values = primary, base = base, date = date1)

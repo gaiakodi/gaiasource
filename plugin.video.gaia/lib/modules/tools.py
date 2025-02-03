@@ -5831,6 +5831,19 @@ class System(object):
 			# This does an internal Trakt refresh if necessary.
 			# Do not do this the first time Gaia is launched after a fresh install. Do this at the end of the wizard.
 			if not self.tWizard and not self.tInitial:
+
+				#gaiaremove - #gaiafix
+				#gaiaremove - this can be removed a few weeks after v7.1.2 was released.
+				#gaiaremove - also remove in MetaManager.
+				try:
+					if version['old']['number'] and version['old']['number'] <= 70010010.0 and version['new']['number'] > 70010010.0:
+						from lib.meta.manager import MetaManager
+						manager = MetaManager.instance()
+						manager.mFix = True
+						manager.arrival(refresh = True)
+						MetaManager.Instance = None
+				except: Logger.error()
+
 				from lib.modules.playback import Playback
 				Playback.instance().launch(refresh = True, reload = True, delay = True, wait = None)
 		_launchAdd(19, 'Initializing Playback History', _launchPlayback) # 90%
@@ -7027,12 +7040,15 @@ class Settings(object):
 	# We try to write multiple times in a thread, sleeping in between, until the file size has changed or 2.5 seconds have passed.
 	# Hence, if this function was not able to write to file during this time, the old settings will remain in the file. On the next launch this will be retried.
 	@classmethod
-	def clean(self, reload = False, retry = True, background = True):
-		if background: Pool.thread(target = self._clean, kwargs = {'reload' : reload, 'retry' : retry, 'delay' : True}, start = True)
-		else: self._clean(reload = reload, retry = retry)
+	def clean(self, reload = False, retry = True, background = True, force = False):
+		if background: Pool.thread(target = self._clean, kwargs = {'reload' : reload, 'retry' : retry, 'delay' : True, 'force' : force}, start = True)
+		else: self._clean(reload = reload, retry = retry, force = force)
 
 	@classmethod
-	def _clean(self, reload = False, retry = True, delay = False):
+	def _clean(self, reload = False, retry = True, delay = False, force = False):
+		# Do not clean on the first run after a fresh install.
+		if not force and not Settings.getBoolean('internal.initial.launch'): return False
+
 		# Important when called from service.py after Kodi is freshly booted.
 		# Otherwise Koldi might not have loaded the addon settings yet, causing many "Resetting to default value" calls below.
 		if delay: Time.sleep(3)

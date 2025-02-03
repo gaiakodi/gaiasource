@@ -22,6 +22,13 @@
 # https://myds.cloud/%E8%B5%84%E6%96%99/%E7%A3%81%E5%8A%9B%E6%90%9C%E7%B4%A2
 # https://github.com/fmhy/FMHY/wiki/%F0%9F%8C%80-Torrenting
 
+#gaiaremove - https://feed.animetosho.org/json?q=one%20piece
+#gaiaremove - has torrents, NZB, and hoster links.
+#					https://feed.animetosho.org/json?show=torrent&id=674425
+#gaiaremove - has different numbering . Eg : "One Piece Log Fish-Man Island Saga EP14 2160p"
+#gaiaremove - https://www.tokyotosho.info/rss_customize.php
+#gaiaremove - add an anime provider category.
+
 import os
 import sys
 

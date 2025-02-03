@@ -1095,6 +1095,8 @@ class HTTPSConnectionPool(HTTPConnectionPool):
             conn.connect()
 
         # TODO revise this, see https://github.com/urllib3/urllib3/issues/2791
+        # GAIACODE
+        '''
         if not conn.is_verified and not conn.proxy_is_verified:
             warnings.warn(
                 (
@@ -1105,6 +1107,7 @@ class HTTPSConnectionPool(HTTPConnectionPool):
                 ),
                 InsecureRequestWarning,
             )
+        '''
 
 
 def connection_from_url(url: str, **kw: typing.Any) -> HTTPConnectionPool:
