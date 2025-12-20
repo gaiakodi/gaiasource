@@ -35,6 +35,12 @@ class Cache(Database):
 
 	Skip = '[GAIACACHESKIP]' # If a function returns this value, it will not be cached.
 
+	# Parameter that can be passed as kwargs indicating a certain parameter should be excluded from the ID generation.
+	# Eg: cache.cacheSeconds(timeout, function, param1 = 1.0, param2 = 2.0, param3 = 3.0, __exclude__ = 'param1')
+	# The ID is generated with these parameters: param2, param3
+	# These parameters are passed to "function": param1, param2, param3
+	Exclude = '__exclude__'
+
 	ModeSynchronous = 1		# If expired, wait until the new data has been retrieved, and return the new data.
 	ModeAsynchronous = 2	# If expired, retrieve the new data in the background, and immediately return the old data.
 	ModeDefault = ModeAsynchronous
@@ -52,6 +58,7 @@ class Cache(Database):
 	TimeoutMinute25 = 1500 # 25 Minutes.
 	TimeoutMinute30 = 1800 # 30 Minutes.
 	TimeoutMinute45 = 2700 # 45 Minutes.
+	TimeoutMinute60 = 3600 # 60 Minutes.
 
 	TimeoutHour1 = 3600 # 1 Hour.
 	TimeoutHour2 = 7200 # 2 Hours.
@@ -62,6 +69,7 @@ class Cache(Database):
 	TimeoutHour9 = 32400 # 9 Hours.
 	TimeoutHour12 = 43200 # 12 Hours.
 	TimeoutHour18 = 64800 # 18 Hours.
+	TimeoutHour24 = 86400 # 24 Hours.
 
 	TimeoutDay1 = 86400 # 1 Day.
 	TimeoutDay2 = 172800 # 2 Days.
@@ -69,10 +77,23 @@ class Cache(Database):
 	TimeoutDay4 = 345600 # 4 Days.
 	TimeoutDay5 = 432000 # 5 Days.
 	TimeoutDay6 = 518400 # 6 Days.
+	TimeoutDay7 = 604800 # 7 Days.
+	TimeoutDay8 = 691200 # 8 Days.
+	TimeoutDay9 = 777600 # 9 Days.
+	TimeoutDay10 = 864000 # 10 Days.
+	TimeoutDay11 = 950400 # 11 Days.
+	TimeoutDay12 = 1036800 # 12 Days.
+	TimeoutDay13 = 1123200 # 13 Days.
+	TimeoutDay14 = 1209600 # 14 Days.
 
 	TimeoutWeek1 = 604800 # 1 Week.
 	TimeoutWeek2 = 1209600 # 2 Weeks.
 	TimeoutWeek3 = 1814400 # 3 Weeks.
+	TimeoutWeek4 = 2419200 # 4 Weeks.
+	TimeoutWeek5 = 3024000 # 5 Weeks.
+	TimeoutWeek6 = 3628800 # 6 Weeks.
+	TimeoutWeek7 = 4233600 # 7 Weeks.
+	TimeoutWeek8 = 4838400 # 8 Weeks.
 
 	TimeoutMonth1 = 2592000 # 1 Month (30 Days).
 	TimeoutMonth2 = 5270400 # 2 Months (61 Days).
@@ -81,6 +102,7 @@ class Cache(Database):
 	TimeoutMonth5 = 13132800 # 5 Months (152 Days).
 	TimeoutMonth6 = 15811200 # 6 Months (183 Days).
 	TimeoutMonth9 = 23673600 # 9 Months (274 Days).
+	TimeoutMonth12 = 31536000 # 12 Months (365 Days).
 
 	TimeoutYear1 = 31536000 # 1 Year (365 Days).
 	TimeoutYear2 = 63072000 # 2 Years (730 Days).
@@ -198,16 +220,22 @@ class Cache(Database):
 	##############################################################################
 
 	def id(self, function, *args, **kwargs):
-		kwargs = self._cacheArguments(function, *args, **kwargs)
-		return self._id(function, kwargs)
+		kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
+		return self._id(function, kwargs, exclude)
 
-	def _id(self, function, kwargs):
+	def _id(self, function, kwargs, exclude = None):
 		if function:
 			init = self._idInitialize()
 			id = init['expression2'].sub('', init['expression1'].sub('', repr(function))) + '_'
 		else:
 			id = ''
-		id += '_'.join([str(key) + '=' + str(value) for key, value in kwargs.items()])
+
+		if exclude:
+			if Tools.isStructure(exclude): id += '_'.join([str(key) + '=' + str(value) for key, value in kwargs.items() if not key in exclude])
+			else: id += '_'.join([str(key) + '=' + str(value) for key, value in kwargs.items() if not key == exclude])
+		else:
+			id += '_'.join([str(key) + '=' + str(value) for key, value in kwargs.items()])
+
 		return self._idHash(id)
 
 	@classmethod
@@ -243,11 +271,35 @@ class Cache(Database):
 		return 'Function : %s | Parameters: %s' % (function, parameters)
 
 	##############################################################################
+	# TIME
+	##############################################################################
+
+	# Time of the first cache entry.
+	def timeFirst(self):
+		return self._selectValue('SELECT MIN(time) FROM %s;')
+
+	# Time of the last cache entry.
+	def timeLast(self):
+		return self._selectValue('SELECT MAX(time) FROM %s;')
+
+	def _age(self, time):
+		if time: return Time.timestamp() - time
+		return None
+
+	# The age in seconds of the first cache entry.
+	def ageFirst(self):
+		return self._age(time = self.timeFirst())
+
+	# The age in seconds of the last cache entry.
+	def ageLast(self):
+		return self._age(time = self.timeLast())
+
+	##############################################################################
 	# EXECUTE
 	##############################################################################
 
 	def execute(self, function, *args, **kwargs):
-		kwargs = self._cacheArguments(function, *args, **kwargs)
+		kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
 		return function(**kwargs)
 
 	##############################################################################
@@ -285,7 +337,7 @@ class Cache(Database):
 		#	[1, 2, 2, 3, 4, 5]
 		# Now there is no Season 0, but two Season 2s.
 		# NB: copying data, especially larger structured with many nested dicts/lists can take a long time. Maybe a better solution?
-		if serialize: data = Tools.copy(data, deep = True)
+		if serialize and Tools.isStructure(data): data = Tools.copy(data, deep = True)
 
 		# Check _cacheDelete() for more details.
 		if id in self.mBusy: self.mBusy[id] += 1
@@ -374,7 +426,11 @@ class Cache(Database):
 		except: parameters = function.func_code.co_varnames # Python 2
 		parameters = (parameter for parameter in parameters if not parameter == 'self')
 		kwargs.update(dict(zip(parameters, args)))
-		return kwargs
+
+		exclude = kwargs.get(Cache.Exclude)
+		if exclude: del kwargs[Cache.Exclude]
+
+		return kwargs, exclude
 
 	def _cache(self, id, function, kwargs, thread_ = False, delay_ = None):
 		try:
@@ -392,8 +448,8 @@ class Cache(Database):
 
 	def cache(self, mode, timeout, refresh, function, *args, **kwargs):
 		try:
-			kwargs = self._cacheArguments(function, *args, **kwargs)
-			id = self._id(function, kwargs)
+			kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
+			id = self._id(function, kwargs, exclude)
 
 			if mode is None: mode = self.mMode
 			if timeout is None: timeout = self.mTimeout
@@ -450,8 +506,8 @@ class Cache(Database):
 
 	def cacheRetrieve(self, function, *args, **kwargs):
 		try:
-			kwargs = self._cacheArguments(function, *args, **kwargs)
-			id = self._id(function, kwargs)
+			kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
+			id = self._id(function, kwargs, exclude)
 			return self._cacheDataFrom(self._cacheSelect(id))
 		except:
 			return None
@@ -459,19 +515,28 @@ class Cache(Database):
 	def cacheExists(self, function, *args, **kwargs):
 		return bool(self.cacheRetrieve(function, *args, **kwargs))
 
+	# The cache data is still valid and has not reached its timeout yet.
+	def cacheValid(self, timeout, function, *args, **kwargs):
+		try:
+			time = self.cacheTime(function, *args, **kwargs)
+			if time: return (Time.timestamp() - time) < timeout
+			else: return False
+		except:
+			return None
+
 	# The timestamp of the last cached call.
 	def cacheTime(self, function, *args, **kwargs):
 		try:
-			kwargs = self._cacheArguments(function, *args, **kwargs)
-			id = self._id(function, kwargs)
+			kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
+			id = self._id(function, kwargs, exclude)
 			return self._cacheSelectTime(id)
 		except:
 			return None
 
 	# Delete the entire cache entry.
 	def cacheDelete(self, function, *args, **kwargs):
-		kwargs = self._cacheArguments(function, *args, **kwargs)
-		id = self._id(function, kwargs)
+		kwargs, exclude = self._cacheArguments(function, *args, **kwargs)
+		id = self._id(function, kwargs, exclude)
 		self._cacheDelete(id)
 
 	# Use the timeout set in the constructor.
@@ -651,6 +716,13 @@ class Cache(Database):
 			if times: return Tools.listSort(times)[:count][-1]
 		return None
 
+	def clearOld(self, time = None, commit = True, compact = True):
+		time = Time.timestamp() - (time or 15768000) # 6 months.
+		result = self._clean(time = time, commit = commit, compact = compact)
+		self._commit()
+		self._compact()
+		return result
+
 # The idea behind this local memory cache is as follows:
 #	1. Try to load the cached value from a class variable.
 #	2. If not available, try to load the value from a global Kodi window property.
@@ -666,12 +738,13 @@ class Memory(object):
 	Data		= {}
 
 	@classmethod
-	def reset(self, settings = True):
+	def reset(self, settings = True, force = False):
 		# When using <reuselanguageinvoker>, clear old values every now and then.
 		time = Time.timestamp() - Memory.Timeout
-		for k, v in Memory.Data.items():
+		for k in list(Memory.Data.keys()): # Use a list, since items are deleted from the dict in the loop.
 			try:
-				if v['time'] < time:
+				if not force: v = Memory.Data[k]
+				if force or (Tools.isDictionary(v) and v['time'] < time):
 					del Memory.Data[k]
 					System.windowPropertyClear(k)
 			except: Logger.error()
@@ -685,22 +758,34 @@ class Memory(object):
 		return id and id.startswith(Memory.Property)
 
 	@classmethod
-	def get(self, id = None, uncached = False, local = True, kodi = False, **kwargs):
-		id = id if self.idValid(id) else self.id(id, **kwargs)
+	def idFixed(self, id = None, fixed = None, **kwargs):
+		if fixed: return fixed
+		else: return id if self.idValid(id) else self.id(id, **kwargs)
+
+	@classmethod
+	def get(self, id = None, fixed = None, uncached = False, timeout = None, local = True, kodi = False, **kwargs):
+		id = self.idFixed(id = id, fixed = fixed, **kwargs)
 
 		valid = True
 		value = None
+		if timeout: timeout = Time.timestamp() - timeout
 
 		if local:
-			try: return Memory.Data[id]['value']
+			try:
+				value = Memory.Data[id]
+				if timeout and value['time'] < timeout: return Memory.Uncached if uncached else None
+				return value['value']
 			except: pass
 
 		if kodi:
 			value = System.windowPropertyGet(id)
 			if value:
 				value = Converter.jsonFrom(value)
-				Memory.Data[id] = value
-				value = value['value']
+				if timeout and value['time'] < timeout:
+					valid = False
+				else:
+					Memory.Data[id] = value
+					value = value['value']
 			else:
 				valid = False
 		else:
@@ -710,24 +795,24 @@ class Memory(object):
 		return value
 
 	@classmethod
-	def set(self, value, id = None, local = True, kodi = False, **kwargs):
-		id = id if self.idValid(id) else self.id(id, **kwargs)
+	def set(self, value, id = None, fixed = None, local = True, kodi = False, **kwargs):
+		id = self.idFixed(id = id, fixed = fixed, **kwargs)
 		data = {'value' : value, 'time' : Time.timestamp()}
 		if local: Memory.Data[id] = data
 		if kodi: System.windowPropertySet(id, Converter.jsonTo(data)) # Always save as a JSON object, so we can preserve the data type and deal with "empty" values.
 		return value
 
 	@classmethod
-	def clear(self, id = None, local = True, kodi = False, **kwargs):
-		id = id if self.idValid(id) else self.id(id, **kwargs)
+	def clear(self, id = None, fixed = None, local = True, kodi = False, **kwargs):
+		id = self.idFixed(id = id, fixed = fixed, **kwargs)
 		if local:
 			try: del Memory.Data[id]
 			except: pass
 		if kodi: System.windowPropertyClear(id)
 
 	@classmethod
-	def has(self, id = None, local = True, kodi = False, **kwargs):
-		id = id if self.idValid(id) else self.id(id, **kwargs)
+	def has(self, id = None, fixed = None, local = True, kodi = False, **kwargs):
+		id = self.idFixed(id = id, fixed = fixed, **kwargs)
 		if local and id in Memory.Data: return True
 		if kodi and System.windowPropertyGet(id): return True
 		return False

@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter, Language, Math
+from lib.modules.tools import Media, Logger, Regex, Time, Tools, Converter, Language, Country, Math
 from lib.modules.compression import Compressor
 from lib.modules.network import Networker
 from lib.modules.concurrency import Pool
@@ -343,7 +343,13 @@ class MetaTmdb(MetaProvider):
 		if Tools.isArray(values): data['include_image_language'] = ','.join(values)
 
 		self._usageUpdate()
-		return Networker().requestJson(method = method, link = link, data = data)
+		networker = Networker()
+		result = networker.requestJson(method = method, link = link, data = data)
+
+		error = networker.responseErrorType()
+		if error and error in Networker.ErrorServer: self._errorUpdate()
+
+		return result
 
 	##############################################################################
 	# ITEM
@@ -396,7 +402,12 @@ class MetaTmdb(MetaProvider):
 			if genre: result['genre'] = genre
 
 		language = item.get('original_language')
-		if language: result['language'] = [language]
+		if language: result['language'] = Language.codes([language])
+
+		country = item.get('origin_country')
+		if country:
+			if not Tools.isArray(country): country = [country]
+			result['country'] = Country.codes(country)
 
 		rating = item.get('vote_average')
 		votes = item.get('vote_count')
@@ -468,6 +479,35 @@ class MetaTmdb(MetaProvider):
 
 	def _idEpisode(self, imdb = None, tvdb = None):
 		return self._id(media = Media.Episode, imdb = imdb, tvdb = tvdb)
+
+	##############################################################################
+	# EXTRACT
+	##############################################################################
+
+	def _extractType(self, item):
+		# It seems that TMDb recently added the "episode_type" attribute.
+		# But it is not documented and the forums do not really list the different values, except for "finale".
+		# Add these, since for future episodes, TMDb has the type, while Trakt has not, since they probably have not scraped TMDb yet.
+
+		try:
+			type = item.get('episode_type')
+			if type:
+				if Tools.isArray(type): type = ' '.join(type)
+				type = type.lower()
+
+				result = []
+
+				if 'premiere' in type: result.append(Media.Premiere)
+				elif 'finale' in type: result.append(Media.Finale)
+				elif 'standard' in type: result.append(Media.Standard)
+
+				if 'mid' in type: result.append(Media.Middle)
+				elif 'season' in type: result.append(Media.Inner)
+				elif 'serie' in type or 'show' in type: result.append(Media.Outer)
+
+				if result: return self.mMetatools.mergeType(values = result, season = item.get('season_number'), episode = item.get('episode_number'))
+		except: Logger.error()
+		return None
 
 	##############################################################################
 	# LIMIT
@@ -566,12 +606,23 @@ class MetaTmdb(MetaProvider):
 			if Tools.isArray(serie): serie = '|'.join([str(i) for i in serie])
 			data['with_type'] = serie
 
-		if year: data['first_air_date_year' if show else 'year'] = year
+		if year:
+			if Tools.isArray(year):
+				if movie:
+					# Retrieving home releases often returns decad old movies.
+					# This is because those old movies get a new 4k/BluRay release, which gives them a new "release_date".
+					# Also add "primary_release_date" which is applied to the oldest date of the movie, to filter out those old movies.
+					# https://www.themoviedb.org/talk/5a87b514c3a3682dbf04eca7
+					data['primary_release_date.gte'] = '%d-01-01' % year[0]
+					data['primary_release_date.lte'] = '%d-12-31' % year[1]
+			else:
+				data['first_air_date_year' if show else 'year'] = year
 
 		if date:
 			# NB: Use "primary_release_date" instead of "release_date".
 			# Otherwise when returning the latests digital/physical releases, old items are returned (sometimes 20+ years old).
 			# Update: Maybe this was only a temporary TMDb issue. When using "primary_release_date", the digital/physical release date is ignored, that is, titles released later than "primary_release_date.lte" are still returned.
+			# Update (2025-03): Check the new primary_release_date above in "year".
 			dateStart = None
 			dateEnd = None
 			if Tools.isArray(date):
@@ -776,17 +827,23 @@ class MetaTmdb(MetaProvider):
 							if studio: result['studio'] = [i['name'] for i in studio]
 
 							country = dataMovie.get('production_countries')
-							if country: result['country'] = [i['iso_3166_1'].lower() for i in country]
+							if country: result['country'] = Country.codes([i['iso_3166_1'].lower() for i in country])
 
 							languages = dataMovie.get('spoken_languages')
-							if languages: result['language'] = [i['iso_639_1'].lower() for i in languages]
+							if languages: result['language'] = Language.codes([i['iso_639_1'].lower() for i in languages])
 							languages = dataMovie.get('original_language')
 							if languages:
 								# TMDb does not have a valid order for spoken_languages.
 								# Eg: GoodFellas (1990): spoken_languages = ['it', 'en'], original_language = 'en'
-								languages = [languages]
-								if 'language' in result: result['language'] = Tools.listUnique(languages + result['language'])
-								else: result['language'] = Tools.listUnique(languages)
+								languages = Language.codes([languages])
+								if languages:
+									if 'language' in result: result['language'] = Tools.listUnique(languages + result['language'])
+									else: result['language'] = Tools.listUnique(languages)
+
+							country = dataMovie.get('origin_country')
+							if country:
+								if not Tools.isArray(country): country = [country]
+								result['country'] = Country.codes(country)
 
 							homepage = dataMovie.get('homepage')
 							if homepage: result['homepage'] = homepage
@@ -804,7 +861,10 @@ class MetaTmdb(MetaProvider):
 							if dataCollection:
 								collection = {}
 								collectionId = dataCollection.get('id')
-								if collectionId: collection['id'] = collectionId
+								if collectionId:
+									collectionId = str(collectionId)
+									collection['tmdb'] = collectionId
+									collection['id'] = {'tmdb' : collectionId}
 								collectionTitle = dataCollection.get('name')
 								if collectionTitle: collection['title'] = Regex.replace(data = Networker.htmlDecode(collectionTitle), expression = '\s+', replacement = ' ', all = True) # Sometimes TMDb has 2 spaces between the title and the "Collection" part.
 
@@ -851,50 +911,86 @@ class MetaTmdb(MetaProvider):
 						except: Logger.error()
 
 						try:
-							if dataImage:
+							if dataImage or dataMovie:
 								images = {i : [] for i in MetaImage.Types}
 								poster = [[], []]
 								keyart = [[], []]
 								fanart = [[], []]
 								landscape = [[], []]
 
-								entries = (
-									('posters', MetaImage.TypePoster),
-									('backdrops', MetaImage.TypeFanart),
-									('logos', MetaImage.TypeClearlogo),
-								)
-								for entry in entries:
-									try:
-										if entry[0] in dataImage:
-											indexed = 0
-											for i in dataImage[entry[0]]:
-												indexed += 1
-												index = 99999999 - indexed
-												vote = i.get('vote_average')
-												vote = float(vote) if vote else 0
-												sort = {
-													MetaImage.SortIndex : index,
-													MetaImage.SortVote : vote,
-													MetaImage.SortVoteIndex : [vote, index],
-												}
-												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
-												if entry[1] == MetaImage.TypePoster:
-													if image[MetaImage.AttributeLanguage]:
-														poster[0].append(image)
-														keyart[1].append(image)
+								if dataImage:
+									entries = (
+										('posters', MetaImage.TypePoster),
+										('backdrops', MetaImage.TypeFanart),
+										('logos', MetaImage.TypeClearlogo),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataImage:
+												indexed = 0
+												for i in dataImage[entry[0]]:
+													indexed += 1
+													index = 99999999 - indexed
+													vote = i.get('vote_average')
+													vote = float(vote) if vote else 0
+													sort = {
+														MetaImage.SortIndex : index,
+														MetaImage.SortVote : vote,
+														MetaImage.SortVoteIndex : [vote, index],
+													}
+													image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
+													if image:
+														if entry[1] == MetaImage.TypePoster:
+															if image[MetaImage.AttributeLanguage]:
+																poster[0].append(image)
+																keyart[1].append(image)
+															else:
+																poster[1].append(image)
+																keyart[0].append(image)
+														elif entry[1] == MetaImage.TypeFanart:
+															if image[MetaImage.AttributeLanguage]:
+																landscape[0].append(image)
+																fanart[1].append(image)
+															else:
+																landscape[1].append(image)
+																fanart[0].append(image)
+														else:
+															images[entry[1]].append(image)
+										except: Logger.error()
+
+								# Update (2025-09): Not sure if this is a new change to the API, a temporary issues, or always was there.
+								# For some seasons, the "images" dict returned by TMDb does not contain any images.
+								# However, there might still be a single image stored as a separate path attribute. Use these images as a fallback.
+								# This has only been observed with the season metadata, but also do this here, in case some movies have the same problem.
+								if dataMovie:
+									entries = (
+										('poster_path', MetaImage.TypePoster),
+										('backdrop_path', MetaImage.TypeFanart),
+										('logo_path', MetaImage.TypeClearlogo),
+										('still_path', MetaImage.TypeThumb),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataMovie:
+												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = dataMovie[entry[0]]), provider = MetaImage.ProviderTmdb)
+												if image:
+													if entry[1] == MetaImage.TypePoster:
+														if image[MetaImage.AttributeLanguage]:
+															if not poster[0] and not poster[1]: poster[0].append(image)
+															if not keyart[0] and not keyart[1]: keyart[1].append(image)
+														else:
+															if not poster[0] and not poster[1]: poster[1].append(image)
+															if not keyart[0] and not keyart[1]: keyart[0].append(image)
+													elif entry[1] == MetaImage.TypeFanart:
+														if image[MetaImage.AttributeLanguage]:
+															if not landscape[0] and not landscape[1]: landscape[0].append(image)
+															if not fanart[0] and not fanart[1]: fanart[1].append(image)
+														else:
+															if not landscape[0] and not landscape[1]: landscape[1].append(image)
+															if not fanart[0] and not fanart[1]: fanart[0].append(image)
 													else:
-														poster[1].append(image)
-														keyart[0].append(image)
-												elif entry[1] == MetaImage.TypeFanart:
-													if image[MetaImage.AttributeLanguage]:
-														landscape[0].append(image)
-														fanart[1].append(image)
-													else:
-														landscape[1].append(image)
-														fanart[0].append(image)
-												else:
-													images[entry[1]].append(image)
-									except: Logger.error()
+														if not images[entry[1]]: images[entry[1]].append(image)
+										except: Logger.error()
 
 								images[MetaImage.TypePoster] = poster[0] + poster[1]
 								images[MetaImage.TypeKeyart] = keyart[0] + keyart[1]
@@ -977,7 +1073,9 @@ class MetaTmdb(MetaProvider):
 							if ids: result['id'] = ids
 
 							title = dataSet.get('name')
-							if title: result['title'] = result['set'] = Regex.remove(data = Networker.htmlDecode(title), expression = '(?:\s*-\s*)?(?:\s*movie\s*)?(?:\s*[\[\(\{])?\s*((?:d(?:i|uo|ou)|tr[iy]|(?:quadr[iao]|tetr[ao])|penta|hex[ao]|hept[ao]|oct[ao]|enn?e[ao]|dec[ao]|antho)log(?:(?:i|í)[ae]?|y)s?|coll?ecti(?:on|e)s?|sagas?|set|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|seri|sammlung|(?:film)?reihe|komplett|verzameling|samling|kolekcja|kolekce|koleksiyonu|трилогия|коллекция|полный)(?:\s*[\]\)\}])?$', all = True, cache = True)
+							if title:
+								title = Networker.htmlDecode(title)
+								result['set'] = result['title'] = result['originaltitle'] = title
 
 							plot = dataSet.get('overview')
 							if plot: result['plot'] = result['setoverview'] = Networker.htmlDecode(plot)
@@ -1009,8 +1107,13 @@ class MetaTmdb(MetaProvider):
 										resultPart['premiered'] = premiered
 										resultPart['time'] = {MetaTools.TimePremiere : Time.timestamp(premiered, format = Time.FormatDate, utc = True)}
 
-								genre = part.get('genres')
-								if genre: resultPart['genre'] = MetaTmdb._convertGenre(genre = [i['id'] for i in genre], inverse = True)
+								genre = part.get('genre_ids')
+								if not genre:
+									genre = part.get('genres')
+									if genre: genre = [i.get('id') for i in genre]
+								if genre:
+									genre = self._convertGenre(genre = genre, inverse = True)
+									if genre: resultPart['genre'] = genre
 
 								rating = part.get('vote_average')
 								if not rating is None: resultPart['rating'] = rating
@@ -1019,12 +1122,18 @@ class MetaTmdb(MetaProvider):
 								if not votes is None: resultPart['votes'] = votes
 
 								languages = part.get('spoken_languages')
-								if languages: resultPart['language'] = [i['iso_639_1'].lower() for i in languages]
+								if languages: resultPart['language'] = Language.codes([i['iso_639_1'].lower() for i in languages])
 								languages = part.get('original_language')
 								if languages:
-									languages = [languages]
-									if 'language' in resultPart: resultPart['language'] = Tools.listUnique(languages + resultPart['language'])
-									else: resultPart['language'] = Tools.listUnique(languages)
+									languages = Language.codes([languages])
+									if languages:
+										if 'language' in resultPart: resultPart['language'] = Tools.listUnique(languages + resultPart['language'])
+										else: resultPart['language'] = Tools.listUnique(languages)
+
+								country = part.get('origin_country')
+								if country:
+									if not Tools.isArray(country): country = [country]
+									resultPart['country'] = Country.codes(country)
 
 								resultPart['adult'] = part.get('adult')
 
@@ -1053,18 +1162,10 @@ class MetaTmdb(MetaProvider):
 								genre = Tools.listUnique([i for i in values if i])
 								if values: result['genre'] = genre
 
-							rating = []
-							votes = []
-							for i in parts:
-								value = i.get('rating')
-								if not value is None: rating.append(value)
-								value = i.get('votes')
-								if not value is None: votes.append(value)
-
-							voting = self.mMetatools.voting(metadata = {'voting' : {'rating' : {'tmdb' : rating or None}, 'votes' : {'tmdb' : votes or None}}})
+							voting = self.mMetatools.votingAverageWeighted(metadata = parts, maximum = True)
 							if voting:
 								result['rating'] = Math.round(voting['rating'], places = 3) # Round to save storage space in the cache.
-								result['votes'] = max(votes)  if votes else 0
+								result['votes'] = voting['votes']
 
 							values = []
 							for i in parts:
@@ -1073,6 +1174,14 @@ class MetaTmdb(MetaProvider):
 							if values:
 								language = Tools.listUnique([i for i in values if i])
 								if values: result['language'] = language
+
+							values = []
+							for i in parts:
+								country = i.get('country')
+								if country: values.extend(country)
+							if values:
+								country = Tools.listUnique([i for i in values if i])
+								if values: result['country'] = country
 
 							adult = False
 							for part in dataParts:
@@ -1084,50 +1193,86 @@ class MetaTmdb(MetaProvider):
 							result['part'] = parts
 
 						try:
-							if dataImage:
+							if dataImage or dataSet:
 								images = {i : [] for i in MetaImage.Types}
 								poster = [[], []]
 								keyart = [[], []]
 								fanart = [[], []]
 								landscape = [[], []]
 
-								entries = (
-									('posters', MetaImage.TypePoster),
-									('backdrops', MetaImage.TypeFanart),
-									('logos', MetaImage.TypeClearlogo),
-								)
-								for entry in entries:
-									try:
-										if entry[0] in dataImage:
-											indexed = 0
-											for i in dataImage[entry[0]]:
-												indexed += 1
-												index = 99999999 - indexed
-												vote = i.get('vote_average')
-												vote = float(vote) if vote else 0
-												sort = {
-													MetaImage.SortIndex : index,
-													MetaImage.SortVote : vote,
-													MetaImage.SortVoteIndex : [vote, index],
-												}
-												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
-												if entry[1] == MetaImage.TypePoster:
-													if image[MetaImage.AttributeLanguage]:
-														poster[0].append(image)
-														keyart[1].append(image)
+								if dataImage:
+									entries = (
+										('posters', MetaImage.TypePoster),
+										('backdrops', MetaImage.TypeFanart),
+										('logos', MetaImage.TypeClearlogo),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataImage:
+												indexed = 0
+												for i in dataImage[entry[0]]:
+													indexed += 1
+													index = 99999999 - indexed
+													vote = i.get('vote_average')
+													vote = float(vote) if vote else 0
+													sort = {
+														MetaImage.SortIndex : index,
+														MetaImage.SortVote : vote,
+														MetaImage.SortVoteIndex : [vote, index],
+													}
+													image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
+													if image:
+														if entry[1] == MetaImage.TypePoster:
+															if image[MetaImage.AttributeLanguage]:
+																poster[0].append(image)
+																keyart[1].append(image)
+															else:
+																poster[1].append(image)
+																keyart[0].append(image)
+														elif entry[1] == MetaImage.TypeFanart:
+															if image[MetaImage.AttributeLanguage]:
+																landscape[0].append(image)
+																fanart[1].append(image)
+															else:
+																landscape[1].append(image)
+																fanart[0].append(image)
+														else:
+															images[entry[1]].append(image)
+										except: Logger.error()
+
+								# Update (2025-09): Not sure if this is a new change to the API, a temporary issues, or always was there.
+								# For some seasons, the "images" dict returned by TMDb does not contain any images.
+								# However, there might still be a single image stored as a separate path attribute. Use these images as a fallback.
+								# This has only been observed with the season metadata, but also do this here, in case some sets have the same problem.
+								if dataSet:
+									entries = (
+										('poster_path', MetaImage.TypePoster),
+										('backdrop_path', MetaImage.TypeFanart),
+										('logo_path', MetaImage.TypeClearlogo),
+										('still_path', MetaImage.TypeThumb),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataSet:
+												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = dataSet[entry[0]]), provider = MetaImage.ProviderTmdb)
+												if image:
+													if entry[1] == MetaImage.TypePoster:
+														if image[MetaImage.AttributeLanguage]:
+															if not poster[0] and not poster[1]: poster[0].append(image)
+															if not keyart[0] and not keyart[1]: keyart[1].append(image)
+														else:
+															if not poster[0] and not poster[1]: poster[1].append(image)
+															if not keyart[0] and not keyart[1]: keyart[0].append(image)
+													elif entry[1] == MetaImage.TypeFanart:
+														if image[MetaImage.AttributeLanguage]:
+															if not landscape[0] and not landscape[1]: landscape[0].append(image)
+															if not fanart[0] and not fanart[1]: fanart[1].append(image)
+														else:
+															if not landscape[0] and not landscape[1]: landscape[1].append(image)
+															if not fanart[0] and not fanart[1]: fanart[0].append(image)
 													else:
-														poster[1].append(image)
-														keyart[0].append(image)
-												elif entry[1] == MetaImage.TypeFanart:
-													if image[MetaImage.AttributeLanguage]:
-														landscape[0].append(image)
-														fanart[1].append(image)
-													else:
-														landscape[1].append(image)
-														fanart[0].append(image)
-												else:
-													images[entry[1]].append(image)
-									except: Logger.error()
+														if not images[entry[1]]: images[entry[1]].append(image)
+										except: Logger.error()
 
 								images[MetaImage.TypePoster] = poster[0] + poster[1]
 								images[MetaImage.TypeKeyart] = keyart[0] + keyart[1]
@@ -1177,8 +1322,18 @@ class MetaTmdb(MetaProvider):
 						if 'name' in dataShow and 'id' in dataShow:
 							result['media'] = Media.Show
 
+							mini = False
 							type = dataShow.get('type')
-							if type and Tools.isString(type) and type.lower().startswith('mini'): result['niche'] = [Media.Mini]
+							if type and Tools.isString(type) and Regex.match(data = type, expression = 'mini\-?serie'):
+								mini = True
+							else:
+								try:
+									season = dataShow.get('seasons')
+									if season:
+										season = season[0].get('name')
+										if season and Regex.match(data = season, expression = 'mini\-?serie'): mini = True
+								except: Logger.error()
+							if mini: result['niche'] = [Media.Mini]
 
 							ids = {}
 							external = dataShow.get('external_ids') or {}
@@ -1218,6 +1373,9 @@ class MetaTmdb(MetaProvider):
 
 							genre = dataShow.get('genres')
 							if genre: result['genre'] = MetaTmdb._convertGenre(genre = [i['id'] for i in genre], inverse = True)
+							if mini:
+								if not result.get('genre'): result['genre'] = []
+								result['genre'].append(MetaTools.GenreMini)
 
 							rating = dataShow.get('vote_average')
 							if not rating is None: result['rating'] = rating
@@ -1226,7 +1384,9 @@ class MetaTmdb(MetaProvider):
 							if not votes is None: result['votes'] = votes
 
 							duration = dataShow.get('episode_run_time')
-							if duration: result['duration'] = duration[0] * 60
+							if duration:
+								duration = duration[0] * 60
+								result['duration'] = duration
 
 							status = dataShow.get('status')
 							if status: result['status'] = MetaTmdb._convertStatus(status = status, inverse = True)
@@ -1237,16 +1397,24 @@ class MetaTmdb(MetaProvider):
 							studio = dataShow.get('production_companies')
 							if studio: result['studio'] = [i['name'] for i in studio]
 
+							# Sometimes alternative ISO codes are returned that are not an official code.
+							# Eg: tt0806901 - [{'iso_3166_1': 'DE', 'name': 'Germany'}, {'iso_3166_1': 'XG', 'name': 'East Germany'}]
 							country = dataShow.get('production_countries')
-							if country: result['country'] = [i['iso_3166_1'].lower() for i in country]
+							if country: result['country'] = Country.codes([i['iso_3166_1'].lower() for i in country])
 
 							languages = dataShow.get('spoken_languages')
-							if languages: result['language'] = [i['iso_639_1'].lower() for i in languages]
+							if languages: result['language'] = Language.codes([i['iso_639_1'].lower() for i in languages])
 							languages = dataShow.get('original_language')
 							if languages:
-								languages = [languages]
-								if 'language' in result: result['language'] = Tools.listUnique(languages + result['language'])
-								else: result['language'] = Tools.listUnique(languages)
+								languages = Language.codes([languages])
+								if languages:
+									if 'language' in result: result['language'] = Tools.listUnique(languages + result['language'])
+									else: result['language'] = Tools.listUnique(languages)
+
+							country = dataShow.get('origin_country')
+							if country:
+								if not Tools.isArray(country): country = [country]
+								result['country'] = Country.codes(country)
 
 							homepage = dataShow.get('homepage')
 							if homepage: result['homepage'] = homepage
@@ -1256,6 +1424,7 @@ class MetaTmdb(MetaProvider):
 							try:
 								from lib.meta.pack import MetaPack
 
+								seasonReleased = None
 								seasonSpecial = None
 								episodeSpecial = None
 								seasonOfficial = dataShow.get('number_of_seasons')
@@ -1267,6 +1436,22 @@ class MetaTmdb(MetaProvider):
 											seasonSpecial = 1
 											episodeSpecial = i.get('episode_count')
 											break
+
+								lastEpisode = dataShow.get('last_episode_to_air')
+								if lastEpisode: seasonReleased = lastEpisode.get('season_number')
+
+								count = {}
+								if not seasonOfficial is None or not seasonReleased is None or not seasonSpecial is None:
+									count['season'] = {}
+									if not seasonOfficial is None: count['season']['total'] = seasonOfficial
+									if not seasonReleased is None: count['season']['released'] = seasonReleased
+									if not seasonOfficial is None and not seasonReleased is None: count['season']['unreleased'] = seasonOfficial - seasonReleased
+									if not seasonSpecial is None: count['season']['special'] = seasonSpecial
+								if not episodeOfficial is None or not episodeSpecial is None:
+									count['episode'] = {}
+									if not episodeOfficial is None: count['episode']['total'] = episodeOfficial
+									if not episodeSpecial is None: count['episode']['special'] = episodeSpecial
+								if count: result['count'] = count
 
 								pack = MetaPack.reduceBase(seasonOfficial = seasonOfficial, seasonSpecial = seasonSpecial, episodeOfficial = episodeOfficial, episodeSpecial = episodeSpecial, duration = duration)
 								if pack: result['packed'] = pack
@@ -1301,50 +1486,86 @@ class MetaTmdb(MetaProvider):
 						except: Logger.error()
 
 						try:
-							if dataImage:
+							if dataImage or dataShow:
 								images = {i : [] for i in MetaImage.Types}
 								poster = [[], []]
 								keyart = [[], []]
 								fanart = [[], []]
 								landscape = [[], []]
 
-								entries = (
-									('posters', MetaImage.TypePoster),
-									('backdrops', MetaImage.TypeFanart),
-									('logos', MetaImage.TypeClearlogo),
-								)
-								for entry in entries:
-									try:
-										if entry[0] in dataImage:
-											indexed = 0
-											for i in dataImage[entry[0]]:
-												indexed += 1
-												index = 99999999 - indexed
-												vote = i.get('vote_average')
-												vote = float(vote) if vote else 0
-												sort = {
-													MetaImage.SortIndex : index,
-													MetaImage.SortVote : vote,
-													MetaImage.SortVoteIndex : [vote, index],
-												}
-												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
-												if entry[1] == MetaImage.TypePoster:
-													if image[MetaImage.AttributeLanguage]:
-														poster[0].append(image)
-														keyart[1].append(image)
+								if dataImage:
+									entries = (
+										('posters', MetaImage.TypePoster),
+										('backdrops', MetaImage.TypeFanart),
+										('logos', MetaImage.TypeClearlogo),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataImage:
+												indexed = 0
+												for i in dataImage[entry[0]]:
+													indexed += 1
+													index = 99999999 - indexed
+													vote = i.get('vote_average')
+													vote = float(vote) if vote else 0
+													sort = {
+														MetaImage.SortIndex : index,
+														MetaImage.SortVote : vote,
+														MetaImage.SortVoteIndex : [vote, index],
+													}
+													image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
+													if image:
+														if entry[1] == MetaImage.TypePoster:
+															if image[MetaImage.AttributeLanguage]:
+																poster[0].append(image)
+																keyart[1].append(image)
+															else:
+																poster[1].append(image)
+																keyart[0].append(image)
+														elif entry[1] == MetaImage.TypeFanart:
+															if image[MetaImage.AttributeLanguage]:
+																landscape[0].append(image)
+																fanart[1].append(image)
+															else:
+																landscape[1].append(image)
+																fanart[0].append(image)
+														else:
+															images[entry[1]].append(image)
+										except: Logger.error()
+
+								# Update (2025-09): Not sure if this is a new change to the API, a temporary issues, or always was there.
+								# For some seasons, the "images" dict returned by TMDb does not contain any images.
+								# However, there might still be a single image stored as a separate path attribute. Use these images as a fallback.
+								# This has only been observed with the season metadata, but also do this here, in case some shows have the same problem.
+								if dataShow:
+									entries = (
+										('poster_path', MetaImage.TypePoster),
+										('backdrop_path', MetaImage.TypeFanart),
+										('logo_path', MetaImage.TypeClearlogo),
+										('still_path', MetaImage.TypeThumb),
+									)
+									for entry in entries:
+										try:
+											if entry[0] in dataShow:
+												image = MetaImage.create(link = self._metadataImage(type = entry[1], path = dataShow[entry[0]]), provider = MetaImage.ProviderTmdb)
+												if image:
+													if entry[1] == MetaImage.TypePoster:
+														if image[MetaImage.AttributeLanguage]:
+															if not poster[0] and not poster[1]: poster[0].append(image)
+															if not keyart[0] and not keyart[1]: keyart[1].append(image)
+														else:
+															if not poster[0] and not poster[1]: poster[1].append(image)
+															if not keyart[0] and not keyart[1]: keyart[0].append(image)
+													elif entry[1] == MetaImage.TypeFanart:
+														if image[MetaImage.AttributeLanguage]:
+															if not landscape[0] and not landscape[1]: landscape[0].append(image)
+															if not fanart[0] and not fanart[1]: fanart[1].append(image)
+														else:
+															if not landscape[0] and not landscape[1]: landscape[1].append(image)
+															if not fanart[0] and not fanart[1]: fanart[0].append(image)
 													else:
-														poster[1].append(image)
-														keyart[0].append(image)
-												elif entry[1] == MetaImage.TypeFanart:
-													if image[MetaImage.AttributeLanguage]:
-														landscape[0].append(image)
-														fanart[1].append(image)
-													else:
-														landscape[1].append(image)
-														fanart[0].append(image)
-												else:
-													images[entry[1]].append(image)
-									except: Logger.error()
+														if not images[entry[1]]: images[entry[1]].append(image)
+										except: Logger.error()
 
 								images[MetaImage.TypePoster] = poster[0] + poster[1]
 								images[MetaImage.TypeKeyart] = keyart[0] + keyart[1]
@@ -1394,7 +1615,7 @@ class MetaTmdb(MetaProvider):
 						requests = []
 						if quick:
 							# If too many appends are added, TMDb returns: "Too many append to response objects: The maximum number of remote calls is 20."
-							# Split them over mutiple requests.
+							# Split them over multiple requests.
 							append = list(idSeasons.values()) + list(idImages.values()) + list(idPeople.values())
 							append = [append[i : i + MetaTmdb.LimitAppend] for i in range(0, len(append), MetaTmdb.LimitAppend)]
 
@@ -1500,50 +1721,86 @@ class MetaTmdb(MetaProvider):
 
 									try:
 										# Seasons only seem to have posters on TMDb, but no fanart, landscape, etc.
-										if dataImage:
+										if dataImage or dataSeason:
 											images = {i : [] for i in MetaImage.Types}
 											poster = [[], []]
 											keyart = [[], []]
 											fanart = [[], []]
 											landscape = [[], []]
 
-											entries = (
-												('posters', MetaImage.TypePoster),
-												('backdrops', MetaImage.TypeFanart),
-												('logos', MetaImage.TypeClearlogo),
-											)
-											for entry in entries:
-												try:
-													if entry[0] in dataImage:
-														indexed = 0
-														for i in dataImage[entry[0]]:
-															indexed += 1
-															index = 99999999 - indexed
-															vote = i.get('vote_average')
-															vote = float(vote) if vote else 0
-															sort = {
-																MetaImage.SortIndex : index,
-																MetaImage.SortVote : vote,
-																MetaImage.SortVoteIndex : [vote, index],
-															}
-															image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
-															if entry[1] == MetaImage.TypePoster:
-																if image[MetaImage.AttributeLanguage]:
-																	poster[0].append(image)
-																	keyart[1].append(image)
+											if dataImage:
+												entries = (
+													('posters', MetaImage.TypePoster),
+													('backdrops', MetaImage.TypeFanart),
+													('logos', MetaImage.TypeClearlogo),
+												)
+												for entry in entries:
+													try:
+														if entry[0] in dataImage:
+															indexed = 0
+															for i in dataImage[entry[0]]:
+																indexed += 1
+																index = 99999999 - indexed
+																vote = i.get('vote_average')
+																vote = float(vote) if vote else 0
+																sort = {
+																	MetaImage.SortIndex : index,
+																	MetaImage.SortVote : vote,
+																	MetaImage.SortVoteIndex : [vote, index],
+																}
+																image = MetaImage.create(link = self._metadataImage(type = entry[1], path = i.get('file_path')), provider = MetaImage.ProviderTmdb, language = i.get('iso_639_1'), sort = sort)
+																if image:
+																	if entry[1] == MetaImage.TypePoster:
+																		if image[MetaImage.AttributeLanguage]:
+																			poster[0].append(image)
+																			keyart[1].append(image)
+																		else:
+																			poster[1].append(image)
+																			keyart[0].append(image)
+																	elif entry[1] == MetaImage.TypeFanart:
+																		if image[MetaImage.AttributeLanguage]:
+																			landscape[0].append(image)
+																			fanart[1].append(image)
+																		else:
+																			landscape[1].append(image)
+																			fanart[0].append(image)
+																	else:
+																		images[entry[1]].append(image)
+													except: Logger.error()
+
+											# Update (2025-09): Not sure if this is a new change to the API, a temporary issues, or always was there.
+											# For some seasons, the "images" dict returned by TMDb does not contain any images.
+											# However, there might still be a single image stored as a separate path attribute. Use these images as a fallback.
+											# Eg: Good times, bad times (when retrieving with "quick=True").
+											if dataSeason:
+												entries = (
+													('poster_path', MetaImage.TypePoster),
+													('backdrop_path', MetaImage.TypeFanart),
+													('logo_path', MetaImage.TypeClearlogo),
+													('still_path', MetaImage.TypeThumb),
+												)
+												for entry in entries:
+													try:
+														if entry[0] in dataSeason:
+															image = MetaImage.create(link = self._metadataImage(type = entry[1], path = dataSeason[entry[0]]), provider = MetaImage.ProviderTmdb)
+															if image:
+																if entry[1] == MetaImage.TypePoster:
+																	if image[MetaImage.AttributeLanguage]:
+																		if not poster[0] and not poster[1]: poster[0].append(image)
+																		if not keyart[0] and not keyart[1]: keyart[1].append(image)
+																	else:
+																		if not poster[0] and not poster[1]: poster[1].append(image)
+																		if not keyart[0] and not keyart[1]: keyart[0].append(image)
+																elif entry[1] == MetaImage.TypeFanart:
+																	if image[MetaImage.AttributeLanguage]:
+																		if not landscape[0] and not landscape[1]: landscape[0].append(image)
+																		if not fanart[0] and not fanart[1]: fanart[1].append(image)
+																	else:
+																		if not landscape[0] and not landscape[1]: landscape[1].append(image)
+																		if not fanart[0] and not fanart[1]: fanart[0].append(image)
 																else:
-																	poster[1].append(image)
-																	keyart[0].append(image)
-															elif entry[1] == MetaImage.TypeFanart:
-																if image[MetaImage.AttributeLanguage]:
-																	landscape[0].append(image)
-																	fanart[1].append(image)
-																else:
-																	landscape[1].append(image)
-																	fanart[0].append(image)
-															else:
-																images[entry[1]].append(image)
-												except: Logger.error()
+																	if not images[entry[1]]: images[entry[1]].append(image)
+													except: Logger.error()
 
 											images[MetaImage.TypePoster] = poster[0] + poster[1]
 											images[MetaImage.TypeKeyart] = keyart[0] + keyart[1]
@@ -1570,7 +1827,16 @@ class MetaTmdb(MetaProvider):
 
 				if data:
 					dataSeason = data['season']
-					if dataSeason is False or not 'episodes' in dataSeason: complete = False
+					if dataSeason is False or (dataSeason and not 'episodes' in dataSeason):
+						# If the season does not exist on TMDb.
+						# {'success': False, 'status_code': 34, 'status_message': 'The resource you requested could not be found.'}
+						# Eg: 62715 S02
+						#if season and season > 1 and dataSeason and dataSeason.get('status_code') == 34: pass
+						#else: complete = False
+
+						# Leave for now and ignore 34 errors, since we cannot determine if the season does not exist on TMDb at all, or if does not exist yet, but will be added at a later stage.
+						# If we check errors here, do the same for MetaTrakt which will also not have the season.
+						complete = False
 
 					if dataSeason and 'episodes' in dataSeason:
 						result = []
@@ -1614,6 +1880,9 @@ class MetaTmdb(MetaProvider):
 
 							duration = episode.get('runtime')
 							if duration: resultEpisode['duration'] = duration * 60
+
+							type = self._extractType(item = episode)
+							if type: resultEpisode['type'] = type
 
 							try:
 								if 'crew' in episode:
@@ -1691,6 +1960,7 @@ class MetaTmdb(MetaProvider):
 
 	def _metadataImage(self, type, path):
 		# https://www.themoviedb.org/talk/53c11d4ec3a3684cf4006400
+		if path is None: return None
 		size = {MetaImage.TypePoster : 780, MetaImage.TypeFanart : 1280, MetaImage.TypeClearlogo : 500, MetaImage.TypePhoto : 185}
 		size = size.get(type)
 		if size: size = 'w%d' % size
@@ -1726,7 +1996,6 @@ class MetaTmdb(MetaProvider):
 					# For detailed metadata for the remainder of the seasons, we just use the data from TVDb/Trakt.
 					# Although the detailed episode data is not absolutely required, since it will probably the same as Trakt, it might still be a good idea to add it, in case Trakt goes down and then the TVDb-only data will cause havoc to the numbering in packs.
 					#data = self._request(link = MetaTmdb.LinkDetailShow % id, data = {'append_to_response' : 'season/1,external_ids'}, cache = cache)
-
 					if quick:
 						data = self._request(link = MetaTmdb.LinkDetailShow % id, data = {'append_to_response' : ['external_ids', 'season/0', 'season/1', 'season/2']}, cache = cache)
 					else:
@@ -1734,15 +2003,31 @@ class MetaTmdb(MetaProvider):
 						if data:
 							dataSeasons = data.get('seasons')
 							if dataSeasons:
+								# "append_to_response=translations" only returns the show translations, but not the episode translations.
+								# And there does not seem to be any effort to add a feature like this: https://www.themoviedb.org/talk/63e602a59512e100b2b188b0
+								# If Trakt does not have the TVDb IDs for episodes, it becomes difficult to match the episodes by title in MetaPack.
+								# Eg: Good times, bad times:
+								#	Trakt: default titles (eg "Episode 8") and German aliases.
+								#	TVDb: German titles
+								#	TMDb: default titles (eg "Episode 8")
+								# If such default titles are used, add the original language of the show to the parameters, so that episode titles for that language are returned.
+								language = None
+								last = data.get('last_episode_to_air')
+								if last and (not last.get('name') or Regex.match(data = last.get('name'), expression = '^episode\s*\d+')): language = data.get('original_language')
+
 								seasons = [i.get('season_number') for i in dataSeasons]
 								seasons = ['season/%d' % i for i in seasons if not i is None]
 
 								# If too many appends are added, TMDb returns: "Too many append to response objects: The maximum number of remote calls is 20."
-								# Split them over mutiple requests.
+								# Split them over multiple requests.
 								limit = MetaTmdb.LimitAppend - 1
 								append = [seasons[i : i + limit] for i in range(0, len(seasons), limit)]
 
-								requests = [{'id' : 'season' + str(i), 'parameters' : {'link' : MetaTmdb.LinkDetailShow % id, 'data' : {'append_to_response' : ['external_ids'] + i}, 'cache' : cache}} for i in append]
+								requests = []
+								for i in append:
+									parameters = {'append_to_response' : ['external_ids'] + i}
+									if language: parameters['language'] = language
+									requests.append({'id' : 'season' + str(i), 'parameters' : {'link' : MetaTmdb.LinkDetailShow % id, 'data' : parameters, 'cache' : cache}})
 								data = self._execute(requests = requests, threaded = threaded)
 
 								# Combined the split requests.
@@ -1769,6 +2054,20 @@ class MetaTmdb(MetaProvider):
 					sequential = 0
 					seasons = {}
 					if dataSeasons:
+						# Add custom episode numbers if absolute numbers are used.
+						# Eg: One Piece
+						custom1 = False
+						try:
+							for season in dataSeasons:
+								numberSeason = season.get('season_number')
+								if numberSeason and numberSeason > 1:
+									values = dataEpisodes.get(numberSeason)
+									if values:
+										if min([j.get('episode_number') for j in values]) >= 3:
+											custom1 = True
+											break
+						except: Logger.error()
+
 						for season in dataSeasons:
 							numberSeason = season.get('season_number')
 							if not numberSeason is None:
@@ -1776,8 +2075,39 @@ class MetaTmdb(MetaProvider):
 
 								values = dataEpisodes.get(numberSeason)
 								if values:
+									counter = 0
+									previous = 0
+									custom2 = True
+									try:
+										numbers = [j.get('episode_number') for j in values]
+										if not len(values) == (max(numbers) - min(numbers) + 1): custom2 = False
+									except:
+										custom2 = False
+										Logger.error()
+
 									for j in values:
-										item = {'number' : {MetaPack.NumberStandard : [numberSeason, j.get('episode_number')], MetaPack.NumberSequential : [1, sequential if numberSeason > 0 else 0]}}
+										numberEpisode = j.get('episode_number')
+										item = {'number' : {MetaPack.NumberStandard : [numberSeason, numberEpisode], MetaPack.NumberSequential : [1, sequential if numberSeason > 0 else 0]}}
+
+										if custom1 and custom2 and numberSeason > 0:
+											counter += 1
+
+											# Sometimes TMDb has a missing episode.
+											# Increase the counter, so that the custom episode still matches with the standard episode number.
+											# Eg: The Tonight Show Starring Jimmy Fallon S01E174 (missing on both Trakt and TMDb).
+											# Only do this up to 3 missing episodes, since Trakt/TMDb can sometimes have entire blocks of episodes missing.
+											if previous:
+												difference = abs(previous - numberEpisode)
+												if difference > 1 and difference <= 3: counter += (difference - 1)
+
+											# Add this for shows where TMDb uses season-numbering for seasons, but within each season, episodes are numbered absolutely.
+											# Eg: One Piece
+											# Do this in case a few new unaired episodes were added to TMDb, but are not on Trakt yet.
+											# Otherwise the last episodes on TMDb will not be added to the pack.
+											# Eg: One Piece S22E1136+S22E1137 are on TMDb already, but Trakt only goes to S22E1135 at that point.
+											item['number'][MetaPack.NumberCustom] = [numberSeason, counter]
+
+											previous = numberEpisode
 
 										id = j.get('id')
 										if id: item['id'] = {'tmdb' : str(id)}
@@ -1785,32 +2115,49 @@ class MetaTmdb(MetaProvider):
 										title = j.get('name')
 										if title: item['title'] = [title]
 
-										time = j.get('air_date')
-										if time: item['time'] = Time.timestamp(fixedTime = time, format = Time.FormatDate, utc = True)
+										date = j.get('air_date')
+										if date:
+											time = Time.timestamp(fixedTime = date, format = Time.FormatDate, utc = True)
+											item['year'] = Time.year(timestamp = time) if time else j.get('year')
+											item['date'] = date
+											item['time'] = time
 
 										duration = j.get('runtime')
 										if duration: item['duration'] = duration * 60
 
+										type = self._extractType(item = j)
+										if type: item['serie'] = type
+
 										episodes.append(item)
-								else:
+
+								# Do not add this, since some seasons on TMDb have missing episodes, which makes these assumed numbers incorrect.
+								# Eg: The Tonight Show Starring Jimmy Fallon S03E13-59 are missing.
+								# Missing TMDb numbers are now interpolated in MetaPack from the Trakt numbers.
+								'''else:
 									count = season.get('episode_count') or 0
 									if count:
 										for i in range(1, count + 1):
 											if numberSeason > 0: sequential += 1
 											item = {'number' : {MetaPack.NumberStandard : [numberSeason, i], MetaPack.NumberSequential : [1, sequential if numberSeason > 0 else 0]}}
 											episodes.append(item)
+								'''
 
 								title = season.get('name')
 								title = [title] if title else None
 
-								time = season.get('air_date')
-								if time: time = Time.timestamp(fixedTime = time, format = Time.FormatDate, utc = True)
-								elif episodes: time = episodes[0].get('time') # Some seasons do not have an air_date. Eg: One Piece S02+.
+								time = None
+								date = season.get('air_date')
+								if date: time = Time.timestamp(fixedTime = date, format = Time.FormatDate, utc = True)
+								elif episodes:
+									time = episodes[0].get('time') # Some seasons do not have an air_date. Eg: One Piece S02+.
+									date = episodes[0].get('date')
+
 								seasons[numberSeason] = {
 									'id'		: {'tmdb' : str(season.get('id'))},
 									'title'		: title,
 									'number'	: {MetaPack.NumberStandard : numberSeason, MetaPack.NumberSequential : 1 if numberSeason else 0},
 									'year'		: Time.year(timestamp = time) if time else None,
+									'date'		: date,
 									'time'		: time,
 									'episodes'	: episodes,
 								}
@@ -1828,8 +2175,9 @@ class MetaTmdb(MetaProvider):
 					title = data.get('name')
 					title = [title] if title else None
 
-					time = data.get('first_air_date')
-					if time: time = Time.timestamp(fixedTime = time, format = Time.FormatDate, utc = True)
+					time = None
+					date = data.get('first_air_date')
+					if date: time = Time.timestamp(fixedTime = date, format = Time.FormatDate, utc = True)
 
 					status = data.get('status')
 					if status: status = MetaTools.statusExtract(status)
@@ -1852,12 +2200,13 @@ class MetaTmdb(MetaProvider):
 					if temp: language.extend(temp) if Tools.isArray(temp) else language.append(temp)
 					temp = data.get('spoken_languages')
 					if temp: language.extend([i.get('iso_639_1') for i in temp])
-					language = Tools.listUnique([i.lower() for i in language if i]) if language else None
+					language = Tools.listUnique(Language.codes([i.lower() for i in language if i])) if language else None
 
-					country = []
-					temp = data.get('origin_country')
-					if temp: country.extend(temp) if Tools.isArray(temp) else country.append(temp)
-					country = Tools.listUnique([i.lower() for i in country if i]) if country else None
+					country = None
+					value = data.get('origin_country')
+					if value:
+						if not Tools.isArray(value): value = [value]
+						country = Tools.listUnique(Country.codes(value))
 
 					result = {
 						'id' : {
@@ -1867,6 +2216,7 @@ class MetaTmdb(MetaProvider):
 						},
 						'title'		: title,
 						'year'		: data.get('year') or (Time.year(timestamp = time) if time else None),
+						'date'		: date,
 						'time'		: time,
 						'status'	: status,
 						'duration'	: duration,

@@ -258,7 +258,7 @@ class Database(object):
 		except Exception as error:
 			if log:
 				# Limit query printed to file, since some queries are very big (eg: providers), filling up the log file.
-				xbmc.log('GAIA ERROR [Database Query - %s]: %s -- %s' % (self._mName, str(error), str(query[:2000])), xbmc.LOGERROR)
+				xbmc.log('GAIA ERROR [Database Query - %s]: %s -- %s -- %s' % (self._mName, str(error), str(query[:1000]), str(parameters)[:1000]), xbmc.LOGERROR)
 
 				# Database file lock errors. Notify the user to restart Kodi.
 				if 'is locked' in str(error):
@@ -279,6 +279,7 @@ class Database(object):
 						if retry is True: retry = 2
 						if retry > 0:
 							if unlock: self.__unlock()
+							from lib.modules.tools import Time
 							Time.sleep(1.0)
 							return self._execute(query = query, parameters = parameters, commit = commit, compact = compact, lock = lock, unlock = unlock, log = log, retry = retry - 1)
 
@@ -386,9 +387,18 @@ class Database(object):
 		if query is None: query = 'DELETE FROM `%s`;'
 		return self._executeAll(query, tables, parameters = parameters, commit = commit, compact = compact)
 
-	def _deleteFile(self):
-		from lib.modules import tools
-		return tools.File.delete(self._mPath)
+	def _deleteFile(self, full = True):
+		from lib.modules.tools import File
+		result = File.delete(self._mPath)
+
+		# Also delete the Write-Ahead-Logging files.
+		# Otherwise when only deleteing the .db file and then trying to add something to the new file, these errors occur:
+		#	[Database Query - cache]: file is not a database -- INSERT OR IGNORE INTO cache ...
+		if full:
+			File.delete(self._mPath + '-wal')
+			File.delete(self._mPath + '-shm')
+
+		return result
 
 	# Drops single table.
 	def _drop(self, table, parameters = None, commit = True, compact = True):
@@ -419,10 +429,8 @@ class Database(object):
 	# COMPRESSION
 	##############################################################################
 
-	def _compression(self):
-		if self._mCompression: return {'enabled' : True, 'type' : self._mCompression, 'limit' : 1}
-		elif self._mCompression is False: return False
-
+	@classmethod
+	def compression(self, name = None):
 		if Database.Compression is None:
 			try:
 				from lib.modules.tools import Settings
@@ -454,9 +462,12 @@ class Database(object):
 				#			Compression: 580-600 ms
 				#			Decompression: 1750-2900 ms
 
+				# Previously medium=10KB and large=100KB, but there were some larger metadata objects in cache.db between 5-10KB which should be compressed.
+				# The cache.db limit below could also be reduced from "medium" to "small", but that would mean "setting >= 4" would not have an effect on any of the databases.
+				mini = 10 # 10B
 				small = 1024 # 1KB
-				medium = 10240 # 10KB
-				large = 102400 # 100KB
+				medium = 5120 # 5KB
+				large = 51200 # 50KB
 				if setting >= 4: # Force compression of smaller objects.
 					large = medium
 					medium = small
@@ -476,7 +487,7 @@ class Database(object):
 					# Eg: Days of our Lives has a 6MB umcompressed show pack, which is only 200KB compressed.
 					# Plus daytime shows like these can have a single absolute season with 1000s of episodes. Days of our Lives has 17k+ episodes.
 					# LZMA is about 25-35% slower to decompress than Zlib/Gzip, making menus slower. Can make a huge difference if an episode Progress menu is loaded with shows that have 20+ episodes per season (aka large metadata).
-					Database.NameMetadata	: {'enabled' : level2,	'type' : types[Compressor.SizeSmall],	'limit' : small},
+					Database.NameMetadata	: {'enabled' : level2,	'type' : types[Compressor.SizeSmall],	'limit' : mini},
 
 					# Stores a few large data objects. Every playback inserts a single stream JSON object.
 					Database.NameHistory	: {'enabled' : level1,	'type' : types[Compressor.SizeMedium],	'limit' : small},
@@ -487,18 +498,24 @@ class Database(object):
 			except:
 				Database.Compression = False
 
-		try: return Database.Compression[self._mName]
+		try: return Database.Compression[name]
 		except: return False
 
-	def _compress(self, data, force = False):
+	def _compression(self):
+		if self._mCompression: return {'enabled' : True, 'type' : self._mCompression, 'limit' : 1}
+		elif self._mCompression is False: return False
+		return self.compression(name = self._mName)
+
+	def _compress(self, data, limit = None, force = False):
 		compression = self._compression()
-		if compression and compression['enabled'] and (force or len(data) > compression['limit']):
+		if compression and compression['enabled'] and (force or len(data) > (limit or compression['limit'])):
 			try: data = Compressor.compress(data = bytes(data, 'utf-8'), type = compression['type'], level = 0)
 			except: pass
 		return data
 
-	def _decompress(self, data, type = None):
+	def _decompress(self, data, type = None, full = False):
 		binary = False
+		error = False
 		try:
 			if isinstance(data, bytes):
 				binary = True
@@ -510,12 +527,15 @@ class Database(object):
 					else: type = Compressor.type(data = data)
 				if type:
 					try: data = str(Compressor.decompress(data = data, type = type), 'utf-8')
-					except: pass
+					except: error = True
 		except:
 			# Cannot decompress.
 			# Eg: unsupported compression algorithm used to generate the external metadata addon.
 			if binary: data = None
-		return data
+			error = True
+
+		if full: return data, error
+		else: return data
 
 	##############################################################################
 	# CLEAN
@@ -788,7 +808,7 @@ class Database(object):
 		totalSize = 0
 		totalLimit = 0
 		totalUnlimited = False
-		free = Hardware.storageUsageFreeBytes(refresh = True)
+		free = Hardware.detectStorageUsage()['free']['bytes']
 		usable = int(free * Database.LimitFree)
 
 		limits = []
@@ -888,7 +908,7 @@ class Database(object):
 		if choice == Dialog.ChoiceCustom: return False
 
 		size = 0
-		free = Hardware.storageUsageFreeBytes(refresh = True)
+		free = Hardware.detectStorageUsage()['free']['bytes']
 		databases = self._cleanSettingsDatabases()
 
 		if choice == Dialog.ChoiceYes:
@@ -934,7 +954,7 @@ class Database(object):
 
 		# Recalculate these, in case we use the "Compact" action.
 		name = database['name']
-		free = Hardware.storageUsageFreeBytes(refresh = True)
+		free = Hardware.detectStorageUsage()['free']['bytes']
 		usable = int(free * Database.LimitFree)
 		size = Database(name = name, connect = False)._size()
 		settings = self._cleanSettings()

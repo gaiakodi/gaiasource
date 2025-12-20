@@ -18,7 +18,24 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Settings, Logger, Time, Subprocess, System, File
+#gaiaremove
+# Update (2025-06-22):
+# A new Cloudscraper module (v3.0.0) has been released, which promises considrably better bypassing of newer Cloudflare challenges.
+# However, the new version is still very unstable and currently does not work at all.
+# Specifically this error:
+#	https://github.com/VeNoMouS/cloudscraper/issues/287
+#	https://github.com/VeNoMouS/cloudscraper/issues/284
+# NB: The current v3 is also sync, only allowing a single CF request at a time. From the Github issues it seems that async calls are not supported. This could create a big problem during scraping?
+# Stick to the old version for now.
+# In a few weeks from now, once a stable release is available, do the following:
+#	1. Change the default module in settings.xml to V3 (network.cloudflare.version). Check #5 below.
+#	2. Change the help label of the module setting to reflect the V3 improvements.
+#	3. Properley test this to see how many URLs can be bypassed - and if the blocked scrapers now work?
+#	4. Change the impact of Provider.StatusCloudflare to have a lesser impact when auto-selecting providers during wizard/optimization. ProviderBase.order() and ProviderBase.optimizationRating().
+#	5. Due do the new version only allowing sync (and not asyns) requests, it takes 50-70% longer to do a scrape with the 25 best torrent providers. Test this, and only make the new version thew default version if it does not cause this performance issue.
+# Update (2025-12): Still no new update released.
+
+from lib.modules.tools import Settings, Logger, Time, Subprocess, System, File, Regex
 from lib.modules.external import Importer
 from lib.modules.concurrency import Lock
 
@@ -34,6 +51,14 @@ class CloudflareException(Exception):
 		except: self.cookies = None
 
 class Cloudflare(object):
+
+	# Must adhere to settings.xml.
+	ModuleCfscrape = 0
+	ModuleCloudscraper = 1
+
+	# Must adhere to settings.xml.
+	VersionLegacy = 0
+	VersionLatest = 1
 
 	# SSL/TLS certificates can make use of RSA or Elliptic Curve Cryptography (ECC).
 	# ECC is genrally faster and more secure than RSA (or at least similar security).
@@ -69,24 +94,31 @@ class Cloudflare(object):
 		{'type' : EngineNative,	'name' : 'Native',	'reliable' : False,	'message' : None},
 	]
 
+	# https://www.wappalyzer.com/technologies/cdn/cloudflare/
 	Links = [
-		'http://kat.tv',
-		'https://yggtorrent.re',
-		'https://soap2day.is',
+		'http://example.com',
 		'https://iptorrents.eu',
 		'https://arma-models.ru',
-		'https://yggtorrent.si',
-		'https://www.extreme-down.ninja',
 		'https://www.spigotmc.org',
 		'https://rlsbb.ru',
+		'https://chatgpt.com',
+		'https://openai.com',
+		'https://shopify.com',
+		'https://deepseek.com',
+		'https://hostinger.com',
+		'https://medium.com',
+		'https://hubspot.com',
+		'https://hd24bit.com',
+		'https://marketplace.tonnel.network/',
 
+		'https://yggtorrent.top',
 		'https://bt4g.org/search/dummy',
-		'https://btmet.com',
-		'https://demonoid.is/files/?query=dummy',
 		'https://ext.to/search/?q=dummy',
 		'https://idope.se',
 		'https://www.torrentfunk.com/all/torrents/dummy.html',
 		'https://torrentquest.com/search/?q=dummy',
+		'https://extratorrent.st',
+		'https://magnetdl.co/search/?q=dummy',
 
 		'https://cloudflare.com',
 		'https://gitlab.com',
@@ -94,13 +126,36 @@ class Cloudflare(object):
 		'https://vimeo.com',
 
 		# Domain down.
+
+		#'http://kat.tv',
+		#'https://soap2day.is',
+		#'https://www.extreme-down.ninja',
+
 		#'https://www.magnetdl.com/d/dummy/',
 		#'https://btmulu.com',
+		#'https://btmet.com',
+		#'https://demonoid.is/files/?query=dummy',
 	]
 
 	Headers = [
 		'cf-request-id',
 		'cf-ray',
+	]
+
+	# https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#Cloudflare
+	ErrorsDefault = [
+		403,
+	]
+	ErrorsCustom = [
+		520,
+		521,
+		522,
+		523,
+		524,
+		525,
+		526,
+		527,
+		530,
 	]
 
 	DelayMinimum = 1
@@ -130,6 +185,7 @@ class Cloudflare(object):
 	ReuseScrapers = {}
 
 	Timeout = 30
+	Module = None
 
 	# Must be the same as in network.py.
 	# Must have the same values as in settings.xml.
@@ -150,6 +206,7 @@ class Cloudflare(object):
 	@classmethod
 	def reset(self, settings = True):
 		Cloudflare.ReuseScrapers = {}
+		Cloudflare.Module = None
 
 	##############################################################################
 	# GENERAL
@@ -158,6 +215,14 @@ class Cloudflare(object):
 	@classmethod
 	def enabled(self):
 		return self._settingsEnabled()
+
+	@classmethod
+	def settingsModule(self):
+		return Settings.getInteger('network.cloudflare.module')
+
+	@classmethod
+	def settingsVersion(self):
+		return Settings.getInteger('network.cloudflare.version')
 
 	@classmethod
 	def settingsEngine(self, settings = True):
@@ -286,8 +351,45 @@ class Cloudflare(object):
 		Logger.error('Cloudflare ' + description + ' [' + link + ']')
 
 	@classmethod
+	def error(self, code, data = None):
+		# Some VPNs are straight out blocked by Cloudflare for some domains (eg: ExtraTorrent).
+		# No captcha is shown, but Cloudflare shows an error page:
+		#
+		#	Error 1020
+		#	Access denied
+		#	What happened?
+		#	This website is using a security service to protect itself from online attacks.
+		#
+		# <h1 class="inline-block md:block mr-2 md:mb-2 font-light text-60 md:text-3xl text-black-dark leading-tight">
+		#    <span data-translate="error">Error</span>
+		#    <span>1020</span>
+		#  </h1>
+
+		try:
+			default = False
+			custom = False
+			if code in Cloudflare.ErrorsDefault: default = True
+			elif code in Cloudflare.ErrorsCustom: custom = True
+
+			if data:
+				if default or custom:
+					if Regex.match(data = data, expression = '(cloudflare|_cf_chl_opt|cf-error-details)'):
+						if default:
+							# Do not just check the headers (eg: server: cloudflare), since some sites (eg: ApiBay when not sending GET parameters) return the same headers and 403, but it does not show the Cloudflare.
+							# https://support.cloudflare.com/hc/en-us/articles/360029779472-Troubleshooting-Cloudflare-1XXX-errors
+							if Regex.match(data = data, expression = '(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3}|enable\s*javascript\s*and\s*cookies)'): return True
+						elif custom:
+							return True
+			else:
+				if custom: return True
+		except: Logger.error()
+
+		return False
+
+	@classmethod
 	def module(self):
-		return Importer.moduleCloudScraper()
+		if Cloudflare.Module is None: Cloudflare.Module = Importer.moduleCloudflare()
+		return Cloudflare.Module
 
 	@classmethod
 	def prepare(self):
@@ -399,6 +501,7 @@ class Cloudflare(object):
 	# Either set a HTTP code and reponse headers dictionary, or pass in the urllib2/requests response/error object.
 	@classmethod
 	def blocked(self, code = None, headers = None, response = None):
+		data = None
 		if not response is None:
 			if code is None:
 				try: code = response.getcode()
@@ -406,20 +509,17 @@ class Cloudflare(object):
 			if headers is None:
 				try: headers = response.info().dict
 				except: headers = response.headers
+			data = response.text
 		if code in [301, 307, 308, 429, 503]:
 			for header in headers:
 				if header.lower() in Cloudflare.Headers:
 					return True
+		if self.error(code = code, data = data): return True
 		return False
 
 	# Sometimes the bypass fails, but when retyring again it works.
 	# This is due to new Cloudflare V2 challenges, which are currently returned +-80% of the time, whereas the other 20% returns old/solvable challenges.
-	def request(self, link, method = None, headers = None, data = None, path = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, redirect = True, log = True):
-		# Old bypasser.
-		#cfscrape = Importer.moduleCfScrape()
-		#scraper = cfscrape.CloudflareScraper()
-		#response = scraper.request(method = method, url = link, headers = headers, data = data, timeout = timeout, verify = certificate)
-
+	def request(self, link, method = None, headers = None, data = None, path = None, check = None, engine = None, retry = None, timeout = None, certificate = None, curve = None, redirect = True, log = True):
 		if log: Logger.log('Trying to bypass Cloudflare [' + link + ']')
 		cloudscraper = self.module()
 
@@ -444,8 +544,19 @@ class Cloudflare(object):
 					if file:
 						with scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect, stream = True) as stream:
 							stream.raise_for_status()
-							for chunk in stream.iter_content(chunk_size = 8192):
-								file.write(chunk)
+							if check:
+								if check is True: check = 0.01
+								count = 0
+								for chunk in stream.iter_content(chunk_size = 8192):
+									file.write(chunk)
+									count += 1
+									if count > 128: # After every 1MB.
+										count = 0
+										if System.aborted(): raise Exception('Download Aborted')
+										Time.sleep(check)
+							else:
+								for chunk in stream.iter_content(chunk_size = 8192):
+									file.write(chunk)
 						file.close()
 				else:
 					scraper.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout, verify = self._verify(certificate), allow_redirects = redirect)
@@ -454,11 +565,15 @@ class Cloudflare(object):
 				break
 			except cloudscraper.exceptions.CloudflareException as error:
 				if log: self._error('Cloudflare Error - Retry ' + str(i + 1), link)
-				if i < retry - 1: Time.sleep(delay)
+				if i < retry - 1:
+					if System.aborted(): break
+					Time.sleep(delay)
 				else: raise CloudflareException(error, scraper)
 			except Exception as error:
 				if log: self._error('Unknown Error', link)
 				raise CloudflareException(error, scraper)
+
+		if duration is None: duration = timer.elapsed(milliseconds = True)
 
 		# NB: scraper.response.cookies does not return all of the cookies.
 		# Not entirley sure why, but maybe only the cookies of the last request are returned, and not all the cookies in the chain or redirection.

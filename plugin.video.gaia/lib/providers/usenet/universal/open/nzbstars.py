@@ -18,11 +18,43 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.providers.core.spot import ProviderSpotHtml
+# New provider working via the API (post 2025-12).
 
+from lib.providers.core.spot import ProviderSpotJson
+
+class Provider(ProviderSpotJson):
+
+	_Link	= ['https://nzbstars.com']
+
+	##############################################################################
+	# INITIALIZE
+	##############################################################################
+
+	def initialize(self):
+		ProviderSpotJson.initialize(self,
+			name					= 'NZBStars',
+			description				= '{name} is a usenet indexer. The API contains many English titles, but is also a great source for other European languages. {name} has various bugs, incomplete metadata, missing {containers} and file sizes, and should therefore not be the first choice for a usenet indexer.',
+			rank					= 2,
+
+			link					= Provider._Link,
+
+			# Does not support ID searches.
+			# Returns error: IMDB information returned is invalid.
+			supportMovieImdb		= False,
+
+			# Does not support ID searches.
+			supportShowTvdb			= False,
+			supportShowImdb			= False,
+		)
+
+
+# Old provider using HTML (pre 2025).
+'''
 # When executing an API query in the browser, a JS error is show: "This query is not allowed!".
 # Executing the query with CURL mostly returns "Missing parameter" errors.
 # A few type of queries actually execute, but return random results.
+
+from lib.providers.core.spot import ProviderSpotHtml
 
 class Provider(ProviderSpotHtml):
 
@@ -40,3 +72,4 @@ class Provider(ProviderSpotHtml):
 
 			link					= Provider._Link,
 		)
+'''

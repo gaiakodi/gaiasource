@@ -178,14 +178,14 @@ class Provider(ProviderBase):
 	##############################################################################
 
 	# gaiaremove - this we should be able to remove (make "extract = False") when Orion has updated its database/metadata in the future.
-	# gaiaremove - also check orionoid.py -> Stream.invalidExtract() if thisz is ever changed.
+	# gaiaremove - also check orionoid.py -> Stream.invalidExtract() if this is ever changed.
 	def extract(self, streams):
 		extract = Provider._CustomEnabled
 		try:
 			extract = self.custom(Provider._CustomExtract)
 			if extract is Provider._CustomAutomatic:
 				performance = Hardware.performance()
-				limit = Math.scale(value = performance['rating'], fromMinimum = 0, fromMaximum = 1, toMinimum = 500, toMaximum = 3000)
+				limit = Math.scale(value = performance['rating'], fromMinimum = 0, fromMaximum = 1, toMinimum = 500, toMaximum = 3500)
 				if not performance['performance'] == Hardware.PerformanceExcellent and len(streams) > limit: extract = Provider._CustomDisabled
 				else: extract = Provider._CustomEnabled
 		except:	self.logError()
@@ -316,7 +316,7 @@ class Provider(ProviderBase):
 				if serie: filePack = Stream.FilePackSeason
 				else: filePack = Stream.FilePackCollection
 				fileSizeInexact = fileSize
-				if fileSize:
+				if fileSize and pack:
 					if serie:
 						try: counter = pack[MetaPack.ValueCount][MetaPack.ValueSeason][numberSeason]
 						except: counter = pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueMean]
@@ -413,9 +413,9 @@ class Provider(ProviderBase):
 
 						counter = 0
 
-						if countSeason == 1 and number['season'][0] == Stream.NumberPack: # Show pack.
+						if pack and countSeason == 1 and number['season'][0] == Stream.NumberPack: # Show pack.
 							counter = pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueEpisode]
-						elif countSeason > 1 or not countEpisode: # Show or season pack.
+						elif pack and (countSeason > 1 or not countEpisode): # Show or season pack.
 							for i in number['season']:
 								try: counter += pack[MetaPack.ValueCount][MetaPack.ValueSeason][i]
 								except: counter += pack[MetaPack.ValueCount][MetaPack.NumberOfficial][MetaPack.ValueMean]

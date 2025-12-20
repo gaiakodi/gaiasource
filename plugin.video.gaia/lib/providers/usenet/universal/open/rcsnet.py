@@ -33,7 +33,10 @@ class Provider(ProviderSpotJson):
 			name					= 'RCSNet',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages. {name} has various bugs, is not very reliable, and should therefore not be the first choice for a usenet indexer.',
 			rank					= 2,
-			status					= ProviderSpotJson.StatusDead, # Prints PHP code instead of executing it.
+
+			# Prints PHP code instead of executing it.
+			# Update (2025-12): Subdomain (plex.rcsnet.nl) shows "Not Found" error. Main domain (rcsnet.nl) redirects to an IP and does not load anything.
+			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,
 

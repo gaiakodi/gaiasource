@@ -62,7 +62,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link and other metadata, which substantially increases scraping time',
 			rank						= 3,
 			performance					= ProviderHtml.PerformanceBad,
-			status						= ProviderHtml.StatusDead, # Server down for more than 30 days (2023-02-20). Still down (2024-12).
+			status						= ProviderHtml.StatusDead, # Server down for more than 30 days (2023-02-20). Still down (2024-12).. Still down (2025-06).
 
 			link						= Provider._Link,
 			mirror						= Provider._Mirror,

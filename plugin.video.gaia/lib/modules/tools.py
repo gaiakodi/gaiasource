@@ -211,32 +211,41 @@ class Time(object):
 						except: return 0
 
 	@classmethod
-	def format(self, timestamp = None, format = FormatDateTime, local = None):
-		if timestamp is None: timestamp = self.timestamp()
+	def format(self, timestamp = None, format = FormatDateTime, local = None, zone = None, country = None):
+		try:
+			date = self.date(timestamp = timestamp)
 
-		# Windows cannot handle negative timestamps.
-		# https://github.com/arrow-py/arrow/issues/675
-		if timestamp < 0: date = datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds = timestamp)
-		else: date = datetime.datetime.utcfromtimestamp(timestamp)
+			# Sometimes an error is raised if the timezone is not known.
+			# 	raise UnknownTimeZoneError(zone), externals.pytz.exceptions.UnknownTimeZoneError: 'Europe/Kyiv'
+			# Instead of returning None, just ignore the zone.
+			# It might not be accurate, but at least there is a time.
+			try:
+				if local or zone or country:
+					from lib.modules.external import Importer
+					pytz = Importer.modulePytz()
 
-		if local:
-			from lib.modules.external import Importer
-			pytz = Importer.modulePytz()
-			date = pytz.utc.localize(date).astimezone(pytz.timezone(self.zone()))
-		return date.strftime(format)
+					# Misspelled zones.
+					if zone == 'Europe/Kyiv': zone = 'Europe/Kiev'
+
+					date = pytz.utc.localize(date).astimezone(pytz.timezone(zone or self.zone(country = country)))
+			except: Logger.error()
+
+			return date.strftime(format)
+		except: Logger.error()
+		return None
 
 	# datetime object from string.
 	# utc=False: interpret a date string without a timezone (eg 2024-10-01) as a local date. utc=True: interpret the date string as a UTC date.
 	@classmethod
-	def datetime(self, string, format = FormatDateTime, utc = False):
+	def datetime(self, string, format = FormatDateTime, utc = False, zone = None, country = None):
 		# Python has had a bug for years, that changes the function datetime.datetime.strptime to None after it was called the first time.
 		# http://forum.kodi.tv/showthread.php?tid=112916
 		try:
-			return datetime.datetime.strptime(string, format)
+			result = datetime.datetime.strptime(string, format)
 		except:
 			try:
 				# This should not happen anymore, due to the fix with DateProxy.
-				# But still leave herte in case there are other issues, like the function notr exisiting in some older Python or Android versions.
+				# But still leave here in case there are other issues, like the function notr exisiting in some older Python or Android versions.
 				function1 = None
 				function2 = None
 				if utc:
@@ -247,11 +256,37 @@ class Time(object):
 				try: function2 = time.mktime
 				except: pass
 
-				try: return datetime.datetime.fromtimestamp(function1(time.strptime(string, format)))
-				except: return datetime.datetime.fromtimestamp(function2(time.strptime(string, format)))
+				try: result = datetime.datetime.fromtimestamp(function1(time.strptime(string, format)))
+				except: result = datetime.datetime.fromtimestamp(function2(time.strptime(string, format)))
 			except:
 				# Somtimes mktime fails (mktime argument out of range), which seems to be an issue with very large dates (eg 2120-02-03) on Android or dates before 1970 on Windows.
 				return None
+
+		if result:
+			try:
+				if zone or country:
+					from lib.modules.external import Importer
+					pytz = Importer.modulePytz()
+					timezone = pytz.timezone(zone or self.zone(country = country))
+					if timezone:
+						# This adds a weird offset.
+						# Eg: For "America/New_York" (2025-04-21 23:30:00-04:56) it adds an offset of -04:56, instead of -04:00.
+						#result = result.replace(tzinfo = timezone)
+						result = timezone.localize(result)
+			except: Logger.error()
+
+			return result
+
+	@classmethod
+	def date(self, timestamp):
+		try:
+			# Windows cannot handle negative timestamps.
+			# https://github.com/arrow-py/arrow/issues/675
+			if timestamp is None: return datetime.datetime.now()
+			elif timestamp < 0: return datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds = timestamp)
+			else: return datetime.datetime.utcfromtimestamp(timestamp)
+		except: Logger.error()
+		return None
 
 	@classmethod
 	def delta(self, weeks = 0, days = 0, hours = 0, minutes = 0, seconds = 0, milliseconds = 0, microseconds = 0):
@@ -259,13 +294,21 @@ class Time(object):
 
 	@classmethod
 	def year(self, timestamp = None):
-		if timestamp is None: return datetime.datetime.now().year
-		else: return datetime.datetime.utcfromtimestamp(timestamp).year
+		try: return self.date(timestamp = timestamp).year
+		except: Logger.error()
+		return None
 
 	@classmethod
 	def month(self, timestamp = None):
-		if timestamp is None: return datetime.datetime.now().month
-		else: return datetime.datetime.utcfromtimestamp(timestamp).month
+		try: return self.date(timestamp = timestamp).month
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def day(self, timestamp = None):
+		try: return self.date(timestamp = timestamp).day
+		except: Logger.error()
+		return None
 
 	@classmethod
 	def past(self, seconds = 0, minutes = 0, hours = 0, days = 0, months = 0, years = 0, timestamp = None, format = FormatTimestamp, local = None, utc = False):
@@ -417,6 +460,7 @@ class Tools(object):
 			return copy.deepcopy(instance) if deep else copy.copy(instance)
 
 	# inverse=True: when merging lists, do structure2+structure1 instead of structure1+structure2.
+	# lists=None: replace the entire list, instead of appending to list. If none=True, always replaces the structure1 with the structure2 list. If none=False, only replaces the structure1 with the structure2 list if the all items in the structure1 list are None.
 	@classmethod
 	def update(self, structure1, structure2, none = True, lists = False, unique = True, inverse = False):
 		attribute = unique if Tools.isString(unique) or Tools.isArray(unique) else None
@@ -429,8 +473,16 @@ class Tools(object):
 				elif lists and Tools.isArray(value):
 					structure1[key] = (value + structure1.get(key, [])) if inverse else (structure1.get(key, []) + value)
 					if unique: structure1[key] = self.listUnique(structure1[key], attribute = attribute, update = True, none = none, lists = lists, unique = unique)
+				elif lists is None and Tools.isArray(value):
+					if none: structure1[key] = value
+					elif structure1[key] and all(i is None for i in structure1[key]): structure1[key] = value
 				else: structure1[key] = value
 		return structure1
+
+	# Get the size of a var in bytes.
+	@classmethod
+	def size(self, variable):
+		return sys.getsizeof(variable)
 
 	@classmethod
 	def type(self, variable):
@@ -515,6 +567,15 @@ class Tools(object):
 	def executeFunction(self, instance, name, *args, **kwargs):
 		return self.getFunction(instance = instance, name = name)(*args, **kwargs)
 
+	@classmethod
+	def replaceAlphaNumeric(self, data, replace = ''):
+		try:
+			for char in data:
+				if char.isalnum() and not char == replace:
+					data = data.replace(char, replace)
+		except: pass
+		return data
+
 	# Remove special characters (non-alpha-numeric).
 	# Do not use [^\w\d], since it removes unicode alpha characters.
 	# \p is not supported in Python's re module.
@@ -535,6 +596,17 @@ class Tools(object):
 			for char in data:
 				if not char.isalpha() and not char == replace:
 					data = data.replace(char, replace)
+		except: pass
+		return data
+
+	# Remove ASCII symbols.
+	# https://stackoverflow.com/questions/3411771/best-way-to-replace-multiple-characters-in-a-string
+	@classmethod
+	def replaceSymbol(self, data, replace = ''):
+		try:
+			for char in '!?,.;:@#$%^&*()[]{}<>/\|~=+-_`"\'':
+				if char in data: data = data.replace(char, replace)
+			return data
 		except: pass
 		return data
 
@@ -593,7 +665,15 @@ class Tools(object):
 		return equal
 
 	@classmethod
-	def listUnique(self, data, attribute = None, update = False, none = True, lists = False, unique = True):
+	def dictionaryRemove(self, data, value):
+		for i in value if Tools.isArray(value) else [value]:
+			try: del data[i]
+			except: pass
+		return data
+
+	# internal: the list contains internal lists that cannot be hashed.
+	@classmethod
+	def listUnique(self, data, attribute = None, update = False, none = True, lists = False, unique = True, internal = False):
 		try:
 			if attribute:
 				result = []
@@ -628,9 +708,16 @@ class Tools(object):
 			elif len(data) > 0 and self.isList(data[0]):
 				return [list(j) for j in set(tuple(i) for i in data)]
 			else:
-				seen = set()
-				add = seen.add
-				return [i for i in data if not (i in seen or add(i))]
+				if internal:
+					result = []
+					for i in data:
+						if i not in result:
+							result.append(i)
+					return result
+				else:
+					seen = set()
+					add = seen.add
+					return [i for i in data if not (i in seen or add(i))]
 		except:
 			Logger.error()
 			return data
@@ -645,8 +732,13 @@ class Tools(object):
 			else: result.append(i)
 		return result
 
+	# order: sort the list according to the order of another list.
 	@classmethod
-	def listSort(self, data, key = None, reverse = False, inplace = False):
+	def listSort(self, data, order = None, key = None, reverse = False, inplace = False):
+		if order:
+			order = {value : index for index, value in enumerate(order)}
+			key = lambda i : order[i]
+
 		if inplace:
 			data.sort(key = key, reverse = reverse)
 			return data
@@ -686,6 +778,17 @@ class Tools(object):
 	@classmethod
 	def listChunk(self, data, chunk = 10):
 		return [data[i : i + chunk] for i in range(0, len(data), chunk)]
+
+	@classmethod
+	def listCluster(self, data, difference = 1.0):
+		if data:
+			data = Tools.listSort(data)
+			cluster = [[data[0]]]
+			for i in data[1:]:
+				if abs(i - cluster[-1][-1]) <= difference: cluster[-1].append(i)
+				else: cluster.append([i])
+			return cluster
+		return []
 
 	# Randomly pick an item from a list.
 	@classmethod
@@ -738,6 +841,27 @@ class Tools(object):
 		try: return data.index(value)
 		except: return default
 
+	# multiple: the "value" parameter contains multiple values to remove.
+	#	True: multiple values
+	#	False: single value
+	#	None: multiple values if "value" is an array, else single value.
+	@classmethod
+	def listRemove(self, data, value, multiple = None, all = False):
+		if multiple is None: multiple = self.isArray(value)
+		try:
+			if multiple:
+				if all:
+					data = [i for i in data if not i in value]
+				else:
+					for i in value: data.remove(i)
+			else:
+				if all:
+					data = [i for i in data if not i == value]
+				else:
+					data.remove(value)
+		except: pass
+		return data
+
 	@classmethod
 	def stringSplit(self, value, length, join = None):
 		result = [value[i : i + length] for i in range(0, len(value), length)]
@@ -760,13 +884,13 @@ class Tools(object):
 	@classmethod
 	def stringRemovePrefix(self, data, remove):
 		# str.removeprefix() is only avilable in Python 3.9+
-		if data.startswith(remove): data = data[len(remove):]
+		if remove and data.startswith(remove): data = data[len(remove):]
 		return data
 
 	@classmethod
 	def stringRemoveSuffix(self, data, remove):
 		# str.removesuffix() is only avilable in Python 3.9+
-		if data.endswith(remove): data = data[:len(remove)]
+		if remove and data.endswith(remove): data = data[:-len(remove)]
 		return data
 
 	@classmethod
@@ -774,6 +898,13 @@ class Tools(object):
 		if remove: data = self.stringRemoveSuffix(data = self.stringRemovePrefix(data = data, remove = remove), remove = remove)
 		if prefix: data = self.stringRemovePrefix(data = data, remove = prefix)
 		if suffix: data = self.stringRemoveSuffix(data = data, remove = suffix)
+		return data
+
+	# Remove duplicate spaces.
+	@classmethod
+	def stringRemoveSpace(self, data):
+		# https://stackoverflow.com/questions/1546226/is-there-a-simple-way-to-remove-multiple-spaces-in-a-string
+		while '  ' in data: data = data.replace('  ', ' ')
 		return data
 
 	@classmethod
@@ -877,27 +1008,49 @@ class Regex(object):
 	FlagCaseInsensitive	= re.IGNORECASE
 	FlagMultiLines		= re.MULTILINE
 	FlagAllLines		= re.DOTALL
+	FlagUnicode			= re.UNICODE
 
 	FlagsDefault 		= FlagCaseInsensitive
 
 	Symbol				= '[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
 	Nonalpha			= '[\d\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
 
-	Cache				= {}
+	CacheData			= {}
+	CacheSize			= 2048
+
+	@classmethod
+	def initialize(self):
+		# NB: Do not cache expressions manually anymore.
+		# Python already internally caches expressions in re.compile().
+		# Caching it again just increases the lookup time.
+		# Eg: MetaTools.cleanStudio() takes twice as long with our own regex caching than without.
+		# https://docs.python.org/3/library/re.html#re.compile
+		# https://bugs.python.org/issue17441
+		# https://stackoverflow.com/questions/9914552/pythonic-and-efficient-way-of-defining-multiple-regexes-for-use-over-many-iterat
+
+		# Many sources say the default cache size is 100.
+		# But it seems the default Python (Linux) size is 512.
+		# Increase the cache size.
+		# During scraping, the cache will reach its limit with all the expressions in stream.py.
+		re._MAXCACHE = Regex.CacheSize
 
 	@classmethod
 	def expression(self, expression, flags = FlagsDefault, cache = False):
 		if Tools.isString(expression):
-			if cache:
-				try:
-					id = expression + '_' + str(flags)
-					return Regex.Cache[id]
-				except:
-					compiled = re.compile(expression, flags = flags)
-					Regex.Cache[id] = compiled
-					return compiled
-			else:
-				return re.compile(expression, flags = flags)
+			# NB: Check initialize() for more info.
+
+			#if cache:
+			#	try:
+			#		id = expression + '_' + str(flags)
+			#		return Regex.CacheData[id]
+			#	except:
+			#		compiled = re.compile(expression, flags = flags)
+			#		Regex.CacheData[id] = compiled
+			#		return compiled
+			#else:
+			#	return re.compile(expression, flags = flags)
+
+			return re.compile(expression, flags = flags)
 		else:
 			return expression # Already compiled expression.
 
@@ -968,12 +1121,16 @@ class Regex(object):
 						data = data[:start + offset] + replacement + data[end + offset:]
 						offset += len(replacement) - (end - start)
 			else:
-				match = self.search(data = data, expression = expression, flags = flags)
+				match = self.search(data = data, expression = expression, flags = flags, cache = cache)
 				if match: data = data[:match.start(group)] + replacement + data[match.end(group):]
 			return data
 		else:
-			if all is True: return re.sub(expression, replacement, data, flags = flags)
-			else: return re.sub(expression, replacement, data, count = all if Tools.isInteger(all, bool = False) else 1, flags = flags)
+			if all is True:
+				if cache: return self.expression(expression = expression, flags = flags, cache = cache).sub(replacement, data)
+				else: return re.sub(expression, replacement, data, flags = flags)
+			else:
+				if cache: return self.expression(expression = expression, flags = flags, cache = cache).sub(replacement, data, count = all if Tools.isInteger(all, bool = False) else 1)
+				else: return re.sub(expression, replacement, data, count = all if Tools.isInteger(all, bool = False) else 1, flags = flags)
 
 	@classmethod
 	def remove(self, data, expression, group = None, all = False, flags = FlagsDefault, cache = False):
@@ -993,7 +1150,7 @@ class JavaScript(object):
 	@classmethod
 	def execute(self, code, variable = None):
 		# When executing/parsing multiple code snippets from multiple threads at the same time using EvalJs, only one execution will succeed.
-		# EvalJs probably uses an interal cache which gets overwritten but the code from multiple threads.
+		# EvalJs probably uses an internal cache which gets overwritten but the code from multiple threads.
 		# eval_js does not have this problem and can be executed in parallel. However, when using a lock, it is still about 50% faster than without a lock.
 		try:
 			JavaScript.Lock.acquire()
@@ -1056,7 +1213,7 @@ class Math(object):
 	def round(self, value, places = 0):
 		return round(value, places)
 
-	# Round to closests eg 10.
+	# Round to closest eg 10.
 	@classmethod
 	def roundClosest(self, value, base = 10):
 		return int(base * round(float(value) / base))
@@ -1305,6 +1462,7 @@ class Language(object):
 	CodeGerman = 'de'
 	CodeDutch = 'nl'
 	CodeRussian = 'ru'
+	CodeJapanese = 'ja'
 	CodeChinese = 'zh'
 	CodeTurkish = 'tr'
 	CodeIndian = ('hi', 'bn', 'mr', 'te', 'ta', 'gu', 'ur', 'kn', 'or', 'ml', 'pa', 'as', 'sa', 'mai', 'mni') # Must be a tuple to be used as a dict-key in MetaImdb.
@@ -1849,9 +2007,16 @@ class Language(object):
 		return result
 
 	@classmethod
-	def codes(self, code = CodeDefault, universal = True, frequency = None, country = None):
-		result = self.languages(universal = universal, frequency = frequency, country = country)
-		return [i[Language.Code][code] for i in result]
+	def codes(self, language = None, code = CodeDefault, universal = True, frequency = None, country = None, none = False):
+		if language is None:
+			return [i[Language.Code][code] for i in self.languages(universal = universal, frequency = frequency, country = country)]
+		elif Tools.isList(language):
+			language = [self.language(language = i) for i in language]
+			return [i[Language.Code][code] for i in language if none or i]
+		else:
+			language = self.language(language = language)
+			if language: return language[Language.Code][code]
+		return None
 
 	@classmethod
 	def variations(self):
@@ -2389,6 +2554,18 @@ class Country(object):
 		return None
 
 	@classmethod
+	def codes(self, data = None, code = CodeDefault, none = False):
+		if data is None:
+			return [i[Country.Code][code] for i in self.countries()]
+		elif Tools.isList(data):
+			country = [self.country(data = i) for i in data]
+			return [i[Country.Code][code] for i in country if none or i]
+		else:
+			country = self.country(data = data)
+			if country: return country[Country.Code][code]
+		return None
+
+	@classmethod
 	def language(self, data, language = LanguageAll):
 		country = self.country(data = data)
 		if country:
@@ -2676,7 +2853,7 @@ class Sound(object):
 
 	@classmethod
 	def play(self, path, cached = True, stop = False, delay = True):
-		if delay: Pool.thread(target = self._play, kwargs = {'path' : path, 'cached' : cached, 'stop' : stop, 'delay' : delay}, start = True)
+		if delay or delay is None: Pool.thread(target = self._play, kwargs = {'path' : path, 'cached' : cached, 'stop' : stop, 'delay' : delay}, start = True)
 		else: self._play(path = path, cached = cached, stop = stop, delay = delay)
 		return bool(path)
 
@@ -2697,86 +2874,96 @@ class Sound(object):
 		xbmc.stopSFX()
 
 	@classmethod
-	def execute(self, mode, time):
+	def execute(self, mode, time, delay = None, external = None):
 		try:
-			path = self. file(mode = mode, time = time)
-			if not path: return False
-			self.play(path = path)
-			return True
+			# When the addon is busy with a lot of processing (eg: preloading metadata), the sound plays very choppy, basically unbearable.
+			# Probably because xbmc.playSFX() uses the same/current addon invoker to play the sound, which is now busy with other tasks.
+			# The only way to solve this, is to execute the sound in a separate invoker, which seems to play the sound smoothly.
+			# Update: Even with an external execution, the sound can sometimes still be choppy. But still probably better than direct execution.
+			if external:
+				# Already enough delay for the invoker to start.
+				if delay is None: delay = False
+				System.executePlugin(action = 'soundPlay', parameters = {'mode' : mode, 'time' : time, 'delay' : delay})
+				return True
+			else:
+				path = self.file(mode = mode, time = time)
+				if not path: return False
+				self.play(path = path, delay = delay)
+				return True
 		except: Logger.error()
 		return False
 
 	@classmethod
-	def executeLaunch(self, time):
-		return self.execute(mode = Sound.ModeLaunch, time = time)
+	def executeLaunch(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModeLaunch, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executeLaunchStart(self):
-		return self.executeLaunch(time = Sound.TimeStart)
+	def executeLaunchStart(self, delay = None, external = None):
+		return self.executeLaunch(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executeLaunchFinish(self):
-		return self.executeLaunch(time = Sound.TimeFinish)
+	def executeLaunchFinish(self, delay = None, external = None):
+		return self.executeLaunch(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
-	def executeScrape(self, time):
-		return self.execute(mode = Sound.ModeScrape, time = time)
+	def executeScrape(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModeScrape, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executeScrapeStart(self):
-		return self.executeScrape(time = Sound.TimeStart)
+	def executeScrapeStart(self, delay = None, external = None):
+		return self.executeScrape(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executeScrapeFinish(self):
-		return self.executeScrape(time = Sound.TimeFinish)
+	def executeScrapeFinish(self, delay = None, external = None):
+		return self.executeScrape(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
-	def executeStream(self, time):
-		return self.execute(mode = Sound.ModeStream, time = time)
+	def executeStream(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModeStream, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executeStreamStart(self):
-		return self.executeStream(time = Sound.TimeStart)
+	def executeStreamStart(self, delay = None, external = None):
+		return self.executeStream(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executeStreamFinish(self):
-		return self.executeStream(time = Sound.TimeFinish)
+	def executeStreamFinish(self, delay = None, external = None):
+		return self.executeStream(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
-	def executeRating(self, time):
-		return self.execute(mode = Sound.ModeRating, time = time)
+	def executeRating(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModeRating, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executeRatingStart(self):
-		return self.executeRating(time = Sound.TimeStart)
+	def executeRatingStart(self, delay = None, external = None):
+		return self.executeRating(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executeRatingFinish(self):
-		return self.executeRating(time = Sound.TimeFinish)
+	def executeRatingFinish(self, delay = None, external = None):
+		return self.executeRating(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
-	def executePower(self, time):
-		return self.execute(mode = Sound.ModePower, time = time)
+	def executePower(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModePower, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executePowerStart(self):
-		return self.executePower(time = Sound.TimeStart)
+	def executePowerStart(self, delay = None, external = None):
+		return self.executePower(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executePowerFinish(self):
-		return self.executePower(time = Sound.TimeFinish)
+	def executePowerFinish(self, delay = None, external = None):
+		return self.executePower(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
-	def executeNotify(self, time):
-		return self.execute(mode = Sound.ModeNotify, time = time)
+	def executeNotify(self, time, delay = None, external = None):
+		return self.execute(mode = Sound.ModeNotify, time = time, delay = delay, external = external)
 
 	@classmethod
-	def executeNotifyStart(self):
-		return self.executeNotify(time = Sound.TimeStart)
+	def executeNotifyStart(self, delay = None, external = None):
+		return self.executeNotify(time = Sound.TimeStart, delay = delay, external = external)
 
 	@classmethod
-	def executeNotifyFinish(self):
-		return self.executeNotify(time = Sound.TimeFinish)
+	def executeNotifyFinish(self, delay = None, external = None):
+		return self.executeNotify(time = Sound.TimeFinish, delay = delay, external = external)
 
 	@classmethod
 	def enabled(self, mode, time):
@@ -3287,6 +3474,16 @@ class Converter(object):
 			Logger.error()
 			return string
 
+	# Convert hex-escaped characters in the string.
+	# Eg: Arz\xe9 -> Arzé
+	@classmethod
+	def unicodeUnescape(self, string):
+		try:
+			return self.unicode(string.encode('utf8').decode('unicode_escape'))
+		except:
+			Logger.error()
+			return string
+
 	@classmethod
 	def unicode(self, value, encoding = 'utf-8'):
 		if Tools.isString(value):
@@ -3578,6 +3775,7 @@ class Logger(object):
 			# Other errors (eg: TypeError and IndexError) might still be thrown.
 			if not exit and errortype == 'SystemExit': return None
 
+			errormessage = None
 			try: errormessage = value.message
 			except:
 				try:
@@ -3586,7 +3784,8 @@ class Logger(object):
 				except: pass
 			if message: message += ' -> '
 			else: message = ''
-			message += str(errortype) + ' -> ' + str(errormessage)
+			message += str(errortype)
+			if errormessage: message += ' -> ' + str(errormessage)
 			parameters = [filename, linenumber, name]
 		else:
 			parameters = None
@@ -3595,6 +3794,12 @@ class Logger(object):
 	@classmethod
 	def errorCustom(self, message, level = LevelDefault):
 		self.log(message, type = Logger.TypeError, level = level, prefix = True)
+
+	@classmethod
+	def traceback(self):
+		import traceback
+		data = '\n'.join([str(i) for i in traceback.format_stack()])
+		File.writeNow('/tmp/gaia_traceback.txt', data)
 
 	@classmethod
 	def path(self):
@@ -3999,11 +4204,12 @@ class File(object):
 	def deleteDirectory(self, path, force = True, check = True):
 		try:
 			valid = not check or self.existsDirectory(path)
+			if not valid: return False
 
 			# For samba paths
 			try:
 				if valid:
-					xbmcvfs.rmdir(path)
+					xbmcvfs.rmdir(path, force = force)
 					if not self.existsDirectory(path): return True
 			except: pass
 
@@ -4032,7 +4238,7 @@ class File(object):
 						self.delete(os.path.join(path, i), force = force)
 					for i in directories:
 						self.deleteDirectory(os.path.join(path, i), force = force)
-					try: xbmcvfs.rmdir(path)
+					try: xbmcvfs.rmdir(path, force = force)
 					except: pass
 					try:
 						import shutil
@@ -4177,8 +4383,8 @@ class File(object):
 			except: pass
 			# This is important, especailly for Windows.
 			# When deleteing a file and immediatly replacing it, the old file might still exist and the file is never replaced.
-			if sleep: Time.sleep(0.1 if sleep == True else sleep)
-		if bytes == None:
+			if sleep: Time.sleep(0.1 if sleep is True else sleep)
+		if bytes is None:
 			return xbmcvfs.copy(pathFrom, pathTo)
 		else:
 			try:
@@ -4301,6 +4507,8 @@ class System(object):
 	PowerReload = 'reload'				# Reload the Kodi user profile (reloads profile, addons, addon.xml, settings, and restarts services).
 	PowerRefresh = 'refresh'			# Refresh the Kodi skin (reloads changes to the skin XML).
 	PowerRelaunch = 'relaunch'			# Relaunch the Gaia addon.
+
+	CommandData	= 'data'
 
 	Navigation = []
 	NavigationParameter = 'navigation'
@@ -4453,7 +4661,7 @@ class System(object):
 
 	# This function reloads the Kodi user profile, reloading addons, addon.xml, settings, and restarting services.
 	@classmethod
-	def reload(self, message = False, loader = None):
+	def reload(self, message = False, loader = None, delay = None):
 		reload = True
 
 		interactive = bool(message)
@@ -4472,9 +4680,15 @@ class System(object):
 				Loader.show()
 				Time.sleep(0.5) # Wait, otherwise Kodi freezes while reloading the profile before the Loader is visible.
 
+			# Wait some time to allow Kodi to finish up before reloading.
+			# Is useful when changing a setting and then reloading, to allow Kodi to write the setting to file. Otherwise reloading starts before Kodi can write to file.
+			if delay: Time.sleep(2 if delay is True else delay)
+
 			# Waiting does not work with self.execute().
 			# When using the RPC, waiting is possible. But if the 'wait' parameter is passed to Profiles.LoadProfile, the call fails complaining about too many parameters in the call.
 			self.execute('LoadProfile(%s)' % xbmc.getInfoLabel('system.profilename'))
+
+		return reload
 
 	@classmethod
 	def visible(self, item):
@@ -4522,6 +4736,7 @@ class System(object):
 	@classmethod
 	def navigationDescription(self, name = None):
 		from lib.modules.interface import Format
+		if name: name = Format.fontBold(name)
 		return Format.iconJoin(self.navigation(name = name))
 
 	@classmethod
@@ -4813,7 +5028,7 @@ class System(object):
 
 	# action: None = selection from dialog, Specific = execute a specific action.
 	@classmethod
-	def power(self, action = True, proper = True, level = 1, execute = True, warning = True, notification = True, sound = True, wait = False):
+	def power(self, action = True, proper = True, level = 1, execute = True, warning = True, notification = True, sound = True, delay = None, wait = False):
 		from lib.modules.interface import Translation, Format, Dialog, Loader
 		from lib.modules.convert import ConverterDuration
 		from lib.modules.interface import Player
@@ -4860,24 +5075,24 @@ class System(object):
 		if not data: return False
 		action = data
 
-		def _exit(delay):
+		def _exit(delayed):
 			# Stop playback and let Trakt history and progress sync first.
 			player = Player()
 			playback = player.isPlayback()
 			if playback:
 				player.stop()
-				Time.sleep(delay)
+				Time.sleep(delayed)
 			else:
-				Time.sleep(delay / 4.0)
+				Time.sleep(delayed / 4.0)
 
-		def _power(action, warning, notification, sound):
+		def _power(action, warning, notification, sound, delay):
 			timeout = 10
-			delay = 15
+			delayed = 15
 			choice = True
 			thread = None
 			label = action['label']
 
-			thread = Pool.thread(target = _exit, kwargs = {'delay' : delay}, start = True)
+			thread = Pool.thread(target = _exit, kwargs = {'delayed' : delayed}, start = True)
 			if warning:
 				message = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordOptimal)
 				message = Regex.replace(data = message, expression = '(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
@@ -4887,15 +5102,29 @@ class System(object):
 			if choice:
 				Loader.show()
 				if sound: Sound.executePowerStart()
-				if notification: Dialog.notification(title = 36419, message = Translation.string(36420) % Format.fontBold(label), icon = Dialog.IconWarning, time = delay * 1000, sound = False) # Play its own sound here.
+				if notification: Dialog.notification(title = 36419, message = Translation.string(36420) % Format.fontBold(label), icon = Dialog.IconWarning, time = delayed * 1000, sound = False) # Play its own sound here.
 				thread.join()
 				Time.sleep(1)
-				_execute(action = action, sound = sound, direct = False)
+				_execute(action = action, sound = sound, delay = delay, direct = False)
 
-		def _execute(action, sound, direct):
+		def _execute(action, sound, direct, delay):
 			if sound:
 				if direct and Sound.executePowerStart(): sound = False
 				if sound and Sound.executePowerFinish(): Time.sleep(2)
+
+			# If reloading, go to the home window.
+			# Otherwise, once Kodi is reloaded, it shows the Gaia menu that was visible before the reload.
+			# The user should be forced to open Gaia again, so that the launch window is shown and the main Gaia menu displayed.
+			if action['action'] == System.PowerReload:
+				Dialog.closeAll()
+				Time.sleep(0.01)
+				self.home()
+				Time.sleep(0.3)
+				self.execute('ReplaceWindow(Videos,)') # Replace menu history. Container.Update(,replace) does not seem to work.
+				Time.sleep(0.3)
+
+			if delay: Time.sleep(2 if delay is True else delay)
+
 			command = action['command']
 			if Tools.isString(command): self.execute(command = command)
 			else: command()
@@ -4904,8 +5133,8 @@ class System(object):
 			Dialog.closeNotification()
 			Loader.hide()
 
-		if not proper or action['action'] in [System.PowerMinimize, System.PowerScreensaver]: _execute(action = action, sound = sound, direct = True)
-		else: Pool.thread(target = _power, kwargs = {'action' : action, 'warning' : warning, 'notification' : notification, 'sound' : sound}, start = True, join = wait)
+		if not proper or action['action'] in [System.PowerMinimize, System.PowerScreensaver]: _execute(action = action, sound = sound, delay = delay, direct = True)
+		else: Pool.thread(target = _power, kwargs = {'action' : action, 'warning' : warning, 'notification' : notification, 'sound' : sound, 'delay' : delay}, start = True, join = wait)
 		return action['action']
 
 	@classmethod
@@ -4963,7 +5192,7 @@ class System(object):
 				if encoded:
 					if Tools.isArray(encoded): data.extend(encoded)
 					else: data.append(encoded)
-				parameters = {'data' : data}
+				parameters = {System.CommandData : data}
 
 			from lib.modules.network import Networker
 			query = Networker.linkEncode(self.commandFormat(parameters))
@@ -5008,17 +5237,18 @@ class System(object):
 		from lib.modules.network import Networker
 		if command is None: command = self.arguments(2)
 
-		parameters = dict(Networker.linkDecode(command.replace(self.plugin() + '/', '').replace('?', '')))
+		if Tools.isDictionary(command): parameters = command
+		else: parameters = dict(Networker.linkDecode(command.replace(self.plugin() + '/', '').replace('?', '')))
 		parameters = self.commandUnformat(parameters)
 
-		if 'data' in parameters:
-			if Tools.isArray(parameters['data']):
+		if System.CommandData in parameters:
+			if Tools.isArray(parameters[System.CommandData]):
 				data = {}
-				for i in parameters['data']:
+				for i in parameters[System.CommandData]:
 					data.update(self.commandDecode(i))
 				parameters = data
 			else:
-				parameters = self.commandDecode(parameters['data'])
+				parameters = self.commandDecode(parameters[System.CommandData])
 
 		return parameters
 
@@ -5280,9 +5510,10 @@ class System(object):
 		return False
 
 	@classmethod
-	def addonDetails(self, id = GaiaAddon, properties = None):
+	def addonDetails(self, id = GaiaAddon, properties = None, dependencies = None):
 		try:
 			if not properties: properties = ['name', 'version', 'enabled', 'installed']
+			if dependencies: properties.append('dependencies')
 			return System.executeJson(addon = id, method = 'Addons.GetAddonDetails', parameters = {'properties' : properties})['result']['addon']
 		except: pass
 		return None
@@ -5298,7 +5529,8 @@ class System(object):
 
 	@classmethod
 	def execute(self, command, wait = False):
-		return xbmc.executebuiltin(command, wait)
+		if command: return xbmc.executebuiltin(command, wait)
+		else: return None
 
 	@classmethod
 	def executeScript(self, script, parameters = None, wait = False):
@@ -5363,13 +5595,16 @@ class System(object):
 		return result
 
 	@classmethod
-	def temporary(self, directory = None, file = None, gaia = True, make = True, clear = False):
-		path = File.translatePath('special://temp/')
+	def temporary(self, directory = None, file = None, gaia = True, make = True, clear = False, profile = False):
+		if profile: path = os.path.join(self.profile(), 'Temp')
+		else: path = File.translatePath('special://temp/')
+
 		if gaia: path = os.path.join(path, System.name().lower())
 		if directory: path = os.path.join(path, directory)
 		if clear: File.deleteDirectory(path, force = True)
 		if make: File.makeDirectory(path)
 		if file: path = os.path.join(path, file)
+
 		return path
 
 	@classmethod
@@ -5383,8 +5618,9 @@ class System(object):
 		return path
 
 	@classmethod
-	def temporaryClear(self):
-		return File.deleteDirectory(self.temporary(make = False))
+	def temporaryClear(self, system = True, profile = True):
+		if system: File.deleteDirectory(path = self.temporary(make = False), check = True)
+		if profile: File.deleteDirectory(path = self.temporary(make = False, profile = True), check = True)
 
 	@classmethod
 	def versionDataGet(self):
@@ -5398,6 +5634,49 @@ class System(object):
 	@classmethod
 	def versionDataClear(self):
 		self.windowPropertyClear(System.PropertyVersion)
+
+	@classmethod
+	def prepare(self, action = None, parameters = None):
+		# These are functions that should be called every time a new Python process/invoker is initiated, not just when the addon is launched for the first time.
+		quick = False
+
+		# Execute on first launch.
+		# Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
+		if action is None or action == 'home' or action == 'menu' or action == 'search' or action == 'scrape' or action == 'play' or action.startswith('oracle'): self.launch()
+
+		# Reduce processing time for menus that are in any case loaded in a new Python process, because they were launched as an "action" instead of a "folder" and therefore do not have a Kodi handle.
+		# Importing and doing all the advanced initialization below is not needed for a "wrapper" process like this.
+		# This can save around 100ms.
+		# Use when opening show/season and other series submenus.
+		# More info in MetaTools._items().
+		if action == 'menu':
+			from lib.meta.menu import MetaMenu
+			quick = MetaMenu.menuExternal(**parameters)
+
+		if not quick:
+			# Initialize the internal regex cache.
+			Regex.initialize()
+
+			# For Gaia Eminence navigation.
+			System.navigationResolve(action = action, parameters = parameters)
+
+			from lib.modules.shortcut import Shortcut
+			Shortcut.process(parameters)
+
+			# Otherwise importing modules in sub-threads might cause the execution to deadlock.
+			# Check the modulePrepare() function for more info.
+			# The deadlock can happen from various places in the indexers (navigator/movies/shows/season/episodes).
+			#	Eg: navigator -> History -> Seasons (sporadic - sometimes it works).
+			#	Eg: movies/shows/season/episodes -> metadata().
+			# There are too many sporadic deadlocks at various places, so it seems better to just place it here.
+			# Although it takes about 250-300ms, most plugin calls will probably use some of the Networker features anyways, and will then have to import the modules at a later stage.
+			# UPDATE (2024-11): This is probably not needed anymore. Everything seems to run smoothly without the import here.
+			# The deadlock might have been caused by too many threads being used during scraping to process the streams (fixed now).
+			# Maybe one thread started to import the modules, then gets paused and another thread is started, which now deadlocks, because the previous thread has not finished the import yet.
+			#from lib.modules.network import Networker
+			#Networker.modulePrepare()
+
+		return quick
 
 	@classmethod
 	def _observe(self):
@@ -5457,8 +5736,10 @@ class System(object):
 		return self.launchStatus(default = 0) >= status
 
 	@classmethod
-	def launch(self, hidden = None):
+	def launch(self, hidden = None, delay = None):
 		if self.launchStatus(default = 0) >= 5: return False # More efficient than always calling self.launchDataGet().
+		Settings.saveInitialize() # More info about this under the function.
+
 		observe = False
 		if hidden is None: hidden = not self.originGaia() # Do not show the launch window if requests come from widgets or any other addon that is not Gaia.
 
@@ -5487,12 +5768,13 @@ class System(object):
 
 			self.launchDataSet({'progress' : 0, 'status' : None})
 
-		Pool.thread(target = self._launch, kwargs = {'hidden' : hidden, 'observe' : observe}, start = True)
+		Pool.thread(target = self._launch, kwargs = {'hidden' : hidden, 'observe' : observe, 'delay' : delay}, start = True)
 		return True
 
 	@classmethod
-	def _launch(self, hidden = False, observe = False):
+	def _launch(self, hidden = False, delay = False, observe = False):
 		if not hidden and self.launchStatus(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '1')
+		if delay: Time.sleep(3 if delay is True else delay)
 
 		# Sequential non-threaded and parallel threaded execution seems to take more or less the same time.
 		# Sometimes sequential execution is actually faster.
@@ -5505,7 +5787,8 @@ class System(object):
 		self.tStatus = ['Initializing Gaia Launch']
 		self.tProgress = 1
 		self.tInitial = False
-		self.tWizard = False
+		self.tWizardSetup = False
+		self.tWizardVersion = False
 
 		def _launchObserve():
 			if not hidden:
@@ -5557,7 +5840,7 @@ class System(object):
 				thread.start()
 
 		def _launchFinalize():
-			from lib.modules.interface import Splash, Loader
+			from lib.modules.interface import Dialog, Translation, Splash, Loader
 
 			if not hidden: Sound.executeLaunchFinish()
 
@@ -5574,22 +5857,40 @@ class System(object):
 
 			Loader.enable()
 
+			reload = False
+			threads = []
+
 			# Initial Launch
 			if not hidden:
-				from lib.modules.window import WindowWizard
+				from lib.modules.window import WindowWizardSetup, WindowWizardVersion
 				Time.sleep(1.5)
-				if WindowWizard.show(initial = True, wait = True): changed = True
+
+				wizard = WindowWizardSetup.show(initial = True, wait = True)
+				if not wizard is False:
+					changed = True
+				else:
+					wizard = WindowWizardVersion.show(initial = True, wait = True)
+					if not wizard is False: changed = True
+
+				# Do not restart here immediately. First let important things finish below, like settings backup.
+				if wizard is None:
+					if Dialog.options(title = 32501, message = 36900, labelConfirm = 32501, labelDeny = 35015, default = Dialog.ChoiceYes):
+						reload = True
 
 			self.tProgress = max(100 if observe else 98, self.tProgress)
 			self.tStatus = ['Launching Gaia']
 			if not hidden:
 				try: self.tSplash.update(progress = self.tProgress, status = self.tStatus[0])
 				except: pass
-
 			_launchProgress() # Make sure 100% is written to the global variable for the observer.
 
+			# Check for corrupted provider settings.
+			if not hidden:
+				from lib.providers.core.manager import Manager
+				Manager.checkCorrupt(fix = True)
+
 			# System Details
-			if not hidden: Pool.thread(target = Logger.system, kwargs = {'level' : Logger.LevelStandard}).start()
+			if not hidden: Pool.thread(target = Logger.system, kwargs = {'level' : Logger.LevelStandard}, start = True)
 
 			# Updates
 			Extension.versionCheck(wait = False)
@@ -5598,28 +5899,64 @@ class System(object):
 			if not hidden:
 				Time.sleep(0.5) # Wait a little to not immediately pop up new dialogs.
 				Splash.popupClose()
+				if reload: Loader.show()
 
-				Donations.popup(wait = True)
+			if not hidden and not reload:
+				# There is already a donation window in the wizard.
+				if not self.tWizardSetup and not self.tWizardVersion and not self.tInitial and not version['change']['major']:
+					Donations.popup(wait = True)
 
 				# Announcement
 				def _launchAnnouncement():
 					Time.sleep(0.5)
-					Announcements.show(wait = True, version = version['old']['number'] if (version['old']['number'] and not version['old']['number'] == version['new']['number']) else None)
+
+					versioned = None
+					if version['old']['number'] and not version['old']['number'] == version['new']['number']:
+						versioned = version['old']['number']
+					else:
+						# If the version wizard was shown during a major version change.
+						# At the end of the wizard the user will restart the device and the announcements will therefore not show.
+						# Use the values from the settings to still show the announcement after the restart.
+						updated = Settings.getInteger('internal.update.time')
+						if updated and (Time.timestamp() - updated) < 10800:
+							versionOld = Settings.getInteger('internal.update.old')
+							versionNew = Settings.getInteger('internal.update.new')
+							if versionOld and not versionOld == versionNew:
+								versioned = versionOld
+
+					Announcements.show(wait = True, version = versioned)
 					Announcements.storage(wait = True)
-				Pool.thread(target = _launchAnnouncement).start()
+				threads.append(Pool.thread(target = _launchAnnouncement, start = True))
 
 			# Backup - Export
 			if not hidden or changed:
-				#gaiaremove - the if-statement check can be removed at a later stage. This is just to prevent backup imports between v6 and v7.
-				if not(version['old']['number'] and version['old']['number'] < 70000000.0 and version['new']['number'] >= 70000000.0):
-					if not self.tWizard:
-						def _launchBackup():
-							Time.sleep(2)
-							Backup.automaticImport() # Check again, in case the initialization corrupted the settings.
-							Backup.automaticExport()
-						Pool.thread(target = _launchBackup, start = True)
+				def _launchBackup():
+					Time.sleep(2)
+
+					# Prevent automatic backup imports when upgrading to a major version, since the old settings might not apply to the new version anymore.
+					if not self.tWizardSetup and not self.tWizardVersion and not version['change']['major'] and not reload:
+						Backup.automaticImport() # Check again, in case the initialization corrupted the settings.
+
+					Backup.automaticExport()
+				threads.append(Pool.thread(target = _launchBackup, start = True))
 
 			if self.launchStatus(default = 0) < 4: self.windowPropertySet(System.PropertyInitial, '3' if hidden else '5')
+
+			if reload:
+				[thread.join() for thread in threads]
+				Loader.hide()
+				System.power(action = System.PowerRestart, warning = True, notification = True, sound = True, delay = 10, wait = True) # Restarts Kodi, not the device.
+
+			# Reload the bulk data here.
+			# Only do this once Gaia is launched, and not in the background.
+			# Since this might show a dialog.
+			if not reload and not hidden and not self.tWizardSetup and not self.tWizardVersion and not self.tInitial:
+				[thread.join() for thread in threads] # Wait for announcements to finish.
+				from lib.modules.playback import Playback
+				Playback.instance().launch(bulk = True, refresh = False, reload = False, delay = False, wait = False) # NB: Important to use "wait=False" and not "wait=None".
+
+			# Check Settings.save for more info.
+			Settings.saveWait()
 
 		self.tInitial = not Settings.getBoolean('internal.initial.launch')
 		update = System.windowPropertyGet(System.PropertyUpdate)
@@ -5629,15 +5966,12 @@ class System(object):
 			update = not Settings.getString('internal.version') == self.version()
 			System.windowPropertySet(System.PropertyUpdate, str(int(update)))
 
-		# Wizard
-		from lib.modules.window import WindowWizard
-		self.tWizard = Settings.getInteger(WindowWizard.PropertyInitial) == WindowWizard.StatusUncompleted
-
 		# Splash
 		from lib.modules.interface import Splash, Loader
 		if not hidden:
 			if not Splash.loader(): Loader.disable()
-			self.tSplash = Splash.popup(time = None, wait = False, slogan = (self.tInitial or update), alternative = not(self.tInitial or update))
+			upgrade = self.tInitial or update
+			self.tSplash = Splash.popup(time = None, wait = False, slogan = upgrade, alternative = not upgrade)
 			Sound.executeLaunchStart()
 
 		# Only observe progress if the actually code execution happens from service.py.
@@ -5697,16 +6031,37 @@ class System(object):
 				ExternalLoader.clear()
 			except: Logger.error()
 
-		# Do not do this if Gaia was installed from scratch without having and old version.
-		if version['old']['number']:
-			if version['old']['number'] < 70000000.0 and version['new']['number'] >= 70000000.0:
-				# Clear everything between v6 and v7.
-				#gaiaremove - this can be removed in a later version.
-				directories, files = File.listDirectory(System.profile())
-				for i in directories:
-					if not 'download' in i.lower(): File.deleteDirectory(i)
-				for i in files:
-					File.delete(i)
+		# Wizard
+		from lib.modules.window import WindowWizardSetup
+		self.tWizardSetup = WindowWizardSetup.statusUncompleted()
+
+		# Always show the version wizard on a major version upgrade.
+		# This is useful for:
+		#	1. Clearing cache.db:
+		#		- Allows the smart menus to be reinitialized and uncluttered from old content.
+		#		- Makes sure that any new code that uses data from the cache, but requires the data to be in a new/different structure, works in the new version and does not throw errors.
+		#		- Reduce the cache size and remove old content from the cache that is not needed anyways.
+		#		- Major versions are only released every 1-3 years. So it will not clear the cache too often. And clearing the cache at least once a year is a good idea.
+		#	2. Hardware detection (part of the optimization step):
+		#		- Get a new speedtest reading, just to refresh it, and in case the user has upgraded his internet connection over the past years.
+		#		- Redetects the hardware to get fresh values. This is important if the hardware detection code was changed, and previously undetectable hardware can now be detected.
+		#		- Resets the hardware values, in case the user imported a settings backup from another devices, or upgraded the current device's hardware.
+		#	3. Reoptimize the provider and scraping settings:
+		#		- The status, rank, etc of providers can change. Reoptimizing them disables newly dead providers, and enables newly added providers.
+		#		- Any changes to fundamental provider code are renewed.
+		#	4. Metadata Detail level setting:
+		#		- In case the user previously selected Essential/Standard metadata, he now has the opportunity to increase it to Extended, for a better experience.
+		#	5. Metadata preload:
+		#		- If the cache is cleared, preloading MUST be done, so that the smart menus are reinitialized and populated.
+		#		- Can be useful to refresh some old metadata, possible changes to the metadata structure, and changes to the smart-loading code.
+		#		- Can help catch up with preloading metadata once in a while, in case the smart-menu background loading has fallen behind.
+		#		- After clearing the cache and reinitializing the Arrivals menu, the newly sorted movie releases are typically better and show bigger blockbusters, often because the old code (sorting, release dates, smart code, etc) was improved.
+		if not self.tInitial and not self.tWizardSetup:
+			# If a version wizard is needed for some minor version upgrades for certain version, because something has to be reinitialized, the specific version can be added here as well.
+			if version['change']['major']:
+				from lib.modules.window import WindowWizardVersion
+				WindowWizardVersion.statusClear() # If the version changed, reset the wizard status from the previous old version, so that the new version wizard can be shown.
+				self.tWizardVersion = WindowWizardVersion.statusUncompleted() # This will always be True after clearing the status above, but this should only execute once, if version['change']['major'] is True right after a version upgrade.
 
 		_launchProgress(4) # 25%
 
@@ -5728,7 +6083,16 @@ class System(object):
 			except: Logger.error()
 			try: MetaTools.settingsInitialize()
 			except: Logger.error()
+
+			# Used for announcements.
+			if version['change']['full']:
+				Settings.set('internal.update.time', Time.timestamp())
+				Settings.set('internal.update.old', version['old']['number'])
+				Settings.set('internal.update.new', version['new']['number'])
 		_launchAdd(1, 'Initializing Settings Data', _launchSettings) # 26%
+
+		# Clear Temporary
+		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 27%
 
 		# Compression
 		def _launchCompression():
@@ -5738,21 +6102,21 @@ class System(object):
 			# The thread will wait for launch to finish before starting the benchmark.
 			from lib.modules.compression import Compressor
 			Pool.thread(target = Compressor.benchmark, kwargs = {'settings' : True, 'background' : True, 'wait' : 120, 'delay' : True}, start = True)
-		_launchAdd(2, 'Initializing Compression Algorithms', _launchCompression) # 28%
+		_launchAdd(2, 'Initializing Compression Algorithms', _launchCompression) # 29%
 
 		# Context Menu
 		def _launchContext():
 			from lib.modules.interface import Context
 			Context.initialize()
-		_launchAdd(3, 'Initializing Context Menu', _launchContext) # 31%
+		_launchAdd(3, 'Initializing Context Menu', _launchContext) # 32%
 
 		# Promotions
-		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 32%
+		_launchAdd(1, 'Initializing New Promotions', Promotions.update, refresh = False) # 33%
 
 		# Window
 		if version['change']['full']:
 			from lib.modules.window import Window
-			_launchAdd(4, 'Initializing Custom Windows', Window.clean) # 36%
+			_launchAdd(4, 'Initializing Custom Windows', Window.clean) # 37%
 		else: _launchProgress(4)
 
 		# Copy the select theme background as fanart to the root folder.
@@ -5766,10 +6130,14 @@ class System(object):
 				File.delete(fanartTo) # Delete old fanart.
 				fanartFrom = Theme.fanart()
 				if fanartFrom: File.copy(fanartFrom, fanartTo, overwrite = True)
-		_launchAdd(1, 'Initializing Image Files', _launchImage) # 37%
+		_launchAdd(1, 'Initializing Image Files', _launchImage) # 38%
 
-		# Clear Temporary
-		_launchAdd(1, 'Initializing Temporary Directory', System.temporaryClear) # 38%
+		# Studio Icons
+		# Load from file so that the lookup table is already available when the first menu is opened.
+		def _launchCompany():
+			from lib.meta.company import MetaCompany
+			MetaCompany.helper()
+		_launchAdd(1, 'Initializing Company Icons', _launchCompany) # 39%
 
 		# Cache
 		def _launchCache():
@@ -5825,28 +6193,42 @@ class System(object):
 			if self.tInitial: Manager.optimizeInternal()
 		_launchAdd(15, 'Initializing Provider Structure', _launchProviders) # 71%
 
-		# Playback + Trakt
+		# Trakt
+		def _launchTrakt():
+			# Check if the Trakt API token is still valid, and if not, make the user reauthneticate their Trakt account.
+			# This is also done in the WindowWizardVersion.
+			# NB: This must be done BEFORE _launchPlayback() below, so that the metadata reloading can use then new Trakt authentication.
+			if not self.tWizardSetup and not self.tWizardVersion and not self.tInitial:
+				from lib.modules import trakt
+				trakt.authenticationCheck()
+		_launchAdd(1, 'Initializing Trakt Account', _launchTrakt) # 72%
+
+		# Playback
 		def _launchPlayback():
 			# This allows for faster navigation and updated metadata for Quick/Progress/Arrivals menus.
 			# This does an internal Trakt refresh if necessary.
 			# Do not do this the first time Gaia is launched after a fresh install. Do this at the end of the wizard.
-			if not self.tWizard and not self.tInitial:
+			if not self.tWizardSetup and not self.tWizardVersion and not self.tInitial:
+				# Update (2025-04)
+				# NB: Important to use "wait=False" and not "wait=None".
+				# Previously some settings did not get updated to a new value during the launch process.
+				# Eg: When the "internal.donation" setting reached 50 and Gaia is launched, the donations window shows. Then "internal.donation" gets reset to 0.
+				# For a very short time, one can see the value of "internal.donation" being 0 in the profile's settings.xml.
+				# But a second later, the value gets changed back to 50 for some reason. The donations window will show again when Gaia is launched the next time.
+				# There might be some old cached settings in Kodi's code from a few seconds earlier that replaces the newly updated settings. This issue occurs with or without Gaia's internal settings cache enabled.
+				# This seems to happen a lot more if Gaia is launched a second after Kodi is booted, without waiting for the background service/launch processes to finish first.
+				# Another user also reported that his provider setting gets sporadically reset during launch (about 10% of the time).
+				# The actual providers in settings.db were still intact, but "provider.configuration.data" in settings.xml was reset to its default value.
+				# This might be the same issue.
+				# When calling the function below with "wait=False", it will be executed in a thread that will then sleep for "delay".
+				# This seems to solve the issue with the settings to updating.
+				# Maybe it is the sleeping in Playback._launch() that is done otherwise in the main thread instead of a subthread.
+				if not self.developerVersion():
+					from lib.modules.playback import Playback
+					#Playback.instance().launch(refresh = True, reload = True, delay = True, wait = None)
+					Playback.instance().launch(refresh = True, reload = True, delay = True, wait = False)
 
-				#gaiaremove - #gaiafix
-				#gaiaremove - this can be removed a few weeks after v7.1.2 was released.
-				#gaiaremove - also remove in MetaManager.
-				try:
-					if version['old']['number'] and version['old']['number'] <= 70010029.0 and version['new']['number'] > 70010029.0:
-						from lib.meta.manager import MetaManager
-						manager = MetaManager.instance()
-						manager.mFix = True
-						manager.arrival(refresh = True)
-						MetaManager.Instance = None
-				except: Logger.error()
-
-				from lib.modules.playback import Playback
-				Playback.instance().launch(refresh = True, reload = True, delay = True, wait = None)
-		_launchAdd(19, 'Initializing Playback History', _launchPlayback) # 90%
+		_launchAdd(18, 'Initializing Playback History', _launchPlayback) # 90%
 
 		# Clean Old Settings
 		# Place this last, since it can take very long, and we do not want to show this status from the start until close to the end of the progress.
@@ -6101,6 +6483,7 @@ class Settings(object):
 	Database = 'settings'
 	Lock = Lock()
 	Busy = 0
+	Save = None
 
 	LevelBasic = 0
 	LevelStandard = 1
@@ -6712,6 +7095,20 @@ class Settings(object):
 				'none' : SpecialDefault,
 			},
 		},
+		'menu.general.sleepy.duration' : {
+			'type' : CustomDuration,
+			'title' : 36768,
+			'value' : {
+				'unit' : UnitDay,
+				'default' : 3,
+				'minimum' : 1,
+				'maximum' : 14,
+			},
+			'special' : {
+				'zero' : SpecialNever,
+				'none' : SpecialDefault,
+			},
+		},
 		'interface.button.time' : {
 			'type' : CustomDuration,
 			'title' : 32312,
@@ -6858,6 +7255,10 @@ class Settings(object):
 	}
 
 	@classmethod
+	def reset(self, settings = True):
+		Settings.Save = None
+
+	@classmethod
 	def _addon(self):
 		if Settings.Addon is None: Settings.Addon = System.addon()
 		return Settings.Addon
@@ -6941,7 +7342,10 @@ class Settings(object):
 				result = True
 				data = Regex.replace(data = data, expression = '<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', replacement = 'true' if enabled else 'false', group = 1)
 				File.writeNow(path, data)
-				System.reload(message = False if silent and not notification else 33148)
+
+				# NB: Important to delay the reloading to allow Kodi to write the changed setting to file.
+				# Otherwise if often happens that after the reload the setting has not changed and the dialog is shown about the mismatched interpreter.
+				if System.reload(message = False if silent and not notification else 33148, delay = True): settings = False
 
 		if settings: self.launch(id = id)
 		return result
@@ -6961,10 +7365,10 @@ class Settings(object):
 			from lib.meta.pack import MetaPack
 			from lib.meta.cache import MetaCache
 			from lib.meta.image import MetaImage
+			from lib.meta.company import MetaCompany
 			from lib.meta.manager import MetaManager
 			from lib.meta.provider import MetaProvider
 			from lib.meta.service import MetaService
-			from lib.meta.providers.fanart import MetaFanart
 			from lib.meta.services.tvdb import MetaTvdb
 			from lib.providers.core.manager import Manager
 			from lib.providers.core.base import ProviderBase
@@ -6991,14 +7395,14 @@ class Settings(object):
 			from lib.modules import trakt as Trakt
 
 			classes = [
-				MetaTools, MetaMenu, MetaPack, MetaCache, MetaImage, MetaManager, MetaProvider, MetaService, MetaTvdb, MetaFanart,
+				MetaTools, MetaMenu, MetaPack, MetaCache, MetaImage, MetaCompany, MetaManager, MetaProvider, MetaService, MetaTvdb,
 				Debrid, Stream,
 				Manager, ProviderBase, ProviderDebrid, ProviderExternal, ProviderWeb,
 				Account, Cloudflare, Search, Shortcut, Menu, Core, Handler, Playback, Window, Trakt,
 				Font, Icon, Format, CoreDialog, Dialog, Context,
 				Player, Streamer, Subtitle,
 				Cache, Memory, Pool,
-				Language, Title, Audience, System, Time, Environment,
+				Language, Title, Audience, System, Time, Environment, Settings,
 				#Importer, Loader, # Do not reset these. They do not rely on any settings. And it is actually more efficient to not reset, so we can reuse imported modules between invokers, which typically take long to import.
 			]
 			for i in classes:
@@ -7066,11 +7470,22 @@ class Settings(object):
 			if not id in exceptions and self.idDataLabel(id) in idsMain:
 				if not self.defaultIs(id = self.idDataLabel(id)) and self._getDatabase(id = self.idDataValue(id)) is None: # Check defaultIs() on the label, not on "id".
 					Logger.log('CLEAN SETTINGS - Resetting to default value (%s)' % id)
-					self.defaultData(id = id)
+					self.defaultData(id = id, save = False) # save: more info under save(). Do not save these during the launch. If they fail to update, bad luck, it can be done next time when Gaia is launched late.
 					change = True
 
-		# Only do this here, since some values might be reset to default above.
 		self.cacheClear()
+
+		# Update (2025-12):
+		# Is this still needed in Kodi 21+?
+		# This manually overwrites the settings.xml file and is probably not a good idea.
+		# This might only have been needed for older Kodis, were Kodi complained in the log that some setting from the profile does not exist in the addon xml.
+		# Hopefully Kodi nowadays remove old non-existing settings automatically.
+		# This was thought to be the cause from Settings.save. However, it turns out this is not the cause. More info under Settings.save.
+		# However, we should probably still not do this anymore.
+		# If we ever enable this again, make sure Settings.save still works.
+		# And this should probably only be done once when the version changes, since that is the only time settings get removed.
+		'''
+		# Only do this here, since some values might be reset to default above.
 		dataUser = self.cacheDataUser()
 		idsUser = Regex.extract(data = dataUser, expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"(.*?)".*?(?:<\/setting>|\/>)(?:\r|\n|$))', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
@@ -7098,7 +7513,7 @@ class Settings(object):
 				_write(data = dataUser, reload = reload)
 			else:
 				File.writeNow(self.pathProfile(), dataUser)
-				if reload: self.cacheClear()
+				if reload: self.cacheClear()'''
 
 	@classmethod
 	def path(self, id):
@@ -7151,6 +7566,82 @@ class Settings(object):
 	@classmethod
 	def size(self):
 		return File.size(self.pathProfile()) + File.size(self.pathDatabase())
+
+	###################################################################
+	# SAVE
+	###################################################################
+
+	#gaiaremove
+	#gaiaremove - NB: Ignore all the eliminated causes. This was tested with the Interpreter setting set at "Standard" and therefore any changes to the code during testing did not take effect and the conclusions might be incorrect.
+	# This is a weird one!!
+	# If you start Gaia shortly after Kodi is booted, this happens.
+	#	If you start Gaia 1-3 seconds after Kodi, it sometimes does not happen.
+	#	But it happens most of the time when starting Gaia 3-5 seconds after Kodi.
+	#	This also seems to happen more frequently on Windows and and on low-end devices with Linux.
+	#	If you let all background processes/addons finish and wait 5 minutes after launch, and only then open Gaia, this overwriting does not seem to happen.
+	# A lot of the settings set/updated during the Gaia-launch execution do not permanently get updated in settings.xml after calling Settings.set(...).
+	#	Sometimes you can see for a short time that the value does get updated inside settings.xml, but a few seconds later the value gets overwritten by the original value before update.
+	#	It was also observed that often the value gets replaced multiple times and not just once. And this is even without this new code below that updates the values multiple times in a loop.
+	# This makes the Donation window and Announcement dialog show up again and again after rebooting Kodi, because their counters/timestamps, although updated during launch, get reset to their previous value.
+	# These have been eliminated as possible causes:
+	#	1. The automatic settings Backup import, which might accidentally replace the setting with an old backup. This is not the case.
+	#	2. The service script is also not the cause. At least not if you remove the code inside service.py.
+	#	3. The 2 Playback.instance().launch(...) calls during launch, which load metadata in the background. If commented-out, the problem still persists.
+	#	4. It is also not Settings.clean(), although the setttings.xml file gets manually written there. Even without the write, this issues still persists. But the write in Settings.clean() was removed, since it probably isn't needed for modern Kodis anymore.
+	# The cause is unknown, but probably it is Kodi itself, that might take some time to initialize the addons or something?
+	# Or there is some Python invoker or other thing in Kodi that loads the original settings into memory, then Gaia launch updates them, and if that other invoker/script finishes, Kodi writes out its settings in memory to file (which are still the old values), replacing the updated values.
+	# Whatever the root cause is, this seems to be a hacky solution:
+	#	1. Save all the settings that were updated during the Gaia launch process to a dict.
+	#	2. Outwait the process that causes this from the launch process. How long to wait or for which process to wait is unclear. But just wait a long time.
+	#	3. Hope that the old settings that are written to file are done by now. Then update the settings from the saved dict to file.
+	# The only drawback of this approach is that if another process updates one of these settings while the launch process waits, it will get overwritten by these functions.
+	#	But there are probably not many settings updated during launch that are updated elsewhere early in the boot process.
+	# Update: What is even weirder is that it was observed that after changing the settings.xml manually (for testing purposes), minutes after boot (once all these settings are done), the manual set setting is overwritten again.
+	#	The manual setting is then overwritten with the value that was correctly fixed by these functions.
+	#	It seems to be auto-replaced exactly once a few seconds after manually editing it, so maybe Kodi checks for file changes?
+	#	So Kodi must have some internal processes which has the settings cached in memory which then gets written to file every now and then, or if that process exits.
+
+	@classmethod
+	def saveInitialize(self):
+		Settings.Save = {}
+
+	@classmethod
+	def saveFinalize(self):
+		if Settings.Save:
+			for i in range(3): # Repeat in case the dict is updated or added-to while iterating over it.
+				ids = list(Settings.Save.keys()) # In case the dict is updated or added-to while iterating over it. And we also delete below.
+				if not ids: break
+				addon = System.addon()
+				for id in ids:
+					addon.setSetting(id = id, value = Settings.Save[id])
+					del Settings.Save[id]
+			Settings.Save = None
+
+	@classmethod
+	def saveUpdate(self):
+		if Settings.Save:
+			ids = list(Settings.Save.keys()) # In case the dict is updated or added-to while iterating over it.
+			addon = System.addon()
+			for id in ids:
+				addon.setSetting(id = id, value = Settings.Save[id])
+
+	@classmethod
+	def saveAdd(self, id, value):
+		if not Settings.Save is None: Settings.Save[id] = value
+
+	@classmethod
+	def saveWait(self):
+		try:
+			# How long to wait is unclear. But 1 minute seems enough.
+			for i in range(12): # 1 minute.
+				self.saveUpdate() # Save while waiting, in case the setting is used by another external process.
+				Time.sleep(5)
+			self.saveFinalize()
+		except: Logger.error()
+
+	###################################################################
+	# CACHE
+	###################################################################
 
 	@classmethod
 	def cache(self):
@@ -7627,6 +8118,11 @@ class Settings(object):
 		self.launch(id = self.idDataLabel(id), wait = wait)
 
 	@classmethod
+	def close(self):
+		from lib.modules.interface import Dialog
+		Dialog.close(id = Dialog.IdDialogAddonSettings)
+
+	@classmethod
 	def wait(self):
 		while Settings.Busy > 0: Time.sleep(0.3)
 
@@ -7639,7 +8135,7 @@ class Settings(object):
 		return id + '.' + Settings.DataValue
 
 	@classmethod
-	def set(self, id, value, cached = False, database = False, background = False):
+	def set(self, id, value, cached = False, database = False, background = False, save = True):
 		Settings.Busy += 1
 		if Tools.isStructure(value) or database:
 			base = self._database()
@@ -7660,7 +8156,9 @@ class Settings(object):
 			def _set(id, value, cached):
 				if cached or self.cacheEnabled(): self.cacheSet(id = id, value = value)
 				Settings.Lock.acquire()
-				self._addon().setSetting(id = Converter.unicode(id), value = value)
+				id = Converter.unicode(id)
+				if save: self.saveAdd(id = id, value = value)
+				self._addon().setSetting(id = id, value = value)
 				Settings.Lock.release()
 				Settings.Busy -= 1
 			if background:
@@ -7700,7 +8198,7 @@ class Settings(object):
 			self.set(id = id, value = value, external = False)
 
 	@classmethod
-	def default(self, id, database = False):
+	def default(self, id, database = False, save = True):
 		try:
 			# This does not always work.
 			# Sometimes when writing the truncated data to file, Kodi later replaces the content with its in-memory version.
@@ -7724,7 +8222,7 @@ class Settings(object):
 
 			for i in id:
 				value = None if database else self.raw(id = i, parameter = Settings.ParameterDefault)
-				self.set(id = i, value = value, database = database)
+				self.set(id = i, value = value, database = database, save = save)
 
 				data = Regex.remove(data = data, expression = expression % i, group = 1)
 				try: del Settings.CacheValuesUser[i]
@@ -7738,9 +8236,9 @@ class Settings(object):
 		return self.getString(id = id) == self.raw(id = id, parameter = Settings.ParameterDefault)
 
 	@classmethod
-	def defaultData(self, id):
-		self.default([id, self.idDataLabel(id)], database = False)
-		self.default([self.idDataValue(id)], database = True)
+	def defaultData(self, id, save = True):
+		self.default([id, self.idDataLabel(id)], database = False, save = save)
+		self.default([self.idDataValue(id)], database = True, save = save)
 
 	# Retrieve the values directly from the original settings instead of the saved user XML.
 	# This is for internal values/settings that have a default value. If these values change, they are not propagate to the user XML, since the value was already set from a previous version.
@@ -7859,7 +8357,7 @@ class Cleanup(object):
 			return ConverterSize(size).stringOptimal(places = 1)
 
 	@classmethod
-	def _clean(self, function, message = None, confirm = None):
+	def _clean(self, function, message = None, confirm = None, old = None):
 		from lib.modules.interface import Translation, Dialog, Loader
 		Loader.hide()
 
@@ -7869,9 +8367,18 @@ class Cleanup(object):
 
 		if Dialog.option(title = 33989, message = message):
 			if not confirm or Dialog.option(title = 33989, message = confirm):
+				if old:
+					choice = Dialog.options(title = 33989, message = 36851, labelConfirm = 33029, labelDeny = 35883, labelCustom = 33743, default = Dialog.ChoiceNo)
+					if choice == Dialog.ChoiceYes: old = False
+					elif choice == Dialog.ChoiceNo: old = True
+					else: return False
+
 				Loader.show()
-				function()
+				if old: function(old = old)
+				else: function()
 				Dialog.notification(title = 33989, message = 33043, icon = Dialog.IconSuccess, duplicates = True)
+				return True
+		return False
 
 	@classmethod
 	def _help(self):
@@ -7891,14 +8398,14 @@ class Cleanup(object):
 		# General
 		subitems = []
 		subitems.append({'title' : 33027, 'size' : self.addonSize, 'clean' : self.addonClean, 'message' : 33899, 'confirm' : 33900})
-		subitems.append({'title' : 35324, 'size' : self.menuSize, 'clean' : self.menuClean, 'message' : 33901, 'confirm' : 33902})
+		subitems.append({'title' : 35324, 'size' : self.menuSize, 'clean' : self.menuClean, 'message' : 33901, 'confirm' : 33902, 'old' : True})
 		items.append({'title' : 32310, 'items' : subitems})
 
 		# Database
 		subitems = []
-		subitems.append({'title' : 33029, 'size' : self.databaseSize, 'clean' : self.databaseClean, 'message' : 33903})
-		subitems.append({'title' : 33016, 'size' : self.databaseCacheSize, 'clean' : self.databaseCacheClean, 'message' : 33904})
-		subitems.append({'title' : 33015, 'size' : self.databaseMetadataSize, 'clean' : self.databaseMetadataClean, 'message' : 33905})
+		subitems.append({'title' : 33029, 'size' : self.databaseSize, 'clean' : self.databaseClean, 'message' : 33903, 'old' : True})
+		subitems.append({'title' : 33016, 'size' : self.databaseCacheSize, 'clean' : self.databaseCacheClean, 'message' : 33904, 'old' : True})
+		subitems.append({'title' : 33015, 'size' : self.databaseMetadataSize, 'clean' : self.databaseMetadataClean, 'message' : 33905, 'old' : True})
 		subitems.append({'title' : 33481, 'size' : self.databaseStreamSize, 'clean' : self.databaseStreamClean, 'message' : 36427})
 		subitems.append({'title' : 32036, 'size' : self.databaseHistorySize, 'clean' : self.databaseHistoryClean, 'message' : 33906})
 		subitems.append({'title' : 33041, 'size' : self.databaseSearchSize, 'clean' : self.databaseSearchClean, 'message' : 33907})
@@ -7949,8 +8456,9 @@ class Cleanup(object):
 					items[i]['items'][j]['value'] = self._size(items[i]['items'][j]['size']())
 					if not 'message' in items[i]['items'][j]: items[i]['items'][j]['message'] = None
 					if not 'confirm' in items[i]['items'][j]: items[i]['items'][j]['confirm'] = None
+					if not 'old' in items[i]['items'][j]: items[i]['items'][j]['old'] = None
 					# NB: Pass values in as lambda parameters and not in the call of self.clean(...) itself, otherwise the function will always execute with the last values set in this for-loop (aka QR code values).
-					items[i]['items'][j]['action'] = lambda function = items[i]['items'][j]['clean'], message = items[i]['items'][j]['message'], confirm = items[i]['items'][j]['confirm']: self._clean(function = function, message = message, confirm = confirm)
+					items[i]['items'][j]['action'] = lambda function = items[i]['items'][j]['clean'], message = items[i]['items'][j]['message'], confirm = items[i]['items'][j]['confirm'], old = items[i]['items'][j]['old']: self._clean(function = function, message = message, confirm = confirm, old = old)
 
 		Loader.hide()
 		return items
@@ -7977,9 +8485,9 @@ class Cleanup(object):
 		return total
 
 	@classmethod
-	def menuClean(self):
-		self.databaseCacheClean()
-		self.databaseMetadataClean()
+	def menuClean(self, old = None):
+		self.databaseCacheClean(old = old)
+		self.databaseMetadataClean(old = old)
 
 	@classmethod
 	def databaseSize(self):
@@ -7995,9 +8503,9 @@ class Cleanup(object):
 		return total
 
 	@classmethod
-	def databaseClean(self):
-		self.databaseCacheClean()
-		self.databaseMetadataClean()
+	def databaseClean(self, old = None):
+		self.databaseCacheClean(old = old)
+		self.databaseMetadataClean(old = old)
 		self.databaseStreamClean()
 		self.databaseHistoryClean()
 		self.databaseSearchClean()
@@ -8011,9 +8519,10 @@ class Cleanup(object):
 		return Cache.instance()._size()
 
 	@classmethod
-	def databaseCacheClean(self):
+	def databaseCacheClean(self, old = None):
 		from lib.modules.cache import Cache
-		Cache.instance().clear(confirm = False)
+		if old: Cache.instance().clearOld()
+		else: Cache.instance().clear(confirm = False)
 
 	@classmethod
 	def databaseMetadataSize(self):
@@ -8021,9 +8530,10 @@ class Cleanup(object):
 		return MetaCache.instance()._size()
 
 	@classmethod
-	def databaseMetadataClean(self):
+	def databaseMetadataClean(self, old = None):
 		from lib.meta.cache import MetaCache
-		MetaCache.instance().clear(confirm = False)
+		if old: MetaCache.instance().clearOld()
+		else: MetaCache.instance().clear(confirm = False)
 
 	@classmethod
 	def databaseStreamSize(self):
@@ -8268,10 +8778,10 @@ class Media(object):
 	Feature			= 'feature'			# Feature full-length movies.
 	Short			= 'short'			# Short films. IMDb: full support (through type) | TMDb: limited support (through keywords or duration) | TVDb: no support (cannot filter by duration) | Trakt: limited support (through genre or duration).
 	Special			= 'special'			# Special films and TV specials. IMDb: full support (through type) | TMDb: limited support (through genre, although only TV movies) | TVDb: limited support (through genre, although only TV movies) | Trakt: limited support (through keywords, although not great).
-	Multi			= 'multi'			# Series with mutiple seasons.
+	Multi			= 'multi'			# Series with multiple seasons.
 	Mini			= 'mini'			# Mini-series with a single season. IMDb: full support (through type) | TMDb: full support (through type) | TVDb: full support (through genre) | Trakt: no support (has a mini-series genre, but nothing labeled as such).
 
-	# SERIE TYPES
+	# CHAPTER TYPES
 	# Season and episode types.
 	Standard		= 'standard'		# A standard season or episode.
 	Exclusive		= 'exclusive'		# A special season (S0) or episode (E0). Do not use "special", since that is reserved for TV specials.
@@ -8279,12 +8789,22 @@ class Media(object):
 	Finale			= 'finale'			# A last season of a show or a last episode of a season.
 	Outer			= 'outer'			# A first or last episode of a show.
 	Inner			= 'inner'			# A first or last episode of a season.
-	Middle			= 'middle'			# A first or last episode in the middle of a season that is split into mutiple parts.
+	Middle			= 'middle'			# A first or last episode in the middle of a season that is split into multiple parts.
+	Alternate		= 'alternate'		# A premiere or finale that is abnormal, typically because the episode numbering between Trakt and TVDb marks premieres/finales at different points int he season. Eg One Piece S21 finale (S21E197 Trakt vs S21E194 TVDb).
 
-	# RELEASE TYPES
-	# How the media was released.
+	# PUBLISH TYPES
+	# How the media was published.
 	Cinema			= 'cinema'			# Released in theaters.
 	Television		= 'television'		# Released for TV or home streaming. IMDb: full support (through type) | TMDb: full support (through genre) | TVDb: full support (through genre) | Trakt: limited support (through keywords, although not great).
+
+	# INTERVAL TYPES
+	# The interval between episode releases. Should conform to the interval types in MetaPack.
+	Weekly			= 'weekly'			# One episode released per week.
+	Daily			= 'daily'			# One episode released per weekday.
+	Instantly		= 'instantly'		# All episodes of a season are released at once.
+	Quickly			= 'quickly'			# All episodes of a season are almost released at once, over just a few days.
+	Batchly			= 'batchly'			# Seasons are divided into smaller subgroups and all episodes within a group are released at once.
+	Otherly			= 'otherly'			# Other types of releases.
 
 	# TOPIC TYPES
 	# Content of the media as a subtype to the base types, or genres.
@@ -8430,6 +8950,16 @@ class Media(object):
 	Award			= 'award'			# Award winners.
 	Trend			= 'trend'			# Currently trending titles. Typically filtered/sorted by current temporary trendiness or popularity.
 
+	class _Base():
+		def __eq__(self, media):
+			return (
+				media == Media.Movie or
+				media == Media.Set or
+				media == Media.Show or
+				media == Media.Season or
+				media == Media.Episode
+			)
+
 	class _Bonus():
 		def __eq__(self, media):
 			return (
@@ -8466,6 +8996,29 @@ class Media(object):
 
 				media == Media.Telly or
 				media == Media.Soap
+			)
+
+	class _Chapter():
+		def __eq__(self, media):
+			return (
+				media == Media.Standard or
+				media == Media.Exclusive or
+				media == Media.Premiere or
+				media == Media.Finale or
+				media == Media.Outer or
+				media == Media.Inner or
+				media == Media.Middle
+			)
+
+	class _Interval():
+		def __eq__(self, media):
+			return (
+				media == Media.Weekly or
+				media == Media.Daily or
+				media == Media.Instantly or
+				media == Media.Quickly or
+				media == Media.Batchly or
+				media == Media.Otherly
 			)
 
 	class _Topic():
@@ -8656,9 +9209,12 @@ class Media(object):
 
 	# Can be used as follows:
 	# if media == Media.Serie: ...
+	Base		= _Base()
 	Bonus		= _Bonus()
 	Film		= _Film()
 	Serie		= _Serie()
+	Chapter		= _Chapter()
+	Interval	= _Interval()
 	Topic		= _Topic()
 	Mood		= _Mood()
 	Age			= _Age()
@@ -8740,6 +9296,12 @@ class Media(object):
 			else: media.append(type)
 		return media
 
+	@classmethod
+	def replace(self, media, type, replacement, copy = False):
+		media = self.remove(media = media, type = type)
+		media = self.add(media = media, type = replacement, copy = copy)
+		return media
+
 	##############################################################################
 	# STRING
 	##############################################################################
@@ -8778,6 +9340,10 @@ class Media(object):
 		else: return True
 
 	@classmethod
+	def isBase(self, media):
+		return self.isMedia(media = media, type = Media.Base)
+
+	@classmethod
 	def isBonus(self, media):
 		return self.isMedia(media = media, type = Media.Bonus)
 
@@ -8788,6 +9354,14 @@ class Media(object):
 	@classmethod
 	def isSerie(self, media):
 		return self.isMedia(media = media, type = Media.Serie)
+
+	@classmethod
+	def isChapter(self, media):
+		return self.isMedia(media = media, type = Media.Chapter)
+
+	@classmethod
+	def isInterval(self, media):
+		return self.isMedia(media = media, type = Media.Interval)
 
 	@classmethod
 	def isTopic(self, media):
@@ -8910,7 +9484,7 @@ class Media(object):
 		return self.isMedia(media = media, type = Media.Mini)
 
 	##############################################################################
-	# IS - SERIE
+	# IS - CHAPTER
 	##############################################################################
 
 	@classmethod
@@ -8941,8 +9515,12 @@ class Media(object):
 	def isMiddle(self, media):
 		return self.isMedia(media = media, type = Media.Middle)
 
+	@classmethod
+	def isAlternate(self, media):
+		return self.isMedia(media = media, type = Media.Alternate)
+
 	##############################################################################
-	# IS - RELEASE
+	# IS - PUBLISH
 	##############################################################################
 
 	@classmethod
@@ -8952,6 +9530,34 @@ class Media(object):
 	@classmethod
 	def isTelevision(self, media):
 		return self.isMedia(media = media, type = Media.Television)
+
+	##############################################################################
+	# IS - INTERVAL
+	##############################################################################
+
+	@classmethod
+	def isWeekly(self, media):
+		return self.isMedia(media = media, type = Media.Weekly)
+
+	@classmethod
+	def isDaily(self, media):
+		return self.isMedia(media = media, type = Media.Daily)
+
+	@classmethod
+	def isInstantly(self, media):
+		return self.isMedia(media = media, type = Media.Instantly)
+
+	@classmethod
+	def isQuickly(self, media):
+		return self.isMedia(media = media, type = Media.Quickly)
+
+	@classmethod
+	def isBatchly(self, media):
+		return self.isMedia(media = media, type = Media.Batchly)
+
+	@classmethod
+	def isOtherly(self, media):
+		return self.isMedia(media = media, type = Media.Otherly)
 
 	##############################################################################
 	# IS - TOPIC
@@ -9554,11 +10160,11 @@ class Audience(object):
 
 	@classmethod
 	def enabled(self):
-		return Settings.getBoolean('metadata.general.audience')
+		return Settings.getBoolean('metadata.region.audience')
 
 	@classmethod
 	def age(self, type):
-		if self.enabled(): return Settings.getInteger('metadata.general.audience.%s' % type)
+		if self.enabled(): return Settings.getInteger('metadata.region.audience.%s' % type)
 		else: return Audience.Default.get(type)
 
 	@classmethod
@@ -9750,14 +10356,18 @@ class Title(object):
 	Native = 1
 
 	DefaultMovie = 0
+	DefaultSet = 0
 	DefaultShow = 0
 	DefaultSeason = 0
 	DefaultEpisode = 11
+	DefaultBonus = 11
 
 	DefaultAeonMovie = 0
+	DefaultAeonSet = 0
 	DefaultAeonShow = 0
 	DefaultAeonSeason = 0
 	DefaultAeonEpisode = 11
+	DefaultAeonBonus = 11
 
 	NameSeasonSeries = None
 	NameSeasonSpecial = None
@@ -9832,7 +10442,7 @@ class Title(object):
 	def _extract(self, metadata, encode = False):
 		title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
 		if encode: title = Converter.unicodeNormalize(string = title, umlaut = True)
-		try: year = int(metadata['year'])
+		try: year = int(metadata.get('tvshowyear') or metadata['year'])
 		except: year = None
 		try: season = int(metadata['season']) if 'season' in metadata else None
 		except: season = None
@@ -9941,6 +10551,12 @@ class Title(object):
 			else: setting -= 2
 			data[Media.Movie] = Title.FormatTitle[setting]
 
+			setting = Settings.getInteger('label.title.layout.set') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonSet if aeon else Title.DefaultSet
+			else: setting -= 2
+			data[Media.Set] = Title.FormatTitle[setting]
+
 			setting = Settings.getInteger('label.title.layout.show') if enabled else Title.Default
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonShow if aeon else Title.DefaultShow
@@ -9957,8 +10573,13 @@ class Title(object):
 			if setting == Title.Native: setting = Title.Default
 			if setting == Title.Default: setting = Title.DefaultAeonEpisode if aeon else Title.DefaultEpisode
 			else: setting -= 2
-
 			data[Media.Episode] = Title.FormatEpisode[setting]
+
+			setting = Settings.getInteger('label.title.layout.bonus') if enabled else Title.Default
+			if setting == Title.Native: setting = Title.Default
+			if setting == Title.Default: setting = Title.DefaultAeonBonus if aeon else Title.DefaultBonus
+			else: setting -= 2
+			data[Media.Extra] = Title.FormatEpisode[setting]
 
 			if skin: Title.FormatSkin = data
 			else: Title.FormatDefault = data
@@ -9970,12 +10591,10 @@ class Title(object):
 		if metadata: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = title, year = year, season = season, episode = episode, encode = encode)
 
-		if media == Media.Extra or media == Media.Recap: media = Media.Unknown
-
 		if media == Media.List:
 			return title
-		elif media == Media.Set:
-			media = Media.Movie
+		elif media == Media.Recap or media == Media.Extra:
+			media = Media.Extra
 		elif media == Media.Unknown:
 			pack = (pack and packs)
 			if not season is None and not episode is None and not pack:
@@ -10013,7 +10632,9 @@ class Title(object):
 		if not metadata is None: title, year, season, episode, packs = self._extract(metadata = metadata, encode = encode)
 		title, year, season, episode = self._data(title = None, year = None, season = season, episode = episode, encode = encode)
 
-		if media == Media.Unknown:
+		if media == Media.Recap or media == Media.Extra:
+			media = Media.Extra
+		elif media == Media.Unknown:
 			pack = (pack and packs)
 			if not season is None and not episode is None and not pack:
 				media = Media.Episode
@@ -11031,28 +11652,30 @@ class Platform(object):
 					elif versionNumber: versionLabel = versionNumber
 
 			try:
-				if sys.maxsize > 2**32: architectureBits = Platform.Bits64 # https://docs.python.org/3/library/platform.html
+				# https://docs.python.org/3/library/platform.html
+				if sys.maxsize > 2**32: architectureBits = Platform.Bits64
 			except: pass
 
 			try: architectureName = platform.machine()
 			except: pass
 			if architectureName:
 				if not architectureBits:
-					if Regex.match(data = architectureName, expression = '(64)'): architectureBits = Platform.Bits64
-					elif Regex.match(data = architectureName, expression = '(86|32|i\d{3}|ulv|atom)'): architectureBits = Platform.Bits32
+					if Regex.match(data = architectureName, expression = '((?<!(?<![a-z])a)64)'): architectureBits = Platform.Bits64
+					elif Regex.match(data = architectureName, expression = '((?<!(?<![a-z])a)86|(?<![a-z])32|i\d{3}|ulv|atom)'): architectureBits = Platform.Bits32
 
-				if Regex.match(data = architectureName, expression = '(intel|x86|i\d{3}|ulv|atom|ia.32|amd)'): architectureType = Platform.ArchitectureX86
-				elif Regex.match(data = architectureName, expression = '(arm|aarch|risc|acorn|a32|a64)'): architectureType = Platform.ArchitectureArm
-				elif Regex.match(data = architectureName, expression = '(arc)'): architectureType = Platform.ArchitectureArc
-
-				# AppleTV
-				# Eg: AppleTV14,1
-				if not architectureType:
-					if Regex.match(data = architectureName, expression = '(appletv1,)'): architectureType = Platform.ArchitectureX86 # Pentium M.
-					elif Regex.match(data = architectureName, expression = '(appletv)'): architectureType = Platform.ArchitectureArm # Native ARM or new Apple A ARM-based processors .
+				processor = Hardware.extractProcessor(data = architectureName)
+				if processor == Hardware.ProcessorArm: architectureType = Platform.ArchitectureArm
+				elif processor == Hardware.ProcessorArc: architectureType = Platform.ArchitectureArc
+				elif processor == Hardware.ProcessorIntel or Hardware.ProcessorAmd: architectureType = Platform.ArchitectureX86
 
 				architectureLabel = architectureName
 				if architectureBits: architectureLabel = '%s (%dbit)' % (architectureLabel, architectureBits)
+
+			if not architectureBits:
+				try:
+					# https://docs.python.org/3/library/platform.html
+					if sys.maxsize <= 2**32: architectureBits = Platform.Bits32
+				except: pass
 
 		except: Logger.error()
 
@@ -11103,7 +11726,7 @@ class Platform(object):
 			from lib.modules.compression import Compressor
 			result['identifier'] = self.detectIdentifier()
 			result['module'] = {
-				'cloudscraper' : Importer.moduleCloudScraper(label = True),
+				'cloudscraper' : Importer.moduleCloudflare(label = True),
 				'psutil' : Psutil().moduleLabel(),
 				'ujson' : Ujson().moduleLabel(),
 				'image' : Importer.moduleQrImage(label = True),
@@ -11158,6 +11781,15 @@ class Hardware(object):
 				'weight' : 0.5,
 				'minimum' : 1600000000, # 1.6GHz
 				'maximum' : 3000000000, # 3.0GHz
+			},
+
+			# ARM CPUs often have a high clock speed and many cores, but are in reality slower as an Intel/AMD.
+			# Eg: The Odroid M2 (Quad-Core Cortex-A76 2.3GHz - Quad-Core Cortex-A55 1.8GHz) has a total clock speed close to that of older Intel i7.
+			# Reduce the rating weight of certain CPUs to accomodate the lower performance.
+			'adjust' : {
+				None : 0.90,
+				ProcessorArm : 0.85,
+				ProcessorArc : 0.80,
 			},
 		},
 		'memory' : {
@@ -11224,6 +11856,42 @@ class Hardware(object):
 	@classmethod
 	def _labelProcessor(self, cores, threads = None):
 		return '%d%s Core%s' % (cores, '' if (not threads or cores == threads) else ('(%d)' % threads), '' if cores == 1 else 's')
+
+	########################################
+	# THREAD
+	########################################
+
+	@classmethod
+	def extractProcessor(self, data):
+		type = None
+		try:
+			if data:
+				# Last updated: 2025-12
+				# https://en.wikipedia.org/wiki/List_of_products_using_ARM_processors
+				#gaiaremove - update these every now and then, especially the ARM A/X/M models.
+
+				if Regex.match(data = data, expression = '(intel)'): type = Hardware.ProcessorIntel
+				elif Regex.match(data = data, expression = '(amd)'): type = Hardware.ProcessorAmd
+
+				elif Regex.match(data = data, expression = '(arm|aarch|risc|acorn|cortex|neoverse|securcore)'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = '(arc)'): type = Hardware.ProcessorArc
+
+				# AppleTV
+				# Eg: AppleTV14,1
+				# AppleTV1,1 is still Intel. All higher versions, AppleTVx are ARM (eg: AppleTV14,1).
+				elif Regex.match(data = data, expression = '(appletv1,)'): type = Hardware.ProcessorIntel # AppleTV: Pentium M.
+				elif Regex.match(data = data, expression = '(apple.?(?:tv|m\d))'): type = Hardware.ProcessorArm # AppleTV: Native ARM or new Apple A ARM-based processors.
+
+				elif Regex.match(data = data, expression = '(am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument)'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = '(a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715))'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = '((?!x86|x64)x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8))'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = '(nvidia|tegra)'): type = Hardware.ProcessorArm
+
+				elif Regex.match(data = data, expression = '(x86|x64|i\d{3}|ulv|atom|ia.?32)'): type = Hardware.ProcessorIntel
+
+				elif Regex.match(data = data, expression = '(apple)'): type = Hardware.ProcessorArm # Assume it is a new Apple device, which all have ARM.
+		except: Logger.error()
+		return type
 
 	########################################
 	# THREAD
@@ -11758,6 +12426,7 @@ class Hardware(object):
 		# Use fallback ratings, otherwise various code (like provider optimization) will have ratings that are too high, since some hardware values are excluded.
 		# Eg: On Nvidia Shield and AppleTV the CPU (at least the clock) cannot be detected.
 
+		processorType = self.processorType()
 		processorTotalFallback = None
 		processorSingleFallback = None
 		memoryFallback = None
@@ -11767,35 +12436,46 @@ class Hardware(object):
 		connectionSpeedFallback = None
 		if fallback:
 			if processorTotal is None or processorSingle is None:
-				processorType = self.processorType()
 				processorCount = self.processorCountCore() or 0
 				if processorType == Hardware.ProcessorIntel or processorType == Hardware.ProcessorAmd:
-					if processorCount >= 6:
-						if processorTotal is None: processorTotalFallback = 0.6
-						if processorSingle is None: processorSingleFallback = 0.6
+					if processorCount >= 8:
+						if processorTotal is None: processorTotalFallback = 0.75
+						if processorSingle is None: processorSingleFallback = 0.75
+					elif processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.65
+						if processorSingle is None: processorSingleFallback = 0.65
+					elif processorCount >= 4:
+						if processorTotal is None: processorTotalFallback = 0.55
+						if processorSingle is None: processorSingleFallback = 0.55
 					else:
-						if processorTotal is None: processorTotalFallback = 0.5
-						if processorSingle is None: processorSingleFallback = 0.5
+						if processorTotal is None: processorTotalFallback = 0.50
+						if processorSingle is None: processorSingleFallback = 0.50
 				elif processorType == Hardware.ProcessorArm:
-					if processorCount >= 6:
+					if processorCount >= 8:
+						if processorTotal is None: processorTotalFallback = 0.40
+						if processorSingle is None: processorSingleFallback = 0.40
+					elif processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.35
+						if processorSingle is None: processorSingleFallback = 0.35
+					elif processorCount >= 4:
 						if processorTotal is None: processorTotalFallback = 0.25
 						if processorSingle is None: processorSingleFallback = 0.25
-					elif processorCount >= 4:
-						if processorTotal is None: processorTotalFallback = 0.2
-						if processorSingle is None: processorSingleFallback = 0.2
 					else:
 						if processorTotal is None: processorTotalFallback = 0.15
 						if processorSingle is None: processorSingleFallback = 0.15
 				else:
-					if processorCount >= 6:
-						if processorTotal is None: processorTotalFallback = 0.2
-						if processorSingle is None: processorSingleFallback = 0.2
+					if processorCount >= 8:
+						if processorTotal is None: processorTotalFallback = 0.30
+						if processorSingle is None: processorSingleFallback = 0.30
+					elif processorCount >= 6:
+						if processorTotal is None: processorTotalFallback = 0.25
+						if processorSingle is None: processorSingleFallback = 0.25
 					elif processorCount >= 4:
+						if processorTotal is None: processorTotalFallback = 0.20
+						if processorSingle is None: processorSingleFallback = 0.20
+					else:
 						if processorTotal is None: processorTotalFallback = 0.15
 						if processorSingle is None: processorSingleFallback = 0.15
-					else:
-						if processorTotal is None: processorTotalFallback = 0.1
-						if processorSingle is None: processorSingleFallback = 0.1
 			if memory is None: memoryFallback = 0.3
 			if storageRead is None: storageReadFallback = 0.5
 			if storageWrite is None: storageWriteFallback = 0.2
@@ -11823,6 +12503,12 @@ class Hardware(object):
 		weightConnectionSpeed = Hardware.Performance['connection']['speed']['weight']
 		weightConnection = weightConnectionLatency + weightConnectionSpeed
 
+		# Reduce the CPU rating a bit for ARM/ARC, since they have a high total clock speed, but are actually slower than an Intel/AMD.
+		weightProcessorAdjust = 1.0
+		if processorTotalFallback is None and processorSingleFallback is None: # Only if the CPU clock speed could be accurately detected.
+			try: weightProcessorAdjust = Hardware.Performance['processor']['adjust'][processorType]
+			except: pass
+
 		weights = []
 		if not processorTotalRater is None: weights.append(weightProcessorTotal)
 		if not processorSingleRater is None: weights.append(weightProcessorSingle)
@@ -11842,9 +12528,11 @@ class Hardware(object):
 		ratingConnection = None if (connectionLatencyRater is None and connectionSpeedRater is None) else 0
 
 		if not processorTotalRater is None:
+			processorTotalRater *= weightProcessorAdjust
 			rating.append(processorTotalRater * (weightProcessorTotal / weights))
 			ratingProcessor += processorTotalRater * (weightProcessorTotal / weightProcessor)
 		if not processorSingleRater is None:
+			processorSingleRater *= weightProcessorAdjust
 			rating.append(processorSingleRater * (weightProcessorSingle / weights))
 			ratingProcessor += processorSingleRater * (weightProcessorSingle / weightProcessor)
 		if not memoryRater is None:
@@ -11872,7 +12560,7 @@ class Hardware(object):
 
 		# Label
 
-		labelRating = None
+		labelRating4 = None
 		labelPerformance = None
 		labelDescription = None
 		labelProcessorDevice = None
@@ -12103,27 +12791,25 @@ class Hardware(object):
 	@classmethod
 	def detectProcessorType(self, model = None):
 		type = None
-
 		try:
 			model = model if model else self.detectProcessorModel()
-			if model:
-				if Regex.match(data = model, expression = '(intel)'): type = Hardware.ProcessorIntel
-				elif Regex.match(data = model, expression = '(amd)'): type = Hardware.ProcessorAmd
-				elif Regex.match(data = model, expression = '(arm|aarch|risc|acorn|a32|a64)'): type = Hardware.ProcessorArm
-				elif Regex.match(data = model, expression = '(arc)'): type = Hardware.ProcessorArc
-				elif Regex.match(data = model, expression = '(appletv1,)'): type = Hardware.ProcessorIntel # AppleTV: Pentium M.
-				elif Regex.match(data = model, expression = '(appletv)'): type = Hardware.ProcessorArm # AppleTV: Native ARM or new Apple A ARM-based processors .
-		except: Logger.error()
+			if model: type = self.extractProcessor(data = model)
 
+			# The above should work. But use this as a fallback.
+			if not type:
+				try:
+					import platform
+					architecture = platform.machine()
+				except: architecture = None
+				if architecture: type = self.extractProcessor(data = architecture)
+		except: Logger.error()
 		return type
 
 	@classmethod
 	def detectProcessorName(self, type = None):
 		type = type if type else self.detectProcessorType()
-
 		try: name = Hardware.Processor[type]['name']
 		except: name = None
-
 		return name
 
 	@classmethod
@@ -12179,7 +12865,13 @@ class Hardware(object):
 				if data:
 					result = Regex.extract(data = data, expression = 'model\s*name\s*:\s*(.*?)[\n\r]')
 					if result: return result.strip()
-					result = Regex.extract(data = data, expression = 'processor\s*:\s*(.*?(?:intel|amd|arm|aarch|risc|acorn|a32|a64|arc).*?)(?:$|\n)') # Android devices.
+
+					# There can be other "processor" entries, with simply a number.
+					# Eg: processor	: 0
+					result = Regex.extract(data = data, expression = 'processor\s*:\s*(.*?(?:intel|amd|arc|apple|arm|aarch|risc|acorn|cortex|neoverse|securcore|am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument|nvidia|tegra|x86|x64|i\d{3}|ulv|atom|ia.?32|a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715)|x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8)).*?)(?:$|\n)') # Android devices.
+					if result: return result.strip()
+
+					result = Regex.extract(data = data, expression = 'cpu\s*model\s*:\s*(.*?)[\n\r]')
 					if result: return result.strip()
 		except: pass
 
@@ -12333,7 +13025,7 @@ class Hardware(object):
 		return _result()
 
 	@classmethod
-	def detectProcessorClock(self, model = None, count = None):
+	def detectProcessorClock(self, model = None, type = None, count = None):
 		def _label(clock, cores = None):
 			if cores: cores = self._labelProcessor(cores = cores) + ' @ '
 			else: cores = ''
@@ -12385,6 +13077,78 @@ class Hardware(object):
 						if not i in group: group[i] = 0
 						group[i] += 1
 					group = [{'clock' : key, 'cores' : value} for key, value in group.items()]
+					group = Tools.listSort(data = group, key = lambda i : i['cores'], reverse = True)
+
+					# For most cases the exact number of cores per clock is not known.
+					# Especially ARMs typically have 2 types of cores with different clock speeds.
+					try:
+						if group and cores and cores > 1 and sum(i['cores'] for i in group) < cores:
+							# Move the higher clock to the front.
+							group = Tools.listSort(data = group, key = lambda i : i['clock'], reverse = True)
+							single = all(i['cores'] == 1 for i in group)
+
+							# Only one group. Add all cores to it.
+							if len(group) == 1:
+								group[0]['cores'] = cores
+
+							# ARMs with exactly 2 groups.
+							# Many ARMs seem to follow this distribution:
+							#	2/3 (66.6%) of the cores run on the higher clock speed.
+							#	1/3 (33.3%) of the cores run on the lower clock speed.
+							# Eg: Odroid N2+:
+							#	Quad-core Cortex-A73 is increased to 2.4Ghz
+							#	Dual-core Cortex-A53 is increased to 2.0Ghz
+							# Other ones are equally divided.
+							# Eg: Odroid M2:
+							#	Quad-Core Cortex-A76 2.3GHz
+							#	Quad-Core Cortex-A55 1.8GHz
+							# If the core count divided by 2 is even, use the 66-33 ratio, otherwise use a 50-50 ratio.
+							# Not sure if this is always the case, but seems like a good guess.
+							# This could be detected more accurately with: /proc/cpuinfo
+							elif (not type or type == Hardware.ProcessorArm) and len(group) == 2 and single:
+								if (cores / 2.0)  % 2 == 0: primary = cores * 0.5 # Even.
+								else: primary = cores * 0.66667 # Odd.
+
+								# Round to the nearest even number, since it is way more likley that the cores in a clusters are mutiples of 2.
+								# Eg: 4 cores = 2 + 2
+								# Eg: 6 cores = 4 + 2
+								# Eg: 8 cores = 4 + 4
+								# Eg: 10 cores = 6 + 4 (not 8+2 or 7+3 or 5+5)
+								primary = Math.round(primary / 2.0) * 2
+								primary = int(Math.round(primary))
+
+								secondary = cores - primary
+								group[0]['cores'] = primary # Group with higher clock speed.
+								group[1]['cores'] = secondary # Group with lower clock speed.
+
+							# Otherwise if all core counts are 1, divide by mutiples of 2.
+							# Each group should have a count of mutiples of 2.
+							elif single:
+								groups = len(group)
+								primary = cores / float(groups)
+								primary = Math.roundUp(primary / 2.0) * 2
+								primary = int(Math.round(primary))
+								secondary = int(Math.roundDown((cores - primary) / (groups - 1)))
+								primary = cores - (secondary * (groups - 1))
+								group[0]['cores'] = primary
+								for i in range(1, groups): group[i]['cores'] = secondary
+
+							# Otherwise divide the remainder of cores equally across the groups.
+							# This can result in groups having an odd number of cores.
+							else:
+								groups = len(group)
+								missing = cores - sum(i['cores'] for i in group)
+								if missing > 0:
+									secondary = int(Math.roundDown(missing / float(groups)))
+									primary = secondary + (missing - (secondary * groups)) # Add any additional rounding deviation to the first group.
+									group[0]['cores'] += primary
+									for i in range(1, groups): group[i]['cores'] += secondary
+
+							# Calculate a more accurate total and average clock speed.
+							total = int(sum(i['cores'] * i['clock'] for i in group))
+							average = int(total / sum(i['cores'] for i in group))
+					except: Logger.error()
+
 					group = Tools.listSort(data = group, key = lambda i : i['cores'], reverse = True)
 					common = group[0]['clock']
 
@@ -12518,7 +13282,7 @@ class Hardware(object):
 		# Only use Kodi's InfoLabel last, since it takes long and sometimes returns -1MHz.
 		try:
 			data = System.infoLabel('System.CpuFrequency', wait = True)
-			if result:
+			if data:
 				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*mhz')
 				result = _result(result, unit = 'mhz', count = count)
 				if result and result['total']: return result
@@ -12586,7 +13350,7 @@ class Hardware(object):
 		type = self.detectProcessorType(model = model)
 		name = self.detectProcessorName(type = type)
 		count = self.detectProcessorCount()
-		clock = self.detectProcessorClock(model = model, count = count)
+		clock = self.detectProcessorClock(model = model, type = type, count = count)
 		usage = self.detectProcessorUsage()
 
 		label = None
@@ -13100,7 +13864,8 @@ class Extension(object):
 	IdAddonSignals = 'script.module.addon.signals'
 	IdTmdbHelper = 'plugin.video.themoviedb.helper'
 	IdVpnManager = 'service.vpn.manager'
-	IdStudioIcons = 'resource.images.studios.white'
+	IdStudioWhite = 'resource.images.studios.white'
+	IdStudioColor = 'resource.images.studios.coloured'
 
 	ConfirmDisabled = 0 # Do not show a confirmation dialog.
 	ConfirmBasic = 1 # Show a confirmation dialog with basic info.
@@ -13166,7 +13931,7 @@ class Extension(object):
 		return System.installed(id = id, enabled = enabled)
 
 	@classmethod
-	def enable(self, id, name = None, refresh = False, confirm = ConfirmDefault, notification = True, automatic = True, action = None, wait = True):
+	def enable(self, id, name = None, refresh = False, confirm = ConfirmDefault, notification = True, automatic = True, action = None, force = False, wait = True):
 		from lib.modules.interface import Format, Dialog, Translation, Loader
 
 		originalId = id
@@ -13205,7 +13970,8 @@ class Extension(object):
 				else: return False
 
 		Loader.show()
-		installed = self.installed(id = id, enabled = False)
+		if force: installed = False
+		else: installed = self.installed(id = id, enabled = False)
 
 		if not installed:
 			try:
@@ -13415,7 +14181,7 @@ class Extension(object):
 				'name' : 'Oath Scrapers',
 				'type' : Extension.TypeOptional,
 				'description' : 33963,
-				'icon' : 'extensionsfenscrapers.png',
+				'icon' : 'extensionsoatscrapers.png',
 			},
 			{
 				'id' : Extension.IdLamScrapers,
@@ -13525,9 +14291,16 @@ class Extension(object):
 				'icon' : 'extensionsvpnmanager.png',
 			},
 			{
-				'id' : Extension.IdStudioIcons,
-				'name' : 'StudioIcons',
+				'id' : Extension.IdStudioWhite,
+				'name' : 'Studio Icons White',
 				'type' : Extension.TypeRecommended,
+				'description' : 34243,
+				'icon' : 'extensionsstudioicons.png',
+			},
+			{
+				'id' : Extension.IdStudioColor,
+				'name' : 'Studio Icons Color',
+				'type' : Extension.TypeOptional,
 				'description' : 34243,
 				'icon' : 'extensionsstudioicons.png',
 			},
@@ -14928,6 +15701,9 @@ class Backup(object):
 	ResultSuccess = 'success'
 	ResultVersion = 'version'
 
+	FileXml = 'xml'
+	FileSql = 'sql'
+
 	@classmethod
 	def _path(self, clear = False):
 		return System.temporary(directory = 'backup', gaia = True, make = True, clear = clear)
@@ -15045,6 +15821,38 @@ class Backup(object):
 		except:
 			Logger.error()
 			return Backup.ResultFailure
+
+	@classmethod
+	def automaticTemporary(self, count = None):
+		if File.existsDirectory(self.automaticPath()):
+			_, files = File.listDirectory(self.automaticPath())
+			if len(files) > 0:
+				import zipfile
+
+				path = self._path(clear = True)
+				files.sort(reverse = True)
+
+				result = []
+				for i in range(count or 1):
+					input = File.joinPath(self.automaticPath(), files[i])
+					output = File.joinPath(path, File.name(path = input, extension = False))
+
+					file = zipfile.ZipFile(input, 'r')
+					file.extractall(output)
+					file.close()
+
+					entry = {}
+					_, extracted = File.listDirectory(output, absolute = True)
+					if extracted:
+						for file in extracted:
+							if file.endswith('.xml'): entry[Backup.FileXml] = file
+							elif file.endswith('.db'): entry[Backup.FileSql] = file
+					if entry: result.append(entry)
+
+				if result:
+					if count is None: return result[0]
+					else: return result
+		return None
 
 	@classmethod
 	def automaticPath(self):
@@ -15239,14 +16047,19 @@ class Donations(object):
 
 	@classmethod
 	def show(self, type = None, wait = False):
-		if type is None:
-			from lib.modules.window import WindowDonation
-			WindowDonation.show(wait = wait)
-		else:
-			from lib.modules.window import WindowQr
-			from lib.modules.api import Api
-			donations = Api.donation(cache = True)
-			WindowQr.show(donations = donations, symbol = type, wait = wait)
+		from lib.modules.api import Api
+
+		# If the API request failed, do not show the donations window, otherwise the window will be empty.
+		# The data is cached with this call, and later retrieved in WindowDonation.
+		donations = Api.donation(cache = True)
+
+		if donations:
+			if type is None:
+				from lib.modules.window import WindowDonation
+				WindowDonation.show(wait = wait)
+			else:
+				from lib.modules.window import WindowQr
+				WindowQr.show(donations = donations, symbol = type, wait = wait)
 
 	@classmethod
 	def popup(self, full = True, wait = False):
@@ -16358,7 +17171,7 @@ class Promotions(object):
 			Dialog.notification(title = 35443, message = 35444, icon = Dialog.IconNativeInformation)
 		else:
 			# Use a specific order.
-			for i in ['orion', 'premiumize', 'offcloud', 'torbox', 'easydebrid', 'realdebrid', 'debridlink', 'alldebrid']:
+			for i in ['orion', 'premiumize', 'offcloud', 'torbox', 'debrider', 'easydebrid', 'realdebrid', 'debridlink', 'alldebrid']:
 				try:
 					i = lower.index(i)
 					items.append(promotions[i])
@@ -16734,7 +17547,7 @@ class Link(object):
 			if not title and media == Media.Set and 'collection' in metadata and 'title' in metadata['collection']: title = metadata['collection']['title']
 			if not title and 'tvshowtitle' in metadata: title = metadata['tvshowtitle']
 			if not title and 'title' in metadata: title = metadata['title']
-			if not year and 'year' in metadata: year = metadata['year']
+			if not year: year = metadata.get('tvshowyear') or metadata.get('year')
 
 			if season is None and 'season' in metadata: season = metadata['season']
 			if episode is None and 'episode' in metadata: episode = metadata['episode']
@@ -17099,4 +17912,59 @@ class Link(object):
 		if query:
 			if Tools.isArray(query): query = ' '.join(query)
 			return 'https://duckduckgo.com/?q=%s' % self._query(query = query, plus = True)
+		return None
+
+
+class Word(object):
+
+	Language = Language.EnglishCode
+	Data = None
+
+	@classmethod
+	def _load(self):
+		if Word.Data is None:
+			result = {}
+			path = File.joinPath(System.pathResources(), 'resources', 'media', 'words')
+			_, files = File.listDirectory(path = path, absolute = True)
+			for file in files:
+				language = File.name(path = file, extension = False)
+				if len(language) == 2: # Exclude ReadMe.
+					data = File.readNow(file)
+					if data:
+						data = data.split('\n')
+						result[language] = {i : True for i in data}
+			Word.Data = result
+		return Word.Data
+
+	@classmethod
+	def words(self, language = True):
+		words = self._load()
+		if words and language: words = words.get(Word.Language if language is True else language)
+		return words
+
+	@classmethod
+	def lookup(self, word, language = True, inverse = False, case = True):
+		if word:
+			words = self.words(language = language)
+			if words:
+				if Tools.isArray(word):
+					if case: word = [i.lower() for i in word]
+					result = []
+					if inverse:
+						for i in word:
+							try: words[i]
+							except: result.append(i)
+					else:
+						for i in word:
+							try: result.append(words[i])
+							except: pass
+					return result
+				else:
+					if case: word = word.lower()
+					if inverse:
+						try: return not words[word]
+						except: return True
+					else:
+						try: return words[word]
+						except: return False
 		return None

@@ -133,7 +133,7 @@ class Provider(ProviderJson, ProviderHtml):
 		description		= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. There are different versions of {name} with version %s having some missing metadata. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.'  % ProviderHtml.Version3
 		rank			= 4
 		performance		= ProviderHtml.PerformancePoor
-		status			= ProviderHtml.StatusImpaired # Update (2024-12): The only working .st domain has heavy Cloudflare protection.
+		status			= ProviderHtml.StatusCloudflare # Update (2024-12): The only working .st domain has heavy Cloudflare protection.
 		link			= Provider._Link[version]
 		mirror			= Provider._Mirror
 		unblock			= Provider._Unblock

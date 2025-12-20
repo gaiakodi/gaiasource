@@ -21,10 +21,13 @@
 # Do not import the Parser here. Check parser() for more info.
 #from lib.modules.parser import Parser
 
-from lib.modules.tools import Logger, Converter, Tools, Regex, Media, Audience, Time, Language, Country, Math, System
-from lib.modules.convert import ConverterDuration, ConverterTime
+from lib.modules.tools import Logger, Converter, Tools, Regex, Media, Audience, Time, Language, Country, Math, System, File, Csv, Settings, Platform, Hardware
+from lib.modules.interface import Translation, Format, Dialog
+from lib.modules.convert import ConverterDuration, ConverterTime, ConverterSize
 from lib.modules.network import Networker
 from lib.modules.cache import Cache
+from lib.meta.cache import MetaCache
+from lib.modules.concurrency import Pool
 
 from lib.modules.account import Imdb as Account
 
@@ -57,6 +60,12 @@ class MetaImdb(MetaProvider):
 	LinkSearchPerson				= '/search/name'
 	LinkFind						= '/find'
 	LinkCsv							= '/export'
+
+	# https://developer.imdb.com/non-commercial-datasets/
+	# https://datasets.imdbws.com/
+	LinkBulk						= 'https://datasets.imdbws.com'
+	LinkBulkEpisode					= 'title.episode.tsv.gz' # 50+ MB
+	LinkBulkRating					= 'title.ratings.tsv.gz' # 8+ MB
 
 	# PATH
 
@@ -311,25 +320,29 @@ class MetaImdb(MetaProvider):
 										MetaTools.GenderOther		: GenderOther,
 									}
 
-	# ONLINE
+	# WATCH
+	# Update (2025-03): The IMDbTV/Freevee option has been removed from the website. Using it causes IMDb requests to fail.
 
-	OnlineFree						= 'US/IMDbTV'						# Freevee
-	OnlineUsRent					= 'US/today/Amazon/subs'
-	OnlineUsBuy						= 'US/today/Amazon/paid'
-	OnlineUkRent					= 'GB/today/Amazon/subs'
-	OnlineUkBuy						= 'GB/today/Amazon/paid'
-	OnlineDeRent					= 'DE/today/Amazon/subs'
-	OnlineDeBuy						= 'DE/today/Amazon/paid'
-	OnlineListRent					= 'has_video_prime_instant_video'	# Used by lists.
-	OnlineListBuy					= 'has_video_amazon_instant_video'	# Used by lists.
-	Onlines							= [OnlineFree, OnlineUsRent, OnlineUsBuy, OnlineUkRent, OnlineUkBuy, OnlineDeRent, OnlineDeBuy]
-	OnlinesList						= [OnlineListRent, OnlineListBuy]
-	OnlinesFree						= [OnlineFree]
-	OnlinesRent						= [OnlineUsRent, OnlineUkRent, OnlineDeRent]
-	OnlinesBuy						= [OnlineUsBuy, OnlineUkBuy, OnlineDeBuy]
-	OnlinesUs						= [OnlineFree, OnlineUsRent, OnlineUsBuy]
-	OnlinesUk						= [OnlineUkRent, OnlineUkBuy]
-	OnlinesDe						= [OnlineDeRent, OnlineDeBuy]
+	WatchFree						= 'US/IMDbTV'						# Freevee
+	WatchUsRent						= 'US/today/Amazon/subs'
+	WatchUsBuy						= 'US/today/Amazon/paid'
+	WatchUkRent						= 'GB/today/Amazon/subs'
+	WatchUkBuy						= 'GB/today/Amazon/paid'
+	WatchDeRent						= 'DE/today/Amazon/subs'
+	WatchDeBuy						= 'DE/today/Amazon/paid'
+	WatchListRent					= 'has_video_prime_instant_video'	# Used by lists.
+	WatchListBuy					= 'has_video_amazon_instant_video'	# Used by lists.
+	#Watches						= [WatchFree, WatchUsRent, WatchUsBuy, WatchUkRent, WatchUkBuy, WatchDeRent, WatchDeBuy]
+	Watches							= [WatchUsRent, WatchUsBuy, WatchUkRent, WatchUkBuy, WatchDeRent, WatchDeBuy]
+	WatchesList						= [WatchListRent, WatchListBuy]
+	#WatchesFree					= [WatchFree]
+	WatchesFree						= []
+	WatchesRent						= [WatchUsRent, WatchUkRent, WatchDeRent]
+	WatchesBuy						= [WatchUsBuy, WatchUkBuy, WatchDeBuy]
+	#WatchesUs						= [WatchFree, WatchUsRent, WatchUsBuy]
+	WatchesUs						= [WatchUsRent, WatchUsBuy]
+	WatchesUk						= [WatchUkRent, WatchUkBuy]
+	WatchesDe						= [WatchDeRent, WatchDeBuy]
 
 	# THEATER
 
@@ -414,6 +427,87 @@ class MetaImdb(MetaProvider):
 	CacheListId						= Cache.TimeoutMonth1
 	CacheNone						= None
 
+	# BULK
+
+	BulkModeExtended			= 'extended'
+	BulkModeStandard			= 'standard'
+	BulkModeEssential			= 'essential'
+	BulkModeDisabled			= 'disabled'
+	BulkModes					= (BulkModeDisabled, BulkModeEssential, BulkModeStandard, BulkModeExtended)
+
+	# How often to download the IMDb bulk datasets, process them, and add them to metadata.db.
+	# Do not refresh too often, since the download is large (90MB+) and local processing takes long (130secs+).
+	# Also avoid putting a strain on IMDb's server if a lot of users retrieve detailed metadata.
+	# The only reason to refresh more frequently is to get the numbers and ratings of episodes from the past 2 weeks.
+	# The latest ratings are in any case retrieved from HTML, except for episodes SxxE51+ (HTML page only goes until episode 50 per season). All ratings older than 2 weeks are in the dataset.
+	# The pack data might also be slightly outdated, but since the IMDb data is not that important for pack generation, it is acceptable.
+	# The timeout is also depended on the hardware.
+	BulkTimeout						= {
+										BulkModeDisabled :	None,
+										BulkModeExtended :	Cache.TimeoutWeek2,
+										BulkModeStandard :	Cache.TimeoutWeek4,
+										BulkModeEssential :	Cache.TimeoutWeek8,
+
+										None :			Cache.TimeoutDay7, # For semi-forced refreshes.
+										False :			Cache.TimeoutHour12, # For external metadata generation.
+									}
+
+	BulkSizeDownload				= 73400320 # 70MB. Download size of archives.
+	BulkSizeStorage					= 419430400 # 400MB. Minimum free disk space for the downloads and extracted data.
+	BulkSizeMemory					= {
+										# Minimum free RAM to process the data in memory.
+										# Bulk generation/refresh requires 2.1-2.5+ GB RAM (64bit systems) and 1.5-1.6+ GB RAM (32bit systems), since Python uses different lengthed data types for different bitness.
+										# This is because there are 10 million IMDb entries, and Python has an overhead for variables, due to bitness, auto-garbage-collection, and dynamic types.
+										#	64bit systems: 50+ bytes per string and 28-32+ for integers/floats
+										#	32bit systems: 30+ bytes per string and 20-23+ for integers/floats
+										# Without optimization, such as storing the ID as a string instead of an integer, and reading the entire file in one go, increases RAM to 3.5+ GB.
+										# Update: It seems that 64bit systems now also use 1.5-1.6GB.
+										Platform.Bits32: 1825361100, # 1.7GB (100MB above what is needed)
+										Platform.Bits64: 2791728742, # 2.6GB (100MB above what is needed)
+										None: 2362232012, # 2.2GB
+									}
+	BulkSizeMinimum					= {
+										# Minimum total and free memory, otherwise a warning will be shown in the wizard.
+										Platform.Bits32: (3006477107, 1610612736), # [2.8GB, 1.5GB]
+										Platform.Bits64: (4080218931, 2254857830), # [3.8GB, 2.1GB]
+										None: (3435973836, 1932735283), # [3.2GB, 1.8GB]
+									}
+
+	BulkDuration					= (
+										# Although this typically takes 13-14 minutes on a ARMv7l+eMMC during normal bi-weekly updates, during preloading this can sometimes only take 9-10 minutes.
+										(3, 5), 	# Minutes to process on excellent devices. Eg: i7+SSD: 03:50
+										(5, 10), 	# Minutes to process on high-end devices.
+										(10, 15), 	# Minutes to process on medium-end devices. Eg: ARMv7l+eMMC: 13:50
+										(15, 25), 	# Minutes to process on low-end devices.
+									)
+
+	BulkIdPrefix					= '99999'
+	BulkIdShow						= '-1' # Used as an integer during generation.
+	BulkIdLookup					= 'lookup'
+
+	BulkRefreshAutomatic			= 0
+	BulkRefreshSelection			= 1
+
+	BulkDialogDisabled				= 0
+	BulkDialogBackground			= 1
+	BulkDialogForeground			= 2
+
+	BulkActionDisabled				= 0
+	BulkActionNotification			= 1
+	BulkActionSelection				= 2
+	BulkActionRestart				= 3
+	BulkActionMemory				= 4
+
+	BulkSettingsSelected			= 'metadata.bulk.selected'
+	BulkSettingsRefreshed			= 'metadata.bulk.refreshed'
+	BulkSettingsMode				= 'metadata.bulk.mode'
+	BulkSettingsRefresh				= 'metadata.bulk.refresh'
+	BulkSettingsNotification		= 'metadata.bulk.notification'
+	BulkSettingsProgress			= 'metadata.bulk.progress'
+	BulkSettingsAction				= 'metadata.bulk.action'
+
+	BulkCanceled					= None
+
 	# USAGE
 	# IMDb does not seem to have clear limits.
 	# Sometimes if 50 pages are requested in a short time, IMDb will start blocking.
@@ -423,6 +517,9 @@ class MetaImdb(MetaProvider):
 	UsageAuthenticatedDuration		= 60
 	UsageUnauthenticatedRequest		= 250
 	UsageUnauthenticatedDuration	= 60
+
+	UsageMemory						= None
+	UsageStorage					= None
 
 	# OTHER
 
@@ -709,7 +806,7 @@ class MetaImdb(MetaProvider):
 						- True:			Only released titles.
 						- False:		Only unreleased titles.
 						- String:		Specific status.
-						- List:			Mutiple statuses. Values are ORed, so it makes sense to specify multiple values.
+						- List:			Multiple statuses. Values are ORed, so it makes sense to specify multiple values.
 		year:			The IMDb release year.
 						- None:			Any year.
 						- True:			Released this year or earlier.
@@ -737,7 +834,7 @@ class MetaImdb(MetaProvider):
 		genre:			The IMDb genre.
 						- None:			Any genres.
 						- String:		Specific genre.
-						- List:			Mutiple genres. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: Action-Thriller).
+						- List:			Multiple genres. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: Action-Thriller).
 		language:		The IMDb language.
 						Note that IMDb uses 2-letter ISO-639-1 codes. However, some less-known languages use a 3-letter code.
 						Note that this is the release language, not the language of the returned metadata (which is set in the headers).
@@ -745,28 +842,28 @@ class MetaImdb(MetaProvider):
 						- None:			Any languages.
 						- True:			Excluded "spammy" languages, mostly from India and Turkey.
 						- String:		Specific language.
-						- List:			Mutiple languages. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: de-nl).
+						- List:			Multiple languages. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: de-nl).
 		country:		The IMDb country.
 						Note that IMDb uses 2-letter ISO Alpha-2 codes.
 						Values with a "-" or "!" prefix will be excluded.
 						- None:			Any countries.
 						- True:			Excluded "spammy" countries, mostly India and Turkey.
 						- String:		Specific country.
-						- List:			Mutiple countries. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: de-nl).
+						- List:			Multiple countries. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: de-nl).
 		certificate:	The IMDb age certificates.
 						- None:			Any certificate.
 						- String:		Specific certificate.
-						- List:			Mutiple certificates. Values are ORed, so it makes sense to specify multiple values.
+						- List:			Multiple certificates. Values are ORed, so it makes sense to specify multiple values.
 		group:			The IMDb group for titles and people.
 						- None:			Any group.
 						- True:			Award winners, based on the media type.
 						- String:		Specific group.
-						- List:			Mutiple groups. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: won both Oscar and Golden Globe).
+						- List:			Multiple groups. Values are ANDed, so it makes little sense to specify multiple values, except for some specific combination (eg: won both Oscar and Golden Globe).
 		gender:			The IMDb gender for people.
 						- None:			Any gender.
 						- String:		Specific gender.
-						- List:			Mutiple genders. Values are ORed, so it makes sense to specify multiple values.
-		online:			The IMDb online streaming availability.
+						- List:			Multiple genders. Values are ORed, so it makes sense to specify multiple values.
+		watch:			The IMDb watch/stream availability.
 						- None:			Any (un)availability.
 						- True:			Available on any streaming service.
 						- String:		Available on a specific streaming service.
@@ -807,14 +904,14 @@ class MetaImdb(MetaProvider):
 						- None:			No string-formatted parameters.
 						- Dictionary:	String-formatted parameters, with the key being the format ID and the value the replacement data.
 	'''
-	def _linkCreate(self, link = None, media = None, niche = None, id = None, query = None, keyword = None, type = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, gender = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, adult = None, filter = None, view = None, csv = None, format = None, reduce = None):
+	def _linkCreate(self, link = None, media = None, niche = None, id = None, query = None, keyword = None, type = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, gender = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, adult = None, filter = None, view = None, csv = None, format = None, reduce = None):
 		if media == Media.Season: return None # IMDb does not support seasons as separate "objects", only shows and episodes.
 		if format is None: format = {}
 
 		if csv:
 			parameters = {}
 		else:
-			parameters = self._parameterInitialize(media = media, niche = niche, link = link, id = id, query = query, keyword = keyword, type = type, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, gender = gender, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, adult = adult, filter = filter, view = view, format = format)
+			parameters = self._parameterInitialize(media = media, niche = niche, link = link, id = id, query = query, keyword = keyword, type = type, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, gender = gender, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, adult = adult, filter = filter, view = view, format = format)
 			if parameters is None: return None # Unsupported parameters (eg: unsupported genre).
 
 		# IMDb has introduced a new HTML layout for Advanced Search.
@@ -886,14 +983,16 @@ class MetaImdb(MetaProvider):
 			#	Level-3 (Main menu): Many custom exclusions were added and the menu is close to perfect. Some more refinements might be beneficial, but sometimes adding more exclusions might not improve things help. These originals were gotten into a decent state, without picking out every last minor non-original.
 			#	Level-4 (Main menu): Many custom exclusions were added and the menu is essentially perfect, at least as perfect as it can be. More exclusions will not improve anything and this can be left as-is. Although in the future it might have to be updated again, once new titles arrive.
 
+			from lib.meta.company import MetaCompany
+
 			MetaImdb.Companies = {
-				MetaTools.Company20thcentury : {
+				MetaCompany.Company20thcentury : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0000756', 'co0056447', 'co0161074', 'co0096253', 'co0010685', 'co0781821', 'co0017497', 'co0103215', 'co0179259', 'co0365818', 'co0822480', 'co0067247', 'co0840157', 'co0049339', 'co1023009', 'co0103726', 'co0423469', 'co1031931', 'co0645300', 'co0530625', 'co0378436', 'co0166475', 'co0103751', 'co0077505', 'co0048444', 'co0039396', 'co0098487', 'co0039745'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0000756', 'co0010224', 'co0053239', 'co0007180', 'co0189783', 'co0280047', 'co0862964', 'co0092296', 'co0150813', 'co0063964', 'co0161074', 'co0159046', 'co0209782', 'co0296943', 'co0297163', 'co0010685', 'co0063989', 'co0937473', 'co0751509', 'co0826899', 'co0605838', 'co0781821', 'co0853216', 'co0421648', 'co0108018', 'co0937474', 'co0643891', 'co0943364', 'co0226330', 'co0952616', 'co0286182', 'co0711817', 'co0794652', 'co0931863', 'co0544968', 'co0788854', 'co0051662', 'co0764128', 'co0197226', 'co0785884', 'co0256824', 'co0581069', 'co0491690', 'co0368892', 'co0241365', 'co0092951', 'co0273176', 'co0012812', 'co0866807', 'co0832095', 'co0863455', 'co0623011', 'co0746852', 'co0148451', 'co0078923', 'co0866288', 'co0665472', 'co0643890', 'co0195278', 'co0947212', 'co0867515', 'co0862965', 'co0707661', 'co0491691', 'co0380710', 'co0346045', 'co0295671', 'co1051152', 'co0918688', 'co0867516', 'co0863456', 'co0814039', 'co0662795', 'co0662791', 'co0662285', 'co0642443', 'co0046053', 'co1040440', 'co1034313', 'co1027357', 'co0941233', 'co0918845', 'co0918844', 'co0883912', 'co0870304', 'co0867519', 'co0867518', 'co0867517', 'co0855510', 'co0723134', 'co0694711', 'co0613528', 'co0560127', 'co0421647', 'co0368843', 'co0368801', 'co0271701', 'co0270675', 'co0246174', 'co0200961', 'co0173400', 'co0160971', 'co0080169', 'co0924784', 'co0893064', 'co0877266', 'co0782188', 'co0611815', 'co0547664', 'co0547663', 'co0451003', 'co0419314', 'co0379362', 'co0379346', 'co0379325', 'co0379300', 'co0368861', 'co0368661', 'co0212696', 'co0197792', 'co0196456', 'co0195082', 'co0118485', 'co0099617', 'co0094759', 'co0030446'],
 				},
-				MetaTools.CompanyAbc : {
+				MetaCompany.CompanyAbc : {
 					# Show (2108): Level-3
 					# Movie (2249): Level-2
 					# ABC is owned and collaborates with by Disney.
@@ -903,29 +1002,29 @@ class MetaImdb(MetaProvider):
 														Media.Show : {
 															'fixed' : MetaProvider.CompanyNetwork,
 															'exclude' : [
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1466074
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt0086827.
-																#{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt7587890.
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1466074
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt0086827.
+																#{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt7587890.
 															],
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0066206
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0066206
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0066206
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0066206
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
 
 																'co0045367', # Oxygen Media (tt0458352)
 															],
@@ -935,31 +1034,31 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0037052', 'co0050794', 'co0571670', 'co0038002', 'co0033326', 'co0547748', 'co0048955', 'co0072128', 'co0366131', 'co0717722', 'co0113687', 'co0051484', 'co0885117', 'co0815633', 'co0604632', 'co0095158', 'co0093288', 'co0071029', 'co0160591'],
 					MetaProvider.CompanyVendor		: ['co0213225', 'co0016203', 'co0212150', 'co0024582', 'co0094898', 'co0427720', 'co0090366', 'co0081188', 'co0739072', 'co0043953', 'co0504198', 'co0399064', 'co0053123', 'co0078518', 'co0795985', 'co0138770', 'co0086850', 'co0776976', 'co0723944', 'co0503538', 'co1027259', 'co0992781', 'co0976554', 'co0923262', 'co0913419', 'co0860670', 'co0825785', 'co0825784', 'co0795983', 'co0793020', 'co0747268', 'co0716481', 'co0712561', 'co0704979', 'co0625846', 'co0598951', 'co0499524', 'co0493121', 'co0465399', 'co0431081', 'co0430836', 'co0391449', 'co0327798', 'co0297296', 'co0287995', 'co0274340', 'co0272294', 'co0269174', 'co0266935', 'co0094890', 'co0009893', 'co1024565', 'co1008959', 'co0980699', 'co0928550', 'co0868243', 'co0859939', 'co0852116', 'co0842694', 'co0813557', 'co0695216', 'co0233792', 'co0224390', 'co0075098', 'co0303200'],
 				},
-				MetaTools.CompanyAe : {
+				MetaCompany.CompanyAe : {
 					# Show (582): Level-3. Maybe close to Level-4.
 					# Movie (476): Level-2
 					# A+E Studios produces a lot of titles that are not marked as A+E Originals on IMDb posters for other companies (eg Netflix, BBC, History, Lifetime, etc).
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt2188671, tt3230780, tt1836037, tt9308682.
-																#{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt3581932.
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt3581932, tt3910804, tt0091618, tt0115355.
-																#{MetaTools.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # Not for tt3910804, tt0423652, tt2707792, tt10589968.
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt1552112, tt1590961, tt2229907, tt1497563.
-																#{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt4337944.
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0423652, tt11794642.
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt0423652, tt2707792, tt2132641.
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt1785123.
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt1785123, tt0424627.
-																#{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt8594028, tt8594028.
-																#{MetaTools.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # Not for tt0424627.
-																#{MetaTools.CompanyYoutube			: [MetaProvider.CompanyNetwork]}, # Not for tt15250706.
-																#{MetaTools.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt1103973.
-																#{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt18552362.
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt3868860.
-																{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0141842.
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0368479, tt9645942.
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt2188671, tt3230780, tt1836037, tt9308682.
+																#{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt3581932.
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt3581932, tt3910804, tt0091618, tt0115355.
+																#{MetaCompany.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # Not for tt3910804, tt0423652, tt2707792, tt10589968.
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt1552112, tt1590961, tt2229907, tt1497563.
+																#{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt4337944.
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0423652, tt11794642.
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt0423652, tt2707792, tt2132641.
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt1785123.
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt1785123, tt0424627.
+																#{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt8594028, tt8594028.
+																#{MetaCompany.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # Not for tt0424627.
+																#{MetaCompany.CompanyYoutube			: [MetaProvider.CompanyNetwork]}, # Not for tt15250706.
+																#{MetaCompany.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt1103973.
+																#{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt18552362.
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt3868860.
+																{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0141842.
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0368479, tt9645942.
 
 																#'co0039462', # Public Broadcasting Service (PBS). Not for tt0091618.
 																#'co0051618', # Entertainment One. Not for tt0785036, tt1329291.
@@ -979,20 +1078,20 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony				: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm				: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony				: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm				: [MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -1000,12 +1099,12 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0056790', 'co0976488', 'co0736175', 'co0452284', 'co0723513', 'co0930307', 'co0624428', 'co0450920', 'co0979954', 'co0783041', 'co0441521', 'co0159554', 'co1048176', 'co1021426', 'co1002360', 'co0889192', 'co0779123', 'co0778575', 'co0580178', 'co0778574'],
 					MetaProvider.CompanyVendor		: ['co0023845', 'co0331411', 'co0674785', 'co0625685', 'co1057623'],
 				},
-				MetaTools.CompanyAcorn : {
+				MetaCompany.CompanyAcorn : {
 					# Show (176): Level-2
 					# Movie (27): Level-2.
 					# AcornTV has content from ITV, Channel 4, BBC, All3Media, DRG, and ZDF.
 					# Some Acorn Originals do not have any Acorn ID listed under their companies.
-					# Other Acorn Originals are released on mutiple other platforms.
+					# Other Acorn Originals are released on multiple other platforms.
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
@@ -1016,26 +1115,26 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -1043,7 +1142,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0463759', 'co0178134', 'co0174662', 'co0098270', 'co0277845'],
 					MetaProvider.CompanyVendor		: ['co0489114', 'co0502394', 'co0066950'],
 				},
-				MetaTools.CompanyAdultswim : {
+				MetaCompany.CompanyAdultswim : {
 					# Show (216): Level-3
 					# Movie (28): Level-3
 					# Most Adult Swim Originals are released on many other major platforms.
@@ -1052,9 +1151,9 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Show	: {
 															'exclude' : [
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt2560140, tt0388629, tt9335498
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0149460, tt0182576, tt1561755
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0096694
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt2560140, tt0388629, tt9335498
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0149460, tt0182576, tt1561755
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0096694
 
 																'co1060195', # Cartoon Network Productions (tt0220880) (sister channel)
 																'co0238110', # Cartoon Network Studios (tt0115157, tt1305826) (sister channel)
@@ -1082,7 +1181,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0153115', 'co1019499', 'co0583876', 'co1003525', 'co0600922'],
 					MetaProvider.CompanyVendor		: ['co0546259', 'co0635386'],
 				},
-				MetaTools.CompanyAmazon : {
+				MetaCompany.CompanyAmazon : {
 					# Show (1221 of 353+): Level-4. A lot of other originals appear on Amazon, and a few Amazon originals appear on other platforms. Many co-productions.
 					# Movie (1492 of 172+): Level-3.
 					# Numbers might be far off, since many of the international, smaller, and non-direct Amazon originals are not included.
@@ -1129,33 +1228,33 @@ class MetaImdb(MetaProvider):
 																# There are however many other Hulu shows than can not be excluded with other companies.
 																#'co0059995',	# Warner Home Video (tt6474236) - Do not include for tt3498622.
 																#'co0508149',	# Legendary Television (tt6474236) - Do not include for tt0489974.
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCinemax		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCinemax		: [MetaProvider.CompanyNetwork]},
 
 																'co0684443', # Viu (tt13634792)
 																'co0571670', # Freeform (tt11083696)
@@ -1215,23 +1314,23 @@ class MetaImdb(MetaProvider):
 															],
 															'exclude' : [
 																# Do not inlcude Hulu, since some movies on there are produced by Amazon Studios (tt2180339).
-																# {MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																# {MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyStudio]}, # tt10362466, tt13069986, tt12672536
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt3322940
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0181689
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt14331144
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt5883632
-																{MetaTools.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # tt14636170
-																#{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt16426418 - Do not add for tt14948432.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyStudio]}, # tt10362466, tt13069986, tt12672536
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt3322940
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0181689
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt14331144
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt5883632
+																{MetaCompany.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # tt14636170
+																#{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt16426418 - Do not add for tt14948432.
 
 																'co0202446', # YouTube (tt1281966)
 																'co0240130', # StudioCanal UK (tt13397574)
@@ -1327,7 +1426,7 @@ class MetaImdb(MetaProvider):
 																'co0832091', # Dhinchaak (tt6988116)
 																'co0548846', # IMGC Global Entertainmet (tt2806788)
 																'co0015398', # iDream Productions (tt5918074)
-																'tt0093603', # Bcineet (tt5918074)
+																'co0093603', # Bcineet (tt5918074)
 																'co0336601', # Reliance Entertainment (tt0315642)
 																'co0277906', # Mind Blowing Films (tt8144834)
 																'co0333827', # Star VijayTV (tt8176054, tt6067752)
@@ -1371,7 +1470,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyVendor		: ['co0042083', 'co0250772', 'co0249265', 'co0850778', 'co0491850', 'co0389614', 'co0968084', 'co0785664'],
 				},
 
-				MetaTools.CompanyAmc : {
+				MetaCompany.CompanyAmc : {
 					# Show (246 of 87+): Level-3.
 					# Movie (11 of 1?): Level-2. Not really any AMC original films.
 					# https://en.wikipedia.org/wiki/Category:AMC_(TV_channel)_original_programming
@@ -1416,11 +1515,11 @@ class MetaImdb(MetaProvider):
 																'co0848594',
 															],
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0903747, tt6156584.
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0903747, tt1520211.
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Do not add for tt1520211.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Do not add for tt6156584.
-																#{MetaTools.CompanyApple		: [MetaProvider.CompanyNetwork]}, # Do not add for tt14688458.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0903747, tt6156584.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0903747, tt1520211.
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Do not add for tt1520211.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Do not add for tt6156584.
+																#{MetaCompany.CompanyApple		: [MetaProvider.CompanyNetwork]}, # Do not add for tt14688458.
 
 																'co0216537',	# FX Productions (tt2802850)
 																'co0094955',	# Fox Television Studios (tt1637727)
@@ -1513,7 +1612,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyVendor		: ['co0379646', 'co0092267', 'co0794271', 'co0442035', 'co0208997', 'co0441631', 'co0163378', 'co0861142', 'co0495248'],
 				},
 
-				MetaTools.CompanyApple : {
+				MetaCompany.CompanyApple : {
 					# Show (174 of 144+): Level-4. A few Apple originals appear on other platforms.
 					# Movie (57 of 65+): Level-4. Relatively accurate movie originals.
 					# https://en.wikipedia.org/wiki/Category:Apple_TV%2B_original_programming
@@ -1525,16 +1624,16 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0095707. Not the studios for tt18351584, tt21088136.
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt0111993
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt0099698
-																{MetaTools.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt12879180
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt11112478
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0095707. Not the studios for tt18351584, tt21088136.
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt0111993
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt0099698
+																{MetaCompany.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt12879180
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt11112478
 
 																'co0741656', # Twisted Mirror TV (tt6274606)
 																'co0093604', # CBS Broadcasting (tt6396082)
@@ -1549,18 +1648,18 @@ class MetaImdb(MetaProvider):
 																'co0284741', # HBO Entertainment. Do not add for tt19853258 (under Other Companies).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt15727212
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0106677
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt5553210
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0078754
-																#{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0059026. Do not add for tt15326988 (under Other Companies).
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0155388
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyVendor]}, # tt0387301. Do not add for tt19853258 (under Other Companies).
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt15727212
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0106677
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt5553210
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0078754
+																#{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0059026. Do not add for tt15326988 (under Other Companies).
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0155388
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyVendor]}, # tt0387301. Do not add for tt19853258 (under Other Companies).
 
 																'co0037052', # American Broadcasting Company (ABC) (tt0387301)
 																'co0059995', # Warner Home Video (tt0059026)
@@ -1584,7 +1683,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyVendor		: ['co0694131', 'co0177409', 'co0854529', 'co0424544', 'co0585513', 'co0804590', 'co0531699', 'co0428931', 'co0931939', 'co0750014', 'co0239755', 'co1033989', 'co0657282', 'co0636343', 'co1021371', 'co0613564', 'co0887931'],
 				},
 
-				MetaTools.CompanyArd : {
+				MetaCompany.CompanyArd : {
 					# Show (4161): Level-3
 					# Movie (14053): Level-3
 					# Difficult to filter, since co-productions and content-sharing with Britain, France, Scandinavia, and most European countries, even a few with US and AU.
@@ -1602,32 +1701,32 @@ class MetaImdb(MetaProvider):
 															'exclude' : [
 																# Too many ARD titles on BBC. Only use studios.
 																# Too many studios, the smaller ones (eg: BBC Drama Group) will be cut off.
-																#{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt0081834, tt0200849, tt14211026, tt0907702, tt0306353
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyStudio]},
+																#{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt0081834, tt0200849, tt14211026, tt0907702, tt0306353
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0120949
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0106089
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt7085256
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt1001482
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt1436544
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt2071322
-																{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt6921882
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0078600
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt1513168
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0118500
-																{MetaTools.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt4689402
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt21105638
-																{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt3640276
-																{MetaTools.CompanyAubc			: [MetaProvider.CompanyNetwork]}, # tt0088573
-																{MetaTools.CompanyCbc			: [MetaProvider.CompanyNetwork]}, # tt1875337
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0120949
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0106089
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt7085256
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt1001482
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt1436544
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt2071322
+																{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt6921882
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0078600
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt1513168
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0118500
+																{MetaCompany.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt4689402
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt21105638
+																{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt3640276
+																{MetaCompany.CompanyAubc			: [MetaProvider.CompanyNetwork]}, # tt0088573
+																{MetaCompany.CompanyCbc			: [MetaProvider.CompanyNetwork]}, # tt1875337
 
 																'co0831073', # Gain (tt7920978)
 																'co0816435', # ChaiFlicks (tt27195940)
@@ -1664,31 +1763,31 @@ class MetaImdb(MetaProvider):
 														Media.Movie : {
 															'exclude' : [
 																# Too many ARD titles on BBC. Only use studios.
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyChannel5		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAubc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyChannel5		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAubc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbc			: [MetaProvider.CompanyNetwork]},
 
 																'co0028644', # Special Broadcasting Service (SBS) (tt13079194, co0028644)
 																'co0005084', # National Geographic (tt13079194)
@@ -1713,7 +1812,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyVendor		: ['co0085892', 'co0833555', 'co0738126', 'co1011585', 'co0760311', 'co0616840', 'co0604266', 'co0549240', 'co0503369', 'co0382269', 'co0328560', 'co0298474', 'co0298180', 'co0264412', 'co0125917', 'co0125915', 'co0125914', 'co0125086', 'co0125085', 'co0114620', 'co0549239', 'co0294660', 'co0212720', 'co0135975', 'co0107837'],
 				},
 
-				MetaTools.CompanyAubc : {
+				MetaCompany.CompanyAubc : {
 					# Show (871): Level-3 to Level-4
 					# Movie (729): Level-3
 					# Many collaborations with BBC, and other British and German channels. Generally difficult to filter UK content.
@@ -1740,28 +1839,28 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt23845296, tt0185102, tt0103381
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt4192782, tt4878488, tt7371868, tt1587000.
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt13315664.
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0273366, tt0138967. Not for tt0454656.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0092383. Not for tt9214692, tt2699780, tt1401650.
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt23576878, tt15548144. Not studios (tt20697956, tt2155043).
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # tt1008108. Not (tt0090521).
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt10691770
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0387764
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt4122068
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt4644488
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt8201186
-																{MetaTools.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt0478942
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt2141913
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0352085, tt4573608
-																{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt7446086
-																#{MetaTools.CompanyAcorn		: [MetaProvider.CompanyNetwork]}, # tt4905554, tt16343844. not for tt2699780.
-																#{MetaTools.CompanyCbc			: [MetaProvider.CompanyNetwork]}, # tt2155025, tt21058104
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt1610518, tt7005920
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt2401525
-																#{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt7537096
+																#{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt23845296, tt0185102, tt0103381
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt4192782, tt4878488, tt7371868, tt1587000.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt13315664.
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0273366, tt0138967. Not for tt0454656.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0092383. Not for tt9214692, tt2699780, tt1401650.
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt23576878, tt15548144. Not studios (tt20697956, tt2155043).
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # tt1008108. Not (tt0090521).
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt10691770
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0387764
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt4122068
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt4644488
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt8201186
+																{MetaCompany.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt0478942
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt2141913
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0352085, tt4573608
+																{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt7446086
+																#{MetaCompany.CompanyAcorn		: [MetaProvider.CompanyNetwork]}, # tt4905554, tt16343844. not for tt2699780.
+																#{MetaCompany.CompanyCbc			: [MetaProvider.CompanyNetwork]}, # tt2155025, tt21058104
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt1610518, tt7005920
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt2401525
+																#{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt7537096
 
 																# Too much other content listed here that too many titles might be excluded with CH4 networks.
 																#'co0103528', # Channel 4 Television Corporation (tt0111958, tt0262150, tt3330720). Not for tt0103381.
@@ -1789,16 +1888,16 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -1806,7 +1905,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0051111', 'co0638282', 'co0589680', 'co0530354', 'co0385785', 'co0432662', 'co0513317', 'co0061664', 'co0202700', 'co0142963', 'co0395856', 'co0573602', 'co1059801', 'co0396190', 'co0772897', 'co1030092', 'co0892324', 'co0892147', 'co0157128'],
 					MetaProvider.CompanyVendor		: ['co0146211', 'co0324755', 'co0300082', 'co0099385', 'co0107728', 'co0167586', 'co0404882', 'co0225761', 'co0225761', 'co1055432', 'co0960276', 'co0805995', 'co0805351', 'co0771493', 'co0752802', 'co0730018', 'co0696457', 'co0690730', 'co0649060', 'co0647385', 'co0610625', 'co0326245', 'co0298327', 'co0220836', 'co0211730'],
 				},
-				MetaTools.CompanyBbc : {
+				MetaCompany.CompanyBbc : {
 					# Show (3510): Level-3. Not sure if this can be improved in any way. A l.ot of other originals (ITV, HBO, etc) that cannot be filtered out.
 					# Movie (3035): Level-2
 					# Very difficult to exclude anything.
@@ -1839,27 +1938,27 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2442560, tt28118211, tt4179452, tt1475582, tt0185906.
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt1869454, tt10405370, tt2442560, tt1888075, tt0056751, tt11646832.
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # Not for tt2442560, tt1888075.
-																#{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # Not for tt2396135, tt0056751, tt0808096.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt7671070, tt0436992, tt1475582, tt0185906, tt7016936, tt5607976.
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Not for tt0436992, tt1475582, tt1888075, tt31433814, tt7016936.
-																#{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Not for tt0436992, tt0056751.
-																#{MetaTools.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Not for tt1475582.
-																#{MetaTools.CompanyWarner		: [MetaProvider.CompanyNetwork]}, # Not for tt0185906.
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt1888075.
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt2303687, tt9059760.
-																#{MetaTools.CompanyAcorn		: [MetaProvider.CompanyNetwork]}, # Not for tt2303687, tt2294189, tt0362357.
-																#{MetaTools.CompanyBravo		: [MetaProvider.CompanyNetwork]}, # Not for tt2294189, tt7016936.
-																#{MetaTools.CompanyMgm			: [MetaProvider.CompanyNetwork]}, # Not for tt10405370.
-																#{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # Not for tt7016936.
-																#{MetaTools.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # Not for tt7016936.
-																#{MetaTools.CompanyAe			: [MetaProvider.CompanyNetwork]}, # Not for tt0115355.
-																#{MetaTools.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # Not for tt4276618.
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt15557874.
-																#{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0758790 (BBC original). Not for tt10661302, tt21822590.
-																{MetaTools.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt10590066. Not sure if there are any co-productions, since CH5 is now owned by Paramount.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2442560, tt28118211, tt4179452, tt1475582, tt0185906.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt1869454, tt10405370, tt2442560, tt1888075, tt0056751, tt11646832.
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # Not for tt2442560, tt1888075.
+																#{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # Not for tt2396135, tt0056751, tt0808096.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt7671070, tt0436992, tt1475582, tt0185906, tt7016936, tt5607976.
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Not for tt0436992, tt1475582, tt1888075, tt31433814, tt7016936.
+																#{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Not for tt0436992, tt0056751.
+																#{MetaCompany.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Not for tt1475582.
+																#{MetaCompany.CompanyWarner		: [MetaProvider.CompanyNetwork]}, # Not for tt0185906.
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt1888075.
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt2303687, tt9059760.
+																#{MetaCompany.CompanyAcorn		: [MetaProvider.CompanyNetwork]}, # Not for tt2303687, tt2294189, tt0362357.
+																#{MetaCompany.CompanyBravo		: [MetaProvider.CompanyNetwork]}, # Not for tt2294189, tt7016936.
+																#{MetaCompany.CompanyMgm			: [MetaProvider.CompanyNetwork]}, # Not for tt10405370.
+																#{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # Not for tt7016936.
+																#{MetaCompany.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # Not for tt7016936.
+																#{MetaCompany.CompanyAe			: [MetaProvider.CompanyNetwork]}, # Not for tt0115355.
+																#{MetaCompany.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # Not for tt4276618.
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt15557874.
+																#{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0758790 (BBC original). Not for tt10661302, tt21822590.
+																{MetaCompany.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt10590066. Not sure if there are any co-productions, since CH5 is now owned by Paramount.
 
 																#'co0014456', # ARTE. Not for tt2442560.
 																#'co0618997', # Bad Wolf. Both ITV and BBC have a lot of titles produced by them (tt2401256).
@@ -1892,18 +1991,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0935075
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0349683, tt0146882
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyStudio]}, # tt1623205, tt4566758
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0935075
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0349683, tt0146882
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyStudio]}, # tt1623205, tt4566758
 
 																'co0072315', # National Broadcasting Company (NBC)
 																'co0037052', # American Broadcasting Company (ABC)
@@ -1937,7 +2036,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0043107', 'co0234667', 'co0234496', 'co0086182', 'co0399177', 'co0219933', 'co0265997', 'co0290595', 'co0534118', 'co0118334', 'co0422378', 'co0103544', 'co0537097', 'co0308047', 'co0132809', 'co0246015', 'co0530479', 'co0114729', 'co0453153', 'co0415789', 'co0164585', 'co0104650', 'co0832669', 'co1039429', 'co0531653', 'co0460362', 'co0317480', 'co0114728', 'co0477883', 'co0334989', 'co0142197', 'co0989615', 'co0503643', 'co0315543', 'co0206538', 'co0561347', 'co0405647', 'co0642119', 'co0621988', 'co0473661', 'co0471445', 'co0410030', 'co0726893', 'co0625141', 'co0348803', 'co0321381', 'co0853285', 'co1067868', 'co1045058', 'co0918458', 'co0883449', 'co0883439', 'co0883438', 'co0882716', 'co0871749', 'co0861902', 'co0806831', 'co0803582', 'co0781048', 'co0780894', 'co0482050', 'co0471188', 'co0401989', 'co0401784', 'co0370496', 'co0365373', 'co0324701', 'co0270289', 'co0479331'],
 					MetaProvider.CompanyVendor		: ['co0103957', 'co0114992', 'co0137763', 'co0065632', 'co0200731', 'co0104087', 'co0225995', 'co0775667', 'co0649102', 'co0593490', 'co0990657', 'co0874518', 'co0709699', 'co0675085', 'co0294183', 'co0291731', 'co0281995', 'co0858275', 'co0417955', 'co0397748', 'co0344444', 'co0272944', 'co0106311', 'co0105842', 'co1019605', 'co1007584', 'co0990658', 'co0976553', 'co0963204', 'co0960250', 'co0955257', 'co0942671', 'co0912517', 'co0815297', 'co0811069', 'co0795915', 'co0786705', 'co0669375', 'co0660947', 'co0659116', 'co0631186', 'co0628629', 'co0548872', 'co0516755', 'co0516737', 'co0497354', 'co0440119', 'co0426629', 'co0377398', 'co0321397', 'co0261608', 'co0247569', 'co0210507', 'co0131862', 'co0094787', 'co0913252', 'co0870149', 'co0801464', 'co0797002', 'co0780683', 'co0774810', 'co0756060', 'co0492919', 'co0411485', 'co0388502', 'co0178374'],
 				},
-				MetaTools.CompanyBoomerang : {
+				MetaCompany.CompanyBoomerang : {
 					# Show (83): Level-3. Most exclusions copied from Cartoon Network.
 					# Movie (11): Level-3. Most exclusions copied from Cartoon Network.
 					# Difficult to filter between Cartoon Network, Adult Swim, Boomerang, and other Warner companies.
@@ -1950,12 +2049,12 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt1596356 (sister channel)
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt1596356 (sister channel)
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
 
 																'co0127153', # Animax (tt9335498)
 																'co0964339', # Animax ()
@@ -1974,20 +2073,20 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt15352516
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0085334, tt0308443
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt15352516
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0085334, tt0308443
 
 																'co0036989', # Pierre Grise Productions (tt0113273)
 
@@ -2024,7 +2123,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0211390', 'co0444611', 'co0530659', 'co0124378', 'co0962875', 'co1020840', 'co0491815', 'co0333438', 'co0250141', 'co1012356', 'co0676555', 'co0344625', 'co0919362', 'co0806729', 'co0679000', 'co0505996'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyBravo : {
+				MetaCompany.CompanyBravo : {
 					# Show (270): Level-3. Difficult to distiguish between NBC (and other sister channels) originals, and other non-originals from smaller studios/networks.
 					# Movie (164): Level-3. Difficult to distiguish between general Universal films.
 					# Do not exclude Netflix, Peacock, Discovery, Hulu (Japan), NBC, Fubo, Hayu, E4, Sky, TLC, ITVBe/ITV, 7Bravo, Seven Network, Freevee, Lifetime, NOW/WOW.
@@ -2044,15 +2143,15 @@ class MetaImdb(MetaProvider):
 														Media.Show : {
 															'exclude' : [
 																# Although USA is a sister channel, there are too many USA Originals if we do not exclude this here.
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt1064899, tt4209256. Excludes tt7945720 (on Wikpedia a Bravo Original, on IMDb poister a USA Original.)
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt1064899, tt4209256. Excludes tt7945720 (on Wikpedia a Bravo Original, on IMDb poister a USA Original.)
 
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt1578873
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt5834204
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0098844
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt1358522
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0072562
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt1632701
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt1833285
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt1578873
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt5834204
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0098844
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt1358522
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0072562
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt1632701
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt1833285
 
 																'co0005035', # Warner Bros. Television (tt0200276)
 																'co0118334', # BBC America (tt7016936)
@@ -2069,23 +2168,23 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
 
 																'co0150452', # The Weinstein Company (tt0375920)
 																'co0195144', # Passion River Films (tt1781069)
@@ -2099,16 +2198,16 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0055388', 'co0979519', 'co0044418', 'co0093310', 'co0051348', 'co0913432', 'co0544037', 'co0321399', 'co0871340', 'co0073234', 'co1005022', 'co0089713'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyBritbox : {
+				MetaCompany.CompanyBritbox : {
 					# Show (100): Level-2
 					# Movie (31): Level-2
 					# Near impossible to distiguish between BritBox Originals, and (other) originals from BBC, ITV, CH4, CH5.
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt9204128, tt15565872
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0384766, tt15565872
-																#{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt15565872
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt9204128, tt15565872
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0384766, tt15565872
+																#{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt15565872
 															],
 														},
 														Media.Movie : {
@@ -2120,18 +2219,18 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0685539', 'co0859609', 'co0957541', 'co1063503', 'co1058884'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyCartoonnet : {
+				MetaCompany.CompanyCartoonnet : {
 					# Show (626): Level-4
 					# Movie (109): Level-3
 					# Difficult to filter between Cartoon Network, Adult Swim, Boomerang, and other Warner companies.
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt0388629
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0096697
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0096657
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0086815
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]}, # tt2325846
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt0388629
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0096697
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0096657
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0086815
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]}, # tt2325846
 
 																'co0127153', # Animax (tt9335498)
 																'co0964339', # Animax ()
@@ -2150,20 +2249,20 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt15352516
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0085334, tt0308443
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt15352516
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0085334, tt0308443
 
 																'co0127153', # Animax ()
 																'co0964339', # Animax ()
@@ -2198,7 +2297,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0005780', 'co1006606', 'co0177449', 'co0445677', 'co1014644', 'co1019493', 'co0967426', 'co1015360', 'co1001745', 'co0967683', 'co0873854', 'co1010748', 'co0323359', 'co0188542', 'co1065573', 'co1006909', 'co0970248', 'co0323319', 'co1008286', 'co0252029', 'co1064907', 'co1039856', 'co1025810', 'co1065574', 'co1060525', 'co1039942', 'co1035369', 'co1030543', 'co0990387', 'co0979463', 'co1059342', 'co1057333', 'co1049124', 'co1048006', 'co1045413', 'co1030544', 'co0868070', 'co0727598'],
 					MetaProvider.CompanyVendor		: ['co1048340', 'co1048303', 'co0919200', 'co0642967', 'co0087030'],
 				},
-				MetaTools.CompanyCbc : {
+				MetaCompany.CompanyCbc : {
 					# Show (998): Level-3 to Level-4
 					# Movie (1089): Level-3 to Level-4
 					# Shares content and co-productions with a lot of US channels.
@@ -2211,41 +2310,41 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt5421602, tt3526078, tt1094229, tt2874692, tt5912064, tt1091909, tt1034007, tt6143796, tt15764684, tt0758790
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt6998202, tt0085017
-																#{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt3526078
-																#{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt1091909, tt10193046, tt10267798
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt9083140
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0758790, tt1091909, tt1094229, tt5912064, tt1297754
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt1094229, tt5912064, tt4919930, tt1699440
-																#{MetaTools.CompanyTubi				: [MetaProvider.CompanyNetwork]}, # Not for tt1094229
-																#{MetaTools.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt1672189, tt0088727, tt1453159, tt1149608
-																#{MetaTools.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt2874692
-																#{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt1091909
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt1495950
-																#{MetaTools.CompanyYoutube			: [MetaProvider.CompanyNetwork]}, # Not for tt1495950
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt7332358, tt8593252, tt1453159, tt15221950
-																#{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # Not for tt6987476, tt8593252, tt11187454, tt15310816, tt29780951
-																#{MetaTools.CompanyCineflix			: [MetaProvider.CompanyNetwork]}, # Not for tt8593252
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0156200, tt1672189, tt0758790, tt1149608, tt0085017, tt15221950
-																#{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # Not for tt1672189, tt1453159
-																#{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt15437862, tt13250034
-																#{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # Not for tt0758790
-																#{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # Not for tt0758790
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0485301, tt0758790, tt7660970, tt1149608, tt10267798
-																#{MetaTools.CompanyCrave			: [MetaProvider.CompanyNetwork]}, # Not for tt1453159
-																#{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt7660970
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt3696720, tt0103504
-																#{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]}, # Not for tt0085017
-																#{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0085017, tt16154056
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt1699440, tt10267798, tt16154056
-																#{MetaTools.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt16154056
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt5421602, tt3526078, tt1094229, tt2874692, tt5912064, tt1091909, tt1034007, tt6143796, tt15764684, tt0758790
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt6998202, tt0085017
+																#{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt3526078
+																#{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt1091909, tt10193046, tt10267798
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt3526078, tt9083140
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0758790, tt1091909, tt1094229, tt5912064, tt1297754
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt1094229, tt5912064, tt4919930, tt1699440
+																#{MetaCompany.CompanyTubi				: [MetaProvider.CompanyNetwork]}, # Not for tt1094229
+																#{MetaCompany.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt1672189, tt0088727, tt1453159, tt1149608
+																#{MetaCompany.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt2874692
+																#{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt1091909
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt1495950
+																#{MetaCompany.CompanyYoutube			: [MetaProvider.CompanyNetwork]}, # Not for tt1495950
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt7332358, tt8593252, tt1453159, tt15221950
+																#{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # Not for tt6987476, tt8593252, tt11187454, tt15310816, tt29780951
+																#{MetaCompany.CompanyCineflix			: [MetaProvider.CompanyNetwork]}, # Not for tt8593252
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0156200, tt1672189, tt0758790, tt1149608, tt0085017, tt15221950
+																#{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # Not for tt1672189, tt1453159
+																#{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt15437862, tt13250034
+																#{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # Not for tt0758790
+																#{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # Not for tt0758790
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0485301, tt0758790, tt7660970, tt1149608, tt10267798
+																#{MetaCompany.CompanyCrave			: [MetaProvider.CompanyNetwork]}, # Not for tt1453159
+																#{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt7660970
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt3696720, tt0103504
+																#{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]}, # Not for tt0085017
+																#{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0085017, tt16154056
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt1699440, tt10267798, tt16154056
+																#{MetaCompany.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt16154056
 
-																{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # tt9686194
-																{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt15384074, tt0144701
-																{MetaTools.CompanyBritbox			: [MetaProvider.CompanyNetwork]}, # tt15210882
-																{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # tt11719808
-																{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt10146162
+																{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # tt9686194
+																{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt15384074, tt0144701
+																{MetaCompany.CompanyBritbox			: [MetaProvider.CompanyNetwork]}, # tt15210882
+																{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # tt11719808
+																{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt10146162
 
 																#'co0118334', # BBC America. Not for tt0758790.
 																#'co0234667', # BBC One (tt1475582). Not for tt0758790, tt0115335.
@@ -2279,13 +2378,13 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt3170832, tt0116483, tt4263482
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0031381
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0172493
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt3170832, tt0116483, tt4263482
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0031381
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0172493
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
 
 																'co0240399', # MSNBC Films (tt1152758)
 															],
@@ -2295,7 +2394,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0045850', 'co0737690', 'co0526683', 'co0018033', 'co0732227', 'co0407617', 'co0365169', 'co0145787', 'co0945984', 'co0006230', 'co0256692', 'co0017485', 'co0849552', 'co0684928', 'co0684927', 'co0578570', 'co0274055'],
 					MetaProvider.CompanyVendor		: ['co0645943', 'co0384853', 'co0057201', 'co1066695', 'co1065113', 'co1065112', 'co1065111', 'co1065081', 'co1064971', 'co0989392', 'co0989391', 'co0921956', 'co0914225', 'co0849553', 'co0804510', 'co0727824', 'co0725740', 'co0689721', 'co0583459', 'co0579073', 'co0380822', 'co0296164', 'co0294079', 'co0044672', 'co0033534', 'co0031756', 'co0990830', 'co0922467'],
 				},
-				MetaTools.CompanyCbs : {
+				MetaCompany.CompanyCbs : {
 					# Show (1862): Level-3. Impossible to filter out Paramount+ and Showtime Originals.
 					# Movie (2706): Level-2
 					# Many Showtime and Paramount+ originals are created by CBS Studios and/or broadcast on CBS (eg tt7440726, tt0452046).
@@ -2306,9 +2405,9 @@ class MetaImdb(MetaProvider):
 														Media.Show : {
 															'fixed' : MetaProvider.CompanyNetwork,
 															'exclude' : [
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0159206. Do not add for tt6226232.
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0159206. Do not add for tt6226232.
 
 																'co0008693', # Home Box Office (HBO) (tt0159206)
 																'co0007546', # Nickelodeon Network (tt0972534, tt0417299) (sibling channel)
@@ -2319,22 +2418,22 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0159273
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt5090568, tt8589698
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0159273
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt5090568, tt8589698
 
 																'co0031085', # Argentina Video Home (tt0094898)
 																'co0219620', # Universal Pictures Video (tt1399103)
@@ -2346,7 +2445,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0070627', 'co0598660', 'co0453313', 'co0326888', 'co0047863', 'co0313883', 'co0877435', 'co0361334', 'co0972197', 'co0754315'],
 					MetaProvider.CompanyVendor		: ['co0042311', 'co0007496', 'co0226201', 'co0274041', 'co0213710', 'co0248464', 'co0106097', 'co0094754', 'co0170466', 'co0212901', 'co0266215', 'co0776051', 'co0172646', 'co0225608', 'co0806725', 'co0244801', 'co0135308', 'co0223570', 'co0266490', 'co0457912', 'co0257036', 'co0445889', 'co0405556', 'co0176590', 'co0794271', 'co0244996', 'co0064922', 'co0361085', 'co0276665', 'co0399026', 'co0030685', 'co1047418', 'co0878295', 'co0124383', 'co0304538', 'co0214398', 'co0791015', 'co0616372', 'co0101612', 'co0877389', 'co0453962', 'co0130300', 'co1032498', 'co0680153', 'co0176456', 'co0147772', 'co0905313', 'co0842403', 'co0700002', 'co0670562', 'co0599875', 'co0587108', 'co0524636', 'co0121770', 'co0032142', 'co0007214', 'co1072706', 'co1067273', 'co1038688', 'co1034107', 'co0992782', 'co0940354', 'co0939093', 'co0840165', 'co0805424', 'co0795987', 'co0761328', 'co0699401', 'co0698066', 'co0679175', 'co0672682', 'co0634761', 'co0622518', 'co0528740', 'co0493419', 'co0489870', 'co0481698', 'co0481487', 'co0479557', 'co0434383', 'co0400863', 'co0309278', 'co0306937', 'co0282920', 'co0276655', 'co0232339', 'co0216642', 'co0181494', 'co0172946', 'co0116822', 'co0093670', 'co0079206', 'co0024107', 'co0017523', 'co1074129', 'co1042083', 'co0953815', 'co0927303', 'co0870263', 'co0868761', 'co0865737', 'co0856617', 'co0855511', 'co0803988', 'co0713727', 'co0710679', 'co0643897', 'co0638970', 'co0635748', 'co0635516', 'co0396072', 'co0276671', 'co0276644', 'co0220929', 'co0214620', 'co0095978'],
 				},
-				MetaTools.CompanyChannel4 : {
+				MetaCompany.CompanyChannel4 : {
 					# Show (2435): Level-3. Too many co-productions, and content from other networks (and vice versa), to accurately filter this.
 					# Movie (2611): Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -2357,29 +2456,29 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt2085059, tt6257970, tt0487831, tt0377260, tt2384811, tt0280330.
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt4374208. Not for tt3922704.
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0112004, tt1844923, tt3706628
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0112004, tt0487831
-																#{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt0387764, tt0487831, tt0280330
-																#{MetaTools.CompanyAubc				: [MetaProvider.CompanyNetwork]}, # Not for tt0387764, tt3330720, tt4122068, tt0377260
-																#{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt4122068
-																#{MetaTools.CompanyCinemax			: [MetaProvider.CompanyNetwork]}, # Not for tt2085059
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt2085059
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt10846104
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0377260, tt3706628
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt3228904. Not for tt3922704.
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt2085059, tt6257970, tt0487831, tt0377260, tt2384811, tt0280330.
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt4374208. Not for tt3922704.
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0112004, tt1844923, tt3706628
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0112004, tt0487831
+																#{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt0387764, tt0487831, tt0280330
+																#{MetaCompany.CompanyAubc				: [MetaProvider.CompanyNetwork]}, # Not for tt0387764, tt3330720, tt4122068, tt0377260
+																#{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # Not for tt4122068
+																#{MetaCompany.CompanyCinemax			: [MetaProvider.CompanyNetwork]}, # Not for tt2085059
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt2085059
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt10846104
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0377260, tt3706628
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt3228904. Not for tt3922704.
 
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0460681, tt0141842. Not for tt0487831, tt1844923, tt11076876, tt1220617.
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt2661044, tt0368530, tt3566726
-																{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # tt2235759
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyNetwork]}, # tt5853176
-																{MetaTools.CompanyBravo				: [MetaProvider.CompanyNetwork]}, # tt5665418
-																{MetaTools.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt3006802
-																{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt2137109
-																{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt1600199
-																{MetaTools.CompanyTbs				: [MetaProvider.CompanyNetwork]}, # tt0086798
-																{MetaTools.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt12074628
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0460681, tt0141842. Not for tt0487831, tt1844923, tt11076876, tt1220617.
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt2661044, tt0368530, tt3566726
+																{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # tt2235759
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyNetwork]}, # tt5853176
+																{MetaCompany.CompanyBravo				: [MetaProvider.CompanyNetwork]}, # tt5665418
+																{MetaCompany.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt3006802
+																{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt2137109
+																{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt1600199
+																{MetaCompany.CompanyTbs				: [MetaProvider.CompanyNetwork]}, # tt0086798
+																{MetaCompany.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt12074628
 
 																#'co0039462', # Public Broadcasting Service (PBS) # Not for tt3706628, tt0094576
 																#'co0014456', # ARTE # Not for tt3706628
@@ -2409,18 +2508,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
 
 																'co0072315', # National Broadcasting Company (NBC)
 																'co0037052', # American Broadcasting Company (ABC)
@@ -2454,7 +2553,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0103528', 'co0706824', 'co0167631', 'co0106185', 'co0651210', 'co0163162', 'co0159436', 'co0007824', 'co0523488', 'co0361173', 'co0557933', 'co0691823'],
 					MetaProvider.CompanyVendor		: ['co0103528', 'co0044785', 'co0235537', 'co0167590', 'co0106289', 'co0108028', 'co0200324', 'co0792816', 'co0412137'],
 				},
-				MetaTools.CompanyChannel5 : {
+				MetaCompany.CompanyChannel5 : {
 					# Show (966): Level-3
 					# Movie (740): Level-2
 					MetaProvider.CompanyOriginal	: {
@@ -2467,21 +2566,21 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt12004280
-																#{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt13430420
-																#{MetaTools.CompanyCrave			: [MetaProvider.CompanyNetwork]}, # Not for tt13406036
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt10590066
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt1905943
-																#{MetaTools.CompanyCbs				: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # Not for tt31647174
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt12004280
+																#{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt13430420
+																#{MetaCompany.CompanyCrave			: [MetaProvider.CompanyNetwork]}, # Not for tt13406036
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt10590066
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt1905943
+																#{MetaCompany.CompanyCbs				: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # Not for tt31647174
 
-																{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt3121722, tt0426769 (sister channel)
-																{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt0903747, tt1520211
-																{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0421030
-																{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt4878326, tt2758950
-																{MetaTools.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # tt1985443
-																{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt1723760
-																{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt8289480, tt0112112
-																{MetaTools.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt1103968
+																{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt3121722, tt0426769 (sister channel)
+																{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt0903747, tt1520211
+																{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0421030
+																{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt4878326, tt2758950
+																{MetaCompany.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # tt1985443
+																{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt1723760
+																{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt8289480, tt0112112
+																{MetaCompany.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt1103968
 
 																# Sister channels
 																'co0093767', # Nicktoons Productions (tt0206512)
@@ -2513,17 +2612,17 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
 
 																'co0072315', # National Broadcasting Company (NBC)
 																'co0037052', # American Broadcasting Company (ABC)
@@ -2552,13 +2651,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0003500', 'co0616900', 'co0174820', 'co0533814', 'co0360612', 'co0773190', 'co0798902', 'co0836811', 'co0340961', 'co0187281', 'co0901456', 'co0187155', 'co0187155', 'co0594710', 'co0237619', 'co1040344', 'co0358510', 'co0106315', 'co1047381', 'co0797466', 'co0732834'],
 					MetaProvider.CompanyVendor		: ['co0106195', 'co0242515'],
 				},
-				MetaTools.CompanyCineflix : {
+				MetaCompany.CompanyCineflix : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0064070', 'co0376305', 'co0317170', 'co0658624', 'co0467141', 'co0344403', 'co0765221', 'co0691772', 'co0647273', 'co0645818', 'co0522055'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0182284', 'co0510368', 'co0775253'],
 				},
-				MetaTools.CompanyCinemax : {
+				MetaCompany.CompanyCinemax : {
 					# Show (39 of 33+): Level-4.
 					# Movie (636 of 5+): Level-2. Not really any Cinemax original films.
 					# https://en.wikipedia.org/wiki/Category:Cinemax_original_programming
@@ -2566,10 +2665,10 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Show	: {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt2085059. Do not add for tt5743796.
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt0448190
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt1279972
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt2295953
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt2085059. Do not add for tt5743796.
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt0448190
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt1279972
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt2295953
 
 																'co0005861', # HBO Films (tt0995832)
 
@@ -2600,23 +2699,23 @@ class MetaImdb(MetaProvider):
 															# These are very inaccurate.
 															# Cinemax probably does not have any film Originals, except maybe the occasional Cinemax After Dark (Eroctica).
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0190641
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0190641
 
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0099685
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0756683
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0090190
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0099685
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0756683
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0090190
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt1727824
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0052618
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt1727824
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0052618
 
 																'co0179392', # Lionsgate UK (tt19637052, tt10366206, tt1320253)
 																'co0800011', # Leonine Distribution (tt7160372)
@@ -2642,20 +2741,20 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0042496', 'co0268340', 'co0861398', 'co0123742', 'co0368145', 'co0872473', 'co0778313', 'co0913502', 'co0790278', 'co0625219', 'co0887358', 'co0802222', 'co0011668'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyColumbia : {
+				MetaCompany.CompanyColumbia : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0050868', 'co0041442', 'co0074221', 'co0103416', 'co0041248', 'co0239725', 'co0032932', 'co0985783', 'co0072216', 'co0624442', 'co0147951', 'co0136288', 'co0001581', 'co0446085', 'co0198276', 'co0142305', 'co0113915', 'co0113868', 'co0075055', 'co0063529', 'co0562672', 'co0562672', 'co0324275', 'co0245365', 'co0142304', 'co0110462', 'co0093452', 'co0008439', 'co0772149', 'co0206582'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0050868', 'co0108852', 'co0001850', 'co0130303', 'co0057923', 'co0282638', 'co0215212', 'co0221123', 'co0128198', 'co0070977', 'co0127120', 'co0003581', 'co0219440', 'co0218288', 'co0214905', 'co0009297', 'co0014351', 'co0189864', 'co0098048', 'co0077851', 'co0213457', 'co0057443', 'co0106070', 'co0110090', 'co0003949', 'co0045926', 'co0108034', 'co0438107', 'co0372744', 'co0005726', 'co0218192', 'co0118308', 'co0095798', 'co0060005', 'co0807814', 'co0075764', 'co0628925', 'co0053539', 'co0768357', 'co0117455', 'co0031545', 'co0774471', 'co0252452', 'co0302174', 'co0170439', 'co0358260', 'co0231770', 'co0006448', 'co0629458', 'co0182605', 'co0176140', 'co0092241', 'co0089682', 'co0237854', 'co0047778', 'co0613324', 'co0218290', 'co0215270', 'co0215257', 'co0035705', 'co0805428', 'co0159180', 'co0108003', 'co0728184', 'co0120631', 'co0139447', 'co0877032', 'co0351835', 'co0539852', 'co0055524', 'co0359121', 'co0225408', 'co0135317', 'co0094232', 'co0287692', 'co0768425', 'co0638112', 'co0114725', 'co0076384', 'co0257569', 'co0037988', 'co0152638', 'co0232238', 'co0015669', 'co0884352', 'co0108012', 'co0051419', 'co0720168', 'co0651764', 'co0176177', 'co0032747', 'co0393411', 'co0135318', 'co0942170', 'co0751613', 'co0039725', 'co0115734', 'co0115429', 'co0045347', 'co0113976', 'co0117466', 'co0815627', 'co0139446', 'co1013825', 'co0942169', 'co0488192', 'co0382315', 'co0163983', 'co0092245', 'co0400389', 'co0211796', 'co0185616', 'co0897405', 'co0325928', 'co0215095', 'co0178866', 'co0162942', 'co0162942', 'co0241443', 'co0057970', 'co0025186', 'co0373110', 'co0700140', 'co0991324', 'co0379792', 'co0954396', 'co0081792', 'co0754056', 'co0982368', 'co0537026', 'co0382360', 'co0008806', 'co1020466', 'co0751516', 'co0379620', 'co1002119', 'co0825783', 'co0778447', 'co0730604', 'co0628924', 'co0371171', 'co0837462', 'co0796316', 'co0728653', 'co0717323', 'co0628032', 'co0613216', 'co0428560', 'co0250208', 'co0185878', 'co0961122', 'co0937939', 'co0826726', 'co0802980', 'co0723390', 'co0229304', 'co0213673', 'co0208202', 'co0118302', 'co0118300', 'co1042290', 'co1041459', 'co1021830', 'co0960788', 'co0960786', 'co0937938', 'co0930442', 'co0919176', 'co0919014', 'co0890192', 'co0793829', 'co0753593', 'co0625795', 'co0455564', 'co0354514', 'co0303509', 'co0301411', 'co0300278', 'co0232073', 'co0200952', 'co0120629', 'co0075055', 'co0073559', 'co0054490', 'co0053661', 'co1061942', 'co1044199', 'co1037590', 'co0996230', 'co0981289', 'co0943399', 'co0924447', 'co0919175', 'co0919019', 'co0919016', 'co0919015', 'co0919013', 'co0913591', 'co0853923', 'co0840651', 'co0835295', 'co0833779', 'co0802979', 'co0797841', 'co0793712', 'co0787177', 'co0544343', 'co0543768', 'co0517926', 'co0492268', 'co0382011', 'co0296648', 'co0289892', 'co0274904', 'co0210948', 'co0040618', 'co0011801', 'co0960785', 'co0960784', 'co0929000', 'co0806647', 'co0793828', 'co0793828', 'co0771804', 'co0770848', 'co0692171', 'co0660474', 'co0659417', 'co0455563', 'co0453812', 'co0337735', 'co0221049', 'co0219416', 'co0215137', 'co0213635', 'co0209928', 'co0206425', 'co0201367', 'co0137852', 'co0004899'],
 				},
-				MetaTools.CompanyComedycen : {
+				MetaCompany.CompanyComedycen : {
 					# Show (527): Level-3, maybe close to Level-4
 					# Movie (183): Level-3
 					# Very difficult to filter, since CC has few originals, but carries a ton of content from many other channels.
 					MetaProvider.CompanyOriginal	: {
 														Media.Unknown : {
 															'allow' : [
-																MetaTools.CompanyFreevee, # tt0094517
+																MetaCompany.CompanyFreevee, # tt0094517
 															],
 
 															'disallow' : [
@@ -2667,33 +2766,33 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt0115147, tt0121955, tt0370194, tt0353049, tt1430587, tt0318959, tt0386180
-																#{MetaTools.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0115147, tt0121955
-																#{MetaTools.CompanyMtv				: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0318959, tt0386180
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0370194, tt0353049, tt9272514, tt1981558
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt1621748
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0094517, tt0353049
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
-																#{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955
-																#{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0386180
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0094517, tt0370194, tt0821375, tt0318959, tt1621748, tt1981558
-																#{MetaTools.CompanyWarner			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0458254, tt2022713
-																#{MetaTools.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt0370194
-																#{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt0370194, tt0353049
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt2022713
-																#{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt5648202
+																#{MetaCompany.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt0115147, tt0121955, tt0370194, tt0353049, tt1430587, tt0318959, tt0386180
+																#{MetaCompany.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0115147, tt0121955
+																#{MetaCompany.CompanyMtv				: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0318959, tt0386180
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0370194, tt0353049, tt9272514, tt1981558
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt1621748
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0094517, tt0353049
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
+																#{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955
+																#{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0386180
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955, tt0094517, tt0370194, tt0821375, tt0318959, tt1621748, tt1981558
+																#{MetaCompany.CompanyWarner			: [MetaProvider.CompanyNetwork]}, # Not for tt0121955
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt0094517
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0458254, tt2022713
+																#{MetaCompany.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt0370194
+																#{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt0370194, tt0353049
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt2022713
+																#{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt5648202
 
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt6226232, tt0460649. Not for tt11457996
-																{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1632701, tt1442437, tt0491738
-																{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt0108778, tt2861424
-																{MetaTools.CompanyTbs				: [MetaProvider.CompanyNetwork]}, # tt1583607, tt1637574, tt1942919
-																{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt0472954, tt0096697
-																{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt0904208
-																{MetaTools.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt10826054
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0284722, tt0112056 (sister channel)
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt6226232, tt0460649. Not for tt11457996
+																{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1632701, tt1442437, tt0491738
+																{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt0108778, tt2861424
+																{MetaCompany.CompanyTbs				: [MetaProvider.CompanyNetwork]}, # tt1583607, tt1637574, tt1942919
+																{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt0472954, tt0096697
+																{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt0904208
+																{MetaCompany.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt10826054
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0284722, tt0112056 (sister channel)
 
 																#'co0037052', # American Broadcasting Company (ABC). Not for tt0108897.
 																#'co0715422', # Quibi. Not for tt0370194.
@@ -2730,23 +2829,23 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
 																'co0024325', # Dutch FilmWorks (DFW) (tt1306980)
 															],
@@ -2756,13 +2855,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0029768', 'co0076380', 'co0226227', 'co0003869', 'co0811133', 'co0903459', 'co0049249', 'co0409231', 'co0360149', 'co0047312', 'co0886579', 'co0387083', 'co0984705', 'co0877841', 'co0131848', 'co0768658', 'co0393953', 'co0947125', 'co0913861', 'co0476675', 'co1073642', 'co1010895', 'co0903461', 'co0903460', 'co0810091'],
 					MetaProvider.CompanyVendor		: ['co0308378', 'co0401415'],
 				},
-				MetaTools.CompanyConstantin : {
+				MetaCompany.CompanyConstantin : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0002257', 'co0117695', 'co0276919', 'co0756918', 'co0401773', 'co0675006', 'co0676507', 'co0368853', 'co0942297', 'co0501831', 'co0886172', 'co0435989', 'co0975833', 'co0866740'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0002257', 'co0080484', 'co0504319', 'co0233657', 'co0179125', 'co1005885', 'co0895098', 'co0244344', 'co1053231', 'co0995200', 'co0962732', 'co0837068', 'co0883893', 'co0877579', 'co0167676', 'co0094921'],
 				},
-				MetaTools.CompanyCrave : {
+				MetaCompany.CompanyCrave : {
 					# Show (48): Level-3
 					# Movie (212): Level-2
 					# There are not many Crave Originals and most were released under The Movie Network (TMN).
@@ -2772,38 +2871,38 @@ class MetaImdb(MetaProvider):
 															'exclude' : [
 																# HBO, Showtime, Starz provide most of the content to Crave, but these are not Crave Originals.
 																# And Crave probably does not shre its originals with HBO, Showtime, and Starz.
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt10738442
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt10738442
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt5171438, tt9184820
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt3502248
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt0965394
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0235137
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt3315386
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt13406036
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt5171438, tt9184820
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt3502248
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt0965394
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0235137
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt3315386
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt13406036
 
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt0456778.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt2490030.
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # Not for tt2490030.
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt4647692.
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt0456778.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt2490030.
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # Not for tt2490030.
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt4647692.
 
 																'co0071026', # MGM Television (tt0374455)
 															],
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
 
 																'co0983179', # Tubi Films (tt31499750)
 															],
@@ -2813,7 +2912,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0043355', 'co0605105', 'co0667174', 'co0758813', 'co0584469'],
 					MetaProvider.CompanyVendor		: ['co0611544', 'co0493530', 'co0047549'],
 				},
-				MetaTools.CompanyCrunchyroll : {
+				MetaCompany.CompanyCrunchyroll : {
 					# Show (611): Level-2
 					# Movie (48): Level-2
 					# Has a lot of anime and partnerships with Sony, Animax, Aniplex, AXN, Funimation, Anime Ltd, etc.
@@ -2821,10 +2920,10 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Unknown : {
 															'exclude' : [
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt12343534
-																#{MetaTools.CompanyAdultswim	: [MetaProvider.CompanyNetwork]}, # Not for tt13042440.
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt12343534
+																#{MetaCompany.CompanyAdultswim	: [MetaProvider.CompanyNetwork]}, # Not for tt13042440.
 															],
 														},
 														Media.Show : {
@@ -2843,7 +2942,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0251163', 'co0931273', 'co0977033'],
 					MetaProvider.CompanyVendor		: ['co0114007', 'co0316684'],
 				},
-				MetaTools.CompanyCw : {
+				MetaCompany.CompanyCw : {
 					# Show (229 of 173+): Level-4.
 					# Movie (91 of 260+): Level-2. Too many titles from smaller studios. Probablby none, or very few, CW original films exist (not even a Wikipedia page).
 					# https://en.wikipedia.org/wiki/Category:The_CW_original_programming
@@ -2865,14 +2964,14 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show	: {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt21064598, tt2193021.
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt21064598, tt2193021, tt0412253 (because it is also a Hulu Original, although listed on Wikipedia as CW Original for the later season).
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt0460637 (purchased show)
-																#{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt9810248, tt21064598 (Both are purchased or co-productions).
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt0808491 (purchased show)
-																#{MetaTools.CompanyRoku			: [MetaProvider.CompanyNetwork]}, # tt10738442. Do not add for tt26452193.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt21064598, tt2193021.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt21064598, tt2193021, tt0412253 (because it is also a Hulu Original, although listed on Wikipedia as CW Original for the later season).
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt0460637 (purchased show)
+																#{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt9810248, tt21064598 (Both are purchased or co-productions).
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt0808491 (purchased show)
+																#{MetaCompany.CompanyRoku			: [MetaProvider.CompanyNetwork]}, # tt10738442. Do not add for tt26452193.
 
 																'co0007893', # Fox Kids Network (tt0214341)
 																#'co0080139', # CTV Television Network (tt21064598, tt0115083, tt1592154, tt10738442, tt30487848) (purchased shows). Do not add for tt21064598.
@@ -2926,19 +3025,19 @@ class MetaImdb(MetaProvider):
 
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -2946,7 +3045,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0174148', 'co0000647', 'co0007077', 'co1024509', 'co0481314', 'co0374263', 'co0378383', 'co0523775', 'co0786540', 'co0371051', 'co0767441', 'co1049674', 'co0664978', 'co0509842', 'co0369245'],
 					MetaProvider.CompanyVendor		: ['co0593960', 'co0547811', 'co0469845', 'co0432088', 'co0221492', 'co0964315', 'co0832948', 'co0800524', 'co0793958', 'co0725543', 'co0710892', 'co0672687', 'co0652452', 'co0615111', 'co0402268', 'co0391210', 'co0357335', 'co0217572', 'co0826832', 'co0664164'],
 				},
-				MetaTools.CompanyDarkhorse : {
+				MetaCompany.CompanyDarkhorse : {
 					# Show (12): Level-5
 					# Movie (33): Level-5
 					MetaProvider.CompanyOriginal	: {
@@ -2963,7 +3062,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0978106'],
 				},
-				MetaTools.CompanyDccomics : {
+				MetaCompany.CompanyDccomics : {
 					# Show (79): Level-5. Near perfect out of the box.
 					# Movie (95): Level-4. Most of the incorrect titles have DC as "Thank you" or "Additional material".
 					MetaProvider.CompanyOriginal	: {
@@ -3005,13 +3104,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0697225', 'co1058414', 'co0951237', 'co0755173', 'co0881612'],
 				},
-				MetaTools.CompanyDimension : {
+				MetaCompany.CompanyDimension : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0019626', 'co0079757'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0210118', 'co0098484'],
 				},
-				MetaTools.CompanyDiscovery : {
+				MetaCompany.CompanyDiscovery : {
 					# Show (2555 of 328+): Level-3. Most shows from other studios seem to be exclusively on Discovery.
 					# Movie (1362 of ?): Level-2. Probably no "true" Discovery original film. Although most movies from other studios seem to be exclusively  on Discovery.
 					# https://en.wikipedia.org/wiki/Category:Discovery_Channel_original_programming
@@ -3030,14 +3129,14 @@ class MetaImdb(MetaProvider):
 																'co0981653', 'co0981669', 'co0614571', 'co0984883', 'co0092660', 'co0092660', 'co0981619', 'co0981827', 'co1010769', 'co0598558', 'co1006785', 'co1061317', 'co0275477', 'co0984881', 'co1067092', 'co1006154', 'co0788357', 'co1012797', 'co0525521', 'co0525521', 'co1012796', 'co0981825', 'co0981689', 'co0981643', 'co1070858', 'co1067096', 'co1048738', 'co1048737', 'co1048736', 'co1048735', 'co1006964', 'co1005826',
 															],
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # tt5626028, tt0121955. Do not add for tt1628033, tt5618256, tt4686698 (co-production Discovery+Netflix).
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyStudio]}, # tt6741278, tt0182576, tt0158552. Do not add network for tt1800864, tt1628033.
-																{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt1942683, tt0760437, tt27502465. Owned by Warner, but too many (any we already disallow Discovery Toons/Kids).
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # tt5626028, tt0121955. Do not add for tt1628033, tt5618256, tt4686698 (co-production Discovery+Netflix).
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyStudio]}, # tt6741278, tt0182576, tt0158552. Do not add network for tt1800864, tt1628033.
+																{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt1942683, tt0760437, tt27502465. Owned by Warner, but too many (any we already disallow Discovery Toons/Kids).
 
-																{MetaTools.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]}, # tt2560140, tt0388629
-																{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt0472954, tt0149460
-																{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0397306, tt1199099
-																{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1064899
+																{MetaCompany.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]}, # tt2560140, tt0388629
+																{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt0472954, tt0149460
+																{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0397306, tt1199099
+																{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1064899
 
 																'co0106185', # E4 (tt5969074, tt9615014)
 																'co0110208', # Shout! Factory (tt3398228)
@@ -3065,17 +3164,17 @@ class MetaImdb(MetaProvider):
 																'co0981669', 'co0614571', 'co0984883', 'co0092660', 'co0092660', 'co0981619', 'co0981827', 'co1010769', 'co0598558', 'co1006785', 'co1061317', 'co0275477', 'co0984881', 'co1067092', 'co1006154', 'co0788357', 'co1012797', 'co0525521', 'co0525521', 'co1012796', 'co0981825', 'co0981689', 'co0981643', 'co1070858', 'co1067096', 'co1048738', 'co1048737', 'co1048736', 'co1048735', 'co1006964', 'co1005826',
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt1649418, tt2463208, tt7991608
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]}, # tt15326988
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt4637028
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt9695722
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1587807
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt1649418, tt2463208, tt7991608
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]}, # tt15326988
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt4637028
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt9695722
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1587807
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt1517489
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt1517489
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
 																'co0037052', # American Broadcasting Company (ABC) (tt0267913)
 																'co1021520', # Sky Original Films (tt15845360)
@@ -3094,7 +3193,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0981669', 'co0834810', 'co0981653', 'co0614571', 'co0225421', 'co0984883', 'co0500808', 'co0726548', 'co0267805', 'co0089706', 'co0210778', 'co0212711', 'co0092660', 'co0045277', 'co0224615', 'co0981619', 'co0981827', 'co0074719', 'co1010769', 'co0030015', 'co1023494', 'co0120666', 'co0598558', 'co0070253', 'co0500448', 'co0188065', 'co0465058', 'co0504369', 'co0885467', 'co0147826', 'co0943778', 'co0457897', 'co0163534', 'co1006785', 'co0274712', 'co1061317', 'co0278859', 'co0102909', 'co0833882', 'co0315118', 'co0253720', 'co0182992', 'co0564243', 'co0409438', 'co0275477', 'co0155054', 'co0131594', 'co0984881', 'co0531164', 'co0271708', 'co0197261', 'co1067092', 'co0979624', 'co0656406', 'co1006154', 'co0927174', 'co0788357', 'co0427466', 'co0243945', 'co0130326', 'co0923071', 'co0896334', 'co0869091', 'co0848923', 'co0405559', 'co0404321', 'co0350346', 'co0225758', 'co0225264', 'co0147813', 'co0064712', 'co0664644', 'co0268270', 'co0106294', 'co1012797', 'co0924477', 'co0894752', 'co0610831', 'co0525521', 'co0511125', 'co0396789', 'co0389407', 'co0195831', 'co1023840', 'co1012796', 'co0981825', 'co0981689', 'co0981643', 'co0933193', 'co0904378', 'co0870258', 'co0746360', 'co0693803', 'co0583138', 'co0534443', 'co0486937', 'co0328002', 'co0166855', 'co1070858', 'co1067096', 'co1048738', 'co1048737', 'co1048736', 'co1048735', 'co1036969', 'co1027849', 'co1027848', 'co1006964', 'co1006908', 'co1005826', 'co0964265', 'co0891875', 'co0828614', 'co0809123', 'co0683600', 'co0654638', 'co0565776', 'co0397571', 'co0314157', 'co0245318', 'co0205109', 'co0168990', 'co1006802', 'co0997619', 'co0965409'],
 					MetaProvider.CompanyVendor		: ['co0077924', 'co0863266', 'co0131861', 'co0212079', 'co0521172', 'co0639652', 'co0021831', 'co0601745', 'co0543688', 'co0473690', 'co0298300', 'co0013509', 'co0051998', 'co0003317', 'co0876160', 'co0394091', 'co0625938', 'co0165242', 'co0808524', 'co0453651', 'co1005816', 'co0318256', 'co0924483', 'co0322476', 'co0284818', 'co0108234', 'co1063267', 'co1044762', 'co1037501', 'co1031570', 'co1031569', 'co1031568', 'co1008104', 'co0986413', 'co0930735', 'co0759066', 'co0607065', 'co0574955', 'co0503443', 'co0453652', 'co0211019', 'co0027586', 'co1058424', 'co0877509', 'co0758186', 'co0642760', 'co0583140', 'co0583139'],
 				},
-				MetaTools.CompanyDisney : {
+				MetaCompany.CompanyDisney : {
 					# Show (804 of 357+): Level-4. A lot of other originals appear on Disney+, and many Disney originals appear on other platforms. Many co-productions (Hulu, NatGeo, ABC, etc).
 					# Movie (934 of 115+): Level-4. Has many normal Walt Disney titles, that are not necessarily part of Disney+/Disney-Channel originals.
 					# https://en.wikipedia.org/wiki/Category:Disney%2B_original_programming
@@ -3127,36 +3226,36 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
 
 																# Fox, FX, and ABC owned by Disney.
 																# But still exclude "FX Productions", since they are inteded for FX/Hulu.
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt2788316, tt14452776, tt5645432, tt11527058
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # tt7235466
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt11691774, tt1640719, tt17543592. Do not add studio for tt12580982.
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt2788316, tt14452776, tt5645432, tt11527058
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # tt7235466
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt11691774, tt1640719, tt17543592. Do not add studio for tt12580982.
 
 																# Although Disney produces a lot of content for Hulu, there are too many Hulu titles.
 																# Most "true" Disney originals (Star Trek, Marvel, etc) are only on Disney+, but not Hulu. But there are exceptions (tt13157618, tt24640580, tt26450613, tt27921614).
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyStudio]}, # tt14500082, tt25050236, tt20285780, tt13018148, tt9811316, tt9114512. Do not add network for tt13157618.
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyStudio]}, # tt14500082, tt25050236, tt20285780, tt13018148, tt9811316, tt9114512. Do not add network for tt13157618.
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0452046
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt13875494
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1199099
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt4803766
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt12878838
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt14531842, tt0086661
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt27775188
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt15669534
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt1533435, tt10166622, tt9174558, tt11997646
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt8610212
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0452046
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt13875494
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1199099
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # tt4803766
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt12878838
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt14531842, tt0086661
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt27775188
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt15669534
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt1533435, tt10166622, tt9174558, tt11997646
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt8610212
 
 																# NatGeo is owned by Disney, but there are too many titles cluttering the menu.
 																# Exclude here. Users can watch them from the NatGeo Originals.
 																# Some are incorrectly excluded: tt17921714, tt5673782, tt9165706.
-																{MetaTools.CompanyNationalgeo	: [MetaProvider.CompanyNetwork]}, # tt10370750, tt4838586, tt2964642, tt4131818, tt3110590, tt1020109, tt26351130, tt11170862, tt11003514, tt11003514, tt10115054
+																{MetaCompany.CompanyNationalgeo	: [MetaProvider.CompanyNetwork]}, # tt10370750, tt4838586, tt2964642, tt4131818, tt3110590, tt1020109, tt26351130, tt11170862, tt11003514, tt11003514, tt10115054
 
 																# Although Disney owns Lifetime, exclude them.
 																'co0006395', # Lifetime Television (tt1991410)
@@ -3211,26 +3310,26 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0114924, tt0107282
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt1414382
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyStudio]}, # tt26569323
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0114924, tt0107282
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt1414382
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyStudio]}, # tt26569323
 
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt1821694, tt1714206
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt1821694, tt1714206
 
-																#{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # Now owned by Disney. Exclude the pre-Disney companies below.
-																#{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]}, # Owned by Disney.
+																#{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # Now owned by Disney. Exclude the pre-Disney companies below.
+																#{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]}, # Owned by Disney.
 
 																'co0225299', # Summit Distribution (tt0945513)
 																'co0292985', # Summit Home Entertainment (tt1673434)
@@ -3258,7 +3357,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0721120', 'co0022105', 'co0847080', 'co0243675', 'co0311978', 'co0172644', 'co0831766', 'co0410032', 'co0875800', 'co0293280', 'co0326117', 'co0655773', 'co0507878', 'co0363715', 'co0293235', 'co0124426', 'co0497271', 'co0465045', 'co0148907', 'co0269642', 'co0127640', 'co0483030', 'co0962993', 'co0931913', 'co0472570', 'co0838196', 'co0410031', 'co0328976', 'co0930616', 'co0586391', 'co0510795', 'co0479835', 'co0311814', 'co1069365', 'co0899094', 'co0616595', 'co0475581', 'co0626229', 'co0503291', 'co0492228', 'co0492228', 'co0487401', 'co0479836', 'co0471424', 'co0970093', 'co0930627', 'co0854831', 'co0743057', 'co0638820', 'co0503303', 'co0308696', 'co0818715', 'co0693410', 'co0503276', 'co0503273', 'co0460088', 'co0438719', 'co1070494', 'co1046200', 'co1031882', 'co0971893', 'co0940491', 'co0864435', 'co0833749', 'co0830701', 'co0716227', 'co0654197', 'co0646640', 'co0545024', 'co0503301', 'co0410034', 'co0410033', 'co0333590', 'co0781340'],
 					MetaProvider.CompanyVendor		: ['co0000779', 'co0226183', 'co0049546', 'co0114699', 'co0013021', 'co0213225', 'co0078478', 'co0039330', 'co0229306', 'co0209825', 'co0033410', 'co0227555', 'co0193692', 'co0811166', 'co0044279', 'co0659852', 'co0351644', 'co0244964', 'co0014626', 'co0292142', 'co0172644', 'co0385962', 'co0121807', 'co0229701', 'co0234296', 'co0248598', 'co0239645', 'co0235043', 'co0087337', 'co0108188', 'co0123419', 'co0565163', 'co0126002', 'co0916747', 'co0882527', 'co0813447', 'co1042820', 'co0824956', 'co0792679', 'co0774695', 'co0133895', 'co0302554', 'co0251885', 'co0170500', 'co0660110', 'co0233849', 'co0916748', 'co0774696', 'co0230605', 'co0606140', 'co0331976', 'co0991889', 'co0916028', 'co0218422', 'co0602039', 'co0514544', 'co0135322', 'co0256585', 'co0595116', 'co0039725', 'co0303939', 'co0077596', 'co0280125', 'co0212150', 'co0119593', 'co0966487', 'co0565114', 'co0269496', 'co0226005', 'co0972210', 'co0127146', 'co0028786', 'co0967209', 'co0256904', 'co0162996', 'co0050977', 'co0497272', 'co0279419', 'co0110121', 'co0011680', 'co0894430', 'co0606141', 'co0238690', 'co0298029', 'co0148456', 'co0958910', 'co0646633', 'co0212721', 'co0094898', 'co0241443', 'co0225392', 'co0188047', 'co0989959', 'co0286221', 'co0183512', 'co0136583', 'co0972527', 'co0956237', 'co0472915', 'co0242391', 'co0979350', 'co0799752', 'co0786439', 'co0586391', 'co0739072', 'co0474398', 'co0360208', 'co0244024', 'co1041397', 'co1009765', 'co0998459', 'co0448448', 'co0380199', 'co0090520', 'co1011371', 'co0918614', 'co0306723', 'co0298883', 'co0298883', 'co0292086', 'co0144563', 'co1033923', 'co1000896', 'co0937874', 'co0850185', 'co0806192', 'co0475581', 'co0406107', 'co0381864', 'co0297226', 'co0167716', 'co0118321', 'co0076708', 'co0918597', 'co0817519', 'co0816614', 'co0777984', 'co0627160', 'co0494199', 'co0479836', 'co0203040', 'co0175122', 'co0039576', 'co1005822', 'co0968316', 'co0968314', 'co0968309', 'co0817786', 'co0806509', 'co0799546', 'co0727433', 'co0671586', 'co0582081', 'co0506477', 'co0497275', 'co0445522', 'co0383487', 'co0366876', 'co0356736', 'co0336503', 'co0228542', 'co0218992', 'co0200835', 'co0122790', 'co0118329', 'co0006618', 'co1052155', 'co1035870', 'co1025506', 'co0968313', 'co0937873', 'co0808425', 'co0770520', 'co0688938', 'co0686598', 'co0654909', 'co0605619', 'co0597852', 'co0595325', 'co0595115', 'co0512778', 'co0503268', 'co0497274', 'co0497273', 'co0482409', 'co0405683', 'co0330522', 'co0310744', 'co0291721', 'co0252715', 'co0242525', 'co0187099', 'co0004375', 'co1071047', 'co1064117', 'co1050629', 'co1037590', 'co1014399', 'co1011345', 'co1011338', 'co1011337', 'co1009793', 'co1009357', 'co0990094', 'co0976075', 'co0968984', 'co0968983', 'co0968982', 'co0968981', 'co0968980', 'co0968315', 'co0968312', 'co0968311', 'co0936067', 'co0927318', 'co0913419', 'co0887985', 'co0874690', 'co0874690', 'co0858033', 'co0836847', 'co0796300', 'co0761450', 'co0752998', 'co0663644', 'co0663602', 'co0646695', 'co0557891', 'co0545133', 'co0506478', 'co0503297', 'co0503269', 'co0480703', 'co0429426', 'co0419912', 'co0419911', 'co0406009', 'co0361752', 'co0356845', 'co0350074', 'co0338893', 'co0338803', 'co0330842', 'co0325880', 'co0305751', 'co0247714', 'co0243626', 'co0228631', 'co0225453', 'co0209424', 'co0189485', 'co0127032', 'co0122778', 'co0120700', 'co0100079', 'co0094890', 'co0044682', 'co0042428', 'co1051278', 'co1051277', 'co1050960', 'co1050659', 'co1050658', 'co1044874', 'co1044115', 'co1044114', 'co1044113', 'co1044112', 'co1038671', 'co0968310', 'co0863768', 'co0782717', 'co0712949', 'co0482408', 'co0348142', 'co0254863', 'co0247742', 'co0144564', 'co0099937', 'co0066549', 'co0058858', 'co0016858'],
 				},
-				MetaTools.CompanyDreamworks : {
+				MetaCompany.CompanyDreamworks : {
 					# Show (196): Level-4
 					# Movie (267): Level-4
 					# Produces content for other networks (NBC, Netflix, HBO, TNT, etc)
@@ -3276,30 +3375,30 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0027541', 'co0067641', 'co0299243', 'co0396719', 'co0772464', 'co0405898', 'co0289670', 'co0397133', 'co0371886', 'co0961518', 'co0377564', 'co0121773', 'co0751021', 'co0513025', 'co0431502', 'co0882259', 'co0646563', 'co0169654', 'co0253584'],
 				},
-				MetaTools.CompanyFacebook : {
+				MetaCompany.CompanyFacebook : {
 					# Show (267): Level-4
 					# Movie (24): Level-4
 					MetaProvider.CompanyOriginal	: {
 														Media.Unknown : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt15430152
-																{MetaTools.CompanyMtv			: [MetaProvider.CompanyNetwork]}, # tt0103520
-																{MetaTools.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt11347766
+																{MetaCompany.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt15430152
+																{MetaCompany.CompanyMtv			: [MetaProvider.CompanyNetwork]}, # tt0103520
+																{MetaCompany.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt11347766
 															],
 														},
 														Media.Show : {
@@ -3321,7 +3420,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0667127', 'co0321654'],
 					MetaProvider.CompanyVendor		: ['co0776772', 'co0933562', 'co0872204'],
 				},
-				MetaTools.CompanyFox : {
+				MetaCompany.CompanyFox : {
 					# Show (870): Level-3 to Level-4
 					# Movie (373): Level-3. Since many titles are produced by 20th Century Fox, one cannot really exclude much.
 					# The biggest problem is probably not being able to filter out FX (now Disney). Too many true Fox originals are listed under the FX/FXX/FXM networks, and some even under FX Productions.
@@ -3357,36 +3456,36 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt1826940, tt2467372, tt0412142
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt1119644, tt0412142, tt0460627
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt0182576, tt2618986, tt1826940, tt0285331, tt0303461
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0118375, tt1195935, tt0149460, tt1561755
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt2467372, tt0285331, tt1119644
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0285331
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0851851, tt1195935, tt5164196, tt1561755
-																#{MetaTools.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt1826940, tt2467372, tt0362359, tt0149460
-																#{MetaTools.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt0204993, tt3749900
-																#{MetaTools.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0118375, tt0149460, tt1561755
-																#{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576
-																#{MetaTools.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt5691552, tt1195935, tt0165598, tt0149460, tt0096697
-																#{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0096697
-																#{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt2618986, tt2647544, tt0118375, tt1195935, tt0149460
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt0851851, tt0303461, tt0204993
-																#{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt1826940, tt5691552, tt0118375, tt0412142, tt0149460, tt1561755
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt1826940
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt1826940, tt2467372, tt0412142
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt1119644, tt0412142, tt0460627
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt0182576, tt2618986, tt1826940, tt0285331, tt0303461
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0118375, tt1195935, tt0149460, tt1561755
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt0455275, tt4052886, tt0182576, tt2467372, tt0285331, tt1119644
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0285331
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0851851, tt1195935, tt5164196, tt1561755
+																#{MetaCompany.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt1826940, tt2467372, tt0362359, tt0149460
+																#{MetaCompany.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt0204993, tt3749900
+																#{MetaCompany.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0118375, tt0149460, tt1561755
+																#{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0182576
+																#{MetaCompany.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt5691552, tt1195935, tt0165598, tt0149460, tt0096697
+																#{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt0096697
+																#{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt0182576, tt2618986, tt2647544, tt0118375, tt1195935, tt0149460
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt0851851, tt0303461, tt0204993
+																#{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt1826940, tt5691552, tt0118375, tt0412142, tt0149460, tt1561755
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt1826940
 
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0944947. Not for tt0362359, tt1119644, tt1615919, tt3749900, tt0165598.
-																#{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1632701, tt0810788. Not for tt7235466.
-																{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt0773262
-																{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt0773262
-																{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt1520211
-																{MetaTools.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # tt2306299
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0397442, tt1405406, tt2661044, tt9471404
-																{MetaTools.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt2375692
-																{MetaTools.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt2188671
-																{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # tt8080122, tt9686194
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0944947. Not for tt0362359, tt1119644, tt1615919, tt3749900, tt0165598.
+																#{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1632701, tt0810788. Not for tt7235466.
+																{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # tt0773262
+																{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt0773262
+																{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt1520211
+																{MetaCompany.CompanyHistory			: [MetaProvider.CompanyNetwork]}, # tt2306299
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0397442, tt1405406, tt2661044, tt9471404
+																{MetaCompany.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt2375692
+																{MetaCompany.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt2188671
+																{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # tt8080122, tt9686194
 
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyStudio]}, # tt3502248 (studios only)
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyStudio]}, # tt3502248 (studios only)
 
 																# We Since we cannot get rid of FX Network, at least remove some (with rights now probably all belong to Disney).
 																'co0216537', # FX Productions (tt6439752, tt2788432, tt6439752, tt1486217). Not for tt2618986. Rea-add, since this might only be one title, but excludes a lot of newer FX productions.
@@ -3428,22 +3527,22 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -3451,7 +3550,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0070925', 'co0202535', 'co0007893', 'co0440497', 'co0039238', 'co0048418', 'co0054541', 'co0721667', 'co0375871', 'co0202574', 'co0204898', 'co0227681', 'co0545358', 'co0258754', 'co0908997', 'co0247100', 'co0771707', 'co0449463', 'co0202732', 'co0301422', 'co0078297', 'co0051829', 'co0277812', 'co0206943', 'co0710263', 'co0004295', 'co0682531', 'co0447568', 'co0250861', 'co0203823', 'co0751740', 'co0356177', 'co0210247', 'co0542537', 'co0306913', 'co0159248', 'co0778133', 'co0478980', 'co0877386', 'co0736326', 'co0198143', 'co0174174', 'co0085044', 'co0449297', 'co0359063', 'co0267041', 'co0249996', 'co0575133', 'co0558237', 'co0626569', 'co0403745', 'co0355572', 'co0355485', 'co0135313', 'co0804693', 'co0731654', 'co0489335', 'co0448576', 'co0365499', 'co0363535', 'co0355970', 'co0589037', 'co0571347', 'co0540887', 'co0284410', 'co0187655', 'co0919693', 'co0823247', 'co0780552', 'co0540882', 'co0540030', 'co0457833', 'co0367883', 'co0367831', 'co0350472', 'co0341010', 'co0326196', 'co0189391', 'co0107413', 'co1071109', 'co1028671', 'co0974175', 'co0857401', 'co0773182', 'co0764281', 'co0619897', 'co0546196', 'co0540886', 'co0540885', 'co0540884', 'co0540881', 'co0540880', 'co0540879', 'co0540033', 'co0540032', 'co0540031', 'co0520126', 'co0495243', 'co0488293', 'co0375893', 'co0364689', 'co0247220', 'co0231938', 'co0203920', 'co0201790', 'co0974098', 'co0953613', 'co0761770', 'co0417565', 'co0233692'],
 					MetaProvider.CompanyVendor		: ['co0000756', 'co0010224', 'co0053239', 'co0028775', 'co0070925', 'co0042311', 'co0007180', 'co0189783', 'co0280047', 'co0862964', 'co0007496', 'co0092296', 'co0017628', 'co0150813', 'co0063964', 'co0125154', 'co0226201', 'co0107998', 'co0159046', 'co0209782', 'co0296277', 'co0296943', 'co0628925', 'co0297163', 'co0768357', 'co0106097', 'co0010685', 'co0063989', 'co0629458', 'co0077922', 'co0937473', 'co0751509', 'co0826899', 'co0266060', 'co0605838', 'co0094754', 'co0212901', 'co0853216', 'co0453999', 'co0421648', 'co0004762', 'co0108018', 'co0266215', 'co0166027', 'co0030121', 'co0937474', 'co0643891', 'co0943364', 'co0226330', 'co0034633', 'co0806725', 'co0244801', 'co0952616', 'co0117449', 'co0565880', 'co0442630', 'co0286182', 'co0223570', 'co0711817', 'co0198140', 'co0873684', 'co0601119', 'co0257036', 'co0794652', 'co0931863', 'co0544968', 'co0445889', 'co0279204', 'co0788854', 'co0051662', 'co0613529', 'co0604098', 'co0169177', 'co0764128', 'co0197226', 'co0819148', 'co0244996', 'co0785884', 'co0025186', 'co0256824', 'co0226875', 'co0037196', 'co0581069', 'co0491690', 'co0389268', 'co0035270', 'co0540029', 'co0368892', 'co0241365', 'co0188813', 'co0186658', 'co0092951', 'co0273176', 'co0044433', 'co0012812', 'co0866807', 'co0832095', 'co0544609', 'co0534355', 'co0526787', 'co0410408', 'co0376922', 'co0124383', 'co0863455', 'co0623011', 'co0350138', 'co0339536', 'co0304538', 'co0775365', 'co0746852', 'co0746833', 'co0653064', 'co0628924', 'co0569543', 'co0496965', 'co0148451', 'co0111795', 'co0078923', 'co0877389', 'co0866288', 'co0665472', 'co0663130', 'co0643890', 'co0373782', 'co0195278', 'co0130300', 'co0947625', 'co0947212', 'co0867515', 'co0862965', 'co0838082', 'co0815746', 'co0794651', 'co0743189', 'co0707661', 'co0680153', 'co0491691', 'co0380710', 'co0346045', 'co0258074', 'co0197094', 'co0009425', 'co1051152', 'co1021830', 'co0918688', 'co0867516', 'co0863456', 'co0817521', 'co0814039', 'co0700002', 'co0670562', 'co0662795', 'co0662791', 'co0662785', 'co0662285', 'co0599875', 'co0590259', 'co0506412', 'co0287474', 'co0279054', 'co0046053', 'co0046053', 'co0039408', 'co1040440', 'co1034313', 'co1027357', 'co0981624', 'co0951793', 'co0939093', 'co0918845', 'co0918844', 'co0883912', 'co0870304', 'co0867519', 'co0867518', 'co0867517', 'co0855510', 'co0771917', 'co0761328', 'co0723388', 'co0698066', 'co0694711', 'co0660503', 'co0613528', 'co0602412', 'co0534310', 'co0481487', 'co0472872', 'co0423932', 'co0421647', 'co0400863', 'co0368843', 'co0368801', 'co0292578', 'co0271701', 'co0270675', 'co0224399', 'co0212875', 'co0209926', 'co0202504', 'co0200961', 'co0173400', 'co0160971', 'co0117468', 'co0080169', 'co0040586', 'co0924784', 'co0855511', 'co0663129', 'co0611815', 'co0547664', 'co0547663', 'co0451003', 'co0443515', 'co0379362', 'co0379346', 'co0379325', 'co0379300', 'co0368861', 'co0368661', 'co0293095', 'co0197792', 'co0196456', 'co0195082', 'co0118485', 'co0099617', 'co0094759', 'co0030446'],
 				},
-				MetaTools.CompanyFreevee : {
+				MetaCompany.CompanyFreevee : {
 					# Show (51): Level-3
 					# Movie (67): Level-2
 					# Freevee Originals created by Amazon Studios and/or also on Amazon Prime.
@@ -3468,18 +3567,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt11090458.
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt0804503
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt1094229, tt0056751
-																{MetaTools.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt0765425
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt2628232, tt0439100
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0077000
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt15766736
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt3517016
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt11090458.
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt0804503
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt1094229, tt0056751
+																{MetaCompany.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt0765425
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt2628232, tt0439100
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0077000
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt15766736
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]}, # tt3517016
 
 																'co0014456', # ARTE (tt2442560)
 																'co0053559', # Paramount Television (tt9288030)
@@ -3510,24 +3609,24 @@ class MetaImdb(MetaProvider):
 																'co0060306', # Lionsgate Films (tt28182736)
 															],
 															'exclude' : [
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyBravo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyBravo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
 
 																'co0735768', # GED Cinema (tt6803046)
 																'co0147162', # Shaw Organisation (tt8615822, tt8615822)
@@ -3549,7 +3648,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0796766', 'co0699104', 'co0047972', 'co0890032'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyFx : {
+				MetaCompany.CompanyFx : {
 					# Show (178 of 87+): Level-4.
 					# Movie (46 of 11+): Level-4.
 					# https://en.wikipedia.org/wiki/Category:FX_Networks_original_programming
@@ -3560,22 +3659,22 @@ class MetaImdb(MetaProvider):
 																'co0011881', # Showtime Australia (tt1124373)
 															],
 															'exclude' : [
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyStudio]}, # tt1520211. Do not add networks for tt2802850.
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt2802850, tt1844624, tt1124373.
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt0182576. Do not add for tt2802850, tt1844624.
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt9244556
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0364845, tt0098936
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1266020
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt1358522
-																{MetaTools.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # tt1561755, tt0118375, tt0149460, tt0182576
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt4093826
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt1132290
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt1462059
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt2094262
-																{MetaTools.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt4229954
-																#{MetaTools.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # tt3551096, tt1195935, tt0149460. Do not add for tt0472954.
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1598754. Tubi created after Dinsey purchased FX from Fox.
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyStudio]}, # tt1520211. Do not add networks for tt2802850.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt2802850, tt1844624, tt1124373.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt0182576. Do not add for tt2802850, tt1844624.
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt9244556
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0364845, tt0098936
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt1266020
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt1358522
+																{MetaCompany.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # tt1561755, tt0118375, tt0149460, tt0182576
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt4093826
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt1132290
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt1462059
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt2094262
+																{MetaCompany.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt4229954
+																#{MetaCompany.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # tt3551096, tt1195935, tt0149460. Do not add for tt0472954.
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1598754. Tubi created after Dinsey purchased FX from Fox.
 
 																'co0878025', # Sky Showcase (tt0096697)
 																'co0202446', # YouTube (tt10691770)
@@ -3604,18 +3703,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt9466114
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt2096673
-																{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt0120484
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt9466114
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt2096673
+																{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # tt0120484
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0293662, tt0371746, tt0458339
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]}, # tt1454029, tt0147800
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt1099212
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt0283111
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt2948356, tt0367085
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt0482606
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0293662, tt0371746, tt0458339
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]}, # tt1454029, tt0147800
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt1099212
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt0283111
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt2948356, tt0367085
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt0482606
 
 																'co0002663', # Warner Bros. (tt1431045, tt0458525)
 																'co0324445', # Starz Digital Media (tt1714203)
@@ -3635,7 +3734,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0060381', 'co0421362', 'co0186186', 'co0362128', 'co0481858', 'co0777254', 'co0197517', 'co0448575', 'co0385924', 'co0157673', 'co1032328', 'co0960667', 'co0902824', 'co0448574', 'co0263771', 'co0746872'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyGaumont : {
+				MetaCompany.CompanyGaumont : {
 					# Show (111): Level-5
 					# Movie (1444): Level-2 to Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -3682,19 +3781,19 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0172053', 'co0105966', 'co0033410', 'co0108034', 'co0182000', 'co0064278', 'co0026280', 'co0212919', 'co0159180', 'co0036160', 'co0187612', 'co0135317', 'co0186581', 'co0140056', 'co0864902', 'co0008471', 'co0064878', 'co0172122', 'co0028520', 'co0398337', 'co0128844', 'co0080245', 'co0240792', 'co0181164', 'co0699827', 'co0175932', 'co0066838', 'co0217840', 'co0173397', 'co0949530', 'co0772044', 'co0594645', 'co0521315', 'co0516770', 'co0456755', 'co0326260', 'co0308033', 'co0304207', 'co0301531', 'co0274195', 'co0247165', 'co0241665', 'co0100931', 'co0910931', 'co0902798', 'co0859868', 'co0147769', 'co0108027'],
 				},
-				MetaTools.CompanyGoogle : {
+				MetaCompany.CompanyGoogle : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0944862', 'co0729093', 'co0678053', 'co0582980', 'co0507176', 'co0352536', 'co0265703'],
 					MetaProvider.CompanyNetwork		: ['co0879800', 'co0422781', 'co1033988', 'co0992738', 'co0642369', 'co0625172', 'co0564081', 'co1021372', 'co0657283', 'co1001116', 'co0623478', 'co0613563', 'co0352536'],
 					MetaProvider.CompanyVendor		: ['co0123378', 'co0487508', 'co0552365', 'co0379677', 'co1008843', 'co0821394', 'co0680753', 'co0635012', 'co0628498'],
 				},
-				MetaTools.CompanyHayu : {
+				MetaCompany.CompanyHayu : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: [],
 					MetaProvider.CompanyNetwork		: ['co0764723'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyHbo : {
+				MetaCompany.CompanyHbo : {
 					# Show (969 of 308+): Level-4.
 					# Movie (629 of 260+): Level-3. Too many titles from smaller studios.
 					# https://en.wikipedia.org/wiki/Category:HBO_original_programming
@@ -3706,24 +3805,24 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyStudio]}, # Do not add network for tt0844441, and others.
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyStudio]}, # Do not add network for tt0844441, and others.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
 
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt1839578
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0200276
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt1442464
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt1220617
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt8712204
-																{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt9466596
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0044231
-																#{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt4276624 - Do not add for tt0944947.
-																#{MetaTools.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # tt0908454, tt0290978 - Do not add for tt0387199.
-																#{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt1582457 - Do not add for tt0944947.
-																#{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt12074628, tt14681924, tt0362359. Do not add for tt0264235.
-																#{MetaTools.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt4276618, tt2017109 (HBO sister company). Do not add for tt0306414, tt1886866.
-																#{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0458253. Do not add for tt0944947, tt0844441.
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt1839578
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0200276
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt1442464
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt1220617
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt8712204
+																{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt9466596
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0044231
+																#{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt4276624 - Do not add for tt0944947.
+																#{MetaCompany.CompanyComedycen	: [MetaProvider.CompanyNetwork]}, # tt0908454, tt0290978 - Do not add for tt0387199.
+																#{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt1582457 - Do not add for tt0944947.
+																#{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt12074628, tt14681924, tt0362359. Do not add for tt0264235.
+																#{MetaCompany.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt4276618, tt2017109 (HBO sister company). Do not add for tt0306414, tt1886866.
+																#{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt0458253. Do not add for tt0944947, tt0844441.
 
 																'co0104481', # Zeppotron (tt2085059)
 																#'co0751740', # FOX (tt2861424). Do not add for tt0844441.
@@ -3789,12 +3888,12 @@ class MetaImdb(MetaProvider):
 														Media.Movie	: {
 															'fixed' : MetaProvider.CompanyStudio,
 															'exclude' : [
-																{MetaTools.CompanyNetflix	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyParamount	: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # tt12361974
+																{MetaCompany.CompanyNetflix	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyParamount	: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # tt12361974
 
 																'co0292142', # Walt Disney Studios Home Entertainment (tt1705786)
 																'co0357132', # Wildcard Distribution (tt5664196)
@@ -3805,7 +3904,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0754095', 'co0008693', 'co0095413', 'co0167627', 'co0006163', 'co0909975', 'co0869157', 'co0777335', 'co0123742', 'co0913428', 'co0140098', 'co0644177', 'co0368145', 'co0092268', 'co1010749', 'co1020089', 'co1010750', 'co0915296', 'co0312842'],
 					MetaProvider.CompanyVendor		: ['co0077623', 'co0101990', 'co0113668', 'co0840644', 'co0112024', 'co0680232', 'co0248784', 'co0114708', 'co0033562', 'co0037614', 'co0031966', 'co0289307', 'co0229386', 'co0306346', 'co0178216', 'co0450274', 'co0622841', 'co0625624', 'co0703486', 'co0638197', 'co0625625', 'co0736914', 'co0638196', 'co0487453', 'co0638200', 'co0638198', 'co0638201', 'co0638199', 'co0891644', 'co0450282', 'co0035311', 'co0799745', 'co0720309', 'co0638203', 'co0620979', 'co0484616', 'co0207690', 'co0148466', 'co0721140', 'co0640662'],
 				},
-				MetaTools.CompanyHistory : {
+				MetaCompany.CompanyHistory : {
 					# Show (576): Level-4
 					# Movie (698): Level-4
 					# Most content provided or shared with A&E and Disney.
@@ -3813,17 +3912,17 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299.
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299, tt11947238.
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299.
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Do not add for tt4803766.
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Do not add for tt3910804.
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299.
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299, tt11947238.
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Do not add for tt2306299.
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Do not add for tt4803766.
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Do not add for tt3910804.
 
-																{MetaTools.CompanyTrutv				: [MetaProvider.CompanyNetwork]}, # tt1674417
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyVendor]}, # tt0075520
-																#{MetaTools.Company20thcentury		: [MetaProvider.CompanyVendor]}, # tt2245988. Not for tt2306299.
-																#{MetaTools.CompanyWarner'			: [MetaProvider.CompanyVendor]}, # Not for tt2306299.
-																{MetaTools.CompanyUniversal			: [MetaProvider.CompanyVendor]}, # tt1567215
+																{MetaCompany.CompanyTrutv				: [MetaProvider.CompanyNetwork]}, # tt1674417
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyVendor]}, # tt0075520
+																#{MetaCompany.Company20thcentury		: [MetaProvider.CompanyVendor]}, # tt2245988. Not for tt2306299.
+																#{MetaCompany.CompanyWarner'			: [MetaProvider.CompanyVendor]}, # Not for tt2306299.
+																{MetaCompany.CompanyUniversal			: [MetaProvider.CompanyVendor]}, # tt1567215
 
 																#'co0072315', # National Broadcasting Company (NBC) (tt2400631). Not for tt1248967.
 																'co0003079', # Concorde Home Entertainment (tt2400631)
@@ -3835,17 +3934,17 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt1075417
+																{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt1075417
 
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony				: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm				: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony				: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm				: [MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -3853,7 +3952,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0003716', 'co0342233', 'co0889133', 'co0308904', 'co0379713', 'co0625848', 'co0995097', 'co0665299', 'co0626674', 'co0524434', 'co0473691', 'co0262373', 'co0880224', 'co0733710', 'co0688432', 'co1057532', 'co1048877', 'co1039714', 'co0904694', 'co0672898', 'co0655111', 'co0510420', 'co0500387', 'co0522483'],
 					MetaProvider.CompanyVendor		: ['co0376124'],
 				},
-				MetaTools.CompanyHulu : {
+				MetaCompany.CompanyHulu : {
 					# Show (515 of 147+): Level-4.
 					# Movie (225 of 71+): Level-4.
 					# https://en.wikipedia.org/wiki/Category:Hulu_original_programming
@@ -3927,8 +4026,8 @@ class MetaImdb(MetaProvider):
 																'co0381648', # Hulu Japan
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
 
 																'co0198457', # Universal Pictures International (UPI) (tt18925334)
 																'co0484138', # NOS Audiovisuais (tt11389872)
@@ -3977,7 +4076,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0218858', 'co0381648', 'co0687042', 'co0630515', 'co0588218'],
 					MetaProvider.CompanyVendor		: ['co0857173'],
 				},
-				MetaTools.CompanyItv : {
+				MetaCompany.CompanyItv : {
 					# Show (3752): Level-3
 					# Movie (1600): Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -3989,36 +4088,36 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt1606375, tt2249364
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt0084987, tt0118401
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt15565872
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt13589004, tt1000734
-																#{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt0096657
-																#{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0096657
-																#{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt1734537, tt2249364, tt0310455, tt7801964
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt1734537
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt2249364, tt6131920, tt4192812, tt2396135
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt2249364, tt3747572
-																#{MetaTools.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # Not for tt11656892
-																#{MetaTools.CompanyCinemax			: [MetaProvider.CompanyNetwork]}, # Not for tt1831575, tt0105977
-																#{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # Not for tt1000734
-																#{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt9642982, tt11716756, tt15565872
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # tt1266020. Not for tt1606375
-																#{MetaTools.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt0063869. Not for tt0118401, tt0094525
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt1266020, tt2149175. Not studios for tt4938084. Not for tt0118401, tt2396135, tt6964748, tt15565872.
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt1606375, tt2249364
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt0084987, tt0118401
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt15565872
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0096657, tt13589004, tt1000734
+																#{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt0096657
+																#{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0096657
+																#{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # Not for tt1734537, tt2249364, tt0310455, tt7801964
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt1734537
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt2249364, tt6131920, tt4192812, tt2396135
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt2249364, tt3747572
+																#{MetaCompany.CompanyStarz			: [MetaProvider.CompanyNetwork]}, # Not for tt11656892
+																#{MetaCompany.CompanyCinemax			: [MetaProvider.CompanyNetwork]}, # Not for tt1831575, tt0105977
+																#{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # Not for tt1000734
+																#{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt9642982, tt11716756, tt15565872
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # tt1266020. Not for tt1606375
+																#{MetaCompany.CompanyAe				: [MetaProvider.CompanyNetwork]}, # tt0063869. Not for tt0118401, tt0094525
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt1266020, tt2149175. Not studios for tt4938084. Not for tt0118401, tt2396135, tt6964748, tt15565872.
 
 																# Not sure if these should be added, since they are produced by ITV/STV, but Apple+ Originals.
-																{MetaTools.CompanyApple				: [MetaProvider.CompanyNetwork]}, # tt21088136, tt18351584
+																{MetaCompany.CompanyApple				: [MetaProvider.CompanyNetwork]}, # tt21088136, tt18351584
 
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0460681, tt0397442
-																{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt6156584
-																{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt4158110
-																{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt1266020, tt2149175
-																{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt0206512
-																{MetaTools.CompanyBravo				: [MetaProvider.CompanyNetwork]}, # tt1411598
-																{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt3148266
-																{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # tt14531842
-																{MetaTools.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt0213338
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0460681, tt0397442
+																{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt6156584
+																{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt4158110
+																{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt1266020, tt2149175
+																{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # tt0206512
+																{MetaCompany.CompanyBravo				: [MetaProvider.CompanyNetwork]}, # tt1411598
+																{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt3148266
+																{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # tt14531842
+																{MetaCompany.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt0213338
 
 																# ITV has done co-productions with these, but there are too many non-originals.
 																'co0072315', # National Broadcasting Company (NBC) (tt0934814, tt4477976, tt2243973, tt0813715, tt0758745)
@@ -4043,18 +4142,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt15353964
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt15353964
 
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
 
 																'co0072315', # National Broadcasting Company (NBC)
 																'co0037052', # American Broadcasting Company (ABC)
@@ -4092,13 +4191,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0015194', 'co0911004', 'co0356585', 'co0104833', 'co0688964', 'co0940556', 'co0165745', 'co0832896', 'co0260257', 'co0984960', 'co0832781', 'co0832898', 'co0228738', 'co0600871', 'co0533816', 'co0139023', 'co0777792', 'co0262036', 'co0225802', 'co0234812', 'co0209174', 'co0177163', 'co0122767', 'co0786320', 'co0662116', 'co0862078', 'co0836774', 'co0743872', 'co0047173', 'co0038954', 'co0661472', 'co0617637', 'co0265624', 'co0986030', 'co0916015', 'co0862080', 'co0836808', 'co0749906', 'co0732240', 'co0701469'],
 					MetaProvider.CompanyVendor		: ['co0382999', 'co0195491', 'co0312028', 'co0260221', 'co0980080', 'co0276713', 'co0169176', 'co1019849', 'co0987704', 'co0945425', 'co0840012', 'co0658525', 'co0596155', 'co0592953', 'co0589309', 'co0496248', 'co0158907', 'co1066271', 'co0975815', 'co0951620', 'co0913255', 'co0735462', 'co0473492'],
 				},
-				MetaTools.CompanyLionsgate : {
+				MetaCompany.CompanyLionsgate : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0060306', 'co0026995', 'co0086772', 'co0006881', 'co0188462', 'co0306113', 'co0592395', 'co0857626', 'co0150906', 'co1042265', 'co1064776', 'co0888885', 'co0757364', 'co0331257'],
 					MetaProvider.CompanyNetwork		: ['co0060306', 'co0179392', 'co0530439', 'co0086772', 'co0129819', 'co0807819', 'co0811073', 'co0199862', 'co0850058', 'co0165815', 'co0183764', 'co0580785', 'co0983801', 'co0732499'],
 					MetaProvider.CompanyVendor		: ['co0292909', 'co0082557', 'co0292919', 'co0301387', 'co1021057', 'co1020766', 'co0292916', 'co1013271', 'co0363154', 'co1042082'],
 				},
-				MetaTools.CompanyLucasfilm : {
+				MetaCompany.CompanyLucasfilm : {
 					# Show (52): Level-5
 					# Movie (75): Level-4. Most of the incorrect titles have Lucasfilm as "Thank you" or "Additional material".
 					MetaProvider.CompanyOriginal	: {
@@ -4110,7 +4209,7 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyMarvel	: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt3385516, tt10872600
+																{MetaCompany.CompanyMarvel	: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt3385516, tt10872600
 
 																'co0420822', # TSG Entertainment (tt6264654)
 																'co0059609', # Happy Madison Productions (tt2191701)
@@ -4165,7 +4264,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0135295', 'co0134604'],
 				},
-				MetaTools.CompanyMarvel : {
+				MetaCompany.CompanyMarvel : {
 					# Show (173): Level-5. Near perfect out of the box. The young kids animation that seem out of place are produced by Marvel.
 					# Movie (120): Level-4. Most of the incorrect titles have Marvel as "Thank you" or "Additional material".
 					MetaProvider.CompanyOriginal	: {
@@ -4204,7 +4303,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0131570', 'co0133841', 'co0013122', 'co0782734', 'co0672091', 'co0501997', 'co0310115', 'co0769644', 'co0597450', 'co0390765', 'co0345534', 'co0276246'],
 				},
-				MetaTools.CompanyMgm : {
+				MetaCompany.CompanyMgm : {
 					# Show (99): Level-3, close to Level-4
 					# Movie (165): Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -4245,9 +4344,9 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0848228
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0903624
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt8521778 (sister channel)
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0848228
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0903624
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt8521778 (sister channel)
 
 																'co0037052', # American Broadcasting Company (ABC) (tt1392170)
 																'co0005073', # Universal Pictures (tt0111282)
@@ -4258,20 +4357,20 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0287003', 'co0963655', 'co0989613', 'co0757549', 'co0500325', 'co0372220', 'co0857173'],
 					MetaProvider.CompanyVendor		: ['co0007143', 'co0007143', 'co0015461', 'co0001770', 'co0811496', 'co0629989', 'co0774691', 'co0241239', 'co0819129', 'co0854778', 'co0811498', 'co0812330', 'co0106028', 'co0110106', 'co0795735', 'co0847176', 'co0108601', 'co0842411', 'co0812376', 'co0071194', 'co0045081', 'co0172646', 'co0838580', 'co0815526', 'co0218708', 'co0028432', 'co0615541', 'co0373148', 'co0824157', 'co0296819', 'co0017533', 'co0834362', 'co0267112', 'co0223702', 'co0831915', 'co0813670', 'co0312972', 'co0976477', 'co0901928', 'co0892556', 'co1020459', 'co0956201', 'co0903518', 'co0431795', 'co0897318', 'co0308798', 'co0182522', 'co0877383', 'co0890175', 'co0057424', 'co0980207', 'co0864701', 'co0342528', 'co0002778', 'co0884625', 'co0842533', 'co0093679', 'co0061822', 'co0379710', 'co1002361', 'co0980535', 'co0940671', 'co0752365', 'co0713989', 'co0541388', 'co0423099', 'co1021676', 'co1011157', 'co0972214', 'co0879364', 'co0870314', 'co0845802', 'co0834722', 'co0544449', 'co0398306', 'co0373431', 'co0364999', 'co0228545', 'co0119613', 'co0959574', 'co0902145', 'co0868221', 'co0867990', 'co0867937', 'co0867936', 'co0867935', 'co0867934', 'co0867933', 'co0867931', 'co0867930', 'co0865133', 'co0865132', 'co0865131', 'co0865130', 'co0865129', 'co0864454', 'co0864453', 'co0864452', 'co0864451', 'co0811497', 'co0757306', 'co0719194', 'co0716032', 'co0663644', 'co0630394', 'co0541390', 'co0522682', 'co0399951', 'co0393210', 'co0389002', 'co0268150', 'co0259336', 'co0259336', 'co0219076', 'co0194242', 'co0099361', 'co0089126', 'co0088925', 'co0077433', 'co0049562', 'co0036731', 'co0007839'],
 				},
-				MetaTools.CompanyMiramax : {
+				MetaCompany.CompanyMiramax : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0022594', 'co0761033'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0564364', 'co0567610', 'co0995068', 'co0681704', 'co0777547', 'co0990661'],
 				},
-				MetaTools.CompanyMtv : {
+				MetaCompany.CompanyMtv : {
 					# Show (921): Level-4
 					# Movie (618): Level-3. MTV Entertainment Studios produces some high-quality movies with other studios (Paramount, MGM, etc). But most of these are not released on MTV at all, so actually not an original.
 					# Very difficult to filter, since MTV has few originals, but carries a ton of content from many other channels.
 					MetaProvider.CompanyOriginal	: {
 														Media.Unknown : {
 															'allow' : [
-																MetaTools.CompanyFreevee, # tt0094517
+																MetaCompany.CompanyFreevee, # tt0094517
 															],
 															'disallow' : [
 																# Exclude non-US/UK/CA MTV channels, since they mostly have content from other networks.
@@ -4294,27 +4393,27 @@ class MetaImdb(MetaProvider):
 																],
 															},
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt3921180, tt3484274, tt0176095, tt0489598, tt0426738, tt1567432, tt0176095, tt1051220
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0290983, tt1051220
-																#{MetaTools.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt0176095, tt1820166, tt7686456, tt1563069, tt0305011
-																#{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt1820166, tt0292861
-																#{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt3484274, tt1567432, tt1051220
-																#{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0465344, tt1145872
-																#{MetaTools.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0118298
-																#{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0361227, tt1820166, tt1344970, tt0264263, tt1563069
-																#{MetaTools.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0306370
-																#{MetaTools.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt0395891, tt3186162, tt1567432, tt1051220
-																#{MetaTools.CompanyHayu				: [MetaProvider.CompanyNetwork]}, # Not for tt1563069
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0305011
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0305011, tt0111873, tt0292861, tt0208616
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt3186138, tt0290983, tt3186138
-																#{MetaTools.CompanyFacebook			: [MetaProvider.CompanyNetwork]}, # Not for tt0103520
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt1292967
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt1051220
-																#{MetaTools.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt1567432
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt3921180, tt3484274, tt0176095, tt0489598, tt0426738, tt1567432, tt0176095, tt1051220
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt0290983, tt1051220
+																#{MetaCompany.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # Not for tt0176095, tt1820166, tt7686456, tt1563069, tt0305011
+																#{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt1820166, tt0292861
+																#{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt3484274, tt1567432, tt1051220
+																#{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # Not for tt0465344, tt1145872
+																#{MetaCompany.CompanyNickelodeon		: [MetaProvider.CompanyNetwork]}, # Not for tt0118298
+																#{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # Not for tt0361227, tt1820166, tt1344970, tt0264263, tt1563069
+																#{MetaCompany.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt0306370
+																#{MetaCompany.CompanyChannel5			: [MetaProvider.CompanyNetwork]}, # Not for tt0395891, tt3186162, tt1567432, tt1051220
+																#{MetaCompany.CompanyHayu				: [MetaProvider.CompanyNetwork]}, # Not for tt1563069
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt0305011
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0305011, tt0111873, tt0292861, tt0208616
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt3186138, tt0290983, tt3186138
+																#{MetaCompany.CompanyFacebook			: [MetaProvider.CompanyNetwork]}, # Not for tt0103520
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt1292967
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt1051220
+																#{MetaCompany.CompanyMgm				: [MetaProvider.CompanyNetwork]}, # Not for tt1567432
 
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0397442
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt0118276. Not for tt1051220.
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0397442
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt0118276. Not for tt1051220.
 
 																#'co0077647', # Viacom. Not for tt0208614, tt0111873, tt0101134, tt0112065.
 																#'co0053846', # Spike. Not for tt1051220.
@@ -4335,23 +4434,23 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																#{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt15486810
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																#{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt15486810
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
 
 																'co0024325', # Dutch FilmWorks (DFW) (tt1306980)
 																'co0158853', # 21 Laps Entertainment (tt2222042)
@@ -4362,7 +4461,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0023307', 'co0066916', 'co0185136', 'co0120656', 'co0170931', 'co0149533', 'co0079817', 'co0074952', 'co0005971', 'co0142523', 'co0753138', 'co0963160', 'co0499552', 'co0164112', 'co0110193', 'co0312264', 'co0215384', 'co0197096', 'co0193440', 'co0149831', 'co0833608', 'co0189216', 'co0120556', 'co0476397', 'co0254798', 'co0210232', 'co0749671', 'co0338315', 'co0329982', 'co0526986', 'co0963395', 'co0357453', 'co0147811', 'co0557951', 'co0288173', 'co0283024', 'co0238894', 'co0233926', 'co0895958', 'co0887610', 'co0804934', 'co0790620', 'co0482778', 'co0367666', 'co0256098', 'co1048003', 'co1021416', 'co0939005', 'co0934596', 'co0893707', 'co0782074', 'co0692922', 'co0595428', 'co0593261', 'co0514535', 'co0499551', 'co0484806', 'co0478015', 'co0403913', 'co0398445', 'co0375670', 'co0338237', 'co0268026', 'co0264230', 'co0199873', 'co0190708', 'co0189546', 'co0189533', 'co0188755', 'co0188430', 'co0169536', 'co0142524', 'co0092945', 'co0015808', 'co1049500', 'co0938465', 'co0781615', 'co0628441', 'co0531814'],
 					MetaProvider.CompanyVendor		: ['co0295362', 'co0878591', 'co0872843', 'co0606143', 'co0122521', 'co0873365', 'co0817756', 'co0817583', 'co0625916', 'co0502802', 'co0350566', 'co0252808', 'co0046412', 'co0171600'],
 				},
-				MetaTools.CompanyNationalgeo : {
+				MetaCompany.CompanyNationalgeo : {
 					# Show (845): Level-4
 					# Movie (1109): Level-4
 					# NatGeo is relatively accurate from the start, without too many exclusions.
@@ -4385,26 +4484,26 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0386950
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt6840134
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0386950
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt6840134
 
 																'co0039462', # Public Broadcasting Service (PBS) (tt0106172, tt0083452)
 															],
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt27837467
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt12262116
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]}, # tt0333766
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]}, # tt0420223
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0120901
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt0120901
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt27837467
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt12262116
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]}, # tt0333766
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]}, # tt0420223
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0120901
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt0120901
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
 
 																'co0039462', # Public Broadcasting Service (PBS) ()
 																'co0026841', # United Artists (tt0310793)
@@ -4419,36 +4518,36 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0139461', 'co0005084', 'co0056555', 'co0286617', 'co1004777', 'co0170411', 'co0376245', 'co0282022', 'co0279494', 'co0040897', 'co0781136', 'co0459291', 'co0130013', 'co0303924', 'co0097694', 'co0645043', 'co0410009', 'co0875566', 'co0649860', 'co0638684', 'co0381565', 'co1044140', 'co0468870', 'co0223788', 'co0217749', 'co0139462', 'co0530592', 'co0965804', 'co0782472', 'co0606234', 'co0243269', 'co0886585', 'co0882848', 'co0863016', 'co0735946', 'co0713969', 'co0369810', 'co0224810', 'co1058738', 'co1020838', 'co1020527', 'co1020525', 'co1020472', 'co1001450', 'co0983810', 'co0965465', 'co0930019', 'co0916743', 'co0879628', 'co0846485', 'co0792207', 'co0546833', 'co0474480', 'co0204659', 'co0195887', 'co0965214', 'co0943055', 'co0748068', 'co0648039'],
 					MetaProvider.CompanyVendor		: ['co0223903', 'co0479685', 'co0273006', 'co0195888', 'co0088666', 'co0975541', 'co0874431', 'co0815045', 'co0814599', 'co0694343', 'co0544568', 'co0453441', 'co0421612', 'co0347855', 'co0334531', 'co0300041', 'co0272951', 'co0824877', 'co0694600', 'co0687580', 'co0290280', 'co0272982', 'co0272950'],
 				},
-				MetaTools.CompanyNbc : {
+				MetaCompany.CompanyNbc : {
 					# Show (2396): Level-3
 					# Movie (2707): Level-2
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'fixed' : MetaProvider.CompanyNetwork,
 															'exclude' : [
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # do not add for tt0203259.
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # do not add for tt0203259.
 															],
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
 
 																'co0580785', # Lions Gate Entertainment (tt6394270)
 															],
@@ -4458,7 +4557,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0072315', 'co0135684', 'co0147812', 'co0588377', 'co0196211', 'co0216142', 'co0046828', 'co0071577', 'co0854498', 'co0622734', 'co0261403', 'co0197667', 'co0015493', 'co0003209', 'co0816726', 'co0704497', 'co0758126', 'co0893655', 'co0889394', 'co0637717', 'co0616374', 'co0213416', 'co0093506', 'co0814736', 'co0260407', 'co0054488'],
 					MetaProvider.CompanyVendor		: ['co0131785', 'co0203432', 'co0108351', 'co0014503', 'co0474968', 'co0672698', 'co0459508', 'co0373481', 'co0800079', 'co0068602', 'co0240399', 'co0203354', 'co0211414', 'co0945036', 'co0345290', 'co0198120', 'co0196214', 'co0839122', 'co0722053', 'co0443630', 'co0387785', 'co0302702', 'co0256170', 'co0775963', 'co0763972', 'co0537229', 'co0468247', 'co0384687', 'co0315124', 'co0306219', 'co0219279', 'co0051472', 'co0879192', 'co0852261', 'co0763971', 'co0728905', 'co0610705', 'co0514291', 'co0354562', 'co0219254', 'co0219220', 'co0154456', 'co1067279', 'co1021678', 'co0992783', 'co0976901', 'co0958317', 'co0926779', 'co0926776', 'co0925618', 'co0922214', 'co0918373', 'co0879183', 'co0871957', 'co0857116', 'co0731677', 'co0672689', 'co0655265', 'co0610076', 'co0608727', 'co0607404', 'co0537945', 'co0537942', 'co0517613', 'co0508202', 'co0488771', 'co0452922', 'co0435778', 'co0416933', 'co0416000', 'co0384730', 'co0338179', 'co0233867', 'co0127161', 'co0123321', 'co0101920', 'co0099445', 'co0093287', 'co0075133', 'co1042083', 'co1042082', 'co0993178', 'co0916077', 'co0868952', 'co0793937', 'co0793935', 'co0638541', 'co0557651', 'co0403386', 'co0271452', 'co0229385', 'co0215788'],
 				},
-				MetaTools.CompanyNetflix : {
+				MetaCompany.CompanyNetflix : {
 					# Show (2805 of 913+): Level-4. A lot of other originals appear on Netflix, and a few Netflix originals appear on other platforms.
 					# Movie (3508 of 600+): Level-4. Relatively accurate movie originals.
 					# Numbers might be far off, since many of the international, smaller, and non-direct Netflix originals are not included.
@@ -4480,34 +4579,34 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # Excludes tt6156584 which is a Netflix Original.
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]}, # Excludes tt6156584 which is a Netflix Original.
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt9055008 is a Paramount+ original, but also on Netflix.
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt11650492 is a Netflix Original, but also on Peacock.
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Excludes tt6156584 which is a Netflix Original.
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyMtv			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAubc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt0106148
-																#{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Do not add for tt28118211.
-																#{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt1548850. Do not add for tt6257970, a Netflix Original, but also on Channel 4.
-																#{MetaTools.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Do not add for tt2707408.
-																#{MetaTools.CompanyUniversal	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # Excludes tt6156584 which is a Netflix Original.
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]}, # Excludes tt6156584 which is a Netflix Original.
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt9055008 is a Paramount+ original, but also on Netflix.
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt11650492 is a Netflix Original, but also on Peacock.
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Excludes tt6156584 which is a Netflix Original.
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyMtv			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAubc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAcorn			: [MetaProvider.CompanyNetwork]}, # tt0106148
+																#{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Do not add for tt28118211.
+																#{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt1548850. Do not add for tt6257970, a Netflix Original, but also on Channel 4.
+																#{MetaCompany.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Do not add for tt2707408.
+																#{MetaCompany.CompanyUniversal	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
 
 																'co0684443', # Viu
 																#'co0332053', # tvN - Do not add for tt27668559.
@@ -4559,20 +4658,20 @@ class MetaImdb(MetaProvider):
 																'co0000756', # tt12823454
 															],
 															'exclude' : [
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt26744289, tt0156887
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1670345
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt5913798
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt1139592
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt8367814
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt1706620, tt2404233, tt1649419
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt3460252
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt4857264
-																#{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]}, # tt11057302, tt12593682, tt0087538 - Do not add, since there are too many Sony music/production companies under vendors (tt7979580, co0086397, co0026545).
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt26744289, tt0156887
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt1670345
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt5913798
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt1139592
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt8367814
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt1706620, tt2404233, tt1649419
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt3460252
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt4857264
+																#{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]}, # tt11057302, tt12593682, tt0087538 - Do not add, since there are too many Sony music/production companies under vendors (tt7979580, co0086397, co0026545).
 
 																'co0137851', # Sony Pictures Home Entertainment (tt11057302, tt12593682, tt0087538) Will still exclude tt7979580.
 																'co0208736', # Sony Pictures Worldwide Acquisitions (SPWA) (tt7014006)
@@ -4628,13 +4727,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0144901', 'co0944055'],
 					MetaProvider.CompanyVendor		: ['co0144901', 'co0944055', 'co0805756', 'co0950660', 'co1048172', 'co0803020'],
 				},
-				MetaTools.CompanyNewline : {
+				MetaCompany.CompanyNewline : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0046718', 'co0043853', 'co0001803', 'co0002753', 'co0765072', 'co0421859'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0079450', 'co0228937', 'co0098273', 'co0042275', 'co0225343', 'co0497163', 'co0346875'],
 				},
-				MetaTools.CompanyNickelodeon : {
+				MetaCompany.CompanyNickelodeon : {
 					# Show (950): Level-3
 					# Movie (248): Level-3
 					# Do not exclude Paramount+, Netflix, Discovery Toons, MTV, Stan, Shout! Factory, CBS (Do excldue CBS, even as a sister channel, otherwise too many false positives)
@@ -4645,14 +4744,14 @@ class MetaImdb(MetaProvider):
 																'co0154874', 'co0184885', 'co1053065',
 															],
 															'exclude' : [
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt0088580
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt0088580
 
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt9018736.
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAdultswim		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt0121955
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt9018736.
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAdultswim		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # tt0121955
 
 																'co0086397', # Sony Pictures Television (tt0098904, tt0118300)
 																'co0059995', # Warner Home Video (tt6226232)
@@ -4670,16 +4769,16 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt12412888
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]}, # tt1055369
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt12412888
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]}, # tt1055369
 
 																#'co0023400', # Paramount Pictures (tt14001894) (parent company). Not for tt25289836.
 																'co0026281', # Jerry Bruckheimer Films (tt14001894)
@@ -4712,7 +4811,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0007546', 'co0031641', 'co0106182', 'co0167426', 'co0301237', 'co0465477', 'co0154874', 'co0467568', 'co0698648', 'co0164662', 'co0893565', 'co0249384', 'co0040603', 'co0492047', 'co0184885', 'co0492991', 'co0295362', 'co0469424', 'co1073978', 'co1028177', 'co1017467', 'co0851270', 'co0385703', 'co0990497', 'co0513608', 'co0397805', 'co0421170', 'co0328444', 'co0300565', 'co1070844', 'co1040835', 'co0981291', 'co0874875', 'co0577889', 'co1072030', 'co1070495', 'co1053067', 'co1053065', 'co1053063', 'co0874876', 'co0479262', 'co1074587', 'co0912620', 'co0847982', 'co0843315', 'co0672931', 'co0539580', 'co0329703', 'co0296940'],
 					MetaProvider.CompanyVendor		: ['co0741051', 'co0216996', 'co1049678', 'co0896623', 'co0619583', 'co0472950', 'co0280606'],
 				},
-				MetaTools.CompanyParamount : {
+				MetaCompany.CompanyParamount : {
 					# Show (227 of 121+): Level-4. A lot of other originals appear on Paramount+, and many Paramount originals appear on other platforms. Many shared content.
 					# Movie (121 of 43+): Level-4.
 					# https://en.wikipedia.org/wiki/Category:Paramount%2B_original_programming
@@ -4742,24 +4841,24 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt9055008.
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt13991232.
-																#{MetaTools.CompanyApple		: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0452046 produced by ABC.
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # Do not add for tt11712058, tt16358384.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Do not add for tt9055008.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt13991232.
+																#{MetaCompany.CompanyApple		: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Do not add for tt0452046 produced by ABC.
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # Do not add for tt11712058, tt16358384.
 
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyStudio]},
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt8819906. Do not add for tt8806524.
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyStudio]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyStudio]}, # tt8819906. Do not add for tt8806524.
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyStudio]},
 
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt8819906. Do not add for tt4236770.
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0098936
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0106004
-																#{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0286486. Do not add for tt0364845.
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0115167
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt8819906. Do not add for tt4236770.
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0098936
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]}, # tt0106004
+																#{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt0286486. Do not add for tt0364845.
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0115167
 
 																# Owned by Paramount, but too many Nickelodeon titles clutter the menu.
-																#{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyStudio]}, # tt1877889, tt2712516. Do not add for tt13657062, tt9795876.
+																#{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyStudio]}, # tt1877889, tt2712516. Do not add for tt13657062, tt9795876.
 
 																'co0011615', # Nickelodeon Productions (tt2712516)
 																'co0577889', # Nickelodeon Games and Sports for Kids (tt0101190)
@@ -4861,19 +4960,19 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt10399608
-																{MetaTools.CompanyRoku			: [MetaProvider.CompanyNetwork]}, # tt17076046
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0063518
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0065597
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt9603212, tt1745960
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt10399608
+																{MetaCompany.CompanyRoku			: [MetaProvider.CompanyNetwork]}, # tt17076046
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0063518
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0065597
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt9603212, tt1745960
 
 																'co0011615', # Nickelodeon Productions (tt2712516, tt32223312)
 																'co0816712', # Warner Bros. Pictures (GB) (tt13097932)
@@ -4901,7 +5000,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0820547', 'co0099482', 'co0533814', 'co0632516', 'co0046264', 'co0027042', 'co0778495', 'co0053846', 'co0777243', 'co0913243', 'co0979606', 'co0947664', 'co0985255', 'co0926308', 'co0673785', 'co0456008', 'co0865737'],
 					MetaProvider.CompanyVendor		: ['co0023400', 'co0023400', 'co0051891', 'co0074341', 'co0220414', 'co0316662', 'co0754555', 'co0796240', 'co0001860', 'co0318358', 'co0094762', 'co0184442', 'co0803844', 'co0316507', 'co1022855', 'co0131790', 'co0834860', 'co0591004', 'co0011257', 'co0850646', 'co0160099', 'co0021163', 'co0034406', 'co0170466', 'co0087315', 'co0317706', 'co0819892', 'co0453999', 'co0033409', 'co0957308', 'co0822247', 'co0817261', 'co0866247', 'co0309607', 'co0086041', 'co0160703', 'co0819893', 'co0029291', 'co0198704', 'co0808354', 'co0919972', 'co0231973', 'co0135308', 'co0048343', 'co0638721', 'co0001917', 'co0097692', 'co0068790', 'co0565880', 'co0051884', 'co0573273', 'co0244783', 'co0822249', 'co0601119', 'co0817224', 'co0906551', 'co0858764', 'co0834967', 'co1044155', 'co0604098', 'co0349683', 'co0349864', 'co0349935', 'co0204503', 'co0483087', 'co0226970', 'co1061662', 'co0375685', 'co0246986', 'co0999387', 'co0793559', 'co0986034', 'co0277788', 'co0599662', 'co0521586', 'co0090065', 'co0940470', 'co0796824', 'co0739819', 'co0611782', 'co0521548', 'co1019841', 'co0749795', 'co0508924', 'co0440806', 'co0235370', 'co0052142', 'co0048308', 'co1071435', 'co1042408', 'co0943142', 'co0867803', 'co0651759', 'co0583146', 'co0349601', 'co0327798', 'co0327534', 'co0296075', 'co0254086', 'co0242103', 'co0221920', 'co0204462', 'co0138659', 'co0124108', 'co0107991', 'co0043519', 'co0039958', 'co0039221', 'co0037676', 'co0985535', 'co0963678', 'co0962134', 'co0896806', 'co0878210', 'co0877199', 'co0870433', 'co0868203', 'co0868045', 'co0848844', 'co0847151', 'co0847150', 'co0847149', 'co0834861', 'co0820546', 'co0817225', 'co0809207', 'co0807232', 'co0774810', 'co0750721', 'co0695983', 'co0689776', 'co0666792', 'co0662236', 'co0662231', 'co0662229', 'co0630473', 'co0626466', 'co0499762', 'co0334177', 'co0316667', 'co0316628', 'co0297121', 'co0267721', 'co0253584', 'co0245428', 'co0219746', 'co0210910', 'co0202723', 'co0198680', 'co0194150', 'co0151286', 'co0142091', 'co0128329', 'co0111166', 'co0076191', 'co0049835', 'co0038360', 'co0031167', 'co0028920', 'co0012106', 'co0005212', 'co0003407'],
 				},
-				MetaTools.CompanyPeacock : {
+				MetaCompany.CompanyPeacock : {
 					# Show (272 of 91+): Level-4.
 					# Movie (165 of 18+): Level-3.
 					# https://en.wikipedia.org/wiki/Category:Peacock_(streaming_service)_original_programming
@@ -4912,23 +5011,23 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10147894
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10474134
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10147894
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10474134
 
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0050032
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0460637
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0103396
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0096694
-																{MetaTools.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt0496424
-																#{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0491738. Part of NBCUniversal
-																#{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0759364. Do not add for tt9814116.
-																#{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt7939800. Do not add for tt10846104.
-																#{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt23743442. Do not add for tt15557874.
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt9849186, tt9454736, tt31029686. Do not add for tt9022422, tt9041792.
-																#{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Do not add for tt17371078.
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]}, # tt0050032
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]}, # tt0460637
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt0103396
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0096694
+																{MetaCompany.CompanyChannel5		: [MetaProvider.CompanyNetwork]}, # tt0496424
+																#{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0491738. Part of NBCUniversal
+																#{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0759364. Do not add for tt9814116.
+																#{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt7939800. Do not add for tt10846104.
+																#{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # tt23743442. Do not add for tt15557874.
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyNetwork]}, # tt9849186, tt9454736, tt31029686. Do not add for tt9022422, tt9041792.
+																#{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Do not add for tt17371078.
 
 																'co0203910', # AXN (tt0364828)
 																'co0137851', # Sony Pictures Home Entertainment (tt0092400)
@@ -4969,20 +5068,20 @@ class MetaImdb(MetaProvider):
 																'co0026545', # tt24429218
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10147894
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0190590
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10474134
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt26541686
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0111301
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt1679335
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0125664
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]}, # tt4104022
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0160236
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt2062622
-																#{MetaTools.CompanySky			: [MetaProvider.CompanyVendor]}, # Do not add for tt31122323, tt24429218.
-																#{MetaTools.CompanyUniversal	: [MetaProvider.CompanyVendor]}, # tt10954984, tt21692408, tt14849194. Do not add for tt1121948. And its part of NBCUniversal.
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10147894
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0190590
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt10474134
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt26541686
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0111301
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt1679335
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]}, # tt0125664
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]}, # tt4104022
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0160236
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt2062622
+																#{MetaCompany.CompanySky			: [MetaProvider.CompanyVendor]}, # Do not add for tt31122323, tt24429218.
+																#{MetaCompany.CompanyUniversal	: [MetaProvider.CompanyVendor]}, # tt10954984, tt21692408, tt14849194. Do not add for tt1121948. And its part of NBCUniversal.
 
 																'co0058792', # Roadshow Films (tt4978420)
 																'co0720464', # Warner Bros. Home Entertainment (tt10954984, tt21692408)
@@ -5017,13 +5116,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0764707', 'co0893462', 'co0859748'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyPhilo : {
+				MetaCompany.CompanyPhilo : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: [],
 					MetaProvider.CompanyNetwork		: ['co0035988'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyPixar : {
+				MetaCompany.CompanyPixar : {
 					# Show (15): Level-4
 					# Movie (48): Level-4. Most of the incorrect titles have Pixar as "Thank you", "Additional material", or "Studio facilities".
 					MetaProvider.CompanyOriginal	: {
@@ -5058,25 +5157,25 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0348691', 'co0593882', 'co1070967', 'co1042473', 'co0894998', 'co0791909', 'co0087268', 'co0754045'],
 				},
-				MetaTools.CompanyPluto : {
+				MetaCompany.CompanyPluto : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: [],
 					MetaProvider.CompanyNetwork		: ['co0545791'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyRegency : {
+				MetaCompany.CompanyRegency : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0007127', 'co0867908', 'co0066289', 'co0023875', 'co1007086', 'co0057227', 'co0172093'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0169144', 'co0802353'],
 				},
-				MetaTools.CompanyRko : {
+				MetaCompany.CompanyRko : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0041421', 'co0055570', 'co1012051', 'co0103147', 'co0570527', 'co0434677', 'co0181377', 'co0063400', 'co0041353', 'co0032881', 'co0030174', 'co0015766', 'co0181770', 'co0142236'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0041421', 'co0119009', 'co0786380', 'co0786630', 'co0413144', 'co0010029', 'co0227201', 'co0134686', 'co0536351', 'co0052638', 'co0227091', 'co0232178', 'co0237410', 'co0686069', 'co0553775', 'co0217289', 'co0179449', 'co0231823', 'co0216147', 'co0187385', 'co0647480', 'co0644319', 'co0053128', 'co0787886', 'co0228093', 'co0422029', 'co0092195', 'co0786409', 'co0056735', 'co0185060', 'co0226417', 'co0800706', 'co0070644', 'co0298865', 'co0980884', 'co0878304', 'co0944451', 'co0885328', 'co0577797', 'co0530337', 'co0363180', 'co0294557', 'co0273555', 'co0228654', 'co0228057', 'co0158195', 'co0088033', 'co0937233', 'co0867874', 'co0864136', 'co0863849', 'co0863848', 'co0781567', 'co0781566', 'co0730403', 'co0727706', 'co0727473', 'co0674253', 'co0673681', 'co0671570', 'co0659060', 'co0658762', 'co0658761', 'co0522672', 'co0477404', 'co0462005', 'co0444348', 'co0413143', 'co0380711', 'co0244861', 'co0232138', 'co0231046', 'co0229874', 'co0229869', 'co0228795', 'co0228777', 'co0228660', 'co0228656', 'co0227694', 'co0227165', 'co0227029', 'co0226998', 'co0220630', 'co0218291', 'co0187074', 'co0181770', 'co0067639', 'co0047507', 'co0044939', 'co0035000'],
 				},
-				MetaTools.CompanyRoku : {
+				MetaCompany.CompanyRoku : {
 					# Show (192): Level-3. There are many titles from Quibi (now Roku) and other smaller channels that might be considered Roku Originals, because the other networks are too small and unknown.
 					# Movie (33): Level-3. Not many Roku Original movies exist.
 					#	https://en.wikipedia.org/wiki/Category:Roku_original_programming
@@ -5086,25 +5185,25 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt0397442
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0370194
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt15552018, tt0131183
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt14989818
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt0397442
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0370194
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt15552018, tt0131183
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt14989818
 
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt10580064, tt10726424.
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt11460580.
-																#{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt26452193.
-																#{MetaTools.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt10338160.
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt27669794.
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt18970320, tt2140663.
-																#{MetaTools.CompanyDiscovery	: [MetaProvider.CompanyNetwork]}, # Not for tt17163920.
-																#{MetaTools.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # Not for tt5535270.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt10580064, tt10726424.
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt11460580.
+																#{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt26452193.
+																#{MetaCompany.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt10338160.
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt27669794.
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt18970320, tt2140663.
+																#{MetaCompany.CompanyDiscovery	: [MetaProvider.CompanyNetwork]}, # Not for tt17163920.
+																#{MetaCompany.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # Not for tt5535270.
 
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyStudio]}, # Not for tt16026032, tt2140663.
-																#{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyStudio]}, # Not for tt16026032.
-																#{MetaTools.Company20thcentury	: [MetaProvider.CompanyStudio]}, # Not for tt16026032.
-																#{MetaTools.CompanyWarner		: [MetaProvider.CompanyStudio]}, # Not for tt10623550.
-																#{MetaTools.CompanyCbs			: [MetaProvider.CompanyStudio]}, # Not for tt29732006.
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyStudio]}, # Not for tt16026032, tt2140663.
+																#{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyStudio]}, # Not for tt16026032.
+																#{MetaCompany.Company20thcentury	: [MetaProvider.CompanyStudio]}, # Not for tt16026032.
+																#{MetaCompany.CompanyWarner		: [MetaProvider.CompanyStudio]}, # Not for tt10623550.
+																#{MetaCompany.CompanyCbs			: [MetaProvider.CompanyStudio]}, # Not for tt29732006.
 
 																#'co0159111', # Quibi (tt9104072, tt10122474). Not for tt10620606, tt11803720. Now owned by Roku.
 																'co0903231', # Rakuten Viki (tt20234568)
@@ -5121,22 +5220,22 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt5177120
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt17076046.
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt15799866
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # tt5177120
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt17076046.
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt15799866
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -5144,13 +5243,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0364962', 'co0850678', 'co0566316', 'co0952202', 'co1031799', 'co0699790', 'co0864985', 'co0495245', 'co0577538'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyScreengems : {
+				MetaCompany.CompanyScreengems : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0010568', 'co0033007', 'co0145747', 'co0148620', 'co0075450', 'co0675845', 'co0240976', 'co0011282', 'co0830233'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0010568', 'co0033007', 'co0964193'],
 				},
-				MetaTools.CompanyShowtime : {
+				MetaCompany.CompanyShowtime : {
 					# Show (310 of 194+): Level-4.
 					# Movie (109 of 102+): Level-3.
 					# https://en.wikipedia.org/wiki/Category:Showtime_(TV_network)_original_programming
@@ -5167,10 +5266,10 @@ class MetaImdb(MetaProvider):
 																'co0052980', # Showtime Networks
 															],
 															'exclude' : [
-																#{MetaTools.CompanyNetflix	: [MetaProvider.CompanyNetwork]}, # Do not add for tt0773262, tt1586680.
-																#{MetaTools.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # Do not add for tt0773262, tt1586680.
-																#{MetaTools.CompanyHbo		: [MetaProvider.CompanyNetwork]}, # tt0944947, tt2356777. Do not add for tt1586680, tt7440726.
-																{MetaTools.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # tt10732048
+																#{MetaCompany.CompanyNetflix	: [MetaProvider.CompanyNetwork]}, # Do not add for tt0773262, tt1586680.
+																#{MetaCompany.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # Do not add for tt0773262, tt1586680.
+																#{MetaCompany.CompanyHbo		: [MetaProvider.CompanyNetwork]}, # tt0944947, tt2356777. Do not add for tt1586680, tt7440726.
+																{MetaCompany.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # tt10732048
 
 																'co0098270', # AcornMedia (tt0115243)
 																'co0022105', # Disney Channel (tt0106110)
@@ -5195,7 +5294,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0052980', 'co0011881', 'co0913372', 'co0901457', 'co0903913', 'co0212571', 'co0553743', 'co0944921', 'co0329011', 'co1036849', 'co0979606', 'co0927319', 'co0984498', 'co0652000', 'co0067309', 'co0014147'],
 					MetaProvider.CompanyVendor		: ['co0087627', 'co0363506', 'co0121751', 'co0362187', 'co0316643', 'co0630026', 'co0698040', 'co0329014', 'co0142105', 'co0029265', 'co0872067', 'co0377252', 'co0125959', 'co0081812'],
 				},
-				MetaTools.CompanySky : {
+				MetaCompany.CompanySky : {
 					# Show (1026): Level-2 to Level-3. Essentailly impossible to filter out HBO, Peacock, NBC, and other titles, due to content sharing and co-productions.
 					# Movie (701): Level-2
 					# A lot of co-productions with HBO (a shit ton), Showtime, Cinemax, and AMC.
@@ -5234,30 +5333,30 @@ class MetaImdb(MetaProvider):
 															'exclude' : [
 																# tt2628232 is a Sky Showtime original, but has not Sky company listed under it. If added int he future, check the other networks to exclude.
 
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2049116
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt5650650, tt7604446, tt4607112, tt3498622, tt7604446
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt10482370, tt10234362, tt3655448, tt7157248, tt7938588, tt3498622, tt4378376, tt1492179
-																#{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # Not for tt9055250, tt6586318
-																#{MetaTools.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt8594276. Not for tt1492179, tt7661390
-																#{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt8038720
-																#{MetaTools.CompanyCrave		: [MetaProvider.CompanyNetwork]}, # Not for tt6586318
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt2711738, tt5830254, tt9174582
-																#{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # Not for tt7661390, tt5830254, tt4075386, tt5936448, tt2049116, tt2647420
-																#{MetaTools.CompanyAubc			: [MetaProvider.CompanyNetwork]}, # Not for tt7604446, tt7604446
-																#{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Not for tt7604446, tt4607112, tt3502470, tt2164430, tt2647420, tt8129450, tt7604446
-																#{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt14190592, tt4607112
-																#{MetaTools.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # Not for tt5830254
-																#{MetaTools.CompanyMgm			: [MetaProvider.CompanyNetwork]}, # Not for tt11694186, tt5932548
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt1492179, tt10234362, tt9454736
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Not for tt8129450
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt9022422, tt9169784, tt9041792, tt9454736
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2049116
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt5650650, tt7604446, tt4607112, tt3498622, tt7604446
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt10482370, tt10234362, tt3655448, tt7157248, tt7938588, tt3498622, tt4378376, tt1492179
+																#{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # Not for tt9055250, tt6586318
+																#{MetaCompany.CompanyCinemax		: [MetaProvider.CompanyNetwork]}, # tt8594276. Not for tt1492179, tt7661390
+																#{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # Not for tt8038720
+																#{MetaCompany.CompanyCrave		: [MetaProvider.CompanyNetwork]}, # Not for tt6586318
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt2711738, tt5830254, tt9174582
+																#{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # Not for tt7661390, tt5830254, tt4075386, tt5936448, tt2049116, tt2647420
+																#{MetaCompany.CompanyAubc			: [MetaProvider.CompanyNetwork]}, # Not for tt7604446, tt7604446
+																#{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Not for tt7604446, tt4607112, tt3502470, tt2164430, tt2647420, tt8129450, tt7604446
+																#{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt14190592, tt4607112
+																#{MetaCompany.CompanyStarz		: [MetaProvider.CompanyNetwork]}, # Not for tt5830254
+																#{MetaCompany.CompanyMgm			: [MetaProvider.CompanyNetwork]}, # Not for tt11694186, tt5932548
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt1492179, tt10234362, tt9454736
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # Not for tt8129450
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt9022422, tt9169784, tt9041792, tt9454736
 
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0452046, tt0773262
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt2306299
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt8690918
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt2654620. Not for tt8129450 (not really a Sky Original)
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt11846996
-																{MetaTools.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt5665418
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt0452046, tt0773262
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt2306299
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt8690918
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # tt2654620. Not for tt8129450 (not really a Sky Original)
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt11846996
+																{MetaCompany.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt5665418
 
 																# Sister channels
 																'co0129175', # NBC Universal Television (tt0386676)
@@ -5310,19 +5409,19 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
 															],
 														},
 													},
@@ -5330,7 +5429,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0050995', 'co0985386', 'co0103727', 'co0104193', 'co0893022', 'co0964826', 'co0276736', 'co0374625', 'co0169165', 'co0885190', 'co0277926', 'co0873210', 'co0329023', 'co0952255', 'co0254125', 'co0106276', 'co0228643', 'co0103971', 'co0919122', 'co0803868', 'co0985385', 'co0971524', 'co0447329', 'co0137267', 'co0971525', 'co0919121', 'co0329071', 'co0217380', 'co0967014', 'co0615219', 'co0952256', 'co0985310', 'co0985309', 'co0840513', 'co0970200', 'co0899218', 'co0285888', 'co0804062', 'co0985311', 'co0778032', 'co0352403', 'co1056655', 'co0411058', 'co0901569', 'co0825565', 'co0787982', 'co0379754', 'co0905512', 'co0702154', 'co0919123', 'co0169100', 'co0885421', 'co0878026', 'co0472197', 'co0986206', 'co0905511', 'co0788771', 'co0901457', 'co1061120', 'co1003875', 'co0965885', 'co0986610', 'co0905510', 'co0995552', 'co0248896', 'co0979861', 'co0979860', 'co0966569', 'co0701341', 'co1056656', 'co0894261', 'co0391299', 'co1003057', 'co0995452', 'co0878025', 'co0481199', 'co0187094', 'co1026404', 'co1005815', 'co0547057', 'co0401180', 'co0323771', 'co1067888', 'co0944921', 'co0943021', 'co0932376', 'co0894054', 'co0488036', 'co0305913', 'co0088784', 'co0985384', 'co0951621', 'co0887040', 'co0228496', 'co0217851', 'co0188660', 'co0187356', 'co0136570', 'co1036849', 'co1034749', 'co1017869', 'co0989607', 'co0811948', 'co0663240', 'co0577710', 'co0569926', 'co0376754', 'co0315254', 'co0301439', 'co1073520', 'co1062046', 'co1062045', 'co1062044', 'co1062043', 'co1062041', 'co1058027', 'co0984498', 'co0980132', 'co0931305', 'co0774567', 'co0693280', 'co0614200', 'co0573344', 'co0560305', 'co0497417', 'co0297571', 'co0228600', 'co0211903', 'co0060930', 'co1020952', 'co0909121', 'co0703068'],
 					MetaProvider.CompanyVendor		: ['co0122767', 'co1058414', 'co0712274', 'co0249192', 'co0944551', 'co0924398', 'co0814668', 'co0751407', 'co0714728', 'co0429154', 'co0334986', 'co0972316', 'co0958729', 'co0816028', 'co0293012', 'co0253892', 'co0253846', 'co0975175', 'co0924399', 'co0909123', 'co0909049', 'co0849558', 'co0790669', 'co0790533', 'co0734975', 'co0703461', 'co0577711', 'co0577709', 'co0540454', 'co0535961', 'co0454785', 'co0449873', 'co0256832', 'co0232548', 'co0978844', 'co0924319', 'co0469192'],
 				},
-				MetaTools.CompanySony : {
+				MetaCompany.CompanySony : {
 					# Show (233): Level-3
 					# Movie (198): Level-3
 					# Sony produces a lot of US/English shows and movies, but these are almost always produced for other networks.
@@ -5361,7 +5460,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0546496', 'co0246050', 'co0544611', 'co0081728', 'co0372942', 'co0725671', 'co0547466', 'co0434265', 'co0725762', 'co0315317', 'co0777877', 'co0295187', 'co0879659', 'co0186035', 'co0361294', 'co0367891', 'co0629936', 'co0896022', 'co0657603', 'co0888494', 'co0806273', 'co0431737', 'co0367866', 'co0822760', 'co0460639', 'co0415756', 'co0373830', 'co0351299', 'co0482699', 'co0468659', 'co0415760', 'co0415758', 'co0415757', 'co0367949', 'co0367927', 'co1037981', 'co0777056', 'co0629937', 'co0624286', 'co0546494', 'co0493700', 'co0479937', 'co0420621', 'co0415753', 'co0364235'],
 					MetaProvider.CompanyVendor		: ['co0137851', 'co0026545', 'co0110101', 'co0052145', 'co0014453', 'co0375381', 'co0145664', 'co0209825', 'co0095398', 'co0769046', 'co0533783', 'co0402495', 'co0185481', 'co0811162', 'co0072831', 'co0163321', 'co0001799', 'co0795863', 'co0584895', 'co0121331', 'co0873390', 'co0655055', 'co0775797', 'co0600878', 'co0307036', 'co0087306', 'co0188620', 'co0565929', 'co0080433', 'co0852957', 'co0144567', 'co0765733', 'co0802090', 'co0243381', 'co0881365', 'co0847351', 'co0060012', 'co0770268', 'co0565928', 'co0151916', 'co0789116', 'co0071829', 'co0865164', 'co0653605', 'co0810034', 'co0802089', 'co0215255', 'co0802091', 'co0256964', 'co0215082', 'co0064922', 'co0880495', 'co0850664', 'co0732568', 'co0080266', 'co0815089', 'co0767764', 'co0305812', 'co0510488', 'co1003784', 'co0472728', 'co0208861', 'co0143764', 'co0104245', 'co0898832', 'co0514017', 'co0281373', 'co0211045', 'co0099317', 'co0009479', 'co0902939', 'co0651690', 'co0384875', 'co0341744', 'co0065232', 'co0043827', 'co0410527', 'co0309356', 'co0179937', 'co0172249', 'co0101612', 'co0088857', 'co0835413', 'co0475310', 'co0393339', 'co0219581', 'co0165909', 'co0033361', 'co1034913', 'co0935482', 'co0832871', 'co0665131', 'co0618335', 'co0617378', 'co0613276', 'co0405210', 'co0280381', 'co0270513', 'co0246535', 'co0132903', 'co0071392', 'co0045940', 'co0980862', 'co0796214', 'co0462171', 'co0457297', 'co0349334', 'co0328292', 'co0310744', 'co0291223', 'co0259638', 'co0057635', 'co0951251', 'co0909503', 'co0828650', 'co0825216', 'co0577179', 'co0558021', 'co0547312', 'co0488996', 'co0469521', 'co0424487', 'co0378943', 'co0309278', 'co0253404', 'co0226000', 'co0213247', 'co0139175', 'co0122709', 'co0032740', 'co0927303', 'co0369424', 'co0254863', 'co0211298', 'co0157130', 'co0131639', 'co0127139', 'co0064651', 'co0028920', 'co0859939', 'co0868243', 'co0842694'],
 				},
-				MetaTools.CompanyStarz : {
+				MetaCompany.CompanyStarz : {
 					# Show (107): Level-3, close to Level-4
 					# Movie (231): Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -5375,16 +5474,16 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt1442449, tt2375692.
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt2375692.
-																#{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt2375692.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt1442449, tt2375692.
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt2375692 (at least for Paramount Channel).
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt9140342. Not for tt2094262.
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt9179552, tt8201186
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt4820370
-																{MetaTools.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt0448190
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0762067
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt1442449, tt2375692.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt2375692.
+																#{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt2375692.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt3006802, tt1442449, tt2375692.
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # Not for tt2375692 (at least for Paramount Channel).
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt9140342. Not for tt2094262.
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt9179552, tt8201186
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt4820370
+																{MetaCompany.CompanyBravo			: [MetaProvider.CompanyNetwork]}, # tt0448190
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt0762067
 
 																'co0118334', # BBC America (tt7016936)
 																'co0081852', # Thruline Entertainment (tt2235759)
@@ -5425,17 +5524,17 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt5177120
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt5177120
 
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0120484
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0120484
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
 
 																'co0028689', # Manga Entertainment (tt0156887)
 																'co0835320', # Universal Home Entertainment (tt1262416)
@@ -5448,7 +5547,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0000869', 'co0002342', 'co0324445', 'co0316607', 'co0746532', 'co0238789', 'co0740154', 'co0010826', 'co0746531', 'co0809057', 'co0530112', 'co1042752', 'co0186042', 'co1069971', 'co1018571', 'co0793760', 'co0786037', 'co0002075', 'co1042751', 'co0635080'],
 					MetaProvider.CompanyVendor		: ['co0198595', 'co0209315', 'co0224655'],
 				},
-				MetaTools.CompanySyfy : {
+				MetaCompany.CompanySyfy : {
 					# Show (203 of 139+): Level-3.
 					# Movie (454 of 259+): Level-2.
 					# https://en.wikipedia.org/wiki/Category:Syfy_original_programming
@@ -5462,22 +5561,22 @@ class MetaImdb(MetaProvider):
 																'co0602021', # Shudder (tt4820370)
 															],
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt1910645. Do not add for tt3148266, tt3230854.
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt3230854, tt4254242.
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0944947, tt0436992. Do not add for tt0094517, tt4276624.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt1910645. Do not add for tt3148266, tt3230854.
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Do not add for tt3230854, tt4254242.
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0944947, tt0436992. Do not add for tt0094517, tt4276624.
 
-																{MetaTools.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt2661044, tt2632424
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt10016724
-																#{MetaTools.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # tt0056751. Do not add for tt0118480.
-																{MetaTools.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt0056751
-																{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0112159, tt0088595
-																#{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt3663490. Do not add for tt4820370.
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt6632666
-																#{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0115243. Do not add for tt0112111.
-																#{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt6110648 (USA is a sibling network to Syfy). Do not add for tt8690918.
-																#{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]}, # Do not add for tt1132290.
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Tons also appear on various Fox networks.
-																#{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0436992, tt0106179, tt0118276, tt3322312, tt0103584, tt0162065, tt1199099. Do not add for tt8388390, tt8388390.
+																{MetaCompany.CompanyCw			: [MetaProvider.CompanyNetwork]}, # tt2661044, tt2632424
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt10016724
+																#{MetaCompany.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # tt0056751. Do not add for tt0118480.
+																{MetaCompany.CompanyBritbox		: [MetaProvider.CompanyNetwork]}, # tt0056751
+																{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0112159, tt0088595
+																#{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # tt3663490. Do not add for tt4820370.
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt6632666
+																#{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0115243. Do not add for tt0112111.
+																#{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt6110648 (USA is a sibling network to Syfy). Do not add for tt8690918.
+																#{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]}, # Do not add for tt1132290.
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Tons also appear on various Fox networks.
+																#{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]}, # tt0436992, tt0106179, tt0118276, tt3322312, tt0103584, tt0162065, tt1199099. Do not add for tt8388390, tt8388390.
 
 																'co0808044', # Jio Cinema (tt0944947)
 																'co0052417', # NHK (tt0436992)
@@ -5565,15 +5664,15 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0304669
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]}, # tt0464154, tt0113497
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0113497
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt5834426, tt1259521
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyVendor]}, # tt0304669
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]}, # tt0464154, tt0113497
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]}, # tt0113497
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]}, # tt5834426, tt1259521
 
-																{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0338526
+																{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # tt0338526
 
 																'co0097402', # United International Pictures (UIP) (tt6772950)
 																'co0292985', # Summit Home Entertainment (tt1245526)
@@ -5589,7 +5688,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0282285', 'co0024368', 'co0876404', 'co0298911', 'co0002937', 'co0308282', 'co0470060', 'co0234798', 'co0289068', 'co0951622', 'co0288390', 'co0188604', 'co0810364', 'co0370054', 'co0306623', 'co0174586', 'co0449313', 'co1056650', 'co1041024', 'co0951623', 'co0370118', 'co0307546', 'co0229476', 'co1049885', 'co0951626', 'co0951625', 'co0951624', 'co0619890', 'co0619887', 'co0619878', 'co0619866', 'co0619861', 'co0619860', 'co0561779', 'co0369798', 'co0311751', 'co0293780', 'co0220940', 'co0311104'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyTbs : {
+				MetaCompany.CompanyTbs : {
 					# Show (251): Level-4 to Level-5
 					# Movie (212): Level-3
 					MetaProvider.CompanyOriginal	: {
@@ -5600,25 +5699,25 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # Not for tt4903242, tt7529770, tt1600199, tt10691888, tt6396094, tt6317068
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt6317068
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt1637574, tt5323988, tt4168956, tt5460226, tt7529770, tt0926732, tt5323988
-																#{MetaTools.CompanyTrutv			: [MetaProvider.CompanyNetwork]}, # Not for tt1637574
-																#{MetaTools.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt1637574, tt0397306, tt1942919
-																#{MetaTools.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt6317068
-																#{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0397306
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt1441109
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt1441109
-																#{MetaTools.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt5460226
-																#{MetaTools.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306
-																#{MetaTools.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt3597790, tt1600199, tt3597790
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt7529770
-																#{MetaTools.CompanyMtv				: [MetaProvider.CompanyNetwork]}, # Not for tt1441109
-																#{MetaTools.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt10338160
-																#{MetaTools.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]}, # Not for tt25531288 (This was probably mislabled for the unrelated TBS Japan)
+																#{MetaCompany.CompanyTnt				: [MetaProvider.CompanyNetwork]}, # Not for tt4903242, tt7529770, tt1600199, tt10691888, tt6396094, tt6317068
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt6317068
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # Not for tt1637574, tt5323988, tt4168956, tt5460226, tt7529770, tt0926732, tt5323988
+																#{MetaCompany.CompanyTrutv			: [MetaProvider.CompanyNetwork]}, # Not for tt1637574
+																#{MetaCompany.CompanyComedycen		: [MetaProvider.CompanyNetwork]}, # Not for tt1637574, tt0397306, tt1942919
+																#{MetaCompany.CompanyAdultswim		: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt6317068
+																#{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]}, # Not for tt0397306
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt1441109
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt1441109
+																#{MetaCompany.CompanyBbc				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306, tt5460226
+																#{MetaCompany.CompanyItv				: [MetaProvider.CompanyNetwork]}, # Not for tt0397306
+																#{MetaCompany.CompanyChannel4			: [MetaProvider.CompanyNetwork]}, # Not for tt3597790, tt1600199, tt3597790
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # Not for tt7529770
+																#{MetaCompany.CompanyMtv				: [MetaProvider.CompanyNetwork]}, # Not for tt1441109
+																#{MetaCompany.CompanyRoku				: [MetaProvider.CompanyNetwork]}, # Not for tt10338160
+																#{MetaCompany.CompanyCrunchyroll		: [MetaProvider.CompanyNetwork]}, # Not for tt25531288 (This was probably mislabled for the unrelated TBS Japan)
 
 																# Too many TBS animated originals also on CN.
-																#{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0115157, tt0088631, tt0118289, tt0419315, tt0083475. Not for tt0098763, tt0101169, tt0126173.
+																#{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0115157, tt0088631, tt0118289, tt0419315, tt0083475. Not for tt0098763, tt0101169, tt0126173.
 																'co0238110', # Cartoon Network Studios (tt0115157, tt0419315)
 																'co1060195', # Cartoon Network Productions (tt0118289)
 																#'co0024579', # Hanna-Barbera Productions (tt0083475). Not for tt0098763, tt0101169, tt0126173.
@@ -5648,13 +5747,13 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix	: [MetaProvider.CompanyNetwork]}, # tt5164214, tt0457939
-																{MetaTools.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # tt1375666
-																{MetaTools.CompanyAmc		: [MetaProvider.CompanyNetwork]}, # tt0111161
-																{MetaTools.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # tt0088247, tt0196229
-																{MetaTools.CompanyTubi		: [MetaProvider.CompanyNetwork]}, # tt0149261, tt1690953
-																{MetaTools.CompanyPeacock	: [MetaProvider.CompanyNetwork]}, # tt2293640
-																{MetaTools.CompanyDisney	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt1323594, tt0119174
+																{MetaCompany.CompanyNetflix	: [MetaProvider.CompanyNetwork]}, # tt5164214, tt0457939
+																{MetaCompany.CompanyAmazon	: [MetaProvider.CompanyNetwork]}, # tt1375666
+																{MetaCompany.CompanyAmc		: [MetaProvider.CompanyNetwork]}, # tt0111161
+																{MetaCompany.CompanyParamount	: [MetaProvider.CompanyNetwork]}, # tt0088247, tt0196229
+																{MetaCompany.CompanyTubi		: [MetaProvider.CompanyNetwork]}, # tt0149261, tt1690953
+																{MetaCompany.CompanyPeacock	: [MetaProvider.CompanyNetwork]}, # tt2293640
+																{MetaCompany.CompanyDisney	: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt1323594, tt0119174
 
 																'co0228937', # New Line Home Entertainment (tt0359013)
 																'co0070627', # CBS (tt0083929)
@@ -5672,7 +5771,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0005051', 'co0183474', 'co0057274', 'co0418169', 'co0396917', 'co0756309', 'co0528223', 'co0688123', 'co0505494', 'co0569273', 'co1037480', 'co0867778', 'co1000321', 'co0541624'],
 					MetaProvider.CompanyVendor		: ['co0972823', 'co0568014', 'co0012522'],
 				},
-				MetaTools.CompanyTnt : {
+				MetaCompany.CompanyTnt : {
 					# Show (234 of 90+): Level-4.
 					# Movie (337 of 98+): Level-3.
 					# https://en.wikipedia.org/wiki/Category:TNT_(American_TV_network)_original_programming
@@ -5680,25 +5779,25 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyOriginal	: {
 														Media.Show	: {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # tt1958961. Do not add for tt4604612.
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt4607112. Do not add for tt2402207, tt1196946.
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0944947 (Both owned by Warner). Do not add for tt8129610, tt0458253, tt1462059, tt4604612, tt1196946.
-																{MetaTools.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0944947 (Both owned by Warner)
-																{MetaTools.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt1783495, tt0795065 (Both owned by Warner)
-																{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # tt1480669 (Both owned by Warner)
-																{MetaTools.CompanyDiscovery			: [MetaProvider.CompanyNetwork]}, # tt17676766 (Both owned by Warner)
-																{MetaTools.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt1586680
-																#{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt6226232. Do not add for tt4604612.
-																{MetaTools.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt6156584
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0108778. Do not add for tt1714204.
-																#{MetaTools.CompanyNbc				: [MetaProvider.CompanyNetwork]}, # tt0098844, tt0098904. Do not add for tt2402207.
-																#{MetaTools.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # tt0369179. Do not add for tt1196946.
-																#{MetaTools.CompanySky				: [MetaProvider.CompanyNetwork]}, # tt14190592. Do not add for tt2402207.
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # tt2071645, tt1728102. Do not add for tt1462059.
-																#{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt4189492. Do not add for tt1462059.
-																{MetaTools.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt4643084
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt0799862, tt0944947. Do not add for tt3663490.
-																{MetaTools.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1127107
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # tt1958961. Do not add for tt4604612.
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # tt4607112. Do not add for tt2402207, tt1196946.
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0944947 (Both owned by Warner). Do not add for tt8129610, tt0458253, tt1462059, tt4604612, tt1196946.
+																{MetaCompany.CompanyCw				: [MetaProvider.CompanyNetwork]}, # tt0944947 (Both owned by Warner)
+																{MetaCompany.CompanyAdultswim			: [MetaProvider.CompanyNetwork]}, # tt1783495, tt0795065 (Both owned by Warner)
+																{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # tt1480669 (Both owned by Warner)
+																{MetaCompany.CompanyDiscovery			: [MetaProvider.CompanyNetwork]}, # tt17676766 (Both owned by Warner)
+																{MetaCompany.CompanyShowtime			: [MetaProvider.CompanyNetwork]}, # tt1586680
+																#{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # tt6226232. Do not add for tt4604612.
+																{MetaCompany.CompanyAmc				: [MetaProvider.CompanyNetwork]}, # tt6156584
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0108778. Do not add for tt1714204.
+																#{MetaCompany.CompanyNbc				: [MetaProvider.CompanyNetwork]}, # tt0098844, tt0098904. Do not add for tt2402207.
+																#{MetaCompany.CompanyCbs				: [MetaProvider.CompanyNetwork]}, # tt0369179. Do not add for tt1196946.
+																#{MetaCompany.CompanySky				: [MetaProvider.CompanyNetwork]}, # tt14190592. Do not add for tt2402207.
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # tt2071645, tt1728102. Do not add for tt1462059.
+																#{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # tt4189492. Do not add for tt1462059.
+																{MetaCompany.CompanyStarz				: [MetaProvider.CompanyNetwork]}, # tt4643084
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # tt0799862, tt0944947. Do not add for tt3663490.
+																{MetaCompany.CompanyUsa				: [MetaProvider.CompanyNetwork]}, # tt1127107
 
 																'co0077535', # The WB Television Network (tt0460653) (sister channel)
 																'co0100472', # TBS Productions Inc. (tt4903242) (sister channel)
@@ -5762,19 +5861,19 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie	: {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0098084
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0106233
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]}, # tt0098084
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0106233
 
-																#{MetaTools.CompanyParamount	: [MetaProvider.CompanyVendor]}, # Do not add for tt0435591, tt0329390.
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0062622, tt0903624
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt0088323
+																#{MetaCompany.CompanyParamount	: [MetaProvider.CompanyVendor]}, # Do not add for tt0435591, tt0329390.
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0062622, tt0903624
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]}, # tt0088323
 
 																'co0008693', # Home Box Office (HBO) (tt1933667) (sister channel)
 																'co0228937', # New Line Home Entertainment (tt0109686)
@@ -5794,36 +5893,36 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0009512', 'co0011489', 'co0257711', 'co0350722', 'co0505495', 'co0607678', 'co0724274', 'co0771916', 'co0224166', 'co0561952', 'co0418278', 'co0835799', 'co0024749', 'co1010896', 'co0449308', 'co0887203', 'co0852643', 'co0675903', 'co0241737', 'co0893018', 'co0037608', 'co1064922', 'co1029550', 'co0988991', 'co0617058', 'co0239363', 'co1068047', 'co1059526', 'co0868070', 'co0617059'],
 					MetaProvider.CompanyVendor		: ['co0448330', 'co0407107', 'co0375990', 'co0361258', 'co0671664'],
 				},
-				MetaTools.CompanyTouchstone : {
+				MetaCompany.CompanyTouchstone : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0049348', 'co0067205', 'co0925713', 'co0110398', 'co0759606', 'co0426272', 'co1066685', 'co0747847'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0041517', 'co0659855', 'co0226864', 'co0477440', 'co0300570', 'co0233977', 'co0886556', 'co0750134', 'co0883363', 'co0194602', 'co0387386', 'co1002359', 'co0735841', 'co0539616', 'co0662162', 'co0501762', 'co0241748', 'co0501763', 'co0229151'],
 				},
-				MetaTools.CompanyTristar : {
+				MetaCompany.CompanyTristar : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0005883', 'co0074221', 'co0051191', 'co0440338', 'co0032932', 'co0624442', 'co0147951', 'co0015605', 'co0001581', 'co0250475', 'co0142305', 'co0113915', 'co0113868', 'co0773877', 'co0355277', 'co0348512', 'co0245365', 'co0168261', 'co0142304', 'co0093452', 'co0008439'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0001850', 'co0127120', 'co0003581', 'co0009297', 'co0005883', 'co0189864', 'co0098048', 'co0077851', 'co0213457', 'co0057443', 'co0003949', 'co0045926', 'co0108034', 'co0005726', 'co0060005', 'co0075764', 'co0628925', 'co0768357', 'co0774471', 'co0170439', 'co0006448', 'co0182605', 'co0047778', 'co0613324', 'co0035705', 'co0728184', 'co0539852', 'co0225408', 'co0135317', 'co0094232', 'co0287692', 'co0768425', 'co0638112', 'co0114725', 'co0037988', 'co0152638', 'co0015669', 'co0884352', 'co0720168', 'co0393411', 'co0135318', 'co0942170', 'co0751613', 'co0039725', 'co0115429', 'co0045347', 'co0815627', 'co0942169', 'co0382315', 'co0163983', 'co0241443', 'co0057970', 'co0373110', 'co0700140', 'co0379792', 'co0954396', 'co0754056', 'co0982368', 'co0382360', 'co1020466', 'co0379620', 'co1002119', 'co0628032', 'co0613216', 'co0428560', 'co0961122', 'co0826726', 'co0802980', 'co0723390', 'co1042290', 'co1021830', 'co0960788', 'co0960786', 'co0919176', 'co0919014', 'co0890192', 'co0753593', 'co0625795', 'co0294950', 'co0120629', 'co1055336', 'co1037590', 'co0981289', 'co0976563', 'co0943399', 'co0919175', 'co0919019', 'co0919016', 'co0919015', 'co0919013', 'co0853923', 'co0833779', 'co0802979', 'co0793712', 'co0670235', 'co0382011', 'co0367774', 'co0284253', 'co0232258', 'co0210948', 'co0189829', 'co1062404', 'co0960785', 'co0960784', 'co0820799', 'co0820798', 'co0774102', 'co0337735', 'co0313694', 'co0217342', 'co0209928', 'co0201367', 'co0137852', 'co0004899'],
 				},
-				MetaTools.CompanyTrutv : {
+				MetaCompany.CompanyTrutv : {
 					# Show (194): Level-4. Pretty accurate out of the box.
 					# Movie (78): Level-4
 					MetaProvider.CompanyOriginal	: {
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2100976
-																#{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt2100976, tt8026448, tt3559912, tt5034326, tt7552590, tt1674417, tt4264096
-																#{MetaTools.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt1198300
-																#{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt4661598
-																#{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt0434702
-																#{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
-																#{MetaTools.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
-																#{MetaTools.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
-																#{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # Not for tt1674417
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # Not for tt2100976
+																#{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # Not for tt2100976, tt8026448, tt3559912, tt5034326, tt7552590, tt1674417, tt4264096
+																#{MetaCompany.CompanyTbs			: [MetaProvider.CompanyNetwork]}, # Not for tt1198300
+																#{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]}, # Not for tt4661598
+																#{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]}, # Not for tt0434702
+																#{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
+																#{MetaCompany.CompanyPluto		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
+																#{MetaCompany.CompanyTubi			: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt0247882
+																#{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # Not for tt1674417
 
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt0106079
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt0106079
 
 																'co0072315', # National Broadcasting Company (NBC) (tt0278191, tt0406429)
 																'co0011242', # Conaco (tt1637574)
@@ -5833,10 +5932,10 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0109127, tt0119137, tt5275892
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0356634
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt0100419
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0458364
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0109127, tt0119137, tt5275892
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]}, # tt0356634
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]}, # tt0100419
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]}, # tt0458364
 															],
 														},
 													},
@@ -5844,7 +5943,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0214175', 'co0036798', 'co0494156', 'co0670573', 'co0200080'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyTubi : {
+				MetaCompany.CompanyTubi : {
 					# Show (43): Level-3. Some difficult to filter through Fox and Amazon.
 					# Movie (959): Level-2. Contains a bunch of Tubi Originals, but there are too many low-budget films from various studios/distributors to filter them properley.
 					# Has a lot of content on Amazon.
@@ -5854,19 +5953,19 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt0247882
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt26765082
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt3079768
-																{MetaTools.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt10589896, tt7356206, tt13664658
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt6917254
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt1355237, co0007546
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt6459140
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt29964473, tt6599010.
-																#{MetaTools.CompanyDiscovery	: [MetaProvider.CompanyNetwork]}, # Not for tt10627334.
-																#{MetaTools.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Not for tt21438656.
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]}, # tt0247882
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]}, # tt26765082
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # tt3079768
+																{MetaCompany.CompanyYoutube		: [MetaProvider.CompanyNetwork]}, # tt10589896, tt7356206, tt13664658
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt6917254
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]}, # tt1355237, co0007546
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]}, # tt6459140
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]}, # Not for tt29964473, tt6599010.
+																#{MetaCompany.CompanyDiscovery	: [MetaProvider.CompanyNetwork]}, # Not for tt10627334.
+																#{MetaCompany.CompanyBbc			: [MetaProvider.CompanyNetwork]}, # Not for tt21438656.
 
 																'co0037052', # American Broadcasting Company (ABC) (tt0057733, tt0059968, tt0073972)
 																'co0072315', # National Broadcasting Company (NBC) (tt1568769)
@@ -5900,24 +5999,24 @@ class MetaImdb(MetaProvider):
 																'co0103528', # Channel 4 Television Corporation (too much other content listed here that too many titles might be excluded with CH4 networks).
 															],
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyChannel4		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyYoutube		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPluto			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyChannel4		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyYoutube		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPluto			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
 
 																'co0335765', # Just Bridge Entertainment (tt1242432)
 																'co0339529', # Tanweer Films (tt1560747)
@@ -5938,23 +6037,23 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0724460', 'co0866625', 'co0983179'],
 					MetaProvider.CompanyVendor		: [],
 				},
-				MetaTools.CompanyTurner : {
+				MetaCompany.CompanyTurner : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0045447', 'co0099229', 'co0046564', 'co0064735', 'co0040732', 'co0458361', 'co0150930', 'co0781641', 'co0079227', 'co0728074', 'co0159949', 'co0981578', 'co0971288', 'co0900992', 'co0748955', 'co0662531', 'co0471992', 'co0453802', 'co0446580', 'co0198473', 'co0142333', 'co0098174', 'co0038957', 'co0007241'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0183824', 'co0093282', 'co0084770', 'co0134695', 'co0386603', 'co0009902', 'co0134697', 'co0000078', 'co0147819', 'co0337017', 'co0213389', 'co0381252', 'co0228203', 'co1005738', 'co0974338', 'co0840781', 'co0507520', 'co0397542', 'co0379858', 'co0342533', 'co0206108', 'co0147789', 'co0969989', 'co0917898', 'co0850163', 'co0808042', 'co0639907', 'co0606930', 'co0580410', 'co0386061', 'co0310903', 'co0219076', 'co0199827'],
 				},
-				MetaTools.CompanyUniversal : {
+				MetaCompany.CompanyUniversal : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0005073', 'co0046592', 'co0021358', 'co0129175', 'co0195910', 'co0242101', 'co0769928', 'co0202966', 'co0196576', 'co0359888', 'co0598523', 'co0186420', 'co0186606', 'co0770762', 'co0080319', 'co0040731', 'co0443986', 'co0242700', 'co0216142', 'co0066651', 'co0882993', 'co0453011', 'co0751260', 'co0302927', 'co0733397', 'co0438125', 'co0514005', 'co0163456', 'co0118092', 'co0818184', 'co0313476', 'co0284326', 'co0272828', 'co0064407', 'co0608727', 'co0486437', 'co0485242', 'co0263504', 'co0242277', 'co0175276', 'co0048374', 'co0029904', 'co0574746', 'co0338344', 'co0086865', 'co0075806', 'co1048379', 'co0451692', 'co0035434', 'co0018727', 'co0017927'],
 					MetaProvider.CompanyNetwork		: ['co0046592', 'co1013700', 'co0667778', 'co0227561', 'co0440561', 'co0305757', 'co0365525', 'co0770762', 'co0603572', 'co0356636', 'co0395977', 'co0464716', 'co0420019', 'co0326139', 'co0465167', 'co0420018', 'co1006786', 'co0878217', 'co0470442', 'co0464717', 'co0406983', 'co0406980', 'co0323517'],
 					MetaProvider.CompanyVendor		: ['co0005073', 'co0023827', 'co0026044', 'co0251089', 'co0060214', 'co0219586', 'co0048238', 'co0297627', 'co0183709', 'co0388514', 'co0105063', 'co0131785', 'co0215138', 'co0198457', 'co0021358', 'co0219620', 'co0375381', 'co0021294', 'co0215174', 'co0219608', 'co0666801', 'co0215230', 'co0067464', 'co0110681', 'co0820078', 'co1003954', 'co0035519', 'co0814477', 'co0533783', 'co0117467', 'co0000534', 'co0129175', 'co0215234', 'co0824421', 'co0794561', 'co0768338', 'co0816494', 'co0241799', 'co0295614', 'co0236977', 'co0215157', 'co0215102', 'co0474968', 'co0854301', 'co0233831', 'co0824424', 'co0030491', 'co0055622', 'co0770680', 'co0195910', 'co0743251', 'co0811906', 'co0812374', 'co0656151', 'co0600878', 'co0137262', 'co0752505', 'co0141128', 'co0429910', 'co0305143', 'co0811907', 'co0565929', 'co0055043', 'co0813571', 'co0840675', 'co0063715', 'co0320855', 'co0056049', 'co0459508', 'co0820080', 'co0180647', 'co0028565', 'co0842674', 'co0151315', 'co0304386', 'co0565928', 'co0710991', 'co0824425', 'co0353649', 'co0752504', 'co0809355', 'co0800079', 'co0872541', 'co0251706', 'co0199066', 'co0184745', 'co0108183', 'co0762550', 'co0121774', 'co0844550', 'co0234421', 'co0824435', 'co0196211', 'co0345290', 'co0688663', 'co0202418', 'co0047319', 'co0820079', 'co0813065', 'co0651230', 'co0443270', 'co0420666', 'co0388893', 'co0205372', 'co0198120', 'co0046866', 'co0379771', 'co0246106', 'co0233644', 'co0196530', 'co0066651', 'co0524308', 'co0292422', 'co0823296', 'co0410007', 'co0240556', 'co0117469', 'co0899185', 'co0838692', 'co0408923', 'co0215112', 'co0548735', 'co0523203', 'co0487454', 'co0380632', 'co0196214', 'co0839122', 'co0835320', 'co0824436', 'co0722053', 'co0682067', 'co0592768', 'co0261403', 'co0223327', 'co0197667', 'co0030676', 'co0751668', 'co0704497', 'co0643665', 'co0256170', 'co0235121', 'co0226568', 'co0213976', 'co0076154', 'co0074924', 'co0053942', 'co0824611', 'co0824439', 'co0775963', 'co0573772', 'co0570325', 'co0542755', 'co0497044', 'co0468247', 'co0458146', 'co0315124', 'co0291326', 'co0215160', 'co0093119', 'co0018085', 'co0983635', 'co0879192', 'co0852261', 'co0797158', 'co0758126', 'co0728905', 'co0514291', 'co0497968', 'co0215092', 'co0140049', 'co0049911', 'co0034656', 'co0023945', 'co0021866', 'co1060162', 'co1021678', 'co0981888', 'co0919416', 'co0879183', 'co0867345', 'co0859748', 'co0843089', 'co0824438', 'co0725110', 'co0691059', 'co0679150', 'co0648656', 'co0648655', 'co0647543', 'co0616374', 'co0572760', 'co0570326', 'co0555207', 'co0517613', 'co0454780', 'co0454779', 'co0416933', 'co0412392', 'co0385643', 'co0361097', 'co0340231', 'co0309423', 'co0233867', 'co0232391', 'co0215218', 'co0215215', 'co0215193', 'co0213416', 'co0193613', 'co0189485', 'co0030062', 'co0967328', 'co0896256', 'co0804920', 'co0800639', 'co0784876', 'co0784875', 'co0773033', 'co0726722', 'co0722000', 'co0721999', 'co0721998', 'co0721997', 'co0715061', 'co0715059', 'co0694362', 'co0679102', 'co0658490', 'co0648654', 'co0636388', 'co0632635', 'co0405240', 'co0353338', 'co0330119', 'co0318230', 'co0305123', 'co0260407', 'co0244009', 'co0243802', 'co0220548', 'co0215283', 'co0215282', 'co0215271', 'co0215243', 'co0215185', 'co0162928', 'co0140051', 'co0125927', 'co0125160', 'co0063145', 'co0042035', 'co0006624'],
 				},
-				MetaTools.CompanyUsa : {
+				MetaCompany.CompanyUsa : {
 					# Show (283): Level-3 or Level 4. Quite a lot of NBC Originals that cannot be filtered out.
 					# Movie (247): Level-2.
 					# USA content appear not only on NBC and other Universal channels, but also Netflix and Amazon.
-					# Contains a lot of syndication television (rights leased out to mutiple channels at the same time), like Xena, Highlander, and Hercules.
+					# Contains a lot of syndication television (rights leased out to multiple channels at the same time), like Xena, Highlander, and Hercules.
 					MetaProvider.CompanyOriginal	: {
 														Media.Unknown : {
 															'disallow' : [
@@ -5966,17 +6065,17 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt6110648, tt0098844.
-																#{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt6048596, tt4209256, tt6233618.
-																#{MetaTools.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0810788, tt4209256, tt2393813.
-																#{MetaTools.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt0810788.
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0810788, tt1442437, tt7235466.
-																#{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt14129378.
-																#{MetaTools.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt8388390, tt0314979, tt0220238.
-																#{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt0389564.
-																#{MetaTools.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0103488. Not for tt0389564.
-																#{MetaTools.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt3205236
-																{MetaTools.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # tt0084972, tt0086824, tt0115226.
+																#{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]}, # Not for tt6110648, tt0098844.
+																#{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]}, # Not for tt6048596, tt4209256, tt6233618.
+																#{MetaCompany.CompanyFox				: [MetaProvider.CompanyNetwork]}, # Not for tt0810788, tt4209256, tt2393813.
+																#{MetaCompany.CompanyFx				: [MetaProvider.CompanyNetwork]}, # Not for tt0810788.
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # Not for tt0810788, tt1442437, tt7235466.
+																#{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]}, # Not for tt14129378.
+																#{MetaCompany.CompanySyfy				: [MetaProvider.CompanyNetwork]}, # Not for tt8388390, tt0314979, tt0220238.
+																#{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]}, # Not for tt0389564.
+																#{MetaCompany.CompanyHbo				: [MetaProvider.CompanyNetwork]}, # tt0103488. Not for tt0389564.
+																#{MetaCompany.CompanyHulu				: [MetaProvider.CompanyNetwork]}, # Not for tt3205236
+																{MetaCompany.CompanyCartoonnet		: [MetaProvider.CompanyNetwork]}, # tt0084972, tt0086824, tt0115226.
 
 																#'co0037052', # American Broadcasting Company (ABC) (tt1442437)
 																#'co0209226', # ABC Signature. Not for tt0312172.
@@ -6001,22 +6100,22 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																#{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0405422
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0099938
-																{MetaTools.CompanyTnt			: [MetaProvider.CompanyNetwork]},
-																#{MetaTools.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Not for tt0991178.
-																{MetaTools.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
+																#{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0405422
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]}, # tt0099938
+																{MetaCompany.CompanyTnt			: [MetaProvider.CompanyNetwork]},
+																#{MetaCompany.CompanySyfy			: [MetaProvider.CompanyNetwork]}, # Not for tt0991178.
+																{MetaCompany.CompanyCrunchyroll	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyStudio]},
 
 																'co0031085', # Argentina Video Home (tt0106677)
 															],
@@ -6026,7 +6125,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0014957', 'co0069685', 'co0043969', 'co0019361', 'co0006634', 'co0082039', 'co0077920', 'co0107062', 'co0094214', 'co0058588', 'co0005674', 'co0724032', 'co0055632', 'co0046901', 'co0027352'],
 					MetaProvider.CompanyVendor		: ['co0429394', 'co0198469', 'co0419861'],
 				},
-				MetaTools.CompanyWarner : {
+				MetaCompany.CompanyWarner : {
 					# Show (114): Level-3
 					# Movie (59): Level-3
 					# The WB is now disfunct. Most of its content is now on The CW and HBO, but also a lot on other competing channels (Disney, ABC, etc).
@@ -6043,10 +6142,10 @@ class MetaImdb(MetaProvider):
 																'co0001860', # United Paramount Network (UPN) (tt0118276, tt0201391)
 															],
 															'exclude' : [
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0121955, tt0159206, tt0060028, tt0115341
-																#{MetaTools.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0168366. Not for tt0238784.
-																{MetaTools.CompanyUniversal			: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0112230.
-																#{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0426371. Not for tt0238784, tt0118276.
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]}, # tt0121955, tt0159206, tt0060028, tt0115341
+																#{MetaCompany.CompanyCartoonnet	: [MetaProvider.CompanyNetwork]}, # tt0168366. Not for tt0238784.
+																{MetaCompany.CompanyUniversal			: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]}, # tt0112230.
+																#{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork]}, # tt0426371. Not for tt0238784, tt0118276.
 
 																'co0005861', # HBO Films (tt0185906)
 																'co0028689', # Manga Entertainment (tt0168366)
@@ -6061,13 +6160,13 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyPeacock			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyParamount			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDisney			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal			: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyPeacock			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyParamount			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDisney			: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury		: [MetaProvider.CompanyVendor]},
 
 																'co0037052', # American Broadcasting Company (ABC) (tt0088206)
 															],
@@ -6077,13 +6176,13 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0077535', 'co0068578', 'co0108606', 'co0204431', 'co0919124', 'co0909338', 'co0545732', 'co1064788', 'co0740777', 'co0301671', 'co1014492', 'co0569058', 'co1010891', 'co0893585', 'co0065120', 'co1063231', 'co0908564', 'co0983586', 'co0909047'],
 					MetaProvider.CompanyVendor		: ['co0059995', 'co0002663', 'co0189793', 'co0089683', 'co0812621', 'co0270424', 'co0342489', 'co0200179', 'co0006383', 'co0214905', 'co0142160', 'co0498895', 'co0087314', 'co0535067', 'co0135321', 'co0106012', 'co0125154', 'co0101941', 'co0106070', 'co0110090', 'co0011555', 'co0438107', 'co0372744', 'co0692919', 'co0118308', 'co0256390', 'co0134706', 'co0056265', 'co0302997', 'co0077674', 'co0075764', 'co0158349', 'co0519888', 'co0053539', 'co0006819', 'co0863266', 'co0307857', 'co0350543', 'co0094757', 'co0176140', 'co0705983', 'co0816712', 'co0720464', 'co0782945', 'co0040785', 'co0770152', 'co0094779', 'co0504146', 'co0032440', 'co0705982', 'co0183230', 'co0350637', 'co0214931', 'co0858195', 'co0081227', 'co0565132', 'co0076018', 'co0239855', 'co0758947', 'co0456097', 'co0421999', 'co0120631', 'co0301198', 'co0187668', 'co0934836', 'co0826866', 'co0626392', 'co0220585', 'co0764931', 'co0870245', 'co0940463', 'co0918687', 'co0064773', 'co0725649', 'co0633129', 'co0108012', 'co0850083', 'co0810652', 'co0209324', 'co0218220', 'co0535056', 'co0128866', 'co0106448', 'co0804751', 'co0287772', 'co0009906', 'co0870244', 'co0512860', 'co0002939', 'co0029726', 'co0237555', 'co0619970', 'co0123357', 'co0215074', 'co0185616', 'co0505091', 'co0402893', 'co0225995', 'co0796988', 'co0304370', 'co0286417', 'co0185428', 'co0162942', 'co0162942', 'co0362429', 'co0046746', 'co0038141', 'co0179187', 'co0072019', 'co0920944', 'co0563079', 'co0290255', 'co0245917', 'co0101954', 'co0094755', 'co0078954', 'co0991324', 'co0364444', 'co0497928', 'co0495055', 'co0227665', 'co0221830', 'co0007935', 'co0959586', 'co0812966', 'co0537026', 'co0297444', 'co0258778', 'co0197868', 'co0152618', 'co0030066', 'co0028883', 'co0882558', 'co0830537', 'co0679446', 'co0516429', 'co0237970', 'co0179125', 'co0051678', 'co0013187', 'co1017479', 'co0825783', 'co0730604', 'co0724683', 'co0664213', 'co0649990', 'co0427039', 'co0154279', 'co0118328', 'co0108205', 'co0075148', 'co1022038', 'co0819108', 'co0570824', 'co0504952', 'co0491625', 'co0445543', 'co0423665', 'co0416202', 'co0166128', 'co0139177', 'co0108370', 'co0039510', 'co1009463', 'co1005816', 'co0904295', 'co0823159', 'co0822856', 'co0815746', 'co0780034', 'co0738220', 'co0725007', 'co0724684', 'co0705919', 'co0654365', 'co0609695', 'co0416473', 'co0335868', 'co0219725', 'co0113272', 'co0106320', 'co0030701', 'co0836843', 'co0813815', 'co0775557', 'co0748065', 'co0701804', 'co0620395', 'co0505090', 'co0453813', 'co0403730', 'co0399929', 'co0352118', 'co0256160', 'co0252812', 'co0245148', 'co0244887', 'co0225757', 'co0206213', 'co0191174', 'co0177654', 'co0131854', 'co0131608', 'co0077865', 'co0070086', 'co0052955', 'co0043200', 'co0031809', 'co0025297', 'co0017870', 'co1063179', 'co1051569', 'co1031570', 'co1031569', 'co1031568', 'co0932647', 'co0840651', 'co0817266', 'co0805127', 'co0769869', 'co0764429', 'co0764375', 'co0747433', 'co0745167', 'co0738052', 'co0725008', 'co0676595', 'co0626379', 'co0544343', 'co0543922', 'co0524188', 'co0502853', 'co0497383', 'co0497257', 'co0491626', 'co0427898', 'co0410678', 'co0382216', 'co0357957', 'co0312698', 'co0298415', 'co0227481', 'co0224399', 'co0146101', 'co0125165', 'co0117476', 'co0112558', 'co0104518', 'co0077784', 'co0060316', 'co0056681', 'co0031565', 'co0004441', 'co1058424', 'co1040646', 'co0981172', 'co0937798', 'co0856617', 'co0793828', 'co0793828', 'co0670752', 'co0662755', 'co0635467', 'co0502722', 'co0498720', 'co0453812', 'co0395391', 'co0352634', 'co0339073', 'co0333669', 'co0308496', 'co0240701', 'co0218114', 'co0194242', 'co0183782', 'co0173783', 'co0150853', 'co0108196', 'co0011676'],
 				},
-				MetaTools.CompanyWeinstein : {
+				MetaCompany.CompanyWeinstein : {
 					MetaProvider.CompanyOriginal	: {},
 					MetaProvider.CompanyStudio		: ['co0150452'],
 					MetaProvider.CompanyNetwork		: [],
 					MetaProvider.CompanyVendor		: ['co0368345', 'co0446953', 'co0210128', 'co0349607'],
 				},
-				MetaTools.CompanyYoutube : {
+				MetaCompany.CompanyYoutube : {
 					# Show (176): Level-4
 					# Movie (54): Level-4
 					MetaProvider.CompanyOriginal	: {
@@ -6101,20 +6200,20 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyApple			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyConstantin	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyApple			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmazon		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyDreamworks	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyConstantin	: [MetaProvider.CompanyVendor]},
 
 																'co0449307', # Weltkino Filmverleih (tt4420704)
 																'co0814477', # Universal Pictures Home Entertainment (tt7069740)
@@ -6125,7 +6224,7 @@ class MetaImdb(MetaProvider):
 					MetaProvider.CompanyNetwork		: ['co0202446', 'co1055457', 'co0715084', 'co1017567', 'co0574035', 'co0847367', 'co0883766', 'co0925788', 'co1020655', 'co0722763', 'co0687834', 'co0494570', 'co1045018', 'co1009431', 'co0701624', 'co1038049', 'co1025883'],
 					MetaProvider.CompanyVendor		: ['co0506705', 'co0457964', 'co0932994', 'co0711702', 'co0702332', 'co0506486', 'co0957563'],
 				},
-				MetaTools.CompanyZdf : {
+				MetaCompany.CompanyZdf : {
 					# Show (2161): Level-2 to Level-3
 					# Movie (6858): Level-1 to Level-2
 					# Has tons of non-original content from US, UK, and other countries. Very difficult to filter, especailly the BBC content.
@@ -6148,27 +6247,27 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Show : {
 															'exclude' : [
-																#{MetaTools.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt2294189, tt13925166, tt7263154. Not for tt8879894, tt6811236.
-																{MetaTools.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0141842, tt11847842
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyCbs			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAbc			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFox			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyFx			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyUsa			: [MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt3032476, tt1399664
-																{MetaTools.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt0412253
-																{MetaTools.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt1542981, tt4316650
-																#{MetaTools.CompanyAe			: [MetaProvider.CompanyNetwork]}, # tt0112130. Not for tt0253839.
+																#{MetaCompany.CompanyNetflix		: [MetaProvider.CompanyNetwork]}, # tt2294189, tt13925166, tt7263154. Not for tt8879894, tt6811236.
+																{MetaCompany.CompanyHbo			: [MetaProvider.CompanyNetwork]}, # tt0141842, tt11847842
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyCbs			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAbc			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFox			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyFx			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyShowtime		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyNickelodeon	: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDiscovery		: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyUsa			: [MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyAmc			: [MetaProvider.CompanyNetwork]}, # tt3032476, tt1399664
+																{MetaCompany.CompanyHulu			: [MetaProvider.CompanyNetwork]}, # tt0412253
+																{MetaCompany.CompanyHistory		: [MetaProvider.CompanyNetwork]}, # tt1542981, tt4316650
+																#{MetaCompany.CompanyAe			: [MetaProvider.CompanyNetwork]}, # tt0112130. Not for tt0253839.
 
 																# There might be legitimit co-productions here, but there are too many UK titles cluttering the menu.
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt2294189, tt11847842
-																{MetaTools.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0118401
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]}, # tt2294189, tt11847842
+																{MetaCompany.CompanyItv			: [MetaProvider.CompanyNetwork]}, # tt0118401
 
 																'co0062107', # Toei Animation (tt0122336)
 																'co0103544', # BBC Northern Ireland (tt2294189)
@@ -6186,18 +6285,18 @@ class MetaImdb(MetaProvider):
 														},
 														Media.Movie : {
 															'exclude' : [
-																{MetaTools.CompanyBbc			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]},
-																{MetaTools.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyBbc			: [MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork]},
+																{MetaCompany.CompanyDisney		: [MetaProvider.CompanyStudio, MetaProvider.CompanyVendor]},
 
-																{MetaTools.CompanySony			: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyWarner		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyUniversal		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyColumbia		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyMgm			: [MetaProvider.CompanyVendor]},
-																{MetaTools.Company20thcentury	: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyParamount		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
-																{MetaTools.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanySony			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyWarner		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyUniversal		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyColumbia		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyMgm			: [MetaProvider.CompanyVendor]},
+																{MetaCompany.Company20thcentury	: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyParamount		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyLionsgate		: [MetaProvider.CompanyVendor]},
+																{MetaCompany.CompanyTouchstone	: [MetaProvider.CompanyVendor]},
 
 																'co0150452', # The Weinstein Company (tt1126590)
 															],
@@ -6279,7 +6378,7 @@ class MetaImdb(MetaProvider):
 		for i in [None, MetaProvider.CompanyStudio, MetaProvider.CompanyNetwork, MetaProvider.CompanyVendor]: # Order is important, since we want to eg place studios before vendors, in case the URL gets cut off.
 			value = data[i]
 			if value:
-				value = Tools.listInterleave(*value) # Interleave, so if there are mutiple companies, the IDs with the most titles for each are added to the front of the list.
+				value = Tools.listInterleave(*value) # Interleave, so if there are multiple companies, the IDs with the most titles for each are added to the front of the list.
 				if value: companies.extend(value)
 
 		if original:
@@ -6323,7 +6422,7 @@ class MetaImdb(MetaProvider):
 												elif i == 'exclude': value3 = [(MetaImdb.Negate + n.lstrip(MetaImdb.Negate)) for n in value3 if not n.lstrip(MetaImdb.Negate) in allow]
 												data[m].append(value3)
 
-			# Interleave, so if there are mutiple companies, the IDs with the most titles for each are added to the front of the list.
+			# Interleave, so if there are multiple companies, the IDs with the most titles for each are added to the front of the list.
 			# There might be so many IDs dropped, that we have to get the most important to the front.
 			# Eg: [all-custom, first-10-networks, first-3-studios, first-5-vendors, next-10-networks, next-3-studios, next-10-vendors, remaining-networks, remaining-studios, remaining-vendors]
 			competitors = [[], [], []]
@@ -6375,7 +6474,7 @@ class MetaImdb(MetaProvider):
 	# PARAMETER
 	##############################################################################
 
-	def _parameterInitialize(self, link = None, media = None, niche = None, id = None, query = None, keyword = None, type = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, gender = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, adult = None, filter = None, view = None, **parameters):
+	def _parameterInitialize(self, link = None, media = None, niche = None, id = None, query = None, keyword = None, type = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, gender = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, adult = None, filter = None, view = None, **parameters):
 		result = {}
 
 		if filter is None:
@@ -6596,6 +6695,9 @@ class MetaImdb(MetaProvider):
 						type.append(MetaImdb.TypeMovie)
 		if not type is None: result['title_type'] = Tools.listUnique(self._parameterExclude(type))
 
+		yeared = year[0] if (year and Tools.isArray(year)) else year
+		past = not date and yeared and yeared <= Time.year() # Check before date is changed below.
+
 		# Company
 		# Place before date.
 		company = self._convertCompanies(media = media, niche = niche, company = company, studio = studio, network = network)
@@ -6614,12 +6716,12 @@ class MetaImdb(MetaProvider):
 		if not release is None:
 			if sort is None:
 				sort = MetaImdb.SortDate
-				if order is None: order = MetaImdb.OrderAscending
+				if order is None: order = MetaImdb.OrderDescending
 			if release == MetaImdb.ReleaseNew:
-				if date is None: date = [None, Time.timestamp()]
+				if date is None: date = [None if sort == MetaImdb.SortDate else Time.past(days = 365, format = Time.FormatTimestamp), Time.timestamp()]
 			elif release == MetaImdb.ReleaseHome:
-				if date is None: date = [None, Time.timestamp()]
-				if online is None: online = MetaImdb.Onlines
+				if date is None: date = [None if sort == MetaImdb.SortDate else Time.past(days = 365, format = Time.FormatTimestamp), Time.timestamp()]
+				if watch is None: watch = MetaImdb.Watches
 			elif release == MetaImdb.ReleaseFuture:
 				if date is None: date = [Time.future(days = 1, format = Time.FormatTimestamp), None]
 
@@ -6668,14 +6770,14 @@ class MetaImdb(MetaProvider):
 		niched = [niche] if Tools.isString(niche) else Tools.copy(niche) if Tools.isArray(niche) else []
 		if isAnime: niched.append(Media.Anime)
 		if isDonghua: niched.append(Media.Donghua)
-		rating, votes = self._voting(media = media, niche = niched, release = release, year = year, date = date, genre = genre, language = language, country = country, certificate = certificate, company = company, status = status, rating = rating, votes = votes, sort = True, active = True) # active=True: many users vote on IMDb.
+		rating, votes = self._voting(media = media, niche = niched, release = release, year = year, date = date, past = past, genre = genre, language = language, country = country, certificate = certificate, company = company, status = status, rating = rating, votes = votes, sort = True, active = True) # active=True: many users vote on IMDb.
 		if Media.isExplore(niche):
 			if Media.isAll(niche):
 				pass
 			elif Media.isNew(niche):
 				if sort is None: sort = MetaImdb.SortDate
 			elif Media.isHome(niche):
-				if online is None: online = MetaImdb.Onlines
+				if watch is None: watch = MetaImdb.Watches
 				if sort is None: sort = MetaImdb.SortDate
 			elif Media.isBest(niche):
 				if sort is None: sort = MetaImdb.SortRating
@@ -6808,7 +6910,7 @@ class MetaImdb(MetaProvider):
 				exclude = []
 				excludes = [['in'], ['tr']]
 
-				# Currently do not do this. It seems the language filtering above removes the neccessary India/Turkish titles.
+				# Currently do not do this. It seems the language filtering above removes the necessary India/Turkish titles.
 				'''for i in excludes:
 					if not any(j in i for j in setting):
 						if not Tools.isArray(country) or not any(j in contains for j in i):
@@ -6846,13 +6948,13 @@ class MetaImdb(MetaProvider):
 		if not group is None:
 			if group is True:
 				# Most IMDb parameters, except for title_type, use AND for a comma-separated list, not "OR"
-				# Hence, specifying mutiple groups requires a title to match ALL groups, not ANY group.
+				# Hence, specifying multiple groups requires a title to match ALL groups, not ANY group.
 				# https://community-imdb.sprinklr.com/conversations/imdbcom/ats-support-for-or-searches-in-genres-countries-and-other-fields/5f4a79d48815453dba8c71d8
 				if isMovie: group = MetaImdb.GroupOscarWinner
 				elif isShow: group = MetaImdb.GroupEmmyWinner
 			if not Tools.isArray(group): group = [group]
 
-			# IMDb has changed there groups mutiple times over the past weeks.
+			# IMDb has changed there groups multiple times over the past weeks.
 			# There is no consistency, sometimes using singular, other times plural.
 			if isPerson:
 				for i in range(len(group)):
@@ -6868,17 +6970,17 @@ class MetaImdb(MetaProvider):
 			gender = self._convertGender(gender = gender, default = True)
 			result['gender'] = self._parameterExclude(gender)
 
-		# Online
-		if not online is None:
-			if not Tools.isArray(online): online = [online]
-			for i in range(len(online)):
-				value = online[i]
-				if value is True: value = MetaImdb.OnlinesList if isList else MetaImdb.Onlines
-				elif value is False: value = self._parameterNegate(MetaImdb.OnlinesList if isList else MetaImdb.Onlines)
-				online[i] = value
-			if online:
-				online = Tools.listUnique(Tools.listFlatten(online))
-				if online: result['watch_option' if isList else 'online_availability'] = self._parameterExclude(online)
+		# Watch
+		if not watch is None:
+			if not Tools.isArray(watch): watch = [watch]
+			for i in range(len(watch)):
+				value = watch[i]
+				if value is True: value = MetaImdb.WatchesList if isList else MetaImdb.Watches
+				elif value is False: value = self._parameterNegate(MetaImdb.WatchesList if isList else MetaImdb.Watches)
+				watch[i] = value
+			if watch:
+				watch = Tools.listUnique(Tools.listFlatten(watch))
+				if watch: result['watch_option' if isList else 'online_availability'] = self._parameterExclude(watch)
 
 		# Theater
 		if not theater is None:
@@ -6992,12 +7094,20 @@ class MetaImdb(MetaProvider):
 	# LOG
 	##############################################################################
 
-	def _logFatal(self, id = None, code = None):
+	def _logFatal(self, id = None, code = None, update = None, missing = None):
+		# Increase the IMDb error counter.
+		# These errors should generally be seen as temporary errors, since it is mostly caused by temporary blocks after too many requests were made in a short period of time.
+		if update: self._errorUpdate()
+
 		details = ''
 		if id and code: details = ' [%s - %s]' % (id, code)
 		elif id: details = ' [%s]' % id
 		elif code: details = ' [%s]' % code
-		self._log(details, 'The IMDb data cannot be processed. This might be because too many requests where made in a short period of time and IMDb is temporarily blocking requests from your IP.', type = Logger.TypeFatal)
+
+		if missing: missing = 'This could also be due to missing data on IMDb, especially if it is very recent or future release.'
+		else: missing = ''
+
+		self._log(details, 'The IMDb data cannot be processed. This might be because too many requests where made in a short period of time and IMDb is temporarily blocking requests from your IP.' + missing, type = Logger.TypeFatal)
 		return None
 
 	def _logError(self, id = None, message = None, attribute = None):
@@ -7038,7 +7148,7 @@ class MetaImdb(MetaProvider):
 				if (failsafe and result is False) or result == MetaImdb.Privacy: self._cacheDelete(function = self._requestData, link = link, language = language_, country = country_, method = method, timeout_ = timeout)
 			return (result, link) if internal else result
 		except:
-			self._error()
+			self._logError()
 		finally:
 			if lock: self._unlock(limit = lock)
 		return (None, link) if internal else None
@@ -7056,6 +7166,9 @@ class MetaImdb(MetaProvider):
 		# Not entirley certain if this actually works, but with a random agent these errors seem to be less frequent than with a fixed user agent.
 		networker = Networker()
 		result = networker.requestText(method = method, link = link, data = data, headers = self._requestHeaders(language = language, country = country), agent = Networker.AgentDesktopRandom, timeout = timeout_)
+
+		error = networker.responseErrorType()
+		if error and error in Networker.ErrorServer: self._errorUpdate()
 
 		# Private watchlists (which is just a normal list) returns 404.
 		# Private ratings lists returns 403.
@@ -7085,6 +7198,14 @@ class MetaImdb(MetaProvider):
 		headers[Networker.HeaderAcceptEncoding] = 'gzip, deflate, br'
 
 		return headers
+
+	##############################################################################
+	# CLEAN
+	##############################################################################
+
+	@classmethod
+	def cleanTitle(self, data):
+		return self._extractTitle(data = data)
 
 	##############################################################################
 	# EXTRACT
@@ -7161,15 +7282,58 @@ class MetaImdb(MetaProvider):
 		except: Logger.error()
 		return None
 
-	def _extractNiche(self, data):
+	def _extractNiche(self, data, item = None):
 		try:
 			niche = []
 			if data == MetaImdb.TypeMovie or data == MetaImdb.TypeMovieFeature: niche.append(Media.Feature)
 			if data == MetaImdb.TypeMovieTv or data == MetaImdb.TypeShortTv: niche.append(Media.Television)
 			if data == MetaImdb.TypeShort or data == MetaImdb.TypeShortTv: niche.append(Media.Short)
 			if data == MetaImdb.TypeSpecial: niche.append(Media.Special)
-			if data == MetaImdb.TypeMiniseries: niche.append(Media.Mini)
+
+			if data == MetaImdb.TypeMiniseries:
+				# Sometimes IMDb marks a show as mini-series, but there are more than one seasons.
+				# Maybe a mistake on IMDb. The show was originally intended as a mini-series, but later they decide to add new seasons.
+				# Eg: tt20234568 (mini-series type, but 2 seasons).
+				multi = False
+				if item:
+					seasons = self._extract(data = item, keys = ['episodes', 'seasons'])
+					if seasons:
+						for season in seasons:
+							season = season.get('number')
+							if season and season > 1:
+								multi = True
+								break
+
+				if multi: niche.append(Media.Multi)
+				else: niche.append(Media.Mini)
+			elif data == MetaImdb.TypeShow:
+				niche.append(Media.Multi)
+
 			if niche: return niche
+		except: Logger.error()
+		return None
+
+	# Static, since it is called from cleanTitle().
+	@classmethod
+	def _extractTitle(self, data):
+		try:
+			if data:
+				# Titles that are a pure number (eg: "1984") will be interpreted as an integer in CSVs. Cast to string.
+				data = str(data)
+
+				# Future/unreleased episodes use this format:
+				#	Episode #4.1
+				# Clean it to be consistent with other providers:
+				#	Episode 1
+				temp = Regex.extract(data = data, expression = '([a-z]+\s)\s*#(?:\d+\.)?(\d+)', group = None)
+				if temp: data = temp[0] + temp[1]
+
+				# Titles ending in a slash.
+				# Eg: Nate Bargatze/Jessica Williams/Nicole Avant/Darlene Love/
+				# Eg: Ray Romano/Rose/
+				data = data.rstrip('/')
+
+				return data
 		except: Logger.error()
 		return None
 
@@ -7196,6 +7360,49 @@ class MetaImdb(MetaProvider):
 		except: Logger.error()
 		return None
 
+	def _extractImage(self, data):
+		try:
+			images = {i : [] for i in (None, MetaImage.TypePoster, MetaImage.TypeFanart, MetaImage.TypeThumb)}
+
+			for i in data:
+				try:
+					i = i['node']
+					link = self.linkImage(link = i['url'])
+					if link:
+						width = i.get('width') or 1
+						height = i.get('height') or 1
+						aspect = width / height
+
+						# Eg: https://www.imdb.com/title/tt29425792/
+						if aspect > 1: # Landscape
+							item = {'link' : link, 'quality' : width}
+							if width >= 800: images[MetaImage.TypeFanart].append(item)
+							images[MetaImage.TypeThumb].append(item)
+						else: # Potrait
+							item = {'link' : link, 'quality' : height}
+							# Sometimes the image is slightly potrait, but is not a poster, but rather some character.
+							# https://m.media-amazon.com/images/M/MV5BYWFmNzRhYTUtY2M1ZS00OTM4LTljYzgtYmFjZjAxZmIxMTMxXkEyXkFqcGc@._V1_.jpg
+							if aspect > 0.85: images[None].append(item)
+							else: images[MetaImage.TypePoster].append(item)
+				except: Logger.error()
+
+			# Add the slightly portrait images as fanart/thumbnails if there are not any of those types.
+			# Since those portrait images still look better as background than the poster.
+			if images[None]:
+				for i in (MetaImage.TypeFanart, MetaImage.TypeThumb):
+					if not images[i]: images[i] = images[None]
+
+			# Sort by highest resolution.
+			result = {}
+			for type, image in images.items():
+				if type and image:
+					image = Tools.listSort(data = image, key = lambda i : i['quality'], reverse = True)
+					result[type] = [i['link'] for i in image]
+
+			return result
+		except: Logger.error()
+		return None
+
 	def _extractTime(self, data):
 		try:
 			if data: return Time.timestamp(data, format = '%Y-%m-%dT%H:%M:%SZ', utc = True)
@@ -7210,16 +7417,26 @@ class MetaImdb(MetaProvider):
 
 			date = data.get('releaseDate')
 			if date:
-				year = date.get('year')
-				month = date.get('month')
-				day = date.get('day')
+				if Tools.isDictionary(date):
+					year = date.get('year')
+					month = date.get('month')
+					day = date.get('day')
+
+					# Sometimes the date only has a year or a year+month for as few less-known titles.
+					# If there is a year and month, assume it is the last day of the month
+					if year and month and not day: day = 28 if month == 2 else 30
+				elif Tools.isString(date) and '-' in date:
+					return date
 
 			# Sometimes the release date is wrong.
 			# Eg: The Office (UK) tt0290978: Release date 2023-01-23 | Release year: 2001-2003.
 			date = data.get('releaseYear')
 			if date:
-				year2 = date.get('year')
-				if not year or (year2 and year2 < year): year = year2
+				if Tools.isDictionary(date):
+					year2 = date.get('year')
+					if not year or (year2 and year2 < year): year = year2
+				else:
+					if not year: year = date
 
 			if year and month and day: return '%d-%02d-%02d' % (year, month, day)
 		except: Logger.error()
@@ -7263,13 +7480,13 @@ class MetaImdb(MetaProvider):
 
 	def _extractCountry(self, data):
 		try:
-			if data: return [i.lower() for i in data] if Tools.isArray(data) else data.lower()
+			if data: return Country.codes([i.lower() for i in data] if Tools.isArray(data) else data.lower())
 		except: Logger.error()
 		return None
 
 	def _extractLanguage(self, data):
 		try:
-			if data: return [i.lower() for i in data] if Tools.isArray(data) else data.lower()
+			if data: return Language.codes([i.lower() for i in data] if Tools.isArray(data) else data.lower())
 		except: Logger.error()
 		return None
 
@@ -7370,6 +7587,38 @@ class MetaImdb(MetaProvider):
 				try: award['nominations'] = data['nominations']
 				except: pass
 				if award: return [award]
+		except: Logger.error()
+		return None
+
+	def _extractCount(self, data):
+		try:
+			if data:
+				episode = None
+				season = None
+				unknown = None
+
+				try: episode = data['episodes']['total']
+				except: Logger.error()
+
+				try: unknown = data['unknownSeasonEpisodes']['total']
+				except: Logger.error()
+
+				try:
+					seasons = [i['number'] for i in data['seasons']]
+					if seasons: season = max(seasons)
+				except: Logger.error()
+
+				count = {}
+				if not episode is None:
+					if not 'episode' in count: count['episode'] = {}
+					count['episode']['total'] = episode
+				if not unknown is None:
+					if not 'episode' in count: count['episode'] = {}
+					count['episode']['unknown'] = unknown
+				if not season is None:
+					if not 'season' in count: count['season'] = {}
+					count['season']['total'] = season
+				if count: return count
 		except: Logger.error()
 		return None
 
@@ -7521,6 +7770,7 @@ class MetaImdb(MetaProvider):
 					# Extract media, in case different medias are returned (eg: global search returning movies and shows together).
 					for item in items:
 						self._dataSet(item = item, key = 'media', value = self.mMetatools.media(metadata = item, media = media))
+
 						self._dataSet(item = item, key = 'niche', value = self.mMetatools.niche(metadata = item, media = media, niche = niche))
 
 						# IMDb often only returns partial metadata.
@@ -7529,6 +7779,7 @@ class MetaImdb(MetaProvider):
 						# If we for instance discover the History genre, IMDb retruns a bunch of titles where the genre is listed as 4th or 5th genre.
 						# Hence, the History genre is not added to the metadata and some titles might later be filtered out locally.
 						# Add the search parameter to the metadata to avoid this.
+
 						if genre: self._dataSet(item = item, key = 'genre', value = genre)
 						if language: self._dataSet(item = item, key = 'language', value = language)
 						if country: self._dataSet(item = item, key = 'country', value = country)
@@ -7561,7 +7812,7 @@ class MetaImdb(MetaProvider):
 							if filterType and not type in filterType: continue
 
 							self._extract(result = result, data = item, attribute = 'media', keys = ['titleType', 'id'], function = self._extractMedia)
-							self._extract(result = result, data = item, attribute = 'niche', keys = ['titleType', 'id'], function = self._extractNiche)
+							self._extract(result = result, data = item, attribute = 'niche', keys = ['titleType', 'id'], function = lambda x : self._extractNiche(x, item = item))
 
 							if Media.isEpisode(result.get('media')):
 								self._extract(result = result, data = item, attribute = ['imdb'], keys = ['series', 'id'])
@@ -7575,10 +7826,11 @@ class MetaImdb(MetaProvider):
 								else: result['id'] = {'imdb' : result['imdb']}
 							else: continue
 
-							self._extract(result = result, data = item, attribute = 'title', keys = ['titleText'])
-							self._extract(result = result, data = item, attribute = 'originaltitle', keys = ['originalTitleText'])
+							self._extract(result = result, data = item, attribute = 'title', keys = ['titleText'], function = self._extractTitle)
+							self._extract(result = result, data = item, attribute = 'originaltitle', keys = ['originalTitleText'], function = self._extractTitle)
 							self._extract(result = result, data = item, attribute = 'plot', keys = ['plot'], function = self._extractDescription)
 							self._extract(result = result, data = item, attribute = 'year', keys = ['releaseYear'])
+							self._extract(result = result, data = item, attribute = 'premiered', function = self._extractPremiered)
 							self._extract(result = result, data = item, attribute = 'mpaa', keys = ['certificate'], function = lambda x : self._extractCertificate(x, media = media))
 							self._extract(result = result, data = item, attribute = 'duration', keys = ['runtime'])
 							self._extract(result = result, data = item, attribute = 'genre', keys = ['genres'], function = self._extractGenre)
@@ -7594,6 +7846,11 @@ class MetaImdb(MetaProvider):
 
 							result['rating'] = self._data(resultImdb, ['voting', 'rating'])
 							result['votes'] = self._data(resultImdb, ['voting', 'votes'])
+
+							premiered = result.get('premiered')
+							if premiered:
+								if not result.get('time'): result['time'] = {}
+								result['time'][MetaTools.TimePremiere] = ConverterTime(premiered, format = ConverterTime.FormatDate, utc = True).timestamp()
 
 							result['temp'] = {'imdb' : {}} # Always add the IMDb temp, since we check if the this item is from an IMDb list in metadataImdb().
 							if resultImdb: result['temp']['imdb'] = resultImdb
@@ -7705,6 +7962,7 @@ class MetaImdb(MetaProvider):
 									if filterMovie and Regex.match(data = title, expression = '^\s*episode:', cache = True): continue # Some movie lists contain shows.
 									elif filterShow and Regex.match(data = title, expression = '^\s*movie:', cache = True): continue # Some show lists contain movies.
 
+									title = self._extractTitle(title)
 									result['title'] = title
 									result['originaltitle'] = title
 							except: pass
@@ -7807,7 +8065,7 @@ class MetaImdb(MetaProvider):
 										except: pass
 
 							try:
-								ratingTime = ConverterTime(Regex.extract(data = itemData, expression = 'rated\s*on\s*(.*?)<', group = 1, cache = True), format = ConverterTime.FormatDateShort).timestamp()
+								ratingTime = ConverterTime(Regex.extract(data = itemData, expression = 'rated\s*on\s*(.*?)<', group = 1, cache = True, utc = True), format = ConverterTime.FormatDateShort).timestamp()
 								if ratingTime:
 									if not 'voting' in resultImdb: resultImdb['voting'] = {}
 									resultImdb['voting']['time'] = ratingTime
@@ -7890,7 +8148,7 @@ class MetaImdb(MetaProvider):
 							self._extract(result = result, data = item, attribute = ['id', 'user'], keys = ['author', 'userId'])
 							result['user'] = result.get('id').get('user')
 
-							self._extract(result = result, data = item, attribute = 'title', keys = ['name', 'originalText'])
+							self._extract(result = result, data = item, attribute = 'title', keys = ['name', 'originalText'], function = self._extractTitle)
 							self._extract(result = result, data = item, attribute = 'plot', keys = ['description', 'originalText', 'plainText'], function = self._extractDescription)
 
 							self._extract(result = result, data = item, attribute = ['time', 'added'], keys = ['createdDate'], function = self._extractTime)
@@ -7946,16 +8204,21 @@ class MetaImdb(MetaProvider):
 							if filterType and not type in filterType: continue
 
 							self._extract(result = result, data = item, attribute = 'media', keys = ['titleType', 'id'], function = self._extractMedia)
-							self._extract(result = result, data = item, attribute = 'niche', keys = ['titleType', 'id'], function = self._extractNiche)
+							self._extract(result = result, data = item, attribute = 'niche', keys = ['titleType', 'id'], function = lambda x : self._extractNiche(x, item = item))
 
-							self._extract(result = result, data = item, attribute = 'imdb', keys = ['id'])
+							# Get the show ID, not the episode ID, when episodes are added to lists.
+							# This data does not seem to have the season and episode numbers, only the episode ID.
+							# Hence, we cannot return episodes from the watchlist (like Trakt), but only the show the episodes belongs to.
+							self._extract(result = result, data = item, attribute = 'imdb', keys = ['series', 'series', 'id'])
+							if not result.get('imdb'): self._extract(result = result, data = item, attribute = 'imdb', keys = ['id'])
 							if 'imdb' in result: result['id'] = {'imdb' : result['imdb']}
 							else: continue
 
-							self._extract(result = result, data = item, attribute = 'title', keys = ['titleText', 'text'])
-							self._extract(result = result, data = item, attribute = 'originaltitle', keys = ['originalTitleText', 'text'])
+							self._extract(result = result, data = item, attribute = 'title', keys = ['titleText', 'text'], function = self._extractTitle)
+							self._extract(result = result, data = item, attribute = 'originaltitle', keys = ['originalTitleText', 'text'], function = self._extractTitle)
 							self._extract(result = result, data = item, attribute = 'plot', keys = ['plot', 'plotText', 'plainText'], function = self._extractDescription)
 							self._extract(result = result, data = item, attribute = 'year', keys = ['releaseYear', 'year'])
+							self._extract(result = result, data = item, attribute = 'premiered', function = self._extractPremiered)
 							self._extract(result = result, data = item, attribute = 'mpaa', keys = ['certificate', 'rating'], function = lambda x : self._extractCertificate(x, media = media))
 							self._extract(result = result, data = item, attribute = 'duration', keys = ['runtime', 'seconds'])
 							self._extract(result = result, data = item, attribute = 'genre', keys = ['titleGenres', 'genres'], function = self._extractGenre)
@@ -7972,6 +8235,11 @@ class MetaImdb(MetaProvider):
 
 							result['rating'] = self._data(resultImdb, ['voting', 'rating'])
 							result['votes'] = self._data(resultImdb, ['voting', 'votes'])
+
+							premiered = result.get('premiered')
+							if premiered:
+								if not result.get('time'): result['time'] = {}
+								result['time'][MetaTools.TimePremiere] = ConverterTime(premiered, format = ConverterTime.FormatDate, utc = True).timestamp()
 
 							result['temp'] = {'imdb' : {}} # Always add the IMDb temp, since we check if the this item is from an IMDb list in metadataImdb().
 							if resultImdb: result['temp']['imdb'] = resultImdb
@@ -8139,8 +8407,6 @@ class MetaImdb(MetaProvider):
 
 	def _extractCsv(self, data, media = None, niche = None, filterMovie = None, filterDocu = None, filterShort = None, filterSpecial = None, filterShow = None, filterRating = None, filterUser = None):
 		try:
-			from lib.modules.tools import Csv
-
 			result = []
 			items = Csv.decode(data = data, header = True, structured = True, convertList = False) # Do not convert lists, since the Title column might be split into a list if it contains a comma.
 
@@ -8218,18 +8484,18 @@ class MetaImdb(MetaProvider):
 				except: pass
 
 				try:
-					added = ConverterTime(data['Created'], format = ConverterTime.FormatDate).timestamp()
+					added = ConverterTime(data['Created'], format = ConverterTime.FormatDate, utc = True).timestamp()
 					if added: resultList['added'] = added
 				except: pass
 
 				try:
-					updated = ConverterTime(data['Modified'], format = ConverterTime.FormatDate).timestamp()
+					updated = ConverterTime(data['Modified'], format = ConverterTime.FormatDate, utc = True).timestamp()
 					if updated: resultList['updated'] = updated
 				except: pass
 
 				try:
 					title = data.get('Title')
-					if title: result['title'] = result['originaltitle'] = str(title) # Titles that are a pure number (eg: "1984") will be interpreted as an integer. Cast to string.
+					if title: result['title'] = result['originaltitle'] = self._extractTitle(title)
 				except: pass
 
 				try:
@@ -8288,7 +8554,7 @@ class MetaImdb(MetaProvider):
 				except: pass
 
 				try:
-					ratingTime = ConverterTime(data.get('Date Rated'), format = ConverterTime.FormatDate).timestamp()
+					ratingTime = ConverterTime(data.get('Date Rated'), format = ConverterTime.FormatDate, utc = True).timestamp()
 					if ratingTime:
 						if not 'voting' in resultImdb: resultImdb['voting'] = {}
 						resultImdb['voting']['time'] = ratingTime
@@ -8314,8 +8580,8 @@ class MetaImdb(MetaProvider):
 								if not 'premiered' in result:
 									try:
 										for format in [ConverterTime.FormatDateAmerican, ConverterTime.FormatDateAmericanShort, ConverterTime.FormatDateAmerican.replace(',', ''), ConverterTime.FormatDateAmericanShort.replace(',', '')]:
-											premiered = ConverterTime(date, format = format).string(format = ConverterTime.FormatDate)
-											if not premiered and '.' in date: premiered = ConverterTime(date.replace('.', ''), format = format).string(format = ConverterTime.FormatDate)
+											premiered = ConverterTime(date, format = format, utc = True).string(format = ConverterTime.FormatDate)
+											if not premiered and '.' in date: premiered = ConverterTime(date.replace('.', ''), format = format, utc = True).string(format = ConverterTime.FormatDate)
 											if premiered:
 												result['premiered'] = premiered
 												break
@@ -8346,12 +8612,12 @@ class MetaImdb(MetaProvider):
 				except: pass
 
 				try:
-					added = ConverterTime(data['Created'], format = ConverterTime.FormatDate).timestamp()
+					added = ConverterTime(data['Created'], format = ConverterTime.FormatDate, utc = True).timestamp()
 					if added: resultList['added'] = added
 				except: pass
 
 				try:
-					updated = ConverterTime(data['Modified'], format = ConverterTime.FormatDate).timestamp()
+					updated = ConverterTime(data['Modified'], format = ConverterTime.FormatDate, utc = True).timestamp()
 					if updated: resultList['updated'] = updated
 				except: pass
 
@@ -8465,16 +8731,16 @@ class MetaImdb(MetaProvider):
 	# DISCOVER
 	##############################################################################
 
-	def discover(self, media = None, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
-		try: return self._retrieve(reduce = True, link = MetaImdb.LinkSearchTitle, media = media, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+	def discover(self, media = None, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+		try: return self._retrieve(reduce = True, link = MetaImdb.LinkSearchTitle, media = media, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 		except: Logger.error()
 		return None
 
-	def discoverMovie(self, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
-		return self.discover(media = Media.Movie, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+	def discoverMovie(self, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+		return self.discover(media = Media.Movie, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 
-	def discoverShow(self, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
-		return self.discover(media = Media.Show, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+	def discoverShow(self, niche = None, id = None, query = None, keyword = None, status = None, release = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+		return self.discover(media = Media.Show, niche = niche, id = id, query = query, keyword = keyword, status = status, release = release, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 
 	def discoverPerson(self, query = None, group = None, gender = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
 		try: return self._retrieve(reduce = True, link = MetaImdb.LinkSearchPerson, query = query, group = group, gender = gender, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
@@ -8485,15 +8751,15 @@ class MetaImdb(MetaProvider):
 	# SEARCH
 	##############################################################################
 
-	def search(self, media = None, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+	def search(self, media = None, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
 		if filter is None: filter = MetaProvider.FilterNone # Do not filter when searching.
-		return self.discover(media = media, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+		return self.discover(media = media, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 
-	def searchMovie(self, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
-		return self.search(media = Media.Movie, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+	def searchMovie(self, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+		return self.search(media = Media.Movie, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 
-	def searchShow(self, media = None, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
-		return self.search(media = Media.Show, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
+	def searchShow(self, media = None, niche = None, query = None, keyword = None, status = None, year = None, date = None, duration = None, rating = None, votes = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, network = None, group = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
+		return self.search(media = Media.Show, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, rating = rating, votes = votes, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = group, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
 
 	def searchPerson(self, query = None, group = None, gender = None, limit = None, page = None, offset = None, sort = None, order = None, filter = None, cache = None):
 		return self.discoverPerson(query = query, group = group, gender = gender, limit = limit, page = page, offset = offset, sort = sort, order = order, filter = filter, cache = cache)
@@ -8546,14 +8812,14 @@ class MetaImdb(MetaProvider):
 	#	2. CSV: Limited filtering available in post-request. No sorting available. No images available. All items retrieved at once, therefore no paging. Should be used for non-menu where paging is not needed and/or all items are required at once.
 	# UPDATE: IMDb has now also changed the old page HTML. It now works similar to the Advanced Search and can return a maximum of 100 items. Use CSV by default.
 	# UPDATE (2024-11-11): IMDb has changed the CSV export again. Not it creates an export on AWS which takes some time to generate. But the only way to get the URL to the export is to be logged in, which is impossible via code.
-	def list(self, id = None, media = None, year = None, date = None, rating = None, votes = None, genre = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, csv = False, cache = None):
+	def list(self, id = None, media = None, year = None, date = None, rating = None, votes = None, genre = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, csv = False, cache = None):
 		try:
 			id = self._idList(id)
 			if csv:
 				items = self._retrieve(link = MetaImdb.LinkList, id = id, media = media, cache = cache, csv = True)
 				return self._filter(items = items, year = year, date = date, rating = rating, votes = votes, genre = genre)
 			else:
-				return self._retrieve(link = MetaImdb.LinkList, id = id, media = media, year = year, date = date, rating = rating, votes = votes, genre = genre, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, cache = cache)
+				return self._retrieve(link = MetaImdb.LinkList, id = id, media = media, year = year, date = date, rating = rating, votes = votes, genre = genre, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, cache = cache)
 		except: Logger.error()
 		return None
 
@@ -8564,14 +8830,14 @@ class MetaImdb(MetaProvider):
 	# Lists can be retrieve in one of the following ways:
 	#	1. HTML: Limited filtering available in pre-request. Paging and sorting available in pre-request. Should be used in menus if paging/filtering/sorting is used.
 	#	2. CSV: Limited filtering available in post-request. No sorting available. All items retrieved at once, therefore no paging. Should be used for non-menu where paging is not needed and/or all items are required at once.
-	def listWatch(self, user = None, id = None, media = None, year = None, date = None, rating = None, votes = None, genre = None, online = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, csv = False, cache = None):
+	def listWatch(self, user = None, id = None, media = None, year = None, date = None, rating = None, votes = None, genre = None, watch = None, theater = None, limit = None, page = None, offset = None, sort = None, order = None, csv = False, cache = None):
 		try:
 			# Note that this does not return the user's ratings.
 			# Ratings are only added to the CSV if the user is logged in (aka session cookies are added to the request).
 			if not id:
 				id = self.listId(link = self._linkListWatch(user = user))
 				if id == MetaImdb.Privacy: return id
-			if id: return self.list(id = id, media = media, year = year, date = date, rating = rating, votes = votes, genre = genre, online = online, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, csv = csv, cache = cache)
+			if id: return self.list(id = id, media = media, year = year, date = date, rating = rating, votes = votes, genre = genre, watch = watch, theater = theater, limit = limit, page = page, offset = offset, sort = sort, order = order, csv = csv, cache = cache)
 		except: Logger.error()
 		return None
 
@@ -8637,14 +8903,14 @@ class MetaImdb(MetaProvider):
 				Time.sleepRandom(0.5, 2.0)
 				return self.metadata(id = id, language = language, country = country, cache = MetaImdb.CacheNone, retry = int(retry) - 1)
 			else:
-				return self._logFatal(id = id, code = 'metadata-a')
+				return self._logFatal(id = id, code = 'metadata-a', update = True)
 
 		data = []
 		try: data.append(datas['mainColumnData'])
 		except: pass
 		try: data.append(datas['aboveTheFoldData'])
 		except: pass
-		if not data: return self._logFatal(id = id, code = 'metadata-b')
+		if not data: return self._logFatal(id = id, code = 'metadata-b', update = True)
 
 		result = {}
 		finance = {}
@@ -8657,10 +8923,10 @@ class MetaImdb(MetaProvider):
 			result['id'] = {'imdb' : result['imdb']}
 		else: return self._logFatal(id = id, code = 'metadata-c')
 
-		self._extract(id = id, result = result, data = data, attribute = 'niche', keys = ['titleType', 'id'], function = self._extractNiche) # Get mini-series niche.
+		self._extract(id = id, result = result, data = data, attribute = 'niche', keys = ['titleType', 'id'], function = lambda x : self._extractNiche(x, item = data)) # Get mini-series niche.
 
-		self._extract(id = id, result = result, data = data, attribute = 'title', keys = ['titleText', 'text'])
-		self._extract(id = id, result = result, data = data, attribute = 'originaltitle', keys = ['originalTitleText', 'text'])
+		self._extract(id = id, result = result, data = data, attribute = 'title', keys = ['titleText', 'text'], function = self._extractTitle)
+		self._extract(id = id, result = result, data = data, attribute = 'originaltitle', keys = ['originalTitleText', 'text'], function = self._extractTitle)
 		self._extract(id = id, result = result, data = data, attribute = 'plot', keys = ['plot', 'plotText', 'plainText'], function = self._extractDescription)
 		self._extract(id = id, result = result, data = data, attribute = 'year', keys = ['releaseYear', 'year'])
 		self._extract(id = id, result = result, data = data, attribute = 'premiered', function = self._extractPremiered)
@@ -8679,6 +8945,8 @@ class MetaImdb(MetaProvider):
 
 		self._extract(id = id, result = result, data = data, attribute = 'award', keys = ['prestigiousAwardSummary'], function = self._extractAward)
 
+		self._extract(id = id, result = result, data = data, attribute = 'count', keys = ['episodes'], function = self._extractCount)
+
 		self._extract(id = id, result = finance, data = data, attribute = 'budget', keys = ['productionBudget', 'budget', 'amount'])
 		self._extract(id = id, result = finance, data = data, attribute = 'revenue', keys = ['worldwideGross', 'total', 'amount'])
 		self._extract(id = id, result = finance, data = data, attribute = 'opening', keys = ['openingWeekendGross', 'gross', 'total', 'amount'])
@@ -8687,7 +8955,6 @@ class MetaImdb(MetaProvider):
 			except: pass
 			result['finance'] = finance
 
-		self._extract(id = id, result = tempImdb, data = data, attribute = ['image', 'poster'], keys = ['primaryImage', 'url'], function = self.linkImage)
 		self._extract(id = id, result = tempImdb, data = data, attribute = ['voting', 'rating'], keys = ['ratingsSummary', 'aggregateRating'], function = self._extractRating)
 		self._extract(id = id, result = tempImdb, data = data, attribute = ['voting', 'votes'], keys = ['ratingsSummary', 'voteCount'], function = self._extractVotes)
 		self._extract(id = id, result = tempMetacritic, data = data, attribute = ['voting', 'rating'], keys = ['metacritic', 'metascore', 'score'], function = self._extractMetacritic, log = False)
@@ -8695,13 +8962,42 @@ class MetaImdb(MetaProvider):
 		result['rating'] = self._data(tempImdb, ['voting', 'rating'])
 		result['votes'] = self._data(tempImdb, ['voting', 'votes'])
 
-		image = (tempImdb.get('image') or {}).get('poster')
-		if image:
-			image = MetaImage.create(link = image, provider = self.id(), sort = {MetaImage.SortIndex : 0, MetaImage.SortVote : 0})
-			if image: result[MetaImage.Attribute] = {MetaImage.TypePoster : [image]}
+		premiered = result.get('premiered')
+		if premiered:
+			if not result.get('time'): result['time'] = {}
+			result['time'][MetaTools.TimePremiere] = ConverterTime(premiered, format = ConverterTime.FormatDate, utc = True).timestamp()
+
+		# Add the images listed under "Photos" on the IMDb page.
+		# Some titles are only on IMDb, but not on Trakt/TMDb.
+		# Or they are on Trakt/TMDb, but Trakt/TMDb do not have images, especially for newer releases.
+		# Use the IMDb photos as fanart in this case, since it looks better than using the psoter as fanart fallback.
+		# Eg (new release, not images on Trakt/TMDb yet): tt32400680
+		self._extract(id = id, result = tempImdb, data = data, attribute = [MetaImage.Attribute], keys = ['titleMainImages', 'edges'], function = self._extractImage)
+
+		poster = self._extract(id = id, data = data, keys = ['primaryImage', 'url'], function = self.linkImage)
+		if poster:
+			if not tempImdb.get(MetaImage.Attribute): tempImdb[MetaImage.Attribute] = {}
+			if not tempImdb.get( MetaImage.Attribute).get( MetaImage.TypePoster): tempImdb[MetaImage.Attribute][MetaImage.TypePoster] = []
+			tempImdb[MetaImage.Attribute][MetaImage.TypePoster].insert(0, poster)
+
+		result[MetaImage.Attribute] = {}
+		for type, images in (tempImdb.get(MetaImage.Attribute) or {}).items():
+			if images:
+				if not result[MetaImage.Attribute].get(type): result[MetaImage.Attribute][type] = []
+				if not Tools.isArray(images): images = [images]
+				for image in images:
+					if image:
+						image = MetaImage.create(link = image, provider = self.id(), sort = {MetaImage.SortIndex : 0, MetaImage.SortVote : 0})
+						if image: result[MetaImage.Attribute][type].append(image)
 
 		result['temp'] = {}
-		if tempImdb: result['temp']['imdb'] = tempImdb
+
+		# Always add the temp IMDb structure, even if it is an empty dict.
+		# This is important for MetaManager if a title only exists on IMDb, but not on other providers (eg tt23624830).
+		# Do not "if tempImdb", because the dict can be empty if there are no votes and images for the title on IMDb.
+		# if tempImdb: result['temp']['imdb'] = tempImdb
+		result['temp']['imdb'] = tempImdb
+
 		if tempMetacritic: result['temp']['metacritic'] = tempMetacritic
 
 		return result
@@ -8724,26 +9020,48 @@ class MetaImdb(MetaProvider):
 
 					if data:
 						results = []
-
 						for k, v in data.items():
-							result = {'media' : Media.Season, 'season' : k, 'episodes' : [], 'temp' : {'imdb' : {'voting' : {}, 'count' : None}}}
+							result = {'media' : Media.Season, 'season' : k, 'year' : None, 'premiered' : None, 'aired' : None, 'episodes' : [], 'temp' : {'imdb' : {'voting' : {}, 'count' : None}}}
 							if v: result.update(v)
 							else: continue
 
-							rating = []
-							votes = []
+							voting = []
 							episodes = result.get('episodes')
 							if episodes:
-								result['temp']['imdb']['count'] = len(episodes)
+								first = None
+
 								for episode in episodes:
 									if episode:
+										if episode.get('episode') == 1: first = episode
 										ratingEpisode = episode.get('rating')
-										if ratingEpisode: rating.append(ratingEpisode) # NB: Do not include 0.0 ratings, which are typical for unaired episodes.
 										votesEpisode = episode.get('votes')
-										if not votesEpisode is None: votes.append(votesEpisode)
+										if ratingEpisode and not votesEpisode is None: voting.append({'rating' : ratingEpisode, 'votes' : votesEpisode}) # NB: Do not include 0.0 ratings, which are typical for unaired episodes.
 
-							if rating: result['rating'] = result['temp']['imdb']['voting']['rating'] = sum(rating) / float(len(rating))
-							if votes: result['votes'] = result['temp']['imdb']['voting']['votes'] = max(votes)
+								# The first episode can be a special or unaired pilot without a date.
+								# Eg: GoT S01
+								if not first: first = episodes[0]
+								if first:
+									result['year'] = first.get('year')
+									result['premiered'] = result['aired'] = first.get('premiered')
+
+							try:
+								if voting:
+									voting = self.mMetatools.votingAverageWeighted(metadata = voting, maximum = True) # maximum: Do not return the total vote count.
+
+									# The bulk metadata contains all episodes and is therefore more accurate.
+									# Use the bulk ratings if there are more votes, since the bulk data can sometimes be outdated by a few days.
+									votingBulk = self.bulk(id = id, season = k)
+									if not voting or (votingBulk and votingBulk.get('votes', 0) > voting.get('votes', 0)): voting = votingBulk
+
+									if voting:
+										result['rating'] = result['temp']['imdb']['voting']['rating'] = voting['rating']
+										result['votes'] = result['temp']['imdb']['voting']['votes'] = voting['votes']
+							except: Logger.error()
+
+							try:
+								bulk = self.bulk(id = id, season = k, data = True)
+								result['temp']['imdb']['count'] = max(len(episodes) if episodes else 0, len(bulk.get('episodes') or []) if bulk else 0)
+							except: Logger.error()
 
 							try: del result['episodes']
 							except: pass
@@ -8761,9 +9079,8 @@ class MetaImdb(MetaProvider):
 	def metadataEpisode(self, id, season, language = None, country = None, cache = False, threaded = None):
 		try:
 			if not id: return None
-			if season == 0: season = MetaImdb.Special
 
-			data = self._request(link = self._linkTitle(id = id, season = season), language_ = language, country_ = country, cache = MetaImdb.CacheMetadata if cache is True else cache if cache else MetaImdb.CacheNone, lock = self._metadataLock(), timeout = self._metadataTimeout())
+			data = self._request(link = self._linkTitle(id = id, season = MetaImdb.Special if season == 0 else season), language_ = language, country_ = country, cache = MetaImdb.CacheMetadata if cache is True else cache if cache else MetaImdb.CacheNone, lock = self._metadataLock(), timeout = self._metadataTimeout())
 			if not data: return None
 
 			# IMDb only sometimes returns the page with JSON. Other times it just returns the pure already formatted HTML.
@@ -8772,14 +9089,14 @@ class MetaImdb(MetaProvider):
 			# When it does not return JSON, it is the old styled IMDb episode page.
 			parser = self.parser(data = data)
 
-			result = self._metadataEpisodeNew(id = id, parser = parser)
-			if not result: result = self._metadataEpisodeOld(id = id, parser = parser)
+			result = self._metadataEpisodeNew(id = id, season = season, parser = parser)
+			if not result: result = self._metadataEpisodeOld(id = id, season = season, parser = parser)
 			return result
 		except:
 			Logger.error()
 			return self._logFatal(id = id, code = 'metadata-episode-z')
 
-	def _metadataEpisodeOld(self, id, parser):
+	def _metadataEpisodeOld(self, id, season, parser):
 		try:
 			months = {'Jan' : '01', 'Feb' : '02', 'Mar' : '03', 'Apr' : '04', 'May' : '05', 'Jun' : '06', 'Jul' : '07', 'Aug' : '8', 'Sep' : '09', 'Oct' : '10', 'Nov' : '11', 'Dec' : '12'}
 
@@ -8790,7 +9107,7 @@ class MetaImdb(MetaProvider):
 			if not episodes: return None
 
 			episodes = episodes.find_all('div', {'class' : 'list_item'})
-			if not episodes: return self._logFatal(id = id, code = 'metadata-episode-old-a')
+			if not episodes: return self._logFatal(id = id, code = 'metadata-episode-old-a', update = True)
 
 			expressionId = self._idExpressionTitle()
 			try:
@@ -8807,7 +9124,7 @@ class MetaImdb(MetaProvider):
 				resultTemp = {}
 
 				if showId: resultEpisode['id'] = {'imdb' : showId}
-				if showTitle: resultEpisode['tvshowtitle'] = showTitle
+				if showTitle: resultEpisode['tvshowtitle'] = self._extractTitle(showTitle)
 
 				name = episode.find('a', {'itemprop' : 'name'})
 				if name:
@@ -8815,7 +9132,7 @@ class MetaImdb(MetaProvider):
 					if idEpisode:
 						if not 'id' in resultEpisode or not resultEpisode['id']: resultEpisode['id'] = {}
 						resultEpisode['id']['episode'] = {'imdb' : idEpisode}
-					resultEpisode['title'] = name.text
+					resultEpisode['title'] = self._extractTitle(name.text)
 
 				plot = episode.find('div', {'itemprop' : 'description'})
 				if plot: resultEpisode['plot'] = self._extractDescription(plot.text)
@@ -8848,7 +9165,7 @@ class MetaImdb(MetaProvider):
 								# https://www.imdb.com/title/tt0434706/episodes?season=1
 								if premiered.strip().startswith('-'): premiered = '01' + premiered.strip()
 
-								date = ConverterTime(premiered, format = '%d-%m-%Y').string(format = '%Y-%m-%d')
+								date = ConverterTime(premiered, format = '%d-%m-%Y', utc = True).string(format = '%Y-%m-%d')
 								break
 							except: Logger.error()
 					if date:
@@ -8883,7 +9200,7 @@ class MetaImdb(MetaProvider):
 			Logger.error()
 			return self._logFatal(id = id, code = 'metadata-episode-old-z')
 
-	def _metadataEpisodeNew(self, id, parser):
+	def _metadataEpisodeNew(self, id, season, parser):
 		try:
 			data = None
 			datas = parser.find_all('script', {'type' : 'application/json'})
@@ -8896,70 +9213,144 @@ class MetaImdb(MetaProvider):
 				except: pass
 			if not data: return None
 
+			showId = None
+			showTitle = None
+			episodes = None
+
 			try: data = data['props']['pageProps']['contentData']
-			except: return self._logFatal(id = id, code = 'metadata-episode-new-a')
+			except:
+				data = None
+				self._logFatal(id = id, code = 'metadata-episode-new-a', update = True)
+			if data:
+				try: show = data['entityMetadata']
+				except:
+					show = None
+					self._logFatal(id = id, code = 'metadata-episode-new-b', update = True)
+				if show:
+					showId = self._extract(id = id, data = show, keys = ['id'])
+					showTitle = self._extract(id = id, data = show, keys = ['titleText', 'text'])
+					try: episodes = data['section']['episodes']['items']
+					except: self._logFatal(id = id, code = 'metadata-episode-new-c', missing = True) # Future shows sometimes have no episodes listed yet.
 
-			try: show = data['entityMetadata']
-			except: return self._logFatal(id = id, code = 'metadata-episode-new-b')
-			showId = self._extract(id = id, data = show, keys = ['id'])
-			showTitle = self._extract(id = id, data = show, keys = ['titleText', 'text'])
-
-			try: episodes = data['section']['episodes']['items']
-			except: return self._logFatal(id = id, code = 'metadata-episode-new-c')
-
+			if not showId: showId = id
 			result = []
-			for episode in episodes:
-				resultEpisode = {}
-				resultTemp = {}
+			bulk = {}
 
-				if showId: resultEpisode['id'] = {'imdb' : showId}
-				if showTitle: resultEpisode['tvshowtitle'] = showTitle
+			# Add episodes from the bulk metadata, since it contains all episodes, instead of a maximum of 50 episodes from the HTML page.
+			# This allows us to at least have the ID, rating, and votes for episodes beyond number 51+.
+			# Add them here, and then overwrite them with the HTML data below.
+			bulked = self.bulk(id = id, season = season, data = True)
+			if bulked:
+				bulked = bulked.get('episodes')
+				if bulked:
+					for episode, item in bulked.items():
+						idEpisode = item.get('id')
+						rating = item.get('rating')
+						votes = item.get('votes')
 
-				idEpisode = self._extract(id = id, data = episode, keys = ['id'])
-				if idEpisode:
-					if not 'id' in resultEpisode or not resultEpisode['id']: resultEpisode['id'] = {}
-					resultEpisode['id']['episode'] = {'imdb' : idEpisode}
+						resultEpisode = {}
+						if showId: resultEpisode['id'] = {'imdb' : showId}
+						if showTitle: resultEpisode['tvshowtitle'] = showTitle
+						if idEpisode:
+							if not 'id' in resultEpisode: resultEpisode['id'] = {}
+							resultEpisode['id']['episode'] = {'imdb' : idEpisode}
+						resultEpisode.update({
+							'season' : item.get('season'),
+							'episode' : item.get('episode'),
+							'rating' : rating,
+							'votes' : votes,
+							'temp' : {
+								'voting' : {
+									'rating' : rating,
+									'votes' : votes,
+								}
+							},
+						})
+						result.append(resultEpisode)
+						bulk[idEpisode] = resultEpisode
 
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'season', keys = ['season'], function = int)
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'episode', keys = ['episode'], function = int)
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'title', keys = ['titleText'])
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'plot', keys = ['plot'], function = self._extractDescription)
+			if episodes:
+				for episode in episodes:
+					resultEpisode = {}
+					resultTemp = {}
 
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'year', keys = ['releaseYear'], function = int)
-				premiered = self._extract(id = id, data = episode, keys = ['releaseDate'])
-				if premiered:
-					# In very few cases, IMDb returns the date as a dictionary.
-					#	Eg: {'month': 5, 'day': 1, 'year': 2006, '__typename': 'ReleaseDate'}
-					if Tools.isDictionary(premiered):
-						try: premiered = '%d-%02d-%02d' % (premiered['year'], premiered['month'], premiered['day'])
-						except: premiered = None
-					else:
-						premiered = ConverterTime(premiered, format = ConverterTime.FormatDateAmerican).string(format = ConverterTime.FormatDate)
+					if showId: resultEpisode['id'] = {'imdb' : showId}
+					if showTitle: resultEpisode['tvshowtitle'] = showTitle
+
+					idEpisode = self._extract(id = id, data = episode, keys = ['id'])
+					if idEpisode:
+						if not 'id' in resultEpisode or not resultEpisode['id']: resultEpisode['id'] = {}
+						resultEpisode['id']['episode'] = {'imdb' : idEpisode}
+
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'season', keys = ['season'], function = int)
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'episode', keys = ['episode'], function = int)
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'title', keys = ['titleText'], function = self._extractTitle)
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'plot', keys = ['plot'], function = self._extractDescription)
+
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'year', keys = ['releaseYear'], function = int)
+					premiered = self._extract(id = id, data = episode, keys = ['releaseDate'])
 					if premiered:
-						resultEpisode['premiered'] = premiered
-						resultEpisode['aired'] = premiered
-						resultEpisode['year'] = int(Regex.extract(data = premiered, expression = '(\d{4})'))
+						# In very few cases, IMDb returns the date as a dictionary.
+						#	Eg: {'month': 5, 'day': 1, 'year': 2006, '__typename': 'ReleaseDate'}
+						time = None
+						if Tools.isDictionary(premiered):
+							try:
+								premiered = '%d-%02d-%02d' % (premiered['year'], premiered['month'], premiered['day'])
+								time = ConverterTime(premiered, format = ConverterTime.FormatDate, utc = True).timestamp()
+							except: premiered = None
+						else:
+							time = ConverterTime(premiered, format = ConverterTime.FormatDateAmerican, utc = True)
+							premiered = time.string(format = ConverterTime.FormatDate)
+							time = time.timestamp()
 
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'rating', keys = ['aggregateRating'], function = self._extractRating)
-				self._extract(id = id, result = resultEpisode, data = episode, attribute = 'votes', keys = ['voteCount'], function = self._extractVotes)
-				if 'rating' in resultEpisode:
-					if not 'voting' in resultTemp: resultTemp['voting'] = {}
-					resultTemp['voting']['rating'] = resultEpisode['rating']
-				if 'votes' in resultEpisode:
-					if not 'voting' in resultTemp: resultTemp['voting'] = {}
-					resultTemp['voting']['votes'] = resultEpisode['votes']
+						if premiered:
+							resultEpisode['premiered'] = premiered
+							resultEpisode['aired'] = premiered
+							resultEpisode['year'] = int(Regex.extract(data = premiered, expression = '(\d{4})'))
 
-				self._extract(id = id, result = resultTemp, data = episode, attribute = ['image', 'thumb'], keys = ['image', 'url'], function = self.linkImage)
+							# Important for episodes that are only on IMDb and will not get the time from anywhere else.
+							# Eg: GoT S01E00.
+							if time:
+								if not resultEpisode.get('time'): resultEpisode['time'] = {}
+								resultEpisode['time'][MetaTools.TimePremiere] = time
 
-				image = (resultTemp.get('image') or {}).get('thumb')
-				if image:
-					image = MetaImage.create(link = image, provider = self.id(), sort = {MetaImage.SortIndex : 0, MetaImage.SortVote : 0})
-					if image: resultEpisode[MetaImage.Attribute] = {MetaImage.TypeThumb : [image]}
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'rating', keys = ['aggregateRating'], function = self._extractRating)
+					self._extract(id = id, result = resultEpisode, data = episode, attribute = 'votes', keys = ['voteCount'], function = self._extractVotes)
+					if 'rating' in resultEpisode:
+						if not 'voting' in resultTemp: resultTemp['voting'] = {}
+						resultTemp['voting']['rating'] = resultEpisode['rating']
+					if 'votes' in resultEpisode:
+						if not 'voting' in resultTemp: resultTemp['voting'] = {}
+						resultTemp['voting']['votes'] = resultEpisode['votes']
 
-				if resultTemp: resultEpisode['temp'] = {'imdb' : resultTemp}
-				if resultEpisode: result.append(resultEpisode)
+					# Future/unreleased episodes might not have a thumbnail yet.
+					# IMDb then uses the show poster for those episode thumbnails.
+					# Do not add those posters, otherwise they are displayed in the menu and look ugly.
+					# Assume it is a thumbnail if the width is greater than the height.
+					try: width = episode['image']['maxWidth']
+					except: width = None
+					try: height = episode['image']['maxHeight']
+					except: height = None
+					if not width or not height or (width > height):
+						self._extract(id = id, result = resultTemp, data = episode, attribute = ['image', 'thumb'], keys = ['image', 'url'], function = self.linkImage)
 
-			return {'episodes' : result} if result else None
+					image = (resultTemp.get('image') or {}).get('thumb')
+					if image:
+						image = MetaImage.create(link = image, provider = self.id(), sort = {MetaImage.SortIndex : 0, MetaImage.SortVote : 0})
+						if image: resultEpisode[MetaImage.Attribute] = {MetaImage.TypeThumb : [image]}
+
+					if resultTemp: resultEpisode['temp'] = {'imdb' : resultTemp}
+					if resultEpisode:
+						found = bulk.get(idEpisode)
+						if found:
+							Tools.update(found, resultEpisode, none = False, lists = True, unique = False)
+						else:
+							result.append(resultEpisode)
+
+			if result:
+				result = Tools.listSort(data = result, key = lambda i : i.get('episode') or -1)
+				return {'episodes' : result}
+			return None
 		except:
 			Logger.error()
 			return self._logFatal(id = id, code = 'metadata-episode-new-z')
@@ -8999,7 +9390,7 @@ class MetaImdb(MetaProvider):
 				except: pass
 
 			try: data = data['props']['pageProps']['contentData']
-			except: return self._logFatal(id = id, code = 'metadata-awards-a')
+			except: return self._logFatal(id = id, code = 'metadata-awards-a', update = True)
 
 			countries = {
 				# Academy Awards
@@ -9175,3 +9566,1009 @@ class MetaImdb(MetaProvider):
 
 	def metadataAwardShow(self, id, cache = False):
 		return self.metadata(id = id, cache = cache)
+
+	##############################################################################
+	# PACK
+	##############################################################################
+
+	def metadataPack(self, id = None, imdb = None, detail = None):
+		complete = True
+		result = None
+		try:
+			if not id: id = imdb
+			if id:
+				data = self.bulk(id = id, data = True)
+				if data:
+					from lib.meta.pack import MetaPack
+
+					data = Tools.copy(data) # Since we sort it inplace below.
+					seasons = data.get('seasons')
+					if seasons:
+						for i, season in seasons.items():
+							episodes = season.get('episodes')
+							if episodes: season['episodes'] = Tools.listSort(episodes.values(), key = lambda i : i.get('episode'))
+						data['seasons'] = Tools.listSort(seasons.values(), key = lambda i : i.get('season'))
+
+						sequential = 0
+						seasons = []
+						for season in (data.get('seasons') or []):
+							numberSeason = season.get('season')
+
+							episodes = []
+							for episode in (season.get('episodes') or []):
+								numberEpisode = episode.get('episode')
+								if numberSeason > 0 and not numberEpisode == 0: sequential += 1
+								episodes.append({
+									'id'		: {'imdb' : episode.get('id')},
+
+									# Use the standard episode number if IMDb has a single absolute season.
+									# Otherwise if there are a lot of episodes, the standard and sequential numbers can deviate from each other at the later episodes.
+									# Eg: Good times bad times.
+									'number'	: {MetaPack.NumberStandard : [numberSeason, numberEpisode], MetaPack.NumberSequential : [1, 0 if numberEpisode == 0 else numberEpisode if numberSeason == 1 else sequential if numberSeason else 0]},
+								})
+
+							seasons.append({
+								'id'		: {'imdb' : season.get('id')},
+								'number'	: {MetaPack.NumberStandard : numberSeason, MetaPack.NumberSequential : 1},
+								'episodes'	: episodes,
+							})
+
+						result = {
+							'id'		: {'imdb' : data.get('id')},
+							'seasons'	: seasons,
+						}
+				else: complete = False
+			else: complete = False
+		except: Logger.error()
+		return {'provider' : self.id(), 'complete' : complete, 'data' : result} if detail else result
+
+	##############################################################################
+	# BULK
+	##############################################################################
+
+	@classmethod
+	def bulkSettingsSelected(self):
+		return Settings.getBoolean(MetaImdb.BulkSettingsSelected)
+
+	@classmethod
+	def bulkSettingsSelectedSet(self):
+		Settings.set(MetaImdb.BulkSettingsSelected, True)
+
+	@classmethod
+	def bulkSettingsRefreshed(self):
+		return Settings.getInteger(MetaImdb.BulkSettingsRefreshed)
+
+	@classmethod
+	def bulkSettingsRefreshedSet(self):
+		Settings.set(MetaImdb.BulkSettingsRefreshed, Time.timestamp())
+
+	@classmethod
+	def bulkSettingsMode(self):
+		return Settings.getString(MetaImdb.BulkSettingsMode).lower()
+
+	@classmethod
+	def bulkSettingsModeEnabled(self):
+		return not self.bulkSettingsMode() == MetaImdb.BulkModeDisabled
+
+	@classmethod
+	def bulkSettingsModeDisabled(self):
+		return self.bulkSettingsMode() == MetaImdb.BulkModeDisabled
+
+	@classmethod
+	def bulkSettingsModeSet(self, bulk):
+		Settings.set(MetaImdb.BulkSettingsMode, bulk.capitalize())
+		self.bulkSettingsSelectedSet() # Indicate that the user has picked an option, instead of the default option in settings.xml.
+
+	@classmethod
+	def bulkSettingsRefresh(self):
+		return Settings.getInteger(MetaImdb.BulkSettingsRefresh)
+
+	@classmethod
+	def bulkSettingsNotification(self):
+		return Settings.getInteger(MetaImdb.BulkSettingsNotification)
+
+	@classmethod
+	def bulkSettingsProgress(self):
+		return Settings.getInteger(MetaImdb.BulkSettingsProgress)
+
+	@classmethod
+	def bulkSettingsAction(self):
+		return Settings.getInteger(MetaImdb.BulkSettingsAction)
+
+	@classmethod
+	def bulkSettingsShow(self, settings = False):
+		from lib.modules.window import WindowMetaBulk
+		WindowMetaBulk.show(wait = True)
+		if settings: Settings.launch(id = MetaImdb.BulkSettingsMode)
+
+	@classmethod
+	def bulkTimeout(self, bulk = None, generate = False, refresh = False):
+		timeout = None
+		if generate: timeout = MetaImdb.BulkTimeout[False]
+		elif refresh is None: timeout = MetaImdb.BulkTimeout[None]
+		else: timeout = MetaImdb.BulkTimeout[bulk or self.bulkSettingsMode()]
+		return timeout
+
+	@classmethod
+	def bulkSizeDownload(self):
+		return MetaImdb.BulkSizeDownload
+
+	@classmethod
+	def bulkSizeStorage(self):
+		return MetaImdb.BulkSizeStorage
+
+	@classmethod
+	def bulkSizeMemory(self, bits = None):
+		return MetaImdb.BulkSizeMemory.get(bits or Platform.architectureBits())
+
+	@classmethod
+	def bulkSizeMinimum(self, bits = None):
+		return MetaImdb.BulkSizeMinimum.get(bits or Platform.architectureBits())
+
+	@classmethod
+	def bulkDuration(self):
+		performance = Hardware.performanceRating()
+		if performance >= 0.8: index = 0
+		elif performance >= 0.5: index = 1
+		elif performance >= 0.3: index = 2
+		else: index = 3
+		return MetaImdb.BulkDuration[index]
+
+	@classmethod
+	def bulkEnabled(self, force = False):
+		return force or not self.bulkSettingsMode() == MetaImdb.BulkModeDisabled
+
+	@classmethod
+	def bulkEnabledDownload(self, refresh = True):
+		return self.bulkUsageStorage(refresh = refresh) >= self.bulkSizeDownload()
+
+	@classmethod
+	def bulkEnabledStorage(self, refresh = True):
+		return self.bulkUsageStorage(refresh = refresh) >= self.bulkSizeStorage()
+
+	@classmethod
+	def bulkEnabledMemory(self, refresh = True):
+		return self.bulkUsageMemory(refresh = refresh) >= self.bulkSizeMemory()
+
+	@classmethod
+	def bulkEnabledMinimum(self, detail = True, memory = True, storage = True, refresh = True):
+		from lib.meta.tools import MetaTools
+		if not detail or not MetaTools.instance().settingsDetail() == MetaTools.DetailEssential:
+			if not storage or self.bulkEnabledStorage(refresh = refresh):
+				if memory:
+					self.bulkUsageMemory(refresh = refresh)
+					minimum = self.bulkSizeMinimum()
+					return self.bulkUsageMemory(total = True) > minimum[0] and self.bulkUsageMemory() > minimum[1]
+				else:
+					return True
+		return False
+
+	@classmethod
+	def bulkUsageMemory(self, total = False, percent = False, refresh = False):
+		# This does not get the current readings: Hardware.memoryUsageTotalBytes(refresh = True)
+		if refresh or MetaImdb.UsageMemory is None: MetaImdb.UsageMemory = Hardware.detectMemoryUsage()
+		return MetaImdb.UsageMemory['total' if total else 'free']['percent' if percent else 'bytes']
+
+	@classmethod
+	def bulkUsageStorage(self, total = False, percent = False, refresh = False):
+		# This does not get the current readings: Hardware.storageUsageTotalBytes(refresh = True)
+		if refresh or MetaImdb.UsageStorage is None: MetaImdb.UsageStorage = Hardware.detectStorageUsage()
+		return MetaImdb.UsageStorage['total' if total else 'free']['percent' if percent else 'bytes']
+
+	# id: movie or show ID.
+	# idEpisode: episode ID. Must also pass in a show ID.
+	def bulk(self, id = None, idEpisode = None, imdb = None, imdbEpisode = None, season = None, episode = None, data = False, force = False, generate = False):
+		try:
+			if force or self.bulkEnabled():
+				if id is None: id = imdb
+				if idEpisode is None: idEpisode = imdbEpisode
+
+				result = self._bulkCache(generate = generate).bulkSelect(idImdb = id)
+				if result:
+					if not season is None:
+						result = result.get(str(season))
+						if result:
+							if episode is None:
+								if not data:
+									# Calculate the season rating from the average episode rating.
+									# Only do this here instead of _bulkAssemble(), since most season ratings are never needed.
+									# Plus S0 "Unknown" is stored as a list and the calculated rating cannot be added to the current structure.
+									voting = self._bulkVoting(value = result)
+									if voting:
+										result = {'season' : season}
+										result.update(voting)
+										return result
+									return None
+							elif result:
+								result = result.get(str(episode))
+						return self._bulkValues(value = result, data = data, season = season, episode = episode)
+					elif not idEpisode is None:
+						# Create a ID lookup table for quick access.
+						lookup = result.get(MetaImdb.BulkIdLookup)
+						if lookup is None:
+							lookup = {}
+							for k1, v1 in result.items():
+								if not k1 == MetaImdb.BulkIdShow:
+									if Tools.isList(v1):
+										for v2 in v1:
+											lookup[v2[0]] = (v2, k1, None)
+									elif Tools.isDictionary(v1):
+										for k2, v2 in v1.items():
+											lookup[v2[0]] = (v2, k1, k2)
+							result[MetaImdb.BulkIdLookup] = lookup # Stores it in the orignal dict which is saved in the MetaCache memory.
+						if lookup:
+							# Sometimes an episode ID is requested that is not in the bulk.
+							# Eg: tt4622118, which is a special on Trakt (S00E08), but is a separate show on IMDb.
+							result = lookup.get(idEpisode)
+							if result: return self._bulkValues(value = result[0], data = data, season = result[1], episode = result[2])
+					else:
+						return self._bulkValues(value = result, id = id, data = data)
+		except: Logger.error()
+		return None
+
+	def _bulkValues(self, value, id = None, season = None, episode = None, data = False):
+		if data:
+			if value:
+				result = {'id' : id, 'rating' : None, 'votes' : None}
+				if Tools.isDictionary(value):
+					voting = self._bulkValue(value = value)
+					if voting:
+						result['rating'] = voting.get('rating')
+						result['votes'] = voting.get('votes')
+					if MetaImdb.BulkIdShow in value or Tools.isDictionary(value.get(list(value.keys())[-1])): # Sometimes there is no BulkIdShow, because the show does not have a rating yet.
+						result['seasons'] = {}
+						for k, v in value.items():
+							if not k == MetaImdb.BulkIdShow and not k == MetaImdb.BulkIdLookup:
+								try: season = int(k)
+								except:
+									# "k" is not an int
+									Logger.error(message = '%s => %s' % (str(k), str(v)))
+									continue
+								result['seasons'][season] = item = {'season' : season}
+								voting = self._bulkVoting(value = v)
+								if voting: item.update(voting)
+								item['episodes'] = {int(k2) : self._bulkValue(value = v2, season = season, episode = int(k2)) for k2, v2 in v.items()}
+					else:
+						voting = self._bulkVoting(value = value)
+						if voting: result.update(voting)
+						result['episodes'] = {int(k) : self._bulkValue(value = v, season = season, episode = int(k)) for k, v in value.items() if not k == MetaImdb.BulkIdShow and not k == MetaImdb.BulkIdLookup}
+				elif Tools.isArray(value) and Tools.isArray(value[0]):
+					result['episodes'] = [self._bulkValue(value = i, season = season, episode = episode) for i in value]
+				else:
+					result = self._bulkValue(value = value, id = id, season = season, episode = episode)
+				return result
+		else:
+			return self._bulkValue(value = value, id = id, season = season, episode = episode)
+		return None
+
+	def _bulkValue(self, value, id = None, season = None, episode = None):
+		if value:
+			force = False
+			if Tools.isDictionary(value):
+				value = value.get(MetaImdb.BulkIdShow)
+				if not value:
+					value = {}
+					force = True
+
+			if value or force:
+				result = {'id' : id}
+				if not season is None: result['season'] = season
+				if not episode is None: result['episode'] = episode
+				result['rating'] = None
+				result['votes'] = None
+
+				size = len(value)
+				if size == 1:
+					result['id'] = value[0]
+				elif size == 2:
+					result['rating'] = value[0]
+					result['votes'] = value[1]
+				elif size == 3:
+					result['id'] = value[0]
+					result['rating'] = value[1]
+					result['votes'] = value[2]
+
+				return result
+		return None
+
+	def _bulkVoting(self, value):
+		if Tools.isDictionary(value): value = list(value.values())
+		value = [self._bulkValue(value = i) for i in value]
+		if value: return self.mMetatools.votingAverageWeighted(metadata = value, maximum = True, round = 6) # maximum: Do not return the total vote count.
+		return None
+
+	def _bulkCache(self, generate):
+		return MetaCache.instance(generate = bool(generate))
+
+	def _bulkSize(self, size):
+		return ConverterSize(size).string(unit = ConverterSize.ByteGiga, places = 1)
+
+	def _bulkNotification(self, silent, foreground, background, total, free):
+		if silent is False or silent is None:
+			settings = self.bulkSettingsNotification()
+			if not settings == MetaImdb.BulkDialogDisabled:
+				title = 36879
+				format = (Format.fontBold(total), Format.fontBold(free))
+				if settings == MetaImdb.BulkDialogForeground:
+					Dialog.confirm(title = title, message = Translation.string(foreground) % format)
+				elif settings == MetaImdb.BulkDialogBackground:
+					message = [Translation.string(background), '%s: %s' % (Translation.string(35417), format[0]), '%s: %s' % (Translation.string(33334), format[1])]
+					Dialog.notification(title = title, message = Format.iconJoin(message), time = 7000, icon = Dialog.IconError)
+				return True
+		return False
+
+	def _bulkNotificationStorage(self, silent):
+		total = self._bulkSize(self.bulkSizeStorage())
+		free = self._bulkSize(self.bulkUsageStorage())
+		Logger.log('BULK GENERATION: The device has insufficient free storage space to generate the IMDb bulkdata. [Required: %s | Available: %s]' % (total, free))
+		return self._bulkNotification(silent = silent, foreground = 36892, background = 36890, total = total, free = free)
+
+	def _bulkNotificationMemory(self, silent):
+		total = self._bulkSize(self.bulkSizeMemory())
+		free = self._bulkSize(self.bulkUsageMemory())
+		Logger.log('BULK GENERATION: The device has insufficient free memory to generate the IMDb bulkdata. [Required: %s | Available: %s]' % (total, free))
+		return self._bulkNotification(silent = silent, foreground = 36893, background = 36891, total = total, free = free)
+
+	# refresh=True: Forcefully refresh the bulk data now, irrespective of how old it is.
+	# refresh=False: Only refresh the bulk data if outdated, where the timeout is based on the user's hardware.
+	# refresh=None: Refresh the bulk data if slightly outdated, where the timeout is fixed and not based on the user's hardware. This is a semi-forced refresh.
+	def bulkRefresh(self, generate = False, force = False, refresh = False, reload = None, selection = None, silent = False, restart = None, wait = True):
+		try:
+			# Refresh the data on request, so that it can be accessed more quickly when needed later on without having to regenrate it first.
+			if self.bulkEnabled(force = force):
+				update = False
+
+				if refresh is True:
+					update = True
+				else:
+					if Tools.isInteger(refresh):
+						timeout = refresh
+					else:
+						timeout = self.bulkTimeout(generate = generate, refresh = refresh)
+
+						# Add a random value [0,24] hours to the timeout.
+						# This ensures that users download the datasets at different times.
+						# Otherwise if a major version is released that clears the cache, most users will download the dataset within the same day.
+						# Adding a random value makes sure the refreshes deviate from each other over time.
+						if not generate: timeout += Math.random(start = 0, end = 86400)
+
+					# If the cache gets corrupted or cleared, this will redownload the bulkdata, even if it was done only a few hours/days ago.
+					# The cache also sometimes gets corrupted during WizardVersion prelaoding. Not sure if it was caused by this. But maybe a good idea not to use the cache in any case.
+					# Hence, do not do this with a cache timeout, but rather a setting.
+					previous = self.bulkSettingsRefreshed()
+					if not previous or (Time.timestamp() - previous) > timeout:
+						update = True
+					elif previous:
+						return None # No refresh needed. Used in MetaManager.bulkImdbRefresh(). Also used in WindowMetaBulk.
+
+				if update:
+					if not silent:
+						if selection is None: selection = self.bulkSettingsRefresh()
+						if selection is True or selection == MetaImdb.BulkRefreshSelection:
+							storage = Format.fontBold(ConverterSize(self.bulkSizeStorage()).stringOptimal())
+							memory = Format.fontBold(ConverterSize(self.bulkSizeMemory()).stringOptimal())
+							duration = '%s %s' % (Format.fontBold('-'.join([str(i) for i in self.bulkDuration()])), Translation.string(35620).lower())
+							if reload:
+								if not Dialog.options(title = 36879, message = Translation.string(36908) % (storage, memory, duration), labelConfirm = 32072, labelDeny = 35015, default = Dialog.ChoiceYes): return False
+							else:
+								if not Dialog.options(title = 36879, message = Translation.string(36898) % (storage, memory, duration)): return False
+
+					if not self.bulkEnabledStorage():
+						self._bulkNotificationStorage(silent = silent)
+						return False
+					elif not self.bulkEnabledMemory():
+						self._bulkNotificationMemory(silent = silent)
+						return False
+
+					if wait: return self._bulkAssemble(generate = generate, silent = silent, restart = restart)
+					else: Pool.thread(target = self._bulkAssemble, kwargs = {'generate' : generate, 'silent' : silent, 'restart' : restart}, start = True)
+					return True
+		except: Logger.error()
+		return False
+
+	@classmethod
+	def bulkRefreshCancel(self):
+		MetaImdb.BulkCanceled = True
+
+	@classmethod
+	def _bulkId(self, imdb):
+		# Store the ID more efficiently to save memory.
+		# More than 10 million IDs are stored in memory, plus most will be store a second time in a lookup table.
+		# This requires a shit ton of memory, so every byte that can be saved helps.
+		#	Padded integer:				32 bytes (64bit system)		20 bytes (32bit system)
+		#	Unicode with tt prefix:		59 bytes (64bit system)		35 bytes (32bit system)
+		#	Unicode without tt prefix:	57 bytes (64bit system)		33 bytes (32bit system)
+		#	Ascii with tt prefix:		43 bytes (64bit system)		27 bytes (32bit system)
+		#	Ascii without tt prefix:	41 bytes (64bit system)		25 bytes (32bit system)
+
+		if not imdb or not imdb.startswith(MetaImdb.IdTitle): return None
+
+		# It seems the shortest ID is 7 digits, including the left-padded 0s (eg: tt0000001).
+		# The longest ID is 8 digits tt32857063, allow this will grow.
+		# Make sure that the shortest generated int + 1 digit is always longer than the longest possible IMDb number.
+		# If we assume a max IMDb length can grow to 10 (2 greater than the current IMDb IDs), then at least 4 padding-digits should be added to the front: (7 + 4) > 10.
+		imdb = imdb.replace(MetaImdb.IdTitle, '')
+		return int('99999' + imdb)
+
+	@classmethod
+	def _bulkIdPrepare(self, id):
+		if not id: return id
+		return MetaImdb.IdTitle + Tools.stringRemovePrefix(str(id), remove = MetaImdb.BulkIdPrefix)
+
+	@classmethod
+	def bulkPrepare(self, id, data):
+		id = self._bulkIdPrepare(id = id)
+		if Tools.isDictionary(data):
+			for k1, v1 in data.items():
+				if Tools.isDictionary(v1):
+					for k2, v2 in v1.items():
+						v2[0] = self._bulkIdPrepare(id = v2[0])
+		return id, data
+
+	def _bulkAssemble(self, generate = False, silent = False, restart = None):
+		# The entire function (download + extraction + processing + writing to database) takes around 130-145 seconds on a high-end CPU and SSD, including all the Pool.check() in between.
+		try:
+			self.tUsage = [self.bulkUsageMemory(refresh = True)]
+
+			MetaImdb.BulkCanceled = None # Use class variable, so it can be set bulkRefreshCancel() when the process is canceled during preloading.
+
+			self.tSilent = silent
+			self.tDialog = None
+			self.tSettings = self.bulkSettingsProgress()
+			self.tDuration = self.bulkDuration()
+			self.tTitles = 0
+			self.tItems = None
+			self.tSize = 0
+			self.tStatus = None
+			self.tProgress = 0
+			self.tPrevious = None
+			self.tTimer = None
+
+			# Still show a background dialog during preloading, otherwise the user might think preloading is stuck, because it takes so long.
+			basic = silent is None
+			if basic:
+				self.tSilent = False
+				self.tSettings = MetaImdb.BulkDialogBackground
+
+			self.tTime = Time(start = True)
+			show = MetaImdb.BulkIdShow
+
+			self._bulkProgress(progress = 0, status = 'Preparing data collection')
+			Pool.thread(target = self._bulkProgressor, start = True) # Smoother duration updates for foreground dialogs.
+
+			items = self._bulkEpisode()
+			if not self._bulkCheck(): return False
+			self._bulkProgress(progress = 60)
+			self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+			if items and not Pool.aborted():
+				ratings = self._bulkRating()
+				if not self._bulkCheck(): return False
+				self._bulkProgress(progress = 75)
+				self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+				if ratings and not Pool.aborted():
+					self.tItems = items
+					self._bulkProgress(status = 'Assembling episode data')
+					count = 0
+					increment = 10 * (1.0 / len(items))
+					for id, v in items.items():
+						# Sleep to allow more important code to execute, and abort if Kodi was exited.
+						# About 230k items.
+						count += 1
+						if count > 10000:
+							count = 0
+							if not self._bulkCheck(delay = Pool.DelayQuick): return False # Prevent the function from getting executed again by the cache on failure.
+
+						for k1, v1 in v.items():
+							if Tools.isArray(v1):
+								for v2 in v1:
+									rating = ratings.get(v2[0])
+									if not rating is None:
+										del ratings[v2[0]] # Free up some memory.
+										v2.extend(rating)
+
+							elif Tools.isDictionary(v1):
+								for k2, v2 in v1.items():
+									rating = ratings.get(v2[0])
+									if not rating is None:
+										del ratings[v2[0]] # Free up some memory.
+										v2.extend(rating)
+
+						rating = ratings.get(id)
+						if not rating is None:
+							del ratings[id] # Free up some memory.
+							if Tools.isDictionary(v): # Show ratings.
+								value = []
+								v[show] = value
+								v = value
+							v.extend(rating)
+
+						self._bulkProgress(increment = increment)
+					if not self._bulkCheck(): return False
+					self._bulkProgress(progress = 85)
+					self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+					self._bulkProgress(status = 'Assembling rating data')
+					count = 0
+					increment = 5 * (1.0 / len(ratings))
+					for id in list(ratings.keys()): # So that we can delete from the dict while looping.
+						if id is None: continue # Already added in the previous loop.
+
+						count += 1
+						if count > 30000:
+							count = 0
+							if not self._bulkCheck(delay = Pool.DelayQuick): return False # Prevent the function from getting executed again by the cache on failure.
+
+						items[id] = ratings[id]
+						del ratings[id] # Free up some memory.
+
+						self._bulkProgress(increment = increment)
+					if not self._bulkCheck(): return False
+					self._bulkProgress(progress = 90)
+					self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+				# Clear up some memory.
+				ratings = None
+				self.tItems = Tools.size(self.tItems) # Save the size for progress, and clear the dict to save some memory.
+				self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+				result = None
+				if not self._bulkCheck(): return False
+				self._bulkProgress(progress = 90)
+				if items and not Pool.aborted() and self._bulkCheck():
+					self._bulkProgress(status = 'Caching bulk data')
+					result = self._bulkCache(generate = generate).bulkInsert(items = items, wait = True)
+
+				self.bulkSettingsRefreshedSet()
+				self._bulkProgress(progress = 100, final = True)
+				self.tUsage.append(self.bulkUsageMemory(refresh = True))
+
+				# Execute in a thread, so that this function can exit and the garbage collector can clean up, to detect how much memory could be freed up afterwards.
+				if not MetaImdb.BulkCanceled:
+					self.tElapsed = self.tTime.elapsed()
+					def _usage():
+						Time.sleep(15)
+						titles = Math.thousand(self.tTitles)
+						duration = ConverterDuration(self.tElapsed, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)
+						memory1 = ConverterSize(max([(self.tUsage[0] - i) for i in self.tUsage])).string(unit = ConverterSize.ByteMega, places = 0)
+						memory2 = ConverterSize(self.tUsage[0] - self.bulkUsageMemory(refresh = True)).string(unit = ConverterSize.ByteMega, places = 0)
+						Logger.log('BULK GENERATION: Bulkdata succefully refreshed. [Titles: %s | Duration: %s | Used Memory: %s | Lost Memory: %s]' % (titles, duration, memory1, memory2))
+					Pool.thread(target = _usage, start = True)
+
+				if not basic and not generate and not MetaImdb.BulkCanceled:
+					reload = False
+					self.bulkUsageMemory(refresh = True)
+					try:
+						usage = self.bulkUsageMemory()
+						memory = (usage < 1395864371) or (usage < 2362232012 and self.bulkUsageMemory(percent = True) < 0.6) # Less than 1.3GB free or (less than 2.2GB free and less than 60% free).
+					except: memory = False
+					title = 36879
+					summary = [
+						Format.fontBold(36894),
+						'%s %s' % (Format.fontBold(ConverterDuration(self.tTime.elapsed(), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)), Translation.string(35882)),
+						'%s %s' % (Format.fontBold(ConverterSize(self.tSize).string(unit = ConverterSize.ByteMega, places = 0)), Translation.string(36839)),
+						'%s %s' % (Format.fontBold(Math.thousand(self.tTitles)), Translation.string(33881)),
+					]
+
+					Dialog.closeAllProgress()
+					if restart is False:
+						summary = Format.newline().join([
+							summary[0],
+							'     %s' % Format.iconJoin([summary[1], summary[2], summary[3]]),
+							Translation.string(36902),
+						])
+						Dialog.confirm(title = title, message = summary)
+					else:
+						action = self.bulkSettingsAction()
+						if action == MetaImdb.BulkActionNotification:
+							Dialog.notification(title = title, message = Format.iconJoin(summary), duplicates = True, icon = Dialog.IconSuccess)
+						elif action == MetaImdb.BulkActionSelection:
+							summary = Format.newline().join([
+								summary[0],
+								'     %s' % Format.iconJoin([summary[1], summary[2], summary[3]]),
+								'%s %s' % (Translation.string(36901), Translation.string(36900)),
+							])
+							if Dialog.options(title = title, message = summary, labelConfirm = 32501, labelDeny = 35015, default = Dialog.ChoiceYes):
+								reload = True
+						elif action == MetaImdb.BulkActionRestart or (action == MetaImdb.BulkActionMemory and memory):
+							reload = True
+
+					# On some LibreELEC devices, a lot of the used memory is not returned. Not sure why.
+					# This is not a memory leak, since the memory is correctly cleared up on a normal Linux device.
+					# The device does not have to be rebooted. Restarting Kodi seems to work fine and is quicker. But this might be only supported on Windows and Linux.
+					if reload:
+						# Delay to allow any possible buffered writes to the database to finish.
+						Time.sleep(1)
+						System.power(action = System.PowerRestart, warning = True, notification = True, sound = True, delay = 10) # Restarts Kodi, not the device.
+
+				return result
+		except: Logger.error()
+
+		# If download failed.
+		try: self.tDialog.close()
+		except: pass
+		try: canceled = MetaImdb.BulkCanceled
+		except: canceled = False
+		self.tProgress = 100
+		MetaImdb.BulkCanceled = True # Stop _bulkProgressor().
+		if not canceled and not self.bulkSettingsProgress() == MetaImdb.BulkDialogDisabled: Dialog.confirm(title = 36879, message = 36906)
+
+		return False # Prevent the function from getting executed again by the cache on failure.
+
+	def _bulkCheck(self, delay = None):
+		if MetaImdb.BulkCanceled: return False
+		if self.tDialog and self.tDialog.iscanceled():
+			if not MetaImdb.BulkCanceled:
+				self.tDialog.close()
+				choice = Dialog.option(title = 36879, message = 36895)
+				if choice:
+					MetaImdb.BulkCanceled = True
+					self.tDialog.close()
+					return False
+				else:
+					# Close and reopen the progress dialog.
+					# Since if the dailog is canceled once, iscanceled() stays True.
+					self.tDialog = None
+					self._bulkProgress(force = True)
+			else: return MetaImdb.BulkCanceled
+		return Pool.check(delay = delay)
+
+	def _bulkProgressor(self):
+		if not self.tSilent and not self.tSettings == MetaImdb.BulkDialogDisabled:
+			for i in range(1800): # If something went wrong and the loop is not broken out of, stop after 30 minutes.
+				if Pool.aborted() or MetaImdb.BulkCanceled or self.tProgress == 100: break
+				self._bulkProgress()
+				Time.sleep(1)
+
+	def _bulkProgress(self, increment = None, progress = None, status = None, title = False, final = False, force = False):
+		try:
+			if not self.tSilent and not MetaImdb.BulkCanceled and not self.tSettings == MetaImdb.BulkDialogDisabled:
+				if increment: self.tProgress += increment
+				elif progress: self.tProgress = progress
+				if status: self.tStatus = status
+				if title: self.tTitles += 1
+
+				if self.tSettings == MetaImdb.BulkDialogForeground:
+					padding = '     '
+					message = '%s%s%s%s: %s' % (Format.fontBold(36852), Format.newline(), padding, Translation.string(33389), (self.tStatus or 'Busy'))
+					if not self.tDialog: self.tDialog = Dialog.progress(title = 36879, message = message)
+					base = 1 # Show every 1%.
+				elif self.tSettings == MetaImdb.BulkDialogBackground:
+					base = 5 if self.tDuration[0] >= 5 else 10 # Show every 5-10%, depending on how long the process takes on the device.
+
+				stepProgress = Math.roundDownClosest(self.tProgress, base = base)
+				if force or final or self.tPrevious is None or (stepProgress > self.tPrevious) or (self.tSettings == MetaImdb.BulkDialogForeground and (status or self.tTime.elapsed() > self.tTimer)):
+					# There are a few ways in calculating the size:
+					#	1. Tools.size(data): very fast, but returns the size in memory, which is considerably lower than the actual size of the JSON string stored.
+					#	2. len(str(data)): closer to the actual JSON size, however takes very long to stringify and takes a total of 50+ secs for just a few calculations (every 10%).
+					#	3. A combination of the previous 2. First calculate the size with Tools.size() and only if it changed, get the actual size with len(str()). Takes a total about 15-20 secs.
+					#	4. Estimate the string size from using Tools.size(). The current ratios are: Episodes (30758320 bytes, 235892109 string) Ratings (61516544 bytes, 39298792 string).
+					# Note that tDataEpisode can change from a full dict to an empty dict. So always use max() of the current and previous sizes, to avoid the size suddenly going down.
+					size = self.tItems if Tools.isInteger(self.tItems) else Tools.size(self.tItems)
+					self.tSize = max(self.tSize, size * 7.67) # Only use the episode dict, since it is later updated with the ratings.
+
+					message = Translation.string(36894 if final else 36852)
+					label = [
+						Format.fontBold('%d%%' % stepProgress),
+						Format.fontBold(ConverterDuration(self.tTime.elapsed(), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)),
+						Regex.replace(data = ConverterSize(self.tSize).string(unit = ConverterSize.ByteMega, places = 0), expression = '(\d+(?:\.\d+)?)(.*)', replacement = r'[B]\1[/B]\2'),
+						'%s %s' % (Format.fontBold(Math.thousand(self.tTitles)), Translation.string(33881)),
+					]
+
+					if self.tSettings == MetaImdb.BulkDialogForeground:
+						message = [
+							Format.fontBold(message),
+							'%s%s: %s' % (padding, Translation.string(32037), Format.iconJoin([label[0], label[1]])),
+							'%s%s: %s' % (padding, Translation.string(36839), Format.iconJoin([label[2], label[3]])),
+							'%s%s: %s' % (padding, Translation.string(33389), (self.tStatus or 'Busy')),
+						]
+						message = Format.newline().join(message)
+						self.tDialog.update(stepProgress, message)
+
+					elif self.tSettings == MetaImdb.BulkDialogBackground:
+						if self.tPrevious is None: # First notification.
+							time = 8000
+							icon = Dialog.IconWarning
+							message += '.' + (Translation.string(36853) % Format.fontBold('-'.join([str(i) for i in self.tDuration])))
+						else:
+							if final:
+								time = 8000
+								icon = Dialog.IconSuccess
+							else:
+								time = 4000
+								icon = Dialog.IconInformation
+							message += ': %s' % Format.iconJoin(label)
+						Dialog.notification(title = 36879, message = message, duplicates = True, icon = icon, time = time)
+
+					self.tPrevious = Math.roundDownClosest(self.tProgress, base = base)
+					self.tTimer = self.tTime.elapsed()
+		except: Logger.error()
+
+	def _bulkRetrieve(self, link, size, episode, progress = None):
+		try:
+			from lib.modules.tools import Hardware
+
+			# Check if enough storage space is available.
+			# These files are too big to retrieve them into memory using Networker.requestData().
+			# Eg: The episode file is 50MB and takes 4 minutes to download into memory, but only 15 seconds to download to file.
+			if self.bulkUsageStorage(refresh = True) > (size * 1.3) and not Pool.aborted():
+				id = self.id()
+				file = File.name(path = link, extension = False)
+				directory = System.temporary(directory = id)
+				path = System.temporary(directory = id, file = link)
+				link = Networker.linkJoin(MetaImdb.LinkBulk, link)
+				type = 'episode' if episode else 'rating'
+
+				# Add a sleep interval check in between downloading chunks.
+				# This allows other code to execute, instead of this code hogging all the resources during Kodi launch.
+				# It also allows to abort the download if Kodi is exited.
+				# Do not make this interval too large, since it is used between every chunk of 8192 bytes.
+				# Eg: Episode data is 50MB, check is done every 1MB, so total extra time of 0.5 secs (check = Pool.DelayShort).
+				self._bulkProgress(status = 'Downloading %s dataset' % type)
+				Networker().request(link = link, path = path, check = Pool.DelayShort)
+
+				if File.exists(path) and not Pool.aborted() and self._bulkCheck(delay = Pool.DelayShort):
+					from lib.modules.compression import Archiver
+
+					self._bulkProgress(status = 'Extracting %s dataset' % type, increment = progress[0] if progress else None)
+					output = System.temporary(directory = File.joinPath(id, 'data'))
+					Archiver.gzipDecompress(path = path, output = output)
+					if not self._bulkCheck(delay = Pool.DelayShort): return None
+
+					output = File.joinPath(output, file)
+					if File.exists(output) and not Pool.aborted():
+						self._bulkProgress(status = 'Processing %s dataset' % type, increment = progress[1] if progress else None)
+
+						# This is too much work for low-end devices.
+						# Reading the entire file into memory, and then using this inline loop to split the lines, makes low-end devices with less than 4GB RAM very slow, casuing Kodi to freeze or even crash.
+						# This also increases memory consumption too much. The raw data (250MB + 30MB), plus the processed list data (75MB + 13MB). When reading chunked data from file, we only need (75MB + 13MB).
+						# Split the workload into chunks and sleep in between.
+						'''
+							data = File.readNow(path = output)
+							#items = Csv.decode(data = data, structured = False, header = True, delimiterColumn = '\t', convertInteger = True) # Takes too long to decode as a CSV (50-55 secs).
+							items = [i.split('\t') for i in data.split('\n')] # Takes 10-15secs.
+						'''
+
+						def _convertEpisode(item):
+							# Episode ID
+							item[0] = self._bulkId(item[0])
+
+							# Parent ID
+							item[1] = self._bulkId(item[1])
+
+							# Episodes listed under the "Unknown" season has numbers as "\N".
+							# Season
+							try: item[2] = int(item[2])
+							except:
+								try: item[2] = 0
+								except: pass
+
+							# Episode
+							try: item[3] = int(item[3])
+							except:
+								try: item[3] = 0
+								except: pass
+
+						def _convertRating(item):
+							# ID
+							item[0] = self._bulkId(item[0])
+
+							# Rating
+							try: item[1] = float(item[1])
+							except:
+								try: item[1] = None
+								except: pass
+
+							# Votes
+							try: item[2] = int(item[2])
+							except:
+								try: item[2] = None
+								except: pass
+
+						convert = _convertEpisode if episode else _convertRating
+
+						import xbmcvfs
+						file = xbmcvfs.File(output)
+
+						# Use larger chunks to speed up the process.
+						# Small chunk sizes (eg 1KB) take 150-200 secs to process the episode dataset.
+						size = 262144 # 256KB (26 secs for the episode dataset on fast device and 80-90secs on slow device)
+
+						data = ''
+						items = []
+						count = 0
+
+						while True:
+							count += 1
+							if count > 10:
+								count = 0
+								if not self._bulkCheck(delay = Pool.DelayShort): break # Break to close the file below.
+
+							bytes = file.read(size)
+							if bytes:
+								for i in bytes: data += i
+							if data:
+								split = data.split('\n')
+								if split and len(split) > 1:
+									for i in range(len(split) - 1):
+										item = split[i].split('\t')
+										convert(item) # Convert to int/float to save some memory, instead of storing the values as larger strings.
+										items.append(item)
+									data = split[-1]
+							if not bytes: # End of file.
+								if data: # Process the last line.
+									split = data.split('\n')
+									for i in split:
+										item = i.split('\t')
+										convert(item) # Convert to int/float to save some memory, instead of storing the values as larger strings.
+										items.append(item)
+								break
+						file.close()
+
+						File.deleteDirectory(path = directory)
+						if not self._bulkCheck(): return None
+
+						self._bulkProgress(increment = progress[2] if progress else None)
+						return items
+
+		except: Logger.error()
+		return None
+
+	def _bulkEpisode(self):
+		try:
+			# Download: 49.9MB
+			# Extracted: 236.8MB
+			# Stored in database as a single compressed object: 40MB.
+			items = self._bulkRetrieve(link = MetaImdb.LinkBulkEpisode, size = 419430400, episode = True, progress = [5, 5, 15]) # 400MB.
+			if items:
+				self.tItems = result = {}
+				episodes = {}
+				count = 0
+				increment = 25 * (1.0 / len(items))
+				for i in range(len(items)):
+					try:
+						# Sleep to allow more important code to execute, and abort if Kodi was exited.
+						# About 9 million items. Total sleep 1.8 seconds (limit = 50000, delay = 0.01).
+						count += 1
+						if count > 50000:
+							count = 0
+							if not self._bulkCheck(delay = Pool.DelayShort): return False
+
+						# This can use up a lot of memory, since we create new dictionaries below.
+						# Low-end devices might not have enough memory and Kodi freezes up.
+						# As we iterate, set the original item to None to free up memory.
+						item = items[i]
+						items[i] = None
+
+						# Header and last empty row.
+						if not item or not item[0]: continue
+
+						idParent = item[1]
+						idEpisode = item[0]
+						try: numberSeason = item[2]
+						except: numberSeason = 0
+						try: numberEpisode = item[3]
+						except: numberEpisode = 0
+
+						# Store as an list, since it is smaller and faster.
+						entry1 = result.get(idParent)
+						if entry1 is None: entry1 = result[idParent] = {}
+
+						if numberSeason == 0:
+							# Specials in the "Unknown" season do not have episode numbers.
+							# This can be stored as a list.
+							# Or: the IDs seem to be in order of release, so we can assume an episode number.
+							# Update (2025-10): This is not always the case.
+							# For Jimmy Fallon (tt3444938) there are a bunch of episodes under "Unknown", which are future episodes that were not assigned to a new season yet.
+							# Many of those episodes are indeed ordered with sequential IMDb IDs. But there are also a number of episodes which do not fall within this order, where their ID is out of sequence.
+							# The episode order in the bulk data is therefore not always the order in which the episodes appear on the website.
+							# Hence, simply assuming that the IDs are sequential does not work.
+							# But there is no quick fix for this. So leave the current (possible) incorrect IMDb episode numbering for S0. Some shows will simply have a few incorrect numbers in S0.
+
+							#if not numberSeason in result[idParent]: result[idParent][numberSeason] = []
+							#result[idParent][numberSeason].append([idEpisode])
+
+							try: episodes[idParent] += 1
+							except: episodes[idParent] = 1
+
+							entry2 = entry1.get(numberSeason)
+							if entry2 is None: entry1[numberSeason] = {episodes[idParent] : [idEpisode]}
+							else: entry2[episodes[idParent]] = [idEpisode]
+						else:
+							entry2 = entry1.get(numberSeason)
+							if entry2 is None: entry1[numberSeason] = {numberEpisode : [idEpisode]}
+							else: entry2[numberEpisode] = [idEpisode]
+
+						self._bulkProgress(increment = increment, title = True)
+					except: Logger.error()
+
+				episodes.clear() # Clear up some memory.
+
+				# Sort by season and episode numbers.
+				self._bulkProgress(status = 'Sorting episode dataset')
+				count = 0
+				increment = 5 * (1.0 / len(result))
+				for k, v in result.items():
+					count += 1
+					if count > 200000:
+						count = 0
+						if not self._bulkCheck(delay = Pool.DelayQuick): return False
+
+					# Slightly faster, but only 1-2 secs (from the total of 135 secs).
+					#for k1, v2 in v.items():
+					#	if Tools.isDictionary(v2): v[k1] = dict(sorted(v2.items()))
+					#result[k] = dict(sorted(v.items()))
+					for k1, v2 in v.items():
+						if Tools.isDictionary(v2): v[k1] = {x : v2[x] for x in sorted(v2)}
+					result[k] = {x : v[x] for x in sorted(v)}
+
+					self._bulkProgress(increment = increment)
+
+				# Cast the season/episode numbers to strings, since this will happen in any case if the data is JSON-encoded for the cache.
+				# All lookups are done using strings.
+				# Do this after the sorting above, since string sorting does not return the same order (eg: "1" vs "10").
+				#result = {k1 : {str(k2) : {str(k3) : v3 for k3, v3 in v2.items()} if Tools.isDictionary(v2) else v2 for k2, v2 in v1.items()} for k1, v1 in result.items()}
+				# Update: Do not do this anymore, since it requires extra processing and extra memory.
+				# Since the keys are now stored as strings, they require almost twice the amount of memory as integers.
+				# Plus the JSON-encoding will take care of converting the keys to strings.
+				# If this is ever enabled again, make sure the increment percentages in this function add up to 60.
+				'''
+				self._bulkProgress(status = 'Converting episode dataset')
+				self.tItems = temp = {}
+				count = 0
+				increment = 5 * (1.0 / len(result))
+				for k1 in list(result.keys()): # So that we can delete from the dict while looping.
+					count += 1
+					if count > 200000:
+						count = 0
+						if not self._bulkCheck(delay = Pool.DelayQuick): return False
+
+					temp[k1] = {str(k2) : {str(k3) : v3 for k3, v3 in v2.items()} if Tools.isDictionary(v2) else v2 for k2, v2 in result[k1].items()}
+
+					# Free up memory, since we create a new dict above during every iteration.
+					del result[k1]
+
+					self._bulkProgress(increment = increment)
+				result = temp'''
+
+				return result
+		except: Logger.error()
+		return None
+
+	def _bulkRating(self):
+		try:
+			# Download: 8.0MB
+			# Extracted: 27.5MB
+			# Stored in database as a single compressed object: 10MB.
+			items = self._bulkRetrieve(link = MetaImdb.LinkBulkRating, size = 73400320, episode = False, progress = [4, 1, 5]) # 70MB.
+			if items:
+				self._bulkProgress(status = 'Populating rating dataset')
+				result = {}
+				count = 0
+				increment = 5 * (1.0 / len(items))
+				for i in range(len(items)):
+					try:
+						# Sleep to allow more important code to execute, and abort if Kodi was exited.
+						# About 1.6 million items.
+						count += 1
+						if count > 100000:
+							count = 0
+							if not self._bulkCheck(delay = Pool.DelayQuick): return False
+
+						# Free up memory during each iteration.
+						item = items[i]
+						items[i] = None
+
+						try: rating = item[1]
+						except: rating = None
+						try: votes = item[2]
+						except: votes = None
+						if rating is None or votes is None: continue
+						result[item[0]] = (rating, votes) # Store as an tuple, since it is smaller and faster than a dict, and also a bit smaller than a list.
+
+						self._bulkProgress(increment = increment, title = True)
+					except: Logger.error()
+				return result
+		except: Logger.error()
+		return None

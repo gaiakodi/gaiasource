@@ -93,6 +93,7 @@ class Networker(object):
 	ErrorCloudflare				= 'cloudflare'	# The request could not bypass Cloudflare (eg: unsolvable challenges, captcha).
 	ErrorCertificate			= 'certificate'	# SSL retrieval or validation errors.
 	ErrorVpn					= 'vpn'			# VPN not connected, request blocked.
+	ErrorServer					= [ErrorConnection, ErrorTimeout] # (Temporary) issues with the server.
 	ErrorNetwork				= [ErrorConnection, ErrorTimeout, ErrorCloudflare, ErrorCertificate, ErrorVpn]
 
 	CloudflareUnknown			= 'unknown'		# Unknown Cloudflare error.
@@ -100,7 +101,7 @@ class Networker(object):
 	CloudflareSolve				= 'solve'		# Cloudflare challenge cannot be solved.
 	CloudflareLoop				= 'loop'		# Cloudflare recursive depth loop.
 	Cloudflare1020				= '1020'		# Cloudflare code 1020 block.
-	CloudflareIuam				= 'iuam'		# Cloudflare problem extracting IUAM paramters.
+	CloudflareIuam				= 'iuam'		# Cloudflare problem extracting IUAM parameters.
 	CloudflareCaptcha			= 'captcha'		# Cloudflare various captcha errors.
 
 	# Must be the same as in cloudflare.py.
@@ -378,7 +379,7 @@ class Networker(object):
 			if link is None:
 				link = parameters
 			elif parameters:
-				if not self.linkPath(link = link) and not link.endswith('/'): link += '/'
+				if not self.linkPath(link = link) and not '?' in link and not link.endswith('/'): link += '/'
 				link += ('&' if '?' in link else '?') + parameters
 		return link
 
@@ -690,29 +691,48 @@ class Networker(object):
 
 	@classmethod
 	def _headersAgent(self, agent = None, link = None):
+		#gaiaremove - Update these at least once a year.
+		# Last updated: 2025-12-10
+		# Update (2025-03): All requests to Trakt suddenly stopped working, because they were blocked by Cloudflare, although they worked fine a day prior.
+		# This seems to have been caused by outdated user-agent browser versions (eg: Chrome/58.0.3029.110).
+		# Updating the versions seems to have solved the problem.
 		# https://www.whatismybrowser.com/guides/the-latest-user-agent/
 		if agent == Networker.AgentAddon:
 			return tools.Platform.agent()
 		elif agent == Networker.AgentMobileFixed:
-			return 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36'
+			return 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.173 Mobile Safari/537.36'
 		elif agent == Networker.AgentMobileRandom:
 			agents = [
-				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.3',
-				'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36',
-				'Mozilla/5.0 (Linux; Android 12; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36',
-				'Mozilla/5.0 (Android 12; Mobile; LG-M255; rv:102.0) Gecko/102.0 Firefox/102.0',
-				'Mozilla/5.0 (Linux; Android 12; LM-Q710(FGN)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.71 Mobile Safari/537.36',
-				'Mozilla/5.0 (iPhone; CPU iPhone OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Mobile/15E148 Safari/604.1',
-				'Mozilla/5.0 (iPhone; CPU iPhone OS 15_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/103.0.5060.63 Mobile/15E148 Safari/604.1',
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.3650.66',
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:145.0) Gecko/20100101 Firefox/145.0',
+
+				'Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0',
+				'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+				'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 OPR/124.0.0.0',
+
+				'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.173 Mobile Safari/537.36',
+				'Mozilla/5.0 (Linux; Android 16; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7444.173 Mobile Safari/537.36',
+				'Mozilla/5.0 (Android 16; Mobile; rv:68.0) Gecko/68.0 Firefox/145.0',
+
+				'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15',
+				'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+				'Mozilla/5.0 (Macintosh; Intel Mac OS X 15.7; rv:145.0) Gecko/20100101 Firefox/145.0',
+
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1',
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/143.0.7499.92 Mobile/15E148 Safari/604.1',
 			]
 			return tools.Tools.listPick(agents)
 		elif agent == Networker.AgentDesktopFixed:
-			return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+			return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
 		elif agent == Networker.AgentDesktopRandom:
-			browser = [['%s.0' % i for i in range(18, 43)], ['37.0.2062.103', '37.0.2062.120', '37.0.2062.124', '38.0.2125.101', '38.0.2125.104', '38.0.2125.111', '39.0.2171.71', '39.0.2171.95', '39.0.2171.99', '40.0.2214.93', '40.0.2214.111', '40.0.2214.115', '42.0.2311.90', '42.0.2311.135', '42.0.2311.152', '43.0.2357.81', '43.0.2357.124', '44.0.2403.155', '44.0.2403.157', '45.0.2454.101', '45.0.2454.85', '46.0.2490.71', '46.0.2490.80', '46.0.2490.86', '47.0.2526.73', '47.0.2526.80'], ['11.0']]
-			windows = ['Windows NT 10.0', 'Windows NT 7.0', 'Windows NT 6.3', 'Windows NT 6.2', 'Windows NT 6.1', 'Windows NT 6.0', 'Windows NT 5.1', 'Windows NT 5.0']
+			# Update (2025-03): These versions seem to be outdated causing Cloudflare errors. Using newer versions seems to solve the problem.
+			#browser = [['%s.0' % i for i in range(18, 43)], ['37.0.2062.103', '37.0.2062.120', '37.0.2062.124', '38.0.2125.101', '38.0.2125.104', '38.0.2125.111', '39.0.2171.71', '39.0.2171.95', '39.0.2171.99', '40.0.2214.93', '40.0.2214.111', '40.0.2214.115', '42.0.2311.90', '42.0.2311.135', '42.0.2311.152', '43.0.2357.81', '43.0.2357.124', '44.0.2403.155', '44.0.2403.157', '45.0.2454.101', '45.0.2454.85', '46.0.2490.71', '46.0.2490.80', '46.0.2490.86', '47.0.2526.73', '47.0.2526.80'], ['11.0']]
+			#agents = ['Mozilla/5.0 ({windows}{feature}; rv:{browser}) Gecko/20100101 Firefox/{browser}', 'Mozilla/5.0 ({windows}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{browser} Safari/537.36', 'Mozilla/5.0 ({windows}{feature}); Trident/7.0; rv:{browser}) like Gecko']
+			browser = [['%s.0' % i for i in range(136, 145)], ['%s.0.0.0' % i for i in range(135, 143)], ['%s.0.0.0' % i for i in range(135, 143)]]
+			agents = ['Mozilla/5.0 ({windows}{feature}; rv:{browser}) Gecko/20100101 Firefox/{browser}', 'Mozilla/5.0 ({windows}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{browser} Safari/537.36', 'Mozilla/5.0 ({windows}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/{browser}']
+			windows = ['Windows NT 10.0', 'Windows NT 7.0', 'Windows NT 6.3', 'Windows NT 6.2', 'Windows NT 6.1', 'Windows NT 6.0'] # Old: 'Windows NT 5.1', 'Windows NT 5.0'
 			features = ['; WOW64', '; Win64; IA64', '; Win64; x64', '']
-			agents = ['Mozilla/5.0 ({windows}{feature}; rv:{browser}) Gecko/20100101 Firefox/{browser}', 'Mozilla/5.0 ({windows}{feature}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{browser} Safari/537.36', 'Mozilla/5.0 ({windows}{feature}; Trident/7.0; rv:{browser}) like Gecko']
 			index = tools.Math.random(0, len(agents) - 1)
 			return agents[index].format(windows = tools.Tools.listPick(windows), feature = tools.Tools.listPick(features), browser = tools.Tools.listPick(browser[index]))
 		elif tools.Tools.isString(agent) and ('/' in agent or ' ' in agent): # Eg: subtitle.py.
@@ -947,6 +967,8 @@ class Networker(object):
 			If the link prarameter is not provided: Do not make a new request and just return the REQUEST dictionary from the previous request.
 		PARAMETERS
 			link (required): Request URL.
+			path (optional): The file to download the response to.
+			check (optional): The number of seconds to sleep between download chunks to the file "path". Can be used to slow down the download and abort the download if Kodi was exited.
 			method (optional): HTTP method. If no method is set and data is passed in, the method will be POST. If no method is set and no data is passed in, the method will be GET.
 			data (optional): The POST, JSON, or form data. If the method is GET, the data will be appended as GET parameters to the URL.
 			type (optional): The type of the data. If not set, normal POST data is assumed. Alternativley the data can be JSON, HTTP multi-part, or HTTP form data.
@@ -995,20 +1017,20 @@ class Networker(object):
 				'cookies' : <None/Dictionary - The response cookies (case sensitive keys - can be accessed with any case, since it uses CaseInsensitiveDict).>,
 			}
 	'''
-	def request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, cloudflare = True, debug = None, cache = False):
+	def request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, process = True, cloudflare = True, check = None, debug = None, cache = False):
 		if cache is False:
-			return self._request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
+			return self._request(link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug, check = check)
 		else:
 			from lib.modules.cache import Cache
 			if tools.Tools.isFunction(cache):
-				self.mResponse = cache(function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
+				self.mResponse = cache(function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug, check = check)
 			else:
 				if tools.Tools.isNumber(cache): time = cache
 				else: time = Cache.TimeoutMedium
-				self.mResponse = Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug)
+				self.mResponse = Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, link = link, path = path, method = method, data = data, type = type, headers = headers, cookies = cookies, range = range, agent = agent, timeout_ = timeout, concurrency = concurrency, certificate = certificate, curve = curve, redirect = redirect, encode = encode, charset = charset, vpn = vpn, process = process, cloudflare = cloudflare, debug = debug, check = check)
 			return self.mResponse
 
-	def _request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, cloudflare = True, process = True, debug = None):
+	def _request(self, link = None, path = None, method = None, data = None, type = None, headers = None, cookies = None, range = None, agent = None, timeout_ = None, concurrency = None, certificate = None, curve = None, redirect = True, encode = True, charset = None, vpn = True, cloudflare = True, process = True, check = None, debug = None):
 		try:
 			if link is None: return self.mRequest
 
@@ -1082,6 +1104,7 @@ class Networker(object):
 			reuse = self._settingsReuse()
 			released = False
 			duration = None
+			timer = None
 
 			try:
 				headers = dict(self._headersClean(headers = headers)) # Headers are case insensitive. But just make them titlecase in case the Cloudflare scraper does something weird.
@@ -1095,7 +1118,7 @@ class Networker(object):
 						Networker.ConcurrencySemaphore[concurrency].acquire()
 
 					if cloudflare and Cloudflare.enabled():
-						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, path = path, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, log = False)
+						result = Cloudflare(validate = validate, reuse = reuse).request(method = method, link = link, path = path, headers = headers, data = data, timeout = timeout_, certificate = certificate, curve = curve, redirect = redirect, check = check, log = False)
 						response = result['response']
 						responseCookies = result['cookies']
 						duration = result['duration']
@@ -1112,13 +1135,24 @@ class Networker(object):
 							if file:
 								with session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect, stream = True) as response:
 									response.raise_for_status()
-									for chunk in response.iter_content(chunk_size = 8192):
-										file.write(chunk)
+									if check:
+										if check is True: check = 0.01
+										count = 0
+										for chunk in response.iter_content(chunk_size = 8192):
+											file.write(chunk)
+											count += 1
+											if count > 128: # After every 1MB.
+												count = 0
+												if tools.System.aborted(): raise Exception('Download Aborted')
+												tools.Time.sleep(check)
+									else:
+										for chunk in response.iter_content(chunk_size = 8192):
+											file.write(chunk)
 								file.close()
 						else:
 							response = session.request(method = 'GET' if method is None else method, url = link, headers = headers, data = data, timeout = timeout_, verify = verify, allow_redirects = redirect)
 
-						duration = timer.elapsed(milliseconds = True)
+						if timer: duration = timer.elapsed(milliseconds = True)
 
 						# NB: session.response.cookies does not return all of the cookies.
 						# Not entirley sure why, but maybe only the cookies of the last request are returned, and not all the cookies in the chain or redirection.
@@ -1208,15 +1242,7 @@ class Networker(object):
 		        #    <span data-translate="error">Error</span>
 		        #    <span>1020</span>
 		        #  </h1>
-				#
-				# Do not just check the headers (eg: server: cloudflare), since some sites (eg: ApiBay when not sending GET parameters) return the same headers and 403, but it does not show the Cloudflare.
-				# https://support.cloudflare.com/hc/en-us/articles/360029779472-Troubleshooting-Cloudflare-1XXX-errors
-				if self.mResponse['error']['code'] == 403:
-					try:
-						if tools.Regex.match(data = responseText, expression = '(cloudflare|_cf_chl_opt)'):
-							if tools.Regex.match(data = responseText, expression = '(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3}|enable\s*javascript\s*and\s*cookies)'):
-								self.mResponse['error']['type'] = Networker.ErrorCloudflare
-					except: pass
+				if Cloudflare.error(code = self.mResponse['error']['code'], data = responseText): self.mResponse['error']['type'] = Networker.ErrorCloudflare
 
 			except Exception as error:
 				if concurrency and not released: Networker.ConcurrencySemaphore[concurrency].release()
@@ -1247,8 +1273,13 @@ class Networker(object):
 				errorCode = None
 				errorName = error.__class__.__name__.lower()
 
+				try: errorDescription = error.message
+				except: errorDescription = str(error)
+
 				if 'connectionerror' in errorName:
-					errorType = Networker.ErrorConnection
+					# Eg: HTTPSConnectionPool(host='www.torlock.com', port=443): Read timed out.
+					if errorDescription and ('timed out' in errorDescription or 'timeout' in errorDescription): errorType = Networker.ErrorTimeout
+					else: errorType = Networker.ErrorConnection
 				elif 'cloudflare' in errorName:
 					errorType = Networker.ErrorCloudflare
 					errorCode = Networker.CloudflareUnknown
@@ -1263,9 +1294,6 @@ class Networker(object):
 					errorType = Networker.ErrorTimeout
 				elif 'ssl' in errorName:
 					errorType = Networker.ErrorCertificate
-
-				try: errorDescription = error.message
-				except: errorDescription = str(error)
 
 				try:
 					errorMessage = tools.Regex.extract(data = errorDescription, expression = '>:\s*(.*)')
@@ -1501,6 +1529,9 @@ class Networker(object):
 	def responseErrorDescription(self):
 		return self.mResponse['error']['description']
 
+	def responseErrorServer(self):
+		return self.responseErrorType() in Networker.ErrorServer
+
 	def responseErrorNetwork(self):
 		return self.responseErrorType() in Networker.ErrorNetwork
 
@@ -1527,21 +1558,28 @@ class Networker(object):
 
 		return False
 
-	def responseErrorXxx(self, rangeFrom, rangeTo):
+	def responseErrorXxx(self, rangeFrom, rangeTo, exclude = None):
 		code = self.mResponse['error']['code']
-		return code and tools.Tools.isInteger(code) and code >= rangeFrom and code <= rangeTo
+		if code:
+			if exclude:
+				if tools.Tools.isArray(exclude):
+					if code in exclude: return False
+				else:
+					if code == exclude: return False
+			return tools.Tools.isInteger(code) and code >= rangeFrom and code <= rangeTo
+		return False
 
-	def responseError2xx(self):
-		return self.responseErrorXxx(rangeFrom = 200, rangeTo = 299)
+	def responseError2xx(self, exclude = None):
+		return self.responseErrorXxx(rangeFrom = 200, rangeTo = 299, exclude = exclude)
 
-	def responseError3xx(self):
-		return self.responseErrorXxx(rangeFrom = 300, rangeTo = 399)
+	def responseError3xx(self, exclude = None):
+		return self.responseErrorXxx(rangeFrom = 300, rangeTo = 399, exclude = exclude)
 
-	def responseError4xx(self):
-		return self.responseErrorXxx(rangeFrom = 400, rangeTo = 499)
+	def responseError4xx(self, exclude = None):
+		return self.responseErrorXxx(rangeFrom = 400, rangeTo = 499, exclude = exclude)
 
-	def responseError5xx(self):
-		return self.responseErrorXxx(rangeFrom = 500, rangeTo = 599)
+	def responseError5xx(self, exclude = None):
+		return self.responseErrorXxx(rangeFrom = 500, rangeTo = 599, exclude = exclude)
 
 	def responseDuration(self):
 		return self.mResponse['duration']
@@ -3576,7 +3614,7 @@ class Tracker(object):
 
 	# gaiaremove - update these
 	# Common Trackers
-	# Last update: 2024-11-27
+	# Last update: 2025-12-10
 	# Do not add too many trackers. Anything above 150 trackers in a magnet link will cause a failure on Premiumize, most likeley due to GET/POST size limits. Also makes the magnet unnecessarily large for Orion.
 	# Trackers are automatically retrieved from newtrackon.com, but keep this list as backup in case newtrackon.com is not accessible.
 	# https://newtrackon.com
@@ -3584,31 +3622,42 @@ class Tracker(object):
 	Trackers = {}
 	TrackersNew = {}
 	TrackersCommon = [
+		# These have been running reliably for years.
 		'udp://tracker.opentrackr.org:1337/announce',			# 100% uptime (Netherlands)
-		'udp://exodus.desync.com:6969/announce',				# 100% uptime (United States)
-		'https://tracker.lilithraws.org:443/announce',			# 100% uptime (Canada/United States)
-		'https://tracker.moeking.me:443/announce',				# 100% uptime (Canada/United States)
-		'udp://z.mercax.com:53/announce',						# 100% uptime (United States)
-		'udp://u4.trakx.crim.ist:1337/announce',				# 100% uptime (United States)
-		'https://tracker.tamersunion.org:443/announce',			# 100% uptime (Canada/United States)
-		'https://trackers.mlsub.net:443/announce',				# 100% uptime (United States)
-		'https://tracker.ipfsscan.io:443/announce',				# 100% uptime (Canada/United States)
-		'https://tracker.yemekyedim.com:443/announce',			# 100% uptime (Canada/United States)
-		'udp://amigacity.xyz:6969/announce',					# 100% uptime (United States)
-		'udp://odd-hd.fr:6969/announce',						# 100% uptime (France)
-		'udp://bandito.byterunner.io:6969/announce',			# 99.9% uptime (Germany)
-		'udp://explodie.org:6969/announce',						# 99.9% uptime (United States)
-		'udp://open.stealth.si:80/announce',					# 99.8% uptime (Norway)
-		'https://pybittrack.retiolus.net:443/announce',			# 99.8% uptime (Finland)
-		'udp://trackarr.org:6969/announce',						# 99.8% uptime (Germany)
-		'udp://tracker.torrent.eu.org:451/announce',			# 99.8% uptime (France)
-		'http://tracker.beeimg.com:6969/announce',				# 99.8% uptime (Switzerland)
-		'udp://t.overflow.biz:6969/announce',					# 99.8% uptime (Brazil)
-		'udp://tracker.tryhackx.org:6969/announce',				# 99.6% uptime (Germany)
-		'udp://ismaarino.com:1234/announce',					# 99.6% uptime (Spain)
-		'http://tracker.bt4g.com:2095/announce',				# 99.5% uptime (Canada/United States)
-		'udp://tracker.cyberia.is:6969/announce',				# 92.1% uptime (Ukraine)
+		'https://tracker.yemekyedim.com:443/announce',			# 100% uptime (Canada/United Kingdom)
+		'udp://tracker.torrent.eu.org:451/announce',			# 100% uptime (France)
+		'udp://open.stealth.si:80/announce',					# 99.9% uptime (Norway)
+		'udp://bandito.byterunner.io:6969/announce',			# 99.8% uptime (Netherlands)
+		'udp://tracker.tryhackx.org:6969/announce',				# 99.8% uptime (Germany)
+		'https://tracker.moeking.me:443/announce',				# 99.4% uptime (Canada)
+		'http://tracker.beeimg.com:6969/announce',				# 99.3% uptime (Switzerland)
+		'http://tracker.bt4g.com:2095/announce',				# 98.0% uptime (Canada)
+		'udp://t.overflow.biz:6969/announce',					# 84.7% uptime (Brazil)
 
+		# These were newly added (2025-12).
+		'udp://martin-gebhardt.eu:25/announce',					# 100% uptime (Germany)
+		'http://tracker.mywaifu.best:6969/announce',			# 100% uptime (Finland)
+		'udp://tracker.fnix.net:6969/announce',					# 100% uptime (Netherlands)
+		'udp://tracker.qu.ax:6969/announce',					# 100% uptime (France)
+		'udp://tracker.t-1.org:6969/announce',					# 100% uptime (Switzerland/Luxembourg)
+		'http://wegkxfcivgx.ydns.eu:80/announce',				# 100% uptime (South Africa)
+		'https://tracker.moeblog.cn:443/announce',				# 99.8% uptime (Canada)
+		'https://shahidrazi.online:443/announce',				# 99.6% uptime (Germany)
+		'udp://open.demonii.com:1337/announce',					# 99.6% uptime (New Zealand)
+		'udp://open.demonoid.ch:6969/announce',					# 99.4% uptime (New Zealand)
+		'udp://tracker.srv00.com:6969/announce'					# 99.1% uptime (Sweden)
+		'udp://tracker.dler.com:6969/announce',					# 99.1% uptime (Taiwan)
+		'udp://tracker.gmi.gd:6969/announce',					# 98.6% uptime (United States)
+		'http://tracker-zhuqiy.dgj055.icu:80/announce',			# 95.8% uptime (Finland/United States)
+		'udp://opentracker.io:6969/announce',					# 90.6% uptime (Germany)
+
+		# These were disabled, because there were too many trackers (2025-12).
+		#'https://tracker.alaskantf.com:443/announce',			# 100% uptime (Germany)
+		#'http://open.acgtracker.com:1096/announce',			# 100% uptime (Germany)
+		#'https://tracker.pmman.tech:443/announce',				# 99.5% uptime (Canada)
+		#'udp://open-tracker.demonoid.ch:6969/announce',		# 99.3% uptime (New Zealand)
+
+		# These were previously disabled, because there were too many trackers (pre 2025-12).
 		#'udp://tracker.birkenwald.de:6969/announce',			# 100% uptime (Germany)
 		#'http://tracker.files.fm:6969/announce',				# 100% uptime (Germany)
 		#'udp://tracker.beeimg.com:6969/announce',				# 100% uptime (Switzerland)
@@ -3624,6 +3673,24 @@ class Tracker(object):
 		#'udp://retracker.netbynet.ru:2710/announce',			# 67.0% uptime (Russia)
 		#'https://tracker.foreverpirates.co:443/announce',		# 54.4% uptime (United States)
 		#'udp://9.rarbg.com:2890/announce',						# 97.9% uptime (France) - RarBG shut down.
+
+		# These worked previously, but haven now a low uptime (2025-12).
+		#'udp://exodus.desync.com:6969/announce',				# 22% uptime (United States)
+		#'udp://explodie.org:6969/announce',					# 20% uptime (United States)
+
+		# These worked previously, but haven now been down for a while (2025-12).
+		#'https://tracker.lilithraws.org:443/announce',			# down for 7 motnhs (Canada/United States)
+		#'udp://z.mercax.com:53/announce',						# Down for 1 year (United States)
+		#'udp://u4.trakx.crim.ist:1337/announce',				# Down for 9 months (United States)
+		#'https://tracker.tamersunion.org:443/announce',		# Down for 2 months (Canada/United States)
+		#'https://trackers.mlsub.net:443/announce',				# Down for 11 months (United States)
+		#'https://tracker.ipfsscan.io:443/announce',			# Down for 11 months (Canada/United States)
+		#'udp://amigacity.xyz:6969/announce',					# Down for 1 year (United States)
+		#'udp://odd-hd.fr:6969/announce',						# Down for 11 months (France)
+		#'https://pybittrack.retiolus.net:443/announce',		# Down for 4 months (Finland)
+		#'udp://trackarr.org:6969/announce',					# Down for 7 months (Germany)
+		#'udp://ismaarino.com:1234/announce',					# Down for 7 months (Spain)
+		#'udp://tracker.cyberia.is:6969/announce',				# Down for 5 months (Ukraine)
 	]
 
 	##############################################################################

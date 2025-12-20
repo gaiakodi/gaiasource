@@ -64,6 +64,7 @@ class ProviderSpotJson(ProviderSpot):
 
 			customIncomplete		= True,
 
+			supportZero				= False, # No links are returned with "q=Title&season=1&ep=0", but episodes are returned with "q=Title&season=1".
 			supportOffset			= False,
 			supportAttributes		= False,
 

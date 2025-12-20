@@ -55,7 +55,7 @@ class Provider(ProviderHtml):
 		ProviderHtml.initialize(self,
 			name						= 'Pirateiro',
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. The search page of {name} does not contain all the metadata. A subpage must therefore be retrieved for each result in order to extract the magnet link, which substantially increases scraping time. Subpages also load very slowly, further increasing scraping time.',
-			rank						= 2, # Because of slow subpages.
+			rank						= 2, # Because of very very slow subpages.
 			performance					= ProviderHtml.PerformanceBad,
 
 			link						= Provider._Link,
@@ -73,7 +73,7 @@ class Provider(ProviderHtml):
 
 			# Subpages take very long to load, sometimes 10+ seconds.
 			# Maybe a temp problem, or Pirateiro does this to prevent scraping.
-			# Set a fixed number of threads to use, in order to retrieve mutiple subpages concurrently.
+			# Set a fixed number of threads to use, in order to retrieve multiple subpages concurrently.
 			searchConcurrency			= 6,
 
 			searchQuery					= {

@@ -61,12 +61,24 @@ class Provider(ProviderHtml):
 			name						= 'GloTorrents',
 			description					= '{name} is a less-known {container} site, but has many and high-quality results with good metadata. The site contains results in various languages, but most of them are in English.',
 			rank						= 4,
-			performance					= ProviderHtml.PerformanceGood,
+
+			# Update (2025-06): Domain is up, but searches return a HTTP 500 error.
+			# Using "retryCount" solves the issue for now.
+			performance					= ProviderHtml.PerformanceGood - ProviderHtml.PerformanceStep,
 
 			link						= Provider._Link,
 			unblock						= Provider._Unblock,
 
 			customVerified				= True,
+
+			# Update (2025-06)
+			# GloTorrents returns an empty page with HTTP error 500 (Internal Server Error) with most requests.
+			# However, when retrying the same request immediately afterwards (with the same domain, query, etc), it suddenly returns results.
+			# Not sure if this is a temporary issue with GloTorrents' server, or if this is a more permanent issue.
+			# Retrying the requests seems to solve the issue and returns links.
+			retryCount					= 3,
+			retryError					= 500,
+			retryDelay					= 1,
 
 			supportMovie				= True,
 			supportShow					= True,

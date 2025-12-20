@@ -79,3 +79,10 @@ In dammit.py, comment out the self.log.warning(...) statement, otherwise these e
 2021-11-10 11:38:41.445 T:18200   ERROR <general>:
 
 #########################################################################################################################
+
+Remove warning in __init__.py. This warning sometimes shows if we parse non-HTML stuff, like names/titles.
+Often happens for YouTube and trailers from video.py.
+
+	MarkupResemblesLocatorWarning: The input looks more like a filename than markup. You may want to open this file and pass the filehandle into Beautiful Soup.
+
+#########################################################################################################################

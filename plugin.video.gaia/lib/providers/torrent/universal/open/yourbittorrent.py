@@ -43,7 +43,14 @@ class Provider(ProviderHtml):
 	def initialize(self):
 		ProviderHtml.initialize(self,
 			name					= 'YourBittorrent',
-			description				= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link and other metadata, which substantially increases scraping time. {name} does not support paging and will therefore return few results.',
+			description				= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link and other metadata, which substantially increases scraping time. {name} does not support paging and will therefore return few results. Recently {name} has been very slow and is often inaccessible.',
+
+			# Update (2025-11):
+			# Back in the day YourBittorrent worked great.
+			# But over the past 1+ year, YourBittorrent is often completely inaccessible.
+			# It loads very very slowly and then does not return any results, or returns YourBittorrent HTML (with search bar, etc), but shows a 404 error.
+			# Every now and then it does work and is even searchable and returns results, but this is very rare and still takes very long for a single page.
+			# Reduce the rank and performance to not select this provider automatically anymore.
 			rank					= 3,
 			performance				= ProviderHtml.PerformanceBad,
 

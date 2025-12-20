@@ -18,16 +18,10 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+# https://www.reddit.com/r/Piracy/wiki/megathread/all_purpose/
 # https://torrends.to/proxy/
 # https://myds.cloud/%E8%B5%84%E6%96%99/%E7%A3%81%E5%8A%9B%E6%90%9C%E7%B4%A2
 # https://github.com/fmhy/FMHY/wiki/%F0%9F%8C%80-Torrenting
-
-#gaiaremove - https://feed.animetosho.org/json?q=one%20piece
-#gaiaremove - has torrents, NZB, and hoster links.
-#					https://feed.animetosho.org/json?show=torrent&id=674425
-#gaiaremove - has different numbering . Eg : "One Piece Log Fish-Man Island Saga EP14 2160p"
-#gaiaremove - https://www.tokyotosho.info/rss_customize.php
-#gaiaremove - add an anime provider category.
 
 import os
 import sys
@@ -84,6 +78,7 @@ class ProviderBase(object):
 	# Mode - must have the same value as the directory name
 	ModeUnknown							= None
 	ModeUniversal						= 'universal'
+	ModeAnime							= 'anime'
 	ModeEnglish							= 'english'
 	ModeFrench							= 'french'
 	ModeGerman							= 'german'
@@ -92,9 +87,10 @@ class ProviderBase(object):
 	ModePortuguese						= 'portuguese'
 	ModeItalian							= 'italian'
 	ModeRussian							= 'russian'
-	Modes								= [ModeUniversal, ModeEnglish, ModeFrench, ModeGerman, ModeDutch, ModeSpanish, ModePortuguese, ModeItalian, ModeRussian]
+	Modes								= [ModeUniversal, ModeAnime, ModeEnglish, ModeFrench, ModeGerman, ModeDutch, ModeSpanish, ModePortuguese, ModeItalian, ModeRussian]
 	ModesData							= {
 											ModeUniversal	: {'enabled' : True,	'label' : 35355},
+											ModeAnime		: {'enabled' : True,	'label' : 35565},
 											ModeEnglish		: {'enabled' : True,	'label' : 35801},
 											ModeFrench		: {'enabled' : True,	'label' : 35033},
 											ModeGerman		: {'enabled' : True,	'label' : 35797},
@@ -142,6 +138,7 @@ class ProviderBase(object):
 	VerifySuccess						= 'success'
 	VerifyFailure						= 'failure'
 	VerifyLimited						= 'limited'
+	VerifyOptional						= 'optional'
 
 	VerifyConnection					= 'connection'
 	VerifyRequest						= 'request'
@@ -158,8 +155,8 @@ class ProviderBase(object):
 
 	VerifyOrder							= [VerifyDomain, VerifyAccount, VerifyScrape]
 	VerifyValues						= [VerifySuccess, VerifyLimited, VerifyFailure]
-	VerifyLabels						= {VerifySuccess : 33025, VerifyLimited : 33024, VerifyFailure : 33023, VerifyConnection : 33404, VerifyRequest : 35261, VerifyCloudflare : 35689, VerifyCertificate : 35386, VerifyError : 35311, VerifyDomain : 33500, VerifyAccount : 33339, VerifyScrape : 35514}
-	VerifyColors						= {VerifySuccess : 'colorExcellent', VerifyLimited : 'colorMedium', VerifyFailure : 'colorBad'}
+	VerifyLabels						= {VerifySuccess : 33025, VerifyLimited : 33024, VerifyFailure : 33023, VerifyOptional : 35323, VerifyConnection : 33404, VerifyRequest : 35261, VerifyCloudflare : 35689, VerifyCertificate : 35386, VerifyError : 35311, VerifyDomain : 33500, VerifyAccount : 33339, VerifyScrape : 35514}
+	VerifyColors						= {VerifySuccess : 'colorExcellent', VerifyLimited : 'colorMedium', VerifyFailure : 'colorBad', VerifyOptional : 'colorSpecial'}
 
 	# Time
 	TimeDefault							= 60
@@ -183,12 +180,13 @@ class ProviderBase(object):
 
 	# Status
 	StatusOperational					= 'operational'	# The provider works as expected.
-	StatusImpaired						= 'impaired'	# The provider is impaired, such as strong Cloudflare protection, inaccessible by some VPNs, or other restrictions. Impaired providers are show in a light font in the manager dialog.
+	StatusCloudflare					= 'cloudflare'	# The provider is blocked by Cloudflare, typically when using a VPN.
+	StatusImpaired						= 'impaired'	# The provider is impaired, excluding Cloudflare issues, inaccessible by some VPNs, or other restrictions. Impaired providers are show in a light font in the manager dialog.
 	StatusDead							= 'dead'		# The provider is dead, such as having no working domain or the website has closed down. Dead providers are disabled by default and are show in an italic font in the manager dialog.
 	StatusHidden						= 'hidden'		# The provider is completely ignored as if it does not exist. Hidden providers are not shown in the manager dialog at all.
 	StatusDefault						= StatusOperational
-	StatusLabels						= {StatusOperational : 33430, StatusImpaired : 33431, StatusDead : 36357, StatusHidden : 36358}
-	StatusDescriptions					= {StatusOperational : 36359, StatusImpaired : 36360, StatusDead : 36361, StatusHidden : 36362}
+	StatusLabels						= {StatusOperational : 33430, StatusCloudflare : 35689, StatusImpaired : 33431, StatusDead : 36357, StatusHidden : 36358}
+	StatusDescriptions					= {StatusOperational : 36359, StatusCloudflare : 36806, StatusImpaired : 36360, StatusDead : 36361, StatusHidden : 36362}
 
 	# Process
 	ProcessRequest						= 'request'
@@ -232,6 +230,8 @@ class ProviderBase(object):
 	RequestHeaders						= 'headers'
 
 	# Account
+	AccountOptional						= 'optional'
+
 	AccountInputDialog					= 'dialog' # Shows an input dialog to ask the user for the account details.
 	AccountInputCustom					= 'custom' # Calls a custom function to handle the authentication.
 
@@ -345,7 +345,7 @@ class ProviderBase(object):
 	ScrapeRequest						= 'request'
 
 	# Custom
-	CustomVersion						= 'version'		# Interface version.
+	CustomVersion						= 'version'		# Scraper version.
 	CustomSize							= 'size'		# Minimum file size.
 	CustomTime							= 'time'		# Maximum age.
 	CustomPeers							= 'peers'		# Minimum torrent peers.
@@ -625,6 +625,7 @@ class ProviderBase(object):
 		#	AccountInputDialog: Ask the user for manual input which is stored in the provider settings.
 		#	AccountInputCustom: Initiates a custom account process. Subclasses must implement accountCustomEnabled(), accountSettingsLabel(), and accountCustomDialog().
 		#	String: A settings ID. The value is directly retrieved from and saved to the normal settings.
+		accountOptional			= None,			# Set to True, so that the provider can be used with or without an account. For instance, adding an account can increase API rate limits.
 		accountUsername			= None,			# Account username.
 		accountEmail			= None,			# Account email.
 		accountPassword			= None,			# Account password.
@@ -700,7 +701,11 @@ class ProviderBase(object):
 			if status == ProviderBase.StatusDead: enabled = False
 			if developer is None: developer = False
 
-			if supportNiche and Tools.isString(supportNiche): supportNiche = [supportNiche]
+			# Assume Anime/Donghua support if it is an Anime provider.
+			# Also include general Japanese/Chinese content, since Tokyotosho also has a "Drama" category for content that is not really anime (eg: "Kamen Rider").
+			if supportNiche is None and mode == ProviderBase.ModeAnime: supportNiche = [Media.Anime, Media.Donghua, Media.Japanese, Media.Chinese]
+			elif supportNiche and Tools.isString(supportNiche): supportNiche = [supportNiche]
+
 			if supportMovie is None: supportMovie = True
 			if supportShow is None: supportShow = True
 			if supportSpecial is None: supportSpecial = True
@@ -723,6 +728,7 @@ class ProviderBase(object):
 			addonName = addonName if addonName else gaia
 
 			account = {}
+			if accountOptional: account[ProviderBase.AccountOptional] = accountOptional
 			if accountUsername: account[ProviderBase.AccountTypeUsername] = ProviderBase.AccountInputDialog if accountUsername is True else accountUsername
 			if accountEmail: account[ProviderBase.AccountTypeEmail] = ProviderBase.AccountInputDialog if accountEmail is True else accountEmail
 			if accountPassword: account[ProviderBase.AccountTypePassword] = ProviderBase.AccountInputDialog if accountPassword is True else accountPassword
@@ -1276,9 +1282,10 @@ class ProviderBase(object):
 		elif self.typeCenter(): order += 0.10
 		elif self.typePremium(): order += 0.05
 
-		if self.statusImpaired(): order -= 0.25
+		if self.statusCloudflare(): order -= 0.25
+		elif self.statusImpaired(): order -= 0.25
 		elif self.statusDead(): order -= 0.60
-		elif self.statusHidden(): order -= 0.50
+		elif self.statusHidden(): order -= 0.50 if System.developer() else 99.0
 
 		order = Math.scale(value = order, fromMinimum = 0, fromMaximum = 4.0, toMinimum = 0, toMaximum = 1)
 		if inverse: order = 1 - order
@@ -1303,7 +1310,7 @@ class ProviderBase(object):
 		if rating: rating = sum(rating) / float(len(rating))
 		else: rating = 0.4
 
-		if status and self.statusImpaired(): rating -= ProviderBase.PerformanceStep
+		if status and (self.statusCloudflare() or self.statusImpaired()): rating -= ProviderBase.PerformanceStep
 
 		if language:
 			languages = self.languages()
@@ -1343,7 +1350,12 @@ class ProviderBase(object):
 		if self.typePremium(): return False
 
 		# Enable providers which have an active account.
-		if account and self.accountHas(): return self.accountEnabled()
+		if account and self.accountHas():
+			if self.accountOptional():
+				# If no optional account was provided, continue with the other criteria below.
+				if self.accountEnabled(): return True
+			else:
+				return self.accountEnabled()
 
 		# Disable dead providers.
 		if dead and self.statusDead(): return False
@@ -1388,6 +1400,9 @@ class ProviderBase(object):
 	def statusOperational(self):
 		return self.status() == ProviderBase.StatusOperational
 
+	def statusCloudflare(self):
+		return self.status() == ProviderBase.StatusCloudflare
+
 	def statusImpaired(self):
 		return self.status() == ProviderBase.StatusImpaired
 
@@ -1398,7 +1413,7 @@ class ProviderBase(object):
 		return self.status() == ProviderBase.StatusHidden
 
 	def statusActive(self):
-		return self.statusOperational() or self.statusImpaired()
+		return self.statusOperational() or self.statusCloudflare() or self.statusImpaired()
 
 	def statusLabel(self, status = None, label = True, description = True, color = True):
 		try:
@@ -1408,7 +1423,8 @@ class ProviderBase(object):
 			result = ''
 
 			if status == ProviderBase.StatusOperational: color = Format.colorExcellent()
-			elif status == ProviderBase.StatusImpaired: color = Format.colorMedium()
+			elif status == ProviderBase.StatusCloudflare: color = Format.colorMedium()
+			elif status == ProviderBase.StatusImpaired: color = Format.colorPoor()
 			elif status == ProviderBase.StatusDead: color = Format.colorBad()
 			else: color = None
 
@@ -1439,9 +1455,11 @@ class ProviderBase(object):
 	def languageTertiary(self, index = 0):
 		return self.language(index = index, code = Language.CodeTertiary)
 
-	def languages(self, copy = False):
-		if copy: return Tools.copy(self.mData['language'])
-		else: return self.mData['language']
+	def languages(self, copy = False, universal = True):
+		if copy: languages = Tools.copy(self.mData['language'])
+		else: languages = self.mData['language']
+		if not universal: languages = [i for i in languages if not i == Language.CodeUniversal]
+		return languages
 
 	def languageSet(self, language):
 		if not Tools.isArray(language): language = [language]
@@ -1640,11 +1658,29 @@ class ProviderBase(object):
 						linksSettings.insert(index, link1)
 						index += 1
 
+				# Change the domain order if it changed in the new version.
+				# Eg: A later alternative domain has now become the main domain is is moved to the front.
+				try:
+					# Try to keep the order as much as possible, if the user moved a custom domain to the front.
+					customBefore = []
+					customAfter = []
+					custom = customBefore
+					for link in linksSettings:
+						if link['custom']: custom.append(link['link'])
+						else: custom = customAfter
+					order = customBefore + [link['link'] for link in linksDefault] + customAfter
+					linksSettings = Tools.listSort(data = linksSettings, key = lambda i : order.index(i['link']) if i['link'] in order else 999999)
+				except: self.logError()
+
 				# Remove old domains if there are new domains.
 				linksSettings = [link for link in linksSettings if link['custom'] or 'fixed' in link]
 				for i in range(len(linksSettings)):
 					try: del linksSettings[i]['fixed']
 					except: pass
+
+				# Filter out any duplicate links added by custom.
+				try: linksSettings = Tools.listUnique(data = linksSettings, attribute = 'link')
+				except: self.logError()
 
 				self.linkSet(linksSettings, settings = True)
 		except: self.logError()
@@ -1807,6 +1843,9 @@ class ProviderBase(object):
 	def modeUniversal(self):
 		return self.mode() == ProviderBase.ModeUniversal
 
+	def modeAnime(self):
+		return self.mode() == ProviderBase.ModeAnime
+
 	def modeEnglish(self):
 		return self.mode() == ProviderBase.ModeEnglish
 
@@ -1855,7 +1894,7 @@ class ProviderBase(object):
 	##############################################################################
 
 	def enabled(self):
-		return self.enabledSettings() and self.enabledFailure() and self.enabledPreset() and self.enabledDeveloper() and self.enabledSupport() and self.enabledAccount() and self.enabledInternal()
+		return self.enabledSettings() and self.enabledFailure() and self.enabledPreset() and self.enabledDeveloper() and self.enabledSupport() and self.enabledAccount() and self.enabledInternal() and self.enabledExternal()
 
 	def enabledDefault(self):
 		return self.mData['enabled']['default']
@@ -1951,9 +1990,12 @@ class ProviderBase(object):
 		self.enableSupport(enable = not disable)
 
 	def enabledAccount(self):
-		return not self.accountHas() or self.accountEnabled()
+		return not self.accountHas() or self.accountEnabled(optional = True)
 
 	def enabledInternal(self):
+		return True
+
+	def enabledExternal(self):
 		return True
 
 	##############################################################################
@@ -2022,6 +2064,9 @@ class ProviderBase(object):
 			except: result = None
 		return result
 
+	def accountOptional(self):
+		return self.accountType(type = ProviderBase.AccountOptional)
+
 	def accountUsername(self):
 		return self.account(type = ProviderBase.AccountTypeUsername)
 
@@ -2041,13 +2086,16 @@ class ProviderBase(object):
 		if type: self.mSettings['account'][type] = None
 		else: self.mSettings['account'] = None
 
-	def accountHas(self):
+	def accountHas(self, optional = None):
 		try:
+			if optional and self.accountOptional(): return True
 			values = list(self.mData['account'].keys())
 			return any(i in ProviderBase.AccountTypeOrder and self.mData['account'][i] for i in values)
 		except: return False
 
-	def accountEnabled(self, type = None):
+	def accountEnabled(self, type = None, optional = None):
+		if optional and self.accountOptional(): return True
+
 		if type: items = {type : self.mData['account'][type]}
 		else: items = self.mData['account']
 
@@ -2058,6 +2106,7 @@ class ProviderBase(object):
 			elif account == ProviderBase.AccountInputCustom:
 				if not self.accountCustomEnabled():
 					return False
+
 		return True
 
 	def accountAttributes(self):
@@ -2068,7 +2117,7 @@ class ProviderBase(object):
 				label = self.accountLabel(type = type)
 				value = None
 				format = None
-				if self.accountEnabled(type = type):
+				if self.accountEnabled(type = type, optional = True):
 					value = self.account(type = type)
 					if account == ProviderBase.AccountInputCustom:
 						try: format = self.accountSettingsLabel(type = type)
@@ -2076,7 +2125,7 @@ class ProviderBase(object):
 					else:
 						format = value
 				format = self.accountFormat(type = type, value = format)
-				result.append({'type' : type, 'label' : label, 'value' : value, 'format' : format})
+				result.append({'type' : type, 'label' : label, 'value' : value, 'format' : format, 'optional' : self.accountOptional()})
 		return result
 
 	def accountLabel(self, type):
@@ -2326,7 +2375,7 @@ class ProviderBase(object):
 						value = '%d %s' % (value, Translation.string(35807 if value == 1 else 35808))
 					elif formatter == ProviderBase.SettingsFormatVersion:
 						if value == ProviderBase.VersionAutomatic: value = Format.fontItalic(33800)
-						elif value.isdigit(): value = '%s %s' % (Translation.string(33359), str(value))
+						elif value.isdigit(): value = '%s %s' % (Translation.string(36797), str(value)) # Use "Variant" label. Otherwise the user might think a higher "Version" is better (eg V2 is better than V1), which is not always the case.
 					elif Tools.isString(formatter) or Tools.isInteger(formatter):
 						if Tools.isInteger(formatter): formatter = Translation.string(formatter)
 						try: value = formatter % value
@@ -2528,9 +2577,12 @@ class ProviderBase(object):
 		return result
 
 	@classmethod
-	def settingsGlobalLimitPageSet(self, value):
-		Settings.setCustom(ProviderBase.SettingsGlobalLimitPage, value)
-		ProviderBase.SettingsData['limit'][ProviderBase.ScrapePage] = None
+	def settingsGlobalLimitPageSet(self, value, temporary = False):
+		if temporary:
+			ProviderBase.SettingsData['limit'][ProviderBase.ScrapePage] = value
+		else:
+			Settings.setCustom(ProviderBase.SettingsGlobalLimitPage, value)
+			ProviderBase.SettingsData['limit'][ProviderBase.ScrapePage] = None
 
 	@classmethod
 	def settingsGlobalLimitPageLabel(self, value = None):
@@ -3130,6 +3182,7 @@ class ProviderBase(object):
 
 	def customInitialize(self, custom = None, version = None, size = None, time = None, peers = None, seeds = None, leeches = None, search = None, category = None, verified = None, spam = None, adult = None, password = None, incomplete = None):
 		extra = []
+		if custom and Tools.isDictionary(custom): custom = [custom]
 
 		# Order matters for the settingfs dialog. Showq important ones first.
 		if version: extra.append(self.customVersionInitialize(version))
@@ -3193,7 +3246,6 @@ class ProviderBase(object):
 		return self.customHas(id = ProviderBase.CustomVersion)
 
 	def customVersionInitialize(self, custom):
-		label = Translation.string(33359)
 		if Tools.isInteger(custom): custom = [i for i in range(1, custom + 1)]
 		if Tools.isArray(custom): custom = [str(i) for i in custom]
 
@@ -3202,7 +3254,7 @@ class ProviderBase(object):
 
 		result = {
 			ProviderBase.SettingsId				: ProviderBase.CustomVersion,
-			ProviderBase.SettingsLabel			: 'Interface Version',
+			ProviderBase.SettingsLabel			: 'Scraper Version',
 			ProviderBase.SettingsRefresh		: 'link', # Clear the domains and reinitialize the provider.
 			ProviderBase.SettingsDefault		: default,
 			ProviderBase.SettingsType			: None,
@@ -3569,10 +3621,10 @@ class ProviderBase(object):
 			if not self.stopped() and account:
 				accountType, accountReason = self.verifyAccount(internal = True)
 			if not self.stopped() and scrape:
-				if accountType is None or accountType == ProviderBase.VerifySuccess:
+				if accountType is None or accountType == ProviderBase.VerifySuccess or accountType == ProviderBase.VerifyOptional:
 					scrapeType, scrapeReason = self.verifyScrape(internal = True)
 				elif scrape:
-					if self.accountHas():
+					if self.accountHas() and not self.accountOptional():
 						scrapeType = accountType
 						scrapeReason = accountReason
 					else:
@@ -3580,7 +3632,7 @@ class ProviderBase(object):
 						scrapeReason = domainReason
 		else:
 			# Ignore accounts for open providers (eg: TorrentApi/Torrentz2k that uses accountless tokens).
-			if account and self.accountHas() and not self.accessOpen():
+			if account and self.accountHas() and not self.accountOptional() and not self.accessOpen():
 				accountType = domainType
 				accountReason = domainReason
 			if scrape:
@@ -3630,6 +3682,7 @@ class ProviderBase(object):
 			for item in items:
 				if self.stopped(): break # Otherwise the GUI becomes unresponsive on cancel, waiting for the threads.
 				item['media'] = media
+				item['niche'] = None
 				item['silent'] = True
 				item['cacheLoad'] = False
 				item['cacheSave'] = False
@@ -3642,6 +3695,7 @@ class ProviderBase(object):
 
 		if not internal: self.stopClear()
 		self.concurrencyInitialize()
+		self.settingsGlobalLimitPageSet(value = 1, temporary = True) # Only scrape the first page.
 		self.mVerify = True
 		result = ProviderBase.VerifyFailure
 		reason = None
@@ -3843,6 +3897,16 @@ class ProviderBase(object):
 		if country: country = Tools.copy(country) if Tools.isArray(country) else [country]
 		if network: network = Tools.copy(network) if Tools.isArray(network) else [network]
 		if studio: studio = Tools.copy(studio) if Tools.isArray(studio) else [studio]
+
+		# Sometimes English is not listed as a the first language, although it is the main spoken language.
+		# Eg: Body of Lies: Language ['ar', 'en'] - Country ['gb', 'us']
+		# Move English to the front.
+		if country and language and len(language) > 1:
+			if not language[0] == Language.EnglishCode and language[1] == Language.EnglishCode:
+				origin = country[0] if Tools.isArray(country) else country
+				if origin in ['us', 'uk', 'gb', 'au', 'nz'] or (origin == 'ca' and not language[0] == Language.CodeFrench):
+					language.remove(Language.EnglishCode)
+					language.insert(0, Language.EnglishCode)
 
 		self.mParameters = {'query' : query, 'media' : media, 'niche' : niche, 'titles' : Tools.copy(titles), 'years' : Tools.copy(years), 'time' : time, 'idImdb' : idImdb, 'idTmdb' : idTmdb, 'idTvdb' : idTvdb, 'idTrakt' : idTrakt, 'numberSeason' : numberSeason, 'numberEpisode' : numberEpisode, 'numberPack' : numberPack, 'language' : language, 'country' : country, 'network' : network, 'studio' : studio, 'pack' : pack, 'duration' : duration, 'exact' : exact, 'silent' : silent}
 

@@ -54,6 +54,7 @@ class Provider(ProviderHtml):
 		ProviderHtml.initialize(self,
 			name						= 'TorrentDownload',
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has some inaccurate metadata.',
+
 			rank						= 4,
 			performance					= ProviderHtml.PerformanceGood,
 

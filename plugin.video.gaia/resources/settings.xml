@@ -1149,6 +1149,22 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
+				<setting id="premium.orion.authentication.debrider" type="string" label="36833" help="34655" parent="premium.orion.authentication.label">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=debrider&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="premium.orion.enabled">true</condition>
+								<condition setting="premium.orion.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
 				<setting id="premium.orion.authentication.easydebrid" type="string" label="36024" help="34655" parent="premium.orion.authentication.label">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=orionDebrid&type=easydebrid&help=true&settings=true)</data>
@@ -1734,6 +1750,28 @@ The label is then added to the action element:
 					</control>
 					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
 					<level>0</level>
+				</setting>
+
+				<!-- ########## PREMIUM - EXTERNAL - DEBRIDER ########## -->
+				<!-- Not supported by ResolveUrl or UrlResolver. -->
+				<setting id="premium.debrider.link" type="string" label="">
+					<control type="button" format="action"></control>
+					<default>https://debrider.app</default>
+					<level>0</level>
+					<enable>false</enable>
+					<constraints><allowempty>true</allowempty></constraints>
+				</setting>
+				<setting id="premium.debrider.authentication" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="premium.debrider.authentication.label" type="string" label="36833" help="34542">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=debriderAuthentication&help=true&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>[I]$ADDON[plugin.video.gaia 33642][/I]</default>
+					<level>0</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
 				</setting>
 
 				<!-- ########## PREMIUM - EXTERNAL - EASYDEBRID ########## -->
@@ -2468,6 +2506,21 @@ The label is then added to the action element:
 					</dependencies>
 				</setting>
 				<setting id="scrape.cache.inspection.torbox" type="integer" label="35607" help="34113" parent="scrape.cache.inspection">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>1</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35022">1</option>
+							<option label="35400">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="scrape.cache.inspection">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="scrape.cache.inspection.debrider" type="integer" label="36834" help="34541" parent="scrape.cache.inspection">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>1</level>
@@ -3602,7 +3655,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="stream.youtube.retrieval.trailer" type="integer" label="35536" help="34355" parent="stream.youtube.retrieval">
+				<setting id="stream.youtube.retrieval.trailer" type="integer" label="33409" help="34355" parent="stream.youtube.retrieval">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3668,7 +3721,29 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="stream.youtube.retrieval.extra" type="integer" label="35653" help="34433" parent="stream.youtube.retrieval">
+				<setting id="stream.youtube.retrieval.reaction" type="integer" label="33990" help="34464" parent="stream.youtube.retrieval">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.retrieval.bonus" type="integer" label="33408" help="34433" parent="stream.youtube.retrieval">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3712,7 +3787,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="stream.youtube.retrieval.making" type="integer" label="35650" help="34431" parent="stream.youtube.retrieval">
+				<setting id="stream.youtube.retrieval.production" type="integer" label="35650" help="34431" parent="stream.youtube.retrieval">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3734,7 +3809,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="stream.youtube.retrieval.director" type="integer" label="35377" help="34435" parent="stream.youtube.retrieval">
+				<setting id="stream.youtube.retrieval.direction" type="integer" label="33407" help="34435" parent="stream.youtube.retrieval">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3800,7 +3875,7 @@ The label is then added to the action element:
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="stream.youtube.retrieval.reaction" type="integer" label="33990" help="34464" parent="stream.youtube.retrieval">
+				<setting id="stream.youtube.retrieval.alternation" type="integer" label="33401" help="34667" parent="stream.youtube.retrieval">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -3814,6 +3889,28 @@ The label is then added to the action element:
 					</constraints>
 					<dependencies>
 						<dependency type="visible" setting="stream.youtube.retrieval">4</dependency>
+						<dependency type="enable">
+							<and>
+								<condition setting="account.youtube.enabled">true</condition>
+								<condition setting="account.youtube.authentication">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="stream.youtube.context" type="integer" label="36243" help="34668">
+					<control type="spinner" format="string"/>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="33489">1</option>
+							<option label="33800">2</option>
+							<option label="33110">3</option>
+							<option label="35233">4</option>
+						</options>
+					</constraints>
+					<dependencies>
 						<dependency type="enable">
 							<and>
 								<condition setting="account.youtube.enabled">true</condition>
@@ -4224,6 +4321,37 @@ The label is then added to the action element:
 					</constraints>
 				</setting>
 				<setting id="playback.details.description.production" type="integer" label="35429" help="34563" parent="playback.details.description">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+							<option label="36092">3</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.details.description" operator="gt">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.details.description.type" type="integer" label="33158" help="34663" parent="playback.details.description">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="36090">1</option>
+							<option label="36091">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="playback.details.description" operator="gt">0</dependency>
+					</dependencies>
+				</setting>
+				<setting id="playback.details.description.rating" type="integer" label="36769" help="34664" parent="playback.details.description">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>3</level>
@@ -5248,7 +5376,7 @@ The label is then added to the action element:
 								<condition setting="activity.rating.enabled">true</condition>
 								<and>
 									<condition setting="activity.binge.enabled">true</condition>
-									<condition setting="activity.binge.enabled.continue">true</condition>
+									<condition setting="activity.binge.continue">true</condition>
 								</and>
 							</or>
 						</dependency>
@@ -5266,7 +5394,7 @@ The label is then added to the action element:
 			<group id="metadata.general" label="32310">
 				<setting id="metadata.general.detail" type="string" label="33161" help="34465">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaDetail&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=metadataDetail&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>Standard</default>
@@ -5275,9 +5403,20 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="metadata.general.external" type="string" label="33301" help="34559" parent="metadata.general.detail">
+				<setting id="metadata.general.preload" type="string" label="36841" help="34680">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsMetaExternal&settings=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=metadataPreload&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>0% $ADDON[plugin.video.gaia 36839]</default>
+					<level>1</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="metadata.general.external" type="string" label="33301" help="34559" parent="metadata.general.preload">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=metadataExternal&settings=true)</data>
 						<close>true</close>
 					</control>
 					<default>$ADDON[plugin.video.gaia 35859]</default>
@@ -5286,28 +5425,110 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 				</setting>
-				<setting id="metadata.general.language" type="string" label="33238" help="34001">
+			</group>
+
+			<!-- ########## METADATA - BULK ########## -->
+			<group id="metadata.bulk" label="36897">
+				<setting id="metadata.bulk.selected" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
+				<setting id="metadata.bulk.refreshed" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
+				<setting id="metadata.bulk.mode" type="string" label="36879" help="34684">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=metadata.general.language&title=33238&automatic=true&none=false)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=metadataBulk&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>Disabled</default> <!-- Only enable if the user manually enables it in the settings or wizard. -->
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="metadata.bulk.refresh" type="integer" label="36896" help="34687" parent="metadata.bulk.mode">
+					<control type="spinner" format="string"/>
+					<default>1</default> <!-- Important for message when bulk data is loaded for the first time in the wizard. -->
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="33800">0</option>
+							<option label="35143">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="metadata.bulk.mode" operator="!is">Disabled</dependency>
+					</dependencies>
+				</setting>
+				<setting id="metadata.bulk.notification" type="integer" label="36888" help="34685" parent="metadata.bulk.mode">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32337">1</option>
+							<option label="35877">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="metadata.bulk.mode" operator="!is">Disabled</dependency>
+					</dependencies>
+				</setting>
+				<setting id="metadata.bulk.progress" type="integer" label="36889" help="34686" parent="metadata.bulk.mode">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="32337">1</option>
+							<option label="35877">2</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="metadata.bulk.mode" operator="!is">Disabled</dependency>
+					</dependencies>
+				</setting>
+				<setting id="metadata.bulk.action" type="integer" label="36899" help="34688" parent="metadata.bulk.mode">
+					<control type="spinner" format="string"/>
+					<default>2</default>
+					<level>3</level>
+					<constraints>
+						<options>
+							<option label="32302">0</option>
+							<option label="35881">1</option>
+							<option label="35143">2</option>
+							<option label="32501">3</option>
+							<option label="35004">4</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="metadata.bulk.mode" operator="!is">Disabled</dependency>
+					</dependencies>
+				</setting>
+			</group>
+
+			<!-- ########## METADATA - REGION ########## -->
+			<group id="metadata.region" label="33715">
+				<setting id="metadata.region.language" type="string" label="33238" help="34001">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=metadata.region.language&title=33238&automatic=true&none=false)</data>
 						<close>false</close>
 					</control>
 					<default>Automatic</default>
 					<level>2</level>
 				</setting>
-				<setting id="metadata.general.country" type="string" label="33947" help="34462">
+				<setting id="metadata.region.country" type="string" label="33947" help="34462">
 					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCountry&id=metadata.general.country&title=33238&automatic=true&none=false&frequency=true)</data>
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCountry&id=metadata.region.country&title=33238&automatic=true&none=false&frequency=true)</data>
 						<close>false</close>
 					</control>
 					<default>Automatic</default>
 					<level>3</level>
 				</setting>
-				<setting id="metadata.general.audience" type="boolean" label="33438" help="34124">
+				<setting id="metadata.region.audience" type="boolean" label="33438" help="34124">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 				</setting>
-				<setting id="metadata.general.audience.kid" type="integer" label="33439" help="34114" parent="metadata.general.audience">
+				<setting id="metadata.region.audience.kid" type="integer" label="33439" help="34114" parent="metadata.region.audience">
 					<control type="spinner" format="string"/>
 					<default>8</default>
 					<level>2</level>
@@ -5324,10 +5545,10 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.general.audience">true</dependency>
+						<dependency type="visible" setting="metadata.region.audience">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="metadata.general.audience.teen" type="integer" label="33440" help="34115" parent="metadata.general.audience">
+				<setting id="metadata.region.audience.teen" type="integer" label="33440" help="34115" parent="metadata.region.audience">
 					<control type="spinner" format="string"/>
 					<default>14</default>
 					<level>2</level>
@@ -5344,10 +5565,10 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.general.audience">true</dependency>
+						<dependency type="visible" setting="metadata.region.audience">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="metadata.general.audience.adult" type="integer" label="33441" help="34116" parent="metadata.general.audience">
+				<setting id="metadata.region.audience.adult" type="integer" label="33441" help="34116" parent="metadata.region.audience">
 					<control type="spinner" format="string"/>
 					<default>99</default>
 					<level>2</level>
@@ -5364,7 +5585,7 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="metadata.general.audience">true</dependency>
+						<dependency type="visible" setting="metadata.region.audience">true</dependency>
 					</dependencies>
 				</setting>
 			</group>
@@ -5473,18 +5694,6 @@ The label is then added to the action element:
 		<!-- ########## IMAGE ########## -->
 		<category id="image" label="36202" help="34398">
 
-			<!-- ########## IMAGE - LOCATION ########## -->
-			<group id="image.location" label="33874">
-				<setting id="image.location.language" type="string" label="35381" help="34062">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=image.location.language&title=35381&automatic=true&none=true)</data>
-						<close>false</close>
-					</control>
-					<default>Automatic</default>
-					<level>2</level>
-				</setting>
-			</group>
-
 			<!-- ########## IMAGE - GENERAL ########## -->
 			<group id="image.general" label="32310">
 				<setting id="image.general.limit" type="integer" label="32313" help="34063">
@@ -5501,6 +5710,18 @@ The label is then added to the action element:
 							<option label="35228">5</option>
 						</options>
 					</constraints>
+				</setting>
+			</group>
+
+			<!-- ########## IMAGE - REGION ########## -->
+			<group id="image.region" label="33715">
+				<setting id="image.region.language" type="string" label="35381" help="34062">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsLanguage&id=image.region.language&title=35381&automatic=true&none=true)</data>
+						<close>false</close>
+					</control>
+					<default>Automatic</default>
+					<level>2</level>
 				</setting>
 			</group>
 
@@ -5643,29 +5864,7 @@ The label is then added to the action element:
 				<setting id="image.selection.episode.season" type="boolean" label="35687" help="34292" parent="image.selection.episode.label">
 					<control type="toggle"/>
 					<level>2</level>
-					<default>false</default>
-				</setting>
-				<setting id="image.selection.multiple" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
-				<setting id="image.selection.multiple.label" type="string" label="35598" help="34421">
-					<control type="button" format="action">
-						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=multiple&settings=true)</data>
-						<close>true</close>
-					</control>
-					<default>$ADDON[plugin.video.gaia 33564]</default>
-					<level>2</level>
-					<constraints>
-						<allowempty>true</allowempty>
-					</constraints>
-				</setting>
-				<setting id="image.selection.multiple.show" type="boolean" label="35686" help="34291" parent="image.selection.multiple.label">
-					<control type="toggle"/>
-					<level>2</level>
 					<default>true</default>
-				</setting>
-				<setting id="image.selection.multiple.season" type="boolean" label="35687" help="34292" parent="image.selection.multiple.label">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>false</default>
 				</setting>
 			</group>
 
@@ -5708,7 +5907,7 @@ The label is then added to the action element:
 				<setting id="image.special.episode.season" type="boolean" label="35687" help="34292" parent="image.special.episode.label">
 					<control type="toggle"/>
 					<level>2</level>
-					<default>false</default>
+					<default>true</default>
 				</setting>
 				<setting id="image.special.recap" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
 				<setting id="image.special.recap.label" type="string" label="35592" help="34419">
@@ -5733,6 +5932,76 @@ The label is then added to the action element:
 					<constraints>
 						<allowempty>true</allowempty>
 					</constraints>
+				</setting>
+			</group>
+
+			<!-- ########## IMAGE - OTHER ########## -->
+			<group id="image.other" label="35149">
+				<setting id="image.other.smart" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.other.smart.label" type="string" label="35598" help="34421">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=smart&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="image.other.smart.show" type="boolean" label="35686" help="34291" parent="image.other.smart.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="image.other.smart.season" type="boolean" label="35687" help="34292" parent="image.other.smart.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="image.other.base" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.other.base.label" type="string" label="36751" help="34676">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=base&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="image.other.base.show" type="boolean" label="35686" help="34291" parent="image.other.base.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="image.other.base.season" type="boolean" label="35687" help="34292" parent="image.other.base.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="image.other.player" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>0</level></setting>
+				<setting id="image.other.player.label" type="string" label="36752" help="34677">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsImage&mode=selection&media=player&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+				</setting>
+				<setting id="image.other.player.show" type="boolean" label="35686" help="34291" parent="image.other.player.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="image.other.player.season" type="boolean" label="35687" help="34292" parent="image.other.player.label">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
 				</setting>
 			</group>
 
@@ -5768,15 +6037,15 @@ The label is then added to the action element:
 						</options>
 					</constraints>
 				</setting>
-				<setting id="label.general.style.future" type="boolean" label="35505" help="34666" parent="label.general.style">
+				<setting id="label.general.style.color" type="boolean" label="35505" help="34666" parent="label.general.style">
 					<control type="toggle"/>
 					<level>2</level>
 					<default>false</default>
 					<dependencies>
 						<dependency type="visible">
 							<or>
-								<condition setting="label.general.format">1</condition>
-								<condition setting="label.general.format">2</condition>
+								<condition setting="label.general.style">1</condition>
+								<condition setting="label.general.style">2</condition>
 							</or>
 						</dependency>
 					</dependencies>
@@ -5793,6 +6062,33 @@ The label is then added to the action element:
 				<setting id="label.title.layout.movie" type="integer" label="33634" help="34160" parent="label.title.layout">
 					<control type="list" format="string">
 						<heading>33634</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33589">3</option>
+							<option label="33590">4</option>
+							<option label="33591">5</option>
+							<option label="33592">6</option>
+							<option label="33593">7</option>
+							<option label="33594">8</option>
+							<option label="33595">9</option>
+							<option label="33596">10</option>
+							<option label="33597">11</option>
+							<option label="33598">12</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.title.layout.set" type="integer" label="36799" help="34410" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>36799</heading>
 					</control>
 					<default>0</default>
 					<level>2</level>
@@ -5921,135 +6217,67 @@ The label is then added to the action element:
 						<dependency type="visible" setting="label.title.layout">true</dependency>
 					</dependencies>
 				</setting>
+				<setting id="label.title.layout.bonus" type="integer" label="36798" help="34409" parent="label.title.layout">
+					<control type="list" format="string">
+						<heading>36798</heading>
+					</control>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="33564">0</option>
+							<option label="35022">1</option>
+							<option label="33588">2</option>
+							<option label="33609">3</option>
+							<option label="33610">4</option>
+							<option label="33611">5</option>
+							<option label="33612">6</option>
+							<option label="33172">7</option>
+							<option label="33173">8</option>
+							<option label="33613">9</option>
+							<option label="33614">10</option>
+							<option label="33615">11</option>
+							<option label="33174">12</option>
+							<option label="33175">13</option>
+							<option label="33176">14</option>
+							<option label="33616">15</option>
+							<option label="33617">16</option>
+							<option label="33618">17</option>
+							<option label="33619">18</option>
+							<option label="33177">19</option>
+							<option label="33178">20</option>
+							<option label="33620">21</option>
+							<option label="33621">22</option>
+							<option label="33622">23</option>
+							<option label="33179">24</option>
+							<option label="33180">25</option>
+							<option label="33181">26</option>
+							<option label="33623">27</option>
+							<option label="33624">28</option>
+							<option label="33625">29</option>
+							<option label="33626">30</option>
+							<option label="33627">31</option>
+							<option label="33628">32</option>
+							<option label="33629">33</option>
+							<option label="33630">34</option>
+							<option label="33631">35</option>
+							<option label="33632">36</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="label.title.layout">true</dependency>
+					</dependencies>
+				</setting>
 			</group>
 
 			<!-- ########## LABEL - DETAIL ########## -->
 			<group id="label.detail" label="33379">
-				<setting id="label.detail.enabled" type="boolean" label="32359" help="34319">
+				<setting id="label.detail.enabled" type="boolean" label="32531" help="34320">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
 				</setting>
-				<setting id="label.detail.placement" type="integer" label="32358" help="34320" parent="label.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="32051">0</option>
-							<option label="32050">1</option>
-							<option label="32053">2</option>
-							<option label="32052">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.decoration" type="integer" label="32407" help="34410" parent="label.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>0</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35049">1</option>
-							<option label="35050">2</option>
-							<option label="35367">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.style" type="integer" label="32406" help="34409" parent="label.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35644">1</option>
-							<option label="36027">2</option>
-							<option label="36028">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.color" type="integer" label="32408" help="34541" parent="label.detail.enabled">
-					<control type="spinner" format="string"/>
-					<default>3</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="33112">0</option>
-							<option label="35486">1</option>
-							<option label="35487">2</option>
-							<option label="36052">3</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level" type="integer" label="32531" help="34542">
-					<control type="spinner" format="string"/>
-					<default>1</default>
-					<level>2</level>
-					<constraints>
-						<options>
-							<option label="36090">0</option>
-							<option label="36091">1</option>
-							<option label="36092">2</option>
-						</options>
-					</constraints>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level.quick" type="boolean" label="36016" help="34660" parent="label.detail.level">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level.progress" type="boolean" label="36017" help="34661" parent="label.detail.level">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level.arrival" type="boolean" label="36018" help="34662" parent="label.detail.level">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level.mixed" type="boolean" label="35538" help="34663" parent="label.detail.level">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.level.other" type="boolean" label="35540" help="34664" parent="label.detail.level">
-					<control type="toggle"/>
-					<level>2</level>
-					<default>true</default>
-					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
-					</dependencies>
-				</setting>
-				<setting id="label.detail.play" type="boolean" label="35021" help="34218">
+				<setting id="label.detail.media" type="boolean" label="33427" help="34671">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
@@ -6057,7 +6285,129 @@ The label is then added to the action element:
 						<dependency type="visible" setting="label.detail.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.play.threshold" type="integer" label="35039" help="34539" parent="label.detail.play">
+				<setting id="label.detail.media.menu" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.media.menu.label" type="string" label="35456" help="34669" parent="label.detail.media">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailMediaMenu&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.media">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.media.format" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.media.format.label" type="string" label="32358" help="34670" parent="label.detail.media">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailMediaFormat&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.media">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity" type="boolean" label="32359" help="34319">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.menu" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.menu.label" type="string" label="35456" help="34669" parent="label.detail.activity">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityMenu&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.format" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.format.label" type="string" label="32358" help="34670" parent="label.detail.activity">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityFormat&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.play" type="boolean" label="35021" help="34218">
+					<control type="toggle"/>
+					<level>1</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.play.media" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.play.media.label" type="string" label="36729" help="34672" parent="label.detail.activity.play">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityPlay&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.play">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.play.threshold" type="integer" label="35039" help="34539" parent="label.detail.activity.play">
 					<control type="slider" format="integer">
 						<heading>35039</heading>
 						<popup>true</popup>
@@ -6073,20 +6423,47 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.play">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.play">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.progress" type="boolean" label="35040" help="34540">
+				<setting id="label.detail.activity.progress" type="boolean" label="35040" help="34540">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>true</default>
 					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.progress.format" type="integer" label="36094" help="34659" parent="label.detail.progress">
+				<setting id="label.detail.activity.progress.media" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.progress.media.label" type="string" label="32406" help="34673" parent="label.detail.activity.progress">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityProgress&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.progress">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.progress.format" type="integer" label="36094" help="34659" parent="label.detail.activity.progress">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -6100,20 +6477,47 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.progress">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.progress">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.rating" type="boolean" label="35020" help="34215">
+				<setting id="label.detail.activity.rating" type="boolean" label="35020" help="34215">
 					<control type="toggle"/>
 					<level>1</level>
-					<default>false</default>
+					<default>true</default>
 					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.rating.format" type="integer" label="36093" help="34658" parent="label.detail.rating">
+				<setting id="label.detail.activity.rating.media" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.rating.media.label" type="string" label="32407" help="34674" parent="label.detail.activity.rating">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityRating&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.rating">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.rating.format" type="integer" label="36093" help="34658" parent="label.detail.activity.rating">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -6127,20 +6531,47 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.rating">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.rating">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.air" type="boolean" label="35017" help="34213">
+				<setting id="label.detail.activity.air" type="boolean" label="35017" help="34213">
 					<control type="toggle"/>
 					<level>1</level>
 					<default>false</default>
 					<dependencies>
-						<dependency type="visible" setting="label.detail.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.air.zone" type="integer" label="35018" help="34214" parent="label.detail.air">
+				<setting id="label.detail.activity.air.media" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>1</level></setting>
+				<setting id="label.detail.activity.air.media.label" type="string" label="32408" help="34675" parent="label.detail.activity.air">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsDetailActivityAir&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>2</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="label.detail.enabled">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.air">true</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
+				<setting id="label.detail.activity.air.zone" type="integer" label="35018" help="34214" parent="label.detail.activity.air">
 					<control type="spinner" format="string"/>
 					<default>0</default>
 					<level>2</level>
@@ -6155,12 +6586,13 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.air">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.air">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.air.format" type="integer" label="35019" help="34216" parent="label.detail.air">
+				<setting id="label.detail.activity.air.format" type="integer" label="35019" help="34216" parent="label.detail.activity.air">
 					<control type="spinner" format="string"/>
 					<default>2</default>
 					<level>2</level>
@@ -6175,12 +6607,13 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.air">true</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.air">true</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.air.format.day" type="integer" label="35031" help="34217" parent="label.detail.air">
+				<setting id="label.detail.activity.air.day" type="integer" label="35031" help="34217" parent="label.detail.activity.air">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
@@ -6194,13 +6627,14 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.air">true</condition>
-								<condition setting="label.detail.air.format" operator="!is">0</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.air">true</condition>
+								<condition setting="label.detail.activity.air.format" operator="!is">0</condition>
 							</and>
 						</dependency>
 					</dependencies>
 				</setting>
-				<setting id="label.detail.air.format.time" type="integer" label="35048" help="34228" parent="label.detail.air">
+				<setting id="label.detail.activity.air.time" type="integer" label="35048" help="34228" parent="label.detail.activity.air">
 					<control type="spinner" format="string"/>
 					<default>1</default>
 					<level>3</level>
@@ -6214,8 +6648,9 @@ The label is then added to the action element:
 						<dependency type="visible">
 							<and>
 								<condition setting="label.detail.enabled">true</condition>
-								<condition setting="label.detail.air">true</condition>
-								<condition setting="label.detail.air.format" operator="!is">1</condition>
+								<condition setting="label.detail.activity">true</condition>
+								<condition setting="label.detail.activity.air">true</condition>
+								<condition setting="label.detail.activity.air.format" operator="!is">1</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -6421,7 +6856,7 @@ The label is then added to the action element:
 				</setting>
 				<setting id="menu.general.watched" type="integer" label="35672" help="34439">
 					<control type="spinner" format="string"/>
-					<default>0</default>
+					<default>1</default>
 					<level>3</level>
 					<constraints>
 						<options>
@@ -6430,6 +6865,42 @@ The label is then added to the action element:
 							<option label="33029">2</option>
 						</options>
 					</constraints>
+				</setting>
+				<setting id="menu.general.sleepy" type="boolean" label="36766" help="34660">
+					<control type="toggle"/>
+					<level>2</level>
+					<default>true</default>
+				</setting>
+				<setting id="menu.general.sleepy.limit" type="integer" label="36767" help="34661" parent="menu.general.sleepy">
+					<control type="slider" format="integer">
+						<heading>36767</heading>
+						<popup>true</popup>
+					</control>
+					<default>3</default>
+					<level>3</level>
+					<constraints>
+						<minimum>0</minimum>
+						<step>1</step>
+						<maximum>10</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.general.sleepy">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="menu.general.sleepy.duration" type="boolean"><default>false</default><control type="toggle"/><constraints><allowempty>true</allowempty></constraints><visible>false</visible><level>3</level></setting>
+				<setting id="menu.general.sleepy.duration.label" type="string" label="36768" help="34662" parent="menu.general.sleepy">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCustom&id=menu.general.sleepy.duration&settings=true)</data>
+						<close>true</close>
+					</control>
+					<default>$ADDON[plugin.video.gaia 33564]</default>
+					<level>3</level>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="menu.general.sleepy">true</dependency>
+					</dependencies>
 				</setting>
 			</group>
 
@@ -6709,7 +7180,7 @@ The label is then added to the action element:
 					<level>2</level>
 					<default>true</default>
 				</setting>
-				<setting id="menu.show.future.season" type="boolean" label="35117" help="34241" parent="menu.show.future">
+				<setting id="menu.show.future.season" type="boolean" label="36553" help="34241" parent="menu.show.future">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>true</default>
@@ -6717,7 +7188,7 @@ The label is then added to the action element:
 						<dependency type="visible" setting="menu.show.future">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="menu.show.future.episode" type="boolean" label="35118" help="34242" parent="menu.show.future">
+				<setting id="menu.show.future.episode" type="boolean" label="36554" help="34242" parent="menu.show.future">
 					<control type="toggle"/>
 					<level>3</level>
 					<default>true</default>
@@ -6893,7 +7364,7 @@ The label is then added to the action element:
 						<heading>35437</heading>
 						<popup>true</popup>
 					</control>
-					<default>20</default>
+					<default>15</default>
 					<level>3</level>
 					<constraints>
 						<minimum>5</minimum>
@@ -6985,10 +7456,13 @@ The label is then added to the action element:
 						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
 					</dependencies>
 				</setting>
-				<setting id="menu.icon.studio" type="boolean" label="33360" help="34571" parent="menu.icon.enabled">
-					<control type="toggle"/>
+				<setting id="menu.icon.company" type="string" label="33360" help="34571" parent="menu.icon.enabled">
+					<control type="button" format="action">
+						<data>RunPlugin(plugin://plugin.video.gaia/?action=settingsCompany&settings=true)</data>
+						<close>true</close> <!-- Important to close the dialog. Otherwise the setting does not hold if Kodi is restarted with one of the Force options. -->
+					</control>
 					<level>3</level>
-					<default>true</default>
+					<default>$ADDON[plugin.video.gaia 33800]</default>
 					<dependencies>
 						<dependency type="visible" setting="menu.icon.enabled">true</dependency>
 					</dependencies>
@@ -10038,7 +10512,7 @@ The label is then added to the action element:
 			<group id="network.cloudflare" label="35689">
 				<setting id="network.cloudflare.enabled" type="boolean" label="35692" help="34449">
 					<control type="toggle"/>
-					<level>2</level>
+					<level>1</level>
 					<default>true</default>
 				</setting>
 				<setting id="network.cloudflare.verification" type="string" label="35868" help="34450" parent="network.cloudflare.enabled">
@@ -10055,6 +10529,39 @@ The label is then added to the action element:
 						<dependency type="visible" setting="network.cloudflare.enabled">true</dependency>
 					</dependencies>
 				</setting>
+				<setting id="network.cloudflare.module" type="integer" label="36807" help="34678" parent="network.cloudflare.enabled">
+					<control type="spinner" format="string"/>
+					<default>1</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="36808">0</option>
+							<option label="36809">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible" setting="network.cloudflare.enabled">true</dependency>
+					</dependencies>
+				</setting>
+				<setting id="network.cloudflare.version" type="integer" label="36810" help="34679" parent="network.cloudflare.enabled">
+					<control type="spinner" format="string"/>
+					<default>0</default>
+					<level>2</level>
+					<constraints>
+						<options>
+							<option label="36811">0</option>
+							<option label="36299">1</option>
+						</options>
+					</constraints>
+					<dependencies>
+						<dependency type="visible">
+							<and>
+								<condition setting="network.cloudflare.enabled">true</condition>
+								<condition setting="network.cloudflare.module">1</condition>
+							</and>
+						</dependency>
+					</dependencies>
+				</setting>
 				<setting id="network.cloudflare.engine" type="string" label="35690" help="34451" parent="network.cloudflare.enabled">
 					<control type="button" format="action">
 						<data>RunPlugin(plugin://plugin.video.gaia/?action=cloudflareEngine&settings=true)</data>
@@ -10066,7 +10573,12 @@ The label is then added to the action element:
 						<allowempty>true</allowempty>
 					</constraints>
 					<dependencies>
-						<dependency type="visible" setting="network.cloudflare.enabled">true</dependency>
+						<dependency type="visible">
+							<and>
+								<condition setting="network.cloudflare.enabled">true</condition>
+								<condition setting="network.cloudflare.module">1</condition>
+							</and>
+						</dependency>
 					</dependencies>
 				</setting>
 				<setting id="network.cloudflare.retry" type="integer" label="35691" help="34452" parent="network.cloudflare.enabled">
@@ -10156,6 +10668,7 @@ The label is then added to the action element:
 
 				<setting id="internal.dummy" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.version" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
+				<setting id="internal.wizard" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.donation" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.announcement" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.promotions" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
@@ -10172,6 +10685,10 @@ The label is then added to the action element:
 				<setting id="internal.initial.disclaimer" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.promotions" type="boolean"><default>false</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.initial.menu" type="string"><default></default><constraints><allowempty>true</allowempty></constraints><level>4</level><visible>false</visible></setting>
+
+				<setting id="internal.update.time" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.update.old" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
+				<setting id="internal.update.new" type="integer"><default>0</default><level>4</level><visible>false</visible></setting>
 
 				<setting id="internal.key.gaia" type="string"><default>PVlsVndKblZ1NTBkTlpsVzFGVmJ3ZDFVR3BFZFcxR2UzWlZNTmRIVldSV2FVcEhiWVoxYUpoblZHRlVQ</default><level>4</level><visible>false</visible></setting>
 				<setting id="internal.key.orion" type="string"><default>PTRVTWtGMVVGZEhOT3BtVFZGbFZaVlRVV0ZGTVRwSGFNTmxSSlJqVnJWelNWWmxXVFJWUmt0VVVVdFdQ</default><level>4</level><visible>false</visible></setting>

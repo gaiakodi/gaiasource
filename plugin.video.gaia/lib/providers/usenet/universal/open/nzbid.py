@@ -32,4 +32,11 @@ class Provider(ProviderNzbreader1):
 		ProviderNzbreader1.initialize(self,
 			name	= 'nzbID',
 			link	= Provider._Link,
+
+			# Update (2025-12):
+			# The website does not return any results anymore: "No collections found".
+			# This is the case for most common search queries. Although some other queries ("the", "nzb", "*") does return results.
+			# Searching "mkv" returns very few results, all porn. So maybe they only index porn now.
+			# This seems to be the same with other NzbReader sites, like NZBFriends and FindNZB.
+			status	= ProviderNzbreader1.StatusImpaired,
 		)

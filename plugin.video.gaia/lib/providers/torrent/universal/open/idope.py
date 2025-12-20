@@ -133,7 +133,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less know {container} site. {name} has multiple structural problems, outdated metadata, and strong Cloudflare protection that might not be bypassable and cause scraping to fail. Version %s must request subpages to extract additional information, which substantially increases scraping time.' % ProviderHtml.Version2,
 			rank						= 3,
 			performance					= ProviderHtml.PerformanceBad,
-			status						= ProviderHtml.StatusImpaired, # Cloudflare.
+			status						= ProviderHtml.StatusCloudflare, # Cloudflare.
 
 			link						= Provider._Link[version],
 			mirror						= Provider._Mirror[version],

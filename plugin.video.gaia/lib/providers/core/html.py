@@ -68,6 +68,7 @@ class Html(object):
 	TagLink					= 'a'
 	TagDiv					= 'div'
 	TagSpan					= 'span'
+	TagNav					= 'nav'
 	TagParagraph			= 'p'
 	TagImage				= 'img'
 	TagFont					= 'font'
@@ -116,7 +117,7 @@ class Html(object):
 	AttributeAria			= 'aria-%s'
 	AttributeAriaLabel		= AttributeAria % 'label'
 
-	# Parameters starting/ending with an _ are alwways considered to be HTML attributes.
+	# Parameters starting/ending with an _ are always considered to be HTML attributes.
 	def __init__(self, **kwargs):
 		self.mData = {}
 		attribute = {}
@@ -259,6 +260,12 @@ class HtmlDiv(Html):
 class HtmlSpan(Html):
 	def __init__(self, **kwargs):
 		kwargs[Html.ParseTag] = Html.TagSpan
+		Html.__init__(self, **kwargs)
+
+
+class HtmlNav(Html):
+	def __init__(self, **kwargs):
+		kwargs[Html.ParseTag] = Html.TagNav
 		Html.__init__(self, **kwargs)
 
 

@@ -33,8 +33,8 @@ class ProviderJson(ProviderWeb):
 
 		extractList						= None,	# The outer list/array containing the individual items.
 
-		#  Extract an full link or path from HTML that points to a sub-page. The sub-page is requested and passed into the extract functions.
-		# Can be used to extract additional metadata from aa sub-paage for each item in extractList.
+		# Extract a full link or path from JSON that points to a sub-page. The sub-page is requested and passed into the extract functions.
+		# Can be used to extract additional metadata from a sub-page for each item in extractList.
 		# searchConcurrency will be set to True if it was not already set.
 		# Will only be executed if the file name is valid.
 		extractDetails					= None,
@@ -128,7 +128,7 @@ class ProviderJson(ProviderWeb):
 
 		if not extractDetails is None:
 			if self.searchConcurrency() is None: self.searchConcurrencySet(True)
-			self.extractDetails = (lambda data: self.extractJson(item = data, keys = extractDetails))
+			self.extractDetails = (lambda data: self.extractJson(item = item, keys = extractDetails))
 
 		if not extractLink is None: self.extractLink = (lambda item, details = None, entry = None: self.extractJson(item = item, details = details, entry = entry, keys = extractLink))
 
@@ -223,10 +223,14 @@ class ProviderJson(ProviderWeb):
 			if Tools.isArray(keys):
 				data = item
 				if Tools.isArray(keys[0]):
-					if keys[0][0] == ProviderWeb.Details: data = details
+					if keys[0][0] == ProviderWeb.Details:
+						data = details
+						keys = keys[1:]
 					return [Tools.dictionaryGet(dictionary = data, keys = key, merge = True) for key in keys]
 				else:
-					if keys[0] == ProviderWeb.Details: data = details
+					if keys[0] == ProviderWeb.Details:
+						data = details
+						keys = keys[1:]
 					return Tools.dictionaryGet(dictionary = data, keys = keys, merge = True)
 			else:
 				return Tools.dictionaryGet(dictionary = item, keys = keys, merge = True)

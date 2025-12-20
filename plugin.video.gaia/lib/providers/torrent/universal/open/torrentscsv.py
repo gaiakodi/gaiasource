@@ -18,6 +18,14 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+# Update (2025-06)
+# The API parameters have changed.
+#	https://torrents-csv.com/service/search?q=[QUERY]&size=[NUMBER_OF_RESULTS]&after=[AFTER]
+# The size parameter does not seem to work anymore, even though it is still documented. It seems that a fixed limit of 25 is now used.
+# The "page" parameter was removed.
+# A new "after" parameter was added. This seems to not be the page or offset.
+# Instead, a new "next" attribute was added to the JSON results, which is the next "rowid" to retrieve from, that is after the last item of the previous page.
+
 from lib.providers.core.json import ProviderJson
 
 class Provider(ProviderJson):
@@ -31,6 +39,7 @@ class Provider(ProviderJson):
 	_ParameterQuery			= 'q'
 	_ParameterPage			= 'page'
 	_ParameterLimit			= 'size'
+	_ParameterAfter			= 'after'
 
 	_AttributeList			= 'torrents'
 	_AttributeHash			= 'infohash'
@@ -40,6 +49,7 @@ class Provider(ProviderJson):
 	_AttributeSeeds			= 'seeders'
 	_AttributeLeeches		= 'leechers'
 	_AttributeDownloads		= 'completed'
+	_AttributeNext			= 'next'
 
 	##############################################################################
 	# INITIALIZE
@@ -59,8 +69,14 @@ class Provider(ProviderJson):
 			supportShow				= True,
 			supportPack				= True,
 
-			offsetStart				= 1,
-			offsetIncrease			= 1,
+			# Update (2025-06)
+			# TorrentsCsv does not use page numbers like before.
+			# Instead it now has an "after" parameter, which is the "rowid" of the previous torrent serving as an ID offset to retrieve torrents after this ID.
+			# The results now contain a "next" attribute which can be passed in as the next request's "after" parameter. The "next" attribute is essentially the "rowid" parameter from the last torrent in the current results returned.
+			# The "next" attribute is now returned using processOffset().
+			#offsetStart			= 1,
+			#offsetIncrease			= 1,
+			offsetStart				= 0, # If not specified, it will add an empty string as the parameter (after=''), which does not return any results.
 
 			formatEncode			= ProviderJson.FormatEncodeQuote,
 
@@ -69,8 +85,9 @@ class Provider(ProviderJson):
 										ProviderJson.RequestPath : Provider._Path,
 										ProviderJson.RequestData : {
 											Provider._ParameterQuery	: ProviderJson.TermQuery,
-											Provider._ParameterPage		: ProviderJson.TermOffset, # Paging does not work anymore with the .com and is also not documented. Can still return only 100 results.
-											Provider._ParameterLimit	: Provider._LimitOffset,
+											Provider._ParameterLimit	: Provider._LimitOffset, # Update (2025-06): The limit/size parameter does not work anymore. The limit is not fixed at 25.
+											#Provider._ParameterPage	: ProviderJson.TermOffset, # Paging does not work anymore with the .com and is also not documented. Can still return only 100 results.
+											Provider._ParameterAfter	: ProviderJson.TermOffset,
 										},
 									},
 
@@ -87,6 +104,12 @@ class Provider(ProviderJson):
 	##############################################################################
 	# PROCESS
 	##############################################################################
+
+	def processOffset(self, data, items):
+		try:
+			if data and data.get(Provider._AttributeNext): return data.get(Provider._AttributeNext)
+			else: return ProviderHtml.Skip
+		except: self.logError()
 
 	def processSourceApproval(self, value, item, details = None, entry = None):
 		if details:

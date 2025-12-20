@@ -260,6 +260,7 @@ class ProviderNewz(ProviderUsenetJson):
 
 		supportExact			= True,		# Supports exact string searches.
 
+		supportZero				= True,		# Supports 0 as episode number for searching packs (q=Title&season=1&ep=0). Otherwise the episode zero-number is not added at all.
 		supportOffset			= True,		# Supports offset and paging.
 		supportCategory			= True,		# Supports the "cat" parameter to search individual categories.
 		supportAttributes		= True,		# Supports the "attrs" (instead of "extended=1") parameter in queries.
@@ -366,35 +367,35 @@ class ProviderNewz(ProviderUsenetJson):
 		# Therefore, always search by query (first).
 		# Make searching by ID secondary, so those links are cut away if the user has set a request limit, but the query link remains.
 		queriesSpecial = []
-		if supportSpecialQuery: queriesSpecial.append(self._linkCreateShow(query = True, special = True, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
+		if supportSpecialQuery: queriesSpecial.append(self._linkCreateShow(query = True, special = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
 		if supportSpecialTvdb:
-			queriesSpecial.append(self._linkCreateShow(tvdb = True, season = True, episode = True, special = True, offset = supportOffset, attributes = supportAttributes))
-			if supportPackSeasonTvdb: queriesSpecial.append(self._linkCreateShow(tvdb = True, season = True, special = True, pack = True, offset = supportOffset, attributes = supportAttributes))
+			queriesSpecial.append(self._linkCreateShow(tvdb = True, season = True, episode = True, special = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+			if supportPackSeasonTvdb: queriesSpecial.append(self._linkCreateShow(tvdb = True, season = True, special = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
 		elif supportSpecialImdb:
-			queriesSpecial.append(self._linkCreateShow(imdb = True, season = True, episode = True, special = True, offset = supportOffset, attributes = supportAttributes))
-			if supportPackSeasonImdb: queriesSpecial.append(self._linkCreateShow(imdb = True, season = True, special = True, pack = True, offset = supportOffset, attributes = supportAttributes))
+			queriesSpecial.append(self._linkCreateShow(imdb = True, season = True, episode = True, special = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+			if supportPackSeasonImdb: queriesSpecial.append(self._linkCreateShow(imdb = True, season = True, special = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
 		elif supportSpecialTitle:
-			queriesSpecial.append(self._linkCreateShow(title = True, season = True, episode = True, special = True, offset = supportOffset, attributes = supportAttributes))
-			if supportPackSeasonTitle: queriesSpecial.append(self._linkCreateShow(title = True, season = True, special = True, pack = True, offset = supportOffset, attributes = supportAttributes))
+			queriesSpecial.append(self._linkCreateShow(title = True, season = True, episode = True, special = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+			if supportPackSeasonTitle: queriesSpecial.append(self._linkCreateShow(title = True, season = True, special = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
 		queries.append(queriesSpecial)
 
-		if supportShowTvdb: queries.append(self._linkCreateShow(tvdb = True, season = True, episode = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportShowImdb: queries.append(self._linkCreateShow(imdb = True, season = True, episode = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportShowTitle: queries.append(self._linkCreateShow(title = True, season = True, episode = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportShowQuery: queries.append(self._linkCreateShow(query = True, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
+		if supportShowTvdb: queries.append(self._linkCreateShow(tvdb = True, season = True, episode = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportShowImdb: queries.append(self._linkCreateShow(imdb = True, season = True, episode = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportShowTitle: queries.append(self._linkCreateShow(title = True, season = True, episode = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportShowQuery: queries.append(self._linkCreateShow(query = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
 
 		# Must be before show packs.
-		if supportPackSeasonTvdb: queries.append(self._linkCreateShow(tvdb = True, season = True, pack = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportPackSeasonImdb: queries.append(self._linkCreateShow(imdb = True, season = True, pack = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportPackSeasonTitle: queries.append(self._linkCreateShow(title = True, season = True, pack = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportPackSeasonQuery: queries.append(self._linkCreateShow(query = True, pack = True, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
+		if supportPackSeasonTvdb: queries.append(self._linkCreateShow(tvdb = True, season = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportPackSeasonImdb: queries.append(self._linkCreateShow(imdb = True, season = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportPackSeasonTitle: queries.append(self._linkCreateShow(title = True, season = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportPackSeasonQuery: queries.append(self._linkCreateShow(query = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
 
 		# Must be after season packs.
-		if supportPackShowImdb: queries.append(self._linkCreateShow(tvdb = True, pack = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportPackShowTvdb: queries.append(self._linkCreateShow(imdb = True, pack = True, offset = supportOffset, attributes = supportAttributes))
-		elif supportPackShowQuery: queries.append(self._linkCreateShow(query = True, pack = True, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
+		if supportPackShowImdb: queries.append(self._linkCreateShow(tvdb = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportPackShowTvdb: queries.append(self._linkCreateShow(imdb = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes))
+		elif supportPackShowQuery: queries.append(self._linkCreateShow(query = True, pack = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
 
-		if supportExact: queries.append(self._linkCreateShow(exact = True, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
+		if supportExact: queries.append(self._linkCreateShow(exact = True, zero = supportZero, offset = supportOffset, attributes = supportAttributes, category = supportCategory))
 
 		ProviderUsenetJson.initialize(self,
 			description			= description,
@@ -466,14 +467,14 @@ class ProviderNewz(ProviderUsenetJson):
 			return Networker.linkCreate(link = path, parameters = parameters, encode = bool(link))
 		except: self.logError()
 
-	def _linkCreateSearch(self, query = None, title = None, imdb = None, tvdb = None, season = None, episode = None, special = False, offset = False, category = None, attributes = False):
+	def _linkCreateSearch(self, query = None, title = None, imdb = None, tvdb = None, season = None, episode = None, special = False, zero = False, offset = False, category = None, attributes = False):
 		local = bool(title or imdb or tvdb)
 		query = ProviderUsenetJson.TermQuery if query is True else query if query else None
 		title = ProviderUsenetJson.TermTitle if title is True else title if title else None
 		imdb = ProviderUsenetJson.TermIdImdbNumber if imdb is True else imdb if imdb else None
 		tvdb = ProviderUsenetJson.TermIdTvdb if tvdb is True else tvdb if tvdb else None
 		season = ProviderUsenetJson.TermSeason if season is True else season if season else None
-		episode = ProviderUsenetJson.TermEpisode if episode is True else episode if episode else None if special else 0 if season else None # Do not use ep=0 for special episode season packs.
+		episode = ProviderUsenetJson.TermEpisode if episode is True else episode if episode else None if special else 0 if (season and zero) else None # Do not use ep=0 for special episode season packs.
 		age = self.customTime(days = True)
 		return self._linkCreate(
 			extended = True,
@@ -495,11 +496,12 @@ class ProviderNewz(ProviderUsenetJson):
 		return ProviderUsenetJson.TermTypeMovie + (ProviderUsenetJson.TermTypeExact if exact else ProviderUsenetJson.TermTypePack if pack else ProviderUsenetJson.TermTypePackNone) + self._linkCreateSearch(
 			query = True if exact else query,
 			imdb = imdb,
+			offset = offset,
 			category = (ProviderNewz._CategoryMovie + ProviderNewz._CategoryOther) if category else None,
 			attributes = attributes,
 		)
 
-	def _linkCreateShow(self, query = False, title = False, imdb = False, tvdb = False, season = False, episode = False, special = False, pack = False, exact = False, offset = False, category = False, attributes = False):
+	def _linkCreateShow(self, query = False, title = False, imdb = False, tvdb = False, season = False, episode = False, special = False, pack = False, zero = False, exact = False, offset = False, category = False, attributes = False):
 		return ProviderUsenetJson.TermTypeShow + (ProviderUsenetJson.TermTypeSpecial if special else ProviderUsenetJson.TermTypeSpecialNone) + (ProviderUsenetJson.TermTypeExact if exact else ProviderUsenetJson.TermTypePack if pack else ProviderUsenetJson.TermTypePackNone) + self._linkCreateSearch(
 			query = True if exact else query,
 			title = title,
@@ -508,6 +510,8 @@ class ProviderNewz(ProviderUsenetJson):
 			season = season,
 			episode = episode,
 			special = special,
+			zero = zero,
+			offset = offset,
 			category = (ProviderNewz._CategoryShow + ProviderNewz._CategoryOther) if category else None,
 			attributes = attributes,
 		)

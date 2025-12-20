@@ -125,6 +125,27 @@
 				<label>$INFO[Window.Property(GaiaTip)]</label>
 			</control>
 
+			<!-- PRELOAD -->
+
+			<!-- Too difficult to do this directly in Python. -->
+			<!-- The Python fadelabel control scrolls the label left-to-right instead of fading the label in-and-out. -->
+			<control type="fadelabel">
+				<top>475</top>
+				<right>140</right>
+				<width>1000</width>
+				<height>32</height>
+				<font>[GAIAFONTSMALL]</font>
+				<scroll>true</scroll>
+				<scrollout>false</scrollout>
+				<pauseatend>5000</pauseatend>
+				<align>center</align>
+				<aligny>center</aligny>
+				<label>$INFO[Window.Property(GaiaPreload1)]</label>
+				<label>$INFO[Window.Property(GaiaPreload2)]</label>
+				<label>$INFO[Window.Property(GaiaPreload3)]</label>
+				<visible>Integer.IsEqual(Window.Property(GaiaPreload),1) + !String.IsEmpty(Window.Property(GaiaPreload1))</visible>
+			</control>
+
 			<!-- LIST -->
 
 			<control type="group">

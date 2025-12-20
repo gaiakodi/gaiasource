@@ -65,6 +65,10 @@ class Provider(ProviderUsenetHtml):
 			rank						= 4,
 			performance					= ProviderUsenetHtml.PerformanceBad,
 
+			#gaiaremove
+			# Update (2025-12): Domain just shows "Redirecting" with an empty page. If still inaccesible in a few months, change to StatusDead.
+			status						= ProviderUsenetHtml.StatusImpaired,
+
 			link						= Provider._Link,
 
 			supportMovie				= True,

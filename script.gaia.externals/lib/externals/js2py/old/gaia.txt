@@ -1,0 +1,47 @@
+#########################################################################################################################
+
+Download:			https://pypi.org/project/Js2Py/#files
+Current Version:	0.71 (2022-07-01)
+Used By:			CloudScraper
+
+#########################################################################################################################
+
+find ./ -type f -exec sed -i -e 's/from pyjsparser/from externals.pyjsparser/g' {} \;
+find ./ -type f -exec sed -i -e 's/import pyjsparser.parser/import externals.pyjsparser as pyjsparser/g' {} \;
+find ./ -type f -exec sed -i -e 's/import pyjsparser/import externals.pyjsparser as pyjsparser/g' {} \;
+find ./ -type f -exec sed -i -e 's/from js2py/from externals.js2py.old/g' {} \;
+find ./ -type f -exec sed -i -e 's/from tzlocal/from externals.tzlocal/g' {} \;
+
+find ./ -type f -exec sed -i -e 's/from six/from externals.six.six/g' {} \;
+find ./ -type f -exec sed -i -e 's/import six/from externals.six import six/g' {} \;
+
+find ./ -type f -exec sed -i -e 's/or g is '"'"'OP_CODE'"'"'/or g == '"'"'OP_CODE'"'"'/g' {} \;
+
+#########################################################################################################################
+
+find ./ -type f -exec sed -i -e 's/import numpy/import numpygaiadummy/g' {} \;
+
+When executing the debug.sh script that calls tools.py -> JavaScript.execute(), everything works fine.
+When exeucting the script again right afterwards, Kodi hangs. Sometimes after some time, Kodi might also just crash.
+This is caused by the numpy import.
+
+Not sure if this is somhow related to:
+
+	https://github.com/python-pillow/Pillow/issues/5320
+	https://github.com/numpy/numpy/issues/18848
+
+"Remove" all numpy imports and let Js2Py run without numpy.
+do not just remove the import statements, since they are often wrapped in a try-catch where variables are set in the excecption part.
+Instead, replace the imports with a fake module to make sure it always fails without ever importing the actual numpy module.
+
+#########################################################################################################################
+
+On Android (Nvidia Shield), node_import.py has problems creating a temp directory:
+
+GAIA 6.0.3 (ERROR) [.kodi/addons/plugin.video.gaia/lib/modules/external.py, 50, module]: FileNotFoundError -> ['Traceback (most recent call last):\n', '  File ".kodi/addons/plugin.video.gaia/lib/modules/external.py", line 50, in module\n    raise exception\n', '  File ".kodi/addons/plugin.video.gaia/lib/modules/external.py", line 43, in module\n    package = import_module(module)\n', '  File "/data/user/0/net.kodinerds.maven.kodi/cache/apk/assets/python3.8/lib/python3.8/importlib/__init__.py", line 127, in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n', '  File "<frozen importlib._bootstrap>", line 1014, in _gcd_import\n', '  File "<frozen importlib._bootstrap>", line 991, in _find_and_load\n', '  File "<frozen importlib._bootstrap>", line 975, in _find_and_load_unlocked\n', '  File "<frozen importlib._bootstrap>", line 671, in _load_unlocked\n', '  File "<frozen importlib._bootstrap_external>", line 783, in exec_module\n', '  File "<frozen importlib._bootstrap>", line 219, in _call_with_frames_removed\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/js2py/__init__.py", line 75, in <module>\n    from .node_import import require\n', '  File ".kodi/addons/script.gaia.externals/lib/externals/js2py/node_import.py", line 12, in <module>\n    DIRNAME = tempfile.mkdtemp()\n', '  File "/data/user/0/net.kodinerds.maven.kodi/cache/apk/assets/python3.8/lib/python3.8/tempfile.py", line 348, in mkdtemp\n    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)\n', '  File "/data/user/0/net.kodinerds.maven.kodi/cache/apk/assets/python3.8/lib/python3.8/tempfile.py", line 117, in _sanitize_params\n    dir = gettempdir()\n', '  File "/data/user/0/net.kodinerds.maven.kodi/cache/apk/assets/python3.8/lib/python3.8/tempfile.py", line 286, in gettempdir\n    tempdir = _get_default_tempdir()\n', '  File "/data/user/0/net.kodinerds.maven.kodi/cache/apk/assets/python3.8/lib/python3.8/tempfile.py", line 218, in _get_default_tempdir\n    raise FileNotFoundError(_errno.ENOENT,\n', "FileNotFoundError: [Errno 2] No usable temporary directory found in ['/tmp', '/var/tmp', '/usr/tmp', '/']\n"]
+
+#########################################################################################################################
+
+Add the gaiaCommand() calls.
+
+#########################################################################################################################

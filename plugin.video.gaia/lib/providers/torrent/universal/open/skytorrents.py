@@ -52,7 +52,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has many and high-quality results with good metadata, but also has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank						= 4,
 			performance					= ProviderHtml.PerformanceGood,
-			status						= ProviderHtml.StatusDead, # Domain redirects to a different website.
+			status						= ProviderHtml.StatusDead, # Domain redirects to a different website. Update (2025-06): Still down.
 
 			link						= Provider._Link,
 			mirror						= Provider._Mirror,

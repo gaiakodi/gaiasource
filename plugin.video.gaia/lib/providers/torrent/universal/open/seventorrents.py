@@ -49,7 +49,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has many {containers}, but also has Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank						= 4,
 			performance					= ProviderHtml.PerformanceGood,
-			status						= ProviderHtml.StatusDead, # Domains are down, but still accessible through: https://seventorrents.unblockit.cam
+			status						= ProviderHtml.StatusDead, # Domains are down, but still accessible through: https://seventorrents.unblockit.cam. Update (2025-06): Still down.
 
 			link						= Provider._Link,
 

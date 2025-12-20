@@ -19,7 +19,7 @@
 '''
 
 from lib.informers import Informer as InformerBase
-from lib.modules.tools import Time, System, Media
+from lib.modules.tools import Time, System, Media,Logger
 from lib.modules.interface import Loader, Dialog, Directory
 from lib.modules.window import WindowBackground, WindowStreams
 
@@ -94,7 +94,7 @@ class Informer(InformerBase):
 			item = Directory(cache = False, lock = False).item()
 			if metadata:
 				metatools = MetaTools.instance()
-				item = metatools.item(item = item, metadata = metadata, extendLabel = MetaTools.ExtendTitle, cleanStudio = False, cleanIcon = False) # Do not decorate the title with the season/episode number, progress percentage, etc, since it looks ugly.
+				item = metatools.item(item = item, metadata = metadata, extendLabel = MetaTools.ExtendTitle, extendTagline = False, extendPlot = False, cleanStudio = False, cleanIcon = False) # Do not decorate the title with the season/episode number, progress percentage, etc, since it looks ugly.
 				try: background = item['images'][MetaImage.TypeFanart]
 				except: pass
 				item = item['item']

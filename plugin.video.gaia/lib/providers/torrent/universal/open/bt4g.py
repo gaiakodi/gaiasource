@@ -71,7 +71,7 @@ class Provider(ProviderHtml):
 		name			= 'BT4G'
 		description		= '{name} is a well-known {container} site. The site contains results in various languages, but most of them are in English. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.'
 		rank			= 3
-		status			= ProviderHtml.StatusImpaired # Cloudflare.
+		status			= ProviderHtml.StatusCloudflare # Cloudflare. For v1, Cloudflare only seems to block requests when accessing page 4+.
 
 		version = self.customVersion()
 		if version == ProviderHtml.Version1:

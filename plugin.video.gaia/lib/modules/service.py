@@ -115,8 +115,18 @@ class Service(object):
 
 			# Initialize Gaia during Kodi boot.
 			if kodi:
-				if self.settingAcceleration(): System.launch(hidden = True)
-				if self.settingAutomatic(): System.launchAutomatic()
+				def _launch():
+					# Sleep at least a few seconds.
+					# This might avoid some sporadic errors when Kodi is launched and the service is started too early.
+					# Eg: Sometimes during the early execution of the service, some settings return the wrong value. Maybe Kodi hasn't had time to initialize the addons?
+					# This also allows other addons to finish, freeing up memory and CPU.
+					Time.sleep(2)
+					if self.settingAcceleration():
+						System.launch(hidden = True)
+					if self.settingAutomatic():
+						Time.sleep(1)
+						System.launchAutomatic()
+				Pool.thread(target = _launch, start = True)
 
 			# VPN Monitor
 			# NB: Utilizes an infinite busy-wait thread.

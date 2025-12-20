@@ -19,10 +19,10 @@
 '''
 
 import os
-import imp
 import pkgutil
 
 from lib.providers.core.base import ProviderBase
+from lib.modules.external import Importer
 from lib.modules.database import Database
 from lib.modules.tools import Logger, Tools, Media, Hash, Time, File, System, Converter, Settings, Language, Math, Regex, Hardware, Platform
 from lib.modules.concurrency import Pool, Lock
@@ -107,6 +107,66 @@ class Manager(object):
 	@classmethod
 	def checkWait(self):
 		if Manager.Thread: Manager.Thread.join()
+
+	# Check if the providers got corrupted.
+	# This can happen if eg the device loses power unexpectedly and therefore not finishing the writing to the database.
+	# This makes the "provider.configuration.data" setting have an empty value (empty dict {}) in settings.db, even if it still is marked as having a value in settings.xml.
+	# The symptoms of this is that no providers are selected and scraping fails. When opening the provider configuration dialog, all categories are "Disabled" and none can be opened up to a submenu.
+	# Resetting the "provider.configuration.data" seems to solve the problem.
+	@classmethod
+	def checkCorrupt(self, fix = False):
+		try:
+			corrupt = not Settings.getData(Manager.SettingsConfigurationData)
+			if corrupt and fix:
+				from lib.modules.tools import Backup
+				from lib.modules.database import Database
+				from lib.modules.interface import Dialog
+
+				id = Manager.SettingsConfigurationData
+				success = False
+
+				Dialog.notification(title = 36874, message = 36875, icon = Dialog.IconWarning)
+
+				def _success():
+					label = Settings.getDataLabel(id = id)
+					if label:
+						label = Regex.extract(data = label, expression = '(\d+)')
+						if label and int(label) > 0: return True
+					return False
+
+				backups = Backup.automaticTemporary(count = 5) # Use mutiple backups, in case the corrupted setting got added to the most recent backup.
+				if backups:
+					for backup in backups:
+						try:
+							backup = backup.get(Backup.FileSql)
+							if backup:
+								database = Database(path = backup)
+								data = database._selectValue(query = 'SELECT data FROM settings WHERE id = ?', parameters = [Settings.idDataValue(id = id)])
+								database._close()
+								if data:
+									data = Converter.jsonFrom(data)
+									if data:
+										self.settingsSave(data = data, count = True, wait = True)
+										success = _success()
+										if success: break
+						except: Logger.error()
+
+				# No backup, or backup data is unusable.
+				if not success:
+					Dialog.closeNotification()
+					choice = Dialog.options(title = 36874, message = 36877, labelConfirm = 36878, labelDeny = 33743, default = Dialog.ChoiceYes)
+					if choice == Dialog.ChoiceYes:
+						Settings.default(id = id)
+						Manager.optimizeProvider()
+						success = _success()
+
+				if success:
+					self.check(progress = False, load = True, wait = True)
+					Dialog.notification(title = 36874, message = 36876, icon = Dialog.IconSuccess)
+
+				return success
+		except: Logger.error()
+		return False
 
 	##############################################################################
 	# DATA
@@ -297,8 +357,7 @@ class Manager(object):
 										try: versionCurrent = System.version(module)
 										except: versionCurrent = None
 										versions[module] = versionCurrent
-									if versionCurrent and not versionOld == versionCurrent:
-										return None
+									if versionCurrent and not versionOld == versionCurrent: return None
 						except: Logger.error()
 
 					settings = self.settingsLoad()
@@ -328,8 +387,8 @@ class Manager(object):
 							if not access is None:
 								if not data[i]['category']['access'] == access: continue
 
-							source = imp.load_source(data[i]['file']['id'], data[i]['file']['path'])
-							object = source.Provider(data = data[i])
+							module = Importer.moduleFile(id = data[i]['file']['id'], path = data[i]['file']['path'])
+							object = module.Provider(data = data[i])
 
 							if full:
 								enabledSupport = True
@@ -441,12 +500,13 @@ class Manager(object):
 						directory = file[0]
 						path = os.path.join(directory, name)
 
-						object = imp.load_source(id, path).Provider(initialize = True)
+						moduled = Importer.moduleFile(id = id, path = path) # NB: Do not overwrite the "module" var passed into _providersInitialize().
+						object = moduled.Provider(initialize = True)
 
 						instances = []
 						try:
 							instances = object.instances()
-							if module and not instances: instances.append(object) # Show "supported" external addons in the settings dialog.
+							if moduled and not instances: instances.append(object) # Show "supported" external addons in the settings dialog.
 						except: instances.append(object)
 
 						instancesMulti = len(instances) > 1
@@ -461,7 +521,7 @@ class Manager(object):
 					except ImportError:
 						if ProviderBase.logDeveloper(): Logger.error() # Do not log errors for non-installed external scraping addons.
 					except Exception as error:
-						Logger.log('A provider could not be loaded (%s): %s.' % (str(id), str(error)))
+						Logger.log('A provider could not be loaded ( %s): %s.' % (str(id), str(error)))
 						Logger.error()
 
 				if module:
@@ -521,6 +581,7 @@ class Manager(object):
 			addon (None/string): The addon ID the provider comes from.
 			enabled (None/boolean): The enabled status of the provider.
 			media (None/string): The media type of the provider.
+			niche (None/list): Exclude niche-specific providers during generic scraping.
 			type (None/string): The category type of the provider.
 			mode (None/string): The category mode of the provider.
 			access (None/string): The category access of the provider.
@@ -532,7 +593,7 @@ class Manager(object):
 			sort (boolean): Sort the providers according to various attributes, from best to worst providers.
 	'''
 	@classmethod
-	def providers(self, id = None, exclude = None, description = None, addon = None, enabled = None, media = None, type = None, mode = None, access = None, local = None, external = None, preset = None, settings = True, module = False, reload = False, sort = False):
+	def providers(self, id = None, exclude = None, description = None, addon = None, enabled = None, media = None, niche = None, type = None, mode = None, access = None, local = None, external = None, hidden = None, preset = None, settings = True, module = False, reload = False, sort = False):
 		typeMulti = Tools.isArray(type)
 		modeMulti = Tools.isArray(mode)
 		accessMulti = Tools.isArray(access)
@@ -557,6 +618,24 @@ class Manager(object):
 
 		if not enabled is None: providers = [i for i in providers if i.enabled() == enabled]
 		if not media is None: providers = [i for i in providers if media in i.supportMedia()]
+
+		# This does not filter providers based on the supported niche.
+		# Instead, it excludes niche-specific providers if non-niche/generic content is scraped.
+		# Eg: if a normal movie is scraped, Anime providers should be ignored.
+		if niche: # Check here, since this value is also None when opening the provider config setting.
+			temp = []
+			niches = []
+			if not niche is True:
+				niches = [Media.Anime, Media.Donghua]
+				niches = [i for i in niches if i in niche]
+			for i in providers:
+				support = i.supportNiche()
+				if support: # Niche-specific providers.
+					if niches and any(j in support for j in niches): temp.append(i)
+				else: # Generic providers.
+					temp.append(i)
+			providers = temp
+
 		if not type is None:
 			if typeMulti: providers = [i for i in providers if i.type() in type]
 			else: providers = [i for i in providers if i.type() == type]
@@ -568,6 +647,7 @@ class Manager(object):
 			else: providers = [i for i in providers if i.access() == access]
 		if not local is None: providers = [i for i in providers if i.typeLocal() == local]
 		if not external is None: providers = [i for i in providers if i.typeExternal() == external]
+		if not hidden is None: providers = [i for i in providers if i.statusHidden() == hidden]
 
 		if sort:
 			# Randomize the provider order.
@@ -921,7 +1001,8 @@ class Manager(object):
 		if type:
 			if not data[type]['enabled']: return False
 			elif mode:
-				if not data[type]['data'][mode]['enabled']: return False
+				if not mode in data[type]['data']: return False # Newly added mode category (eg: anime) which is added in a future version, but is not in the old settings.
+				elif not data[type]['data'][mode]['enabled']: return False
 				elif access:
 					if not data[type]['data'][mode]['data'][access]['enabled']: return False
 					else:
@@ -950,7 +1031,8 @@ class Manager(object):
 			if providers is None: providers = self.providers(type = type, mode = mode, access = access, addon = addon, reload = True)
 			if not providers: return None
 
-			enabled = [i for i in providers if i.enabledSettings(type = not type, mode = not mode, access = not access, addon = not addon) and i.enabledInternal()]
+			# enabledExternal() to remove external providers which addons are not installed.
+			enabled = [i for i in providers if i.enabledSettings(type = not type, mode = not mode, access = not access, addon = not addon) and i.enabledInternal() and i.enabledExternal()]
 			account = [i for i in enabled if i.enabledAccount()]
 
 			countAll = len(providers)
@@ -1019,14 +1101,18 @@ class Manager(object):
 				# Important for external providers which are disabled by default.
 				enabled = not data[type]['enabled']
 				if mode:
-					enabled = enabled or not data[type]['data'][mode]['enabled']
-					if access:
-						enabled = enabled or not data[type]['data'][mode]['data'][access]['enabled']
-						if addon:
-							enabled = enabled or not data[type]['data'][mode]['data'][access]['data'][addon]['enabled']
-							data[type]['data'][mode]['data'][access]['data'][addon]['enabled'] = enabled
-						if enabled or not addon: data[type]['data'][mode]['data'][access]['enabled'] = enabled
-					if enabled or not access: data[type]['data'][mode]['enabled'] = enabled
+					# Newly added mode category (eg: anime) which is added in a future version, but is not in the old settings.
+					if not mode in data[type]['data']:
+						enabled = False
+					else:
+						enabled = enabled or not data[type]['data'][mode]['enabled']
+						if access:
+							enabled = enabled or not data[type]['data'][mode]['data'][access]['enabled']
+							if addon:
+								enabled = enabled or not data[type]['data'][mode]['data'][access]['data'][addon]['enabled']
+								data[type]['data'][mode]['data'][access]['data'][addon]['enabled'] = enabled
+							if enabled or not addon: data[type]['data'][mode]['data'][access]['enabled'] = enabled
+						if enabled or not access: data[type]['data'][mode]['enabled'] = enabled
 				if enabled or not mode: data[type]['enabled'] = enabled
 
 				self.settingsSave(data = data)
@@ -1048,6 +1134,7 @@ class Manager(object):
 
 	@classmethod
 	def settingsDefault(self, data = None, providers = None, attributes = None, type = None, mode = None, access = None, addon = None):
+		force = False
 		if data is None: data = self.settingsLoad()
 		if providers is None:
 			if type:
@@ -1057,6 +1144,7 @@ class Manager(object):
 				elif type: del data[type]
 			else:
 				data = {}
+				force = True
 		else:
 			if not Tools.isArray(providers): providers = [providers]
 			if attributes and not Tools.isArray(attributes): attributes = [attributes]
@@ -1075,7 +1163,7 @@ class Manager(object):
 				else:
 					values[id] = {}
 
-		self.settingsSave(data = data)
+		self.settingsSave(data = data, force = force)
 		if providers is None:
 			self._providersClear() # Important to reload providers correctly (eg: toggle a specific external provider, go to the main menu withoutu closing the dialog, and click Default = the provider toggle is not reset).
 			providers = self.providers(type = type, mode = mode, access = access, addon = addon, reload = True)
@@ -1242,9 +1330,14 @@ class Manager(object):
 		return data
 
 	@classmethod
-	def settingsSave(self, data, count = False, wait = False):
-		Settings.setData(Manager.SettingsConfigurationData, data)
-		if count: self.settingsLabel(wait = wait)
+	def settingsSave(self, data, count = False, force = False, wait = False):
+		# Only save the settings if data has a value.
+		# Hopefully this avoids (at least some) corrupted provider settings error.
+		# During this corruption, the setting is always an empty dict {}, so it must be written to database using this function?
+		# More info under checkCorrupt().
+		if force or data:
+			Settings.setData(Manager.SettingsConfigurationData, data)
+			if count: self.settingsLabel(wait = wait)
 
 	@classmethod
 	def settingsLabel(self, count = None, wait = False):
@@ -1278,7 +1371,7 @@ class Manager(object):
 		bulletBad = Format.iconBullet(color = Format.colorBad())
 
 		def _settingsProviders(type = None, mode = None, access = None, addon = None, module = False, reload = False):
-			self.globalProviders = self.providers(type = type, mode = mode, access = access, addon = addon, module = module, reload = reload)
+			self.globalProviders = self.providers(type = type, mode = mode, access = access, addon = addon, module = module, reload = reload, hidden = self.globalHidden)
 			return self.globalProviders
 
 		def _settingsMenu(menu, provider = None, index = None):
@@ -1294,7 +1387,7 @@ class Manager(object):
 
 		def _settingsMenuOffset():
 			value = self.globalMenuOffset
-			self.globalMenuOffset = 0 # Reset on menu refresh.
+			self.globalMenuOffset = 0 # Reset on menu refresh.7
 			return value
 
 		def _settingsBack(type = None, mode = None, access = None, addon = None, provider = False, force = False):
@@ -1331,7 +1424,7 @@ class Manager(object):
 			else: self.globalMenu = None
 
 		def _settingsHelp(provider = None):
-			description = Translation.string(34347) % (ProviderBase.rankIcon(), bulletBad.strip(), bulletMedium.strip(), bulletGood.strip())
+			description = Translation.string(34347) % (ProviderBase.rankIcon(), bulletBad.strip(), bulletPoor.strip(), bulletMedium.strip(), bulletGood.strip())
 			mirrors = None
 			status = None
 			rank = None
@@ -1350,7 +1443,7 @@ class Manager(object):
 				performance = provider.performanceLabel()
 				settingsScrape = provider.scrapeAttributes()
 				settingsCustom = provider.customAttributes()
-				if provider.accountHas(): settingsProvider.append({'label' : 33339, 'description' : 34342})
+				if provider.accountHas() and not provider.accountOptional(): settingsProvider.append({'label' : 33339, 'description' : 34342})
 				if provider.linkHas(): settingsProvider.append({'label' : 33159, 'description' : 34343})
 			else:
 				settingsScrape = ProviderBase.scrapeAttributesAll()
@@ -1380,8 +1473,8 @@ class Manager(object):
 		def _settingsToggleStatus(providers = None, navigate = True):
 			choice = Dialog.options(title = 33196, message = 33377, labelConfirm = 33430, labelDeny = 33456, labelCustom = 33431)
 			if choice == Dialog.ChoiceYes: choice = [ProviderBase.StatusOperational]
-			elif choice == Dialog.ChoiceNo: choice = [ProviderBase.StatusOperational, ProviderBase.StatusImpaired]
-			elif choice == Dialog.ChoiceCustom: choice = [ProviderBase.StatusImpaired]
+			elif choice == Dialog.ChoiceNo: choice = [ProviderBase.StatusOperational, ProviderBase.StatusCloudflare, ProviderBase.StatusImpaired]
+			elif choice == Dialog.ChoiceCustom: choice = [ProviderBase.StatusCloudflare, ProviderBase.StatusImpaired]
 			else: choice = None
 			if choice:
 				enabled = []
@@ -1406,7 +1499,7 @@ class Manager(object):
 
 		def _settingsVerify(providers = None, type = None, mode = None, access = None, addon = None):
 			verify = self.verify(providers = providers, type = type, mode = mode, access = access, addon = addon, internal = True)
-			if not verify: self.globaClose = True
+			if not verify: self.globalClose = True
 
 		def _settingsOptimize():
 			self.optimizeProvider(wait = True)
@@ -1486,7 +1579,7 @@ class Manager(object):
 			self.settingsUpdate(provider)
 
 		def _settingsItems():
-			if self.globaClose: return None
+			if self.globalClose: return None
 
 			# Direct settings dialog for a specific provider ID.
 			if self.globalId and not self.globalMenu: _settingsMenu(menu = 'settings', provider = self.globalId)
@@ -1712,7 +1805,8 @@ class Manager(object):
 					if provider.typeSpecial() and 'orion' in sort: sort = '' # Always place Orion first.
 
 					providerBullet = bulletGood
-					if provider.statusImpaired(): providerBullet = bulletMedium
+					if provider.statusCloudflare(): providerBullet = bulletMedium
+					elif provider.statusImpaired(): providerBullet = bulletPoor
 					elif provider.statusDead(): providerBullet = bulletBad
 					elif provider.typeExternal(): providerBullet = bulletGood if provider.addonEnabled(scraper = True, parent = False) else bulletBad
 
@@ -1831,7 +1925,8 @@ class Manager(object):
 
 		# Execute
 
-		self.globaClose = False
+		self.globalHidden = None if System.developer() else False
+		self.globalClose = False
 		self.globalMenu = None
 		self.globalMenuId = None
 		self.globalMenuOffset = 0
@@ -2138,9 +2233,9 @@ class Manager(object):
 				except:
 					def callback(category):
 						if category == Hardware.CategoryProcessor: progress.append((5, 36047))
-						elif category == Hardware.CategoryMemory: progress.append((10, 36048))
-						elif category == Hardware.CategoryStorage: progress.append((20, 36139))
-						elif category == Hardware.CategoryConnection: progress.append((50, 35008))
+						elif category == Hardware.CategoryMemory: progress.append((5, 36048))
+						elif category == Hardware.CategoryStorage: progress.append((15, 36139))
+						elif category == Hardware.CategoryConnection: progress.append((25, 35008)) # So that it starts at 70%.
 
 					data = Hardware.performance(processor = processor, memory = memory, storage = storage, connection = connection, callback = callback)
 
@@ -2812,18 +2907,21 @@ class Manager(object):
 				except: result['analyze'] = False
 				self.tResult.append(result)
 
-			functions.append((0.65, {'function' : self._optimizeDevice, 'processor' : analyzeProcessor, 'memory' : analyzeMemory, 'storage' : analyzeStorage, 'connection' : analyzeConnection, 'progress' : progress, 'analyze' : analyzeProcessor or analyzeMemory or analyzeStorage or analyzeConnection}))
-			functions.append((0.07, {'function' : self._optimizeProvider, 'progress' : progress, 'analyze' : analyzeProvider}))
-			functions.append((0.07, {'function' : self._optimizePack, 'progress' : progress, 'analyze' : analyzePack}))
-			functions.append((0.07, {'function' : self._optimizeTitle, 'progress' : progress, 'analyze' : analyzeTitle}))
-			functions.append((0.07, {'function' : self._optimizeKeyword, 'progress' : progress, 'analyze' : analyzeKeyword}))
-			functions.append((0.07, {'function' : self._optimizeMirror, 'progress' : progress, 'analyze' : analyzeMirror}))
+			functions.append((0.1, {'function' : self._optimizeProvider, 'progress' : progress, 'analyze' : analyzeProvider}))
+			functions.append((0.1, {'function' : self._optimizePack, 'progress' : progress, 'analyze' : analyzePack}))
+			functions.append((0.1, {'function' : self._optimizeTitle, 'progress' : progress, 'analyze' : analyzeTitle}))
+			functions.append((0.1, {'function' : self._optimizeKeyword, 'progress' : progress, 'analyze' : analyzeKeyword}))
+			functions.append((0.1, {'function' : self._optimizeMirror, 'progress' : progress, 'analyze' : analyzeMirror}))
 
-			label = Translation.string(35007)
-			if not internal: WindowOptimization.update(diagnoseProgress = 0, diagnoseStatus = label)
+			# Add this last, since the speedtest takes the longest.
+			# Try to make the speedtest show a progress of 50% or 70%, since this looks better.
+			functions.append((0.4, {'function' : self._optimizeDevice, 'processor' : analyzeProcessor, 'memory' : analyzeMemory, 'storage' : analyzeStorage, 'connection' : analyzeConnection, 'progress' : progress, 'analyze' : analyzeProcessor or analyzeMemory or analyzeStorage or analyzeConnection}))
 
 			function = None
-			progressCurrent = 0
+			progressCurrent = 10 # Start with some progress.
+			label = Translation.string(35007)
+			if not internal: WindowOptimization.update(diagnoseProgress = progressCurrent, diagnoseStatus = label)
+
 			while True:
 				if not internal:
 					while len(progress) > 0:
@@ -2904,6 +3002,7 @@ class Manager(object):
 		settings = False,
 		internal = False,
 		stepper = False,
+		progress = None,
 		wait = False,
 	):
 		Settings.set(Manager.SettingsOptimization, True)
@@ -2922,7 +3021,7 @@ class Manager(object):
 		return WindowOptimization.show(
 			wait = wait,
 			stepper = True if stepper else False,
-			progress = stepper if Tools.isNumber(stepper) else None,
+			progress = progress if progress else stepper if Tools.isNumber(stepper) else None,
 			updateScrape = updateScrape,
 			updateProvider = updateProvider,
 			navigationNext = navigationNext,

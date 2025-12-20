@@ -18,14 +18,14 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Tools, Logger
+from lib.modules.tools import Tools, Logger, Regex, Language
 from lib.modules.network import Networker
 from lib.modules.cache import Cache
-from lib.modules.concurrency import Lock
 from lib.modules.account import Fanart as Account
 from lib.meta.image import MetaImage
+from lib.meta.provider import MetaProvider
 
-class MetaFanart(object):
+class MetaFanart(MetaProvider):
 
 	TypeMovie	= 'movies'
 	TypeShow	= 'tv'
@@ -34,99 +34,69 @@ class MetaFanart(object):
 
 	Index		= 99999999
 
-	Lock		= Lock()
-	Account		= None
-	Headers		= None
-
 	##############################################################################
-	# RESET
+	# CONSTRUCTOR
 	##############################################################################
 
-	@classmethod
-	def reset(self, settings = True):
-		if settings:
-			MetaFanart.Account = None
-			MetaFanart.Headers = None
+	def __init__(self):
+		MetaProvider.__init__(self, account = Account.instance())
+		self.mHeaders = self.account().headers()
 
 	##############################################################################
 	# GENERAL
 	##############################################################################
 
-	@classmethod
-	def retrieve(self, type = None, id = None, link = None, cache = None):
+	def _retrieve(self, type = None, id = None, link = None, cache = None):
 		if Tools.isArray(id):
 			# Some Fanart items do not have an IMDb ID. In such a case try to use the TMDb ID.
 			data = None
 			for i in id:
-				data = self._retrieve(type = type, id = i, link = link, cache = cache)
+				data = self._request(type = type, id = i, link = link, cache = cache)
 				if data and not('error message' in data and data['error message'].lower() == 'not found'): return data
 			return data
 		else:
-			return self._retrieve(type = type, id = id, link = link, cache = cache)
+			return self._request(type = type, id = id, link = link, cache = cache)
 
-	@classmethod
-	def _retrieve(self, type = None, id = None, link = None, cache = None):
+	def _request(self, type = None, id = None, link = None, cache = None):
 		if not link: link = MetaFanart.Link % (type, id)
 		networker = Networker()
-		headers = self.headers()
+		headers = self.mHeaders
 		if cache:
 			if cache is True: timeout = Cache.TimeoutLong
 			else: timeout = cache
 			cache = Cache.instance()
 			result = cache.cache(mode = None, timeout = timeout, refresh = None, function = networker.request, link = link, headers = headers)
-			if not result or result['error']['type'] in Networker.ErrorNetwork:
+
+			try: error = result['error']['type']
+			except: error = None
+			if error and error in Networker.ErrorServer: self._errorUpdate()
+
+			if not result or (error and error in Networker.ErrorNetwork):
 				# Delete the cache, otherwise the next call will return the previously failed request.
 				cache.cacheDelete(networker.request, link = link, headers = headers)
 				return False
 		else:
 			result = networker.request(link = link, headers = headers)
-			if not result or result['error']['type'] in Networker.ErrorNetwork: return False
+
+			try: error = result['error']['type']
+			except: error = None
+			if error and error in Networker.ErrorServer: self._errorUpdate()
+
+			if not result or (error and error in Networker.ErrorNetwork): return False
 		return Networker.dataJson(result['data'])
-
-	@classmethod
-	def headers(self):
-		self.account() # Initialize sccount and headers.
-		return MetaFanart.Headers
-
-	@classmethod
-	def account(self):
-		if MetaFanart.Account is None:
-			MetaFanart.Lock.acquire()
-			if MetaFanart.Account is None:
-				MetaFanart.Account = Account.instance()
-				MetaFanart.Headers = MetaFanart.Account.headers()
-			MetaFanart.Lock.release()
-		return MetaFanart.Account
-
-	@classmethod
-	def _process(self, data, index):
-		index = MetaFanart.Index - index
-		id = data.get('id')
-		id = (MetaFanart.Index - int(id)) if id else 0
-		vote = data.get('likes')
-		vote = int(vote) if vote else 0
-		sort = {
-			MetaImage.SortIndex : index,
-			MetaImage.SortId : id,
-			MetaImage.SortVote : vote,
-			MetaImage.SortVoteIndex : [vote, index],
-			MetaImage.SortVoteId : [vote, id],
-		}
-		return MetaImage.create(link = data.get('url'), provider = MetaImage.ProviderFanart, language = data.get('lang'), sort = sort)
 
 	##############################################################################
 	# MOVIE
 	##############################################################################
 
-	@classmethod
-	def movie(self, imdb = None, tmdb = None, cache = False):
+	def metadataMovie(self, imdb = None, tmdb = None, cache = False):
 		try:
 			if imdb or tmdb:
 				id = []
 				if imdb: id.append(imdb)
 				if tmdb: id.append(tmdb)
 
-				data = self.retrieve(type = MetaFanart.TypeMovie, id = id, cache = cache)
+				data = self._retrieve(type = MetaFanart.TypeMovie, id = id, cache = cache)
 				if data is False: return False
 
 				if data and ('name' in data or 'tmdb_id' in data or 'imdb_id' in data):
@@ -156,7 +126,7 @@ class MetaFanart(object):
 								index = 0
 								for i in values:
 									index += 1
-									images[entry[2]].append(self._process(data = i, index = index))
+									images[entry[2]].append(self._imageCreate(data = i, index = index))
 						except: Logger.error()
 
 					if images: return images
@@ -168,11 +138,10 @@ class MetaFanart(object):
 	##############################################################################
 
 	# season: None (images for the show), True (images for all seasons), integer (images for a specific season).
-	@classmethod
-	def show(self, tvdb = None, season = None, cache = False):
+	def metadataShow(self, tvdb = None, season = None, cache = False):
 		try:
 			if tvdb:
-				data = self.retrieve(type = MetaFanart.TypeShow, id = tvdb, cache = cache)
+				data = self._retrieve(type = MetaFanart.TypeShow, id = tvdb, cache = cache)
 				if data is False: return False
 
 				if data and ('name' in data or 'thetvdb_id' in data):
@@ -221,13 +190,15 @@ class MetaFanart(object):
 										if season is True:
 											number = int(i['season'])
 											if not number in imagesSeason: imagesSeason[number] = Tools.copy(images)
-											imagesSeason[number][entry[2]].append(self._process(data = i, index = index))
+											imagesSeason[number][entry[2]].append(self._imageCreate(data = i, index = index))
 										else:
-											images[entry[2]].append(self._process(data = i, index = index))
+											images[entry[2]].append(self._imageCreate(data = i, index = index))
 						except: Logger.error()
 
 					if season is True:
-						if imagesSeason: return imagesSeason
+						if imagesSeason:
+							imagesSeason = self._imageSeason(images = imagesSeason)
+							return imagesSeason
 					elif images:
 						return images
 		except: Logger.error()
@@ -237,6 +208,124 @@ class MetaFanart(object):
 	# SET
 	##############################################################################
 
-	@classmethod
-	def set(self, imdb = None, tmdb = None, cache = False):
-		return self.movie(imdb = imdb, tmdb = tmdb, cache = cache)
+	def metadataSet(self, imdb = None, tmdb = None, cache = False):
+		return self.metadataMovie(imdb = imdb, tmdb = tmdb, cache = cache)
+
+	###################################################################
+	# IMAGE
+	###################################################################
+
+	def _imageCreate(self, data, index):
+		index = MetaFanart.Index - index
+		id = data.get('id')
+		id = (MetaFanart.Index - int(id)) if id else 0
+		vote = data.get('likes')
+		vote = int(vote) if vote else 0
+		sort = {
+			MetaImage.SortIndex : index,
+			MetaImage.SortId : id,
+			MetaImage.SortVote : vote,
+			MetaImage.SortVoteIndex : [vote, index],
+			MetaImage.SortVoteId : [vote, id],
+		}
+		return MetaImage.create(link = data.get('url'), provider = MetaImage.ProviderFanart, language = data.get('lang'), theme = data.get('theme'), sort = sort)
+
+	def _imageSeason(self, images):
+		try:
+			# Group season images based on a common theme.
+
+			# Prefer metadata language setting, followed by general language setting, followed by no language (None), and all other images last.
+			from lib.meta.tools import MetaTools
+			exclude = (None, Language.CodeUniversal, Language.CodeNone, Language.CodeUnknown)
+			settings = []
+			setting = MetaImage.settingsLanguage()
+			if setting: settings.append(setting)
+			setting = MetaTools.instance().settingsLanguage()
+			if setting: settings.append(setting)
+			setting = Language.settingsCode()
+			if setting: settings.extend(setting)
+			settings.append(None)
+			settings = Tools.listUnique(settings)
+			settings = {settings[i] : (10 - i) for i in range(len(settings)) if not settings[i] in exclude}
+
+			for type in MetaImage.Types:
+				ids = {}
+				votes = []
+				total = len(images)
+				threshold = total * 0.4 # The theme/group needs to cover at least 40% of the seasons.
+
+				def _name(image):
+					name = Networker.linkName(image.get('link'), extension = False)
+					if name: name = Regex.extract(data = name, expression = '.*\-+(.*)')
+					return name
+
+				def _id(name):
+					return Regex.replace(data = name, expression = '\-(\d+)(?:$|\-)', replacement = 'x', group = 1)
+
+				def _add(id, vote, language):
+					try:
+						ids[id]['count'] += 1
+						ids[id]['vote'] += vote
+					except:
+						ids[id] = {'count' : 1, 'vote' : vote, 'language' : language}
+
+				for image in images.values():
+					subids = {}
+					voted = False
+					for i in image[type]:
+						name = _name(image = i)
+						if name:
+							try: vote = i['sort']['vote'][0] or 0
+							except: vote = 0
+							if not voted:
+								votes.append(vote)
+								voted = True
+
+							id = name
+							for k in range(len(name)):
+								id = id[:-1]
+
+								# Allow up to 3 characters.
+								# Eg: GoT DE season posters start with 6060 and 6062.
+								if len(id) < 3: break
+
+								# Do not add twice for the same image group.
+								# Otherwise shorter prefixes can be added multiple times and then having a larger count than longer prefixes.
+								if not id in subids:
+									subids[id] = True
+									_add(id = id, vote = vote, language = i.get('language'))
+
+				if ids:
+					setting = MetaImage.settingsLanguage(media = MetaImage.MediaSeason, type = type)
+					if setting and not setting in exclude: settings[100] = setting
+
+					ids = {k : v for k, v in sorted(ids.items(), key = lambda i : (settings.get(i[1]['language'], 0), i[1]['count'], i[1]['vote'], len(i[0])), reverse = True)}
+					id = next(iter(ids))
+
+					# Add the theme/group index.
+					keys = list(ids.keys())
+					for number, image in images.items():
+						for i in image[type]:
+							name = name = _name(image = i)
+							if name:
+								for j in range(len(keys)):
+									if name.startswith(keys[j]):
+										i[MetaImage.AttributeTheme] = keys[j]
+										i['sort'][MetaImage.SortTheme] = j
+										break
+
+					# Only do this if there are common images across at least "threshold"% of the seasons.
+					# Otherwise keep the orignal order.
+					if id and ids[id]['count'] >= threshold:
+						for number, image in images.items():
+							temp1 = []
+							temp2 = []
+							for i in image[type]:
+								name = name = _name(image = i)
+								if name:
+									match = name.startswith(id)
+									if match: temp1.append(i)
+									else: temp2.append(i)
+							if temp1 or temp2: images[number][type] = temp1 + temp2
+		except: Logger.error()
+		return images

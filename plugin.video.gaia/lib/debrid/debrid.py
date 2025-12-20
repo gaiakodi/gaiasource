@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import File, Tools
+from lib.modules.tools import File, Tools, Regex
 from lib.modules.concurrency import Lock
 
 class Debrid(object):
@@ -28,18 +28,19 @@ class Debrid(object):
 	TypeHandle		= 'handle'
 
 	Meta			= {
-						'premiumize'	: {'id' : 'premiumize',		'name' : 'Premiumize',		'abbreviation' : 'P',	'acronym' : 'PM'},
-						'offcloud'		: {'id' : 'offcloud',		'name' : 'OffCloud',		'abbreviation' : 'O',	'acronym' : 'OC'},
-						'torbox'		: {'id' : 'torbox',			'name' : 'TorBox',			'abbreviation' : 'T',	'acronym' : 'TB'},
-						'easydebrid'	: {'id' : 'easydebrid',		'name' : 'EasyDebrid',		'abbreviation' : 'E',	'acronym' : 'ED'},
-						'realdebrid'	: {'id' : 'realdebrid',		'name' : 'RealDebrid',		'abbreviation' : 'R',	'acronym' : 'RD'},
-						'debridlink'	: {'id' : 'debridlink',		'name' : 'DebridLink',		'abbreviation' : 'D',	'acronym' : 'DL'},
-						'alldebrid'		: {'id' : 'alldebrid',		'name' : 'AllDebrid',		'abbreviation' : 'A',	'acronym' : 'AD'},
-						'linksnappy'	: {'id' : 'linksnappy',		'name' : 'LinkSnappy',		'abbreviation' : 'L',	'acronym' : 'LS'},
-						'megadebrid'	: {'id' : 'megadebrid',		'name' : 'MegaDebrid',		'abbreviation' : 'M',	'acronym' : 'MD'},
-						'rapidpremium'	: {'id' : 'rapidpremium',	'name' : 'RapidPremium',	'abbreviation' : 'R',	'acronym' : 'RP'},
-						'simplydebrid'	: {'id' : 'simplydebrid',	'name' : 'SimplyDebrid',	'abbreviation' : 'S',	'acronym' : 'SD'},
-						'smoozed'		: {'id' : 'smoozed',		'name' : 'Smoozed',			'abbreviation' : 'S',	'acronym' : 'SM'},
+						'premiumize'	: {'id' : 'premiumize',		'name' : 'Premiumize',		'abbreviation' : 'P',	'acronym' : 'PM',	'expression' : '(premiumize|energycdn)'},
+						'offcloud'		: {'id' : 'offcloud',		'name' : 'OffCloud',		'abbreviation' : 'O',	'acronym' : 'OC',	'expression' : '(off[\-\s]?cloud)'},
+						'torbox'		: {'id' : 'torbox',			'name' : 'TorBox',			'abbreviation' : 'T',	'acronym' : 'TB',	'expression' : '(tor[\-\s]?box)'},
+						'debrider'		: {'id' : 'debrider',		'name' : 'Debrider',		'abbreviation' : 'D',	'acronym' : 'DB',	'expression' : '(debrider)'},
+						'easydebrid'	: {'id' : 'easydebrid',		'name' : 'EasyDebrid',		'abbreviation' : 'E',	'acronym' : 'ED',	'expression' : '(easy[\-\s]?debrid)'},
+						'realdebrid'	: {'id' : 'realdebrid',		'name' : 'RealDebrid',		'abbreviation' : 'R',	'acronym' : 'RD',	'expression' : '(real[\-\s]?debrid)'},
+						'debridlink'	: {'id' : 'debridlink',		'name' : 'DebridLink',		'abbreviation' : 'D',	'acronym' : 'DL',	'expression' : '(debrid[\-\s\.]?link)'}, # Streaming domain: debrid.link.
+						'alldebrid'		: {'id' : 'alldebrid',		'name' : 'AllDebrid',		'abbreviation' : 'A',	'acronym' : 'AD',	'expression' : '(all[\-\s]?debrid)'},
+						'linksnappy'	: {'id' : 'linksnappy',		'name' : 'LinkSnappy',		'abbreviation' : 'L',	'acronym' : 'LS',	'expression' : '(link[\-\s]?snappy)'},
+						'megadebrid'	: {'id' : 'megadebrid',		'name' : 'MegaDebrid',		'abbreviation' : 'M',	'acronym' : 'MD',	'expression' : '(mega[\-\s]?debrid)'},
+						'rapidpremium'	: {'id' : 'rapidpremium',	'name' : 'RapidPremium',	'abbreviation' : 'R',	'acronym' : 'RP',	'expression' : '(rapid[\-\s]?premium)'},
+						'simplydebrid'	: {'id' : 'simplydebrid',	'name' : 'SimplyDebrid',	'abbreviation' : 'S',	'acronym' : 'SD',	'expression' : '(simply[\-\s]?debrid)'},
+						'smoozed'		: {'id' : 'smoozed',		'name' : 'Smoozed',			'abbreviation' : 'S',	'acronym' : 'SM',	'expression' : '(smoozed)'},
 					}
 
 	Lock			= Lock()
@@ -138,6 +139,16 @@ class Debrid(object):
 			except: return None
 
 	@classmethod
+	def detect(self, *values):
+		for i in values:
+			debrid = Debrid.Meta.get(i)
+			if debrid: return debrid
+			for k, v in Debrid.Meta.items():
+				if Regex.match(data = i, expression = v['expression']):
+					return v
+		return None
+
+	@classmethod
 	def deletePlayback(self, link, source):
 		id = source['stream'].streamId()
 		if not id: id = link
@@ -214,6 +225,21 @@ class Debrid(object):
 				'cache' : {'rating' : 4, 'label' : 36250, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : True}},
 				'select' : {'rating' : 4, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : False}},
 				'extra' : {'rating' : 2, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : False}},
+			},
+			{
+				'id' : 'debrider',
+				'name' : 36833,
+				'description' : 'Debrider is an overall good service and has great value for money. Debrider is a relatively new services that supports cached torrents and usenet. Although not natively supported in Gaia, most functionality can be utilized through Orion. Debrider is good choice if you are on a budget and want a service with a decent cache.',
+
+				'general' : {'rating' : 4,  'recommend' : 2, 'native' : False, 'limit' : False},
+				'subscription' : {'rating' : 5, 'fee' : 3.50},
+				'customer' : {'rating' : 4, 'label' : 36247},
+				'api' : {'rating' : 4, 'label' : 36244},
+				'network' : {'rating' : 4, 'support' : {'torrent' : True, 'usenet' : True, 'hoster' : False}},
+				'stream' : {'rating' : 3, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : False}},
+				'cache' : {'rating' : 5, 'label' : 36250, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : False}},
+				'select' : {'rating' : 4, 'support' : {'gaia' : False, 'orion' : True, 'resolver' : False}},
+				'extra' : {'rating' : 0, 'support' : {'gaia' : False, 'orion' : False, 'resolver' : False}},
 			},
 			{
 				'id' : 'easydebrid',

@@ -48,6 +48,11 @@ class Provider(ProviderUsenetHtml):
 			rank						= 2,
 			performance					= ProviderUsenetHtml.PerformanceBad,
 
+			# Update (2025-12):
+			# The website does not return any results anymore: "No collections found".
+			# More info under nzbID.
+			status						= ProviderUsenetHtml.StatusImpaired,
+
 			link						= Provider._Link,
 
 			supportMovie				= True,

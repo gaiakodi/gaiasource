@@ -52,7 +52,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is an old but long-lasting {container} site. The site contains results in various languages, but most of them are in English. {name} is unreliable and has inaccurate or missing metadata, such as the peer count, and should therefore only be used if no other {container} provider works. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank						= 1,
 			performance					= ProviderHtml.PerformanceGood - ProviderHtml.PerformanceStep,
-			status						= ProviderHtml.StatusImpaired, # Cloudflare. Even when Cloudflare is not present, there is still a custom reCaptcha on the site.
+			status						= ProviderHtml.StatusCloudflare, # Cloudflare. Even when Cloudflare is not present, there is still a custom reCaptcha on the site.
 
 			link						= Provider._Link,
 			unblock						= Provider._Unblock,

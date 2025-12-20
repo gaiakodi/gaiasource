@@ -100,7 +100,7 @@ class Serializer(object):
 				'__class__' : instance.__class__.__name__,
 				'__module__' : Tools.getModule(instance),
 
-				# This seems to not be neccessary anymor, due to the deep copying added in cache.py -> _cacheUpdate().
+				# This seems to not be necessary anymor, due to the deep copying added in cache.py -> _cacheUpdate().
 				# Read the comments above under dataExport() if this needs to be reabled.
 				#'__data__' : Tools.copy(instance, deep = True).dataExport(),
 				'__data__' : instance.dataExport(),

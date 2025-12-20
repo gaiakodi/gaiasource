@@ -23,7 +23,7 @@ import sys
 import re
 
 from lib import debrid
-from lib.debrid.external import External, Orion, Torbox, Easydebrid, Alldebrid, Debridlink
+from lib.debrid.external import External, Orion, Torbox, Debrider, Easydebrid, Alldebrid, Debridlink
 
 from lib.modules import trakt as traktx
 from lib.modules import network
@@ -234,6 +234,7 @@ class Core(object):
 		if not Core.GlobalMetadata is None: return Core.GlobalMetadata
 		metadata = window.Window.propertyGlobal(Core.PropertyMetadata)
 		if metadata: metadata = tools.Converter.jsonFrom(metadata)
+		else: metadata = None # Can be an empty string when calling "Context -> Play -> Play With" from the history streams window.
 		return metadata
 
 	@classmethod
@@ -504,8 +505,7 @@ class Core(object):
 			else:
 				if self.navigationPlaybackSpecial:
 					self.progressClose(loader = loader) # For autoplay.
-					try: background = MetaImage.extract(data = metadata)['fanart']
-					except: background = None
+					background = MetaImage.imageFanart(data = metadata, custom = MetaImage.CustomBase)
 					window.WindowPlayback.show(background = background, status = message)
 
 					def _progressClose():
@@ -605,7 +605,7 @@ class Core(object):
 			interface.Dialog.notification(title = 35580, message = 35587, icon = interface.Dialog.IconWarning)
 		elif metadata and scrape:
 			interface.Dialog.notification(title = 35580, message = interface.Translation.string(35599) % (metadata.get('tvshowtitle'), tools.Title.number(metadata = metadata)), icon = interface.Dialog.IconSuccess)
-			self.scrape(binge = True, tvshowtitle = metadata.get('tvshowtitle'), title = metadata.get('title'), year = metadata.get('year'), imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = metadata.get('season'), episode = metadata.get('episode'), metadata = metadata)
+			self.scrape(binge = True, tvshowtitle = metadata.get('tvshowtitle'), title = metadata.get('title'), year = metadata.get('year'), tvshowyear = metadata.get('tvshowyear'), imdb = metadata.get('imdb'), tmdb = metadata.get('tmdb'), tvdb = metadata.get('tvdb'), trakt = metadata.get('trakt'), season = metadata.get('season'), episode = metadata.get('episode'), metadata = metadata)
 		elif not scrape:
 			interface.Loader.hide()
 		return metadata
@@ -614,7 +614,7 @@ class Core(object):
 	# SCRAPE
 	##############################################################################
 
-	def scrape(self, title = None, tvshowtitle = None, year = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, premiered = None, metadata = None, pack = None, autoplay = None, autopack = None, preset = None, library = None, exact = False, items = None, process = True, binge = None, cache = True):
+	def scrape(self, title = None, tvshowtitle = None, year = None, tvshowyear = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, premiered = None, metadata = None, pack = None, autoplay = None, autopack = None, preset = None, library = None, exact = False, items = None, process = True, binge = None, cache = True):
 		try:
 			self.propertyStatusSet(Core.StatusInitialize)
 
@@ -645,6 +645,10 @@ class Core(object):
 			# Only has to be done if accessed from the home screen. Not necessary if the user is already in a directory structure.
 			# Check for tools.Binge.ModeBackground. Seems to be an issue on Mac devices causing the episode direcotry list to be loaded if binge scraping happens in the background.
 			if not binge == tools.Binge.ModeBackground and self.navigationStreamsDirectory and not tools.System.originGaia() and not tools.System.originPlaylist(): tools.System.launchAddon()
+
+			# Check if the provider settings got corrupted and fix if possible.
+			# This already gets done during Kodi launch, but do here as well, since otherwise scraping will fail since there are no providers.
+			if not self.silent and not binge: ProviderManager.checkCorrupt(fix = True)
 
 			self.binge = binge
 			self.new = items is None
@@ -678,7 +682,7 @@ class Core(object):
 						lookup = number
 						if number == MetaPack.NumberSequential and not season == 1: lookup = MetaPack.NumberStandard
 
-						metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, number = lookup, filter = True)
+						metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle or title, year = tvshowyear or year, season = season, episode = episode, number = lookup, filter = True)
 					else:
 						metadata = manager.metadataMovie(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, filter = True)
 
@@ -686,6 +690,13 @@ class Core(object):
 						interface.Dialog.notification(title = 33458, message = 33459, icon = interface.Dialog.IconError)
 						self.progressClose(force = True)
 						return
+
+			# Ask the user about scraping specials.
+			special = self._scrapeSpecial(metadata = metadata)
+			if not special:
+				if not special is False: self.progressClose(force = True)
+				self.propertyStatusSet(Core.StatusFinished)
+				return None
 
 			# Ask the user if the episode is available under alternative numbers.
 			ignore = False
@@ -713,6 +724,18 @@ class Core(object):
 					if (MetaPack.NumberAbsolute in number or MetaPack.NumberSequential in number) and not numberStandard: ignore = True # When an absolute number is selected in from the Absolute menu.
 					elif not change['episode'] == episode: ignore = True # When an absolute number is selected in from the dialog.
 
+				# If the selected standard number does not match the official standard number.
+				# This is when the episode has a different season and/or episode number on different providers.
+				# Ignore, since this will cause the wrong links for the given episode number.
+				# Eg: Money Heist S02E01+ (Trakt/TMDb/TVDb) vs S03E01+ (IMDb). Do not use the S03E01 number for this episode, since S03E01 is different on Trakt/TVDb.
+				if not ignore and change.get('number') == MetaPack.NumberStandard:
+					pack = metadata.get('pack')
+					if pack: pack = MetaPack.instance(pack)
+					if pack:
+						provider = change.get('provider')[0] if change.get('provider') else None
+						lookup = pack.episode(season = change['season'], episode = change['episode'], provider = provider)
+						if not lookup or not pack.numberStandard(item = lookup) == pack.numberStandard(item = lookup, provider = provider): ignore = True
+
 				# Retrieve the metadata if the number changed, in order to get the correct metadata (title, number, etc).
 				changed = not(change['season'] == season and change['episode'] == episode and (change['number'] == (number or MetaPack.NumberStandard)))
 				if changed:
@@ -720,7 +743,7 @@ class Core(object):
 					episode = change['episode']
 					number = change['number']
 					if number and tools.Tools.isArray(number): number = number[0]
-					metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode, number = number, filter = True)
+					metadata = manager.metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle or title, year = tvshowyear or year, season = season, episode = episode, number = number, filter = True)
 			elif change is False: # Canceled.
 				self.progressClose(force = True)
 				return
@@ -735,6 +758,7 @@ class Core(object):
 				title = metadata.get('title')
 				tvshowtitle = metadata.get('tvshowtitle')
 				year = metadata.get('year')
+				tvshowyear = metadata.get('tvshowyear')
 
 				season = metadata.get('season')
 				episode = metadata.get('episode')
@@ -742,12 +766,12 @@ class Core(object):
 				pack = metadata.get('pack')
 
 			if not pack and (tvshowtitle or not season is None):
-				pack = manager.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year)
+				pack = manager.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle or title, year = tvshowyear or year)
 
 			history.History().add(media = self.media, metadata = metadata) # If already added, will just increase the counter.
 
 			if exact: self.scrapeLabel = title if title else tvshowtitle
-			else: self.scrapeLabel = tools.Title.titleUniversal(metadata = metadata, title = title if tvshowtitle is None else tvshowtitle, year = year, season = season, episode = episode)
+			else: self.scrapeLabel = tools.Title.titleUniversal(metadata = metadata, title = tvshowtitle or title, year = tvshowyear or year, season = season, episode = episode)
 
 			# Clear temporary filter settings.
 			# Must be before self.scrapeItem().
@@ -758,8 +782,7 @@ class Core(object):
 
 			if self.new:
 				if not self.silent and self.navigationCinema:
-					try: background = MetaImage.extract(data = metadata)[MetaImage.TypeFanart]
-					except: background = None
+					background = MetaImage.imageFanart(data = metadata, custom = MetaImage.CustomBase)
 					self.navigationCinemaTrailer.cinemaStart(media = self.media, background = background)
 				tools.Logger.log('Scraping Initialized', name = 'CORE', type = tools.Logger.TypeInfo)
 
@@ -767,7 +790,7 @@ class Core(object):
 				self.timerGlobal = tools.Time(start = True)
 				self.propertyStatusSet(Core.StatusScrape)
 
-				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, tvshowtitle = tvshowtitle, premiered = premiered, metadata = metadata, pack = pack, preset = preset, exact = exact, autoplay = autoplay, cache = cache)
+				result = self.scrapeItem(title = title, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, tvshowtitle = tvshowtitle, tvshowyear = tvshowyear, premiered = premiered, metadata = metadata, pack = pack, preset = preset, exact = exact, autoplay = autoplay, cache = cache)
 
 				if result is None or (self.progressCanceled() and not self.navigationCinema): # Avoid the no-streams notification right after the unavailable notification.
 					self.progressClose(force = True)
@@ -857,6 +880,26 @@ class Core(object):
 			Stream.reset(invalid = False) # Do not clear invalid, since they arte still used by Orion. This is cleared at the end of addon.py in any case.
 			ProviderManager.reset()
 
+	def _scrapeSpecial(self, metadata):
+		if not self.silent and tools.Media.isEpisode(metadata.get('media')):
+			try: movie = tools.Media.Movie in metadata['special']['type']
+			except: movie = False
+			if movie:
+				choice = interface.Dialog.options(title = 33105, message = 36838, labelConfirm = 35496, labelDeny = 33743, labelCustom = 33028, default = interface.Dialog.ChoiceCustom)
+				if choice == interface.Dialog.ChoiceYes:
+					title = metadata.get('title') or metadata.get('tvshowtitle')
+					def _menu():
+						tools.Time.sleep(0.05) # Wait for the scrape() function to finish and exit.
+						from lib.modules.menu import Menu
+						Menu.instance().menu(menu = Menu.MenuSearch, media = tools.Media.Movie, query = title, direct = True) # direct: to use the passed in query, instead of using the title in the episode menu.
+					Pool.thread(target = _menu, start = True)
+					return False
+				elif choice == interface.Dialog.ChoiceCustom:
+					return True
+				elif choice == interface.Dialog.ChoiceNo:
+					return None
+		return True
+
 	def _scrapeNumber(self, metadata, number = None):
 		# Test this with:
 		#	One Piece:
@@ -874,6 +917,8 @@ class Core(object):
 		#	Star Wars: Young Jedi Adventures
 		#		Absolute Menu: S01E25, S01E26
 		#		S01 Menu: S01E25, S01E26
+		#	Pokemon
+		#		S20 Menu: S20E01
 
 		try:
 			if not self.silent and tools.Media.isEpisode(metadata.get('media')):
@@ -882,37 +927,53 @@ class Core(object):
 
 				def _mergeNumber(values, *extra):
 					if values:
-						number = [i['number'] for i in values if i['number']]
+						provider = [i['provider'] for i in values if i['provider']]
 						if extra:
 							for i in extra:
-								i = i.get('number')
-								if i: number.extend(i)
-						number = tools.Tools.listUnique(number)
-						return {'season' : values[0].get('season'), 'episode' : values[0].get('episode'), 'number' : number or None}
+								i = i.get('provider')
+								if i: provider.extend(i)
+						provider = tools.Tools.listUnique(provider)
+						return {'number' : values[0].get('number'), 'season' : values[0].get('season'), 'episode' : values[0].get('episode'), 'provider' : provider or None}
 					return None
 
-				def _mergeLabel(values, provider = True, exclude = False):
+				def _mergeLabel(values, provider = True, exclude = False, all = None):
 					if values:
 						label = []
+
+						# Mark only the first special as "Gaia" in _mergeProvider().
+						# Eg: One Piece S00E42 (Gaia uses the TVDb specials, since there are more episodes than in Trakt/TMDb)
+						# Eg: Downton Abbey S02E09
+						special = None
+						for i in all or values:
+							if i.get('season') == 0:
+								special = i
+								break
+
 						for i in values:
 							if exclude and any(i['season'] == j['season'] and i['episode'] == j['episode'] for j in exclude): continue
-							number = _mergeProvider(i['number'])
+							number = i.get('number')
+							if i == special: number = MetaPack.NumberSpecial
+							number = _mergeProvider(number = number, provider = i.get('provider'))
 							if number:
 								title = interface.Format.fontBold(tools.Title.number(media = tools.Media.Episode, season = i['season'], episode = i['episode']))
 								if provider: label.append('%s (%s)' % (title, number))
 								else: label.append('%s' % title)
+
 						if label: return ', '.join(label)
 					return None
 
-				def _mergeProvider(values):
-					if values:
+				def _mergeProvider(number, provider):
+					if provider:
 						# Order matters for readability.
 						label = []
-						if MetaPack.NumberStandard in values or MetaPack.NumberSequential in values: label.append(35639)
-						if MetaPack.ProviderTrakt in values: label.append(32315)
-						if MetaPack.ProviderTvdb in values: label.append(35668)
-						if MetaPack.ProviderTmdb in values: label.append(33508)
-						if MetaPack.ProviderImdb in values: label.append(32034)
+
+						if 'gaia' in provider or number == MetaPack.NumberSpecial: label.append(35639)
+
+						if MetaPack.ProviderTrakt in provider: label.append(32315)
+						if MetaPack.ProviderTvdb in provider: label.append(35668)
+						if MetaPack.ProviderTmdb in provider: label.append(33508)
+						if MetaPack.ProviderImdb in provider: label.append(32034)
+
 						if label: return '/'.join([interface.Translation.string(i) for i in label])
 					return None
 
@@ -930,27 +991,47 @@ class Core(object):
 
 				niche = metadata.get('niche')
 				niche = tools.Media.isAnime(niche) or tools.Media.isDonghua(niche)
-				sequential = number == MetaPack.NumberSequential or type.get(MetaPack.NumberSequential) or niche
+				if number == MetaPack.NumberAbsolute or number == MetaPack.NumberSequential or type.get(MetaPack.NumberSequential) or type.get(MetaPack.NumberAbsolute) or niche:
+					sequential = True
+					absolute = True
+				else:
+					sequential = False
+					absolute = False
 
-				numbers = [{'number' : None, 'season' : season, 'episode' : episode}]
+				numbers = [{'number' : None, 'season' : season, 'episode' : episode, 'provider' : None}]
 
 				numberStandard = base.get(MetaPack.NumberStandard)
-				if numberStandard and not numberStandard[MetaPack.PartEpisode] is None: numbers.append({'number' : MetaPack.NumberStandard, 'season' : numberStandard[MetaPack.PartSeason], 'episode' : numberStandard[MetaPack.PartEpisode]})
+				if numberStandard and not numberStandard[MetaPack.PartEpisode] is None: numbers.append({'number' : MetaPack.NumberStandard, 'season' : numberStandard[MetaPack.PartSeason], 'episode' : numberStandard[MetaPack.PartEpisode], 'provider' : 'gaia'})
+
+				for provider, i in base.items():
+					if tools.Tools.isDictionary(i):
+						numberSeasoned = i.get(MetaPack.NumberStandard)
+						if numberSeasoned and not numberSeasoned[MetaPack.PartEpisode] is None: numbers.append({'number' : MetaPack.NumberStandard, 'season' : numberSeasoned[MetaPack.PartSeason], 'episode' : numberSeasoned[MetaPack.PartEpisode], 'provider' : provider})
+
+				if absolute:
+					numberAbsolute = base.get(MetaPack.NumberAbsolute)
+					if numberAbsolute and numberAbsolute[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberAbsolute, 'season' : numberAbsolute[MetaPack.PartSeason], 'episode' : numberAbsolute[MetaPack.PartEpisode], 'provider' : 'gaia'})
+
+					for provider, i in base.items():
+						if tools.Tools.isDictionary(i):
+							numberAbsolute = i.get(MetaPack.NumberAbsolute)
+							if numberAbsolute and numberAbsolute[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberAbsolute, 'season' : numberAbsolute[MetaPack.PartSeason], 'episode' : numberAbsolute[MetaPack.PartEpisode], 'provider' : provider})
 
 				if sequential:
 					# Exclude sequential numbers S01E00.
 					# Eg: Donwton Abbey -> Absolute menu -> S01E00 (Christmas Specials).
 					numberSequential = base.get(MetaPack.NumberSequential)
-					if numberSequential and numberSequential[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberSequential, 'season' : numberSequential[MetaPack.PartSeason], 'episode' : numberSequential[MetaPack.PartEpisode]})
+					if numberSequential and numberSequential[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberSequential, 'season' : numberSequential[MetaPack.PartSeason], 'episode' : numberSequential[MetaPack.PartEpisode], 'provider' : 'gaia'})
 
-				for provider, i in base.items():
-					if tools.Tools.isDictionary(i):
-						numberSeasoned = i.get(MetaPack.NumberStandard)
-						if numberSeasoned and not numberSeasoned[MetaPack.PartEpisode] is None: numbers.append({'number' : provider, 'season' : numberSeasoned[MetaPack.PartSeason], 'episode' : numberSeasoned[MetaPack.PartEpisode]})
+					for provider, i in base.items():
+						if tools.Tools.isDictionary(i):
+							numberSequential = i.get(MetaPack.NumberSequential)
+							if numberSequential and numberSequential[MetaPack.PartEpisode]: numbers.append({'number' : MetaPack.NumberSequential, 'season' : numberSequential[MetaPack.PartSeason], 'episode' : numberSequential[MetaPack.PartEpisode], 'provider' : provider})
 
 				numbersDefault = {}
 				numbersSeason = {}
 				numbersSpecial = {}
+				numbersAbsolute = {}
 				numbersSequential = {}
 
 				for i in numbers:
@@ -959,7 +1040,8 @@ class Core(object):
 
 					if not value: lookup.append(numbersDefault)
 
-					if value == MetaPack.NumberSequential: lookup.append(numbersSequential)
+					if value == MetaPack.NumberAbsolute: lookup.append(numbersAbsolute)
+					elif value == MetaPack.NumberSequential: lookup.append(numbersSequential)
 					elif i.get('season') == 0: lookup.append(numbersSpecial)
 					else: lookup.append(numbersSeason)
 
@@ -971,8 +1053,9 @@ class Core(object):
 
 				numbersDefault = [_mergeNumber(i) for i in numbersDefault.values()]
 				numbersSeason = [_mergeNumber(i) for i in numbersSeason.values()]
-				numbersSpecial = [_mergeNumber(i, {'number' : [MetaPack.NumberStandard]}) for i in numbersSpecial.values()]
-				numbersSequential = [_mergeNumber(i, *numbersSeason, *numbersSpecial) for i in numbersSequential.values()]
+				numbersSpecial = [_mergeNumber(i) for i in numbersSpecial.values()]
+				numbersAbsolute = [_mergeNumber(i) for i in numbersAbsolute.values()]
+				numbersSequential = [_mergeNumber(i) for i in numbersSequential.values()]
 
 				# Remove numbers that are the same between season and special/sequential.
 				# Do not do for specials only.
@@ -980,15 +1063,26 @@ class Core(object):
 				numbersSpecial = [i for i in numbersSpecial if season == 0 or not(i['season'] == season and i['episode'] == episode)]
 				if not sequential: numbersSequential = [i for i in numbersSequential if not(i['season'] == season and i['episode'] == episode)]
 
+				if not absolute: numbersAbsolute = [i for i in numbersAbsolute if not(i['season'] == season and i['episode'] == episode)]
+
 				labelDefault = tools.Title.number(media = tools.Media.Episode, season = numbersDefault[0]['season'], episode = numbersDefault[0]['episode']) if numbersDefault else None
 				labelSeason = _mergeLabel(numbersSeason)
 				labelSequential = _mergeLabel(numbersSequential)
 				labelSpecial = _mergeLabel(numbersSpecial)
 
+				numberInclude = [i for i in numbersAbsolute if not any(i['season'] == j['season'] and i['episode'] == j['episode'] for j in numbersSequential)]
+				if numberInclude: numberInclude = numbersSequential # Either use none (sequential is used instead) or all.
+				labelAbsolute = _mergeLabel(numberInclude)
+
 				choose = False
 				if labelSpecial:
 					choose = True
+				elif labelSequential or labelAbsolute:
+					choose = True
 				elif labelSequential:
+					# UPDATE: NB: This is not used anymore.
+					# The "elif labelSequential or labelAbsolute:" will always execute before this.
+
 					# Do not show a dialog if only TVDb has a season number different to the sequential number, since we do not scrape TVDb numbers.
 					# Eg: One Piece -> Absolute menu -> S01E61 vs S01E62.
 					# Update: Allow this now, since we added a "More" button which allows all numbers to be scraped.
@@ -999,7 +1093,7 @@ class Core(object):
 						if len(numbersFilter) > 1:
 							choose = True
 						else:
-							numbering = numbersFilter[0]['number']
+							numbering = numbersFilter[0]['number'] or [None]
 							if MetaPack.NumberStandard in numbering or MetaPack.ProviderTrakt in numbering: choose = True
 							else:
 								# Still allow if TVDb has the only season-based numbering.
@@ -1015,10 +1109,28 @@ class Core(object):
 										lookup2 = pack.episode(season = lookup2[MetaPack.PartSeason], episode = lookup2[MetaPack.PartEpisode], number = numbering)
 										if pack.typeUnofficial(item = lookup2): choose = True
 				elif len(numbersSeason) > 1:
+					lookup1 = pack.episode(season = numbersSeason[0]['season'], episode = numbersSeason[0]['episode'], number = numbersSeason[0]['number'])
+					lookup2 = pack.episode(season = numbersSeason[-1]['season'], episode = numbersSeason[-1]['episode'], number = numbersSeason[-1]['number'])
+
 					# Eg: Star Wars: Young Jedi Adventures S01E26.
-					lookup1 = pack.episode(season = numbersSeason[0]['season'], episode = numbersSeason[0]['episode'], number = numbersSeason[0]['number'][0])
-					lookup2 = pack.episode(season = numbersSeason[-1]['season'], episode = numbersSeason[-1]['episode'], number = numbersSeason[-1]['number'][0])
-					if (pack.typeOfficial(item = lookup1) and pack.typeUnofficial(item = lookup2)) or (pack.typeOfficial(item = lookup2) and pack.typeUnofficial(item = lookup1)): choose = True
+					if (pack.typeOfficial(item = lookup1) and pack.typeUnofficial(item = lookup2)) or (pack.typeOfficial(item = lookup2) and pack.typeUnofficial(item = lookup1)):
+						choose = True
+
+					# Eg: LEGO Masters S05E02 + S06E01
+					# Eg: Money Heist S04 + S05 (IMDb)
+					else:
+						provider1 = tools.Tools.copy(numbersSeason[0]['provider'])
+						try: provider1.remove('gaia')
+						except: pass
+
+						provider1 = provider1[0] if len(provider1) == 1 and any(i in (MetaPack.ProviderTrakt, MetaPack.ProviderTmdb, MetaPack.ProviderTvdb, MetaPack.ProviderImdb) for i in provider1) else None
+						provider2 = tools.Tools.copy(numbersSeason[-1]['provider'])
+						try: provider2.remove('gaia')
+						except: pass
+
+						provider2 = provider2[0] if len(provider2) == 1 and any(i in (MetaPack.ProviderTrakt, MetaPack.ProviderTmdb, MetaPack.ProviderTvdb, MetaPack.ProviderImdb) for i in provider2) else None
+						if not pack.numberStandard(item = lookup1, provider = provider1) == pack.numberStandard(item = lookup1, provider = provider2): choose = True
+						elif (provider1 and not provider2) or (not provider1 and provider2): choose = True # Eg: Money Heist S04 + S05 (IMDb)
 
 				if choose:
 					option1 = tools.Tools.copy(numbersDefault[0])
@@ -1045,7 +1157,8 @@ class Core(object):
 							label = ''
 							if labelSeason: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(32055)) + labelSeason
 							if labelSpecial: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(33105)) + labelSpecial
-							if labelSequential: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(36677)) + labelSequential
+							if labelSequential: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(35831 if labelAbsolute else 36677)) + labelSequential
+							if labelAbsolute: label += interface.Format.fontNewline() + '   ' + interface.Format.fontBold('%s: ' % interface.Translation.string(36677)) + labelAbsolute
 
 							message = interface.Translation.string(36678) % (interface.Format.fontBold(labelDefault), label)
 							choice = interface.Dialog.options(title = 36679, message = message, labelConfirm = label2, labelDeny = 33432, labelCustom = interface.Format.fontBold(label1), default = interface.Dialog.ChoiceCustom)
@@ -1054,17 +1167,17 @@ class Core(object):
 								return option2
 							elif choice == interface.Dialog.ChoiceCustom:
 								return option1
-							if choice == interface.Dialog.ChoiceNo:
+							elif choice == interface.Dialog.ChoiceNo:
 								added = {}
 								items = []
 								values = []
-								for i in [[numbersSeason, MetaPack.NumberStandard, 32055], [numbersSpecial, MetaPack.NumberSpecial, 33105], [numbersSequential, MetaPack.NumberSequential, 36677], [numbersDefault, number, 33564]]:
+								for i in [[numbersSeason, MetaPack.NumberStandard, 32055], [numbersSpecial, MetaPack.NumberSpecial, 33105], [numbersSequential, MetaPack.NumberSequential, 35831], [numbersAbsolute, MetaPack.NumberAbsolute, 36677], [numbersDefault, number, 33564]]:
 									for j in i[0]:
 										id = '%s_%s_%s' % (j['season'], j['episode'], str(j.get('number')))
-										if not id in added and j.get('number'):
+										if not id in added and j.get('provider'):
 											added[id] = True
 											values.append(j)
-											items.append('%s: %s' % (interface.Format.fontBold(i[2]), _mergeLabel([j])))
+											items.append('%s: %s' % (interface.Format.fontBold(i[2]), _mergeLabel([j], all = i[0])))
 
 								choice = interface.Dialog.select(title = 36679, items = items)
 								if choice >= 0: return values[choice]
@@ -1261,8 +1374,7 @@ class Core(object):
 				interface.Dialog.notification(title = self.mLastTitle, message = self.mLastMessage1, icon = interface.Dialog.IconInformation)
 			elif not self.navigationCinema:
 				if self.navigationScrapeSpecial:
-					try: background = MetaImage.extract(data = self.mLastMetadata)['fanart']
-					except: background = None
+					background = MetaImage.imageFanart(data = self.mLastMetadata, custom = MetaImage.CustomBase)
 					window.WindowScrape.show(background = background, status = self.mLastMessage1)
 					window.WindowBackground.close() # Might still be open from player.py -> interact() to allow a continues background during rating/continue/next-episode-playback.
 				else:
@@ -1321,13 +1433,13 @@ class Core(object):
 		elif mini: return self.timeString % seconds
 		else: return seconds
 
-	def scrapeItem(self, title, year, imdb, tmdb, tvdb, trakt, season, episode, tvshowtitle, premiered, metadata, pack = None, preset = None, exact = False, autoplay = False, cache = True):
+	def scrapeItem(self, title, year, imdb, tmdb, tvdb, trakt, season, episode, tvshowtitle, tvshowyear, premiered, metadata, pack = None, preset = None, exact = False, autoplay = False, cache = True):
 		try:
 			def titleClean(value, year = None, internal = None):
 				values = []
 				if value is None: return values
 
-				# Titles with mutiple dots, eg: S.W.A.T.
+				# Titles with multiple dots, eg: S.W.A.T.
 				if not internal == 1 and value.count('.') >= 3:
 					temp = [value, value.replace('.', ''), value.replace('.', ' ')]
 					values = tools.Tools.listFlatten(temp + [titleClean(value = i, year = year, internal = 1) for i in temp])
@@ -1389,7 +1501,7 @@ class Core(object):
 				return tools.Tools.listUnique([i.strip() for i in values])
 
 			def titleStrip(title):
-				# Strip mutiple times, since eg after we stripped a "-", there might be a new " " before the "-" that now has to be removed as well.
+				# Strip multiple times, since eg after we stripped a "-", there might be a new " " before the "-" that now has to be removed as well.
 				# Eg: "XXXX - "
 				for i in range(3): title = title.strip(' ').strip(':').strip('-').strip('.').strip(',').strip('(').strip(')').strip('[').strip(']')
 				return title
@@ -1491,9 +1603,22 @@ class Core(object):
 					processedMain.append(self.titles['main'])
 					processedBasic.append(self.titles['main'])
 				if 'original' in self.titles and self.titles['original']:
+					# If this is a foreign (non-English) title, add it to the front of the search queries.
+					# These foreign titles are more likely to be found using the original title in the original language, rather than using the English title.
+					# Only do this for "pure" foreign titles, since some movies can be joint-ventures from multiple countries and the movie is in multiple languages, all while the English title is most commonly used.
+					# Eg: Manitou's Canoe
+					foreign = False
+					if self.originalLanguage and not tools.Language.EnglishCode in self.originalLanguage[:2]:
+						language = self.originalLanguage[0]
+						languageTitles = []
+						for i in ['extra', 'alias', 'native']:
+							try: languageTitles.extend(self.titles[i][language])
+							except: pass
+						if self.titles['original'] in languageTitles: foreign = True
+
 					# If the user selected a different Primary Language to English, the 'main' title will be in that language.
 					# In such a case, push the original title to the front, so that the first title being searched is more likley to return results.
-					if tools.Language.settingsCode(single = True) == tools.Language.EnglishCode:
+					if not foreign and tools.Language.settingsCode(single = True) == tools.Language.EnglishCode:
 						titles.append(self.titles['original'])
 						processedMain.append(self.titles['original'])
 						processedBasic.append(self.titles['original'])
@@ -1566,6 +1691,18 @@ class Core(object):
 					processedAlias.extend(temp3)
 					processedAlias = tools.Tools.listUnique(processedAlias)
 
+				# If the title contains a digit as a letter-replacement, prefer the one with the letter, since this is what most uploaders use.
+				# This is important, so that the letter-title is used for pack searching, even if the main title has a digit.
+				# Eg: Prefer "Pluribus" over "Plur1bus".
+				main = self.titles.get('main')
+				original = self.titles.get('original')
+				if main and original and not main == original:
+					if tools.Regex.match(data = main, expression = '[a-z]\d[a-z]'):
+						if not tools.Regex.match(data = original, expression = '[a-z]\d[a-z]'):
+							titles.insert(0, original)
+							processedMain.insert(0, original)
+							processedBasic.insert(0, original)
+
 				titles = tools.Tools.listUnique(titles)
 				processedMain = tools.Tools.listUnique(processedMain)
 
@@ -1573,13 +1710,18 @@ class Core(object):
 				# Eg: "The Lord of the Rings: The Two Towers" -> "The Two Towers"
 				if 'collection' in self.titles and self.titles['collection']:
 					if 'main' in self.titles and self.titles['main']:
-						titleReduced = re.sub(self.titles['collection'], '', self.titles['main'], re.IGNORECASE)
+						# Ignore apostrophes.
+						# Eg: "Manitou's Canoe" => "Canoe" (and not "'s Canoe").
+						titleReduced = re.sub(self.titles['collection'] + '(?:\'s)?', '', self.titles['main'], re.IGNORECASE)
 						if not titleReduced == self.titles['main']:
 							titleReduced = titleStrip(titleReduced)
 							# Avoid: "Hotel Transylvania 3 Summer Vacation" -> "3 Summer Vacation"
 							if titleReduced and titleValid(titleReduced, year) and not tools.Tools.isNumeric(titleReduced[0]):
-								titles.append(titleReduced)
-								processedMain.append(titleReduced)
+								# Do not add too short reduced titles, since they might cause false positives.
+								# Eg (ingore): "Manitou's Canoe" => "Canoe"
+								if ' ' in titleReduced or len(titleReduced) >= 7:
+									titles.append(titleReduced)
+									processedMain.append(titleReduced)
 
 				# If there is an abbreviation in the title, remove it.
 				# Eg: "XMA: Xtreme Martial Arts" -> "Xtreme Martial Arts"
@@ -1619,6 +1761,11 @@ class Core(object):
 								# Eg: "Nineteen Eighty-Four" + "George Orwell Nineteen Eighty Four 1984" = "George Orwell 1984"
 								titleStripped = val.replace(self.titles['main'], '').replace(tools.Tools.replaceNotAlphaNumeric(data = self.titles['main'], replace = ' '), '')
 								titleStripped = titleStrip(titleStripped.replace('  ', ' ')) # strip brackets, etc.
+
+								# Exclude very short stripped titles, which lead to too many false positives during matching.
+								# Eg: Paradise (2025) has an alias "Paradise City". When stripped, this becomes only "City", which will match too many false positives.
+								if len(titleStripped) <= 6 and len(self.titles['main']) <= 15: continue
+
 								if titleStripped and not titleStripped == val and titleValid(titleStripped, year) and not titleStripped.endswith('\'s') and not titleStripped.lower() in people:
 									# From: The Terminator (1984) [BluRay] [1080p] REMASTERED
 									# To: 1984) [BluRay] [1080p] REMASTERED
@@ -1656,6 +1803,16 @@ class Core(object):
 				main = []
 				expression = '^%s*$' % tools.Regex.Nonalpha
 				for title in titles:
+					# For titles with subscripts/superscripts.
+					# Eg: "The Accountant²" -> "The Accountant 2"
+					script = tools.Regex.extract(data = title, expression = '([\u00B0\u00B2\u00B3\u00B9\u02AF\u0670\u0711\u2121\u213B\u2207\u29B5\uFC5B-\uFC5D\uFC63\uFC90\uFCD9\u2070\u2071\u2074-\u208E\u2090-\u209C\u0345\u0656\u17D2\u1D62-\u1D6A\u2A27\u2C7C]+)', flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagUnicode)
+					unscripted = None
+					if script:
+						unscripted = title.replace(script, '')
+						script = title.replace(script, ' ' + tools.Converter.unicodeNormalize(script) + ' ')
+						script = tools.Regex.replace(data = script, expression = '\s+', replacement = ' ').strip()
+						main.append(script)
+
 					nonalpha = tools.Regex.match(data = title, expression = expression)
 					titlesCleaned = titleClean(title, year)
 					for titleCleaned in titlesCleaned:
@@ -1677,8 +1834,12 @@ class Core(object):
 						# Some sites do not deal with encoding unicode at all. Instead, they just strip any unicode characters.
 						titleCleaned4 = tools.Converter.unicodeStrip(string = titleCleaned)
 						if not titleCleaned4.lower() in people:
-							if nonalpha or not tools.Regex.match(data = titleCleaned4, expression = expression):
-								main.append(titleCleaned4)
+							# Do not add if the unicode is subscripts/superscripts.
+							# Eg: Otherwise "The Accountant²" will add "The Accountant".
+							if not unscripted == titleCleaned4:
+								if nonalpha or not tools.Regex.match(data = titleCleaned4, expression = expression):
+									main.append(titleCleaned4)
+
 				for i in range(len(main)):
 					try: main[i] = main[i].decode('utf-8')
 					except: pass
@@ -1900,7 +2061,7 @@ class Core(object):
 				search = tools.Tools.listUnique(temp)
 
 				self.titles['search'] = {}
-				self.titles['search']['main'] = search
+				self.titles['search']['main'] = tools.Tools.listUnique(search)
 				self.titles['search']['native'] = native if settingNative else {}
 				self.titles['search']['collection'] = collection
 				self.titles['search']['episode'] = Stream.titleEpisodeIgnore(episode) # Do not search for very common episode titles (eg: "VII", "Episode 2", etc).
@@ -1924,11 +2085,13 @@ class Core(object):
 				for processed in [processedMain, processedAlias]:
 					# This is important for matching titles in stream.py.
 					# Eg: The title "Amélie", but most file names contain "Amelie".
+					# Eg: "Predator: Pogromca zabójców" -> "Predator Pogromca zabojcow".
+					processedCustom = processed
 					processedExtra = []
 					expression = re.compile('^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
 					seen = set()
-					processed = [i for i in processed if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
-					for title in processed:
+					processedCustom = [i for i in processedCustom if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
+					for title in processedCustom:
 						titleNew = tools.Converter.unicodeNormalize(string = title, umlaut = False).strip()
 						if titleNew and (titleNew == title or not expression.match(titleNew)) and titleValid(titleNew, year):
 							processedExtra.append(titleNew)
@@ -1939,7 +2102,7 @@ class Core(object):
 					for i in range(len(processedExtra)):
 						try: processedExtra[i] = processedExtra[i].decode('utf-8')
 						except: pass
-					processed.extend(processedExtra)
+					processedCustom.extend(processedExtra)
 
 					# Sometimes there are weird aliases, which hinders metadata extraction (eg keywords like "1080p", "BluRay", etc).
 					#	The Terminator BluRay 1080p REMASTERED
@@ -1947,13 +2110,28 @@ class Core(object):
 					for i in ['2160p?', '1080p?', '720p?', '4k', '(?:hd.*?)?dvd', 'bluray', 'vhs']:
 						expression = '(?:^|\s)(%s?%s%s?)(?:$|\s)' % (tools.Regex.Symbol, i, tools.Regex.Symbol)
 						if not tools.Regex.match(data = self.titles['main'], expression = expression):
-							for j in range(len(processed)):
-								processedNew = tools.Regex.remove(data = processed[j], expression = expression, group = 1, all = True)
-								if not processedNew == processed[j]: processed[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
+							for j in range(len(processedCustom)):
+								processedNew = tools.Regex.remove(data = processedCustom[j], expression = expression, group = 1, all = True)
+								if not processedNew == processedCustom[j]: processedCustom[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
 
 					# Exclude network/studio prefixes.
 					# Eg: "FX's 将軍" -> "FX's"
-					processed = [i for i in processed if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
+					processedCustom = [i for i in processedCustom if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
+
+					processed.extend(processedCustom)
+
+				# German titles without leading articles.
+				try:
+					for i in ['extra', 'alias', 'native']:
+						try: titlesGerman = self.titles[i]['de']
+						except: titlesGerman = None
+						if titlesGerman:
+							if not tools.Tools.isArray(titlesGerman): titlesGerman = [titlesGerman]
+							for j in titlesGerman:
+								if j and j.count(' ') >= 2: # Only do this if there are at least 3 words.
+									j = tools.Regex.remove(data = j, expression = '^\s*(?:der|die|das|dem|den|der|des)\s+')
+									if j: processed.append(j)
+				except: tools.Logger.error()
 
 				seen = set()
 				processedMain = [i for i in processedMain if i and not(i.lower() in seen or seen.add(i.lower()))]
@@ -2022,6 +2200,13 @@ class Core(object):
 				threads.append(Pool.thread(target = additionalYear, kwargs = {'title' : title, 'titleShow' : titleShow, 'year' : year, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}, start = True))
 				[thread.join() for thread in threads]
 				additionalFinalize()
+
+				# Only do this here, once additionalFinalize() is done, since the original language is used in titleProcess().
+				titleProcess(title, titleShow, year)
+				self.progressTitleOriginal = 100
+				self.progressTitleTranslation = 100
+				self.progressTitleAlias = 100
+				self.progressTitleCollection = 100
 
 			def additionalInitialize(title, titleShow, year, imdb, tmdb, tvdb, trakt, season, episode, metadata):
 				originalLanguage = []
@@ -2262,13 +2447,6 @@ class Core(object):
 				[thread.start() for thread in threads]
 				[thread.join() for thread in threads]
 
-				titleProcess(title, titleShow, year)
-
-				self.progressTitleOriginal = 100
-				self.progressTitleTranslation = 100
-				self.progressTitleAlias = 100
-				self.progressTitleCollection = 100
-
 			def additionalTitleOriginal(update, title, titleShow, imdb, tmdb, tvdb, trakt):
 				self.progressTitleOriginal = 0
 				try:
@@ -2456,7 +2634,7 @@ class Core(object):
 							return self.tmdbDetails[id]
 						result = tmdbDetails(id = imdb, key = key)
 						self.progressTitleCollection = 50
-						try: self.titles['collection'] = re.sub('collection$', '', result['belongs_to_collection']['name'], flags = re.IGNORECASE).strip()
+						try: self.titles['collection'] = tools.Regex.remove(data = result['belongs_to_collection']['name'], expression = '\s*[\-\:]?\s*(?:a|the)?\s*collection\s*$').strip()
 						except: self.titles['collection'] = None
 						try: id = result['belongs_to_collection']['id']
 						except: id = None
@@ -2515,8 +2693,9 @@ class Core(object):
 				except: tools.Logger.error()
 				self.progressTitleCollection = 90
 
-			def initializeProviders(media, preset, exclude = None):
-				self.providers = ProviderManager.providers(enabled = True, exclude = exclude, preset = preset, sort = True)
+			def initializeProviders(media, niche, preset, exclude = None):
+				# Set niche to True if there is no niche.
+				self.providers = ProviderManager.providers(enabled = True, media = media, niche = niche or True, exclude = exclude, preset = preset, sort = True)
 				self.providersBusy = len(self.providers)
 
 			tools.Logger.log('Scraping Started', name = 'CORE', type = tools.Logger.TypeInfo)
@@ -2569,6 +2748,10 @@ class Core(object):
 
 			try: year = int(year)
 			except: pass
+			try: tvshowyear = int(tvshowyear)
+			except: pass
+			yearReal = tvshowyear or year # Use the show year instead of the season/episode year, if available.
+
 			try: season = int(season)
 			except: pass
 			try: episode = int(episode)
@@ -2586,7 +2769,7 @@ class Core(object):
 				self.titles['processed'] = {'all' : [title], 'main' : [title]}
 				self.titles['search'] = {'exact' : [title]}
 			else:
-				titleProcess(title, tvshowtitle, year)
+				titleProcess(title, tvshowtitle, yearReal)
 
 			self.streamsTotal = 0
 			self.streamsHdUltra = 0
@@ -2670,6 +2853,7 @@ class Core(object):
 			self.cacheEnabledPremiumize = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.premiumize') == 1
 			self.cacheEnabledOffcloud = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.offcloud') == 1
 			self.cacheEnabledTorbox = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.torbox') == 1
+			self.cacheEnabledDebrider = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debrider') == 1
 			self.cacheEnabledEasydebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.easydebrid') == 1
 			self.cacheEnabledRealdebrid = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.realdebrid') == 1
 			self.cacheEnabledDebridlink = self.cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debridlink') == 1
@@ -2742,6 +2926,15 @@ class Core(object):
 						self.cacheObjects.append(Torbox)
 					else:
 						self.cacheEnabledTorbox = False
+				if self.cacheEnabledDebrider:
+					if Debrider.authenticated():
+						self.cacheTypes.append(handler.Handler.TypeTorrent)
+						self.cacheObjects.append(Debrider)
+
+						self.cacheTypes.append(handler.Handler.TypeUsenet)
+						self.cacheObjects.append(Debrider)
+					else:
+						self.cacheEnabledDebrider = False
 				if self.cacheEnabledEasydebrid:
 					if Easydebrid.authenticated():
 						self.cacheTypes.append(handler.Handler.TypeTorrent)
@@ -2836,7 +3029,7 @@ class Core(object):
 			if (specialAllow or not self.progressCanceled()):
 				timeout = 30 # Do not make this too low, since native titles retrival depends on this.
 				message = 'Initializing Providers'
-				thread = Pool.thread(target = initializeProviders, args = (media, preset))
+				thread = Pool.thread(target = initializeProviders, args = (media, niche, preset))
 
 				thread.start()
 				timerSingle.start()
@@ -2868,7 +3061,7 @@ class Core(object):
 				message = 'Retrieving Additional Metadata'
 				timeout = 45
 
-				thread = Pool.thread(target = additional, args = (title, tvshowtitle, year, imdb, tmdb, tvdb, trakt, season, episode, metadata))
+				thread = Pool.thread(target = additional, args = (title, tvshowtitle, yearReal, imdb, tmdb, tvdb, trakt, season, episode, metadata))
 				thread.start()
 
 				timerSingle.start()
@@ -3277,6 +3470,7 @@ class Core(object):
 			cacheEnabledPremiumize = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.premiumize')
 			cacheEnabledOffcloud = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.offcloud')
 			cacheEnabledTorbox = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.torbox')
+			cacheEnabledDebrider = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debrider')
 			cacheEnabledEasydebrid = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.easydebrid')
 			cacheEnabledRealdebrid = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.realdebrid')
 			cacheEnabledDebridlink = cacheEnabled and tools.Settings.getInteger('scrape.cache.inspection.debridlink')
@@ -3487,6 +3681,7 @@ class Core(object):
 				{'label' : 'Premiumize Inspection', 'value' : orion if cacheEnabledPremiumize == 2 else native if cacheEnabledPremiumize == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'OffCloud Inspection', 'value' : orion if cacheEnabledOffcloud == 2 else native if cacheEnabledOffcloud == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'TorBox Inspection', 'value' : orion if cacheEnabledTorbox == 2 else native if cacheEnabledTorbox == 1 else disabled} if cacheEnabled else None,
+				{'label' : 'Debrider Inspection', 'value' : orion if cacheEnabledDebrider == 2 else native if cacheEnabledDebrider == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'EasyDebrid Inspection', 'value' : orion if cacheEnabledEasydebrid == 2 else native if cacheEnabledEasydebrid == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'RealDebrid Inspection', 'value' : orion if cacheEnabledRealdebrid == 2 else native if cacheEnabledRealdebrid == 1 else disabled} if cacheEnabled else None,
 				{'label' : 'DebridLink Inspection', 'value' : orion if cacheEnabledDebridlink == 2 else native if cacheEnabledDebridlink == 1 else disabled} if cacheEnabled else None,
@@ -3620,16 +3815,10 @@ class Core(object):
 			if metadata is None: metadata = self.propertyMetadata()
 			elif tools.Tools.isString(metadata): metadata = tools.Converter.jsonFrom(network.Networker.linkUnquote(metadata))
 
-			try: title = metadata['tvshowtitle']
-			except:
-				try: title = metadata['title']
-				except: title = None
-			try: year = metadata['year']
-			except: year = None
-			try: season = metadata['season']
-			except: season = None
-			try: episode = metadata['episode']
-			except: episode = None
+			title = metadata.get('tvshowtitle') or metadata.get('title')
+			year = metadata.get('tvshowyear') or metadata.get('year')
+			season = metadata.get('season')
+			episode = metadata.get('episode')
 
 			container = network.Container(link)
 			if container.torrentIs(): sourceType = Stream.SourceTypeTorrent
@@ -3688,7 +3877,7 @@ class Core(object):
 		except: tools.Logger.error()
 		return False
 
-	def showStreams(self, items = None, extras = None, metadata = None, direct = False, filter = True, autoplay = False, clear = False, library = False, initial = False, new = True, add = False, process = True, binge = None):
+	def showStreams(self, items = None, extras = None, metadata = None, direct = False, filter = True, autoplay = False, clear = False, library = False, initial = False, new = True, add = False, process = True, binge = None, retry = False):
 		try:
 			if clear: self._showClear()
 
@@ -3727,11 +3916,13 @@ class Core(object):
 				for i in range(len(items)):
 					items[i]['stream'] = Stream.load(data = items[i]['stream'])
 				if filter:
-					if process: itemsFiltered = self.sourcesFilter(items = items, metadata = metadata, autoplay = autoplay)
+					if process: itemsFiltered = self.sourcesFilter(items = items, metadata = metadata, autoplay = autoplay, apply = filter)
 					else: itemsFiltered = items
 					if len(itemsFiltered) == 0:
-						if not new or self.progressNotification(mixed = self.mixedStreams(items = itemsFiltered)):
-							return self.showStreams(items = items, extras = extras, metadata = metadata, direct = False if autoplay else True, library = library, filter = False, autoplay = False, clear = True, new = new, add = add, binge = binge)
+						if not retry and (not new or self.progressNotification(mixed = self.mixedStreams(items = itemsFiltered))):
+							# Do not use "filter=False", but instead filter only by duplicates.
+							# Otherwise the entire window is cluttered with duplicate streams.
+							return self.showStreams(items = items, extras = extras, metadata = metadata, direct = False if autoplay else True, library = library, filter = Stream.ExclusionDuplicate, autoplay = False, clear = True, new = new, add = add, binge = binge, retry = True)
 						else:
 							self.progressClose(force = True, loader = self.navigationStreamsSpecial and new and not autoplay)
 							return False
@@ -3812,48 +4003,28 @@ class Core(object):
 		# Removing the pack reduces it down to 3-4secs.
 		# Not sure if the pack is needed somewhere (eg: context menu, data passed onto the player, binge, etc).
 		# If we ever need the pack again and have to remove this statement, take the loading time into account.
-		# This is also done below for the stream history window with mutiple titles.
+		# This is also done below for the stream history window with multiple titles.
 		try: del metadata['pack']
 		except: pass
 
-		try: media = metadata['media']
-		except: media = None
+		media = metadata.get('media')
+		title = metadata.get('tvshowtitle') or metadata.get('originaltitle') or metadata.get('title') or ''
+		year = metadata.get('tvshowyear') or metadata.get('year')
+		season = metadata.get('season')
+		episode = metadata.get('episode')
 
-		try: title = metadata['tvshowtitle']
-		except:
-			try: title = metadata['originaltitle']
-			except:
-				try: title = metadata['title']
-				except: title = ''
-
-		try: year = metadata['year']
-		except: year = None
-		try: season = metadata['season']
-		except: season = None
-		try: episode = metadata['episode']
-		except: episode = None
-
-		try: imdb = metadata['imdb']
-		except: imdb = None
-		try: tmdb = metadata['tmdb']
-		except: tmdb = None
-		try: tvdb = metadata['tvdb']
-		except: tvdb = None
-		try: trakt = metadata['trakt']
-		except: trakt = None
+		imdb = metadata.get('imdb')
+		tmdb = metadata.get('tmdb')
+		tvdb = metadata.get('tvdb')
+		trakt = metadata.get('trakt')
 		id = '' if mixed else tools.Hash.sha1((imdb if imdb else trakt if trakt else tmdb if tmdb else tvdb if tvdb else tools.Converter.jsonTo(metadata)) + '_' + str(season) + '_' + str(episode) + '_' + str(total))
 
-		images = MetaImage.extract(data = metadata)
-		if not hasFanart or not MetaImage.TypeFanart in images: images[MetaImage.TypeFanart] = addonFanart
-		try: fanart = images[MetaImage.TypeFanart]
-		except: fanart = None
-		posters = MetaImage.getPoster(data = metadata)
-		try: poster1 = posters[0]
-		except: poster1 = None
-		try: poster2 = posters[1]
-		except: poster2 = None
-		try: poster3 = posters[2]
-		except: poster3 = None
+		images = (MetaImage.image(data = metadata, custom = MetaImage.CustomBase) if metadata else None) or {}
+		if not hasFanart or not images.get(MetaImage.TypeFanart): images[MetaImage.TypeFanart] = addonFanart
+		fanart = images.get(MetaImage.TypeFanart)
+		poster1 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoicePrimary)
+		poster2 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoiceSecondary)
+		poster3 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoiceTertiary)
 		if not poster1 and not poster2 and not poster3: poster1 = Theme.poster() # Exact searches.
 
 		lookup = {'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}
@@ -3952,31 +4123,16 @@ class Core(object):
 						if self.navigationStreamsDirectory: metadataKodi = metatools.clean(metadata = metadata, exclude = True)
 						else: metadataKodi = metatools.clean(metadata = metadata)
 
-						try: media = metadata['media']
-						except: media = None
+						media = metadata.get('media')
+						title = metadata.get('tvshowtitle') or metadata.get('originaltitle') or metadata.get('title') or interface.Translation.string(35160) # Exact searches have not metadata.
+						year = metadata.get('tvshowyear') or metadata.get('year')
+						season = metadata.get('season')
+						episode = metadata.get('episode')
 
-						try: title = metadata['tvshowtitle']
-						except:
-							try: title = metadata['originaltitle']
-							except:
-								try: title = metadata['title']
-								except: title = interface.Translation.string(35160) # Exact searches have not metadata.
-
-						try: year = metadata['year']
-						except: year = None
-						try: season = metadata['season']
-						except: season = None
-						try: episode = metadata['episode']
-						except: episode = None
-
-						try: imdb = metadata['imdb']
-						except: imdb = None
-						try: tmdb = metadata['tmdb']
-						except: tmdb = None
-						try: tvdb = metadata['tvdb']
-						except: tvdb = None
-						try: trakt = metadata['trakt']
-						except: trakt = None
+						imdb = metadata.get('imdb')
+						tmdb = metadata.get('tmdb')
+						tvdb = metadata.get('tvdb')
+						trakt = metadata.get('trakt')
 
 						lookup = {'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}
 						if not season is None: lookup['season'] = season
@@ -3985,15 +4141,12 @@ class Core(object):
 						extra = interface.Format.font((title + ' ' + tools.Title.title(metadata = None, title = '', year = year, season = season, episode = episode, skin = False).strip()).strip(), bold = True)
 						if not self.navigationStreamsSpecial: extra += Stream.labelSeparator()
 
-						images = MetaImage.extract(data = metadata)
-						if not hasFanart or not MetaImage.TypeFanart in images: images[MetaImage.TypeFanart] = addonFanart
-						posters = MetaImage.getPoster(data = metadata)
-						try: poster1 = posters[0]
-						except: poster1 = None
-						try: poster2 = posters[1]
-						except: poster2 = None
-						try: poster3 = posters[2]
-						except: poster3 = None
+						images = MetaImage.image(data = metadata, custom = MetaImage.CustomBase) or {}
+						if not hasFanart or not images.get(MetaImage.TypeFanart): images[MetaImage.TypeFanart] = addonFanart
+						fanart = images.get(MetaImage.TypeFanart)
+						poster1 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoicePrimary)
+						poster2 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoiceSecondary)
+						poster3 = MetaImage.imagePoster(data = metadata, custom = MetaImage.CustomBase, choice = MetaImage.ChoiceTertiary)
 						if not poster1 and not poster2 and not poster3: poster1 = Theme.poster() # Exact searches.
 				except:
 					tools.Logger.error()
@@ -4110,7 +4263,6 @@ class Core(object):
 
 					audio1 = stream.labelAudio(type = False, language = False, format = format)
 					audio2 = stream.labelAudio(language = flagLabel, format = format)
-
 					if audioLanguages and (flagIndividual or flagCombined):
 						audioHas = not labelFill in audio2
 						contains = []
@@ -4205,7 +4357,7 @@ class Core(object):
 				#gaiafuture - Creating a ListItem still take longer than it should.
 				#gaiafuture - Can we do this similar to the metadata? That is, rather than passing the link/stream data to each ListItem, store the streams on disk or memory, create a unique ID for each of them.
 				#gaiafuture - Then only add the ID to the ListItem and if the item is played or the context menu opened on it (eg: copy stream link), load the data of stream using ID.
-				result = metatools.item(label = label, item = item, metadata = metadata, clean = metadataKodi, stream = metadataStream, properties = properties, images = images, playable = False, content = False, command = False, context = not(self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain), contextAdd = not self.navigationStreamsSpecial, contextSource = itemJson, contextOrion = orion, contextCommand = url, contextPlaylist = True, contextShortcut = Shortcut.item(create = True)) # Important to command=False, otherwise it creates a new command that is not used and takes longer.
+				result = metatools.item(label = label, item = item, metadata = metadata, clean = metadataKodi, stream = metadataStream, properties = properties, images = images, playable = False, content = False, command = False, context = not(self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain), contextAdd = not self.navigationStreamsSpecial, contextSource = itemJson, contextOrion = orion, contextCommand = url, contextPlaylist = True, contextShortcut = Shortcut.item(create = True), contextMixed = mixed) # Important to command=False, otherwise it creates a new command that is not used and takes longer.
 
 				# ADD ITEM
 				if self.navigationStreamsDialogDetailed or self.navigationStreamsDialogPlain:
@@ -4299,15 +4451,15 @@ class Core(object):
 					interface.Dialog.notification(title = 35848, message = 36392, icon = interface.Dialog.IconWarning)
 					return self.showStreams(items = items, extras = extras, metadata = metadata, autoplay = False, library = library, new = new, add = add, binge = binge)
 
-		imdb = metadata['imdb'] if 'imdb' in metadata else None
-		tmdb = metadata['tmdb'] if 'tmdb' in metadata else None
-		tvdb = metadata['tvdb'] if 'tvdb' in metadata else None
-		trakt = metadata['trakt'] if 'trakt' in metadata else None
+		imdb = metadata.get('imdb')
+		tmdb = metadata.get('tmdb')
+		tvdb = metadata.get('tvdb')
+		trakt = metadata.get('trakt')
 
-		title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
-		year = metadata['year'] if 'year' in metadata else None
-		season = metadata['season'] if 'season' in metadata else None
-		episode = metadata['episode'] if 'episode' in metadata else None
+		title = metadata.get('tvshowtitle') or metadata.get('title')
+		year = metadata.get('tvshowyear') or metadata.get('year')
+		season = metadata.get('season')
+		episode = metadata.get('episode')
 
 		binging = tools.Media.isSerie(self.media) and binge
 		success = False
@@ -4429,14 +4581,15 @@ class Core(object):
 
 			metadata = self._metadata(metadata = metadata, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 			if metadata:
-				title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
-				year = metadata['year'] if 'year' in metadata else None
-				season = metadata['season'] if 'season' in metadata else None
-				episode = metadata['episode'] if 'episode' in metadata else None
-				imdb = metadata['imdb'] if 'imdb' in metadata else None
-				tmdb = metadata['tmdb'] if 'tmdb' in metadata else None
-				tvdb = metadata['tvdb'] if 'tvdb' in metadata else None
-				trakt = metadata['trakt'] if 'trakt' in metadata else None
+				imdb = metadata.get('imdb')
+				tmdb = metadata.get('tmdb')
+				tvdb = metadata.get('tvdb')
+				trakt = metadata.get('trakt')
+
+				title = metadata.get('tvshowtitle') or metadata.get('title')
+				year = metadata.get('tvshowyear') or metadata.get('year')
+				season = metadata.get('season')
+				episode = metadata.get('episode')
 
 			self.progressPlaybackInitialize(title = heading, message = labelInitiate, metadata = metadata)
 			self.progressPlaybackUpdate(progress = 1, title = heading, message = message)
@@ -4708,7 +4861,7 @@ class Core(object):
 
 				# If the background dialog is not closed, when another background dialog is launched, it will contain the old information from the previous dialog.
 				# Manually close it. Do not close the foreground dialog, since it does not have the issue and keeping the dialog shown is smoother transition.
-				# NB: This seems to not be neccessary with the new interface.Core. However, enable again if the problems are observed.
+				# NB: This seems to not be necessary with the new interface.Core. However, enable again if the problems are observed.
 				#if interface.Core.background():
 				#	interface.Core.close()
 				#	self.loaderShow() # Since there is no dialog anymore.
@@ -5507,7 +5660,7 @@ class Core(object):
 			# If the resolve() function is not implemented by the provider, the original link is returned as the resolved link, and will be set as linkProvider in the stream.
 			url = item['stream'].linkResolved(original = False, provider = True, stream = False)
 			if url is None: # Provider (especially external providers) could not internally resolve the link via the resolve() function.
-				interface.Dialog.notification(title = 33448, message = 33691, icon = interface.Dialog.IconError)
+				interface.Dialog.notification(title = 33448, message = 33691, icon = interface.Dialog.IconError, duplicates = True)
 				return self.sourceResult(error = 'resolve', loader = loader)
 
 			url = url.replace('filefactory.com/stream/', 'filefactory.com/file/')
@@ -5570,19 +5723,28 @@ class Core(object):
 						# OffCloud sometimes returns links with spaces (eg: season packs).
 						result['link'] = network.Networker.linkClean(result['link'], headersStrip = False)
 
-						extension = network.Networker().linkExtension(link = result['link'])
-						extensions = ['rar', 'zip', '7zip', '7z', 's7z', 'tar', 'gz', 'gzip', 'iso', 'bz2', 'lz', 'lzma', 'dmg']
-						if extension in extensions:
-							if info:
-								message = interface.Translation.string(33757) % extension.upper()
-								interface.Dialog.notification(title = 33448, message = message, icon = interface.Dialog.IconError)
-							try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown, automatic = True)
-							except: pass
-							return self.sourceResult(error = 'filetype', loader = loader)
+					extension = None
+					try: format = not error and result['link'].lower().endswith(debrid.core.Core.Exclusions)
+					except: format = False
+					if format:
+						extension = network.Networker.linkExtension(link = result['link'])
+					elif result['error'] == handler.Handler.ReturnFormat:
+						format = True
+						extension = result['extension']
+					if format:
+						if info:
+							if extension: extension = interface.Format.fontBold(extension.upper())
+							message = tools.Tools.stringRemoveSpace(interface.Translation.string(33757) % (extension or ''))
+							interface.Dialog.notification(title = 33448, message = message, icon = interface.Dialog.IconError, duplicates = True)
+						try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown, automatic = True)
+						except: pass
+						return self.sourceResult(error = 'fileformat', loader = loader)
 
-						# Do not do prechecks at the moment.
-						# If every re-enabled, do not do checks for Emby/Jellyfin, since those servers return an empty reply on HEAD requests.
-						'''if result['link'].startswith('http') and '.m3u8' in result['link']:
+					# Do not do prechecks at the moment.
+					# If every re-enabled, do not do checks for Emby/Jellyfin, since those servers return an empty reply on HEAD requests.
+					'''
+					if not error:
+						if result['link'].startswith('http') and '.m3u8' in result['link']:
 							if not network.Networker().requestSuccess(link = result['link']):
 								error = 'M3U8 Error'
 						elif result['link'].startswith('http'):
@@ -5591,16 +5753,20 @@ class Core(object):
 							if not 'handle' in result or not result['handle'] in [i['id'] for i in handler.Handler.handles()]:
 								if not network.Networker().requestSuccess(link = result['link']):
 									error = 'Server Error'
-						'''
+					'''
 
-					if not error or result['error'] == handler.Handler.ReturnExternal: return result
+					if not error or result['error'] == handler.Handler.ReturnExternal:
+						try: orionoid.Orionoid(silent = True).debridUpdate(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), type = debrid.Debrid.detect(result['handle'], result['link'])['id'], access = True, automatic = True)
+						except: pass
+
+						return result
 		except:
 			if log: tools.Logger.error()
 			error = True
 
 		if error:
 			if log and not error is True: tools.Logger.log(error)
-			if info: interface.Dialog.notification(title = 33448, message = 33449, icon = interface.Dialog.IconError)
+			if info: interface.Dialog.notification(title = 33448, message = 33449, icon = interface.Dialog.IconError, duplicates = True)
 			try: orionoid.Orionoid(silent = True).streamVote(idItem = item['stream'].idOrionItem(), idStream = item['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteDown, automatic = True)
 			except: pass
 			return self.sourceResult(link = url, error = 'unknown', loader = loader)
@@ -5693,9 +5859,11 @@ class Core(object):
 					for provider in providers:
 						keys = []
 
-						keys.append(provider.id())
-						keys.append(provider.name())
-						keys.append(provider.name().lower())
+						if provider.id():
+							keys.append(provider.id())
+						if provider.name():
+							keys.append(provider.name())
+							keys.append(provider.name().lower())
 						try: keys.append(provider.instanceId())
 						except: pass
 

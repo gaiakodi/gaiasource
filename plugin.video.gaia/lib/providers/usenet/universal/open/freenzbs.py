@@ -33,7 +33,10 @@ class Provider(ProviderSpotJson):
 			name					= 'FreeNZBs',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
 			rank					= 4,
-			status					= ProviderSpotJson.StatusDead, # Domain redirects to landing page.
+
+			# Domain redirects to landing page.
+			# Update (2025-12): Redirects to GoDaddy.
+			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,
 

@@ -144,6 +144,37 @@
 			<!-- QR -->
 			<control type="group" id="51000">
 
+				<!-- QR - DEFAULT -->
+				<control type="group">
+					<visible>!String.IsEmpty(Window.Property(GaiaFailure))</visible>
+					<control type="image">
+						<top>232</top>
+						<left>512</left>
+						<width>256</width>
+						<height>256</height>
+						<texture>special://home/addons/script.gaia.resources/resources/media/interface/framebox.png</texture>
+						<animation type="Conditional" condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">
+							<effect type="zoom" tween="cubic" start="0" end="100" center="640,360" time="500" />
+							<effect type="rotate" tween="cubic" start="0" end="360" center="640,360" time="500" />
+							<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+						</animation>
+					</control>
+					<control type="label">
+						<top>232</top>
+						<left>512</left>
+						<width>256</width>
+						<height>256</height>
+						<font>[GAIAFONTLARGE]</font>
+						<aligny>center</aligny>
+						<align>center</align>
+						<wrapmultiline>true</wrapmultiline>
+						<label>$INFO[Window.Property(GaiaFailure)]</label>
+						<animation type="Conditional" condition="Integer.IsEqual(Window.Property(GaiaInitialized),1)">
+							<effect type="fade" tween="cubic" start="0" end="100" time="500" />
+						</animation>
+					</control>
+				</control>
+
 				<!-- QR - CODE -->
 				<control type="image" id="51001">
 					<top>232</top>

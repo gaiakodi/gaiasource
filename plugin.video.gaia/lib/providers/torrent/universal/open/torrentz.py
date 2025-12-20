@@ -28,10 +28,15 @@ from lib.modules.tools import Regex
 #	1. Exact Search: HTML searches the local Torrentz database.
 #	2. Full Search: API searches. Seems to just be a wrapper on ApiBay (URL, parameters and returned data is at least the same).
 #	3. Multi Search: Returns too many incorrect results, especially when sorted.
+# Update: torrentz2.nz now seems to be a copy of BitSearch/SolidTorrents. Both those sites also have a link poiting to this domain.
 
 class Provider(ProviderJson, ProviderHtml):
 
 	_Link					= {
+								# Update (2025-06): The torrentz2.nz domain still works, but the website behind it only loads partially.
+								# New domains exist, bu their search results are poiting to other torrents sites (torrentz2.io, torrentz.eu.com, thetorrentz.com).
+								# https://fastestvpn.com/blogs/torrentz2-proxy-and-alternatives/
+								# https://www.techworm.net/2020/06/torrentz2-eu-alternatives.html
 								ProviderHtml.Version1 : ['https://torrentz2.nz'],
 								ProviderHtml.Version2 : ['https://torrentz2.cyou'], # Must have the wwX subdomain, otherwise it will fail. But the subdomain always changes (ww5, ww7, etc). Retrieve the subdomain through the authentication process.
 								ProviderHtml.Version3 : ['https://torrentz2.cyou'], # Does not require the wwX subdomain.
@@ -128,12 +133,13 @@ class Provider(ProviderJson, ProviderHtml):
 		description		= '{name} is one of the oldest and most well-known {container} sites. The site contains results in various languages, but most of them are in English. {name} changes their domain often and has missing metadata. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail. Version %s uses the new website structure. Version %s uses an API which does not have its own data, but instead retrieves data from ApiBay. Version %s uses the old website structure.' % (ProviderHtml.Version2, ProviderHtml.Version3, ProviderHtml.Version4)
 
 		# Update (2024-12): New version 1 seems to better.
+		# Update (2025-06): Domain is still up, but website is barebone without any functionality.
 		#rank			= 2
 		#performance	= ProviderHtml.PerformanceMedium - ProviderHtml.PerformanceStep
-		#status			= ProviderHtml.StatusImpaired # Cloudflare.
+		#status			= ProviderHtml.StatusCloudflare # Cloudflare.
 		rank			= 3
 		performance		= ProviderHtml.PerformanceGood
-		status			= ProviderHtml.StatusOperational
+		status			= ProviderHtml.StatusDead
 
 		link			= Provider._Link[version]
 		unblock			= Provider._Unblock[version]

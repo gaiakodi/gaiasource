@@ -18,13 +18,20 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+# Update (2025-06):
+# YGG now requires a paid subscription to use the account.
+#	Free accounts registered a long time ago cannot even search.
+#	Newly registered free accounts can search, but cannot download the torrent without a subscription.
+# Registration is also closed for most countries. But registration still works from a French IP.
+
 from lib.providers.core.html import ProviderHtml, Html, HtmlResults, HtmlResult, HtmlTable, HtmlTableRow, HtmlTableCell, HtmlLink, HtmlMain, HtmlDiv
 from lib.modules.network import Networker
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://www5.yggtorrent.re', 'https://www5.yggtorrent.fi', 'https://www5.yggtorrent.la', 'https://www5.yggtorrent.nz', 'https://www5.yggtorrent.si', 'https://www5.yggtorrent.se', 'https://www5.yggtorrent.to', 'https://www5.yggtorrent.gg', 'https://www5.yggtorrent.is']
-	_Mirror					= ['https://www5.yggtorrent.fi/engine/domains']
+	_Link					= ['https://www.yggtorrent.top', 'https://www.ygg.re', 'https://www.ygg.to', 'https://www.yggtorrent.lol', 'https://www.yggtorrent.ch', 'https://www.yggtorrent.to', 'https://www.yggtorrent.lol']
+	#_Mirror				= ['https://www5.yggtorrent.fi/engine/domains']
+	_Mirror					= ['https://yggland.fr/FAQ-Tutos/#status']
 
 	_PathSearch				= 'engine/search?do=search&name=%s&category=2145&sub_category=%s&page=%s' # 2145 = Video
 	_PathDownload			= 'engine/download_torrent?id=%s'
@@ -58,9 +65,12 @@ class Provider(ProviderHtml):
 		ProviderHtml.initialize(self,
 			name					= 'YggTorrent',
 			description				= '{name} is the most widely used torrent site from France. The site contains results in various languages, but most of them are in French. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail. Most VPN servers are subject to these Cloudflare restrictions, but most VPN services have a few servers that are except from Cloudflare and are able to scrape the site. The search page of {name} does not contain all the metadata. A subpage must therefore be retrieved for each result in order to extract hashes, which substantially increases scraping time.',
-			rank					= 4,
+			rank					= 3,
 			performance				= ProviderHtml.PerformanceBad,
-			#status					= ProviderHtml.StatusImpaired, # It seems that YGG has removed/reduced Cloudflare protection.
+
+			# It seems that YGG has removed/reduced Cloudflare protection.
+			# Update (2025-06): YGG has strong Cloudflare protection again.
+			status					= ProviderHtml.StatusCloudflare,
 
 			link					= Provider._Link,
 			mirror					= Provider._Mirror,

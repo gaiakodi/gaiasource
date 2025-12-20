@@ -162,6 +162,12 @@ class Concurrency(object):
 	def _alive(self):
 		return self.is_alive()
 
+	def finished(self, failed = True):
+		status = self.status()
+		if status == Concurrency.StatusFinished: return True
+		if failed and status == Concurrency.StatusFailed: return True
+		return False
+
 	def synchronizer(self):
 		return self.mSynchronizer
 
@@ -272,7 +278,7 @@ class Concurrency(object):
 	def _errorNotification(self, error):
 		from lib.modules.tools import Settings, System
 		if error == Concurrency.ErrorStart:
-			lock = Pool.globalLock()
+			lock = Pool.lockGlobal()
 			lock.acquire()
 			if System.windowPropertyGet(Pool.PropertyNotification):
 				lock.release()
@@ -283,7 +289,9 @@ class Concurrency(object):
 				if setting > 0:
 					from lib.modules.interface import Dialog, Translation, Player
 					if setting == 1:
-						Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000)
+						# Do not wait, otherwise these will heap up if this function is called many times.
+						# Waiting will start even more threads in Dialog.notification(), which can wait for very long, making this problem even more severe.
+						Dialog.notification(title = 36037, message = 33245, icon = Dialog.IconError, time = 20000, wait = False)
 					elif setting == 2:
 						playback = Player().isPlayback()
 						timeout = 30000 if playback else None
@@ -445,11 +453,14 @@ class Pool(object):
 	ModeThread				= 1
 	ModeProcess				= 2
 
+	# NB: If these values are ever changed, make sure that check() still uses the old values, as well as MetaPack.
 	DelayNone				= None
-	DelayShort				= 0.01	# 10ms
-	DelayMedium				= 0.05	# 50ms
-	DelayLong				= 0.1	# 100ms
-	DelayExtended			= 0.5	# 500ms
+	DelayMini				= 0.0001	# 0.1ms
+	DelayQuick				= 0.001		# 1ms
+	DelayShort				= 0.01		# 10ms
+	DelayMedium				= 0.05		# 50ms
+	DelayLong				= 0.1		# 100ms
+	DelayExtended			= 0.5		# 500ms
 	DelayDefault			= DelayMedium
 
 	SettingLevel			= 'general.concurrency.level'
@@ -481,13 +492,50 @@ class Pool(object):
 	DataConnection			= None
 	DataMode				= None
 
+	LockInternal			= None
+	LockGlobal				= None
+	LockCheck				= None
+
 	Instances				= {}
-	Lock					= None
+	Event					= {}
+	Check					= {}
 	Semaphore				= None
 	Joining					= False
 
-	GlobalLock				= None
-	EventFinish				= {}
+	@classmethod
+	def reset(self, settings = True):
+		if settings:
+			Pool.DataGlobal = None
+			Pool.DataMetadata = None
+			Pool.DataScrape = None
+			Pool.DataConnection = None
+
+		Pool.CountTotal = {Thread : 0, Process : 0}
+		Pool.CountConcurrent = {Thread : 0, Process : 0}
+
+		Pool.LockInternal = None
+		Pool.LockGlobal = None
+		Pool.LockCheck = None
+
+		Pool.Instances = {}
+		Pool.Event = {}
+		Pool.Check = {}
+		Pool.Semaphore = None
+		Pool.Joining = False
+
+		# Important to call this again in order to reinitialize the locks, etc.
+		# The Pool.threadInitialize() call at the bottom of the script gets executed before Pool.reset() is called, so it has to be called here again.
+		Pool.threadInitialize()
+
+	@classmethod
+	def sleep(self, seconds):
+		from lib.modules.tools import Time
+		Time.sleep(seconds)
+
+	@classmethod
+	def aborted(self):
+		from lib.modules.tools import System
+		return System.aborted()
 
 	@classmethod
 	def _developer(self):
@@ -500,8 +548,8 @@ class Pool(object):
 
 	@classmethod
 	def _log(self, message, prefix = True, developer = True):
-		from lib.modules.tools import Logger
 		if not developer or self._developer():
+			from lib.modules.tools import Logger
 			if prefix is True: message = 'CONCURRENCY POOL: ' + message
 			elif prefix: message = prefix + message
 			Logger.log(message = message, type = Logger.TypeInfo, level = Logger.LevelExtended)
@@ -521,13 +569,22 @@ class Pool(object):
 			# Note that certain invokers are ment to stay alive, like the "streamsShow" that will remain active until the stream window was closed.
 			excepted = False
 			exceptions = [
-				{'action' : 'scrape', 'instance' : 'Window._initialize1'},		# WindowStreams
-				{'action' : 'streamsShow', 'instance' : 'Window._initialize1'},	# WindowStreams
-				{'action' : 'scrape', 'instance' : 'Trailer._cinemaStart'},		# Cinema Window
+				{'action' : 'scrape', 'instance' : 'Window._initialize1'},					# WindowStreams
+				{'action' : 'streamsShow', 'instance' : 'Window._initialize1'},				# WindowStreams
+				{'action' : 'scrape', 'instance' : 'Trailer._cinemaStart'},					# Cinema Window
 
+				{'action' : 'settingsWizard', 'instance' : 'Window._initialize1'},			# Wizard.
+				{'action' : 'metadataPreload', 'instance' : 'Window._initialize1'},			# Metadata preloading.
+				{'action' : 'settingsOptimization', 'instance' : 'Window._initialize1'},	# Optimization
+				{'action' : 'scrapeOptimize', 'instance' : 'Window._initialize1'},			# Scrape optimization.
+				{'action' : 'providersOptimize', 'instance' : 'Window._initialize1'},		# Provider optimization.
+
+				{'action' : None, 'instance' : 'Library._monitor'},							# Library Monitor
+				{'action' : None, 'instance' : 'Bluetooth._monitorExecute'},				# Bluetooth Monitor
+				{'action' : None, 'instance' : 'MetaCache._bulkInsert'},					# IMDb bulk data insert.
 			]
 			for exception in exceptions:
-				if action == exception['action'] and label == exception['instance']:
+				if (not exception['action'] or action == exception['action']) and label == exception['instance']:
 					excepted = True
 					break
 
@@ -544,17 +601,6 @@ class Pool(object):
 				self._log('--        INSTANCE: %s [%s]' % (instance.id(), label), prefix = False)
 				self._logLine()
 				self._logLine(extra = ' ')
-
-	@classmethod
-	def reset(self, settings = True):
-		if settings:
-			Pool.DataGlobal = None
-			Pool.DataMetadata = None
-			Pool.DataScrape = None
-			Pool.DataConnection = None
-		Pool.CountTotal = {Thread : 0, Process : 0}
-		Pool.CountConcurrent = {Thread : 0, Process : 0}
-		Pool.Joining = False
 
 	@classmethod
 	def _settingPerformance(self, limit):
@@ -951,11 +997,9 @@ class Pool(object):
 	# Returns None if there is probably no maximum limit, aka an unlimited number of threads can be created.
 	@classmethod
 	def benchmark(self):
-		from lib.modules.tools import Time
-
 		self.tStop = False
 		def _benchmark():
-			while not self.tStop: Time.sleep(0.3)
+			while not self.tStop: self.sleep(0.3)
 
 		threads = []
 		unlimited = 10000 # Do not create too many, otherwise systems with unlimited threads starting lagging.
@@ -992,6 +1036,7 @@ class Pool(object):
 
 			Pool.Joining = True
 			time = Time(start = True)
+			timeouts = {}
 
 			# Use a timeout by default if joining all remaining instances at the end of invoker execution.
 			timeoutDefault = timeout is None
@@ -1005,6 +1050,11 @@ class Pool(object):
 			for id, instance in self.threads().items():
 				self._log('   THREAD: %s [%s]' % (id, instance.label()), prefix = False)
 
+			# Add custom timeouts for processes that are known to take longer.
+			exceptions = [
+				{'instance' : 'System._launch', 'timeout' : 180}, # System._launch.<locals>._launchObserve -> Settings.saveWait() will wait 60+ seconds.
+			]
+
 			# Not all instances might have been started yet.
 			# Do multiple loops, so that we can wait on instances that might have started during the first iteration.
 			recheck = True
@@ -1015,22 +1065,38 @@ class Pool(object):
 				for instance in list(Pool.Instances.values()): # Use a list, since instances can be removed while iterating. Otherwise throws: dictionary changed size during iteration.
 					try:
 						if instance and not instance.isDaemon():
+							# Get a custom timeout for exceptions.
+							try:
+								label = instance.label()
+								timeoutException = timeouts.get(label)
+								if not timeoutException:
+									for i in exceptions:
+										if i['instance'] in label:
+											timeoutException = i.get('timeout')
+											break
+									timeouts[label] = timeoutException or True # Make lookuups more efficient, since this is executed in two outside nested loops.
+								timeoutCustom = timeout if timeoutException is True else timeoutException
+							except:
+								from lib.modules.tools import Logger
+								Logger.error()
+								timeoutCustom = timeout
+
 							if busy:
-								if timeout:
+								if timeoutCustom:
 									timer = Time(start = True)
 									while instance.alive():
-										Time.sleep(busy)
-										if timer.elapsed() > timeout:
+										self.sleep(busy)
+										if timer.elapsed() > timeoutCustom:
 											if instance.alive(): self._logDangling(instance = instance)
 											break
 									if timeoutDefault:
 										while instance.alive():
-											Time.sleep(busy)
+											self.sleep(busy)
 								else:
 									while instance.alive():
-										Time.sleep(busy)
+										self.sleep(busy)
 							else:
-								instance.join(timeout = timeout)
+								instance.join(timeout = timeoutCustom)
 								if instance.alive():
 									self._logDangling(instance = instance)
 									if timeoutDefault: instance.join()
@@ -1077,32 +1143,43 @@ class Pool(object):
 					timer = Time(start = True)
 					for i in instance:
 						while i.alive():
-							Time.sleep(busy)
+							self.sleep(busy)
 							if timer.elapsed() > timeout:
 								if i.alive(): self._logDangling(instance = i)
 								break
 				else:
 					for i in instance:
 						while i.alive():
-							Time.sleep(busy)
+							self.sleep(busy)
 			else:
 				for i in instance:
 					i.join(timeout = timeout)
 					if i.alive(): self._logDangling(instance = i)
 
 	@classmethod
-	def wait(self, delay = 1, interval = 0.5):
+	def wait(self, delay = 1, minimum = None, interval = None):
 		# Either wait the full delay, or until the Python process is finishing (addon.py -> Pool.join()).
-		# If the Python process is done in any case, there is no need to wait any longer, since there is no other code to be execute that could interfer.
+		# If the Python process is done in any case, there is no need to wait any longer, since there is no other code to be execute that could interfere.
 		if delay:
-			from lib.modules.tools import Logger
-			from lib.modules.tools import Time
+			# The minimum is useful if the following case:
+			#	1. The current invoker is done executing with its other foreground code, and therefore the caller currently waiting in this function gets executed.
+			#	2. There is another external invoker waiting to get CPU time (eg a menu is opened by the user).
+			#	3. If the current invoker is done too quickly here, the waiting caller gets immediately executed, not allowing enough sleep time so that Kodi switches to the other invoker.
+			# Using a minimum delay of 50-100ms is typically enough for Kodi to switch to another invoker if available.
+			if minimum:
+				if minimum is True: minimum = min(0.1, delay * 0.25)
+				if minimum > delay: delay = minimum
+
+			if not interval:
+				interval = 0.5
+				if delay > 0.1: interval = min(interval, delay / 2.0)
+
 			if delay <= interval:
-				Time.sleep(delay)
+				self.sleep(delay)
 			else:
 				for i in range(int(delay / float(interval))):
-					if Pool.Joining: break
-					Time.sleep(interval)
+					if Pool.Joining and (not minimum or (i * interval) > minimum): break
+					self.sleep(interval)
 
 	# synchronizer: If Semaphore/Premaphore, it is aqcuired BEFORE creating a thread object and BEFORE starting execution.
 	# synchronizer: If Postmaphore, it is aqcuired AFTER creating a thread object, but BEFORE starting execution.
@@ -1117,7 +1194,7 @@ class Pool(object):
 	@classmethod
 	def instance(self, type, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False, delay = None):
 		try:
-			Pool.Lock.acquire()
+			Pool.LockInternal.acquire()
 
 			if Pool.Semaphore is None:
 				limit = self.settingGlobal()
@@ -1137,14 +1214,14 @@ class Pool(object):
 			if synchronizer and not isinstance(synchronizer, Postmaphore):
 				# NB: Important to release the global lock before waiting for the synchronizer.
 				# Otherwise a synchronized thread that starts its own internal thread(s) will deadlock, since the child thread cannot acquire the global lock still held by the parent.
-				try: Pool.Lock.release()
+				try: Pool.LockInternal.release()
 				except: pass
 				try: synchronizer.acquire()
 				except: pass
-				try: Pool.Lock.acquire()
+				try: Pool.LockInternal.acquire()
 				except: pass
 
-			if start and isinstance(start, (int, float)): delay = start
+			if start and not isinstance(start, bool) and isinstance(start, (int, float)): delay = start
 			if delay is True: delay = Pool.DelayDefault
 
 			instance = type(target = target, name = name, synchronizer = synchronizer, delay = delay, args = args, kwargs = kwargs)
@@ -1179,13 +1256,13 @@ class Pool(object):
 			if start: instance.start()
 			if join:
 				# Release here, otherwise threads started from another thread will deadlock.
-				try: Pool.Lock.release()
+				try: Pool.LockInternal.release()
 				except: pass
 				instance.join()
 
 			return instance
 		finally:
-			try: Pool.Lock.release()
+			try: Pool.LockInternal.release()
 			except: pass
 
 	@classmethod
@@ -1201,16 +1278,16 @@ class Pool(object):
 	# Should not be used if the lock will be locked for a long time.
 	# Typical use is for classes to initialize their own Lock/Event/Semaphore.
 	@classmethod
-	def globalLock(self):
-		return Pool.GlobalLock
+	def lockGlobal(self):
+		return Pool.LockGlobal
 
 	# Create an Event object that waits for a thread to finish and be removed from the pool.
 	@classmethod
 	def finishEvent(self, rank = None):
 		if rank is None: rank = 99999999
-		if not rank in Pool.EventFinish: Pool.EventFinish[rank] = []
+		if not rank in Pool.Event: Pool.Event[rank] = []
 		event = Event()
-		Pool.EventFinish[rank].append(event)
+		Pool.Event[rank].append(event)
 		return event
 
 	@classmethod
@@ -1219,12 +1296,12 @@ class Pool(object):
 		# Parent threads might spawn child threads that must finish before the parent finishes.
 		# It is therefore more important to complete the child threads first, to reduce the chance of parent threadsa deadlocking.
 		# Pick a random event from a given rank to reduce the chances of the same thread being readded to the queue.
-		if Pool.EventFinish:
+		if Pool.Event:
 			from lib.modules.tools import Tools
-			rank = max(Pool.EventFinish.keys())
-			events = Pool.EventFinish[rank]
+			rank = max(Pool.Event.keys())
+			events = Pool.Event[rank]
 			Tools.listPick(events, remove = True).set()
-			if not events: del Pool.EventFinish[rank] # Remove empty rank lists.
+			if not events: del Pool.Event[rank] # Remove empty rank lists.
 
 	@classmethod
 	def count(self, type = None, alive = None):
@@ -1247,8 +1324,9 @@ class Pool(object):
 
 	@classmethod
 	def initialize(self):
-		Pool.Lock = Lock()
-		Pool.GlobalLock = Lock()
+		Pool.LockInternal = Lock()
+		Pool.LockGlobal = Lock()
+		Pool.LockCheck = Lock()
 
 	@classmethod
 	def thread(self, target = None, args = (), kwargs = {}, synchronizer = None, start = False, join = False, delay = None):
@@ -1337,6 +1415,156 @@ class Pool(object):
 			# Do not log here anymore, since the remove() is now called multiple times by the same thread/process.
 			#self._log('Cannot find instance to remove: %s' % instance.id())
 		self.finishSignal()
+
+	@classmethod
+	def busy(self, instance = None, id = None):
+		try: return (id or instance.id()) in Pool.Instances
+		except: return False
+
+	@classmethod
+	def retrieve(self, id):
+		try: return Pool.Instances.get(id)
+		except: return None
+
+	##############################################################################
+	# CHECK
+	##############################################################################
+
+	'''
+		Gaia can become temporarily unresponsive while the CPU is busy executing computationally-expensive code.
+
+		Example:
+			1. Gaia is smart-reloading metadata in a background process (including generating packs), such as during Kodi boot or after playback finished.
+			2. The user opens a menu in Gaia. The loader will show for a long time (10-40+ secs) until the menu finally loads.
+			3. This is because the background reloading process is hogging the CPU. Only after the reloading is done, or if it sleeps, will the menu process get CPU time and load the menu.
+
+		Debugging:
+			- Make a Gaia endpoint call to generate 2 large packs (eg One Piece + Pokémon) in a separate process. While the packs are generating, open the Progress/Arrivals menus. The menu should not take more than 1-2 secs to open.
+			- Open the show Progress menu. Once opened, metadata might get refreshed in the background, including generating packs. Now open an episode submenu for one of the shows, which should not take more than 1-2 secs to open.
+
+		For the purpose of this example, a "process" refers to a Python process that Kodi initiated with a separate Python invoker, and not the "Process" class in this file.
+		There are two ways in which Python code is interleaved in Kodi.
+
+		1. Same process:
+			Multiple threads within the same process are interleaved by Python's GIL.
+			All threads will execute sequentially on a single CPU core.
+			One thread can be put to sleep, so that Python switches over to another thread.
+			Hence, if some code within a process needs to be responsive (execute fast), simply add a delay/sleep to other threads.
+		2. Different processes:
+			Not entirely sure how separate Python processes are interleaved in Kodi.
+			Maybe Kodi allows only a single process across all different addons to execute at any given time.
+			But more likely from observation, it seems that process are interleaved similar to threads.
+			Kodi allows a single process to execute at any given time per addon ID.
+			If an addon has multiple processes running, Kodi will interleave them sequentially, similar to how the GIL works for threads.
+			So if one process is executing, other processes of the addon are waiting until the first process finishes or sleeps.
+
+		To solve the problem of a process for menu-loading having to wait a long time until it gets CPU time, add sleeps in between computationally-expensive code, so that Python switches to the execution of another process.
+		There are two main places that has computationally-expensive code:
+
+		1. Metadata refreshing:
+			When metadata is refreshed in the background, various processing and aggregation of the metadata from different providers is needed.
+			A lot of time is used to make the async API calls to retrieve metadata from the providers, and to load metadata from the local MetaCache.
+			However, beyond this, quite a lot of CPU time is still needed afterwards to process and save the metadata.
+		2. Pack generation:
+			Generating packs for shows with a lot of episodes can take a long time, especially for Anime, late-night and daily shows.
+			Eg: One Piece, Pokémon, The Tonight Show Starring Jimmy Fallon
+			For smaller packs it takes a few 100 ms. But for larger packs it can take 20-60 secs to generate on a fast CPU, and up to twice as long on a slow CPU.
+			Most of the time is spend doing string-matching and various lookups in MetaPack.
+			If a pack needs 30 secs to generate, any other process will have to wait this long until they get CPU time.
+
+		There are some things that should be considered when adding sleeps in between code.
+
+		1. Foreground metadata:
+			When loading metadata in the foreground, that is the metadata is needed for the current process execution (eg loading a menu), do not add too many or too long sleeps.
+			Otherwise the foreground process will take long, while constantly and often unnecessarily sleeping.
+			Sleeping should mostly be done for background loading and during MetaManager.reloading().
+			It can still be useful to add very short sleeps for foreground loading, which might allow an async API call to be started, and while waiting for the reply, the local processing can continue.
+		2. Sleep frequency:
+			When the frequency of sleeping, that is how often we check between code and sleep if needed, is too high, other process might take too long to get a chance to execute.
+			Eg: if we only sleep every 10 secs during pack generation, it will take up to 10 secs for other menu processes to get executed.
+			If the frequency of sleeping is low, other processes will be more responsive, but the current process might also take considerably longer to finish, because it wastes a lot of time sleeping frequently.
+		3. Sleep duration:
+			If sleeping for a very short duration, Python might not get a chance to switch over to another thread/process, especially if other code within the same process is still executing.
+			If sleeping for a very long duration, the current process might take too long to execute.
+			The best combination of sleep frequency and duration is important. Check MetaPack -> CheckConfig for stats.
+		4. Global locking:
+			If a thread is put to sleep, Python might simply switch to another thread within the same process, instead of switching to the execution of the other process.
+			This can cause the menu process to not get CPU time soon, since the other process is constantly busy executing its various threads.
+			So within the same process, we need to make all threads sleep at the same time for long enough, so that Python will switch over to another process.
+			This can be achieved by using a lock instead of a basic sleep. That is, if a thread is put to sleep, it locks so that other threads will have to wait for the lock to get released, and therefore all those threads will be waiting at the same time.
+		5. Kodi aborting:
+			If the user closes Kodi while computationally-expensive code is executing, it might cause Kodi to freeze.
+			Kodi will try to kill the processes/threads, but this seems to not really work and the code keeps executing.
+			The user might then kill Kodi because it froze and does not exit (at least not for a while), and this might cause various other issues, like certain Gaia settings losing their value when Kodi is restarted.
+			Hence, during these sleeps, also check if Kodi was aborted, and if so, cancel the current code execution.
+
+		#gaiafuture
+		The solution of sleeping and locking seems to work pretty well.
+		However, we might be able to improve this even further in the future.
+		If Kodi allows only a single process per addon ID to execute at the same time, would it help to add another dummy/reloading addon to Gaia (eg: script.gaia.reload)?
+		This addon will handle:
+			1. Smart-reloading from Playback.reload() through a the dummy addon during boot and after playback is done.
+			2. Instead of doing individual metadata background refreshing at the end of a process, simply pass the media + IDs to the dummy addon, and then start the dummy addon at the end of the current execution to do the refreshing in a separate process.
+		Before doing this, make sure of the following:
+			1. That Kodi allows the concurrent execution of two processes from two different addon IDs. Not that all addons share the same CPU time.
+			2. The dummy addon should import the code from plugin.video.gaia, instead of calling one of its endpoint. This could cause various problems in the dummy addon, such as the wrong addon settings being used. Eg: script.gaia.reload should still use the settings from plugin.video.gaia.
+			3. If plugin.video.gaia makes a system call to script.gaia.reload, does Kodi see this as a new separate process under script.gaia.reload, or will it add the process as a child under plugin.video.gaia?
+	'''
+
+	@classmethod
+	def check(self, delay = False, lock = False):
+		if delay is True: delay = Pool.DelayExtended
+		if (delay or lock) and self.aborted(): return False
+
+		# A global lock can be useful in order to interleave multiple separate Python invokers/processes.
+		# If we just add short sleeps in between code execution, a single thread will be paused, but Python might continue with another thread in the same Python invoker.
+		# For instance, there might be multiple packs being generated concurrently. If the generation of one pack is paused, Python will continue executing the other pack generation thread.
+		# Hence, a second Python invoker currently waiting to be executed might not get interleaved, because the first invoker is still switching between the execution of its threads.
+		# Add a lock, so that all threads within a Python invoker that call this function are paused together, so that there is a large enough gap of no-execution, forcing Python to switch to the second invoker.
+		if lock:
+			if delay and delay > Pool.DelayQuick and Pool.LockCheck.locked(): delay = Pool.DelayQuick # Do not sleep too long if it already waits a long time for the lock to get released.
+			Pool.LockCheck.acquire() # All threads will wait here until the thread that acquired the lock it is done sleeping.
+
+		if delay:
+			if lock and self.aborted(): return False
+			self.sleep(delay)
+
+		if lock:
+			Pool.LockCheck.release()
+
+		# This is called from various places to abort background processes if Kodi is closed.
+		# Otherwise if a reload is busy and the user closes Kodi, Kodi freezes for a while, waiting for all the background reloading to finish.
+		return not self.aborted()
+
+	# Check and sleep for a longer time.
+	@classmethod
+	def checkDelay(self, delay = True, lock = False):
+		return self.check(delay = delay, lock = lock)
+
+	@classmethod
+	def checkIncrement(self, id = True, count = None, limit = None, delay = None, lock = False):
+		if count is None: count = 1
+		try: Pool.Check[id] += count
+		except: Pool.Check[id] = count
+		if limit:
+			if not limit is True and Pool.Check[id] > limit:
+				result = self.check(delay = delay, lock = lock)
+
+				# Only reset the counter AFTER sleeping in check().
+				# If multiple packs are generated concurrently, they use the same ID for this function.
+				# Otherwise if the first pack generation is sleeping, the second pack generation is started.
+				# But since the first pack reset the counter, the second pack needs some time to build up the counter to a high enough value to also sleep.
+				# By resetting the counter afterwards, both pack generations are put to sleep before the counter is reset.
+				self.checkReset(id = id)
+
+				return result
+			else:
+				return self.check()
+		return True
+
+	@classmethod
+	def checkReset(self, id = True):
+		Pool.Check[id] = 0
 
 # Use threading classes by default, and only use multiprocessing classes if manually initialized.
 # Multiprocessing classes would also work in threading, but threading classes a lightweight/faster and better in most cases.

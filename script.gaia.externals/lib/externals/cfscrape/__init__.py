@@ -16,7 +16,10 @@ from externals.requests.adapters import HTTPAdapter
 from externals.requests.compat import urlparse, urlunparse
 from externals.requests.exceptions import RequestException
 
-from externals.urllib3.util.ssl_ import create_urllib3_context, DEFAULT_CIPHERS
+# GAIA
+#from externals.urllib3.util.ssl_ import create_urllib3_context, DEFAULT_CIPHERS
+from externals.urllib3.util.ssl_ import create_urllib3_context
+DEFAULT_CIPHERS = "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA:AES256-SHA:DES-CBC3-SHA"
 
 from .user_agents import USER_AGENTS
 
@@ -88,6 +91,10 @@ class CloudflareCaptchaError(CloudflareError):
 
 class CloudflareScraper(Session):
     def __init__(self, *args, **kwargs):
+        # GAIA
+        kwargs.pop("interpreter")
+        kwargs.pop("ssl_verify")
+    
         self.delay = kwargs.pop("delay", None)
         # Use headers with a random User-Agent if no custom headers have been set
         headers = OrderedDict(kwargs.pop("headers", DEFAULT_HEADERS))
@@ -100,6 +107,9 @@ class CloudflareScraper(Session):
         # Define headers to force using an OrderedDict and preserve header order
         self.headers = headers
         self.org_method = None
+        
+        # GAIA
+        self.response = None
 
         self.mount("https://", CloudflareAdapter())
 
@@ -131,6 +141,9 @@ class CloudflareScraper(Session):
         if self.is_cloudflare_iuam_challenge(resp):
             resp = self.solve_cf_challenge(resp, **kwargs)
 
+        # GAIA
+        self.response = resp
+        
         return resp
 
     def cloudflare_is_bypassed(self, url, resp=None):

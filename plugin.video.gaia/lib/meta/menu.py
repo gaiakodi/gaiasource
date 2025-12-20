@@ -80,6 +80,7 @@ class MetaMenu(object):
 	ParameterLoad			= 'load'						# Internal
 	ParameterRefresh		= 'refresh'						# Internal
 	ParameterContainer		= 'container'					# Internal
+	ParameterDirect			= 'direct'						# Internal
 	ParameterOrigin			= System.OriginsParameter		# Internal
 	ParameterNavigation		= System.NavigationParameter	# Internal
 
@@ -528,7 +529,7 @@ class MetaMenu(object):
 	# NOTIFICATION
 	##############################################################################
 
-	def _notification(self, content, type = None, background = True, delay = False):
+	def notification(self, content, type = None, background = True, delay = False):
 		notification = None
 
 		if content == MetaMenu.ContentProgress:
@@ -545,11 +546,37 @@ class MetaMenu(object):
 		elif content == MetaMenu.ContentSearch:
 			if type == MetaMenu.SearchExact:				notification = {'title' : '%s %s' % (Translation.string(35157), Translation.string(32010)), 'message' : 35159}
 		elif content == MetaMenu.ContentEnterprise:
+			dialog = 'notification'
 			more = MetaMenu.CompanyOriginal + MetaMenu.ParameterMore
-			if type == MetaMenu.CompanyOriginal:			notification = {'title' : 36600, 'message' : 36631, 'dialog' : 'notification'}
-			elif type == more:								notification = {'title' : 36600, 'message' : 36632, 'dialog' : 'notification', 'wait' : False}
+			if type == MetaMenu.CompanyOriginal:			notification = {'title' : 36600, 'message' : 36631, 'dialog' : dialog}
+			elif type == more:								notification = {'title' : 36600, 'message' : 36632, 'dialog' : dialog, 'wait' : False}
 		elif content == MetaMenu.ContentSmart:
 			if True:										notification = {'title' : 35572, 'message' : 35573, 'more' : self._notificationSmart}
+		elif content == 'refresh': # Used by Context.commandRefreshXXX() and MetaManager.metadataRefresh().
+			count = 5
+			dialog = 'option'
+			if not Tools.isArray(type): type = [type, None]
+			if type[0] == 'menu':							notification = {'title' : 33060, 'message' : 36786}
+			elif type[0] == 'list':							notification = {'title' : 33526, 'message' : 36787}
+			else:
+				if Media.isMovie(type[0]):
+					if type[1] == 2:						notification = {'title' : 36771, 'message' : 36790}
+					elif type[1] == 1:						notification = {'title' : 36773, 'message' : 36789}
+					else:									notification = {'title' : 33522, 'message' : 36788}
+				elif Media.isSet(type[0]):
+					if type[1] == 2:						notification = {'title' : 36771, 'message' : 36790}
+					elif type[1] == 1:						notification = {'title' : 33522, 'message' : 36788}
+					else:									notification = {'title' : 36773, 'message' : 36789}
+				elif Media.isPack(type[0]):					notification = {'title' : 36774, 'message' : 36794}
+				elif Media.isSerie(type[0]):
+					if Media.isSeason(type[0]):				notification = {'title' : 33524, 'message' : 36792}
+					elif Media.isEpisode(type[0]):			notification = {'title' : 33525, 'message' : 36793}
+					elif type[1] == 2:						notification = {'title' : 36771, 'message' : 36796}
+					elif type[1] == 1:						notification = {'title' : 36772, 'message' : 36795}
+					else:									notification = {'title' : 33523, 'message' : 36791}
+			if notification:
+				notification.update({'dialog' : dialog, 'confirm' : 32072, 'deny' : 33743, 'default' : Dialog.ChoiceYes, 'count' : count})
+				type = ''.join([str(i) for i in type if not i is None])
 		elif content == Media.Anime:
 			# gaiafuture - This can be removed once anime is fully supproted.
 			notification = {
@@ -560,9 +587,10 @@ class MetaMenu(object):
 
 		if notification:
 			if background: Pool.thread(target = self._notificationUpdate, kwargs = {'notification' : notification, 'content' : content, 'type' : type, 'delay' : delay}, start = True)
-			else: self._notificationUpdate(notification = notification, content = content, type = type, delay = delay)
+			else: return self._notificationUpdate(notification = notification, content = content, type = type, delay = delay)
 
 	def _notificationUpdate(self, notification, content, type = None, delay = False):
+		choice = None
 		if type is None: type = '' # None keys get converted to a string during JSON-encoding.
 
 		id = 'internal.initial.menu'
@@ -574,6 +602,9 @@ class MetaMenu(object):
 		dialog = notification.get('dialog', 'confirm')
 		more = notification.get('more')
 		count = notification.get('count')
+		default = notification.get('default')
+		confirm = notification.get('confirm')
+		deny = notification.get('deny')
 		if not count: count = 5 if dialog == 'notification' else 3
 
 		# Only show max once a day.
@@ -590,17 +621,26 @@ class MetaMenu(object):
 			elif dialog == 'text':
 				if close: Dialog.closeText()
 				Dialog.text(title = title, message = message)
+			elif dialog == 'option':
+				choice = Dialog.option(title = title, message = message, labelConfirm = confirm, labelDeny = deny, default = default or Dialog.ChoiceYes)
 			elif more:
 				if close: Dialog.closeOption()
-				choice = Dialog.option(title = title, message = message, labelConfirm = 33432, labelDeny = 33821, default = Dialog.ChoiceNo)
+				choice = Dialog.option(title = title, message = message, labelConfirm = 33432, labelDeny = 33821, default = default or Dialog.ChoiceNo)
 				if choice == Dialog.ChoiceYes: Dialog.details(title = title, items = more() if Tools.isFunction(more) else more)
 			else:
 				if close: Dialog.closeConfirm()
-				Dialog.confirm(title = title, message = message)
+				choice = Dialog.confirm(title = title, message = message)
 
 			data[content][type]['count'] += 1
 			data[content][type]['time'] = time
 			Settings.setData(id, data)
+		else:
+			choice = True
+
+		if choice == Dialog.ChoiceYes: choice = True
+		elif choice == Dialog.ChoiceNo: choice = False
+		elif choice == Dialog.ChoiceCanceled: choice = None
+		return choice
 
 	def _notificationEmpty(self, media = None, content = None):
 		media = self._media(media)
@@ -769,19 +809,20 @@ class MetaMenu(object):
 			else: message = 36062
 			Dialog.confirm(title = 32034, message = message)
 
-	def _notificationCached(self, delay = True):
+	def notificationCached(self, delay = True, force = False):
 		try:
-			def _notificationCached(delay):
+			def _notificationCached(delay, force):
 				stats = self.mManager._metadataSmartStats()
 				if stats and MetaMenu.ContentProgress in stats:
-					if (Time.timestamp() - stats['time']['notification']) > 21600: # 6 hours.
+					difference = Time.timestamp() - stats['time']['notification']
+					if force or difference > 21600: # 6 hours.
 						if delay: Time.sleep(5) # Wait for the intro splash to finish.
 
 						total = 0
 						done = 0
 						for i in [Media.Movie, Media.Show]:
 							data = stats[MetaMenu.ContentProgress].get(i) or {}
-							total += data.get('all') or 0
+							total += data.get('active') or 0 # Use "active", not "all", to ignore removed items.
 							done += data.get('done') or 0
 						progress = int(min(100, (done / float(total)) * 100))
 
@@ -789,19 +830,32 @@ class MetaMenu(object):
 						done = 0
 						for i in [Media.Movie, Media.Show]:
 							data = stats[MetaMenu.ContentArrival].get(i) or {}
-							total += data.get('all') or 0
+							total += data.get('active') or 0 # Use "active", not "all", to ignore removed items.
 							done += data.get('done') or 0
 						arrivals = int(min(100, (done / float(total)) * 100))
 
-						if progress > 0 or arrivals > 0: # Not on a fresh install during wizard.
-							if progress < 95 or arrivals < 95:
+						# Not on a fresh install during wizard.
+						if force or progress > 0 or arrivals > 0:
+							# Reduce the number of times a notification is shown if relatively much has already been cached.
+							notify = True
+							if progress >= 50 and arrivals >= 30:
+								if progress >= 95 and arrivals >= 90: notify = False # Almost fully loaded.
+								elif arrivals >= 30 and arrivals < 40 and difference < 86400: notify = False # 1 day.
+								elif arrivals >= 40 and arrivals < 50 and difference < 172800: notify = False # 2 days.
+								elif arrivals >= 50 and arrivals < 60 and difference < 259200: notify = False # 3 days.
+								elif arrivals >= 60 and arrivals < 70 and difference < 345600: notify = False # 4 days.
+								elif arrivals >= 70 and arrivals < 80 and difference < 432000: notify = False # 5 days.
+								elif arrivals >= 80 and difference < 604800: notify = False # 7 days.
+
+							if force or notify:
 								progress = Format.fontBold(str(progress) + '%')
 								arrivals = Format.fontBold(str(arrivals) + '%')
 								message = '%s: %s %s %s %s %s' % (Translation.string(36722), progress, Translation.string(32037), Format.iconSeparator(), arrivals, Translation.string(33490))
-								Dialog.notification(title = 35572, message = message, icon = Dialog.IconInformation)
-							self.mManager._metadataSmartStats(notification = True)
-			if delay: Pool.thread(target = _notificationCached, kwargs = {'delay' : delay}, start = True)
-			else: _notificationCached(delay = delay)
+								Dialog.notification(title = 35572, message = message, time = 5000, icon = Dialog.IconInformation)
+
+								self.mManager._metadataSmartStats(notification = True)
+			if delay: Pool.thread(target = _notificationCached, kwargs = {'delay' : delay, 'force' : force}, start = True)
+			else: _notificationCached(delay = delay, force = force)
 		except: Logger.error()
 
 	##############################################################################
@@ -853,6 +907,10 @@ class MetaMenu(object):
 			parameters[MetaMenu.ParameterMenu] = menu
 			parameters[MetaMenu.ParameterLoad] = MetaMenu.LoadInternal
 			self._menuExecute(**parameters)
+
+			# This slightly improves the menu loading time of the Show Progress (from 1.1-1.2 secs to 0.9-1.0 secs without reusing interpreters).
+			# Let the dummy initiator invoker sleep, so that the invoker that actually loads the episode menu gets CPU time first and can execute quicker.
+			Pool.wait(delay = Pool.DelayLong, minimum = True)
 		else:
 			parameters = self._parameters(parameters = parameters, clean = [MetaMenu.ParameterOrigin, MetaMenu.ParameterNavigation, MetaMenu.ParameterAction, MetaMenu.ParameterMedia, MetaMenu.ParameterNiche])
 
@@ -911,7 +969,7 @@ class MetaMenu(object):
 				try: del parameters[i]
 				except: pass
 
-		# Container.Update(...) only works if there is already a vdeio addon opened and there is a menu/container to update.
+		# Container.Update(...) only works if there is already a video addon opened and there is a menu/container to update.
 		# If the call is initiated externally, especially from a widget, no addon/container is opened, and Container.Update(...) will have no effect.
 		# We first have to open the addon and then update the container, which can be done in one go using ActivateWindow(...).
 		# Do not optimzie to keep the URL clean and readable, so it can be easily edited for eg widgets.
@@ -1011,7 +1069,7 @@ class MetaMenu(object):
 		error = data.get('error')
 		busy['busy'] = False
 
-		if items and not load == MetaMenu.LoadSilent: self.buildMedia(data = data, content = content)
+		if items and not load == MetaMenu.LoadSilent: self.buildMedia(data = data, content = content, parameters = parameters)
 		elif error: self._notificationContent(error = error, content = content, **parameters)
 
 		return items
@@ -1023,7 +1081,7 @@ class MetaMenu(object):
 	def _menuFolder(self, content = None, category = None, explore = None, more = None, load = None, **parameters):
 		items = []
 
-		if Media.isAnime(self._niche()) and not content and not category: self._notification(content = Media.Anime)
+		if Media.isAnime(self._niche()) and not content and not category: self.notification(content = Media.Anime)
 
 		if Tools.isString(more):
 			if Tools.isNumeric(more): more = int(more)
@@ -1155,7 +1213,7 @@ class MetaMenu(object):
 	def _menuMain(self):
 		provider = self._provider(content = MetaManager.ContentSearch) # Add provider for context menu options.
 		menu = [
-			#self._menuItem(label = 'XXX',	image = 'oracle',		action = MetaMenu.SearchOracle,		folder = False),#gaiaremove
+			self._menuItem(label = 'Developer',	image = 'bulb', action = 'developer', folder = False) if System.developerVersion() else None,
 
 			self._menuItem(label = 35550,	image = 'quick',	menu = MetaMenu.MenuMedia,	content = MetaMenu.ContentQuick,														condition = self._settingsLevel(content = MetaMenu.ContentQuick)),
 			self._menuItem(label = 32037,	image = 'progress',	menu = MetaMenu.MenuMedia,	content = MetaMenu.ContentProgress,	progress = MetaMenu.ProgressDefault,				condition = self._settingsLevel(content = MetaMenu.ContentProgress)),
@@ -1172,7 +1230,10 @@ class MetaMenu(object):
 		from lib.modules.tools import Promotions
 		if Promotions.enabled(): menu.insert(0, self._menuItem(label = 35442, image = 'promotion', action = 'promotionsMenu', folder = True, condition = self._settingsLevel(content = 'promotion')))
 
-		self._notificationCached()
+		# Do not show when freshly installed or during a version upgrade.
+		updated = Settings.getInteger('internal.update.time')
+		if updated and (Time.timestamp() - updated) > 900:
+			self.notificationCached()
 
 		return menu
 
@@ -1910,6 +1971,8 @@ class MetaMenu(object):
 
 	def _menuCompany(self, category = None, explore = None, more = None):
 		try:
+			from lib.meta.company import MetaCompany
+
 			if explore is None: explore = True
 
 			if category is None:
@@ -1923,7 +1986,7 @@ class MetaMenu(object):
 
 				companies = []
 				count = 0
-				for k, v in MetaTools.company().items():
+				for k, v in MetaCompany.company().items():
 					v = v.get(category)
 					if v:
 						order = v.get(media)
@@ -1943,6 +2006,8 @@ class MetaMenu(object):
 
 	def _menuEnterprise(self, category = None, explore = None, more = None):
 		try:
+			from lib.meta.company import MetaCompany
+
 			if category is None:
 				items = [
 					self._menuItem(label = 36600,	image = 'bulb',			content = MetaMenu.ContentEnterprise,	category = MetaMenu.CompanyOriginal),
@@ -1953,12 +2018,12 @@ class MetaMenu(object):
 			else:
 				if more is True: more = 0
 
-				if category == MetaMenu.CompanyOriginal: self._notification(content = MetaMenu.ContentEnterprise, type = MetaMenu.CompanyOriginal + (MetaMenu.ParameterMore if more else ''))
+				if category == MetaMenu.CompanyOriginal: self.notification(content = MetaMenu.ContentEnterprise, type = MetaMenu.CompanyOriginal + (MetaMenu.ParameterMore if more else ''))
 				media = Media.Movie if Media.isFilm(self._media()) else Media.Show
 
 				companies = []
 				count = 0
-				for k, v in MetaTools.company().items():
+				for k, v in MetaCompany.company().items():
 					if category == MetaMenu.CompanyProducer: type = MetaMenu.CompanyStudio
 					elif category == MetaMenu.CompanyBroadcaster: type = MetaMenu.CompanyNetwork
 					elif category == MetaMenu.CompanyDistributor: type = MetaMenu.CompanyVendor
@@ -2348,36 +2413,42 @@ class MetaMenu(object):
 		query = parameters.get(MetaMenu.ParameterQuery)
 		provider = parameters.get(MetaMenu.ParameterProvider)
 
+		# Set by modules/core.py to scrape for a movie special from an episode menu.
+		direct = parameters.get(MetaMenu.ParameterDirect)
+		try: del parameters[MetaMenu.ParameterDirect]
+		except: pass
+
 		# This is needed to prevent the search dialog from popping up again when the container is refreshed later.
 		# To replicate: Movies -> Search -> Title -> search a title -> scrape the movie -> play one of the streams -> if playback starts, stop playback -> in the reload-streams dialog, click cancel -> the search dialog shows again asking for input.
 		# Save the query as a global variable. If the container containing search results is refreshed, instead of showing the input dialog again, just use the saved query to reload the container.
 		id = 'GaiaSearch'
 		reload = False
-		path = System.infoLabel('Container.FolderPath')
-		if path:
-			path = Networker.linkDecode(path)
-			if path and path.get(MetaMenu.ParameterMenu) == MetaMenu.MenuMedia:
-				memory = Memory.get(id = id, local = False, kodi = True)
-				if memory:
-					reload = True
-					query = memory.get('query')
-					extra = memory.get('extra')
+		if not direct:
+			path = System.infoLabel('Container.FolderPath')
+			if path:
+				path = Networker.linkDecode(path)
+				if path and path.get(MetaMenu.ParameterMenu) == MetaMenu.MenuMedia:
+					memory = Memory.get(id = id, local = False, kodi = True)
+					if memory:
+						reload = True
+						query = memory.get('query')
+						extra = memory.get('extra')
 
 		if not reload:
-			if search == MetaMenu.SearchAdvanced: query, extra = self._searchAdvanced(query = query, provider = provider)
-			elif search == MetaMenu.SearchSet: query = self._searchSet(query = query)
-			elif search == MetaMenu.SearchList: query = self._searchList(query = query)
-			elif search == MetaMenu.SearchPerson: query = self._searchPerson(query = query)
+			if search == MetaMenu.SearchAdvanced: query, extra = self._searchAdvanced(query = query, provider = provider, direct = direct)
+			elif search == MetaMenu.SearchSet: query = self._searchSet(query = query, direct = direct)
+			elif search == MetaMenu.SearchList: query = self._searchList(query = query, direct = direct)
+			elif search == MetaMenu.SearchPerson: query = self._searchPerson(query = query, direct = direct)
 			elif search == MetaMenu.SearchOracle: query = self._searchOracle(query = query)
 			elif search == MetaMenu.SearchExact: query = self._searchExact(query = query)
-			else: query = self._searchTitle(query = query, provider = provider)
+			else: query = self._searchTitle(query = query, provider = provider, direct = direct)
 			Memory.set(id = id, value = {'query' : query, 'extra' : extra}, local = False, kodi = True)
 
 		if extra: parameters.update(extra)
 		parameters[MetaMenu.ParameterQuery] = query
 		return parameters
 
-	def _searchBase(self, type, query = None, provider = None, default = None):
+	def _searchBase(self, type, query = None, provider = None, default = None, direct = None):
 		try:
 			from lib.modules.search import Search
 
@@ -2394,17 +2465,17 @@ class MetaMenu(object):
 				provider = provider or query.get(MetaMenu.ParameterProvider)
 				query = query.get(MetaMenu.ParameterQuery)
 
-			if queried: function = Search.instance().update
+			if queried and not direct: function = Search.instance().update
 			else: function = Search.instance().insert
 			function(type = type, media = self._media(), niche = self._niche(), query = {MetaMenu.ParameterQuery : query, MetaMenu.ParameterProvider : provider})
 		except: Logger.error()
 		return query
 
-	def _searchTitle(self, query = None, provider = None):
+	def _searchTitle(self, query = None, provider = None, direct = None):
 		from lib.modules.search import Search
-		return self._searchBase(type = Search.TypeTitle, query = query, provider = provider)
+		return self._searchBase(type = Search.TypeTitle, query = query, provider = provider, direct = direct)
 
-	def _searchAdvanced(self, query = None, provider = None):
+	def _searchAdvanced(self, query = None, provider = None, direct = None):
 		#gaiafuture
 		self._notificationFuture()
 		return None, None
@@ -2426,7 +2497,7 @@ class MetaMenu(object):
 				provider = provider or query.get(MetaMenu.ParameterProvider)
 				query = query.get(MetaMenu.ParameterQuery)
 
-			if queried: function = Search.instance().update
+			if queried and not direct: function = Search.instance().update
 			else: function = Search.instance().insert
 			function(type = Search.TypeAdvanced, media = self._media(), niche = self._niche(), query = {MetaMenu.ParameterQuery : query, MetaMenu.ParameterProvider : provider})
 
@@ -2434,17 +2505,17 @@ class MetaMenu(object):
 		except: Logger.error()
 		return query, parameters
 
-	def _searchSet(self, query = None, provider = None):
+	def _searchSet(self, query = None, provider = None, direct = None):
 		from lib.modules.search import Search
-		return self._searchBase(type = Search.TypeSet, query = query, provider = provider)
+		return self._searchBase(type = Search.TypeSet, query = query, provider = provider, direct = direct)
 
-	def _searchList(self, query = None, provider = None):
+	def _searchList(self, query = None, provider = None, direct = None):
 		from lib.modules.search import Search
-		return self._searchBase(type = Search.TypeList, query = query, provider = provider)
+		return self._searchBase(type = Search.TypeList, query = query, provider = provider, direct = direct)
 
-	def _searchPerson(self, query = None, provider = None):
+	def _searchPerson(self, query = None, provider = None, direct = None):
 		from lib.modules.search import Search
-		return self._searchBase(type = Search.TypePerson, query = query, provider = provider)
+		return self._searchBase(type = Search.TypePerson, query = query, provider = provider, direct = direct)
 
 	def _searchOracle(self, query = None):
 		try:
@@ -2457,7 +2528,7 @@ class MetaMenu(object):
 		try:
 			from lib.modules.search import Search
 
-			self._notification(content = MetaMenu.ContentSearch, type = MetaMenu.SearchExact, background = False)
+			self.notification(content = MetaMenu.ContentSearch, type = MetaMenu.SearchExact, background = False)
 			if not query: query = Dialog.input(title = Search._title(), type = Dialog.InputAlphabetic)
 			if not query: return None
 
@@ -2473,16 +2544,17 @@ class MetaMenu(object):
 	# BUILD
 	##############################################################################
 
-	def buildMedia(self, media = None, niche = None, data = None, content = None):
+	def buildMedia(self, media = None, niche = None, data = None, content = None, parameters = None):
 		items = data.get('items')
 		base = data.get('base') or {}
 		submenu = base.get('submenu')
+		release = base.get(MetaMenu.ParameterRelease)
 
 		isQuick = content == MetaMenu.ContentQuick
 		isProgress = content == MetaMenu.ContentProgress
 		isSearch = content == MetaMenu.ContentSearch
 		isArrival = content == MetaMenu.ContentArrival
-		isRelease = content == MetaMenu.ContentDiscover and base.get(MetaMenu.ParameterRelease)
+		isRelease = content == MetaMenu.ContentDiscover and release
 
 		niche = self._niche(niche = niche)
 		if media is None:
@@ -2501,7 +2573,7 @@ class MetaMenu(object):
 				media = self._media(mixed = True)
 
 				# For New Seasons/Episodes release menus where the show metadata is used.
-				if base.get(MetaMenu.ParameterRelease) and (Media.isSeason(media) or Media.isEpisode(media)): media = Media.Show
+				if release and (Media.isSeason(media) or Media.isEpisode(media)): media = Media.Show
 
 		# Do before isProgress is edited below.
 		if (isProgress or isQuick) and Media.isSerie(media): multiple = True
@@ -2531,7 +2603,7 @@ class MetaMenu(object):
 
 		#gaiafuture - in a future version, maybe clean this up.
 		#gaiafuture - Pass all attributes that might be needed by MetaTools to construct the menu, items, and labels, as one dictionary.
-		#gaiafuture - This makes it easier than passing in mutiple parameters to each subfunction and interpret their values to determine which eg type of menu it is.
+		#gaiafuture - This makes it easier than passing in multiple parameters to each subfunction and interpret their values to determine which eg type of menu it is.
 		menu = {
 			'media' : media,
 			'niche' : niche,
@@ -2540,8 +2612,10 @@ class MetaMenu(object):
 			'multiple' : multiple,
 
 			'content' : content,
+			'parameters' : parameters,
 			'submenu' : submenu,
 			'progress' : progress,
+			'release' : release,
 
 			'decorate' : decorate,
 			'page' : page,
@@ -2581,10 +2655,11 @@ class MetaMenu(object):
 		# Show notifications for the various Progress menus on what they are used for.
 		# This can also be used for other menus, to show some description or warning about the menu, for the first few times the menu is opened.
 		# Delay to let the menu load first and views.py select an item.
-		if content == MetaMenu.ContentProgress and progress and not progress == MetaMenu.ProgressDefault: self._notification(content = content, type = progress, delay = True)
-		elif content == MetaMenu.ContentQuick or content == MetaMenu.ContentProgress or content == MetaMenu.ContentArrival: self._notification(content = MetaMenu.ContentSmart, delay = True)
+		if content == MetaMenu.ContentProgress and progress and not progress == MetaMenu.ProgressDefault: self.notification(content = content, type = progress, delay = True)
+		elif content == MetaMenu.ContentQuick or content == MetaMenu.ContentProgress or content == MetaMenu.ContentArrival: self.notification(content = MetaMenu.ContentSmart, delay = True)
 
-	def buildExtra(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, content = None):
+	# Add submenu parameter for "Extras" in the Series submenu.
+	def buildExtra(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, content = None, submenu = None):
 		metadata = self.mManager.metadataSeason(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season)
 		directory = Directory(content = Directory.ContentSettings, media = Media.Episode, cache = True, lock = False)
 		directory.addItems(items = self.mTools.itemsExtra(metadata = metadata))

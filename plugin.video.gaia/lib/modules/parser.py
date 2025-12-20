@@ -43,20 +43,22 @@ class Parser(BeautifulSoup):
 	ParserDefault	= ParserHtml
 
 	def __init__(self, data, parser = ParserDefault, only = None, convert = True):
-		# gaiaremove - once Kodi 20 comes out, try adding lxml back (should be part of Kodi build).
+		#gaiaremove - once Kodi 22 comes out, try adding lxml back (should be part of Kodi build).
 		# lxml is about 30-40% faster than html.parser.
 		# Test this on Windows, since on Linux the OS's Python environment is used, which might already have lxml istalled via PIP. On Windows, Kodi ships with its own Python.
 		# UPDATE: With Kodi 20 under Linux still getting:
 		#	ImportError: Interpreter change detected - this module can only be loaded into one interpreter per process.
 		# https://groups.google.com/g/cython-users/c/mmWEyUjpV6M
+		# UPDATE (2026-06): Kodi 21 still does not have lxml. On their Github repo is also does not seem that lxml is included in the current build:
+		# https://github.com/xbmc/xbmc/tree/master/addons
 
-		# LXML currently does not work in Kodi 19.
+		# LXML currently does not work in Kodi 19 - 21.
 		# Even when fixing the LXML errors, just importing the module cause sporadic freezes of Kodi.
 		# Since LXML is currently not used anywhere in Gaia, remove it for now.
 		# More information in the BeautifulSoup and LXML Gaia external ReadMe.
 		if parser == Parser.ParserXml:
 			from lib.modules.tools import System, Logger
-			Logger.error('Cannot use the LXML parser in Gaia under Kodi 19 (yet).')
+			Logger.error('Cannot use the LXML parser in Gaia under Kodi 21 (yet).')
 			System.exit()
 
 		if convert: data = self.convert(data = data, full = False)

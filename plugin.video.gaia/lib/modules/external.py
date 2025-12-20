@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from importlib import import_module
+from importlib import import_module, util as import_util
 from lib.modules.concurrency import Lock
 
 class Importer(object):
@@ -229,6 +229,20 @@ class Importer(object):
 		except: # Module not detected.
 			return Loader.ModuleUnknown.capitalize()
 
+	@classmethod
+	def moduleFile(self, id, path):
+		try:
+			import sys
+			file = import_util.spec_from_file_location(id, path)
+			module = import_util.module_from_spec(file)
+			sys.modules[id] = module
+			file.loader.exec_module(module)
+			return module
+		except:
+			from lib.modules.tools import Logger
+			Logger.error()
+		return None
+
 	###################################################################
 	# BINARIES
 	###################################################################
@@ -311,8 +325,20 @@ class Importer(object):
 	###################################################################
 
 	@classmethod
-	def moduleCloudScraper(self, error = True, label = False):
-		module = self.module(module = 'externals.cloudscraper', error = error)
+	def moduleCloudflare(self, error = True, label = False):
+		from lib.modules.cloudflare import Cloudflare
+		module = Cloudflare.settingsModule()
+		if module == Cloudflare.ModuleCfscrape:
+			return self.moduleCfScrape(error = error, label = label)
+		elif module == Cloudflare.ModuleCloudscraper:
+			version = Cloudflare.settingsVersion()
+			return self.moduleCloudScraper(error = error, label = label, new = version == Cloudflare.VersionLatest)
+		else:
+			return None
+
+	@classmethod
+	def moduleCloudScraper(self, error = True, label = False, new = False):
+		module = self.module(module = 'externals.cloudscraper.' + ('new' if new else 'old'), error = error)
 		if label:
 			from lib.modules.cloudflare import Cloudflare
 			return self.moduleLabel(module = module, extra = Cloudflare._engine(name = True))
@@ -320,8 +346,10 @@ class Importer(object):
 			return module
 
 	@classmethod
-	def moduleCfScrape(self, error = True):
-		return self.module(module = 'externals.cfscrape', error = error)
+	def moduleCfScrape(self, error = True, label = False):
+		module = self.module(module = 'externals.cfscrape', error = error)
+		if label: return self.moduleLabel(module = module, extra = 'CfScrape')
+		else: return module
 
 	###################################################################
 	# TORRENT
@@ -359,17 +387,26 @@ class Importer(object):
 	# JAVASCRIPT
 	###################################################################
 
+	# Update (2025-06):
+	# When trying to import the old JS2PY v0.71 module into Python 3.11, the following error is thrown:
+	#	script.gaia.externals/lib/externals/js2py/utils/injector.py", line 220, in check\n    raise RuntimeError(\n', 'RuntimeError: Your python version made changes to the bytecode\n']
+	# This is discussed here:
+	#	https://github.com/PiotrDabkowski/Js2Py/issues/282
+	# Pretty sure the old JS2PY worked fine before, even in Python 3.11. Not sure why this error suddenly starts showing.
+	# The error is gone when using the "new" JS2PY v 0.74.
+	# If it is indeed a bytecode compatibility issue between Python 3.8 and 3.11, try importing the new module first, and if it fails, import the old module.
+
 	@classmethod
 	def moduleJs2Py(self, error = True):
-		return self.module(module = 'externals.js2py', error = error)
+		return self.module(module = 'externals.js2py.new', backupModule = 'externals.js2py.old', error = error)
 
 	@classmethod
 	def moduleJs2PyEval1(self, error = True):
-		return self.module(module = 'externals.js2py', submodule = 'eval_js', error = error)
+		return self.module(module = 'externals.js2py.new', submodule = 'eval_js', backupModule = 'externals.js2py.old', backupSubmodule = 'eval_js', error = error)
 
 	@classmethod
 	def moduleJs2PyEval2(self, error = True):
-		return self.module(module = 'externals.js2py', submodule = 'EvalJs', error = error)
+		return self.module(module = 'externals.js2py.new', submodule = 'EvalJs', backupModule = 'externals.js2py.old', backupSubmodule = 'EvalJs', error = error)
 
 	###################################################################
 	# TEXTDISTANCE

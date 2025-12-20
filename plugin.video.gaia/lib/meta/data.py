@@ -67,7 +67,7 @@ class MetaData(Serializer):
 	NumberStandard				= 'standard'		# Officialy aired order with episodes divided into seasons.
 	NumberAbsolute				= 'absolute'		# Absolute order without seasons where episodes are numbered sequentially.
 	NumberDisc					= 'disc'			# Order as released on DVD or BluRay.
-	NumberYear					= 'year'			# The year is used as season number. sometimes used by TVDd for daytime shows.
+	NumberYear					= 'year'			# The year is used as season number. Sometimes used by TVDb for daytime shows.
 	NumberRegional				= 'regional'		# TVDb.
 	NumberAlternative			= 'alternative'		# TVDb.
 	NumberAlternativeDisc		= 'alternativedisc'	# TVDb.
@@ -175,6 +175,8 @@ class MetaData(Serializer):
 	ImageQualityHigh			= 'high'
 	ImageQualityLow				= 'low'
 	ImageQualityDefault			= Default
+
+	ImageResolutionDefault		= Default
 
 	ImageOpacitySolid			= 'solid'
 	ImageOpacityClear			= 'clear'
@@ -290,27 +292,41 @@ class MetaData(Serializer):
 	StatusPostproduction		= 'postproduction'	# Busy with post production phase.
 	StatusCompleted				= 'completed'		# Completed with production, but not yet released.
 	StatusReleased				= 'released'		# Released and in theaters. For movies.
-	StatusPilot					= 'pilot'			# First pilot episode released. For shows.
+	StatusPiloted				= 'piloted'			# First pilot episode released. For shows.
 	StatusUpcoming				= 'upcoming'		# Upcoming release. For shows.
 	StatusContinuing			= 'continuing'		# Continuing show on returning for a next season. For shows.
 	StatusEnded					= 'ended'			# Ended with last episode. For shows.
 	StatusCanceled				= 'canceled'		# Canceled without ending properley. For shows.
+	StatusReturning				= 'returning'		# Internal. Not avilable on TVDb, but used by Trakt/TMDb.
+	StatusFinished				= 'finished'		# Internal. Reserved for specials (S0) where it is assumed the season has ended (eg: since the show has ended), but there can be new specials added to S0 years after the show ended.
 	StatusDefault				= Default
+
+	# Serie Type
+
+	SerieTypeStandard			= 'standard'		# A standard season or episode.
+	SerieTypeSpecial			= 'special'			# A special season or episode.
+	SerieTypePremiereShow		= 'premiereshow'	# A first season or episode of a show.
+	SerieTypePremiereSeason		= 'premiereseason'	# A first episode of a season.
+	SerieTypePremiereMiddle		= 'premieremiddle'	# A first episode in the middle of a season that is split into multiple parts.
+	SerieTypePremiereFinale		= 'premierefinale'	# A first season of a show which is also the last season.
+	SerieTypeFinaleShow			= 'finaleshow'		# A last season or episode of a show.
+	SerieTypeFinaleSeason		= 'finaleseason'	# A last episode of a season.
+	SerieTypeFinaleMiddle		= 'finalemiddle'	# A last episode in the middle of a season that is split into multiple parts.
 
 	# Special
 	# https://thetvdb.com/taxonomy
 
 	SpecialImportant			= 'important'	# The special is important to the main story line (TVDb: 277).
 	SpecialUnimportant			= 'unimportant'	# The special is not important to the main story line (TVDb: 278).
-	SpecialBehind				= 'behind'		# The special is a behind the scenes (TVDb: 4447).
+	SpecialProduction			= 'production'	# The special is a behind the scenes (TVDb: 4447).
 	SpecialBlooper				= 'blooper'		# The special is bloopers (TVDb: 4448).
 	SpecialInterview			= 'interview'	# The special is a cast interview (TVDb: 4449).
-	SpecialCrossover			= 'crossover'	# The special is a crossover episode (TVDb: 4450).
+	SpecialCrossover			= 'crossover'	# The special is a crossover episode (TVDb: 4450). Update (2025-07): This category seems to have been removed
 	SpecialDeleted				= 'deleted'		# The special is a deleted scenes (TVDb: 4458).
 	SpecialMovie				= 'movie'		# The special is a full movie (TVDb: 4455).
 	SpecialEpisode				= 'episode'		# The special is a full length episode not aired as part of a normal season (TVDb: 4460).
 	SpecialExtended				= 'extended'	# The special is a extended scenes (TVDb: 4459).
-	SpecialMaking				= 'making'		# The special is a making of (TVDb: 4451).
+	SpecialMaking				= 'making'		# The special is a making of (TVDb: 4451). Update (2025-07): This category seems to have been removed. Now merged with 4447 into "Behind the Scenes/ Makings Of".
 	SpecialOriginal				= 'original'	# The special is not aired, but situational to the show. Original video animation (OVA) used mainly by anime (TVDb: 4452).
 	SpecialPilot				= 'pilot'		# The special is a pilot episode (TVDb: 4453).
 	SpecialRecap				= 'recap'		# The special is a season recap (TVDb: 4454).
@@ -328,12 +344,14 @@ class MetaData(Serializer):
 	}
 	SpecialExtra				= {				# Not part of the main storyline.
 		SpecialUnimportant		: True,
-		SpecialBehind			: True,
+		SpecialProduction		: True,
 		SpecialBlooper			: True,
 		SpecialInterview		: True,
 		SpecialDeleted			: True,
+		SpecialExtended			: True,
 		SpecialMaking			: True,
 		SpecialRecap			: True,
+		SpecialShort			: True,
 		SpecialPodcast			: True,
 	}
 
@@ -401,6 +419,7 @@ class MetaData(Serializer):
 		self.mMedia = None
 		self.mData = {}
 
+		if not media and data and Tools.isDictionary(data): media = data.get('media')
 		self.mediaSet(value = media)
 		self.dataUpdate(data = data)
 
@@ -1198,7 +1217,7 @@ class MetaData(Serializer):
 	###################################################################
 
 	def item(self, media, attribute = Default, sort = Default, selection = SelectionDefault):
-		return self.dataRetrieve(type = media, attribute = attribute, sort = ['number', 'relative'] if sort is True else sort, order = MetaData.OrderAscending, selection = selection)
+		return self.dataRetrieve(type = media, attribute = attribute, sort = ['number', MetaData.NumberStandard] if sort is True else sort, order = MetaData.OrderAscending, selection = selection)
 
 	def movie(self, attribute = Default, selection = SelectionDefault):
 		return self.item(media = MetaData.MediaMovie, attribute = attribute, selection = selection)
@@ -1762,6 +1781,12 @@ class MetaData(Serializer):
 	def typeCompany(self, selection = SelectionDefault):
 		return self.type(media = MetaData.MediaCompany, selection = selection)
 
+	def typeSeason(self, selection = SelectionDefault):
+		return self.type(media = MetaData.MediaSeason, selection = selection)
+
+	def typeEpisode(self, selection = SelectionDefault):
+		return self.type(media = MetaData.MediaEpisode, selection = selection)
+
 	def typeSet(self, value, media = MediaDefault):
 		if value: self.dataUpdate(data = {'type' : value}, media = media)
 
@@ -1879,7 +1904,7 @@ class MetaData(Serializer):
 			if self.mediaShow():
 				seasons = self.season(sort = True)
 				if seasons:
-					minimum = 1950
+					minimum = 1900
 
 					if seasons and not Tools.isList(seasons): seasons = [seasons] # If an individual season is set to the show when retrieving from episodes.py.
 					numbers = [season.numberSeason() for season in seasons if season] # Sometimes None.
@@ -1982,7 +2007,7 @@ class MetaData(Serializer):
 
 	def languageSettings(self, media = None, type = None, decor = None):
 		if media: return MetaImage.settingsLanguage(media = media, type = self.imageTypeConvert(media = media, type = type, decor = decor))
-		else: return Language.settingsCustom('metadata.general.language')
+		else: return Language.settingsCustom('metadata.region.language')
 
 	def languageDefault(self, language, universal = True, media = None, type = None, decor = None):
 		if language == MetaData.LanguageUnknown: language = MetaData.LanguageDefault
@@ -1997,7 +2022,7 @@ class MetaData(Serializer):
 
 	def countryDefault(self, country, universal = True):
 		if country is MetaData.CountryDefault: country = MetaData.CountryOriginal
-		elif country == MetaData.CountrySettings: country = Country.settings('metadata.general.country')
+		elif country == MetaData.CountrySettings: country = Country.settings('metadata.region.country')
 		if country == Country.Automatic: country = MetaData.CountryOriginal
 		if universal and country == MetaData.CountryOriginal: country = MetaData.CountryUniversal
 		return country
@@ -2708,7 +2733,7 @@ class MetaData(Serializer):
 	# IMAGE
 	###################################################################
 
-	def image(self, type = ImageTypeDefault, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionDefault, fallback = FallbackDefault, sort = SortDefault, internal = False):
+	def image(self, type = ImageTypeDefault, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionDefault, fallback = FallbackDefault, sort = SortDefault, internal = False, extract = None):
 		# Things that are done to improve lookup time:
 		#	1. Store images in a nested dictionary instead of a linear list. Lookup by keys is a lot faster than iterating over the list and matching the attributes.
 		#	2. Extract subdata and pass it to fallback dataRetrieve(), instead of calling dataRetrieve() with a full list of the type parameters each time. This especially improves speed if the item does not contain any images.
@@ -2717,6 +2742,9 @@ class MetaData(Serializer):
 		subdata = self.dataRetrieve(media = media, type = 'image')
 		if not subdata: return None # Reduces lookup times if there are no photos at all.
 		mediaCurrent = self.media()
+
+		if extract is None: extract = 'link'
+		elif extract is False: extract = None
 
 		type = self.imageTypeDefault(type = type)
 		quality = self.imageQualityDefault(quality = quality)
@@ -2737,7 +2765,7 @@ class MetaData(Serializer):
 			subdata1 = images = self.dataRetrieve(type = [quality, opacity, decor], media = False, metadata = subdata0)
 			if subdata1:
 				for i in language:
-					images = self.dataRetrieve(type = [i], sort = sort, order = order, extract = 'link', selection = selection, media = False, metadata = subdata1)
+					images = self.dataRetrieve(type = [i], sort = sort, order = order, extract = extract, selection = selection, media = False, metadata = subdata1)
 					if images:
 						if Tools.isArray(images): result.extend(images)
 						else: result.append(images)
@@ -2758,7 +2786,7 @@ class MetaData(Serializer):
 			# Prefer the same type/quality/opacity/decor over language.
 			if subdata1 and languageExtra:
 				for i in languageExtra:
-					result = self.dataRetrieve(type = [i], sort = sort, order = order, extract = 'link', selection = selection, media = False, metadata = subdata1)
+					result = self.dataRetrieve(type = [i], sort = sort, order = order, extract = extract, selection = selection, media = False, metadata = subdata1)
 					if result: break
 
 			if not result:
@@ -2817,7 +2845,7 @@ class MetaData(Serializer):
 						ordered[j] = self.dataRetrieve(type = [ordered[j][0], ordered[j][1], ordered[j][2]], media = False, metadata = subdata0)
 						if ordered[j]:
 							for i in language:
-								result = self.dataRetrieve(type = [i], sort = sort, order = order, extract = 'link', selection = selection, media = False, metadata = ordered[j])
+								result = self.dataRetrieve(type = [i], sort = sort, order = order, extract = extract, selection = selection, media = False, metadata = ordered[j])
 								if result: break
 							if result: break
 
@@ -2825,7 +2853,7 @@ class MetaData(Serializer):
 					if not result and fallback >= MetaData.FallbackSecondary:
 						for j in ordered:
 							if j:
-								result = self.dataRetrieve(sort = sort, order = order, extract = 'link', selection = selection, flatten = MetaData.SelectionList, media = False, metadata = j)
+								result = self.dataRetrieve(sort = sort, order = order, extract = extract, selection = selection, flatten = MetaData.SelectionList, media = False, metadata = j)
 								if result: break
 
 				# Select alterntives.
@@ -2845,82 +2873,82 @@ class MetaData(Serializer):
 
 				# Select any available.
 				if not result and subdata and fallback >= MetaData.FallbackQuaternary:
-					result = self.dataRetrieve(sort = sort, order = order, extract = 'link', selection = selection, flatten = MetaData.SelectionList, media = False, metadata = subdata)
+					result = self.dataRetrieve(sort = sort, order = order, extract = extract, selection = selection, flatten = MetaData.SelectionList, media = False, metadata = subdata)
 
 		result = self.dataSelect(data = result, selection = selection)
 		if Tools.isArray(result): result = Tools.listUnique(result)
 		return result
 
-	def imageIcon(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeIcon, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageIcon(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeIcon, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageIconClear(self, quality = ImageQualityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageIcon(quality = quality, opacity = MetaData.ImageOpacityClear, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageIconClear(self, quality = ImageQualityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageIcon(quality = quality, opacity = MetaData.ImageOpacityClear, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imagePoster(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypePoster, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imagePoster(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypePoster, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageDisc(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeDisc, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageDisc(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeDisc, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imagePhoto(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypePhoto, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imagePhoto(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypePhoto, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageBanner(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeBanner, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageBanner(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeBanner, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageBackground(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeBackground, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageBackground(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeBackground, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageArtwork(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeArtwork, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageArtwork(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeArtwork, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageArtworkClear(self, quality = ImageQualityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageArtwork(quality = quality, opacity = MetaData.ImageOpacityClear, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageArtworkClear(self, quality = ImageQualityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageArtwork(quality = quality, opacity = MetaData.ImageOpacityClear, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageThumbnail(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeThumbnail, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageThumbnail(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeThumbnail, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageCinemagraph(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.image(type = MetaData.ImageTypeCinemagraph, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageCinemagraph(self, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.image(type = MetaData.ImageTypeCinemagraph, quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiActor(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imagePhoto(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiActor(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imagePhoto(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiCharacterart(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imagePhoto(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiCharacterart(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imagePhoto(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiClearart(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageArtwork(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiClearart(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageArtwork(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiClearlogo(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageIcon(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiClearlogo(self, quality = ImageQualityDefault, opacity = ImageOpacityClear, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageIcon(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiIcon(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageIcon(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiIcon(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageIcon(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiDiscart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageDisc(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiDiscart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageDisc(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiThumb(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageThumbnail(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiThumb(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageThumbnail(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiBanner(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageBanner(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiBanner(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageBanner(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiPoster(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imagePoster(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiPoster(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imagePoster(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiFanart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageBackground(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiFanart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageBackground(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiKeyart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imagePoster(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiKeyart(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorPlain, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imagePoster(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageKodiLandscape(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault):
-		return self.imageBackground(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort)
+	def imageKodiLandscape(self, quality = ImageQualityDefault, opacity = ImageOpacitySolid, decor = ImageDecorEmbell, language = LanguageDefault, media = MediaDefault, selection = SelectionSingle, fallback = FallbackDefault, sort = SortDefault, extract = None):
+		return self.imageBackground(quality = quality, opacity = opacity, decor = decor, language = language, media = media, selection = selection, fallback = fallback, sort = sort, extract = extract)
 
-	def imageSet(self, value, id = None, provider = ProviderDefault, type = ImageTypeDefault, quality = ImageQualityDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, vote = 0, sort = 0, media = MediaDefault):
+	def imageSet(self, value, id = None, provider = ProviderDefault, type = ImageTypeDefault, quality = ImageQualityDefault, resolution = ImageResolutionDefault, opacity = ImageOpacityDefault, decor = ImageDecorDefault, language = LanguageDefault, vote = 0, sort = 0, media = MediaDefault):
 		# Set images as a list, so that a list of images can be passed to imageSet().
 		# This reduces the time of dataUpdate() compared to setting images individually.
 		if value:
@@ -2936,6 +2964,7 @@ class MetaData(Serializer):
 					item = {
 						'type' : type,
 						'quality' : quality,
+						'resolution' : resolution,
 						'opacity' : opacity,
 						'decor' : decor,
 						'language' : language,
@@ -2946,6 +2975,7 @@ class MetaData(Serializer):
 				itemDefault = {
 					'type' : self.imageTypeDefault(type = item['type']),
 					'quality' : self.imageQualityDefault(quality = item['quality']),
+					'resolution' : self.imageResolutionDefault(resolution = item['resolution']),
 					'opacity' : self.imageOpacityDefault(opacity = item['opacity']),
 					'decor' : self.imageDecorDefault(decor = item['decor']),
 					'language' : self.languageDefault(language = item['language']),
@@ -2957,6 +2987,8 @@ class MetaData(Serializer):
 				media = self.mediaDefault(media = media)
 
 				# TVDb returns artwork in the main structure (eg: show) that belongs to substructures (eg: season or episode).
+				# Eg: S.W.A.T.
+				ignore = False
 				if self.mediaContent():
 					if id is None:
 						try: id = item['id']
@@ -2968,6 +3000,15 @@ class MetaData(Serializer):
 						if not item and media == MetaData.MediaCharacter: item = self.item(media = media, attribute = {'person' : {'id' : {provider : str(id)}}}, selection = MetaData.SelectionSingle)
 
 						if item: item.imageSet(value = itemDefault, media = media)
+
+						# Update (2025-04)
+						# If season images are returned for the show, ignore them.
+						# Eg: S.W.A.T. - S05 poster is returned for the show.
+						# Not sure if this breaks anything?
+						mediaReal = self.media()
+						if (mediaReal == MetaData.MediaShow and media in (MetaData.MediaSeason, MetaData.MediaEpisode)) or (mediaReal == MetaData.MediaSeason and media == MetaData.MediaEpisode):
+							# Image already added to the season object. Do not add it to the show object.
+							ignore = True
 
 				# Character photos should be added to the main "image" list and not the "character" list.
 				if self.mediaContent() and (self.mediaEntity(media = media) or id): media = MetaData.MediaDefault
@@ -2987,50 +3028,52 @@ class MetaData(Serializer):
 				else:
 					item = itemDefault
 
-				value[i] = item
+				if ignore: value[i] = None
+				else: value[i] = item
 
 			# Always add character photos to the content/main image list as well, even if already added to the subcontent.
 			# Allows the character photos to be part of the movie/show images.
 			images = {}
 			for image in value:
-				data = images
+				if image:
+					data = images
 
-				type = image['type']
-				try:
-					data = data[type]
-				except:
-					data[type] = {}
-					data = data[type]
+					type = image['type']
+					try:
+						data = data[type]
+					except:
+						data[type] = {}
+						data = data[type]
 
-				quality = image['quality']
-				try:
-					data = data[quality]
-				except:
-					data[quality] = {}
-					data = data[quality]
+					quality = image['quality']
+					try:
+						data = data[quality]
+					except:
+						data[quality] = {}
+						data = data[quality]
 
-				opacity = image['opacity']
-				try:
-					data = data[opacity]
-				except:
-					data[opacity] = {}
-					data = data[opacity]
+					opacity = image['opacity']
+					try:
+						data = data[opacity]
+					except:
+						data[opacity] = {}
+						data = data[opacity]
 
-				decor = image['decor']
-				try:
-					data = data[decor]
-				except:
-					data[decor] = {}
-					data = data[decor]
+					decor = image['decor']
+					try:
+						data = data[decor]
+					except:
+						data[decor] = {}
+						data = data[decor]
 
-				language = image['language']
-				try:
-					data = data[language]
-				except:
-					data[language] = []
-					data = data[language]
+					language = image['language']
+					try:
+						data = data[language]
+					except:
+						data[language] = []
+						data = data[language]
 
-				data.append(image)
+					data.append(image)
 
 			self.dataUpdate(data = {'image' : images}, media = media)
 
@@ -3077,21 +3120,29 @@ class MetaData(Serializer):
 		return type
 
 	@classmethod
-	def imageQualityExtract(self, data):
-		try: return MetaData.DataImageQuality[data]
+	def imageQualityExtract(self, data, width = None, height = None):
+		id = str(data) + '_' + str(width) + '_' + str(height) # Include the width/height, since this function is sometimes called with the same data, but sometimes with ans sometimes without width/height.
+		try: return MetaData.DataImageQuality[id]
 		except: pass
 
 		quality = MetaData.ImageQualityDefault
-		if Regex.match(data = data, expression = '(?:high|[^a-z0-9]*h[qd][^a-z0-9]*|16\s*:\s*\d)', cache = True): quality = MetaData.ImageQualityHigh
+		if width: quality = MetaData.ImageQualityLow if width < 500 else MetaData.ImageQualityHigh # Eg: https://thetvdb.com/artwork/60802233
+		elif height: quality = MetaData.ImageQualityLow if height < 600 else MetaData.ImageQualityHigh
+		elif Regex.match(data = data, expression = '(?:high|[^a-z0-9]*h[qd][^a-z0-9]*|16\s*:\s*\d)', cache = True): quality = MetaData.ImageQualityHigh
 		elif Regex.match(data = data, expression = '(?:low|[^a-z0-9]*[sl][qd][^a-z0-9]*|4\s*:\s*3)', cache = True): quality = MetaData.ImageQualityLow
 
-		MetaData.DataImageQuality[data] = quality
+		MetaData.DataImageQuality[id] = quality
 		return quality
 
 	@classmethod
 	def imageQualityDefault(self, quality):
 		if quality is MetaData.ImageQualityDefault: quality = MetaData.ImageQualityHigh
 		return quality
+
+	@classmethod
+	def imageResolutionDefault(self, resolution = None, quality = None, width = None, height = None):
+		if not resolution: resolution = {'quality' : quality, 'width' : width, 'height' : height}
+		return resolution
 
 	@classmethod
 	def imageOpacityExtract(self, data):
@@ -3111,13 +3162,15 @@ class MetaData(Serializer):
 		return opacity
 
 	@classmethod
-	def imageDecorExtract(self, data = None, type = None):
-		id = str(data) + '_' + str(type) # Iclude the type, since TVDb sometimes has a poster also listed as a background.
+	def imageDecorExtract(self, data = None, type = None, text = None, language = None):
+		id = str(data) + '_' + str(type) # Include the type, since TVDb sometimes has a poster also listed as a background.
 		try: return MetaData.DataImageDecor[id]
 		except: pass
 
 		decor = MetaData.ImageDecorDefault
-		if data and Regex.match(data = data, expression = '(?:landscape|logo|icon|clear[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorEmbell
+		if text: decor = MetaData.ImageDecorEmbell
+		elif language and not language == MetaData.LanguageUnknown: decor = MetaData.ImageDecorEmbell
+		elif data and Regex.match(data = data, expression = '(?:landscape|logo|icon|clear[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorEmbell
 		elif data and Regex.match(data = data, expression = '(?:actor|character|photo|thumb|(?:fan|key)[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorPlain
 		else:
 			try: decor = MetaData.ImageDecorTypes[type if type else self.imageTypeExtract(data = data)]
@@ -3271,8 +3324,8 @@ class MetaData(Serializer):
 	def statusReleased(self, media = MediaDefault):
 		return self.status() == MetaData.StatusReleased
 
-	def statusPilot(self, media = MediaDefault):
-		return self.status() == MetaData.StatusPilot
+	def statusPiloted(self, media = MediaDefault):
+		return self.status() == MetaData.StatusPiloted
 
 	def statusUpcoming(self, media = MediaDefault):
 		return self.status() == MetaData.StatusUpcoming
@@ -3312,9 +3365,10 @@ class MetaData(Serializer):
 		elif Regex.match(data = data, expression = '(?:product|film)', cache = True): status = MetaData.StatusProduction
 		elif Regex.match(data = data, expression = '(?:complet)', cache = True): status = MetaData.StatusCompleted
 		elif Regex.match(data = data, expression = '(?:release)', cache = True): status = MetaData.StatusReleased
-		elif Regex.match(data = data, expression = '(?:pilot|test)', cache = True): status = MetaData.StatusPilot
+		elif Regex.match(data = data, expression = '(?:pilot|test)', cache = True): status = MetaData.StatusPiloted
 		elif Regex.match(data = data, expression = '(?:upcoming)', cache = True): status = MetaData.StatusUpcoming
-		elif Regex.match(data = data, expression = '(?:contin|return|busy|running)', cache = True): status = MetaData.StatusContinuing
+		elif Regex.match(data = data, expression = '(?:contin|busy|running)', cache = True): status = MetaData.StatusContinuing
+		elif Regex.match(data = data, expression = '(?:return)', cache = True): status = MetaData.StatusReturning
 		elif Regex.match(data = data, expression = '(?:end|finish)', cache = True): status = MetaData.StatusEnded
 		elif Regex.match(data = data, expression = '(?:cancel)', cache = True): status = MetaData.StatusCanceled
 
@@ -3364,42 +3418,64 @@ class MetaData(Serializer):
 
 	@classmethod
 	def specialExtract(self, data, exclude = None):
-		special = []
-		if exclude and not Tools.isArray(exclude): exclude = [exclude]
+		if data:
+			special = []
+			if exclude and not Tools.isArray(exclude): exclude = [exclude]
 
-		expression = {
-			MetaData.SpecialBehind		: '(behind[\s\-]*the[\s\-]*(?:scenes?|casts?|shows?|series?|seasons?|drama))',	# Eg: Downton Abbey S00E01
-			MetaData.SpecialBlooper		: '(bloopers?)',
-			MetaData.SpecialInterview	: '(interview(?:s|ed|ing)?)',
-			MetaData.SpecialCrossover	: '(cross-?over(?:s|ed|ing)?)',
-			MetaData.SpecialDeleted		: '(deleted[\s\-]*scenes?)',
-			MetaData.SpecialMovie		: '((?:tv[\s\-]*)?movie)',
-			MetaData.SpecialExtended	: '(extended[\s\-]*scenes?)',
-			MetaData.SpecialMaking		: '(making[\s\-]of)',
-			MetaData.SpecialOriginal	: '(ova|original[\s\-]*video[\s\-]*animations?)',
-			MetaData.SpecialPilot		: '((?:un)?(?:aired|released)[\s\-]*pilot|pilot(?:[\s\-]*episode)?)',			# Eg: Sherlock S00E01.
-			MetaData.SpecialRecap		: '((?:(?:show|series|season)[\s\-]*)?recap)',
-			MetaData.SpecialShort		: '(short(?:[\s\-]*episode)?|webisode|webinar)',
-			MetaData.SpecialPodcast		: '((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)', 								# Eg: Last of Us S00E02, S00E06, S00E07, etc.
-			MetaData.SpecialUnimportant	: '(best[\s\-]*of|rewind|concert|pre[\s\-]*show)',								# Eg: Doctor Who S00E37, S00E40, S00E41, S00E50, S00E76, S00E128
+			# Eg: The Cost of Genius: Inside The Queen's Gambit
+			# Eg: Creating the Queen's Gambit
+			if exclude: title = '(?:%s)' % '|'.join([Regex.escape(i) for i in exclude])
+			else: title = 'xxxxxxxxxxxx'
 
-			# Do this after Unimportant. Eg: "Best of the Christmas Specials"
-			MetaData.SpecialEpisode		: '((?:christmas|holiday)[\s\-]*specials?)',									# Eg: The Office UK S00E01, S00E02.
-		}
+			expression = (
+				(MetaData.SpecialProduction,	('((?:inside|creat(?:e|ings?))(?:\s*(?:the|of))*\s%s)' % title, False)),									# Eg: The Queen's Gambit S00E01, S00E02.
 
-		for key, value in expression.items():
-			value += '(?:$|[\s\,\.\!\?\:\-])'
-			if Regex.match(data = data, expression = value):
-				ignore = False
-				if exclude:
-					for j in exclude:
-						if Regex.match(data = j, expression = value):
-							ignore = True
-							break
-				if key in MetaData.SpecialStory and any(i in MetaData.SpecialExtra for i in special): ignore = True # Eg: "Best of the Christmas Specials" (containing both "Best of" and "Christmas Specials")
-				if not ignore: special.append(key)
+				(MetaData.SpecialProduction,	'(behind[\s\-]*the[\s\-]*(?:scenes?|casts?|shows?|series?|seasons?|drama)|^(?:inside|creat(?:e|ings?)))'),	# Eg: Downton Abbey S00E01. The Queen's Gambit S00E02.
+				(MetaData.SpecialBlooper,		'(bloopers?)'),
+				(MetaData.SpecialInterview,		'(interview(?:s|ed|ing)?|conversation|up[\s\-]close[\s\-]with)'),											# Eg: True Detective S00E03.
+				(MetaData.SpecialCrossover,		'(cross-?over(?:s|ed|ing)?)'),
+				(MetaData.SpecialDeleted,		'(deleted[\s\-]*scenes?)'),
+				(MetaData.SpecialMovie,			'((?:tv[\s\-]*)?movie)'),
+				(MetaData.SpecialExtended,		'(extended[\s\-]*scenes?)'),
 
-		return special if special else MetaData.SpecialDefault
+				# Update (2025-07): This category has been removed by TVDb and merged with 4447 into "Behind the Scenes/ Makings Of".
+				# Use SpecialProduction instead, to ensure consistency with specials marked with the taxonomy ID, which are not extracted by title.
+				# Eg: The Witcher S00E01 (Behind ID) vs S00E02-09 (No ID, but titles include "a look inside").
+				#(MetaData.SpecialMaking,		'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: True Detective S00E01, S00E04, S00E05.
+				(MetaData.SpecialProduction,	'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: The Witcher S00E01 vs S00E02-09.
+
+				(MetaData.SpecialOriginal,		'(ova|original[\s\-]*video[\s\-]*animations?)'),
+				(MetaData.SpecialPilot,			'((?:un)?(?:aired|released)[\s\-]*pilot|pilot(?:[\s\-]*episode)?)'),										# Eg: Sherlock S00E01.
+				(MetaData.SpecialRecap,			'((?:(?:show|series|season)[\s\-]*)?recap|story[\s\-]so[\s\-]far|^(?:a|the)?\s*count\-?down)'),				# Eg: Heroes S00E56.
+				(MetaData.SpecialShort,			'(short(?:[\s\-]*episode)?|webisode|webinar)'),
+				(MetaData.SpecialPodcast,		'((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)'), 															# Eg: Last of Us S00E02, S00E06, S00E07, etc.
+				(MetaData.SpecialUnimportant,	'(best[\s\-]*of|rewind|concert|pre[\s\-]*show|comic[\s\-]*relief|awards?|celebrates?|batfa)'),				# Eg: Doctor Who S00E37, S00E40, S00E41, S00E50, S00E76, S00E128. Downton Abbey S00E16, S00E17.
+
+				# Do this after Unimportant. Eg: "Best of the Christmas Specials"
+				(MetaData.SpecialEpisode,		'((?:christmas|holiday)[\s\-]*specials?|episode)'),															# Eg: The Office UK S00E01, S00E02.
+
+				(MetaData.SpecialEpisode,		'^\s*(?:(?:(?:e|é|e\?)pis(?:o|ó|o\?)(?:des?|d?ios?)|part|folge|teil|aflevering|deel)[\s\-\_\.]*(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}|(?:\#\s?)?\d+(?:\.\d+)?(?:$|[^\d])|[ivxlcd]+(?:$|[^\da-z]))|(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}))[\s\:\-]*'),																						# Eg: Money Heist (entire S00 is a season with full episodes).
+			)
+
+			for key, value in expression:
+				excluded = True
+				if Tools.isArray(value):
+					excluded = value[1]
+					value = value[0]
+
+				value += '(?:$|[\s\,\.\!\?\:\-])'
+				if Regex.match(data = data, expression = value):
+					ignore = False
+					if excluded and exclude:
+						for j in exclude:
+							if Regex.match(data = j, expression = value):
+								ignore = True
+								break
+					if key in MetaData.SpecialStory and any(i in MetaData.SpecialExtra for i in special): ignore = True # Eg: "Best of the Christmas Specials" (containing both "Best of" and "Christmas Specials")
+					if not ignore: special.append(key)
+
+			if special: return Tools.listUnique(special)
+		return MetaData.SpecialDefault
 
 	###################################################################
 	# DURATION

@@ -157,7 +157,7 @@ class Environment(object):
 		from lib.modules.interface import Dialog, Translation
 
 		# Do not use a basic command, like "echo" or "ls", since they also work without the special permissions.
-		# Also try to use a command that is available on mutiple platforms (Linux, Mac, Windows, etc).
+		# Also try to use a command that is available on multiple platforms (Linux, Mac, Windows, etc).
 		result = Subprocess.output('ping -h')
 		if result:
 			result = result.lower()

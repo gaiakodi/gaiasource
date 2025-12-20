@@ -42,7 +42,7 @@ class Provider(ProviderHtml):
 			description					= '{name} has a very large and reliable database of {containers}. The site contains results in various languages, but most of them are in English. {name} can only search with the Latin alphabet. Titles that purely consist of numbers, symbols, or other alphabets will not be found. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank						= 4,
 			performance					= ProviderHtml.PerformanceGood - ProviderHtml.PerformanceStep,
-			status						= ProviderHtml.StatusImpaired, # Cloudflare.
+			status						= ProviderHtml.StatusCloudflare, # Cloudflare.
 
 			link						= Provider._Link,
 

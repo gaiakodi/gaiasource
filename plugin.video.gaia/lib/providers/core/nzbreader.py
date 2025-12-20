@@ -127,7 +127,7 @@ class ProviderNzbreader(ProviderUsenetHtml):
 
 			extractOptimizeData			= HtmlTable(class_ = ProviderNzbreader._AttributeContainer), # To detect the last page in processOffset().
 			extractDetails				= extractDetails,
-			extractList					= [HtmlResults(class_ = ProviderNzbreader._AttributeTable, index = -1, start = 1)], # index = -1: Can be mutiple results table on Fork 2. start = 1: table header.
+			extractList					= [HtmlResults(class_ = ProviderNzbreader._AttributeTable, index = -1, start = 1)], # index = -1: Can be multiple results table on Fork 2. start = 1: table header.
 			extractLink					= extractLink,
 			extractIdUniversal			= extractIdUniversal,
 			extractIdCollection			= extractIdCollection,

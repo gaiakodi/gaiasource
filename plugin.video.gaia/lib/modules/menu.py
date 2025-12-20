@@ -35,7 +35,7 @@ class Menu(object):
 	ContentLibrary		= 'library'
 	ContentVerification	= 'verification'
 	ContentExtension	= 'extension'
-	ContentClean		= 'clean'
+	ContentMetadata		= 'metadata'
 	ContentUtility		= 'utility'
 
 	ParameterMenu		= 'menu'
@@ -142,6 +142,7 @@ class Menu(object):
 		elif content == Menu.ContentLibrary: items = self._menuLibrary(category = category, **parameters)
 		elif content == Menu.ContentVerification: items = self._menuVerification(category = category, **parameters)
 		elif content == Menu.ContentExtension: items = self._menuExtension(category = category, **parameters)
+		elif content == Menu.ContentMetadata: items = self._menuMetadata(category = category, **parameters)
 		elif content == Menu.ContentUtility: items = self._menuUtility(category = category, **parameters)
 		else: items = self._menuMain(**parameters)
 		if items: self._build(items = items)
@@ -160,7 +161,8 @@ class Menu(object):
 			self._item(label = 35170,		image = 'library',		content = Menu.ContentLibrary),
 			self._item(label = 33017,		image = 'verification',	content = Menu.ContentVerification),
 			self._item(label = 33720,		image = 'extensions',	content = Menu.ContentExtension),
-			self._item(label = 33989,		image = 'clean',		action = 'clean'),
+			self._item(label = 33015,		image = 'metadata',		content = Menu.ContentMetadata),
+			self._item(label = 33989,		image = 'clean',		action = 'cleanup'),
 			self._item(label = 35330,		image = 'utility',		content = Menu.ContentUtility),
 			self._item(label = donation,	image = 'donations',	action = 'donations',				icon = Icon.SpecialDonations),
 		]
@@ -658,6 +660,20 @@ class Menu(object):
 			for extension in Extension.list():
 				if (installed and extension['installed']) or (not installed and not extension['installed']):
 					items.append(self._item(label = extension['name'], image = extension['icon'], action = 'extensions', id = extension['id']))
+
+		return items
+
+	def _menuMetadata(self, category = None, **parameters):
+		items = []
+
+		if not category:
+			from lib.meta.providers.imdb import MetaImdb
+			items = [
+				self._item(label = 36840,	image = 'metadatadetail',	action = 'metadataDetail'),
+				self._item(label = 33552,	image = 'metadatapreload',	action = 'metadataPreload'),
+				self._item(label = 36880,	image = 'metadataimdb',		action = 'metadataBulk',	settings = not MetaImdb.bulkEnabled(),	selection = True),
+				self._item(label = 33011,	image = 'metadatasettings',	action = 'metadataSettings'),
+			]
 
 		return items
 

@@ -22,6 +22,7 @@ from lib.modules.tools import System, File, Hash, Language, Tools, Time, Media, 
 from lib.modules.network import Networker
 from lib.providers.core.base import ProviderBase
 from lib.modules.stream import Stream
+from lib.modules.external import Importer
 
 class ProviderExternal(ProviderBase):
 
@@ -87,6 +88,15 @@ class ProviderExternal(ProviderBase):
 	def reset(self, settings = True):
 		if settings:
 			ProviderExternal.Settings = {}
+
+	##############################################################################
+	# ENABLED
+	##############################################################################
+
+	def enabledExternal(self):
+		# If an external addon is NOT installed, but its category is enabled in the settings, it will be returned by Manager.providers(enabled = True).
+		# In such a case, check if the instance has an ID. If it has an ID, it is installed. If it does not have an ID, it is not installed.
+		return bool(self.mData['instance'].get('id'))
 
 	##############################################################################
 	# INSTANCES
@@ -702,9 +712,14 @@ class ProviderExternalUnstructured(ProviderExternal):
 	def instanceObject(self, parameterize = True):
 		try:
 			if self.mInstance is None:
-				import imp
+				# NB: Do not use "imp" anymore, since it deprecated in Python 3.13+.
+				#import imp
+
 				self.instancesInclude()
-				self.mInstance = imp.load_source(self.instanceId(), self.instanceFile()).source()
+
+				#self.mInstance = imp.load_source(self.instanceId(), self.instanceFile()).source()
+				self.mInstance = Importer.moduleFile(id = self.instanceId(), path = self.instanceFile()).source()
+
 				if parameterize: self.instanceParameterize()
 		except: self.logError()
 		return self.mInstance
@@ -724,7 +739,9 @@ class ProviderExternalUnstructured(ProviderExternal):
 	@classmethod
 	def instances(self, full = False):
 		import pkgutil
-		import imp
+
+		# NB: Do not use "imp" anymore, since it deprecated in Python 3.13+.
+		#import imp
 
 		items = []
 		providers = []
@@ -767,7 +784,9 @@ class ProviderExternalUnstructured(ProviderExternal):
 										item['name'] = name = id.replace(' ', '').replace('-', '').replace('_', '').replace('.', '').capitalize()
 										item['path'] = path = File.joinPath(path2, id + '.py')
 
-										scraper = imp.load_source(id, path).source()
+										#scraper = imp.load_source(id, path).source()
+										scraper = Importer.moduleFile(id = id, path = path).source()
+
 										if self.instanceIgnore(scraper = scraper):
 											item['ignore'] = True
 											continue

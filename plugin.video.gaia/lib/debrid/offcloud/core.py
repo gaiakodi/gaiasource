@@ -838,12 +838,20 @@ class Core(base.Core):
 			return Core.ErrorOffCloud
 
 	##############################################################################
+	# SUPPORT
+	##############################################################################
+
+	@classmethod
+	def supportedModes(self):
+		return {Core.ModeTorrent : True, Core.ModeUsenet : True, Core.ModeHoster : True}
+
+	##############################################################################
 	# CACHED
 	##############################################################################
 
 	@classmethod
 	def cachedModes(self):
-		return {Core.ModeTorrent, Core.ModeUsenet}
+		return {Core.ModeTorrent : True, Core.ModeUsenet : True}
 
 	# id: single hash or list of hashes.
 	def cachedIs(self, id, timeout = None):

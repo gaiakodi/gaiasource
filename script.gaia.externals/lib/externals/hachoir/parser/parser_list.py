@@ -204,10 +204,18 @@ class HachoirParserList(ParserList):
         todo = []
         # Gaia
         #module = __import__("hachoir.parser").parser
-        import imp,os
-        name = '__init__'
+        def _module(id, path):
+            import importlib.util
+            import sys
+            file = importlib.util.spec_from_file_location(id, path)
+            module = importlib.util.module_from_spec(file)
+            sys.modules[id] = module
+            file.loader.exec_module(module)
+            return module
+        import os
+        id = '__init__'
         path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '__init__.py'))
-        module = imp.load_source(name, path)
+        module = _module(id = id, path = path)
 
         for attrname in dir(module):
             attr = getattr(module, attrname)

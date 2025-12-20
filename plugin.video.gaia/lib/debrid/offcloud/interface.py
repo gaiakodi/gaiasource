@@ -232,6 +232,7 @@ class Interface(base.Interface):
 			tools.Logger.errorCustom('Unexpected OffCloud Error: ' + str(result))
 			title = 'Stream Error'
 			message = 'Stream File Unavailable'
+
 		self._addError(title = title, message = message)
 		result['notification'] = True
 		return result

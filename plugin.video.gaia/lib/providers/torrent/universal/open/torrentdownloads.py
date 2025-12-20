@@ -23,7 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://torrentdownloads.me', 'https://torrentdownloads.pro']
+	_Link					= ['https://torrentdownloads.pro', 'https://torrentdownloads.me']
 	_Unblock				= {ProviderHtml.UnblockFormat2 : 'torrentdownloads', ProviderHtml.UnblockFormat3 : 'torrentdownloads', ProviderHtml.UnblockFormat4 : 'torrentdownloads'}
 	_Path					= 'search/' # Must end with a slash.
 

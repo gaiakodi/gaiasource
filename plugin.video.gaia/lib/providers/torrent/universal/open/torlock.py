@@ -57,6 +57,12 @@ class Provider(ProviderHtml):
 		ProviderHtml.initialize(self,
 			name					= 'TorLock',
 			description				= '{name} is a well-known {container} site. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link and other metadata, which substantially increases scraping time.',
+
+			# Update (2025-12):
+			# Both domains are still working, but they are loading very slowly.
+			# And they often result in a "Read timed out (read timeout=30)" or "EOF occurred in violation of protocol (_ssl.c:1006)" errors.
+			# But occasionally it still returns a few results, although most queries/pages fail.
+			# The rank/performance is already low because of subpages.
 			rank					= 3,
 			performance				= ProviderHtml.PerformanceBad,
 

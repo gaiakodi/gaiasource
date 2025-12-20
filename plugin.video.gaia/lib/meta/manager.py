@@ -59,10 +59,19 @@ class MetaManager(object):
 	SpecialExclude		= False
 	SpecialReduce		= 'reduce'
 
-	ModeSynchronous		= 'synchronous'	# Make various background threads run in the foreground, waiting for them to finish before continuing.
-	ModeUndelayed		= 'undelayed'	# Make Cache write updates immediatly,. instead of scheduling in a background thread to execute at the end of execution.
-	ModeGenerative		= 'generative'	# Put MetaCache into generative mode to create the external metadata addon.
-	ModeAccelerate		= 'accelerate'	# Try to accelerate smart menu refreshes by doing the minimal amount of work. Eg: useful during binging when we do not want to hold up the playback of the next episode if smart-refreshing is going on in the background.
+	ModeSynchronous		= 'synchronous'		# Make various background threads run in the foreground, waiting for them to finish before continuing.
+	ModeUndelayed		= 'undelayed'		# Make Cache write updates immediately, instead of scheduling in a background thread to execute at the end of execution.
+	ModeGenerative		= 'generative'		# Put MetaCache into generative mode to create the external metadata addon.
+	ModeAccelerate		= 'accelerate'		# Try to accelerate smart menu refreshes by doing the minimal amount of work. Eg: useful during binging when we do not want to hold up the playback of the next episode if smart-refreshing is going on in the background.
+
+	OriginTrakt			= 'trakt'			# The release info comes from Trakt's calendars.
+	OriginOfficial		= 'official'		# The release info comes from a disk/streaming release date website.
+	OriginScene			= 'scene'			# The release info comes from a scene-release website.
+	OriginArrival		= 'arrival'			# The release info comes from the internal Arrival menu content.
+	OriginProgress		= 'progress'		# The release info comes from the internal Progress menu content.
+
+	PropertyRelease		= 'GaiaMetaRelease'
+	PropertyBusy		= 'GaiaMetaBusy'
 
 	Instance			= None
 	Batch				= None
@@ -71,19 +80,13 @@ class MetaManager(object):
 	# CONSTRUCTOR
 	##############################################################################
 
-	def __init__(self, mode = None):
-		#gaiaremove - #gaiafix
-		#gaiaremove - this can be removed a few weeks after v7.1.2 was released.
-		#gaiaremove - this is used to fix shows in the Arrivals menu that have a S02+ release, instead of S01.
-		#gaiaremove - remove all code marked with "gaiafix"
-		#gaiaremove - also remove in modules/tools.py.
-		self.mFix = False
-
+	def __init__(self, mode = None, tester = None):
 		self.mTools = MetaTools.instance()
 		self.mLanguage = self.mTools.settingsLanguage()
 
 		self.mDetail = self.mTools.settingsDetail()
 		self.mLevel = self.mTools.settingsDetail(level = True)
+		self.mTester = tester
 
 		self.mDeveloper = System.developerVersion()
 		self.mDeveloperExtra = False
@@ -106,6 +109,8 @@ class MetaManager(object):
 		elif self.mPerformance >= 0.6: self.mPerformanceMedium = True
 		else: self.mPerformanceSlow = True
 
+		self.mReleaseMedia = None
+
 		self.mReloadMedia = None
 		self.mReloadBusy = False
 		self.mReloadQuick = False
@@ -115,6 +120,18 @@ class MetaManager(object):
 
 		self.mProviders = None
 		self.mLimits = {}
+		self.mThreads = {}
+		self.mRenew = None
+
+		# More info in _busyBenchmark()
+		self.mBusyThread = None
+		self.mBusyLock = Lock()
+		self.mBusyGlobal = True		# Use global instead of local memory.
+		self.mBusyMultiple = True	# Store all IDs in a single memory value, instead of storing each ID in a separate memory value.
+		self.mBusyThreaded = False	# Use threads to remove the values from memory.
+		self.mBusyWait = True		# When using threads for removal, delay the removal until other processing is done.
+		self.mBusyRemove = []
+		self.mBusyProvider = [MetaTools.ProviderTrakt, MetaTools.ProviderImdb, MetaTools.ProviderTmdb, MetaTools.ProviderTvdb, MetaTools.ProviderImdx] # Order from most likely to least likley to find the ID, to save some time.
 
 		self.mJob = None
 		self.jobReset()
@@ -141,11 +158,65 @@ class MetaManager(object):
 		MetaManager.Batch = None
 
 	##############################################################################
+	# THREAD
+	##############################################################################
+
+	# These only contain the threads from the _metadataCache() and the update functions called within.
+	# This does not contain any of the other threads *smart-reloading, etc).
+	# These functions allow us to join the threads and wait for the manager to finish the metadata updates it is busy with.
+	# Used by Tester to wait for one batch of metadata updates to finish before continuing to the next batch.
+
+	def _threadAdd(self, thread):
+		# Do not store the thread objects in the self.mThreads.
+		# Otherwise if threadJoin() is never called (currently only called from tester.py), the thread remains in memory and does not get garbage-collected.
+		#self.mThreads[thread.id()] = thread
+		self.mThreads[thread.id()] = True
+
+	def _threadClear(self):
+		self.mThreads = {}
+
+	def threadJoin(self, timeout = None):
+		try:
+			if timeout: timer = Time(start = True)
+			for id in list(self.mThreads.keys()): # Use a list, since we edit/delete from the dict in the loop.
+				if Pool.busy(id = id): Pool.join(instance = Pool.retrieve(id = id), timeout = timeout)
+				del self.mThreads[id]
+				if timeout and timer.elapsed() > timeout: return False
+			return True
+		except: Logger.error()
+		return False
+
+	##############################################################################
+	# CHECK
+	##############################################################################
+
+	@classmethod
+	def _check(self):
+		return Pool.check()
+
+	@classmethod
+	def _checkDelay(self):
+		return Pool.checkDelay(lock = True)
+
+	def _checkInterval(self, mode = None):
+		reloading = bool(self.reloadingMedia())
+		background = mode == MetaCache.RefreshBackground
+
+		if reloading: delay = Pool.DelayMedium
+		elif background: delay = Pool.DelayShort
+		else: delay = False
+
+		return Pool.check(delay = delay, lock = background or reloading)
+
+	##############################################################################
 	# CACHE
 	##############################################################################
 
 	def _cache(self, cache_, refresh_, *args, **kwargs):
 		return Tools.executeFunction(self.mCache, 'cacheClear' if refresh_ else cache_, *args, **kwargs)
+
+	def _cacheTimeout(self, timeout_, refresh_, *args, **kwargs):
+		return Tools.executeFunction(self.mCache, 'cache', None, timeout_, refresh_, *args, **kwargs)
 
 	def _cacheRetrieve(self, *args, **kwargs):
 		return Tools.executeFunction(self.mCache, 'cacheRetrieve', *args, **kwargs)
@@ -254,6 +325,312 @@ class MetaManager(object):
 			self.mJob[None]['count'] += none
 			self.mJob[None]['media'].append(media)
 			if not content is None: self.mJob[None]['content'] = content
+
+	@classmethod
+	def _jobTimer(self, start = True):
+		# Only calculate the time if the code is actually executing, since there can be sleeps in between from _check().
+		return Time(start = start, mode = Time.ModeMonotonic)
+
+	##############################################################################
+	# BUSY
+	##############################################################################
+
+	'''
+		Scenario 1:
+
+			a. Clear the local metadata.db and load a show menu (eg: Highest Rated).
+			b. Since no local metadata is available, the metadata is now retrieved from script.gaia.metadata, returned immediately, and the new metadata is retrieved/refreshed in the background.
+			c. When the menu is loaded/decorated, in playback.py -> _historyItems() -> each show in the list is retrieved again individually with Shows().metadata(...).
+			d. This causes eg 50 separate calls to Shows().metadata(), each of them retrieving the metadata from script.gaia.metadata and refreshing the metadata in the background for a second time.
+			e. The metadata is refreshed in the background again, since the original background threads for retrieving the metadata have not yet finished and have not written to MetaCache.
+			f. In metadataUpdate() the Memory class is used to check if there are multiple concurrent requests to the same show, and let any subsequent request wait and then just use the cached data without making all the provider requests again.
+			g. However, just starting background threads in metadata(), just for them to exit shortly after being started, requires a lot of time, making the "cached" menu still load slowly.
+
+			To solve this, we check if metadata is already retrieved by another thread, BEFORE starting the new background threads.
+			This is done with a local Memory variable, and will therefore only work for calls from within the same process/interpreter.
+			If eg loading the menu twice (either double clicking by accident, or opening a menu, immediately going back and then reopening the menu before the previous call fully finished), multiple interpreters are started and this detection will not work, since the class variable is not shared.
+			In that case, bad luck, make the background threads start twice. New metadata retrieval should still be skipped inside the thread in metadataUpdate() where Memory is used.
+			We could use Memory(kodi = True) to make this work across interpreters, but the time it takes for looking up and setting the global Kodi variable might not be worth the effort, and would only be used very few times.
+
+		Scenario 2:
+
+			Previously "local = True, kodi = False" was used.
+			This can make metadata being retrieved/generated duplicate times across multiple Python processes/invokers, wasting resources and time.
+
+			a. A large pack is outdated (eg One Piece or Pokémon).
+			b. Open the show Progress menu. Since the pack is outdated, it will be retrieved/generated in the background when the menu is opened.
+			c. Open any episode submenu in the Progress menu. Then navigate back to the main Progress menu.
+			d. Since the pack is very large, it takes 30-60 secs to generate. But since we go back to the main Progress menu, the pack is needed again for the menu, retrieved from cache, and since it is still outdated, it will be retrieved/generated again.
+			e. Now the large pack is generated twice (or even more), since it takes a long time to create the pack, and multiple Python processes/invokers have initiated a refresh of the pack before the previous generation was completed.
+
+			It is therefore insufficient to only use local memory, since Python processes/invokers do not share that memory.
+			Hence, use "local = False, kodi = True" to allow checking across multiple Python processes.
+			Do not use "local = True, kodi = True", otherwise a process will first retrieve the local values, although the global values might have been recently updated by another process.
+
+			The performance implication is negligible.
+			The busy functions are only called when metadata is actually being refreshed. But when up-to-date metadata is retrieved from the cache, these functions are not called.
+			Using local memory takes about 0.5ms per item, while global memory takes 0.8ms per item.
+			More info under _busyBenchmark().
+	'''
+
+	def _busyStart(self, media, item):
+		try:
+			# Use a timestamp instead of just setting a boolean.
+			# In case something goes wrong with the global memory, we do not want to never update again until Kodi is restarted and the memory is cleared.
+			# If the value is older than a few minutes, assume it is an outdated value and do not use it.
+			time = Time.timestamp()
+			limit = (time - 300) # 5 minutes.
+			busy = False
+
+			# Atomic operation to read and possibly write the memory value.
+			# Otherwise we read the memory in one process, then another process updates the values, only for the first process to overwrite the memory containing the new value with the later _busySet().
+			self._busyLock()
+
+			# All IDs stored as a single JSON object.
+			if self.mBusyMultiple:
+				data = self._busyGet(initialize = True)
+				if data:
+					for provider in self.mBusyProvider:
+						try:
+							id = self._busyId(item = item, provider = provider)
+							if id:
+								value = data[media][provider].get(id)
+								if value:
+									if value > limit: busy = True
+									break
+						except: pass
+				if not busy:
+					changed = False
+					for provider in self.mBusyProvider:
+						try:
+							id = self._busyId(item = item, provider = provider)
+							if id:
+								if not media in data: data[media] = {}
+								if not provider in data[media]: data[media][provider] = {}
+								data[media][provider][id] = time
+								changed = True
+						except: pass
+					if changed: self._busySet(data = data)
+
+			# IDs stored as individual values.
+			else:
+				ids = self._busyIds(media = media, item = item)
+				for id in ids:
+					data = self._busyGet(id = id, initialize = True)
+					if data:
+						if data > limit: busy = True
+						break
+				if not busy:
+					for id in ids:
+						self._busySet(id = id, data = time)
+
+			self._busyUnlock()
+
+			if busy:
+				developer = self._metadataDeveloper(item = item)
+				if developer: Logger.log('METADATA BUSY [%s]: %s' % (media.upper(), developer))
+
+			return busy
+		except: Logger.error()
+		return None
+
+	def _busyFinish(self, media, item):
+		try:
+			if self.mBusyMultiple:
+				for provider in self.mBusyProvider:
+					try:
+						id = self._busyId(item = item, provider = provider)
+						if id: self.mBusyRemove.append({'media' : media, 'provider' : provider, 'id' : id})
+					except: pass
+			else:
+				ids = self._busyIds(media = media, item = item)
+				if ids: self.mBusyRemove.extend(ids)
+
+			if self.mBusyRemove:
+				if self.mBusyThreaded:
+					self._busyLock()
+					if not self.mBusyThread or self.mBusyThread.finished():
+						self.mBusyThread = Pool.thread(target = self._busyRemove, kwargs = {'wait' : self.mBusyWait})
+						self._busyUnlock()
+						self.mBusyThread.start()
+					else:
+						self._busyUnlock()
+				else:
+					self._busyRemove(wait = False)
+
+			try: del item[MetaCache.Attribute][MetaCache.AttributeBusy]
+			except: pass
+		except: Logger.error()
+
+	def _busyRemove(self, wait = False):
+		try:
+			if self.mBusyRemove:
+				if wait: Pool.wait(delay = 30.0)
+
+				self._busyLock()
+				remove = self.mBusyRemove
+				self.mBusyRemove = []
+
+				if self.mBusyMultiple:
+					changed = False
+					data = self._busyGet()
+					for i in remove:
+						try:
+							del data[i['media']][i['provider']][i['id']]
+							changed = True
+						except: pass
+					if changed: self._busySet(data = data)
+				else:
+					for id in remove:
+						self._busyClear(id = id)
+
+				self._busyUnlock()
+		except: Logger.error()
+
+	def _busyId(self, item, provider):
+		id = item.get(provider)
+		if not id:
+			try: id = item['id'][provider]
+			except: pass
+		if id and Media.isEpisode(item.get('media')): id += '_' + str(item.get('season'))
+		return id
+
+	def _busyIds(self, media, item):
+		ids = []
+		try:
+			for provider in self.mBusyProvider:
+				id = self._busyId(item = item, provider = provider)
+				if id: ids.append(MetaManager.PropertyBusy + '_' + str(media) + '_' + provider + '_' + str(id))
+		except: Logger.error()
+		return ids
+
+	def _busyGet(self, id = None, initialize = False):
+		id = id or MetaManager.PropertyBusy
+		if not self.mBusyMultiple and self.mBusyGlobal:
+			# Slightly faster than using Memory, since there is no JSON-encoding.
+			data = System.windowPropertyGet(id)
+			if data: data = int(data)
+		else:
+			data = Memory.get(fixed = id, local = not self.mBusyGlobal, kodi = self.mBusyGlobal)
+
+		if initialize and data is None:
+			data = {}
+			self._busySet(id = id, data = data)
+		return data
+
+	def _busySet(self, data, id = None):
+		id = id or MetaManager.PropertyBusy
+		if not self.mBusyMultiple and self.mBusyGlobal:
+			# Slightly faster than using Memory, since there is no JSON-encoding.
+			System.windowPropertySet(id, str(data))
+		else:
+			Memory.set(fixed = id, value = data, local = not self.mBusyGlobal, kodi = self.mBusyGlobal)
+
+	def _busyClear(self, id = None):
+		id = id or MetaManager.PropertyBusy
+		if not self.mBusyMultiple and self.mBusyGlobal:
+			System.windowPropertyClear(id)
+		else:
+			Memory.clear(fixed = id, local = not self.mBusyGlobal, kodi = self.mBusyGlobal)
+
+	def _busyLock(self):
+		self.mBusyLock.acquire()
+
+	def _busyUnlock(self):
+		self.mBusyLock.release()
+
+	def _busyBenchmark(self):
+		# When measuring the execution time in _busyFinish() in a live situation, the duration can be very long, from 10-90 secs.
+		# Even when using different types of timers, the execution time seems way too long, sometimes even longer than the entire Python process time (which is obviously incorrect).
+		# However, the total execution time to load a menu does not seem to be greatly affected by using the _busyXxx() functions, even with global memory.
+		# The inaccurate time measurements might be due to other reasons, like the threading and locking in _metadataCache() and _metadataXxxUpdate(), Python interleaving threads, etc.
+		# Rather run this function to benchmark the actual time it takes to read/write value to global memory.
+		#
+		# Results:
+		#	Multiple: Batch IDs are faster for 50 items or less, but single IDs are faster if there are more items. Most of the time there will be considerably less than 50 items being loaded at the same time.
+		#	Threaded: Non-threaded is slightly faster than threaded, depending on how many items are loaded at the same time.
+		#
+		# Using batch IDs can also slow down slightly over time.
+		# Sometimes a few IDs remain in the dict. This can happen if the ID of the base item changes if detailed metadata is retrieved. Or if a process is canceled before _busyRemove() is called.
+		# This is not a huge issue, since this will only be few IDs. But if the user does not restart Kodi for a while, this dict can grow in size.
+		# On the other hand, if single IDs are used, then there will be a lot more global Kodi properties, which can slow down lookup a bit.
+
+		limit = 50
+		media = Media.Show
+		items = self.discover(media = media, niche = Media.Prestige, limit = limit)['items']
+		Logger.log('BUSY MEMORY BENCHMARK: %i Items' % limit)
+
+		benches = [
+			{'label' : 'Default (Default Configuration)',											'multiple' : None, 'global' : None, 'threaded' : None},
+
+			# Only works between threads within the same Python process/invoker.
+			{'label' : 'Local (Local Memory | Threads | Batch IDs | Non-Threaded)',					'multiple' : True, 'global' : False, 'threaded' : False},
+			{'label' : 'Local (Local Memory | Threads | Batch IDs | Threaded)',						'multiple' : True, 'global' : False, 'threaded' : True},
+			{'label' : 'Local (Local Memory | Threads | Single IDs | Non-Threaded)',				'multiple' : False, 'global' : False, 'threaded' : False},
+			{'label' : 'Local (Local Memory | Threads | Single IDs | Threaded)',					'multiple' : False, 'global' : False, 'threaded' : True},
+
+			# Works between threads within the same Python process/invoker and between different Python processes/invokers.
+			{'label' : 'Global (Global Memory | Processes+Threads | Batch IDs | Non-Threaded)',		'multiple' : True, 'global' : True, 'threaded' : False},
+			{'label' : 'Global (Global Memory | Processes+Threads | Batch IDs | Threaded)',			'multiple' : True, 'global' : True, 'threaded' : True},
+			{'label' : 'Global (Global Memory | Processes+Threads | Single IDs | Non-Threaded)',	'multiple' : False, 'global' : True, 'threaded' : False},
+			{'label' : 'Global (Global Memory | Processes+Threads | Single IDs | Threaded)',		'multiple' : False, 'global' : True, 'threaded' : True},
+		]
+
+		# Initialize
+		threads = [Pool.thread(target = self._busyStart, kwargs = {'media' : media, 'item' : item}) for item in items]
+		[thread.start() for thread in threads]
+		[thread.join() for thread in threads]
+		threads = [Pool.thread(target = self._busyFinish, kwargs = {'media' : media, 'item' : item}) for item in items]
+		[thread.start() for thread in threads]
+		[thread.join() for thread in threads]
+		if self.mBusyThread and not self.mBusyThread.finished(): self.mBusyThread.join()
+		self.mBusyThread = None
+		self._busyClear()
+		for item in items:
+			for id in self._busyIds(media = media, item = item):
+				self._busyClear(id = id)
+
+		for bench in benches:
+			if not bench['global'] is None:
+				self.mBusyMultiple = bench['multiple']
+				self.mBusyGlobal = bench['global']
+				self.mBusyThreaded = bench['threaded']
+				self.mBusyWait = False
+
+			total = 0
+			interations = 20
+			for i in range(interations):
+				timer = self._jobTimer()
+
+				threads = [Pool.thread(target = self._busyStart, kwargs = {'media' : media, 'item' : item}) for item in items]
+				[thread.start() for thread in threads]
+				[thread.join() for thread in threads]
+
+				threads = [Pool.thread(target = self._busyFinish, kwargs = {'media' : media, 'item' : item}) for item in items]
+				[thread.start() for thread in threads]
+				[thread.join() for thread in threads]
+
+				if self.mBusyThread and not self.mBusyThread.finished(): self.mBusyThread.join()
+				self.mBusyThread = None
+
+				total += timer.elapsed(True)
+
+				self._busyClear()
+				for item in items:
+					for id in self._busyIds(media = media, item = item):
+						self._busyClear(id = id)
+				Time.sleep(0.3)
+
+			duration = int(total / interations)
+			tab = '\t'
+			if len(bench['label']) <= 64: tab += '\t'
+			if len(bench['label']) <= 56: tab += '\t'
+			if len(bench['label']) <= 45: tab += '\t\t\t'
+			space = ''
+			if duration < 100: space += ' '
+			if duration < 10: space += ' '
+			Logger.log(bench['label'] + ':%sTotal: %s%d ms | Item: %.2f ms ' % (tab, space, duration, duration / limit))
+			Time.sleep(1)
 
 	##############################################################################
 	# PROVIDER
@@ -390,7 +767,7 @@ class MetaManager(object):
 		if keyword or Media.isPleasure(niche):
 			# Do not do this atm. IMDb might have separate keywords, but the results return too many un or less related titles.
 			# Eg: for "Cannabis", IMDb returns few stoners movies and a ton of titles where weed might have only be mentioned once, whereas Trakt returns mostly stoner movies.
-			# Plus we can search mutiple keywords on Trakt (ORed).
+			# Plus we can search multiple keywords on Trakt (ORed).
 			#weight[trakt]	+= poor
 			#weight[imdb]	+= extra
 			weight[trakt]	+= extra
@@ -470,6 +847,8 @@ class MetaManager(object):
 				weight[imdb]	+= good
 
 		# Trakt does not have images for people. IMDb does.
+		# Update: Trakt now has images in their API, including for people.
+		# However, Trakt does not sort the people (eg by popularity). Hence, mostly unknown and Indian actors are returned. So stick with IMDb, which sorts people by popularity.
 		# Only IMDb can lookup by gender.
 		if media == Media.Person or content == MetaManager.ContentPerson:
 			weight[imdb]	+= full
@@ -479,10 +858,100 @@ class MetaManager(object):
 		if Media.isSeason(media): weight[imdb] = none
 
 		# IMDb does support episodes, but the discover/search does not return the episode number, only the show and episode titles and IDs.
-		# Additionally, IMDb episode searches often contain mutiple (different) episodes from the same show, instead of episodes from all different shows.
+		# Additionally, IMDb episode searches often contain multiple (different) episodes from the same show, instead of episodes from all different shows.
 		elif Media.isEpisode(media): weight[imdb] = poor
 
 		return [i[0] for i in Tools.listSort(weight.items(), key = lambda i : i[1], reverse = True) if i[1] >= 0]
+
+	##############################################################################
+	# PROVIDER - USAGE
+	##############################################################################
+
+	@classmethod
+	def providerUsage(self, authenticated = False, full = False, provider = None, cache = False):
+		return MetaProvider.usageGlobal(authenticated = authenticated, full = full, provider = provider, cache = cache)
+
+	# NB: "authenticated = None" by default to get the total of both authenticated and unauthenticated requests.
+	# Update (2025-12): Trakt now does not allow a combined total of 2000 for authenticated/unauthenticated anymore. Only use the unauthenticated total now.
+	@classmethod
+	def providerUsageTotal(self, authenticated = False, full = False, provider = None, cache = False):
+		return self.providerUsage(authenticated = authenticated, full = full, provider = provider, cache = cache)
+
+	@classmethod
+	def providerUsageTrakt(self, authenticated = False, cache = False):
+		return self.providerUsage(provider = MetaTrakt, authenticated = authenticated, cache = cache)
+
+	@classmethod
+	def providerUsageTmdb(self, authenticated = False, cache = False):
+		return self.providerUsage(provider = MetaTmdb, authenticated = authenticated, cache = cache)
+
+	@classmethod
+	def providerUsageTvdb(self, authenticated = False, cache = False):
+		return self.providerUsage(provider = MetaTvdb, authenticated = authenticated, cache = cache)
+
+	@classmethod
+	def providerUsageImdb(self, authenticated = False, cache = False):
+		return self.providerUsage(provider = MetaImdb, authenticated = authenticated, cache = cache)
+
+	@classmethod
+	def providerUsageFanart(self, authenticated = False, cache = False):
+		return self.providerUsage(provider = MetaFanart, authenticated = authenticated, cache = cache)
+
+	##############################################################################
+	# PROVIDER - ERROR
+	##############################################################################
+
+	@classmethod
+	def providerError(self, full = False, provider = None, cache = False):
+		return MetaProvider.errorGlobal(full = full, provider = provider, cache = cache)
+
+	@classmethod
+	def providerErrorTrakt(self, cache = False):
+		return self.providerError(provider = MetaTrakt, cache = cache)
+
+	@classmethod
+	def providerErrorTmdb(self, cache = False):
+		return self.providerError(provider = MetaTmdb, cache = cache)
+
+	@classmethod
+	def providerErrorTvdb(self, cache = False):
+		return self.providerError(provider = MetaTvdb, cache = cache)
+
+	@classmethod
+	def providerErrorImdb(self, cache = False):
+		return self.providerError(provider = MetaImdb, cache = cache)
+
+	@classmethod
+	def providerErrorFanart(self, cache = False):
+		return self.providerError(provider = MetaFanart, cache = cache)
+
+	##############################################################################
+	# PROVIDER - WAIT
+	##############################################################################
+
+	@classmethod
+	def providerWait(self, full = False, provider = None, cache = False):
+		return MetaProvider.waitGlobal(full = full, provider = provider, cache = cache)
+
+	@classmethod
+	def providerWaitTrakt(self, cache = False):
+		return self.providerWait(provider = MetaTrakt, cache = cache)
+
+	@classmethod
+	def providerWaitTmdb(self, cache = False):
+		return self.providerWait(provider = MetaTmdb, cache = cache)
+
+	@classmethod
+	def providerWaitTvdb(self, cache = False):
+		return self.providerWait(provider = MetaTvdb, cache = cache)
+
+	@classmethod
+	def providerWaitImdb(self, cache = False):
+		return self.providerWait(provider = MetaImdb, cache = cache)
+
+	@classmethod
+	def providerWaitFanart(self, cache = False):
+		return self.providerWait(provider = MetaFanart, cache = cache)
 
 	##############################################################################
 	# PROCESS
@@ -507,7 +976,7 @@ class MetaManager(object):
 		except: Logger.error()
 		return items
 
-	def _processSerie(self, media, items):
+	def _processAggregate(self, media, items):
 		# Certain menus contain seasons or episodes, instead of shows.
 		# Eg: New Releases -> New Seasons/Episodes
 		# Loading these menus as season/episode menus is very inefficient, since each entry is from a different show and would have to retrieve/generate pack metadata and full episode/season/show metadata.
@@ -538,7 +1007,7 @@ class MetaManager(object):
 
 					if premiere:
 						if not show.get('time'): show['time'] = {}
-						show['time'][MetaTools.TimeSerie] = premiere
+						show['time'][MetaTools.TimeCustom] = premiere
 
 					result.append(show)
 
@@ -548,10 +1017,20 @@ class MetaManager(object):
 					item['media'] = Media.Show
 					if premiere:
 						if not item.get('time'): item['time'] = {}
-						item['time'][MetaTools.TimeSerie] = premiere
+						item['time'][MetaTools.TimeCustom] = premiere
 					result.append(item)
 
 			items = result
+		else:
+			for item in items:
+				if not item.get('media'): item['media'] = media
+				try: premiere = item['time'][MetaTools.TimePremiere]
+				except: premiere = None
+				if not premiere:
+					premiere = item.get('premiered')
+					if premiere:
+						if not item.get('time'): item['time'] = {}
+						item['time'][MetaTools.TimePremiere] = Time.timestamp(premiere, format = Time.FormatDate, utc = True)
 
 		return items
 
@@ -783,7 +1262,7 @@ class MetaManager(object):
 						break
 
 			if self.mTools.submenuIsEpisode(submenu = submenu):
-				history = MetaTools.submenuHistory()
+				history = self.mTools.submenuHistory()
 
 				# Use the actual episode we want to watch, not the values passed in by parameters, which are offsetted by submenuHistory().
 				# Only do this for the 1st page where we add the history.
@@ -899,7 +1378,7 @@ class MetaManager(object):
 	# RELOAD
 	##############################################################################
 
-	# Prevent mutiple reloads running at the same time, or shortly after each other.
+	# Prevent multiple reloads running at the same time, or shortly after each other.
 	@classmethod
 	def _lock(self, mode, media, content, update = True, delay = None, force = False):
 		id = 'GaiaManagerReload'
@@ -958,9 +1437,13 @@ class MetaManager(object):
 	# history = only update lists/items that are affected by changes in the history (a title was watched/unwatched).
 	# progress = only update lists/items that are affected by changes in the progress (a title's unfinished playback progress).
 	# arrival = only update lists/items that are affected by changes in the arrivals.
+	# bulk = only update the IMDb bulk data. This takes very long and should only be done during launch.
+	# launch = if True the call to this function was made during Kodi launch. If False, it was called from somewhere else, such as during binging. This can be used to only execute certain computationally expensive code during boot.
 	# delay = whether or not to delay the cache refreshes for the lists by a few seconds in order not to hold up other processes. If False, immediately refresh the cache without waiting.
 	@classmethod
-	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, accelerate = False, delay = False, force = False):
+	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, release = None, bulk = False, accelerate = False, launch = False, delay = False, force = False):
+		if not self._checkDelay(): return False
+
 		# This function should never be called from the singleton, since its changes the cache delay, and sets self.mReloadBusy.
 		# Read the comment below for self.mReloadBusy.
 		if self == MetaManager.instance():
@@ -969,7 +1452,7 @@ class MetaManager(object):
 
 		if not media:
 			for i in [Media.Show, Media.Movie, Media.Mixed]:
-				self.reload(media = i, history = history, progress = progress, rating = rating, arrival = arrival, delay = delay, force = force)
+				self.reload(media = i, history = history, progress = progress, rating = rating, arrival = arrival, launch = launch, delay = delay, force = force)
 			return True
 
 		# Do not use the singleton.
@@ -1001,18 +1484,38 @@ class MetaManager(object):
 		# If the metadata of these titles is outdated, they will be refreshed in the background. Although this should not happen too often.
 		manager.mReloadMedia = media
 
+		# Refresh the IMDb bulk metadata.
+		# This can take 3-5+ minutes on a high-end device, and 10-15+ minutes on a low-end device.
+		# Only do this during launch and not during other calls in between, such as after playback ended or when a menu is opened.
+		# Otherwise the device might slow down during binging in case the bulk cache timeout is triggered at that point.
+		# Only refresh during Kodi launch to reduce the impact of the downlaoding/processing.
+		# No need to check the "launch" parameter, since "bulk" is only set to True during launch.
+		# Do this first, since it takes long, might need a restart once done, and its updated data might be needed for the metadata refreshes below.
+		if bulk and Media.isMixed(media):
+			if not self._checkDelay(): return False
+			if developer: Logger.log('RELOAD: Refreshing Bulk Data ...')
+			manager.bulkImdbRefresh(reload = True, wait = True) # Do not set "refresh = True" to force a refresh. Only refresh if the cache timeout was reached in MetaImdb.
+
 		if not Media.isMixed(media):
 			if (history or progress) and self._lockRefresh(media = media, content = MetaManager.ContentProgress, force = force):
+				if not self._checkDelay(): return False
 				if developer: Logger.log('RELOAD: Refreshing %s Progress ...' % media.capitalize())
 				manager.progress(media = media, refresh = True)
 
 			if arrival and self._lockRefresh(media = media, content = MetaManager.ContentArrival, force = force):
+				if not self._checkDelay(): return False
 				if developer: Logger.log('RELOAD: Refreshing %s Arrivals ...' % media.capitalize())
 				manager.arrival(media = media, refresh = True)
 
 			if (history or progress) and self._lockRefresh(media = media, content = MetaManager.ContentQuick, force = force):
+				if not self._checkDelay(): return False
 				if developer: Logger.log('RELOAD: Refreshing %s Quick ...' % media.capitalize())
 				manager.quick(media = media, refresh = True) # Do this last, since it uses the data of the other functions.
+
+			if release or (release is None and (progress or arrival)):
+				if not self._checkDelay(): return False
+				if developer: Logger.log('RELOAD: Refreshing %s Releases ...' % media.capitalize())
+				manager.release(media = media, refresh = True)
 
 		# Reload the cached first page. This is quick, since no full refresh is done.
 		# Also do if ratings were updated, to display the user rating in the progress menu after the rating dialog at the end of playback.
@@ -1020,14 +1523,17 @@ class MetaManager(object):
 		manager.mReloadBusy = True # Prevent smart-reloads if we only reloading the cached menu.
 
 		if (history or progress or rating) and self._lockReload(media = media, content = MetaManager.ContentProgress, force = force):
+			if not self._checkDelay(): return False
 			if developer: Logger.log('RELOAD: Reloading %s Progress ...' % media.capitalize())
 			manager.progress(media = media, reload = True)
 
 		if arrival and self._lockReload(media = media, content = MetaManager.ContentArrival, force = force):
+			if not self._checkDelay(): return False
 			if developer: Logger.log('RELOAD: Reloading %s Arrivals ...' % media.capitalize())
 			manager.arrival(media = media, reload = True)
 
 		if (history or progress or rating) and self._lockReload(media = media, content = MetaManager.ContentQuick, force = force):
+			if not self._checkDelay(): return False
 			if developer: Logger.log('RELOAD: Reloading %s Quick ...' % media.capitalize())
 			manager.quick(media = media, reload = True) # Do this last, since it uses the data of the other functions.
 
@@ -1057,21 +1563,39 @@ class MetaManager(object):
 	# PRELOAD
 	##############################################################################
 
+	# clean: remove old/unused metadata records from MetaCache that have a different settings ID.
 	@classmethod
-	def preload(self, callback = None):
+	def preload(self, callback = None, clean = None):
 		try:
+			progress = 0.0
+			def _progress(percent = None, tasks = None, part = None, status = None, detail = None):
+				if part:
+					if not percent: percent = 0
+					if Tools.isArray(tasks): tasks = len(tasks)
+					elif not tasks: tasks = 1
+					percent = progress + ((percent + 1) / float(tasks) * part)
+				self._batchProgress(percent = percent, status = status, detail = detail)
+
 			def _update():
 				while True:
-					if self._batch('status', 'cool'): self._batchProgress(status = 'Cooling Down Requests', detail = 'Pausing retrievals to give APIs some breathing space.')
-					if self._batchCanceled():
+					if self._batch('status', 'cool'): _progress(status = 'Cooling Down Requests', detail = 'Pausing retrievals to give APIs some breathing space.')
+					if self._batchCanceled(skip = False):
 						self._batchStop()
 						return
 					Time.sleep(1)
 
-			def _base(data, season = False):
-				result = {'imdb' : data.get('imdb'), 'tmdb' : data.get('tmdb'), 'tvdb' : data.get('tvdb'), 'trakt' : data.get('trakt')}
+			def _base(data, media = False, season = False):
+				result = {'imdb' : data.get('imdb'), 'tmdb' : data.get('tmdb'), 'tvdb' : data.get('tvdb'), 'trakt' : data.get('trakt'), 'title' : data.get('tvshowtitle') or data.get('title'), 'year' : data.get('tvshowyear') or data.get('year')}
+				if media:
+					mediad = data.get('media')
+					if media is True and Media.isSerie(mediad): mediad = Media.Show
+					result['media'] = mediad
 				if season: result['season'] = data.get('season')
 				return result
+
+			# limit=False: return all items.
+			# internal=True: in order not to use the outer cache data from content().
+			parameters = {'refresh' : True, 'pack' : False, 'detail' : False, 'limit' : False, 'internal' : True}
 
 			batch = self._batchStart(strict = True, callback = callback, status = 'Initializing Smart Menus', detail = 'Preparing smart menus for metadata retrieval.')
 			Pool.thread(target = _update, start = True)
@@ -1086,154 +1610,668 @@ class MetaManager(object):
 			# 	This makes sure any cache threads are completed before moving to the next task.
 			manager = MetaManager(mode = [MetaManager.ModeSynchronous, MetaManager.ModeUndelayed]) # Do not use MetaManager.instance(), since we change the cache mode and delay.
 
+			# On low-end devices there are major performance issues during preloading.
+			performance = manager.mPerformance
+			performanceGood = performance > 0.65
+			performanceMedium = performance >= 0.3 and performance < 0.65
+			performanceBad = performance < 0.3
+
+			# Low-end devices are considerably slower. Use less iterations.
+			iterated = {
+				'initial' : 1,
+				'extended' : 4 if performanceGood else 3 if performanceMedium else 2,
+				'final' : {
+					'skip' : 4 if performanceGood else 3 if performanceMedium else 2,
+					'unskip' : 7 if performanceGood else 5 if performanceMedium else 3,
+					'quick' : 1,
+				},
+				'reload' : {
+					'skip' : 3 if performanceGood else 2 if performanceMedium else 1,
+					'unskip' : 4 if performanceGood else 3 if performanceMedium else 2,
+				},
+			}
+
+			# Reduce the chunk size for low-end devices. This reduces the number of threads being used.
+			chunked = {
+				'lookup' : 50 if performanceGood else 40 if performanceMedium else 30,
+				Media.Movie : 25 if performanceGood else 20 if performanceMedium else 15, # Movies + Shows.
+				Media.Set : 30 if performanceGood else 25 if performanceMedium else 20,
+				Media.Season : 5 if performanceGood else 4 if performanceMedium else 3, # Seasons + Packs. Do not make the chunk too large, since packs and detailed metadata for all seasons are retrieved.
+				Media.Episode : 4 if performanceGood else 3 if performanceMedium else 2, # Do not make the chunk too large, since some seasons can contain many episodes.
+			}
+
 			from lib.modules.playback import Playback
+			from lib.modules.interface import Format
+			from lib.meta.menu import MetaMenu
+
+			# Try reducing the number of threads where possible.
+			# This is important for low-end devices, which can sometimes run out of threads during the the detailed metadata retrieval phase.
+			threaded = False
+
+			current = Time.timestamp()
+			cache = MetaCache.instance()
 			playback = Playback.instance()
-			progress = 0.0
+			items = []
+			movies = []
+			shows = []
+			sets = {'trakt' : {}, 'tmdb' : {}, 'imdb' : {}}
+
+			stepProgress = 0
+			stepArrival = 0
+			stepQuick = 0
+
+			detailProgress = '%s custom %s %s menu based on your Trakt history.'
+			detailArrival = '%s custom %s %s menu from multiple sources.'
+			detailReleaseMovie = '%s internal release calendar for new movies.'
+			detailReleaseShow = '%s internal release calendar for your Trakt shows.'
+
+			status = 'Initializing Metadata Cache'
+			detail = 'Preparing the metadata cache for preloading.'
+			_progress(0, status = status, detail = detail)
+			if clean: Time.sleep(10) # Wait for cache clearing to finish with the database.
 
 			# SYNC TRAKT DATA
-			part = 0.05
-			if playback._traktEnabled():
+			if not self._batchCanceled():
+				part = 0.03
+				if playback._traktEnabled():
+					self._batchStep(trakt = 0.0)
+					tasks = [
+						{'media' : Media.Movie},
+						{'media' : Media.Show},
+					]
+					for i, task in enumerate(tasks):
+						media = task.get('media')
+						status = 'Synchronizing Trakt %ss' % media.title()
+						detail = 'Retrieving your Trakt %s history, progress, and ratings.' % media
+						_progress(i, tasks = tasks, part = part, status = status, detail = detail)
+
+						playback.refresh(media = task.get('media'), history = True, progress = True, rating = True, force = True, reload = False, wait = True)
+						self._batchStep(trakt = (i + 1) / len(tasks))
+						if not self._batchCool(): break
+					self._batchStep(trakt = 1.0)
+					self._batchCool()
+				progress += part
+
+			# IMDB BULK DATA
+			# NB: Do not load the bulkdata here, especially not before preloading.
+			# On low-end devices, once the bulkdata update is done, the preloading runs super slow.
+			# This is not ideal, since the perloaded metadata will not be using the bulkdata (only if they are later refreshed), but this is just a limitations to accept.
+			# Do the bulkdata at the end, just before the restart.
+			# If enabled again, make sure to the progress parts add up to 100 (with the additional 5% here).
+			'''if not self._batchCanceled():
+				part = 0.05
+				if self._bulkImdbEnabledSettings():
+					self._batchStep(imdb = 0.0)
+
+					status = 'Collecting IMDb Data'
+					detail = 'Creating IMDb bulk dataset with IDs, numbers, and ratings.'
+					_progress(part = part, status = status, detail = detail)
+
+					manager.bulkImdbRefresh(refresh = None, silent = None, wait = True) # refresh=None to semi-force a refresh, without refreshing it every time this function is called, in case the user continues preloading the next day.
+					self._batchStep(imdb = 1.0)
+					self._batchCool()
+				progress += part
+			'''
+
+			# METACACHE CLEAN
+			# Removes old/unused metadata records from the cache that have a different settings ID in the database.
+			# This is only done if "clean" is enabled, which is currently only done on major versions upgrades.
+			# This would then clear old data during version upgrades and reduce the database size.
+			part = 0.02
+			if not self._batchCanceled():
+				if clean:
+					status = 'Clearing Old Metadata'
+					detail = 'Removing old metadata records from the cache.'
+					cache.clearOld()
+			progress += part
+
+			# ARRIVALS AND PROGRESS
+			# Basic/quick creation of the Arrivals and Progress smart-data, which is used for the release calendar.
+			if not self._batchCanceled():
+				part = 0.05
+				iterations = iterated['initial']
+				tasks = [
+					{'media' : Media.Movie,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Movie,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+				]
+				manager.mModeAccelerate = True # To reduce the detailed metadata retrieved during smart loading. Proper loading is done later on.
+				for i, task in enumerate(tasks):
+					if self._batchCanceled(): break
+					iterations = task.get('iterations')
+					for j in range(iterations):
+						if not self._batchCool(): break
+
+						media = task.get('media')
+						content = task.get('content')
+						status = 'Initializing %s %ss' % (content.title(), media.title())
+						if content == MetaManager.ContentProgress: detail = detailProgress
+						elif content == MetaManager.ContentArrival: detail = detailArrival
+						_progress(i, tasks = tasks, part = part, status = status, detail = detail % ('Constructing', media, content))
+
+						values = manager.content(**task, **parameters)
+						if values:
+							values = values.get('items')
+							items.append(values)
+							if content == MetaManager.ContentProgress:
+								if media == Media.Movie: movies.extend(values)
+								elif media == Media.Show: shows.extend(values)
+
+						step = 0.1
+						if content == MetaManager.ContentProgress:
+							stepProgress += step
+							self._batchStep(progress = stepProgress)
+						elif content == MetaManager.ContentArrival:
+							stepArrival += step
+							self._batchStep(arrival = stepArrival)
+
+						if not self._batchCool(): break
+				manager.mModeAccelerate = False # Reset to the original value for the remainder of the code.
+
+				# Set the initial totals here already, so they are displayed in the window.
+				# Detailed totals are calculated later.
+				if not self._batchCanceled() and items:
+					items = Tools.listFlatten(items, recursive = False)
+					items = manager.mTools.filterDuplicate(items = items, id = True)
+
+					itemsMovie = []
+					itemsShow = []
+					itemsSeason = []
+					itemsEpisode = []
+					itemsPack = []
+					itemsSet = []
+
+					# Count movies and shows for both Progress and Arrivals.
+					totalMovie = 0
+					totalShow = 0
+					for item in items:
+						media = item.get('media')
+						if Media.isSerie(media):
+							totalShow += 1
+							itemsShow.append(_base(media = Media.Show, data = item, season = False))
+						elif Media.isMovie(media):
+							totalMovie += 1
+							itemsMovie.append(_base(media = Media.Movie, data = item))
+					self._batchMeta(media = Media.Movie, total = totalMovie)
+					self._batchMeta(media = Media.Show, total = totalShow)
+
+					# Count seasons, episodes, packs, and sets only for Progress, since detailed metadata below movies/shows is not loaded in Arrivals.
+					for item in movies:
+						try: id = item['id']['collection']['tmdb']
+						except: id = None
+						if id: itemsSet.append(_base(media = Media.Set, data = {'tmdb' : id}))
+					for item in shows:
+						itemsPack.append(_base(media = Media.Pack, data = item, season = False))
+						itemsSeason.append(_base(media = Media.Season, data = item, season = False))
+						itemsEpisode.append(_base(media = Media.Episode, data = item, season = False))
+
+					# Sets these only for Progress.
+					# Assume at least one season/episode per show. The exact count is increased below.
+					self._batchMeta(media = Media.Set, total = len(itemsSet))
+					self._batchMeta(media = Media.Pack, total = len(itemsPack))
+					self._batchMeta(media = Media.Season, total = len(itemsSeason))
+					self._batchMeta(media = Media.Episode, total = len(itemsEpisode))
+
+					# Determine which metadata is already in the cache.
+					# Otherwise the metadata counters stay low or even at 0 if the sequential loading is skipped and the user does not know how much is really preloaded.
+					self._batchCool()
+					for i in ((Media.Movie, itemsMovie), (Media.Show, itemsShow), (Media.Season, itemsSeason), (Media.Episode, itemsEpisode), (Media.Pack, itemsPack), (Media.Set, itemsSet)):
+						count = 0
+						tasks = Tools.listChunk(i[1], chunk = chunked['lookup'])
+						for task in tasks:
+							cache.lookup(type = i[0], items = task)
+							if i[0] == Media.Episode: count += sum([len(MetaCache.attribute(j, MetaCache.AttributeSeason)) for j in task if MetaCache.valid(item = j)])
+							else: count += sum([int(MetaCache.valid(item = j)) for j in task])
+							if not self._batchCool(): break
+						if not self._batchCool(): break
+						self._batchMeta(media = i[0], count = count)
+
+				self._batchCool()
+				progress += part
+
+			# RELEASE CALENDAR
+			if not self._batchCanceled():
+				part = 0.05
 				tasks = [
 					{'media' : Media.Movie},
 					{'media' : Media.Show},
 				]
 				for i, task in enumerate(tasks):
 					media = task.get('media')
-					status = 'Synchronizing Trakt %ss' % media.title()
-					detail = 'Retrieving your Trakt %s history, progress, and ratings.' % media
-					self._batchProgress(percent = progress + ((i + 1) / float(len(tasks)) * part), status = status, detail = detail)
+					status = 'Initializing %s Calendar' % media.title()
+					if media == Media.Movie: detail = detailReleaseMovie
+					elif media == Media.Show: detail = detailReleaseShow
+					_progress(i, tasks = tasks, part = part, status = status, detail = detail % 'Constructing')
 
-					playback.refresh(media = task.get('media'), history = True, progress = True, rating = True, force = True, reload = False, wait = True)
+					manager.release(media = media, refresh = True)
+
+					self._batchStep(release = 0.5 * ((i + 1) / len(tasks)))
 					if not self._batchCool(): break
-			self._batchCool()
-			progress += part
+
+				self._batchStep(release = 0.5)
+				self._batchCool()
+				progress += part
 
 			# LOAD SMART MENUS
-			part = 0.45
-			tasks = [
-				{'media' : Media.Movie,	'content' : MetaManager.ContentProgress,	'count' : 3}, # Do this mutiple time to retrieve more detailed metadata.
-				{'media' : Media.Show,	'content' : MetaManager.ContentProgress,	'count' : 3},
-				{'media' : Media.Movie,	'content' : MetaManager.ContentArrival,		'count' : 3},
-				{'media' : Media.Show,	'content' : MetaManager.ContentArrival,		'count' : 3},
-				{'media' : Media.Movie,	'content' : MetaManager.ContentQuick,		'count' : 1},
-				{'media' : Media.Show,	'content' : MetaManager.ContentQuick,		'count' : 1},
-			]
-			tasks = [
-				{'media' : Media.Movie,	'content' : MetaManager.ContentProgress,	'count' : 1},
-				{'media' : Media.Show,	'content' : MetaManager.ContentProgress,	'count' : 1},
-			]
+			# Do a few iterations of the smart menus before retrieving the metadata sequentially.
+			# This ensures that if the user clicks the Skip button, the smart menus are at least intialized enough for basic use.
+			if not self._batchCanceled():
+				iterations = iterated['extended'] # Do this multiple time to retrieve more detailed metadata.
+				part = 0.10
+				tasks = [
+					{'media' : Media.Movie,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Movie,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+				]
 
-			for i, task in enumerate(tasks):
-				if self._batchCanceled(): break
-				for j in range(task.get('count')):
-					if not self._batchCool(): break
+				# Reinitialize these to get more detailed-loaded metadata for from the smart menus.
+				# Eg: greater chance of having Set IDs for Progress movies.
+				items = []
+				moviesArrival = []
+				showsArrival = []
+				moviesProgress = []
+				showsProgress = []
 
-					media = task.get('media')
-					content = task.get('content')
-					status = 'Creating %s %ss' % (content.title(), media.title())
-					if content == MetaManager.ContentProgress: detail = 'Assembling custom %s %s smart menus based on your Trakt history.'
-					elif content == MetaManager.ContentArrival: detail = 'Assembling custom %s %s smart menus from multiple sources.'
-					elif content == MetaManager.ContentQuick: detail = 'Assembling custom %s %s smart menus for swift navigation.'
-					self._batchProgress(percent = progress + ((i + 1) / float(len(tasks)) * part), status = status, detail = detail % (media, content))
-
-					manager.content(refresh = True, **task)
-					self._batchWait(5)
-			self._batchCool()
-			progress += part
-
-			# LOAD PROGRESS SEASONS + PACKS
-			part = 0.15
-			status = 'Populating Progress Seasons'
-			detail = 'Fetching seasons for your favorite shows.'
-			self._batchProgress(percent = progress, status = status, detail = detail)
-
-			episodes = []
-			shows = manager.progress(media = Media.Show, pack = False, detail = False)
-			if shows:
-				shows = shows.get('items')
-				if shows:
-					# Remove season number from the progress, otherwise metadataSeason() will only retrieve that season, instead of all seasons.
-					shows = [_base(data = i, season = False) for i in shows]
-
-					# Do not make the chunk too large, since packs and detailed metadata for all seasons are retrieved.
-					shows = Tools.listChunk(shows, chunk = 5)
-
-					self._batchCool()
-					for i, show in enumerate(shows):
-						self._batchProgress(percent = progress + ((i + 1) / float(len(shows)) * part))
-						seasons = manager.metadataSeason(items = show, pack = False) # Still retrieves the pack, just does not aggregate it.
-						if seasons:
-							for season in seasons:
-								if season:
-									values = []
-									season = Tools.listSort(season, key = lambda i : 9999 if i.get('season') is None else i.get('season'))
-
-									# Always add the specials, since they take long to load and are interleaved in progress submenus.
-									if season[0].get('season') == 0: values.append(_base(data = season.pop(0), season = True))
-
-									# Add the first and last 5 seasons.
-									limit = 5
-									values.extend([_base(data = i, season = True) for i in season[:limit]])
-									values.extend([_base(data = i, season = True) for i in season[-limit:]])
-
-									if values:
-										values = manager.mTools.filterDuplicate(items = values, id = True, number = True)
-										episodes.extend(values)
-
+				for i, task in enumerate(tasks):
+					if self._batchCanceled(): break
+					iterations = task.get('iterations')
+					for j in range(iterations):
 						if not self._batchCool(): break
 
-			self._batchCool()
-			progress += part
+						media = task.get('media')
+						content = task.get('content')
+						status = 'Creating %s %s' % (media.title(), content.title() + ('s' if content == MetaManager.ContentArrival else ''))
+						if content == MetaManager.ContentProgress: detail = detailProgress % ('Assembling', media, content)
+						elif content == MetaManager.ContentArrival: detail = detailArrival % ('Assembling', media, content)
+						_progress(i, tasks = tasks, part = part, status = status, detail = detail)
 
-			# LOAD PROGRESS EPISODES
-			part = 0.15
+						values = manager.content(**task, **parameters)
 
-			status = 'Populating Progress Episodes'
-			detail = 'Fetching episodes for your favorite shows.'
-			self._batchProgress(percent = progress, status = status, detail = detail)
+						# Add these again with hopefully more detailed metadata.
+						# Only do this on the last iteration, since those will have the most metadata.
+						if values and j == (iterations - 1):
+							values = values.get('items')
+							items.append(values)
+							if content == MetaManager.ContentArrival:
+								if media == Media.Movie: moviesArrival.extend(values)
+								elif media == Media.Show: showsArrival.extend(values)
+							elif content == MetaManager.ContentProgress:
+								if media == Media.Movie: moviesProgress.extend(values)
+								elif media == Media.Show: showsProgress.extend(values)
 
-			if episodes:
-				# Do not make the chunk too large, since some seasons can contain many episodes.
-				episodes = Tools.listChunk(episodes, chunk = 3)
+						step = 0.1
+						if content == MetaManager.ContentProgress:
+							stepProgress += step
+							self._batchStep(progress = stepProgress)
+						elif content == MetaManager.ContentArrival:
+							stepArrival += step
+							self._batchStep(arrival = stepArrival)
 
+						self._batchWait(5)
 				self._batchCool()
-				for i, episode in enumerate(episodes):
-					self._batchProgress(percent = progress + ((i + 1) / float(len(episodes)) * part))
-					manager.metadataEpisode(items = episode, pack = False)
+				progress += part
+
+			# REFRESH OUTDATED ITEMS
+			# Refresh outdated metadata of very new releases.
+			# In case the metadata was refreshed a long time ago and has very outdated dates and ratings/votes, causing them to be added far back in the smart lists.
+			# Refresh these items, but not forcefully. Then remove these with _metadataSmartRenew() from the smart-list so they get smart-reloaded with hopefully updated metadata.
+			# Hopefully any missing home release dates were added at this point by _smartRelease().
+			if not self._batchCanceled():
+				part = 0.05
+				try:
+					limit = 150 # Maximum items to refresh.
+					reload = current - 1209600 # Last refreshed more than 2 weeks ago.
+					past = current - 3628800 # 6 weeks into the past.
+					future = current + 604800 # 1 week into the future.
+
+					for entry in ((Media.Movie, moviesArrival), (Media.Show, showsArrival)):
+						status = 'Refreshing Outdated Metadata'
+						detail = 'Updating old metadata for newly released %ss.' % entry[0]
+						_progress(progress, status = status, detail = detail)
+
+						itemsNew = [(manager.mTools.time(metadata = i, type = MetaTools.TimeHome, estimate = False, fallback = False) or manager.mTools.time(metadata = i, type = MetaTools.TimeDebut, estimate = True, fallback = True) or 0, i) for i in entry[1]]
+						itemsPast = [i for i in itemsNew if i[0] > past and i[0] <= current]
+						itemsFuture = [i for i in itemsNew if i[0] > current and i[0] < future]
+						itemsNew = [i[1] for i in itemsPast] + [i[1] for i in itemsFuture]
+						manager._metadataSmartRenew(media = entry[0], items = itemsNew)
+						cache.lookup(type = entry[0], items = itemsNew)
+						itemsNew = [i for i in itemsNew if ((i.get(MetaCache.Attribute) or {}).get(MetaCache.AttributeTime) or 999999999999) < reload] # Do not refresh items not currently cached.
+
+						before = MetaManager.Batch['count']['load'][entry[0]]
+						tasks = Tools.listChunk(itemsNew, chunk = chunked[Media.Movie])
+						for i, task in enumerate(tasks):
+							task = [_base(data = t, media = True, season = False) for t in task]
+							_progress(i, tasks = tasks, part = part * 0.5)
+							manager.metadata(items = task, pack = False, clean = False, aggregate = False, threaded = threaded)
+							if not self._batchCool(): break
+							if (MetaManager.Batch['count']['load'][entry[0]] - before) > limit: break # If a certain number of items were loaded, cancel the process.
+				except: Logger.error()
+				self._batchCool()
+				progress += part
+
+			# Only allow skipping from this point on.
+			# Sleep to allow some time for the sound to play, otherwise too much CPU is used by the preloading that the sound is choppy.
+			# Sleep before and after settings kip.
+			self._batchWait(3)
+			self._batchProgress(skip = True)
+			self._batchWait(3)
+
+			# SEQUENTIAL LOAD METADATA
+			if not self._batchCanceled() and items:
+				part = 0.10
+				status = 'Retrieving Detailed Metadata'
+				detail = 'Fetching detailed movie and show metadata.'
+				_progress(progress, status = status, detail = detail)
+
+				# Interleave Progress/Arrivals and movies/shows.
+				# So that if the user skips the rest of the sequentially retrieved list, an equal number of items were retrieved over movies/shows and Progress/Arrivals.
+
+				items = Tools.listInterleave(*items)
+				items = manager.mTools.filterDuplicate(items = items, id = True)
+
+				# For both Progress and Arrivals.
+				totalMovie = 0
+				totalShow = 0
+				for item in items:
+					media = item.get('media')
+					if Media.isSerie(media): totalShow += 1
+					elif Media.isMovie(media): totalMovie += 1
+				self._batchMeta(media = Media.Movie, total = totalMovie)
+				self._batchMeta(media = Media.Show, total = totalShow)
+
+				# Only for Progress.
+				totalSet = 0
+				for item in moviesProgress:
+					try:
+						if item['id']['collection']['tmdb']: totalSet += 1
+					except: pass
+				self._batchMeta(media = Media.Set, total = totalSet)
+
+				# Only for Progress shows.
+				# Assume at least one season/episode per show. The exact count is increased below.
+				totalShow = len(showsProgress)
+				self._batchMeta(media = Media.Pack, total = totalShow)
+				self._batchMeta(media = Media.Season, total = totalShow)
+				self._batchMeta(media = Media.Episode, total = totalShow)
+
+				# Sequentially load all metadata in chunks.
+				countMovie = 0
+				countShow = 0
+				tasks = Tools.listChunk(items, chunk = chunked[Media.Movie])
+				for i, task in enumerate(tasks):
+					for t in task:
+						if Media.isSerie(t.get('media')): countShow += 1
+						else: countMovie += 1
+					task = [_base(data = t, media = True, season = False) for t in task]
+
+					_progress(i, tasks = tasks, part = part)
+					manager.metadata(items = task, pack = False, clean = False, aggregate = False, threaded = threaded)
+
+					# Get more set IDs, since many Progress movies have no set ID yet, because they were not smart-detailed-loaded yet.
+					for j in task:
+						if Media.isMovie(j.get('media')):
+							try: idSet = j['id']['collection']['tmdb']
+							except: idSet = None
+							if idSet:
+								for k, v in sets.items():
+									id = j['id'].get(k)
+									if id: v[id] = idSet
+
+					self._batchMeta(media = Media.Movie, increase = countMovie)
+					self._batchMeta(media = Media.Show, increase = countShow)
 					if not self._batchCool(): break
 
-			self._batchCool()
-			progress += part
+				self._batchCool()
+				progress += part
+
+			# LOAD PROGRESS SETS
+			if not self._batchCanceled():
+				part = 0.05
+				status = 'Populating Progress Sets'
+				detail = 'Fetching sets for your favorite movies.'
+				_progress(progress, status = status, detail = detail)
+
+				if moviesProgress:
+					tasks = []
+					for i in moviesProgress:
+						try: idSet = i['id']['collection']['tmdb']
+						except: idSet = None
+						if not idSet:
+							for k, v in sets.items():
+								id = i['id'].get(k)
+								if id:
+									idSet = v.get(id)
+									if idSet: break
+						if idSet: tasks.append(idSet)
+					tasks = Tools.listUnique(tasks)
+
+					if tasks:
+						self._batchMeta(media = Media.Set, total = len(tasks))
+						tasks = [_base(data = {'tmdb' : i}, media = Media.Set) for i in tasks]
+						tasks = Tools.listChunk(tasks, chunk = chunked[Media.Set])
+
+						if self._batchCool():
+							countSet = 0
+							for i, set in enumerate(tasks):
+								_progress(i, tasks = tasks, part = part)
+								set = manager.metadataSet(items = set, threaded = threaded)
+
+								countSet += len(set)
+								self._batchMeta(media = Media.Set, increase = countSet)
+								if not self._batchCool(): break
+
+					self._batchCool()
+				progress += part
+
+			# LOAD PROGRESS SEASONS + PACKS
+			if not self._batchCanceled():
+				part = 0.15
+				status = 'Populating Progress Seasons'
+				detail = 'Fetching seasons for your favorite shows.'
+				_progress(progress, status = status, detail = detail)
+
+				episodes = []
+				totalEpisode = 0
+				if showsProgress:
+					# Remove season number from the progress, otherwise metadataSeason() will only retrieve that season, instead of all seasons.
+					showsProgress = [_base(data = i, season = False) for i in showsProgress]
+
+					# Do not make the chunk too large, since packs and detailed metadata for all seasons are retrieved.
+					showsProgress = Tools.listChunk(showsProgress, chunk = chunked[Media.Season])
+
+					if self._batchCool():
+						countSeason = 0
+						for i, show in enumerate(showsProgress):
+							_progress(i, tasks = showsProgress, part = part)
+							seasons = manager.metadataSeason(items = show, pack = False, threaded = threaded) # Still retrieves the pack, just does not aggregate it.
+							if seasons and not self._batchCanceled():
+								countSeason += len(seasons)
+								self._batchMeta(media = Media.Season, increase = countSeason)
+
+								for season in seasons:
+									if season:
+										values = []
+										season = Tools.listSort(season, key = lambda i : 9999 if i.get('season') is None else i.get('season'))
+
+										# Always add the specials, since they take long to load and are interleaved in Progress submenus.
+										if season[0].get('season') == 0: values.append(_base(data = season.pop(0), season = True))
+
+										# Add the first and last 5 seasons.
+										limit = 5
+										values.extend([_base(data = i, season = True) for i in season[:limit]])
+										values.extend([_base(data = i, season = True) for i in season[-limit:]])
+
+										if values:
+											values = manager.mTools.filterDuplicate(items = values, id = True, number = True)
+											if values:
+												episodes.extend(values)
+												try:
+													totalEpisode += season['packed']['count'][MetaPack.NumberOfficial]
+													self._batchMeta(media = Media.Episode, total = totalEpisode)
+												except: pass
+
+							if not self._batchCool(): break
+
+					self._batchCool()
+				progress += part
+
+			# LOAD PROGRESS EPISODES
+			if not self._batchCanceled():
+				part = 0.15
+				status = 'Populating Progress Episodes'
+				detail = 'Fetching episodes for your favorite shows.'
+				_progress(progress, status = status, detail = detail)
+
+				if episodes and self._batchCool():
+					# Do not make the chunk too large, since some seasons can contain many episodes.
+					episodes = Tools.listChunk(episodes, chunk = chunked[Media.Episode])
+					countEpisode = 0
+					for i, episode in enumerate(episodes):
+						_progress(i, tasks = episodes, part = part)
+						values = manager.metadataEpisode(items = episode, pack = False, threaded = threaded)
+
+						if values:
+							countEpisode += len(values)
+							self._batchMeta(media = Media.Episode, increase = countEpisode)
+						if not self._batchCool(): break
+
+				self._batchCool()
+				progress += part
+
+			# Do not allow skipping from this point on.
+			self._batchProgress(skip = False)
+			skip = False # Ignore skipping for certain parts.
+
+			# In case the user skipped, add the progress up until this point.
+			progress = 0.75
+			_progress(progress)
+
+			# RELEASE CALENDAR
+			# Refresh the release calendar with the new fully loaded data from Arrivals and Progress used in _releaseAssemble().
+			if not self._batchCanceled(skip = skip):
+				part = 0.05
+				tasks = [
+					{'media' : Media.Movie},
+					{'media' : Media.Show},
+				]
+				for i, task in enumerate(tasks):
+					media = task.get('media')
+					status = 'Finalizing %s Calendar' % media.title()
+					if media == Media.Movie: detail = detailReleaseMovie
+					elif media == Media.Show: detail = detailReleaseShow
+					_progress(i, tasks = tasks, part = part, status = status, detail = detail % 'Refreshing')
+
+					manager.release(media = media, refresh = True)
+
+					self._batchStep(release = 0.5 + (0.5 * ((i + 1) / len(tasks))))
+					if not self._batchCool(skip = skip): break
+
+				self._batchStep(release = 1.0)
+				self._batchCool(skip = skip)
+				progress += part
+
+			# LOAD SMART MENUS
+			# Refresh the smart menus with the new fully loaded metadata.
+			if not self._batchCanceled(skip = skip):
+				iterations = iterated['final']['skip' if self._batchSkipped() else 'unskip']
+				iterationsQuick = iterated['final']['quick']
+				step = (1.0 - stepProgress) / iterations
+				part = 0.10
+				tasks = [
+					{'media' : Media.Movie,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentProgress,	'iterations' : iterations},
+					{'media' : Media.Movie,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+					{'media' : Media.Show,	'content' : MetaManager.ContentArrival,		'iterations' : iterations},
+					{'media' : Media.Movie,	'content' : MetaManager.ContentQuick,		'iterations' : iterationsQuick},
+					{'media' : Media.Show,	'content' : MetaManager.ContentQuick,		'iterations' : iterationsQuick},
+				]
+
+				for i, task in enumerate(tasks):
+					if self._batchCanceled(skip = skip): break
+					iterations = task.get('iterations')
+					for j in range(iterations):
+						if not self._batchCool(skip = skip): break
+
+						media = task.get('media')
+						content = task.get('content')
+						if content == MetaManager.ContentQuick:
+							status = 'Creating %s %ss' % (content.title(), media.title())
+							detail = 'Assembling custom %s %s menu for swift navigation.' % (media, content)
+						else:
+							status = 'Finalizing %s %s' % (media.title(), content.title() + ('s' if content == MetaManager.ContentArrival else ''))
+							if content == MetaManager.ContentProgress: detail = detailProgress % ('Refreshing', media, content)
+							elif content == MetaManager.ContentArrival: detail = detailArrival % ('Refreshing', media, content)
+						_progress(i, tasks = tasks, part = part, status = status, detail = detail)
+
+						values = manager.content(**task, **parameters)
+
+						if content == MetaManager.ContentQuick:
+							stepQuick += 0.5
+							self._batchStep(quick = stepQuick)
+						else:
+							if content == MetaManager.ContentProgress:
+								stepProgress += step
+								self._batchStep(progress = stepProgress)
+							elif content == MetaManager.ContentArrival:
+								stepArrival += step
+								self._batchStep(arrival = stepArrival)
+
+						self._batchWait(5, skip = skip)
+
+				self._batchStep(progress = 1.0)
+				self._batchStep(arrival = 1.0)
+				self._batchStep(quick = 1.0)
+				self._batchCool(skip = skip)
+				progress += part
 
 			# RELOAD CACHED MENUS
-			part = 0.1
-			count = 2
-			for i in range(count):
-				if not self._batchCool(): break
+			if not self._batchCanceled(skip = skip):
+				iterations = iterated['reload']['skip' if self._batchSkipped() else 'unskip']
+				part = 0.05
+				for i in range(iterations):
+					if not self._batchCool(skip = skip): break
 
-				status = 'Creating Smart Menus'
-				detail = 'Caching custom smart menus for faster loading.'
-				self._batchProgress(percent = progress + ((i + 1) / float(count) * part), status = status, detail = detail)
+					status = 'Generating Smart Menus'
+					detail = 'Caching custom smart menus for faster loading.'
+					_progress(i, tasks = iterations, part = part, status = status, detail = detail)
 
-				playback.reload(history = True, progress = True, rating = True, arrival = True, force = True, wait = True)
-				self._batchWait(5)
-			self._batchCool()
-			progress += part
+					playback.reload(history = True, progress = True, rating = True, arrival = True, force = True, wait = True)
 
-			self._batchProgress(percent = 0.95, status = 'Finalizing Smart Menus', detail = 'Preparing the smart menus and cleaning up.')
-			self._batchWait(30) # Wait for any thread that might still be busy.
-			self._batchProgress(percent = 1.0, status = 'Smart Menus Preloaded', detail = 'The smart menus were preloaded and are now ready to use.')
+					self._batchStep(cache = (i + 1) / iterations)
+					self._batchWait(5, skip = skip)
+				self._batchCool(skip = skip)
+				progress += part
+
+			_progress(0.95, status = 'Finalizing Smart Menus', detail = 'Preparing the smart menus and cleaning up.')
+
+			# Make sure everything is commited and written to disk before restarting.
+			cache._commit()
+			cache._compact()
+			manager.mCache._commit()
+			manager.mCache._compact()
+			self._batchWait(30) # Wait for any thread or disk writes that might still be busy.
+
+			MetaMenu.instance().notificationCached(delay = False, force = True)
+			_progress(1.0, status = 'Smart Menus Preloaded', detail = 'The smart menus were preloaded and are now ready for use.')
+
 			self._batchStop()
 			return True
 		except:
 			Logger.error()
-			self._batchProgress(percent = 1.0, status = 'Smart Preload Failure', detail = 'The smart menus could not be fully preloaded, but should still work.')
+			_progress(1.0, status = 'Smart Preload Failure', detail = 'The smart menus could not be fully preloaded, but should still work.')
 			self._batchStop()
 			return False
 
 	@classmethod
 	def preloadCancel(self):
 		self._batchStop()
+		MetaImdb.bulkRefreshCancel()
+
+	@classmethod
+	def preloadSkip(self):
+		self._batchSkip()
 
 	##############################################################################
 	# GENERATE
@@ -1250,6 +2288,7 @@ class MetaManager(object):
 		#	Pack:		+-10KB
 		#	Season:		+-20KB
 		#	Episode:	+-210KB
+		#	IMDb Bulk:	+-17MB (total)
 
 		from lib.modules.tools import Settings
 		from lib.modules.interface import Dialog, Format
@@ -1259,20 +2298,33 @@ class MetaManager(object):
 			dialog = Dialog.progress(title = 'Metadata Generation', message = 'Initializing ...')
 			cache = MetaCache.instance(generate = True)
 
+			speed = None
+			speeds = []
+
 			while True:
+				current = Time.timestamp()
 				progress = self._batch('progress', 'percent')
 
 				detail = self._batch('progress', 'detail')
-				if not detail or (Time.timestamp() - detail['time']) > 20:
+				if not detail or (current - detail['time']) > 20:
 					detail = cache.details()
 					self._batchProgress(detail = detail)
 
+					interval = 75 # 25+ minutes (once every 20 secs).
+					total = sum([detail['count'][i] for i in [Media.Movie, Media.Set, Media.Show, Media.Season, Media.Episode, Media.Pack]])
+					speeds.append((current, total))
+					total = len(speeds)
+					if total > interval: speeds = speeds[total - interval:]
+					speed = speeds[-1][0] - speeds[0][0]
+					speed = int(Math.roundUp(60 * ((speeds[-1][1] - speeds[0][1]) / float(speed)))) if speed else 0
+
 				message = []
-				message.append(Format.bold('Status: ') + '%s - %s - %d%% - %s' % (
+				message.append(Format.bold('Status: ') + '%s - %s - %d%% - %s - %d/m' % (
 					Format.bold(ConverterSize(detail.get('size')).stringOptimal()),
 					'Cooling Down' if self._batch('status', 'cool') else self._batch('progress', 'status'),
 					int(progress * 100),
 					ConverterDuration(self._batch('progress', 'time'), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockShort),
+					speed,
 				))
 				message.append(Format.bold('Usage: ') + '[B]%s%%[/B] (%d%% Trakt, %d%% IMDb, %d%% TMDb)' % (
 					int(self._batch('usage', 'global') * 100),
@@ -1307,8 +2359,8 @@ class MetaManager(object):
 			'general.language.secondary',
 			'general.language.tertiary',
 
-			'metadata.general.language',
-			'metadata.general.country'
+			'metadata.region.language',
+			'metadata.region.country'
 
 			'metadata.rating.movie',
 			'metadata.rating.movie.fallback',
@@ -1339,6 +2391,16 @@ class MetaManager(object):
 		]
 		for i in settings: Settings.default(i)
 		MetaTools.settingsDetailSet(MetaTools.DetailExtended)
+		MetaImdb.bulkSettingsModeSet(MetaImdb.BulkModeExtended)
+
+		# Not all IMDb ratings are included, due to the 100MB file size limit on Github.
+		# Check MetaCache.externalGenerate() for more details on how items are removed.
+		self._batchProgress(status = 'Refreshing IMDb Bulk Data')
+		refreshBulk = refresh
+		if not refreshBulk:
+			bulk = MetaCache.externalBulk()
+			refreshBulk = None if (bulk and bulk > 1000) else True # refresh=None to semi-force a refresh, without refreshing it every time this function is called.
+		manager.bulkImdbRefresh(refresh = refreshBulk, force = True, wait = True)
 
 		self._batchProgress(status = 'Generating ID List')
 		self._batchCool()
@@ -1346,26 +2408,39 @@ class MetaManager(object):
 		self._batchCool()
 
 		limit = {
-			Media.Movie : 8200,
-			Media.Set : 2500,
-			Media.Show : 8200,
-			Media.Pack : 1500,
-			Media.Season : 1500, # Should be the same as the items for Media.Pack, since seasons will also retrieve/generate the pack.
+			Media.Movie : 6500,
+			Media.Show : 6500,
+			Media.Pack : 1000,
+			Media.Season : 1000, # Should be the same as the items for Media.Pack, since seasons will also retrieve/generate the pack.
+			Media.Set : [2500, 1000], # [number to retrieve, number to keep after sorting by votes]
 		}
 		chunk = {
-			Media.Movie : 50,
+			# Do not make these to high (eg: 50).
+			# The chunks are too , increasing the chances of hitting the Trakt API limit.
+			# Smaller chunks allow more frequent cool downs in between and can therefore detect Trakt limits more quickly.
+			# This number x 5, should not exceed the cool down stop limit of the total Trakt limit.
+			# Eg: chunk (30) x requests-per-title (5) < cool-down-stop (1.0 - 0.8) x Trakt limit (1000)
+			#		= 30x5 < (1.0-0.8)x1000
+			#		= 150 < 200
+			#		= allowed chunk size. max 35.
+			Media.Movie : 30,
+			Media.Show : 30,
+
 			Media.Set : 50,
-			Media.Show : 50,
-			Media.Pack : 10,
-			Media.Season : 10,
+
+			Media.Pack : 15,
+			Media.Season : 15,
 		}
 
+		sets = {}
 		data = {}
 		for i in limit.keys():
 			data[i] = []
 			values = items.get(Media.Show if i in [Media.Season, Media.Pack] else i)
 			if values:
-				values = values[:limit[i]]
+				limited = limit[i]
+				if Tools.isArray(limited): limited = limited[0]
+				values = values[:limited]
 				values = Tools.copy(values) # Copy, since we change the media.
 				for j in values: j['media'] = i # Change the media for seasons and packs.
 				data[i] = Tools.listChunk(values, chunk = chunk[i])
@@ -1378,12 +2453,19 @@ class MetaManager(object):
 			for i in v:
 				step += 1
 				self._batchProgress(percent = (step / total) * 0.95)
-				manager.metadata(items = i, pack = False)
+				items = manager.metadata(items = i, pack = False)
+				if k == Media.Set:
+					for item in items: sets[item.get('id', {}).get('tmdb')] = item.get('votes') or 0
 				if not self._batchCool(): break
+
+		# Sort sets by votes and keep the most popular ones.
+		sets = dict(Tools.listSort(sets.items(), key = lambda i : i[1], reverse = True))
+		sets = {i : sets[i] for i in list(sets)[:limit[Media.Set][1]]}
+		sets = list(sets)
 
 		self._batchProgress(percent = 0.95, status = 'Processing Database')
 		self._batchWait(30) # Wait for any writes to the database to finish.
-		MetaCache.externalGenerate()
+		MetaCache.externalGenerate(sets = sets)
 
 		self._batchProgress(percent = 1, status = 'Finished')
 		thread.join()
@@ -1456,14 +2538,34 @@ class MetaManager(object):
 		MetaManager.Batch[type1][type2] = value
 
 	@classmethod
-	def _batchCanceled(self):
-		return self._batch('status', 'cancel')
+	def _batchCanceled(self, skip = True):
+		canceled = self._batch('status', 'cancel')
+		if canceled: return canceled
+		if skip: return self._batchSkipped()
+		return False
 
 	@classmethod
-	def _batchProgress(self, percent = None, status = None, detail = None):
+	def _batchSkipped(self):
+		return self._batch('status', 'skip')
+
+	@classmethod
+	def _batchProgress(self, percent = None, status = None, detail = None, skip = None, callback = None):
 		if not percent is None: self._batchSet('progress', 'percent', percent)
 		if not status is None: self._batchSet('progress', 'status', status)
 		if not detail is None: self._batchSet('progress', 'detail', detail)
+		if not skip is None: self._batchSet('progress', 'skip', skip)
+		if callback: callback(MetaManager.Batch)
+
+	@classmethod
+	def _batchStep(self, trakt = None, imdb = None, release = None, cache = None, progress = None, arrival = None, quick = None, callback = None):
+		if not trakt is None: self._batchSet('step', 'trakt', trakt)
+		if not imdb is None: self._batchSet('step', 'imdb', imdb)
+		if not release is None: self._batchSet('step', 'release', release)
+		if not cache is None: self._batchSet('step', 'cache', cache)
+		if not progress is None: self._batchSet('step', MetaManager.ContentProgress, progress)
+		if not arrival is None: self._batchSet('step', MetaManager.ContentArrival, arrival)
+		if not quick is None: self._batchSet('step', MetaManager.ContentQuick, quick)
+		if callback: callback(MetaManager.Batch)
 
 	@classmethod
 	def _batchStart(self, strict = False, status = None, detail = None, callback = None):
@@ -1473,8 +2575,28 @@ class MetaManager(object):
 		strict = 0.1 if strict else 0.0
 		MetaManager.Batch = {
 			'limit' : {
-				'start' : [0.5 - strict, 0.75 - strict],
+				# Update (2025-12):
+				# Trakt now only allows 1000 req/5min for unauthenticated requests, not the additional 1000 for authenticated requests.
+				# The usage measurement has been changed to now only include unauthenticated requests, so the hard limit is 1000 req/5min.
+				# The start/stop limits were increased from their old values, otherwise the loading is too slow.
+				# Higher limits are appropriate, since we are not working with the previous 50%-50% of auth/unauth requests, trying to keep under 50%, but the entire 100% is now the 1000 requests.
+				# NB: Do not make the stop limit too high. Since a batch of 50 items can be started after this limit was reached, pushing up the Trakt limit easily 10% higher. With 85% it has been overserved that the Trakt usage can go up to 95%.
+				#	'start' : [0.5 - strict, 0.75 - strict],
+				#	'stop' : 0.6,
+				# This works almost perfectly. Trakt limits are only hit occasionally.
+				#	'start' : [0.5 - strict, 0.6 - strict], 'stop' : 0.85,
+				#	'start' : [0.5 - strict, 0.7 - strict], 'stop' : 0.83,
+				#	'start' : [0.5 - strict, 0.7 - strict], 'stop' : 0.80,
+				#	'start' : [0.4 - strict, 0.5 - strict], 'stop' : 0.80,
+				#	'start' : [0.4 - strict, 0.5 - strict], 'stop' : 0.70,
+				#	'start' : [0.5 - strict, 0.6 - strict], 'stop' : 0.65, (still very occasionally reaches the limit)
+				#	'start' : [0.5 - strict, 0.6 - strict], 'stop' : 0.6, (still very occasionally reaches the limit)
+				# This rarley hits the limit and if so mostly with movies.
+				# 30 movies/min - 35-40 shows/min - 40 packs/min - 20-25 seasons/min
+				'start' : [0.5 - strict, 0.6 - strict],
 				'stop' : 0.6,
+
+				'trakt' : 3,
 			},
 			'usage' : {
 				'global' : 0,
@@ -1483,30 +2605,77 @@ class MetaManager(object):
 				'tmdb' : 0,
 			},
 			'status' : {
+				'strict' : strict,
 				'cool' : None,
 				'cancel' : None,
+				'skip' : None,
 			},
 			'progress' : {
+				'skip' : None,
 				'time' : 0,
 				'percent' : 0,
 				'status' : status,
 				'detail' : detail,
 			},
+			'step' : {
+				'trakt' : None, # None indicates no Trakt account is used.
+				'imdb' : None, # None indicates no IMDb data is retrieved based on the metadata detail level.
+				'release' : 0.0,
+				'cache' : 0.0,
+				MetaManager.ContentProgress : 0.0,
+				MetaManager.ContentArrival : 0.0,
+				MetaManager.ContentQuick : 0.0,
+			},
 			'count' : {
-				'total' : 0,
-				Media.Movie : 0,
-				Media.Show : 0,
-				Media.Season : 0,
-				Media.Episode : 0,
-				Media.Pack : 0,
-				Media.Set : 0,
-				'data' : {
-					Media.Movie : {},
-					Media.Show : {},
-					Media.Season : {},
-					Media.Episode : {},
-					Media.Pack : {},
-					Media.Set : {},
+				# Items which metadata was newly retrieved or refreshed.
+				'load' : {
+					'all' : 0,
+					Media.Movie : 0,
+					Media.Show : 0,
+					Media.Season : 0,
+					Media.Episode : 0,
+					Media.Pack : 0,
+					Media.Set : 0,
+					'data' : {
+						Media.Movie : {},
+						Media.Show : {},
+						Media.Season : {},
+						Media.Episode : {},
+						Media.Pack : {},
+						Media.Set : {},
+					},
+				},
+
+				# Items which metadata was retireved and processed, with or without a refresh.
+				# Values: [count, total].
+				'meta' : {
+					'all' : [0, 0],
+					Media.Movie : [0, 0],
+					Media.Show : [0, 0],
+					Media.Season : [0, 0],
+					Media.Episode : [0, 0],
+					Media.Pack : [0, 0],
+					Media.Set : [0, 0],
+				},
+
+				# Items that were processed in the smart-lists.
+				# Values: [count, total].
+				MetaManager.Smart : {
+					'all' : {
+						'all' : [0, 0],
+						Media.Movie : [0, 0],
+						Media.Show : [0, 0],
+					},
+					MetaManager.ContentProgress : {
+						'all' : [0, 0],
+						Media.Movie : [0, 0],
+						Media.Show : [0, 0],
+					},
+					MetaManager.ContentArrival : {
+						'all' : [0, 0],
+						Media.Movie : [0, 0],
+						Media.Show : [0, 0],
+					},
 				},
 			},
 		}
@@ -1518,76 +2687,235 @@ class MetaManager(object):
 		if MetaManager.Batch: self._batchSet('status', 'cancel', True)
 
 	@classmethod
-	def _batchWait(self, seconds):
+	def _batchSkip(self):
+		if MetaManager.Batch: self._batchSet('status', 'skip', True)
+
+	@classmethod
+	def _batchWait(self, seconds, skip = True):
 		for i in range(seconds):
-			if self._batchCanceled(): break
+			if self._batchCanceled(skip = skip): break
 			Time.sleep(1)
 
 	@classmethod
 	def _batchUpdate(self, callback = None):
-		timer = Time(start = True)
-		while not self._batchCanceled():
-			# Set "authenticated=None" to allow more requests to Trakt with and without authentication data.
-			# Speed up Trakt, since Trakt is typiclly causing the cooldown.
-			MetaManager.Batch['usage'].update(MetaProvider.usageGlobal(authenticated = None, full = True))
+		timer = self._jobTimer()
+		while not self._batchCanceled(skip = False): # Continue the update thread when skipped.
+			MetaManager.Batch['usage'].update(self.providerUsageTotal(full = True))
 			self._batchSet('progress', 'time', timer.elapsed())
 			if callback: callback(MetaManager.Batch)
-			Time.sleep(1)
 
-		countTotal = self._batch('count', 'total')
-		countMovie = self._batch('count', Media.Movie)
-		countShow = self._batch('count', Media.Show)
-		countSeason = self._batch('count', Media.Season)
-		countEpisode = self._batch('count', Media.Episode)
-		countPack = self._batch('count', Media.Pack)
-		countSet = self._batch('count', Media.Set)
-		Logger.log('BATCH LOADED (Total: %d | %ds): %d Movies | %d Shows | %d Seasons | %d Episodes | %d Packs | %d Sets' % (countTotal, timer.elapsed(), countMovie, countShow, countSeason, countEpisode, countPack, countSet))
+			if System.aborted(): self._batchStop() # If Kodi is exited.
+			else: Time.sleep(1)
+
+		countAll = self._batch('count', 'load', 'all')
+		countMovie = self._batch('count', 'load', Media.Movie)
+		countShow = self._batch('count', 'load', Media.Show)
+		countSeason = self._batch('count', 'load', Media.Season)
+		countEpisode = self._batch('count', 'load', Media.Episode)
+		countPack = self._batch('count', 'load', Media.Pack)
+		countSet = self._batch('count', 'load', Media.Set)
+		Logger.log('BATCH LOADED (Total: %d | %ds): %d Movies | %d Shows | %d Seasons | %d Episodes | %d Packs | %d Sets' % (countAll, timer.elapsed(), countMovie, countShow, countSeason, countEpisode, countPack, countSet))
 
 		# Clear some memory.
-		for k in MetaManager.Batch['count']['data'].keys():
-			MetaManager.Batch['count']['data'][k] = {}
+		for i in MetaManager.Batch['count'].keys():
+			if 'data' in MetaManager.Batch['count'][i]:
+				for k in MetaManager.Batch['count'][i]['data'].keys():
+					MetaManager.Batch['count'][i]['data'][k] = {}
 
+		# One last window update.
 		if callback: callback(MetaManager.Batch)
 
 	@classmethod
 	def _batchLoad(self, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None):
-		if MetaManager.Batch:
-			id = None
-			if imdb: id = 'imdb' + str(imdb)
-			elif trakt: id = 'trakt' + str(trakt)
-			elif tmdb: id = 'tmdb' + str(tmdb)
-			elif tvdb: id = 'tvdb' + str(tvdb)
-			if id:
-				id = '%s_%s_%s' % (media, id, str(season))
-				count = MetaManager.Batch['count']
-				if not id in count['data'][media]:
-					count['data'][media][id] = True
-					count[media] += 1
-					count['total'] += 1
+		try:
+			if MetaManager.Batch:
+				id = None
+				if imdb: id = 'imdb' + str(imdb)
+				elif trakt: id = 'trakt' + str(trakt)
+				elif tmdb: id = 'tmdb' + str(tmdb)
+				elif tvdb: id = 'tvdb' + str(tvdb)
+				if id:
+					id = '%s_%s_%s' % (media, id, str(season))
+					count = MetaManager.Batch['count']['load']
+					if not id in count['data'][media]:
+						count['data'][media][id] = True
+						count[media] += 1
+						count['all'] += 1
+		except: Logger.error()
 
 	@classmethod
-	def _batchCool(self):
-		if not self._batchCanceled() and self._batch('usage', 'global') > self._batch('limit', 'stop'):
-			self._batchSet('status', 'cool', Time.timestamp())
+	def _batchSmart(self, content, media, total = None, count = None):
+		try:
+			if MetaManager.Batch:
+				if Media.isSerie(media): media = Media.Show
+				batch = MetaManager.Batch['count'][MetaManager.Smart]
 
-			for i in range(10):
-				if self._batchCanceled(): break
-				Time.sleep(1)
+				if not count is None and not total is None and count > total: total = count
+				if not count is None: batch[content][media][0] = count
+				if not total is None: batch[content][media][1] = total
 
-			if not self._batchCanceled():
-				limit1 = self._batch('limit', 'start', 0)
-				limit2 = self._batch('limit', 'start', 1)
-				while True:
-					if self._batchCanceled(): break
-					if self._batch('usage', 'global') < limit1: break
-					elif self._batch('usage', 'trakt') < limit2 and self._batch('usage', 'imdb') < limit2 and self._batch('usage', 'tmdb') < limit2: break
+				count = 0
+				total = 0
+				for k, v in batch[content].items():
+					if not k == 'all':
+						count += v[0]
+						total += v[1]
+				batch[content]['all'][0] = count
+				batch[content]['all'][1] = total
+
+				countMovie = 0
+				countShow = 0
+				totalMovie = 0
+				totalShow = 0
+				for k, v in batch.items():
+					if not k == 'all':
+						countMovie += v[Media.Movie][0]
+						totalMovie += v[Media.Movie][1]
+						countShow += v[Media.Show][0]
+						totalShow += v[Media.Show][1]
+				batch['all'][Media.Movie][0] = countMovie
+				batch['all'][Media.Movie][1] = totalMovie
+				batch['all'][Media.Show][0] = countShow
+				batch['all'][Media.Show][1] = totalShow
+				batch['all']['all'][0] = countMovie + countShow
+				batch['all']['all'][1] = totalMovie + totalShow
+		except: Logger.error()
+
+	@classmethod
+	def _batchMeta(self, media, total = None, count = None, increase = None):
+		try:
+			if MetaManager.Batch:
+				batch = MetaManager.Batch['count']['meta']
+
+				# Allows increasing the total if the new count is greater than the existing total.
+				if count is None: count = batch[media][0]
+				if total is None: total = batch[media][1]
+
+				if not increase is None: count = max(count, increase)
+				if not count is None and not total is None and count > total: total = count
+				if not count is None: batch[media][0] = count
+				if not total is None: batch[media][1] = total
+
+				count = 0
+				total = 0
+				for k, v in batch.items():
+					if not k == 'all':
+						count += v[0]
+						total += v[1]
+				batch['all'][0] = count
+				batch['all'][1] = total
+		except: Logger.error()
+
+	@classmethod
+	def _batchCool(self, skip = True):
+		if not self._batchCanceled(skip = skip):
+			Time.sleep(0.02) # Allow other threads to execute, like the one updating the preload Window progress.
+
+			usage = self._batch('usage', 'global') > self._batch('limit', 'stop')
+
+			# Sometimes the Trakt API rate limit is reached, even with a low usage.
+			# This is because the user might have loaded a lot of metadata, restarted Kodi, and the global properties are reset.
+			# When the preload is started again, Trakt might return 429 errors, since the limit was reached in the previous Kodi session.
+			# Also use this as an indicator to cool down.
+			# Update: not really needed anymore, since we now also check providerWait(), which will have the Trakt wait duration if error 429 was hit.
+			trakt = self.providerErrorTrakt() > self._batch('limit', 'trakt')
+
+			# Update (2025-12):
+			# Trakt does not return the X-Ratelimit header anymore, at least not for all requests. The Retry-After header is still returned.
+			# Hence, waiting for the number of requests to dial down is not enough anymore.
+			# Wait for the indicated number of seconds returned by Trakt as well.
+			wait = self.providerWait()
+
+			if usage or trakt or wait:
+				self._batchSet('status', 'cool', Time.timestamp())
+
+				for i in range(10):
+					if self._batchCanceled(skip = skip): break
+					Time.sleep(1)
+
+				if not self._batchCanceled(skip = skip):
+					time = Time(start = True)
+					limit1 = self._batch('limit', 'start', 0)
+					limit2 = self._batch('limit', 'start', 1)
+					limit3 = self._batch('limit', 'trakt')
+					while True:
+						if self._batchCanceled(skip = skip): break
+
+						# Only check the request counters if there is no specific wait duration by any provider (eg Trakt).
+						waiting = wait and wait > Time.timestamp()
+						if not waiting: # Not busy waiting.
+							if usage:
+								if self._batch('usage', 'global') < limit1: break
+								elif self._batch('usage', 'trakt') < limit2 and self._batch('usage', 'imdb') < limit2 and self._batch('usage', 'tmdb') < limit2: break
+							elif trakt:
+								if self.providerErrorTrakt() < limit3: break
+								if time.elapsed() > (MetaTrakt._usageDuration() + 10): break # Should not happen, but just in case the provider errors are not reset.
+							else: # Done waiting and no usage/trakt errors.
+								break
+
+						for i in range(5):
+							if self._batchCanceled(skip = skip): break
+							Time.sleep(1)
 
 					for i in range(5):
-						if self._batchCanceled(): break
+						if self._batchCanceled(skip = skip): break
 						Time.sleep(1)
 
 		self._batchSet('status', 'cool', False)
-		return not self._batchCanceled()
+		return not self._batchCanceled(skip = skip)
+
+	##############################################################################
+	# BULK
+	##############################################################################
+
+	# These two parameters allow us to use the bulk data, even if the user has disabled the setting, as long as the data is available in either the internal or external database.
+	# external: Use the data from the preprocessed external addon. These values might be outdated.
+	# internal: Use any existing data from the metadata cache, even if the bulkdata setting was disabled later on.
+	@classmethod
+	def _bulkImdbEnabled(self, internal = True, external = True):
+		if self._bulkImdbEnabledSettings(): return True
+		if internal and self._bulkImdbInternal(): return True
+		if external and self._bulkImdbExternal(): return True
+		return False
+
+	@classmethod
+	def _bulkImdbEnabledSettings(self):
+		return MetaImdb.instance().bulkEnabled()
+
+	@classmethod
+	def _bulkImdbInternal(self):
+		return MetaCache.bulkAvailable()
+
+	@classmethod
+	def _bulkImdbExternal(self):
+		return MetaCache.externalAvailable()
+
+	# These two parameters allow us to use the bulk data, even if the user has disabled the setting, as long as the data is available in either the internal or external database.
+	# external: Use the data from the preprocessed external addon. These values might be outdated.
+	# internal: Use any existing data from the metadata cache, even if the bulkdata setting was disabled later on.
+	def _bulkImdbLookup(self, imdb, imdbEpisode = None, season = None, episode = None, data = False, internal = True, external = True):
+		if internal: internal = self._bulkImdbInternal()
+		if external: external = self._bulkImdbExternal()
+		force = internal or external
+		return MetaImdb.instance().bulk(id = imdb, idEpisode = imdbEpisode, season = season, episode = episode, data = data, force = force, generate = self.mModeGenerative)
+
+	#silent: If True, no dialogs/progress/notifications are shown. If False, everything is shown. If None, only error notifications are shown.
+	def bulkImdbRefresh(self, force = False, refresh = False, reload = None, selection = None, generate = None, silent = False, restart = None, wait = True):
+		timer = Time(start = True)
+		Logger.log('BULK GENERATION: Updating IMDb bulk metadata ...')
+		result = MetaImdb.instance().bulkRefresh(generate = self.mModeGenerative if generate is None else generate, force = force, refresh = refresh, reload = reload, selection = selection, silent = silent, restart = restart, wait = wait)
+		if wait:
+			if result is None:
+				status = 'SUCCESS'
+				message = 'IMDb bulk metadata still up-to-date'
+			elif result:
+				status = 'SUCCESS'
+				message = 'IMDb bulk metadata updated'
+			else:
+				status = 'FAILURE'
+				message = 'IMDb bulk metadata could not be updated'
+			Logger.log('BULK %s (%ds): %s' % (status, timer.elapsed(), message))
+		return result
 
 	##############################################################################
 	# METADATA
@@ -1621,7 +2949,7 @@ class MetaManager(object):
 	#	In the future we should make this "pack=False" by default, and require the caller to explicitly pass in "pack=True" in order to get the pack.
 	#	But for now, since so many callers assume the pack data will be available, return the pack by default, and let callers explicitly state "pack=False" if they do not need the pack.
 
-	def metadata(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None, limit = None, next = None, discrepancy = None, special = None, aggregate = True, hierarchical = False):
+	def metadata(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None, limit = None, next = None, discrepancy = None, special = None, aggregate = True, hierarchical = False):
 		# If no media is passed in, assume the items have different media.
 		# Eg: Single search across movies and shows.
 		if (not media or Media.isMixed(media)) and Tools.isArray(items):
@@ -1660,7 +2988,123 @@ class MetaManager(object):
 
 		return None
 
-	def _metadataDeveloper(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, item = None, extra = None):
+	# level=0: Only refresh outer metadata.
+	# level=1: Only refresh inner metadata.
+	# level=2: Refresh inner and outer metadata.
+	def metadataRefresh(self, level = None, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, notification = None):
+		from lib.modules.interface import Dialog, Translation
+		from lib.meta.menu import MetaMenu
+
+		if MetaMenu.instance().notification(content = 'refresh', type = [media, level], background = False):
+			def _notification(message, warning = False):
+				if notification: Dialog.notification(title = 36770, message = message, icon = Dialog.IconWarning if warning else Dialog.IconInformation, time = 7000)
+
+			if Media.isMovie(media):
+				if level == 2:
+					message = 36775
+					refresh = None
+				elif level == 1:
+					message = 36776
+					refresh = None
+				else:
+					message = 36777
+					refresh = True
+				_notification(message = message)
+				item = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = refresh)
+				if item and (level == 1 or level == 2):
+					try:
+						items = {'media' : Media.Set}
+						items.update(item['collection'])
+					except: items = None
+					if items:
+						item = self.metadata(items = items, refresh = True)
+						if item and level == 2:
+							items = item.get('part')
+							if items: self.metadata(items = items, refresh = True)
+
+			elif Media.isSet(media):
+				if level == 2:
+					message = 36775
+					refresh = True
+				elif level == 1:
+					message = 36777
+					refresh = None
+				else:
+					message = 36776
+					refresh = True
+				_notification(message = message)
+				item = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = refresh)
+				if item and (level == 1 or level == 2):
+					items = item.get('part')
+					if items: self.metadata(items = items, refresh = True)
+
+			elif Media.isSerie(media) or Media.isPack(media):
+				if Media.isShow(media):
+					if level == 2: message = 36782
+					elif level == 1: message = 36783
+					else: message = 36778
+				elif Media.isSeason(media):
+					message = 36779
+				elif Media.isEpisode(media):
+					message = Translation.string(36780) % Title.numberUniversal(media = Media.Season, season = season)
+				elif Media.isPack(media):
+					message = 36781
+				_notification(message = message)
+				item = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season if Media.isEpisode(media) else None, pack = False, refresh = True)
+				if item:
+					if level == 1 or level == 2:
+						self.metadata(media = Media.Pack, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, refresh = True)
+						item = self.metadata(media = Media.Season, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, refresh = True)
+						if item:
+							items = []
+							totalSeason = 0
+							totalEpisode = 0
+							limitSeason = 4 # Minimum number of seasons to refresh.
+							limitEpisode = 300 # Maximum number of episodes to refresh.
+
+							item = Tools.listSort(item, key = lambda i : i.get('season'))
+							if level == 1: item = Tools.listReverse(item)
+							elif level == 2: item = Tools.listUnique(Tools.listInterleave([i for i in item if not i.get('season') == 0], [i for i in item if i.get('season') == 0], Tools.listReverse(item)))
+
+							for i in item:
+								add = False
+								if level == 1:
+									status = i.get('status')
+									add = not status or status in MetaTools.StatusesPresent or status in MetaTools.StatusesFuture
+								elif level == 2:
+									add = True
+								if add:
+									items.append(i.get('season'))
+									count = None
+									try: count = i['packed']['count']['total']
+									except: pass
+									if not count:
+										try: count = i['count']['episode']['total']
+										except: pass
+										if not count: count = 35
+									totalSeason += 1
+									totalEpisode += count
+									if totalSeason >= limitSeason and totalEpisode > limitEpisode: break
+
+							items = Tools.listUnique([i for i in items if not i is None])
+							if items:
+								items = items[:10]
+								items = [{'media' : Media.Episode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : i} for i in items]
+								self.metadata(items = items, pack = False, refresh = True)
+
+			if notification: Dialog.closeNotification()
+			return True
+		return False
+
+	def _metadataRefresh(self, refresh):
+		# If "refresh=False", also do not refresh the sub-metadata which is retrieve in the various update functions.
+		# For instance, if we retrieve the episode metadata, it will also internally retrieve the show/season/pack metadata.
+		# That is, if "refresh=False" for any metadata, any other metadata that is needed should also NOT be refreshed.
+		# Only do this if "refresh=False" and not if "refresh=True" (or another value), otherwise if we refresh the episode metadata, it will also refresh the internal show/season/pack metadata.
+		# Used by tester.py to force the refresh not to happen.
+		return False if refresh is False else None
+
+	def _metadataDeveloper(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, item = None, extra = None):
 		if self.mDeveloper and (not extra or self.mDeveloperExtra):
 			data = []
 
@@ -1681,15 +3125,20 @@ class MetaManager(object):
 			if data: data = ['[%s]' % (' | '.join(data))]
 			else: data = ['']
 
-			if not title and item:
-				if 'tvshowtitle' in item: title = item['tvshowtitle']
-				elif 'title' in item: title = item['title']
-			if not year and item and 'year' in item: year = item['year']
+			if item:
+				if not title: title = item.get('tvshowtitle') or item.get('title')
+				if not year: year = item.get('tvshowyear') or item.get('year')
+
+			# Packs return a list/dict for titles and years.
+			if title and Tools.isArray(title): title = title[0]
+			if year and not Tools.isInteger(year): year = year[0] if Tools.isArray(year) else year.get('minimum') if Tools.isDictionary(year) else None
 
 			if title:
 				data.append(title)
 				if year: data.append('(%d)' % year)
-			if not season is None: data.append('Season %s' % str(int(season)))
+			if not season is None:
+				if episode is None: data.append('S%02d' % season)
+				else: data.append('S%02dE%02d' % (season, episode))
 
 			return ' '.join(data)
 		return None
@@ -1704,8 +3153,14 @@ class MetaManager(object):
 					try:
 						data = temp.get(MetaImage.Attribute)
 						if data:
+							if not result.get(MetaImage.Attribute): result[MetaImage.Attribute] = {}
+							image = result.get(MetaImage.Attribute)
 							for key, value in data.items():
-								if value: result.update({MetaImage.Attribute : {key : [MetaImage.create(link = value, provider = provider)]}})
+								if value:
+									if Tools.isArray(value): value = [MetaImage.create(link = v, provider = provider) for v in value]
+									else: value = [MetaImage.create(link = value, provider = provider)]
+									if not image.get(key): image[key] = value
+									else: image[key] = Tools.listUnique(image[key] + value)
 					except: Logger.error()
 
 					# Voting
@@ -1791,7 +3246,7 @@ class MetaManager(object):
 		threading = len(items) == 1 if threaded is None else threaded
 
 		# Use memeber variables instead of local variables.
-		# In case this function is called mutiple times from different places to retrieve the same metadata.
+		# In case this function is called multiple times from different places to retrieve the same metadata.
 		# Eg: Smart menu background refresh while the foreground menu construction from content() also requests the same metadata.
 		#lock = Lock()
 		#locks = {}
@@ -1800,6 +3255,7 @@ class MetaManager(object):
 
 		semaphore = Semaphore(self.mTools.concurrency(media = media, hierarchical = hierarchical))
 		metacache = MetaCache.instance(generate = self.mModeGenerative)
+		refreshInternal = self._metadataRefresh(refresh = refresh)
 
 		metadataForeground = []
 		metadataBackground = []
@@ -1815,17 +3271,33 @@ class MetaManager(object):
 				try: refreshing = item[MetaCache.Attribute][MetaCache.AttributeRefresh]
 				except: refreshing = MetaCache.RefreshForeground
 
-				# During external metadata addon generation, reretrieve incomplete items.
-				if self.mModeGenerative and item[MetaCache.Attribute].get('part'): refreshing = MetaCache.RefreshForeground
+				if refresh is True:
+					refreshing = MetaCache.RefreshForeground
 
-				if refreshing == MetaCache.RefreshForeground or (refresh is True or refresh == MetaCache.RefreshForeground) or (refreshing == MetaCache.RefreshBackground and self.mModeSynchronous):
-					self.mTools.busyStart(media = media, item = item)
-					parameters.update({'result' : metadataForeground, 'mode' : MetaCache.RefreshForeground})
+				elif refresh is False:
+					refreshing = MetaCache.RefreshDisabled
+
+				# During external metadata addon generation, reretrieve incomplete items.
+				elif self.mModeGenerative and item[MetaCache.Attribute].get('part'):
+					refreshing = MetaCache.RefreshForeground
+
+				elif refreshing == MetaCache.RefreshBackground and self.mModeSynchronous:
+					refreshing = MetaCache.RefreshForeground
+
+				# Force a certain refresh.
+				# Do not change the refreshing value if it is not RefreshForeground/RefreshBackground.
+				# Used by _metadataSmartRefresh() to refresh all metadata in the background.
+				elif (not self.mModeGenerative and not self.mModeSynchronous) and ((refreshing == MetaCache.RefreshBackground and refresh == MetaCache.RefreshForeground) or (refreshing == MetaCache.RefreshForeground and refresh == MetaCache.RefreshBackground)):
+					refreshing = refresh
+
+				if refreshing == MetaCache.RefreshForeground:
+					self._busyStart(media = media, item = item)
+					parameters.update({'result' : metadataForeground, 'mode' : MetaCache.RefreshForeground, 'refresh' : refreshInternal})
 					jobsForeground.append(parameters)
 
-				elif refreshing == MetaCache.RefreshBackground or refresh == MetaCache.RefreshBackground:
-					if not self.mTools.busyStart(media = media, item = item):
-						parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground})
+				elif refreshing == MetaCache.RefreshBackground:
+					if not self._busyStart(media = media, item = item):
+						parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground, 'refresh' : refreshInternal})
 						jobsBackground.append(parameters)
 
 		else:
@@ -1865,29 +3337,29 @@ class MetaManager(object):
 				# Make sure that this does not execute if called from _metadataSmartLoad() with "quick=False" and we are in synchronous mode (called from reload()).
 				elif refreshing == MetaCache.RefreshForeground or (refreshing == MetaCache.RefreshBackground and background is True and self.mModeSynchronous):
 					if foreground is True or (foreground and len(lookup) < foreground) or (background is True and self.mModeSynchronous):
-						self.mTools.busyStart(media = media, item = item)
+						self._busyStart(media = media, item = item)
 						valid.append(item)
 						lookup.append(item)
-						parameters.update({'result' : metadataForeground, 'mode' : MetaCache.RefreshForeground})
+						parameters.update({'result' : metadataForeground, 'mode' : MetaCache.RefreshForeground, 'refresh' : refreshInternal})
 						jobsForeground.append(parameters)
 					elif background is True or (background and len(jobsBackground) < background):
 						useable = True
-						if not self.mTools.busyStart(media = media, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
-							parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground})
+						if not self._busyStart(media = media, item = item): # Still add foreground requests to the background threads if the value of "quick" forbids foreground retrieval.
+							parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground, 'refresh' : refreshInternal})
 							jobsBackground.append(parameters)
 
 				elif refreshing == MetaCache.RefreshBackground:
 					useable = True
 					if background is True or (background and len(jobsBackground) < background):
-						if not self.mTools.busyStart(media = media, item = item):
-							parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground})
+						if not self._busyStart(media = media, item = item):
+							parameters.update({'result' : metadataBackground, 'mode' : MetaCache.RefreshBackground, 'refresh' : refreshInternal})
 							jobsBackground.append(parameters)
 
 				# Still add incomplete metadata to the returned items, since it has metadata, even if something is missing.
 				# Important for metadata that is always labeled as incomplete, because it does not exist on some providers.
 				# Eg: The Office UK S03 (on IMDb, but not on Trakt/TVDb/TMDb).
 				# Also do this for external metadata, other-settings metadata, etc. Everything that is not invalid.
-				if useable and not item[MetaCache.Attribute][MetaCache.AttributeStatus] == MetaCache.StatusInvalid: valid.append(item)
+				if useable and not MetaCache.status(item) == MetaCache.StatusInvalid: valid.append(item)
 
 			items = valid
 
@@ -1896,10 +3368,14 @@ class MetaManager(object):
 
 		if jobsForeground:
 			if len(jobsForeground) == 1:
-				if threaded is None: jobsForeground[0]['threaded'] = True # Faster parallel sub-requests if only one item needs to be retrieved.
-				for i in jobsForeground:
+				if self._checkInterval(mode = MetaCache.RefreshForeground):
+					if threaded is None: jobsForeground[0]['threaded'] = True # Faster parallel sub-requests if only one item needs to be retrieved.
 					semaphore.acquire()
-					function(**i)
+					if self._check():
+						MetaCache.log(jobsForeground[0]['item'])
+						function(**jobsForeground[0])
+					else:
+						semaphore.release()
 			else:
 				if threaded is None and len(jobsForeground) == 2: # Faster parallel sub-requests if only two items needs to be retrieved. 3 or more items use sequential requests.
 					jobsForeground[0]['threaded'] = True
@@ -1907,36 +3383,64 @@ class MetaManager(object):
 				threads = []
 				for i in jobsForeground:
 					semaphore.acquire()
-					threads.append(Pool.thread(target = function, kwargs = i, start = True))
-				[thread.join() for thread in threads] # Wait for metadata that does not exist in the metacache.
+					if self._checkInterval(mode = MetaCache.RefreshForeground):
+						MetaCache.log(i['item'])
+						thread = Pool.thread(target = function, kwargs = i, start = True)
+						threads.append(thread)
+						self._threadAdd(thread = thread)
+					else:
+						semaphore.release()
+						break
+				if self._check(): [thread.join() for thread in threads] # Wait for metadata that does not exist in the metacache.
 
+			# Do not insert if Kodi was aborted, since the loop above might not have finished retrieving all metadata and we do not want to insert unfinished/undetailed metadata.
 			# 1 item: wait (do not start a background thread). Multiple items: do not wait (start a background thread).
-			if metadataForeground: metacache.insert(type = media, items = metadataForeground, wait = None)
+			# Update (2025-11): Copy the metadata, since the metadata is returned and can change before the MetaCache insert thread gets executed.
+			if self._check() and metadataForeground: metacache.insert(type = media, items = metadataForeground, wait = None, copy = True)
 
 		# Let the refresh of old metadata run in the background for the next menu load.
 		# Only start the threads here, so that background threads do not interfere or slow down the foreground threads.
 		if jobsBackground:
 			def _metadataBackground():
 				if len(jobsBackground) == 1:
-					if threaded is None: jobsBackground[0]['threaded'] = True # Faster parallel sub-requests if only one item needs to be retrieved. Even do for background, in case a single item in eg Progress menu is refreshed that needs to be loaded shortly afterwards.
-					semaphore.acquire()
-					function(**jobsBackground[0])
+					if self._checkInterval(mode = MetaCache.RefreshBackground): # Delay slightly to allow more important code to execute first.
+						if threaded is None: jobsBackground[0]['threaded'] = True # Faster parallel sub-requests if only one item needs to be retrieved. Even do for background, in case a single item in eg Progress menu is refreshed that needs to be loaded shortly afterwards.
+						semaphore.acquire()
+						if self._check():
+							MetaCache.log(jobsBackground[0]['item'])
+							function(**jobsBackground[0])
+						else:
+							semaphore.release()
 				else:
 					# For 2 or more background items, do not use threads, to allow foreground processes to use more.
 					for i in range(len(jobsBackground)):
 						semaphore.acquire()
-						jobsBackground[i] = Pool.thread(target = function, kwargs = jobsBackground[i], start = True)
-					[thread.join() for thread in jobsBackground]
+						if self._checkInterval(mode = MetaCache.RefreshBackground): # Delay slightly to allow more important code to execute first.
+							MetaCache.log(jobsBackground[i]['item'])
+							thread = Pool.thread(target = function, kwargs = jobsBackground[i], start = True)
+							jobsBackground[i] = thread
+							self._threadAdd(thread = thread)
+						else:
+							semaphore.release()
+							break
+					if self._check(): [thread.join() for thread in jobsBackground]
 
+				# Do not insert if Kodi was aborted, since the loop above might not have finished retrieving all metadata and we do not want to insert unfinished/undetailed metadata.
 				# Wait (do not start a background thread), since we are already inside a thread.
-				if metadataBackground: metacache.insert(type = media, items = metadataBackground, wait = True)
+				# Update (2025-11): Do not copy here, since it can take very long for packs, and it was already deep-copied below.
+				if self._check() and metadataBackground: metacache.insert(type = media, items = metadataBackground, wait = True, copy = False)
 
 			# Make a deep copy of the items, since the items can be edited/aggregated in the calling functions, and we do not want to store the unnecessary/large data in the database.
 			# Eg: Adding large pack data, next/previous seasons, show/season images, etc.
 			# The data is also deep copied in MetaCache, but because the background update runs in its own thread below, the dict might get edited before MetaCache has a chance to copy it.
-			for i in jobsBackground: i['item'] = Tools.copy(i['item'])
+			# This is also important for partial data (MetaCache.AttributePart):
+			# MetaCache.Attribute gets removed in MetaManager._metadataClean(), and with a copy here, it is ensured that MetaCache.AttributePart is still available in the MetaManager._metadataUpdateXYZ(), even if another thread that retrieved the metadata has removed the attribute in _metadataClean().
+			#for i in jobsBackground: i['item'] = Tools.copy(i['item'], deep = True)
+			for i in jobsBackground: i['item'] = MetaCache.copy(type = media, data = i['item'], deep = None, cache = True) # "deep=None": deep copy all, but only shallow copy packs, because they take long to copy and are not internally edited anyways.
 
-			Pool.thread(target = _metadataBackground, start = True)
+			# Delay to let other more important code execute first, before the less-important background retrieval happens.
+			thread = Pool.thread(target = _metadataBackground, start = True, delay = Pool.DelayExtended)
+			self._threadAdd(thread = thread)
 
 		return items
 
@@ -2034,13 +3538,21 @@ class MetaManager(object):
 					else: deep = False
 
 				values = items if Tools.isArray(items) else [items]
-				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for mutiple shows, each containing a list of seasons or episodes.
+				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for multiple shows, each containing a list of seasons or episodes.
 
 				for item in values:
+					# Remove contradicting niches.
+					# For instance, the niche contains both mini-series and multi-series types.
+					# Eg: tt20234568 (mini-series type, but has 2 seasons).
+					# This should already be fixed in MetaTools.niche().
+					# However, if the menu list returns "Mini", but the detailed metadata has the correct "Multi", then both will be merged into the niche in MetaCache -> Tools.update().
+					# IMDb will still lists "Mini" in the Advanced Search (eg: Arrivals), but this cannot be fixed from MetaImdb._extractNiche(), since the number of seasons is only in the detailed title IMDb page.
+					item['niche'] = self.mTools.nicheClean(niche = item.get('niche'), genre = item.get('genre'))
+
 					try: del item['temp']
 					except: pass
 
-					# Keep the cache form smart menu refreshes.
+					# Keep the cache for smart menu refreshes.
 					if not clean == 'cache':
 						try: del item[MetaCache.Attribute]
 						except: pass
@@ -2140,7 +3652,6 @@ class MetaManager(object):
 			else:
 				for k, v in values.items():
 					ids[k].append(v)
-				return id
 		return None
 
 	def _metadataIdUpdate(self, metadata, ids):
@@ -2156,13 +3667,15 @@ class MetaManager(object):
 			if value:
 				# Also add the top-level ID, for legacy purposes, since all over Gaia the IDs are accessed at the top-level of the dictionary.
 				# At some later point the entire addon should be updated to have the new ID structure.
+				if not 'id' in metadata: metadata['id'] = {}
 				metadata[type] = metadata['id'][type] = value
 
-	def _metadataIdLookup(self, media, title, year = None, list = False):
+	def _metadataIdLookup(self, media, title, year = None, list = False, quick = None):
 		if title:
-			id = self.mTools.id(media = media, title = title, year = year)
+			id = self.mTools.id(media = media, title = title, year = year, quick = quick)
 			if id and any(i for i in id.values()):
-				result = {'imdb' : id.get('imdb'), 'tmdb' : id.get('tmdb'), 'tvdb' : id.get('tvdb'), 'trakt' : id.get('trakt')}
+				# Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
+				result = {'imdb' : id.get('imdb'), 'tmdb' : id.get('tmdb'), 'tvdb' : id.get('tvdb'), 'trakt' : id.get('trakt'), 'title' : title, 'year' : year}
 				return [result] if list else result
 		return None
 
@@ -2175,8 +3688,12 @@ class MetaManager(object):
 	# detail: Wether or not to return detailed metadata.
 	def _metadataSmart(self, media = None, items = None, new = None, filter = None, sort = None, order = None, limit = None, remove = None, content = None, timer = None, detail = False):
 		try:
-			if timer is None: timer = Time(start = True)
+			if not self._check(): return Cache.Skip # Return Skip to not save the unfinished data to the cache.
+			if timer is None: timer = self._jobTimer()
 			current = Time.timestamp()
+
+			movie = Media.isMovie(media)
+			serie = Media.isSerie(media)
 
 			stats = None
 			helper = {}
@@ -2185,7 +3702,7 @@ class MetaManager(object):
 
 			# NB: use "number='extended'", not just "number=True", to also include standard/sequential/Trakt numbers that might be different between "new" (coming from Trakt) and "items" which are already smart-loaded.
 			# Eg: One Piece - "new" items from Trakt (S02E63) vs already smart-loaded "items" (S02E02).
-			number = 'extended' if Media.isSerie(media) else False
+			number = 'extended' if serie else False
 
 			# Add new items to the existing list.
 			if new:
@@ -2240,8 +3757,7 @@ class MetaManager(object):
 
 				# Only add new items that are not in the current list.
 				# This makes sure that existing items with detailed metadata are not replaced with the same item without detailed metadata.
-				new = [i for i in new if not self.mTools.filterContains(items = items, item = i, number = number, key = MetaManager.Smart, helper = helper)] # Reuse the helper.
-
+				new = [i for i in new if not self.mTools.filterContains(items = items, item = i, number = number, key = MetaManager.Smart, helper = helper)] # Reuse the helper.\
 				if new:
 					# Do initial sorting.
 					# Important for Rewatch menus, were we actually want the oldest (watched longest time ago) items first, although the history items coming in are sorted by most recently watched.
@@ -2255,6 +3771,7 @@ class MetaManager(object):
 				# Load existing metadata from the cache.
 				# Over time more and more detailed metadata will be available for improved sorting.
 				items, stats = self._metadataSmartLoad(media = media, items = items, content = content, stats = True)
+				if not self._check(): return Cache.Skip # Return Skip to not save the unfinished data to the cache.
 
 				# Filter and sort using the more detailed metadata retrieved prior.
 				if filter or sort or order: items = self._process(media = media, items = items, filter = filter, sort = sort, order = order, page = False, limit = False)
@@ -2275,35 +3792,144 @@ class MetaManager(object):
 						# There are quite a lot of titles returned within the requested time period, that when detailed metadata is retrieved, their dates are older than the requested time.
 						# Often this is just a few days, but sometimes the digital/physical release date can be 6+ months older than the date requested from the eg Trakt calendar.
 						# If we simply remove titles older than 1 year, these titles will constantly be in the "new" list.
-						# They then get smart-loaded, only to discover that their actual date from the detailed metadata is older than a year, so that they then gets removed here again.
+						# They then get smart-loaded, only to discover that their actual date from the detailed metadata is older than a year, so that they then get removed here again.
 						# This makes the same items stuck in "new" for a very long time, always getting smart-loaded and then removed, instead of spending the time on smart-loading other titles.
-						# Instead of removing the titles older than 1 year, leave them in the list for another year (2 years total) so that they can be used to filter out old items from the "new" list.
-						# These "removed" items only have IDs, but all other metadata gets removed to save disk space.
-						delete = current - remove
-						remove1 = current - remove
-						remove2 = current - (4 * remove)
+						# Instead of removing the titles older than 1 year, leave them in the list for another 9 months (1.75 years total) so that they can be used to filter out old items from the "new" list.
+						# These "removed" items only have IDs and time, but all other metadata gets removed to save disk space.
+						delete = current - int(0.75 * remove) # Delete 9 months after it was first marked for removal.
+						remove1 = current - int(1.0 * remove)
+						remove2 = current - int(2.0 * remove)
+						remove3 = current - int(2.5 * remove)
 						for item in items:
-							removed = item[MetaManager.Smart].get('removed')
+							smart = item[MetaManager.Smart] or {}
+
+							removed = smart.get('removed')
 							if removed:
 								# Completely delete items that were marked as removed a long time ago.
-								if removed < delete: item[MetaManager.Smart]['removed'] = True
+								if removed < delete: smart['removed'] = True
 							else:
 								# Mark more recent items as "removed" and leave in the list for later deletion.
-								time = self.mTools.time(type = MetaTools.TimeHome, metadata = item, estimate = False, fallback = False)
-								if time and time < remove1: item[MetaManager.Smart]['removed'] = current
-								else:
-									# Remove very old premiered releases who recently got a digitial/physical release.
-									time = self.mTools.time(type = MetaTools.TimeLaunch, metadata = item, estimate = False, fallback = False)
-									if time and time < remove2: item[MetaManager.Smart]['removed'] = current
+								# NB: Items not smart-loaded yet will not have the calculated home/launch/debut/etc dates. Use a fallback for the raw dates.
+								time = item.get('time') or {}
+								time1 = None
+								time2 = None
+								time3 = None
+								time4 = None
+
+								# Remove items more quickly if they are unpopular.
+								# That is, they have relatively few votes a long time after release.
+								# Only if the item was smart-loaded/refreshed after its home/premiere release, so that hopefully up-to-date vote counts are available.
+								# This clears up the smart data more quickly to reduce the overall size. And the user is probably not interested in these titles anyways.
+								adjust = 1.0
+								smartTime = smart.get('time')
+								if smartTime:
+									votes = item.get('votes') or 0
+									if votes < 1000:
+										premiere = time.get(MetaTools.TimePremiere)
+										if not premiere: premiere = current - 94672800 # Dummy premiere 3 years ago.
+										if smartTime > premiere:
+											home = None
+											homed = True
+											if movie:
+												home = time.get(MetaTools.TimeDigital) or time.get(MetaTools.TimePhysical) or time.get(MetaTools.TimeTelevision) or time.get(MetaTools.TimeCustom)
+												homed = not home or smartTime > home
+											if homed:
+												age = current - (home or premiere)
+												if age > 47336400: # 1.5+ year.
+													if votes < 100: adjust = 0.4
+													elif votes < 250: adjust = 0.5
+													elif votes < 500: adjust = 0.6
+													elif votes < 1000: adjust = 0.7
+												elif age > 31557600: # 1+ year.
+													if votes < 100: adjust = 0.5
+													elif votes < 250: adjust = 0.6
+													elif votes < 500: adjust = 0.7
+													elif votes < 1000: adjust = 0.8
+												elif age > 23652000: # 9+ months.
+													if votes < 100: adjust = 0.6
+													elif votes < 250: adjust = 0.7
+													elif votes < 500: adjust = 0.8
+													elif votes < 1000: adjust = 0.9
+
+								# Remove digital/physical releases or season premieres older than 1 year.
+								# Movies: home release
+								# Shows: latests season premiere
+								if not removed:
+									# Prefer the custom time for shows, which is the more recent season premiere, instead of the older show premiere.
+									for i in (MetaTools.TimeCustom, MetaTools.TimePremiere) if serie else (MetaTools.TimeHome, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision, MetaTools.TimeCustom):
+										time1 = time.get(i)
+										if time1:
+											if time1 < (remove1 * adjust): removed = True
+											break
+
+								# Remove very old premiered releases who only recently got a digital/physical release, older than 2 years.
+								# Only do this for movies. Otherwise shows with a very old show premiere are removed, even if they have a recent season premiere.
+								# Only do this if there is no home release. If there is a home release, wait for the previous statement to remove by home release date.
+								# Movies: premiere release
+								# Shows: none
+								if not removed and movie and not time1:
+									for i in (MetaTools.TimeDebut, MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision, MetaTools.TimeCustom):
+										time2 = time.get(i)
+										if time2:
+											if time2 < (remove2 * adjust): removed = True
+											break
+
+								# Remove very old releases who do not have a known date, but only a very inaccurate TimeUnknown from the Arrivals request parameter, older than 2 years.
+								if not removed:
+									time3 = time.get(MetaTools.TimeUnknown)
+									if time3 and time3 < (remove2 * adjust): removed = True
+
+								# This will probably never trigger.
+								# Remove titles with very old premieres, but only if there is no time1/time2 (eg: movie home release or show premiere).
+								if not removed and not time1 and not time2:
+									time4 = time.get(MetaTools.TimePremiere)
+									if time4 and time4 < (remove3 * adjust): removed = True
+
+								if removed: smart['removed'] = current
 
 						# Delete items that were marked as "removed" a long time ago to reduce the list size and remove older items over time.
 						items = [item for item in items if not item[MetaManager.Smart].get('removed') is True]
+
+				# In very rare occasions, there are too many items returned by _arrivalRetrieve().
+				# In one case, it has been observed that this function returns 2000-2500 items, a few hours later 5000-6000, and a few hours later 2000-2500 again.
+				# This might be a temporary bug in eg Trakt. Maybe they worked on the API and the temporary changes ignored the "limit" parameter, therefore returning more items then it should.
+				# This is difficult to detect, very sporadic, and only happens in very rare cases.
+				# The items have to be limited in some way, otherwise the list grows too large, slowing down smart-loading, especially on low-end devices, and requiring way to much detailed metadata to be loaded.
+				# The current best solution is to remove the oldest items by release date to a maximum limit.
+				# Even if we remove too many items, or items that are actually important, hopefully they will be re-added during the next iteration when hopefully the temporary bug is gone.
+				# But if the overhead items that were incorrectly added to the list do not fall within the removal date range (eg: too many NEWER items were added with a very low rating), they might be stuck in the list for way longer.
+				# Not sure what should be done about this case.
+				try:
+					if arrival:
+						maximum = 4000
+						if len(items) > maximum:
+							Logger.log('SMART LIMIT (%s - %s Titles): Detected too many titles in Arrivals. This might be a temporary issue and should be investigated further.' % (media.capitalize(), len(items)))
+							if movie:
+								items = Tools.listSort(items, key = lambda i : self.mTools.time(metadata = i, type = MetaTools.TimeHome, estimate = False, fallback = False) or self.mTools.time(metadata = i, type = MetaTools.TimeDebut, estimate = True, fallback = True) or 0, reverse = True)
+							else:
+								items = Tools.listSort(items, key = lambda i : self.mTools.time(metadata = i, type = MetaTools.TimeDebut, estimate = True, fallback = True) or 0, reverse = True)
+							items = items[:maximum]
+							if sort: items = self._process(media = media, items = items, sort = sort, order = order, page = False, limit = False)
+				except: Logger.error()
 
 				# NB: Do not store the detailed metadata in cache.db, otherwise it will become too large.
 				# We still need to retrieve the detailed metadata, since we filter by genre above, and the base metadata might not contain the genre.
 				if not detail: items = self._metadataSmartReduce(media = media, items = items)
 
-			if stats: message = 'Total: %d [%d New, %d Queued, %d Done] | Retrieved: %d [%d Cache, %d Foreground, %d Background]' % (stats['total']['all'], stats['total']['new'], stats['total']['queue'], stats['total']['done'], stats['count']['all'], stats['count']['cache'], stats['count']['foreground'], stats['count']['background'])
+			if stats:
+				message = 'Total: %d [%d Active, %d Removed] | Processed: %d [%d New, %d Queued, %d Done] | Retrieved: %d [%d Cache, %d Foreground, %d Background]' % (
+					stats['total']['all'],
+					stats['total']['active'],
+					stats['total']['remove'],
+					stats['total']['new'] + stats['total']['queue'] + stats['total']['done'], # Should be the same as "active", except if something is wrong.
+					stats['total']['new'],
+					stats['total']['queue'],
+					stats['total']['done'],
+					stats['count']['all'],
+					stats['count']['cache'],
+					stats['count']['foreground'],
+					stats['count']['background']
+				)
 			else: message = 'Smart generation failed without any items'
 			Logger.log('SMART REFRESH (%s %s | %dms): %s' % (media.capitalize(), (content or 'unknown').capitalize(), timer.elapsed(milliseconds = True), message))
 		except: Logger.error()
@@ -2312,6 +3938,7 @@ class MetaManager(object):
 		# Otherwise if the user does not have any progress for a niche, it returns an empty list, and then the cache complaints:
 		#	CACHE: Refreshing failed result data in the background (Empty List) - [Function : Movies._progressAssemble | Parameters: ...]
 		# Add the time for _metadataSmartReload().
+		if not self._check(): return Cache.Skip # Return Skip to not save the unfinished data to the cache.
 		return {
 			'time' : Time.timestamp(),
 			'items' : items,
@@ -2320,8 +3947,9 @@ class MetaManager(object):
 	def _metadataSmartLoad(self, media, items, content = None, stats = False):
 		try:
 			if items:
-				time = Time.timestamp()
+				current = Time.timestamp()
 
+				movie = Media.isMovie(media)
 				serie = Media.isSerie(media)
 				episode = Media.isEpisode(media) or (serie and content == MetaManager.ContentProgress)
 				pack = content == MetaManager.ContentProgress
@@ -2332,18 +3960,60 @@ class MetaManager(object):
 				itemsQueue = [] # Items already in the list, but not smart-loaded before. Medium important.
 				itemsDone = [] # Items already in the list, and smart-loaded before. Least important.
 				itemsRenew = [[], [], []] # Items already smart-loaded, but that are recently released and should be reloaded to get more up-to-date ratings/votes.
-				itemsRemoved = [] # Items removed because they are too old or other reasons.
+				itemsRemove = [] # Items removed because they are too old or other reasons.
 				itemsLoad = []
 
+				# This is set during preloading.
+				# There might be new releases which detailed metadata has not been updated in a while.
+				# Hence, the dates and ratings are outdated, making the item be listed at a far later page in Arrivals.
+				# These items' metadata is hopefully refreshed in preload().
+				# Reset them below in the smart list, so they get reloaded and their (updated) metadata reretrieved from cache, so that they are hopefully sorted to the front of the list.
+				renew = None
+				try:
+					if arrival and self.mRenew: # Only for Arrival, since we reset the dict below, so it can only be used once.
+						renew = self.mRenew.get(media)
+						if renew:
+							self.mRenew[media] = {} # Reset to not do this again on the next iteration.
+							renewProviders = [MetaTools.ProviderTrakt, MetaTools.ProviderImdb, MetaTools.ProviderTmdb, MetaTools.ProviderTvdb]
+				except: Logger.error()
+
 				for item in items:
+					# Can be used for debugging to force a specific item to be reloaded.
+					'''if 'tt0000000' in str(item):
+						item[MetaManager.Smart] = {}
+						itemsNew.append(item)
+					'''
+
+					# Check above for more comments.
+					try:
+						if renew:
+							renewal = False
+							for provider in renewProviders:
+								id = item.get(provider) or (item.get('id') or {}).get(provider)
+								if id and renew[provider].get(id):
+									renewal = True
+									break
+							if renewal:
+								item[MetaManager.Smart] = {}
+								itemsNew.append(item)
+					except: Logger.error()
+
 					self._metadataSmartUpdate(item = item)
 					if content == MetaManager.ContentProgress and not 'external' in item[MetaManager.Smart]:
 						self._metadataSmartUpdate(item = item, key = 'external', value = Tools.get(item, 'playback', 'source', 'external'))
 
 					smart = item[MetaManager.Smart]
 					if smart.get('removed'):
-						itemsRemoved.append(item)
+						itemsRemove.append(item)
 					else:
+						age = self._metadataSmartRelease(media = media, item = item, current = current)
+						if age:
+							ageRelease = age.get('release')
+							ageHome = age.get('home')
+						else:
+							ageRelease = None
+							ageHome = None
+
 						smart = smart.get('time')
 
 						if not smart:
@@ -2368,13 +4038,19 @@ class MetaManager(object):
 								item['id']['imdx'] = item['imdx'] = imdb
 
 							if smart is None: item[MetaManager.Smart]['time'] = 0
-							debut = self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True) # Do not estimate, if there is only a TimeUnknown value, the show estimate date can be far off.
-							if debut:
-								age = time - debut
-								if age < 259200: # Release in the past 3 days. More likley these are wanted in the Arrivals menu.
+
+							# Use more frequent intervals for home releases, to more quickly retrieve new digital/pysical releases.
+							# This is only if not smart-loaded yet. Already smart-loaded items use other code at the end of the loop.
+							if not ageRelease is None and ageRelease > -259200: # Not more than 3 days into the future.
+								# Home release in the past 1 week, or premiere release in the past 3 days.
+								# More likley these are wanted in the Arrivals menu.
+								if ageRelease < 259200 or (not ageHome is None and ageHome < 604800):
 									itemsRelease[0].append(item)
 									continue
-								elif age < 1209600: # Release in the past 2 weeks. More likley these are wanted in the Arrivals menu.
+
+								# Home release in the past 3 weeks, or premiere release in the past 2 weeks.
+								# More likley these are wanted in the Arrivals menu.
+								elif ageRelease < 1209600 or (not ageHome is None and ageHome < 1814400):
 									itemsRelease[1].append(item)
 									continue
 
@@ -2384,13 +4060,10 @@ class MetaManager(object):
 						elif smart == 0:
 							itemsQueue.append(item)
 						else:
-							debut = self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True)
-							if debut:
-								age = time - debut
-								if age < 604800: itemsRenew[0].append(item) # Released in the past week.
-								elif age < 1209600: itemsRenew[1].append(item) # Released in the past 2 weeks.
-								elif age < 1814400: itemsRenew[2].append(item) # Released in the past 3 weeks.
-
+							if not ageRelease is None and ageRelease > -172800: # Not more than 2 days into the future.
+								if ageRelease < 604800: itemsRenew[0].append(item) # Released in the past week.
+								elif ageRelease < 1209600: itemsRenew[1].append(item) # Released in the past 2 weeks.
+								elif ageRelease < 1814400: itemsRenew[2].append(item) # Released in the past 3 weeks.
 							itemsDone.append(item)
 
 				# Add to the other items.
@@ -2405,6 +4078,8 @@ class MetaManager(object):
 				totalNew = len(itemsNew)
 				totalQueue = len(itemsQueue)
 				totalDone = len(itemsDone)
+				totalRemove = len(itemsRemove)
+				totalActive = totalAll - totalRemove
 
 				# First try to retrieve whatever is in the cache from any other request that might have retrieved the detailed metadata.
 				# This call should never cause any new metadata to be retrieved. Only existing metadata should be returned.
@@ -2441,13 +4116,14 @@ class MetaManager(object):
 						itemsCache += self._metadataSmartChunk(items = itemsCache2, limit = 100) # If the limit is changed, also change itemsRenew above.
 
 					itemsCache = self._metadataSmartRetrieve(items = itemsCache, pack = pack, quick = False) # Retrieve from cache and the rest not at all.
+					if not self._checkInterval(): return (False, False) if stats else False
 					if itemsCache:
 						countCache += len(itemsCache)
 						itemsLoad.extend(itemsCache)
 
 						# Remove any items that now have detailed metadata.
 						# NB: Do not filter by number here, since the Trakt number has been converted to a Standard number, and might mismatch here.
-						# There should in any case not be mutiple episodes from the same show in the list.
+						# There should in any case not be multiple episodes from the same show in the list.
 						# Otherwise the converted episode number is always seen as a "new" episode and end up retrieving metadata for it again and again.
 						# Eg: One Piece S02E63.
 						helper = {} # Use a helper, since it is considerably faster if filterContains() is called multiple times in a loop.
@@ -2461,7 +4137,7 @@ class MetaManager(object):
 				# Also retrieving a new episode in the Progress menu, will retrieve metadata for all episodes in the season, season metadata, show metadata, and pack metadata/generation, so even a few items can take long.
 				# This should not hold up the smart list creation a long time.
 				# Still retrieve at least the most recent new item, since that might be the just-watched episode and we want to correctly have the next episode from that show in the new progress list.
-				count = 3
+				count = 3 if episode else 5 if serie else 7 # Update (2025-11): Previously 3 for all media. But increased this, since 3 is very little. There are 10 more added for Arrivals below.
 				itemsCache = None
 
 				if self.mModeAccelerate:
@@ -2496,6 +4172,7 @@ class MetaManager(object):
 
 				if itemsCache:
 					itemsCache = self._metadataSmartRetrieve(items = itemsCache, pack = pack, quick = None) # Retrieve from cache, foreground or background.
+					if not self._checkInterval(): return (False, False) if stats else False
 					if itemsCache:
 						countForeground += len(itemsCache)
 						itemsLoad.extend(itemsCache)
@@ -2508,6 +4185,10 @@ class MetaManager(object):
 					# These will later on also be refreshed by _metadataSmartReload(), so no need to retrieve these in the background/foreground.
 					#itemsCache = self._metadataSmartChunk(items = itemsCache, limit = 7 if episode else 15 if serie else 20)
 					#itemsCache = self._metadataSmartRetrieve(items = itemsCache, pack = pack, quick = True) # Retrieve from cache and the rest in the background.
+					#if not self._checkInterval(): return (False, False) if stats else False
+					#if itemsCache is False:
+					#	if stats: return False, False
+					#	else: return False
 					#if itemsCache:
 					#	countBackground += len(itemsCache)
 					#	itemsLoad.extend(itemsCache)
@@ -2516,6 +4197,7 @@ class MetaManager(object):
 					# The old lower vote count can make new releases have a lower order in sortGlobal().
 					itemsCache = self._metadataSmartChunk(items = itemsCache, limit = (10 if episode else 40) if arrival else (7 if episode else 15 if serie else 20))
 					itemsCache = self._metadataSmartRetrieve(items = itemsCache, pack = pack, quick = False) # Retrieve from cache and the rest not at all.
+					if not self._checkInterval(): return (False, False) if stats else False
 					if itemsCache:
 						countCache += len(itemsCache)
 						itemsLoad.extend(itemsCache)
@@ -2529,7 +4211,7 @@ class MetaManager(object):
 				helper = {} # Use a helper, since it is considerably faster if filterContains() is called multiple times in a loop.
 				for item in itemsLoad:
 					# Do not use the number, since it might have changed.
-					# Plus smart lists should not contain mutiple episodes from the same show.
+					# Plus smart lists should not contain multiple episodes from the same show.
 					found = self.mTools.filterContains(items = items, item = item, helper = helper, result = True)
 					if found:
 						# Add the timestamp to indicate this item was smart-loaded.
@@ -2539,15 +4221,15 @@ class MetaManager(object):
 						# Still allow the external metadata as "fallback", improving filtering/sorting when the smart list is initially created.
 						# This can also greatly help with importing a large Trakt history in the Progress menu, which will have a lot of older titles and this allows for detailed metadata right from the start, and improve filtering/sorting.
 						# However, since we leave the smart time at 0, on the next smart-refresh it will see this as a new/queued item and retrieve it again. This time it would have the new metadata from the local cache.
-						external = (item.get(MetaCache.Attribute) or {}).get(MetaCache.AttributeStatus) == MetaCache.StatusExternal
-						self._metadataSmartUpdate(item = item, key = 'time', value = 0 if external else time)
+						external = MetaCache.status(item) == MetaCache.StatusExternal
+						self._metadataSmartUpdate(item = item, key = 'time', value = 0 if external else current)
 
 						if content == MetaManager.ContentProgress:
 							if Media.isEpisode(item.get('media')):
 								# Episodes coming from the Trakt history still have the Trakt numbers.
 								# It is too expensive to convert all these numbers in Playback.
 								# Do here, so that we do not have to do it later in metadataEpisode() for already smart-loaded items, every time the Progress menu is loaded.
-								if found[MetaManager.Smart]['external']: # This is set on "found", not the "item".
+								if found[MetaManager.Smart].get('external'): # This is set on "found", not the "item".
 									try: number = item['number'][MetaPack.NumberStandard]
 									except: number = None
 									if number:
@@ -2571,7 +4253,7 @@ class MetaManager(object):
 									item[MetaManager.Smart]['pack'] = pack.reduceSmart()
 
 									nextItem = {'imdb' : item.get('imdb'), 'tmdb' : item.get('tmdb'), 'tvdb' : item.get('tvdb'), 'trakt' : item.get('trakt'), 'season' : item.get('season'), 'episode' : item.get('episode')}
-									nextNumber = self._metadataEpisodeIncrement(item = nextItem, number = MetaPack.ProviderTrakt if found[MetaManager.Smart]['external'] else MetaPack.NumberStandard, threaded = False)
+									nextNumber = self._metadataEpisodeIncrement(item = nextItem, number = MetaPack.ProviderTrakt if found[MetaManager.Smart].get('external') else MetaPack.NumberStandard, threaded = False)
 
 									if nextItem.get('invalid') or nextItem.get('episode') is None:
 										# Set to False, to specifically indicate that there is no new episode.
@@ -2583,16 +4265,59 @@ class MetaManager(object):
 										# Add the next episode's time to the smart data.
 										# This is used for preliminary sorting PRIOR to the paging.
 										# Otherwise future episodes cannot be filtered out BEFORE the paging is done. Meaning future episode can only be sorted to the bottom of the 1st page, instead of moving it to later pages.
-										nextTime = pack.time(season = nextSeason, episode = nextEpisode, number = nextNumber)
+										item[MetaManager.Smart]['next'] = {
+											'season' : nextSeason,
+											'episode' : nextEpisode,
+											'number' : nextNumber,
+											'time' : pack.time(season = nextSeason, episode = nextEpisode, number = nextNumber),
+										}
 
-										item[MetaManager.Smart]['next'] = {'season' : nextSeason, 'episode' : nextEpisode, 'number' : nextNumber, 'time' : nextTime}
+									# Used by release() to determine earlier refresh rates.
+									# Add this here, since we already loaded the pack, which is not done again in release() for efficiency reasons.
+									releaseItem = pack.lastEpisodeOfficial()
+									if releaseItem:
+										releaseSeason = pack.numberStandardSeason(item = releaseItem)
+										releaseEpisode = pack.numberStandardEpisode(item = releaseItem)
+										releaseTime = [pack.timeMinimum(season = i) for i in range(releaseSeason + 1)]
+										releaseTime = [i for i in releaseTime if i]
+										item[MetaManager.Smart]['release'] = {
+											Media.Season : releaseSeason,
+											Media.Episode : releaseEpisode,
+											'count' : {
+												Media.Pack : pack.countEpisodeOfficial(), # Total number of episodes in the entire show, excluding S0.
+												Media.Season : releaseSeason, # Total number of seasons, excluding S0.
+												Media.Episode : releaseEpisode, # Total number of episodes in latests seasons.
+												Media.Special : pack.countEpisode(season = 0), # Total number of specials in S0.
+											},
+											'time' : [
+												pack.timeStandard(season = 1, episode = 1),
+												releaseTime,
+												pack.timeValues(season = releaseSeason), # Add all episode dates. The closest one will be picked in release().
+											],
+										}
+									else:
+										item[MetaManager.Smart]['release'] = None
+
 						elif arrival:
 							# NB: Add the season number to the smart dict.
 							# Otherwise for Show Arrivals, the show object + season number is part of the "new" list that comes in.
 							# Once the show object gets smart-loaded, the season number in the root dict gets removed.
-							# This then causes the smart list to grow very large over time, since every show object is added mutiple times to the smart list, once with a season number and once without.
+							# This then causes the smart list to grow very large over time, since every show object is added multiple times to the smart list, once with a season number and once without.
 							# Then when we call MetaTools.filterContains(), these objects are seen as different ones, since they have different season numbers.
 							if Media.isSerie(item.get('media')): item[MetaManager.Smart]['season'] = item.get('season')
+
+							# Some titles have no plot and/or poster.
+							# Sort these titles to the back of the Arrivals list, since they look ugly and are typically low-budget movies.
+							# _arrivalProcess() adds after-filters to remove these items from the menu.
+							# But do this here so we can sort them to the back instead of filtering them at the end, so that menus still have the full 50 items per page.
+
+							complete = bool(item.get('plot')) and bool((item.get(MetaImage.Attribute) or {}).get('poster'))
+							if not complete:
+								# If the title is released in the future, then missing metadata is very common.
+								# Do not set to False, otherwise if they are sorted in MetaTools._sortGlobal(), they get added to the back if the smart-loaded metadata is outdated, even if it is a major blockbuster that will get these missing attributes once released.
+								time = self.mTools.time(type = MetaTools.TimePremiere, metadata = item, estimate = False, fallback = True)
+								if time and time > current: complete = None
+							item[MetaManager.Smart]['complete'] = complete
 
 						found.update(item)
 					else:
@@ -2607,7 +4332,7 @@ class MetaManager(object):
 				# Eg: 2.5 means played fully twice, and currently rewatching with a progress of 50%.
 				# For shows, it means the percetange of the show fully watched.
 				# Eg: 2.5 means all episodes were played twice, and currently rewatching with half the episodes watched.
-				# This might not be a perfect indicator, since the user might have watched a few episodes mutiple times, and others fewer or no times.
+				# This might not be a perfect indicator, since the user might have watched a few episodes multiple times, and others fewer or no times.
 				# But for normal watches, this should be a pretty good indicator.
 				for item in items:
 					play = 0
@@ -2624,7 +4349,7 @@ class MetaManager(object):
 					item[MetaManager.Smart]['play'] = Math.round(play, places = 6) if play else play
 
 			# Important to filter duplicates for Arrivals.
-			# There can be duplicate items, some with one of the IMDb/TMDb/Trakt IDs only, and others with mutiple IDs. Eg: some items come from IMDb sources, otherwise from Trakt or TMDb.
+			# There can be duplicate items, some with one of the IMDb/TMDb/Trakt IDs only, and others with multiple IDs. Eg: some items come from IMDb sources, otherwise from Trakt or TMDb.
 			# Only after detailed metadata retrieval are all the IDs available and can we filter out these duplicates.
 			# This means the Arrivals list can get slightly smaller over time.
 			# Also check the number, since the same show can have 2 seasons released within the same year. Keep both, otherwise the one is always in "new".
@@ -2632,7 +4357,7 @@ class MetaManager(object):
 			items = self.mTools.filterDuplicate(items = items, id = True, title = False, number = True)
 
 			statistics = {
-				'total' : {'all' : totalAll, 'new' : totalNew, 'queue' : totalQueue, 'done' : totalDone},
+				'total' : {'all' : totalAll, 'active' : totalActive, 'new' : totalNew, 'queue' : totalQueue, 'done' : totalDone, 'remove' : totalRemove},
 				'count' : {'all' : countAll, 'cache' : countCache, 'foreground' : countForeground, 'background' : countBackground},
 			}
 			self._metadataSmartStats(media = media, content = content, stats = statistics.get('total'))
@@ -2644,12 +4369,127 @@ class MetaManager(object):
 			if stats: return items, None
 			else: return items
 
+	def _metadataSmartRenew(self, media, items):
+		try:
+			providers = [MetaTools.ProviderTrakt, MetaTools.ProviderImdb, MetaTools.ProviderTmdb, MetaTools.ProviderTvdb]
+			if self.mRenew is None: self.mRenew = {}
+			if not media in self.mRenew:
+				self.mRenew[media] = {}
+				for i in providers: self.mRenew[media][i] = {}
+
+			renew = self.mRenew[media]
+			for item in items:
+				ids = item.get('id')
+				for i in providers:
+					id = ids.get(i)
+					if id: renew[i][id] = True
+		except: Logger.error()
+
+	def _metadataSmartRelease(self, media, item, current = None, update = True):
+		try:
+			# Add the less-inaccurate dates from external sources as TimeCustom as a fallback:
+			#	1. This allows for better sorting of movie Arrivals from MetaTools._sortGlobal() if the digital/physical release dates are not available yet.
+			#	2. This allows for more frequent refreshes of the item in the smart-list below if its digital/physical dates get closer. Movies get added to Arrivals on their digital date and having updated metadata around this time is beneficial.
+			# Most dates returned by _arrivalRetrieve() are premiere dates. Only the Trakt DVD calendar returns a few physical dates.
+			# But digital dates are not available at all in _arrivalRetrieve(), except if detailed metadata is loaded or when using the dates from external sources in release().
+			# The digital/physical release dates can be missing if:
+			#	1. The item was not smart-loaded yet and therefore has missing dates.
+			#	2. The item was smart-loaded a while back and therefore has outdated metadata. Sometimes digital/physical dates are only added to Trakt/TMDb a few days prior to those dates.
+			#	3. The item has no digital/physical dates in the detailed metadata. Either the title does not have those dates at all, or they were simply not entered on Trakt/TMDb.
+			# Hence, if the digital/physical dates are not available for smart items, use the external dates instead for better sorting and quicker refreshing.
+
+			if current is None: current = Time.timestamp()
+			time = item.get('time') or {}
+			movie = Media.isMovie(media)
+
+			# Do not use dates more than 3 days into the future, since they probably still have outdated metadata and we do not want to unnecessarily refresh.
+			# The places that call this function assume this value to be no more than 3 days.
+			future = 259200
+
+			all = []
+			home = []
+			custom = None
+			origin = None
+
+			# Add the external custom date if available from release().
+			# Do this every time the smart list is refreshed, since release() gets updated daily with new dates.
+			# The total lookup for all items is 25-35ms, where most of the time is spend on initializing the release() cache the first time the function is called.
+			try:
+				lookup = self.release(media = media, metadata = item)
+				if lookup:
+					# Add the origin to the smart attributes, which is used in MetaTools._sortGlobal().
+					# Titles that are on the Trakt calendar are weighted higher in the Arrivals menu.
+					# More info under MetaTools._sortGlobal().
+					origin = {
+						'release' : lookup.get('origin'),	# The item's origin in the release() calendar.
+						'arrival' : item.get('origin'),		# The item's origin from the arrival() smart menu.
+					}
+					if update: item[MetaManager.Smart]['origin'] = origin
+
+					lookuped = lookup.get('time')
+					if lookuped:
+						custom = lookuped
+						if movie and update: # Only add this for movies, since shows have a different TimeCustom.
+							# Most recent date in the past. No future dates.
+							homed = lookup.get('home')
+							if homed:
+								home.extend(homed)
+								homed = [i for i in homed if i <= current]
+								if homed: homed = max(homed)
+
+							# NB: Prefer the digitial/physical release date from Trakt.
+							# Since time[2] can be a physical date in the future, while there is a digital date in the past.
+							# Prefer the earlier date for TimeCustom.
+							lookuped = homed or lookuped[2] or lookuped[1] or lookuped[0] # homed=digital/physical(Trakt), 2=digital/physical, 1=limited/theatrical, 0=premiere
+							if lookuped:
+								if not time: item['time'] = time = {} # Sometimes the time attribute is None.
+								time[MetaTools.TimeCustom] = lookuped
+			except: Logger.error()
+
+			# Get the closest time for more frequent refreshes around the release dates.
+			if movie:
+				# Add all 3 custom dates for movies.
+				if custom:
+					all.extend(custom)
+					home.append(custom[2])
+
+				# The digital/pysical release dates might be closer to the current date than the premiere.
+				for t in (MetaTools.TimeHome, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision):
+					value = time.get(t)
+					if value: home.append(value)
+				if not home: # Estimate the time if no other dates are available.
+					value = self.mTools.timeEstimate(type = MetaTools.TimeHome, times = time, metadata = item)
+					if value: home.append(value)
+
+				all.extend(home)
+			else:
+				# Do not include the episode release dates, otherwise refreshing will happen too often when a new episode is released every week.
+				# Only include the show and season premiere.
+				if custom: all.extend(custom[:2])
+
+			# NB: Items not smart-loaded yet, do not have home/debut/etc calculated times, only the raw premiere time.
+			for t in (MetaTools.TimeDebut, MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical) if movie else (MetaTools.TimeDebut, MetaTools.TimePremiere):
+				value = time.get(t)
+				if value: all.append(value)
+			if not all: # Estimate the time if no other dates are available.
+				value = self.mTools.timeEstimate(type = MetaTools.TimeDebut, times = time, metadata = item)
+				if value: all.append(value)
+
+			age = self.mTools.timeClosest(times = all, time = current, future = future, fallback = True) if all else None
+			if age: age = current - age
+
+			home = self.mTools.timeClosest(times = home, time = current, future = future, fallback = True) if home else None
+			if home: home = current - home
+
+			return {'release' : age, 'home' : home, 'origin' : origin}
+		except: Logger.error()
+		return None
 
 	# Always retrieve the pack data, since it is needed to create various smart attributes.
 	# Do not aggregate the show/season data, since it is not needed here, and only slows down things and requires additional disk I/O.
-	def _metadataSmartRetrieve(self, items, quick = None, pack = True, aggregate = False):
+	def _metadataSmartRetrieve(self, items, quick = None, refresh = None, pack = True, aggregate = False):
 		# Clean: keep the MetaCache data to determine if it comes from the external cache.
-		return self.metadata(items = items, quick = quick, pack = pack, aggregate = aggregate, clean = 'cache')
+		return self.metadata(items = items, quick = quick, refresh = refresh, pack = pack, aggregate = aggregate, clean = 'cache')
 
 	def _metadataSmartUpdate(self, item, key = None, value = None):
 		if not MetaManager.Smart in item: item[MetaManager.Smart] = {}
@@ -2664,6 +4504,8 @@ class MetaManager(object):
 			if Media.isSerie(media): media = Media.Show
 			if not data: data = {'time' : {'update' : 0, 'notification' : 0}}
 
+			if stats: self._batchSmart(content = content, media = media, total = stats.get('active'), count = stats.get('done')) # Use "active", not "all", to ignore removed items.
+
 			if stats or notification:
 				if stats:
 					data['time']['update'] = Time.timestamp()
@@ -2672,6 +4514,23 @@ class MetaManager(object):
 				if notification:
 					data['time']['notification'] = Time.timestamp()
 				Settings.setData(id, data)
+
+			try:
+				if data:
+					total = 0
+					done = 0
+					for i in [MetaManager.ContentProgress, MetaManager.ContentArrival]:
+						for j in [Media.Movie, Media.Show]:
+							try:
+								value = data[i][j]
+								total += value.get('active') or 0 # Use "active", not "all", to ignore removed items.
+								done += value.get('done') or 0
+							except: continue
+					progress = int(min(100, (done / float(total)) * 100))
+
+					from lib.modules.interface import Translation
+					Settings.set(id = 'metadata.general.preload', value = '%d%% %s' % (progress, Translation.string(36839)))
+			except: Logger.error()
 
 			if content:
 				data = data.get(content)
@@ -2694,14 +4553,17 @@ class MetaManager(object):
 		return items[:limit1] + Tools.listShuffle(items[limit1:])[:limit2]
 
 	def _metadataSmartReduce(self, media, items, full = True):
-		removed = ['media', 'id', 'imdb', 'imdx', 'tmdb', 'tvdb', 'trakt']
+		# NB: Keep the time dict, since this is needed for semi-removed smart items to be fully removed at a later point based on the dates.
+		# The times are also used for release().
+		# NB: Also keep item['id']['collection'] for sets.
+		removed = ['media', 'id', 'imdb', 'imdx', 'tmdb', 'tvdb', 'trakt', 'time']
 
 		# Include any attributes that might be used for sorting or filtering, BEFORE the detailed metadata is retrieved.
 		values = [
-			'media', 'niche',
+			'media', 'niche', 'origin',
 			'id', 'imdb', 'imdx', 'tmdb', 'tvdb', 'trakt',
-			'title', 'originaltitle',
-			'year', 'premiered', 'time',
+			'tvshowtitle', 'title', 'originaltitle',
+			'tvshowyear', 'year', 'premiered', 'time',
 			'rating', 'votes', # Do not add "voting", since it increases the size, and only the aggregated rating/votes are needed.
 			'country', 'language', 'genre', 'mpaa',
 		]
@@ -2711,7 +4573,7 @@ class MetaManager(object):
 			values.extend([
 				MetaManager.Smart,
 				'progress', 'playcount', 'userrating',
-				#'playback', # Do not add "playback", since it increases the size, but is not needed, since all neccessary values are necessary into MetaManager.Smart.
+				#'playback', # Do not add "playback", since it increases the size, but is not needed, since all necessary values are necessary into MetaManager.Smart.
 			])
 
 		if Media.isSerie(media):
@@ -2747,13 +4609,15 @@ class MetaManager(object):
 
 	def _metadataSmartReload(self, media, items, time, content = None, cache = None, delay = True, force = False):
 		try:
+			if not self._check(): return False
+
 			if items:
 				# Reload in one of these cases:
 				#	1. If forced.
 				#	2. If coming from cache and the cache call was more than a minute ago.
 				#	3. If coming from cache and the overall usage is relativley low.
 				# Do not reload if _metadataSmartLoad() was called immediately beforehand (either cache is None, or time is a few seconds ago).
-				if force or (cache and ((Time.timestamp() - time) > 60 or MetaProvider.usageGlobal() < 0.3)):
+				if force or (cache and ((Time.timestamp() - time) > 60 or self.providerUsage() < 0.3)):
 					parameters = {'media' : media, 'items' : items, 'content' : content, 'delay' : delay}
 
 					# NB: Do not execute in a thread if we are refreshing from reload().
@@ -2763,7 +4627,10 @@ class MetaManager(object):
 						self._metadataSmartRefresh(**parameters)
 					else:
 						Pool.thread(target = self._metadataSmartRefresh, kwargs = parameters, start = True)
+
+					return True
 		except: Logger.error()
+		return None
 
 	def _metadataSmartRefresh(self, media, items, content = None, delay = True):
 		try:
@@ -2776,8 +4643,8 @@ class MetaManager(object):
 				# Wait a long time, since content() can retrieve a lot of metadata when few items are cached, which can take long.
 				# The wait will be less if the script execution finishes more quickly. So this is only the "maximum wait".
 				# Wait at the start, so we can later get more accurate MetaTrakt/MetaImdb usage.
-				Pool.wait(delay = 30.0 if delay is True else delay)
-				timer = Time(start = True)
+				Pool.wait(delay = 30.0 if delay is True else delay, minimum = True)
+				timer = self._jobTimer()
 
 				serie = Media.isSerie(media)
 				episode = Media.isEpisode(media) or (serie and content == MetaManager.ContentProgress)
@@ -2793,7 +4660,12 @@ class MetaManager(object):
 				# So retrieve as minimal metadata as possible in one go. Not too little, otherwise it will take forever to fully load a large Trakt history of a few thousand items.
 				# Add some randomness to avoid issues when the first items can never be retrieved.
 				# If all items were smart-loaded, it will start refreshing older items in case their metadata changes in the future.
-				limit = 5 if episode else 8 if serie else 10 # Just 5 items for episodes can take 60+ secs.
+				#
+				# Update (2025-05): The Progress smart-list takes a few weeks to fully load, but the Arrivals smart-list takes 6 months of continuous use until fully loaded.
+				# Since there are now busy-sleeps during metadata refreshing and pack generation, the background smart-reloading should not hold up Python processes that open menus for too long.
+				# Increase the limit and check if it doesn't affect loading times. This can be further increased (or decreased) in the future.
+				#limit = 5 if episode else 8 if serie else 10 # Just 5 items for episodes can take 60+ secs.
+				limit = 6 if episode else 12 if serie else 15 # Just 5 items for episodes can take 60+ secs, mostly because of the pack generation.
 
 				# After some time most of these items are cached and will not retrieve/refresh the metadata.
 				# Increase the limit if a certain percentage of items are already smart-loaded.
@@ -2814,7 +4686,7 @@ class MetaManager(object):
 				# More reduction is done in _metadataSmartChunk().
 				if done >= 0.5 and not self.mPerformanceFast: limit *= 0.85
 
-				usage = MetaProvider.usageGlobal()
+				usage = self.providerUsage()
 				if usage > 0.75: limit = 0
 				elif usage > 0.25: limit = max(1, int(limit * (1.0 - usage)))
 
@@ -2825,14 +4697,14 @@ class MetaManager(object):
 
 				# Move the new and queued items to the front.
 				lookup = [[], [[], [], []], []]
-				time = Time.timestamp()
+				current = Time.timestamp()
 				items = Tools.listShuffle(items)
 
 				for item in items:
 					smarted = item.get(MetaManager.Smart).get('time')
 
 					# Firstly, add new releases that were not smart-loaded yet.
-					if smarted is None:
+					if not smarted: # None or 0.
 						lookup[0].append(item)
 						continue
 
@@ -2840,25 +4712,26 @@ class MetaManager(object):
 					# Check _metadataSmartLoad() with the "American Primeval" comment.
 					# More recent releases should be reloaded more frequently, since the rating/votes are very low the first few days after release.
 					# This causes important recent releases to be only listed on page 2+.
-					debut = self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True)
-					if debut:
-						age = time - debut
-						if age < 604800:
-							lookup[1][0].append(item)
-							continue
-						elif age < 1209600:
-							lookup[1][1].append(item)
-							continue
-						elif age < 1814400:
-							lookup[1][2].append(item)
-							continue
+					age = self._metadataSmartRelease(media = media, item = item, current = current)
+					if age:
+						age = age.get('release')
+						if not age is None and age > -259200: # Not more than 3 days into the future.
+							if age < 604800: # 1 week.
+								lookup[1][0].append(item)
+								continue
+							elif age < 1209600: # 2 weeks.
+								lookup[1][1].append(item)
+								continue
+							elif age < 1814400: # 3 weeks.
+								lookup[1][2].append(item)
+								continue
 
 					# Thirdly, add older releases that were already smart-loaded.
 					lookup[2].append(item)
 
 				# Titles not smart-loaded yet.
 				# Prefer those that were recently released.
-				lookup[0] = Tools.listSort(lookup[0], key = lambda i : time - (self.mTools.time(metadata = item, type = MetaTools.TimeDebut, estimate = False, fallback = True) or 0))
+				lookup[0] = Tools.listSort(lookup[0], key = lambda i : max(-259200, (self._metadataSmartRelease(media = media, item = i, current = current) or {}).get('release') or 0))
 				items1 = lookup[0][:limit1]
 				items2 = lookup[0][limit1:]
 
@@ -2885,7 +4758,11 @@ class MetaManager(object):
 				total = len(items)
 				if limit:
 					items = self._metadataSmartChunk(items = items, limit = limit)
-					items = self._metadataSmartRetrieve(items = items, quick = None, pack = pack, aggregate = True) # Retrieve from cache, foreground or background. Aggregate to also refresh the show metadata if it is outdated.
+
+					# Retrieve from cache, foreground or background. Aggregate to also refresh the show metadata if it is outdated.
+					# Make all refreshes run in the background to add delays in between.
+					items = self._metadataSmartRetrieve(items = items, quick = None, refresh = MetaCache.RefreshBackground, pack = pack, aggregate = True)
+
 					if items: count = len(items) # Some might be retrieved from the cache. So the actual number of foreground/background retrievals might be lower.
 
 				Logger.log('SMART RELOAD (%s %s | %dms): Total: %d | Retrieved: %d' % (media.capitalize(), (content or 'unknown').capitalize(), timer.elapsed(milliseconds = True), total, count))
@@ -2895,7 +4772,7 @@ class MetaManager(object):
 	# METADATA - MOVIE
 	##############################################################################
 
-	def metadataMovie(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None):
+	def metadataMovie(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None):
 		try:
 			media = Media.Movie
 
@@ -2908,9 +4785,9 @@ class MetaManager(object):
 				else:
 					pickSingle = True
 					items = [items]
-			elif imdb or tmdb or tvdb or trakt:
+			elif trakt or imdb or tmdb or tvdb:
 				pickSingle = True
-				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}]
+				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year}] # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 			elif title:
 				pickSingle = True
 				items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
@@ -2928,7 +4805,7 @@ class MetaManager(object):
 		except: Logger.error()
 		return None
 
-	def _metadataMovieUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataMovieUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
 			# If many requests are made at the same time, there can be various network errors:
 			#	Network Error [Error Type: Connection | Link: https://webservice.fanart.tv/v3/movies/...]: Failed to establish a new connection: [Errno 111] Connection refused
@@ -2947,6 +4824,8 @@ class MetaManager(object):
 			#	2. Do NOT write the data to the metadata cache, since it is incomplete. If the menu is reloaded, this function will be called again and another attempt will be made to get the metadata.
 			#	3. All subrequests are cached. If eg Fanart fails, but Trakt/TMDb was successful, the menu is reloaded and this function called again, only the failed requests are redone, the other ones use the previously cached data.
 			#	4. If a request fails due to network issues (excluding HTTP errors), that request is purged from the cache, so that on the next try the old/invalid cached results are not reused.
+
+			if not self._checkInterval(mode = mode): return None
 
 			media = Media.Movie
 
@@ -2973,20 +4852,25 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times. Can be None if not found.
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			if not imdb or not tmdb:
 				values = partOld.get('id')
@@ -3010,14 +4894,14 @@ class MetaManager(object):
 
 			cache = cache if cache else None
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
-			if developer: Logger.log('MOVIE METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('MOVIE METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
 			# DetailEssential: 2-3 requests [Trakt: 1-2 (summary, optional translations), TMDb: 1 (summary), IMDb: 0, Fanart: 0]
 			# DetailStandard: 6-7 requests [Trakt: 3-4 (summary, studios, releases, optional translations), TMDb: 2 (summary, images), IMDb: 0, Fanart: 1 (summary)]
 			# DetailExtended: 8-9 requests [Trakt: 4-5 (summary, people, studios, releases, optional translations), TMDb: 2 (summary, images), IMDb: 1 (summary), Fanart: 1 (summary)]
 			requests = []
 			if self.mLevel >= 0:
-				requests.append({'id' : 'trakt', 'function' : self._metadataMovieTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'trakt', 'function' : self._metadataMovieTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'title' : title, 'year' : year, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				requests.append({'id' : 'tmdb', 'function' : self._metadataMovieTmdb, 'parameters' : {'tmdb' : tmdb, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				requests.append({'id' : 'imdb', 'function' : self._metadataMovieImdb, 'parameters' : {'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				if self.mLevel >= 1:
@@ -3025,15 +4909,22 @@ class MetaManager(object):
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {}
@@ -3058,7 +4949,7 @@ class MetaManager(object):
 			}
 
 			providers = ['metacritic', 'imdb', 'fanart', 'tmdb', 'trakt'] # Keep a specific order. Later values replace newer values.
-			providersImage = providers[::-1] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
+			providersImage = ['tmdb', 'fanart', 'trakt', 'imdb'] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
 
 			for i in providers:
 				if i in datas:
@@ -3121,10 +5012,15 @@ class MetaManager(object):
 			networks = self.mTools.mergeNetwork(networks, country = countries)
 			if networks: data['network'] = networks
 
-			studios = self.mTools.mergeStudio(studios, other = networks, country = countries)
+			# order: prefer the studios most providers list early.
+			# Check that movies in sets have the same studio icons:
+			#	Harry Potter (Warner Bros)
+			#	The Lord of the Rings (New Line Cinema)
+			#	The Hobbit (New Line Cinema)
+			studios = self.mTools.mergeStudio(studios, other = networks, country = countries, order = False)
 			if studios: data['studio'] = studios
 
-			status = self.mTools.mergeStatus(status)
+			status = self.mTools.mergeStatus(status, media = media)
 			if status: data['status'] = status
 
 			times = self.mTools.mergeTime(times, metadata = data)
@@ -3163,7 +5059,26 @@ class MetaManager(object):
 			niche = self.mTools.niche(niche = niche, metadata = data)
 			if niche: data['niche'] = niche
 
+			# Add the IMDb rating/votes from the bulk datasets.
+			# This should never happen, since the latests rating/votes are already retrieve from HTML if MetaTools.DetailExtended.
+			try:
+				if self._bulkImdbEnabled():
+					try: votingImdb = voting['rating']['imdb']
+					except: votingImdb = None
+					if votingImdb is None:
+						votingImdb = self._bulkImdbLookup(imdb = data.get('imdb'))
+						if votingImdb:
+							voting['rating']['imdb'] = votingImdb.get('rating')
+							voting['votes']['imdb'] = votingImdb.get('votes')
+			except: Logger.error()
+
 			data['voting'] = voting
+
+			# Add the collection ID to the "id" dictionary.
+			# This is added to the smart-loaded data and is later used in release().
+			# Also used by preload() to load a movie set from the smart-reduced-progress-data.
+			collection = Tools.get(data, 'collection', 'id')
+			if collection: data['id']['collection'] = Tools.copy(collection)
 
 			data = {k : v for k, v in data.items() if not v is None}
 
@@ -3186,7 +5101,7 @@ class MetaManager(object):
 
 			# Do this before here already.
 			# Otherwise a bunch of regular expressions are called every time the menu is loaded.
-			self.mTools.cleanPlot(metadata = data)
+			self.mTools.cleanDescription(metadata = data)
 
 			# Calculate the rating here already, so that we have a default rating/votes if this metadata dictionary is passed around without being cleaned first.
 			# More info under meta -> tools.py -> cleanVoting().
@@ -3209,14 +5124,14 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
-	def _metadataMovieId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None):
-		result = self.mTools.idMovie(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+	def _metadataMovieId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, quick = None):
+		result = self.mTools.idMovie(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, quick = quick)
 		if result: return {'complete' : True, 'data' : {'id' : result}}
 		else: return {'complete' : False, 'data' : result}
 
-	def _metadataMovieTrakt(self, trakt = None, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
+	def _metadataMovieTrakt(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, language = None, item = None, cache = None, threaded = None, detail = None):
 		complete = True
 		result = None
 		try:
@@ -3233,30 +5148,31 @@ class MetaManager(object):
 					except: pass
 				result = self._metadataTemporize(item = item, result = result, provider = 'trakt')
 			else: # Comes from another list, or forcefully retrieve detailed metadata.
-				id = trakt or imdb
-				if id:
+				if trakt or imdb or tmdb or tvdb or title:
 					# Trakt has an API limit of 1000 requests per 5 minutes.
 					# Retrieving all the additional metadata will very quickly consume the limit if a few pages are loaded.
 					# Only retrieve the extended metadata if enough requests are still avilable for the past 5 minutes.
-					instance = MetaTrakt.instance()
-					usagesAuthenticated = instance.usage(authenticated = True)
-					usagesUnauthenticated = instance.usage(authenticated = False)
-
 					person = False
 					studio = False
 					release = False
-					if detail == MetaTools.DetailStandard:
-						if usagesUnauthenticated < 0.7: release = True
-						if usagesUnauthenticated < 0.5: studio = True
-					elif detail == MetaTools.DetailExtended:
-						if usagesUnauthenticated < 0.9 or usagesAuthenticated < 0.4: release = True
-						if usagesUnauthenticated < 0.8 or usagesAuthenticated < 0.3: studio = True
-						if usagesUnauthenticated < 0.3: person = True
+					if self.mModeGenerative:
+						person = True
+						studio = True
+						release = True
+					else:
+						usage = self.providerUsageTrakt(authenticated = False)
+						if detail == MetaTools.DetailStandard:
+							if usage < 0.7: release = True
+							if usage < 0.5: studio = True
+						elif detail == MetaTools.DetailExtended:
+							if usage < 0.9: release = True
+							if usage < 0.8: studio = True
+							if usage < 0.5: person = True
 
 					# We already retrieve the cast (with thumbnails), translations, studios, and release dates, from TMDb.
 					# Retrieving all of them here again will add little new metadata and only prolong the retrieval.
 					# translation = None: only retrieve for non-English.
-					return instance.metadataMovie(id = id, summary = True, translation = None, person = person, studio = studio, release = release, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
+					return MetaTrakt.instance().metadataMovie(trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = True, translation = None, person = person, studio = studio, release = release, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
 		except: Logger.error()
 		return {'provider' : 'trakt', 'complete' : complete, 'data' : result}
 
@@ -3291,7 +5207,7 @@ class MetaManager(object):
 				# This can cause an exception if metadata(..., refresh = True) is called, which causes a problem with MetaImage.Attribute, since the values from the local cache are URL strings, whereas the newley retrieved images are still unprocessed dictionaries (eg from TMDb), and these arrays cannot be mixed by MetaImage.
 				# Update: Also do this if it comes from the cache, but the status is "invalid", meaning the data does not come from MetaCache, but the original dict comes from one of the lists/menus.
 				# Eg: basic item comes from random(). It is looked up in MetaCache but cannot be found.
-				if (not MetaCache.Attribute in item or (item.get(MetaCache.Attribute) or {}).get(MetaCache.AttributeStatus) == MetaCache.StatusInvalid) and 'temp' in item and 'imdb' in item['temp']:
+				if (not MetaCache.Attribute in item or MetaCache.status(item) == MetaCache.StatusInvalid) and 'temp' in item and 'imdb' in item['temp']:
 					result = Tools.copy(item)
 					try: del result['temp']
 					except: pass
@@ -3328,7 +5244,7 @@ class MetaManager(object):
 		result = None
 		try:
 			if imdb or tmdb:
-				images = MetaFanart.movie(imdb = imdb, tmdb = tmdb, cache = cache)
+				images = MetaFanart.instance().metadataMovie(imdb = imdb, tmdb = tmdb, cache = cache)
 				if images is False: complete = False
 				elif images: result = {MetaImage.Attribute : images}
 		except: Logger.error()
@@ -3338,7 +5254,7 @@ class MetaManager(object):
 	# METADATA - SET
 	##############################################################################
 
-	def metadataSet(self, tmdb = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None):
+	def metadataSet(self, tmdb = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None):
 		try:
 			media = Media.Set
 
@@ -3353,7 +5269,7 @@ class MetaManager(object):
 					items = [items]
 			elif tmdb:
 				pickSingle = True
-				items = [{'tmdb' : tmdb}]
+				items = [{'tmdb' : tmdb, 'title' : title, 'year' : year}]
 			elif title:
 				pickSingle = True
 				items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
@@ -3371,8 +5287,10 @@ class MetaManager(object):
 		except: Logger.error()
 		return None
 
-	def _metadataSetUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataSetUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
+			if not self._checkInterval(mode = mode): return None
+
 			media = Media.Set
 
 			ids = {'imdb' : [], 'tmdb' : [], 'tvdb' : [], 'trakt' : [], 'slug' : [], 'tvmaze' : [], 'tvrage' : []}
@@ -3398,20 +5316,25 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times. Can be None if not found.
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			if not tmdb:
 				values = partOld.get('id')
@@ -3435,11 +5358,11 @@ class MetaManager(object):
 
 			cache = cache if cache else None
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
-			if developer: Logger.log('SET METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('SET METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
 			# DetailEssential: 1 request [TMDb: 1 (summary), Fanart: 0]
 			# DetailStandard: 3 requests [TMDb: 2 (summary, images), Fanart: 1 (summary)]
-			# DetailExtended: 3 requests [TMDb: 2 (summary, images), Fanart: 1 (summary)]
+			# DetailExtended: 3+parts requests [TMDb: 2 (summary, images, part ID), Fanart: 1 (summary)] (1 request per part to get the IDs below for the IMDb bulk ratings)
 			requests = []
 			if self.mLevel >= 0:
 				requests.append({'id' : 'tmdb', 'function' : self._metadataSetTmdb, 'parameters' : {'tmdb' : tmdb, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
@@ -3448,15 +5371,22 @@ class MetaManager(object):
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {}
@@ -3477,7 +5407,7 @@ class MetaManager(object):
 			}
 
 			providers = ['fanart', 'tmdb'] # Keep a specific order. Later values replace newer values.
-			providersImage = providers[::-1] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
+			providersImage = ['tmdb', 'fanart'] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
 
 			for i in providers:
 				if i in datas:
@@ -3523,6 +5453,9 @@ class MetaManager(object):
 
 								data = Tools.update(data, value, none = False, lists = False, unique = False)
 
+			# If TMDb fails for some reason and has incomplete metadata.
+			if data.get('part') is None: data['part'] = []
+
 			genres = self.mTools.mergeGenre(genres)
 			if genres: data['genre'] = genres
 
@@ -3535,10 +5468,10 @@ class MetaManager(object):
 			networks = self.mTools.mergeNetwork(networks, country = countries)
 			if networks: data['network'] = networks
 
-			studios = self.mTools.mergeStudio(studios, other = networks, country = countries)
+			studios = self.mTools.mergeStudio(studios, other = networks, country = countries, order = False) # order: prefer the studios most providers list early.
 			if studios: data['studio'] = studios
 
-			status = self.mTools.mergeStatus(status)
+			status = self.mTools.mergeStatus(status, media = media)
 			if status: data['status'] = status
 
 			times = self.mTools.mergeTime(times, metadata = data)
@@ -3558,6 +5491,56 @@ class MetaManager(object):
 			niche = self.mTools.mergeNiche(niches)
 			niche = self.mTools.niche(niche = niche, metadata = data)
 			if niche: data['niche'] = niche
+
+			for i in data.get('part'):
+				i['voting'] = {
+					'rating' : {'tmdb' : i.get('rating')},
+					'votes' : {'tmdb' : i.get('votes')},
+				}
+
+			# Add the IMDb rating/votes from the bulk datasets.
+			# This requires an ID lookup for each part and should therefore only be done if MetaTools.DetailExtended.
+			# Loading a mneu with 50 sets with no metadata cached:
+			#	Without this code: 5-7 secs
+			#	With this code with ID lookups cached: 7-8 secs
+			#	With this code with ID lookups not cached (Trakt lookup): 30-35 secs
+			#	With this code with ID lookups not cached (TMDb lookup): 10-15 secs
+			try:
+				if self._bulkImdbEnabled():
+					try: votingImdb = voting['rating']['imdb']
+					except: votingImdb = None
+					if votingImdb is None:
+						def _id(tmdb, parts):
+							if tmdb:
+								# Do a "quick" lookup only on TMDb.
+								# TMDb ID lookups are twice as fast as Trakt lookups.
+								id = self._metadataMovieId(tmdb = tmdb, quick = 'tmdb')
+								if id: parts[tmdb] = id
+						parts = {}
+						t=Time(start=True)
+						threads = [Pool.thread(target = _id, kwargs = {'tmdb' : i['tmdb'], 'parts' : parts}, start = True) for i in data.get('part')]
+						Pool.join(instance = threads)
+
+						values = []
+						for idTmdb, i in parts.items():
+							try: idImdb = i['data']['id']['imdb']
+							except: idImdb = None
+							if idImdb:
+								votingImdb = self._bulkImdbLookup(imdb = idImdb)
+								if votingImdb:
+									values.append(votingImdb)
+									for j in data.get('part'):
+										if j.get('tmdb') == idTmdb:
+											j['voting']['rating']['imdb'] = votingImdb.get('rating')
+											j['voting']['votes']['imdb'] = votingImdb.get('votes')
+											self.mTools.cleanVoting(metadata = j, round = True)
+											break
+
+						votingImdb = self.mTools.votingAverageWeighted(metadata = values, maximum = True)
+						if votingImdb:
+							voting['rating']['imdb'] = Math.round(votingImdb.get('rating'), places = 3)
+							voting['votes']['imdb'] = votingImdb.get('votes')
+			except: Logger.error()
 
 			data['voting'] = voting
 
@@ -3580,9 +5563,11 @@ class MetaManager(object):
 				except: pass
 				if developer: Logger.log('SET IMAGES INCOMPLETE: %s' % developer)
 
+			data['title'] = self.mTools.cleanTitle(title = data.get('title'), media = media, parts = data.get('part'))
+
 			# Do this before here already.
 			# Otherwise a bunch of regular expressions are called every time the menu is loaded.
-			self.mTools.cleanPlot(metadata = data)
+			self.mTools.cleanDescription(metadata = data)
 
 			# Calculate the rating here already, so that we have a default rating/votes if this metadata dictionary is passed around without being cleaned first.
 			# More info under meta -> tools.py -> cleanVoting().
@@ -3605,7 +5590,7 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
 	def _metadataSetId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None):
 		result = self.mTools.idSet(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
@@ -3622,7 +5607,7 @@ class MetaManager(object):
 		result = None
 		try:
 			if imdb or tmdb:
-				images = MetaFanart.set(imdb = imdb, tmdb = tmdb, cache = cache)
+				images = MetaFanart.instance().metadataSet(imdb = imdb, tmdb = tmdb, cache = cache)
 				if images is False: complete = False
 				elif images: result = {MetaImage.Attribute : images}
 		except: Logger.error()
@@ -3633,12 +5618,14 @@ class MetaManager(object):
 	##############################################################################
 
 	# NB: For efficiency, call this function with "pack=False" if the pack data is not needed. More info at metadata().
-	def metadataShow(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None):
+	def metadataShow(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None, aggregate = True):
 		try:
 			media = Media.Show
 
 			pickSingle = False
 			pickMultiple = False
+
+			refreshInternal = self._metadataRefresh(refresh = refresh)
 
 			if items:
 				if Tools.isArray(items):
@@ -3646,9 +5633,9 @@ class MetaManager(object):
 				else:
 					pickSingle = True
 					items = [items]
-			elif imdb or tmdb or tvdb or trakt:
+			elif trakt or imdb or tmdb or tvdb:
 				pickSingle = True
-				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}]
+				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year}] # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 			elif title:
 				pickSingle = True
 				items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
@@ -3661,9 +5648,18 @@ class MetaManager(object):
 
 					if pickSingle: items = items[0] if items else None
 
-					# Add "refresh" here, so that if a show is manually refreshed from the context menu, the pack is also refreshed.
-					# Not sure if metadataShow() is called from elsewhere with "refresh = True", which might unnecessarily refresh packs which can take very long to generate.
-					items = self._metadataPackAggregate(items = items, pack = pack, refresh = refresh, quick = quick, cache = cache, threaded = threaded)
+					# Do not add "refresh" here, otherwise the pack will be refreshed every time a season is refreshed.
+					# Only add "refreshInternal" which is either False or None.
+					items = self._metadataPackAggregate(items = items, pack = pack, refresh = refreshInternal, quick = quick, cache = cache, threaded = threaded)
+
+					# Aggregate the season images for Arrivals menus.
+					# This is a lightweight aggregation, which only retrieves from the local cache.
+					# Hence, if the season metadata is in the cache, season images are displayed.
+					# If the season metadata is not in the cache, use show images instead.
+					# If there is no cached metadata for any of the titles, this adds 5-10ms.
+					# If the metadata is cached for most titles, this adds about 50-100ms.
+					# The first page of Arrivals is cached, so the extra time will only apply to pages 2+.
+					if aggregate: items = self._metadataShowAggregate(items = items, refresh = refreshInternal, threaded = threaded)
 
 					items = self._metadataClean(media = media, items = items, clean = clean)
 
@@ -3671,8 +5667,10 @@ class MetaManager(object):
 		except: Logger.error()
 		return None
 
-	def _metadataShowUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataShowUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
+			if not self._checkInterval(mode = mode): return None
+
 			media = Media.Show
 
 			ids = {'imdb' : [], 'tmdb' : [], 'tvdb' : [], 'trakt' : [], 'slug' : [], 'tvmaze' : [], 'tvrage' : []}
@@ -3686,7 +5684,7 @@ class MetaManager(object):
 			tvrage = item.get('tvrage')
 
 			title = item.get('tvshowtitle') or item.get('title')
-			year = item.get('year')
+			year = item.get('tvshowyear') or item.get('year')
 
 			# By default we do not cache requests to disc, since it takes longer and requires more storage space.
 			# If the same show appears multiple times in the list (some Trakt lists, eg watched list where a show was watched twice), sub-requests will also have to be executed multiple times, since they are not disc-cached.
@@ -3700,20 +5698,25 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times. Can be None if not found.
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			# Trakt requires either a Trakt or IMDb ID.
 			# TMDb requires a TMDb ID.
@@ -3743,14 +5746,14 @@ class MetaManager(object):
 
 			cache = cache if cache else None
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
-			if developer: Logger.log('SHOW METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('SHOW METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
 			# DetailEssential: 2-3 requests [Trakt: 1-2 (summary, optional translations), TVDb: 1 (summary), TMDb: 0, IMDb: 0, Fanart: 0]
 			# DetailStandard: 4-5 requests [Trakt: 2-3 (summary, studios, optional translations), TVDb: 1 (summary), TMDb: 0, IMDb: 0, Fanart: 1 (summary)]
 			# DetailExtended: 8-9 requests [Trakt: 3-4 (summary, people, studios, optional translations), TVDb: 1 (summary), TMDb: 2 (summary), IMDb: 1 (summary), Fanart: 1 (summary)]
 			requests = []
 			if self.mLevel >= 0:
-				requests.append({'id' : 'trakt', 'function' : self._metadataShowTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'trakt', 'function' : self._metadataShowTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'title' : title, 'year' : year, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				requests.append({'id' : 'tvdb', 'function' : self._metadataShowTvdb, 'parameters' : {'tvdb' : tvdb, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				requests.append({'id' : 'imdb', 'function' : self._metadataShowImdb, 'parameters' : {'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				if self.mLevel >= 1:
@@ -3760,15 +5763,22 @@ class MetaManager(object):
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {}
@@ -3780,6 +5790,7 @@ class MetaManager(object):
 			countries = []
 			status = []
 			times = []
+			timed = {}
 			durations = []
 			mpaas = []
 			casts = []
@@ -3788,13 +5799,14 @@ class MetaManager(object):
 			creators = []
 			images = {}
 			packs = {}
+			counts = {}
 			voting = {
 				'rating' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
 				'votes' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
 			}
 
 			providers = ['metacritic', 'imdb', 'tmdb', 'fanart', 'tvdb', 'trakt'] # Keep a specific order. Later values replace newer values.
-			providersImage = providers[::-1] # Preferred providers must be placed first. Otherwise some shows might pick the IMDb image. Eg: tt19401686 (Trakt: the-vikings-2015 vs the-vikings-2015-248534).
+			providersImage = ['tvdb', 'fanart', 'tmdb', 'trakt', 'imdb'] # Preferred providers must be placed first. Otherwise some shows might pick the IMDb image. Eg: tt19401686 (Trakt: the-vikings-2015 vs the-vikings-2015-248534).
 
 			for i in providers:
 				if i in datas:
@@ -3830,7 +5842,9 @@ class MetaManager(object):
 								if 'language' in value: languages.append(value['language'])
 								if 'country' in value: countries.append(value['country'])
 								if 'status' in value: status.append(value['status'])
-								if 'time' in value: times.append(value['time'])
+								if 'time' in value:
+									times.append(value['time'])
+									timed[i] = value['time']
 								if 'duration' in value: durations.append(value['duration'])
 								if 'mpaa' in value: mpaas.append(value['mpaa'])
 
@@ -3844,6 +5858,7 @@ class MetaManager(object):
 								if 'userrating' in value: voting['user'][provider] = value['userrating']
 
 								if 'packed' in value: packs[i] = value['packed']
+								if 'count' in value: counts[i] = value['count']
 
 								data = Tools.update(data, value, none = False, lists = False, unique = False)
 
@@ -3856,7 +5871,7 @@ class MetaManager(object):
 			countries = self.mTools.mergeCountry(countries)
 			if countries: data['country'] = countries
 
-			# Trakt and TMDb often list mutiple networks if shows are later taken over by a new network.
+			# Trakt and TMDb often list multiple networks if shows are later taken over by a new network.
 			#	Community:
 			#		TMDb: ['NBC', 'Yahoo! Screen']
 			#		TVDB: ['NBC', 'Yahoo! Screen', 'YouTube']
@@ -3869,7 +5884,7 @@ class MetaManager(object):
 			#		TMDb: ['Prime Video']
 			#		TVDB: ['Prime Video', 'YouTube']
 			#		Trakt: ['Amazon']
-			# Although Trakt lists mutiple networks on their website (from earliest to newest network), it only returns the newest network via the API.
+			# Although Trakt lists multiple networks on their website (from earliest to newest network), it only returns the newest network via the API.
 			# TMDb sometimes lists the earlier networks first, sometimes the newer networks.
 			# TVDb has an original network attribute, which will be added first to the list. So prefer TVDb.
 			networks = self.mTools.mergeNetwork(networks[0] + networks[1], order = True, country = countries) # They get reversed in merge(), so place TVDb last.
@@ -3878,13 +5893,52 @@ class MetaManager(object):
 			studios = self.mTools.mergeStudio(studios, other = networks, country = countries)
 			if studios: data['studio'] = studios
 
-			status = self.mTools.mergeStatus(status)
+			status = self.mTools.mergeStatus(status, media = media)
 			if status: data['status'] = status
 
-			times = self.mTools.mergeTime(times, metadata = data)
-			if times: data['time'] = times
+			times = self.mTools.mergeTime(times, providers = timed, metadata = data)
+			if times:
+				data['time'] = times
 
-			durations = self.mTools.mergeDuration(durations)
+				zone = (data.get('airs') or {}).get('zone')
+				premiere = times.get(MetaTools.TimePremiere)
+				accurate = True
+
+				# Recalculate the date to accomodate timezones.
+				# Late night shows from the US that air late at night have a GMT time early in the morning of the next day on Trakt.
+				# This mostly matters for episodes, not that much for shows and seasons.
+				# Eg: The Tonight Show Starring Jimmy Fallon S02E44 (Trakt: 2015-03-21T03:30:00Z, actual date in the timezone of release: 2015-03-20 23:30)
+				if Tools.isInteger(premiere):
+					# If Trakt does not have a premiere date yet (eg: future unreleased season), do not replace the date that was calculated with the show's timezone.
+					# TVDb only has the date, but does not have the time.
+					# Hence, converting the TVDb timestamp to a date using the show's timezone (which comes from Trakt) can result in an incorrect date (off by 1 day).
+					# Eg: 2025-01-02 00:00:00 (GMT's timezone) might be converted to 2025-01-01 22:00:00 (show's timezone).
+					if not zone or not (timed.get(MetaTools.ProviderTrakt) or {}).get(MetaTools.TimePremiere): accurate = False
+
+					# Update (2025-11):
+					# The Late Show with Stephen Colbert had the following date on Trakt for a very long time: 2015-09-08 (1441769400)
+					# This date included the timezone offset based on the airing time in NY.
+					# However, Trakt seems to now have removed the offset from the show's premiere date and no has: 2015-09-08T00:00:00Z (1441670400).
+					# This is only for this show, not other shows, including other late-night shows.
+					# This probably happened, because the airing time of Colbert changed.
+					# Earlier seasons/episodes have an airing date with a time of 03:30, while the last episode S11E34 now has 04:30.
+					# So maybe Trakt removed the offset because of the airing time discrepancy between different episodes.
+					# Colbert S01 still has the offset on Trakt. It was only removed for the show metadata.
+					# We could just ignore this and use the new offset-less timezone date.
+					# However, this would make the show's premiere date 2015-09-07, while the actual premiere date is still 2015-09-08.
+					# We now detect if the date returned by Trakt ends with "...T00:00:00.000Z", indicating a possible offset removal.
+					# However, this cannot be done on face-value, since some shows will actually have a date ending in "...T00:00:00.000Z", which does still include the offset (eg: Heroes).
+					# Hence, in trakt.py we check if the date ends with "...T00:00:00.000Z" AND the airing time does not end in "...:00" (eg: 04:30).
+					# If the airing time has a minute value (not :00), but the premiere date does not, assume the offset was removed, and therefore do not use the timezone in the date-string creation below.
+					try: offset = data['temp']['trakt']['offset']
+					except: offset = True
+
+					premiere = Time.format(premiere, format = Time.FormatDate, zone = zone if offset else None)
+
+				# Only update if there is no date, or there is a date and a timezone.
+				if premiere and (accurate or not data.get('premiered')): data['premiered'] = data['aired'] = premiere
+
+			durations = self.mTools.mergeDuration(durations, short = self.mTools.niche(niche = self.mTools.mergeNiche(niches), media = media, metadata = data))
 			if durations: data['duration'] = durations
 
 			mpaas = self.mTools.mergeCertificate(mpaas, media = media)
@@ -3902,11 +5956,49 @@ class MetaManager(object):
 			creator = self.mTools.mergeCrew(creators)
 			if creator: data['creator'] = creator
 
+			seasons = None
+			episodes = None
+			count = self.mTools.mergeCount(counts)
+			if count:
+				data['count'] = count
+				try: seasons = count['season']['total'] or count['season']['released']
+				except: pass
+				try: episodes = count['episode']['total'] or count['episode']['released']
+				except: pass
+
 			data['media'] = media
 
 			niche = self.mTools.mergeNiche(niches)
-			niche = self.mTools.niche(niche = niche, metadata = data)
+
+			# Add the episode release interval to the niche.
+			# This can only be calculated from MetaPack.
+			# Do not retrieve or generate the pack if the show metadata is refreshed, due to performance implications.
+			# The release niche is added to the show in _metadataPackUpdate().
+			# Extract it here from the cached metadata and add it to the new data.
+			# This niche will only be available if the show has ever generated a pack.
+			# But since this the release type is only used during scraping (from the episode metadata), not having it for the show metadata should be fine.
+			niched = item.get('niche')
+			if niched:
+				niched = Media.type(niched, Media.Interval)
+				if niched:
+					if niche is None: niche = []
+					niche.append(niched)
+
+			niche = self.mTools.niche(niche = niche, metadata = data, seasons = seasons, episodes = episodes)
 			if niche: data['niche'] = niche
+
+			# Add the IMDb rating/votes from the bulk datasets.
+			# This should never happen, since the latests rating/votes are already retrieve from HTML if MetaTools.DetailExtended.
+			try:
+				if self._bulkImdbEnabled():
+					try: votingImdb = voting['rating']['imdb']
+					except: votingImdb = None
+					if votingImdb is None:
+						votingImdb = self._bulkImdbLookup(imdb = data.get('imdb'))
+						if votingImdb:
+							voting['rating']['imdb'] = votingImdb.get('rating')
+							voting['votes']['imdb'] = votingImdb.get('votes')
+			except: Logger.error()
 
 			data['voting'] = voting
 
@@ -3917,7 +6009,14 @@ class MetaManager(object):
 			# Check for a detailed explanation under _metadataId().
 			self._metadataIdUpdate(metadata = data, ids = ids)
 
-			if not 'tvshowtitle' in data and 'title' in data: data['tvshowtitle'] = data['title']
+			if not data.get('tvshowtitle') and data.get('title'): data['tvshowtitle'] = data['title']
+
+			# Just for consistency with season/episode metadata.
+			year = data.get('year')
+			if not year and times:
+				premiere = times.get(MetaTools.TimePremiere)
+				if premiere: year = Time.year(premiere)
+			data['tvshowyear'] = data['year'] = year
 
 			if images:
 				MetaImage.update(media = MetaImage.MediaShow, images = images, data = data, sort = providersImage)
@@ -3933,7 +6032,7 @@ class MetaManager(object):
 
 			# Do this before here already.
 			# Otherwise a bunch of regular expressions are called every time the menu is loaded.
-			self.mTools.cleanPlot(metadata = data)
+			self.mTools.cleanDescription(metadata = data)
 
 			# Calculate the rating here already, so that we have a default rating/votes if this metadata dictionary is passed around without being cleaned first.
 			# More info under meta -> tools.py -> cleanVoting().
@@ -3970,14 +6069,14 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
-	def _metadataShowId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None):
-		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+	def _metadataShowId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, quick = None):
+		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, quick = quick)
 		if result: return {'complete' : True, 'data' : {'id' : result}}
 		else: return {'complete' : False, 'data' : result}
 
-	def _metadataShowTrakt(self, trakt = None, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
+	def _metadataShowTrakt(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, language = None, item = None, cache = None, threaded = None, detail = None):
 		complete = True
 		result = None
 		try:
@@ -3994,35 +6093,36 @@ class MetaManager(object):
 					except: pass
 				result = self._metadataTemporize(item = item, result = result, provider = 'trakt')
 			else: # Comes from another list, or forcefully retrieve detailed metadata.
-				id = trakt or imdb
-				if id:
+				if trakt or imdb or tmdb or tvdb or title:
 					# Trakt has an API limit of 1000 requests per 5 minutes.
 					# Retrieving all the additional metadata will very quickly consume the limit if a few pages are loaded.
 					# Only retrieve the extended metadata if enough requests are still avilable for the past 5 minutes.
-					instance = MetaTrakt.instance()
-					usagesAuthenticated = instance.usage(authenticated = True)
-					usagesUnauthenticated = instance.usage(authenticated = False)
-
 					person = False
 					studio = False
-					if detail == MetaTools.DetailStandard:
-						if usagesUnauthenticated < 0.5: studio = True
-					elif detail == MetaTools.DetailExtended:
-						if usagesUnauthenticated < 0.8 or usagesAuthenticated < 0.3: studio = True
-						if usagesUnauthenticated < 0.3: person = True
+					if self.mModeGenerative:
+						person = True
+						studio = True
+					else:
+						usage = self.providerUsageTrakt(authenticated = False)
+						if detail == MetaTools.DetailStandard:
+							if usage < 0.5: studio = True
+						elif detail == MetaTools.DetailExtended:
+							if usage < 0.8: studio = True
+							if usage < 0.5: person = True
 
 					# We already retrieve the cast (with thumbnails), translations and studios, from TMDb.
 					# Retrieving all of them here again will add little new metadata and only prolong the retrieval.
 					# translation = None: only retrieve for non-English.
-					result = instance.metadataShow(id = id, summary = True, translation = None, person = person, studio = studio, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
+					result = MetaTrakt.instance().metadataShow(trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = True, translation = None, person = person, studio = studio, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
 
 					if result.get('complete'):
 						# Create basic pack data in case the full pack metadata has not been retrieved yet.
 						# Is used by some skins (eg Aeon Nox) to display episode counts for show menus.
 						try:
 							data = result.get('data')
-							pack = MetaPack.reduceBase(episodeOfficial = data.get('count', {}).get('released'), duration = data.get('duration'))
-							if pack: result['data']['packed'] = pack
+							if data:
+								pack = MetaPack.reduceBase(episodeOfficial = (data.get('count') or {}).get('released'), duration = data.get('duration'))
+								if pack: result['data']['packed'] = pack
 						except: Logger.error()
 
 					return result # Already contains the outer structure.
@@ -4065,7 +6165,7 @@ class MetaManager(object):
 				# This can cause an exception if metadata(..., refresh = True) is called, which causes a problem with MetaImage.Attribute, since the values from the local cache are URL strings, whereas the newley retrieved images are still unprocessed dictionaries (eg from TMDb), and these arrays cannot be mixed by MetaImage.
 				# Update: Also do this if it comes from the cache, but the status is "invalid", meaning the data does not come from MetaCache, but the original dict comes from one of the lists/menus.
 				# Eg: basic item comes from random(). It is looked up in MetaCache but cannot be found.
-				if (not MetaCache.Attribute in item or (item.get(MetaCache.Attribute) or {}).get(MetaCache.AttributeStatus) == MetaCache.StatusInvalid) and 'temp' in item and 'imdb' in item['temp']:
+				if (not MetaCache.Attribute in item or MetaCache.status(item) == MetaCache.StatusInvalid) and 'temp' in item and 'imdb' in item['temp']:
 					result = Tools.copy(item)
 					try: del result['temp']
 					except: pass
@@ -4102,39 +6202,57 @@ class MetaManager(object):
 		result = None
 		try:
 			if tvdb:
-				images = MetaFanart.show(tvdb = tvdb, cache = cache)
+				images = MetaFanart.instance().metadataShow(tvdb = tvdb, cache = cache)
 				if images is False: complete = False
 				elif images: result = {MetaImage.Attribute : images}
 		except: Logger.error()
 		return {'provider' : 'fanart', 'complete' : complete, 'data' : result}
+
+	def _metadataShowAggregate(self, items, refresh = None, threaded = None):
+		try:
+			if items:
+				# Only aggregate if it contains a season number.
+				# Eg: Arrivals menu.
+				item = items[0] if Tools.isList(items) else items
+				if not item.get('season') is None:
+					# quick = False: Do not retrieve/refresh season or pack metadata. Only retrieve what is in the cache.
+					# Otherwise for the Arrivals menu, this would retrieve too much lower-level metadata for each show listed in the menu.
+					# aggregate = False: Do not aggregate the show, since this is already the show object.
+					items = self._metadataEpisodeAggregate(items = items, threaded = threaded, refresh = refresh, quick = False, aggregate = False)
+		except: Logger.error()
+		return items
 
 	##############################################################################
 	# METADATA - SEASON
 	##############################################################################
 
 	# NB: For efficiency, call this function with "pack=False" if the pack data is not needed. More info at metadata().
-	def metadataSeason(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None, aggregate = True, hint = None):
+	def metadataSeason(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None, aggregate = True, hint = None):
 		try:
 			media = Media.Season
 
 			pickSingle = False
 			pickMultiple = False
 
+			refreshInternal = self._metadataRefresh(refresh = refresh)
+
 			if items:
 				if Tools.isArray(items):
 					pickMultiple = True
 				else:
 					pickSingle = True
+					if season is None: season = items.get('season')
 					items = [items]
-			elif imdb or tmdb or tvdb or trakt:
+			elif trakt or imdb or tmdb or tvdb:
 				pickSingle = True
-				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}]
+				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year}] # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 			elif title:
 				pickSingle = True
 				items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
 
 			if items:
 				items = self._metadataCache(media = media, items = items, function = self._metadataSeasonUpdate, quick = quick, refresh = refresh, cache = cache, threaded = threaded, hint = hint)
+
 				if items:
 					items = self._metadataFilter(media = media, items = items, filter = filter)
 					items = self._metadataAggregate(media = media, items = items) # Must be before picking, since it uses temp and the internal "seasons" list.
@@ -4163,15 +6281,19 @@ class MetaManager(object):
 						items = picks
 
 						if items:
-							items = self._metadataPackAggregate(items = items, pack = pack, quick = quick, cache = cache, threaded = threaded) # Do not add "refresh" here, otherwise the pack will be refreshed every time a season is refreshed.
-							if aggregate: items = self._metadataSeasonAggregate(items = items, threaded = threaded)
+							# Do not add "refresh" here, otherwise the pack will be refreshed every time a season is refreshed.
+							# Only add "refreshInternal" which is either False or None.
+							items = self._metadataPackAggregate(items = items, pack = pack, refresh = refreshInternal, quick = quick, cache = cache, threaded = threaded)
+							if aggregate: items = self._metadataSeasonAggregate(items = items, refresh = refreshInternal, threaded = threaded)
 							items = self._metadataClean(media = media, items = items, clean = clean)
 							return items
 		except: Logger.error()
 		return None
 
-	def _metadataSeasonUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataSeasonUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
+			if not self._checkInterval(mode = mode): return None
+
 			media = Media.Season
 
 			imdb = item.get('imdb')
@@ -4183,7 +6305,7 @@ class MetaManager(object):
 			tvrage = item.get('tvrage')
 
 			title = item.get('tvshowtitle') or item.get('title')
-			year = item.get('year')
+			year = item.get('tvshowyear') or item.get('year')
 
 			# By default we do not cache requests to disc, since it takes longer and requires more storage space.
 			# If the same show appears multiple times in the list (some Trakt lists, eg watched list where a show was watched twice), sub-requests will also have to be executed multiple times, since they are not disc-cached.
@@ -4197,20 +6319,25 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times. Can be None if not found.
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			# Trakt requires either a Trakt or IMDb ID.
 			# TMDb requires a TMDb ID.
@@ -4234,17 +6361,31 @@ class MetaManager(object):
 			if not imdb and not tmdb and not tvdb and not trakt: return False
 
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
-			if developer: Logger.log('SEASON METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('SEASON METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
-			show = self.metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, threaded = threaded)
+			show = self.metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, pack = False, refresh = refresh, threaded = threaded)
 			if not show:
 				Memory.set(id = id, value = {}, local = True, kodi = False)
 				return False
 
-			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, threaded = threaded)
+			# Use the IDs of the show metadata.
+			# This is useful if Trakt does not have the IMDb/TVDb ID yet.
+			# The show metadata would have already done a MetaTrakt.lookup(), so it does not have to be done here again.
+			# Always replace the values, in case the season metadata still contains old IDs or title.
+			idsShow = show.get('id')
+			if idsShow:
+				trakt = idsShow.get('trakt') or trakt
+				imdb = idsShow.get('imdb') or imdb
+				tmdb = idsShow.get('tmdb') or tmdb
+				tvdb = idsShow.get('tvdb') or tvdb
+				slug = idsShow.get('slug') or slug
+			parentTitle = title = show.get('tvshowtitle') or show.get('title') or title
+			parentYear = year = show.get('tvshowyear') or show.get('year') or year
+
+			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = refresh, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			pack = MetaPack.instance(pack = pack)
 
-			if not title and show and 'tvshowtitle' in show: title = show['tvshowtitle']
 			cache = cache if cache else None
 
 			# count = number of seasons.
@@ -4253,7 +6394,7 @@ class MetaManager(object):
 			# DetailExtended: ((3-4)*count + 5-7) requests (eg: 10 seasons = 32 requests or 42 requests with translations) [Trakt: (2-count) or (2*count) (summary, each season, optional translations), TVDb: 2-count (summary, each season), TMDb: 2-(count/20) (summary, each season), IMDb: 1-count (each season), Fanart: 1 (summary)]
 			requests = []
 			if self.mLevel >= 0:
-				requests.append({'id' : 'trakt', 'function' : self._metadataSeasonTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'trakt', 'function' : self._metadataSeasonTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'title' : title, 'year' : year, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				requests.append({'id' : 'tvdb', 'function' : self._metadataSeasonTvdb, 'parameters' : {'tvdb' : tvdb, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				if self.mLevel >= 1:
 					requests.append({'id' : 'fanart', 'function' : self._metadataSeasonFanart, 'parameters' : {'tvdb' : tvdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
@@ -4263,15 +6404,22 @@ class MetaManager(object):
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {'seasons' : []}
@@ -4281,8 +6429,10 @@ class MetaManager(object):
 			networks = {}
 			languages = {}
 			countries = {}
-			status = {}
+			statuses = {}
+			types = {}
 			times = {}
+			timed = {}
 			durations = {}
 			mpaas = {}
 			casts = {}
@@ -4297,7 +6447,7 @@ class MetaManager(object):
 			}
 
 			providers = ['metacritic', 'imdb', 'tmdb', 'fanart', 'tvdb', 'trakt'] # Keep a specific order. Later values replace newer values.
-			providersImage = providers[::-1] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
+			providersImage = ['tvdb', 'fanart', 'tmdb', 'trakt', 'imdb'] # Preferred providers must be placed first. Otherwise it might pick unwanted images first (eg IMDb).
 
 			for i in providers:
 				if i in datas:
@@ -4348,11 +6498,16 @@ class MetaManager(object):
 										if not number in countries: countries[number] = []
 										countries[number].append(season['country'])
 									if 'status' in season:
-										if not number in status: status[number] = []
-										status[number].append(season['status'])
+										if not number in statuses: statuses[number] = []
+										statuses[number].append(season['status'])
+									if 'type' in season:
+										if not number in types: types[number] = []
+										types[number].append(season['type'])
 									if 'time' in season:
 										if not number in times: times[number] = []
 										times[number].append(season['time'])
+										if not number in timed: timed[number] = {}
+										timed[number][i] = season['time']
 									if 'duration' in season:
 										if not number in durations: durations[number] = []
 										durations[number].append(season['duration'])
@@ -4436,7 +6591,6 @@ class MetaManager(object):
 
 			# Some attributes might be missing. Use the show/season attributes.
 			# Eg: Most episodes, if not all, do not have a studio.
-			parentTitle = show.get('tvshowtitle')
 			parentPlot = show.get('plot')
 			parentNetwork = show.get('network')
 			parentStudio = show.get('studio')
@@ -4444,6 +6598,7 @@ class MetaManager(object):
 			parentCountry = show.get('country')
 			parentGenre = show.get('genre')
 			parentMpaa = show.get('mpaa')
+			parentStatus = show.get('status')
 			parentDuration = show.get('duration')
 			parentCast = show.get('cast')
 			parentDirector = show.get('director')
@@ -4451,11 +6606,12 @@ class MetaManager(object):
 			parentCreator = show.get('creator')
 			parentPremiere = show.get('premiered') or show.get('aired')
 			parentTime = show.get('time')
+			parentZone = (show.get('airs') or {}).get('zone')
 
 			# Sometimes TVDb list "probably" incorrect networks for seasons.
 			# Eg: One Piece. TVDb lists BBC, NBC, CBS, Adult Swim as networks, but Fuji TV only for three of the seasons. Trakt has Fuji TV for all seasons.
-			# If Trakt/TMDb list a single network for all seasons, but TVDb has mutiple networks, prefer Trakt. Otherwise prefer TVDb.
-			# Also switch if TVDb returns Syndication (licensed to mutiple networks).
+			# If Trakt/TMDb list a single network for all seasons, but TVDb has multiple networks, prefer Trakt. Otherwise prefer TVDb.
+			# Also switch if TVDb returns Syndication (licensed to multiple networks).
 			# Eg: Star Trek (1966).
 			# Update: About 1/3 of all popular shows have at least one season that TVDb has the completely wrong network listed for seasons.
 			# Eg: Black Mirror S06: Teletoon
@@ -4479,29 +6635,91 @@ class MetaManager(object):
 			countTvdb = len(networksTvdb.keys())
 			countOther = len(networksOther.keys())
 			countAverage = len(data['seasons']) / 2
-			if countOther == 1 and countTvdb > 2: networksSwitch = True
-			elif countOther == 1 and countTvdb >= 1 and any(i in self.mTools.companySyndication() for i in networksTvdb.keys()): networksSwitch = True
+			if countOther == 1 and countTvdb > 2:
+				networksSwitch = True
+			elif countOther == 1 and countTvdb >= 1:
+				from lib.meta.company import MetaCompany
+				if any(i in MetaCompany.helperSyndication() for i in networksTvdb.keys()): networksSwitch = True
 
-			imagesMissing = False
+			imagesMissing = None
+			lastSeason = None
+			for i in data['seasons']:
+				number = i['season']
+				if lastSeason is None or number > lastSeason: lastSeason = number
+
+			lastImdb = None
+			dateImdb = {}
+			try:
+				dataImdb = datas.get('imdb')
+				if dataImdb:
+					for i in dataImdb if Tools.isArray(dataImdb) else [dataImdb]:
+						if i.get('provider') == 'imdb':
+							values = i.get('data')
+							if values:
+								lastImdb = max(j.get('season') or 0 for j in values)
+								try:
+									for j in values:
+										date = j.get('tvshowyear') or j.get('year')
+										if not date:
+											date = j.get('premiered') or j.get('aired')
+											if date: date = int(date.split('-')[0])
+										if date: dateImdb[j.get('season')] = date
+								except: Logger.error()
+							break
+			except: Logger.error()
+			if not lastImdb: lastImdb = -1
+
+			# Do a first run over the images in order to get the theme of the first image selected after sorting.
+			# "imagesThemes" is then used below to pick the actual images.
+			imagesThemes = MetaImage.themes(media = MetaImage.MediaSeason, images = images, sort = providersImage)
+
 			for i in range(len(data['seasons'])):
 				season = data['seasons'][i]
-				number = season['season']
+				numberSeason = season['season']
 
-				value = self.mTools.mergeGenre(genres.get(number))
+				# Use the numbers from the pack, since the mapping between providers might have changed them.
+				# Create default numbering, in case something is not available in the pack.
+				if not 'number' in season: season['number'] = {}
+				number = season['number']
+
+				if not MetaPack.NumberStandard in number: number[MetaPack.NumberStandard] = numberSeason
+				if not MetaPack.NumberSequential in number: number[MetaPack.NumberSequential] = 1
+				if not MetaPack.NumberAbsolute in number: number[MetaPack.NumberAbsolute] = 1
+
+				# Add missing IMDb numbers which are not available from the pack.
+				if (numberSeason in dateImdb or numberSeason > 0 and lastImdb == 1) and lastImdb > 0:
+					if not MetaPack.ProviderImdb in number: number[MetaPack.ProviderImdb] = {}
+
+					# Special season, marked as "Unknown" season for some shows.
+					# Eg: One Piece
+					if numberSeason == 0: number[MetaPack.ProviderImdb][MetaPack.NumberStandard] = 0
+
+					# Only has a single absolute season, typically devided by year.
+					# Eg: One Piece
+					elif lastImdb == 1: number[MetaPack.ProviderImdb][MetaPack.NumberStandard] = 1
+
+					# Allow some leeway in case a new/future season is only on one provider.
+					elif abs(lastSeason - lastImdb) <= 1: number[MetaPack.ProviderImdb][MetaPack.NumberStandard] = number.get(MetaPack.NumberStandard)
+
+					number[MetaPack.ProviderImdb][MetaPack.NumberAbsolute] = number.get(MetaPack.NumberAbsolute)
+					number[MetaPack.ProviderImdb][MetaPack.NumberSequential] = number.get(MetaPack.NumberSequential)
+					number[MetaPack.ProviderImdb][MetaPack.NumberDate] = dateImdb.get(number[MetaPack.ProviderImdb][MetaPack.NumberStandard])
+
+				value = self.mTools.mergeGenre(genres.get(numberSeason), parent = parentGenre)
 				if not value and parentGenre: value = Tools.copy(parentGenre)
 				if value: season['genre'] = value
 
-				value = self.mTools.mergeLanguage(languages.get(number))
+				value = self.mTools.mergeLanguage(languages.get(numberSeason))
 				if not value and parentLanguage: value = Tools.copy(parentLanguage)
 				if value: season['language'] = value
 
-				value = self.mTools.mergeCountry(countries.get(number))
+				value = self.mTools.mergeCountry(countries.get(numberSeason))
 				if not value and parentCountry: value = Tools.copy(parentCountry)
 				if value: season['country'] = value
 
 				# More info at _metadataShowUpdate().
 				value = None
-				network = networks.get(number)
+				network = networks.get(numberSeason)
 				switch = networksSwitch
 				if not switch:
 					try:
@@ -4518,79 +6736,127 @@ class MetaManager(object):
 							if countTvdb <= countAverage: switch = True
 							elif countOther >= countAverage and countTvdb < countOther: switch = True
 					except: pass
-				if network: value = self.mTools.mergeNetwork((network[1] + network[0]) if switch else (network[0] + network[1]), order = True, country = season.get('country')) # Different order if certain situations.
+				if network: value = self.mTools.mergeNetwork((network[1] + network[0]) if switch else (network[0] + network[1]), order = True, country = season.get('country')) # Different order in certain situations.
 				if not value and parentNetwork: value = Tools.copy(parentNetwork)
 				if value: season['network'] = value
 
 				other = value # Must be right after networks.
-				value = self.mTools.mergeStudio(studios.get(number), other = other, country = season.get('country'))
+				value = self.mTools.mergeStudio(studios.get(numberSeason), other = other, country = season.get('country'))
 				if not value and parentStudio: value = Tools.copy(parentStudio)
 				if value: season['studio'] = value
 
-				value = self.mTools.mergeStatus(status.get(number))
-				if value: season['status'] = value
-
 				# If there is no time for S00 and S01, use the show's time.
 				missing = False
-				if number <= 1 and parentTime and not times.get(number):
+				if numberSeason <= 1 and parentTime and not times.get(numberSeason):
 					missing = True
-					if not number in times: times[number] = []
-					times[number].append(parentTime)
-				value = self.mTools.mergeTime(times.get(number), metadata = season)
+					if not numberSeason in times: times[numberSeason] = []
+					times[numberSeason].append(parentTime)
+				value = self.mTools.mergeTime(times.get(numberSeason), providers = timed.get(numberSeason), metadata = season)
 				if value:
 					season['time'] = value
 
+					premiere = None
+					accurate = True
 					# Some shows are only available on IMDb, but not other providers (eg: tt31566242, tt30346074).
 					# These seasons often do not have a release date.
 					# Add the date from the interpolated show date.
-					if not season.get('premiered'):
-						premiered = parentPremiere if missing else None
-						if not premiered:
-							premiered = value.get(MetaTools.TimePremiere)
-							if premiered: premiered = Time.format(premiered, format = Time.FormatDate)
-						if premiered:
-							if not season.get('premiered'): season['premiered'] = premiered
-							if not season.get('aired'): season['aired'] = premiered
+					if not season.get('premiered'): premiere = parentPremiere if missing else None
 
-				value = self.mTools.mergeDuration(durations.get(number))
+					# Recalculate the date to accomodate timezones.
+					# Late night shows from the US that air late at night have a GMT time early in the morning of the next day on Trakt.
+					# This mostly matters for episodes, not that much for shows and seasons.
+					# Eg: The Tonight Show Starring Jimmy Fallon S02E44 (Trakt: 2015-03-21T03:30:00Z, actual date in the timezone of release: 2015-03-20 23:30)
+					if not premiere: premiere = value.get(MetaTools.TimePremiere)
+					if Tools.isInteger(premiere):
+						# If Trakt does not have a premiere date yet (eg: future unreleased season), do not replace the date that was calculated with the show's timezone.
+						# TVDb only has the date, but does not have the time.
+						# Hence, converting the TVDb timestamp to a date using the show's timezone (which comes from Trakt) can result in an incorrect date (off by 1 day).
+						# Eg: 2025-01-02 00:00:00 (GMT's timezone) might be converted to 2025-01-01 22:00:00 (show's timezone).
+						if not parentZone or not ((timed.get(numberSeason) or {}).get(MetaTools.ProviderTrakt) or {}).get(MetaTools.TimePremiere): accurate = False
+						premiere = Time.format(premiere, format = Time.FormatDate, zone = parentZone)
+
+					# Only update if there is no date, or there is a date and a timezone.
+					if premiere and (accurate or not season.get('premiered')): season['premiered'] = season['aired'] = premiere
+
+				value = self.mTools.mergeDuration(durations.get(numberSeason), short = self.mTools.niche(niche = self.mTools.mergeNiche(niches.get(numberSeason)), media = media, metadata = season, show = show, pack = pack))
 				if value: season['duration'] = value
 
-				value = self.mTools.mergeCertificate(mpaas.get(number), media = media)
+				value = self.mTools.mergeCertificate(mpaas.get(numberSeason), media = media)
 				if not value and parentMpaa: value = Tools.copy(parentMpaa)
 				if value: season['mpaa'] = value
 
-				value = self.mTools.mergeCast(casts.get(number), show = parentCast)
+				value = self.mTools.mergeCast(casts.get(numberSeason), show = parentCast)
 				if value: season['cast'] = value
 
-				value = self.mTools.mergeCrew(directors.get(number))
+				value = self.mTools.mergeCrew(directors.get(numberSeason))
 				if not value and parentDirector: value = Tools.copy(parentDirector)
-				if value: data['director'] = value
+				if value: season['director'] = value
 
-				value = self.mTools.mergeCrew(writers.get(number))
+				value = self.mTools.mergeCrew(writers.get(numberSeason))
 				if not value and parentWriter: value = Tools.copy(parentWriter)
-				if value: data['writer'] = value
+				if value: season['writer'] = value
 
-				value = self.mTools.mergeCrew(creators.get(number))
+				value = self.mTools.mergeCrew(creators.get(numberSeason))
 				if not value and parentCreator: value = Tools.copy(parentCreator)
-				if value: data['creator'] = value
+				if value: season['creator'] = value
 
 				season['media'] = media
 
-				niche = self.mTools.mergeNiche(niches.get(number))
+				niche = self.mTools.mergeNiche(niches.get(numberSeason))
 				niche = self.mTools.niche(niche = niche, metadata = season, show = show, pack = pack)
 				if niche: season['niche'] = niche
 
-				if number in votings: season['voting'] = votings[number]
+				if numberSeason in votings:
+					voting = votings[numberSeason]
+
+					# Add the IMDb rating/votes from the bulk datasets.
+					# This should never happen, since the latests rating/votes are already retrieve from HTML if MetaTools.DetailExtended.
+					try:
+						if self._bulkImdbEnabled():
+							try: votingImdb = voting['rating']['imdb']
+							except: votingImdb = None
+							if votingImdb is None and imdb:
+								try: seasonImdb = number[MetaPack.ProviderImdb][MetaPack.NumberStandard]
+								except: seasonImdb = None
+								if seasonImdb is None: seasonImdb = numberSeason
+
+								# Do not using the IMDb rating if IMDb has a single abolsute season, while Trakt/TMDb/TVDb have multiple seasons.
+								# Otherwise, because of the very high vote count on IMDb, all seasons will end up with the same rating, from IMDb's S01.
+								# Eg: One Piece.
+								if not(seasonImdb == 1 and numberSeason > 1):
+									votingImdb = self._bulkImdbLookup(imdb = imdb, season = seasonImdb)
+									if votingImdb:
+										voting['rating']['imdb'] = votingImdb.get('rating')
+										voting['votes']['imdb'] = votingImdb.get('votes')
+					except: Logger.error()
+
+					season['voting'] = voting
 
 				# The season duration returned by providers is typically the duration of the first episode.
 				# This can be off quite a lot from the average episode duration.
 				# This then displays a large deviation for shows with a double-first-episode, or shows like eg Downton Abbey with a slightly longer first episode in each season.
-				duration = pack.durationMean(season = number)
+				duration = pack.durationMean(season = numberSeason)
 				if not duration: duration = season.get('duration')
 				if not duration: duration = parentDuration # Eg: The Office UK S03 (IMDb)
 				if duration: season['duration'] = Math.roundClosest(duration, base = 60) # Round to closest minute.
 
-				if not season.get('tvshowtitle') and parentTitle: season['tvshowtitle'] = parentTitle
+				# Update: Always use the tvshowtitle from the show metadata and replace it in the episode metadata.
+				# The episode metadata might be outdated and contains an old/alias title for tvshowtitle.
+				# Plus the episode metadata only gets a title from TVDb/IMDb, but not from Trakt/TMDb.
+				# The tvshowtitle in the show metadata is therefore more likley to be correct/up-to-date.
+				# Eg: The tvshowtitle for the show is (correctly) "Pluribus", while the tvshowtitle for the episode (on TVDb) is "PLUR1BUS", which is an alias.
+				# This attribute is important, since it is used as the title during scarping.
+				#if not season.get('tvshowtitle') and parentTitle: season['tvshowtitle'] = parentTitle
+				if parentTitle: season['tvshowtitle'] = parentTitle
+
+				# Only some providers return a year for seasons/episodes, like TVDb and IMDb.
+				# TVDb seems to typically have the show year, but IMDb can have the actual season/episode year and not the show year.
+				# If we use the season/episode metadata object to do a title+year lookup or do a scrape, the year might not be the show's year and cause incorrect results.
+				# Always explicitly store the show year.
+				season['tvshowyear'] = parentYear or season.get('year')
+				try: premiere = season['time'][MetaTools.TimePremiere]
+				except: premiere = None
+				if premiere: season['year'] = Time.year(premiere) # Add the actual season year.
 
 				# Unaired seasons often do not have a plot.
 				if not season.get('plot') and parentPlot: season['plot'] = parentPlot
@@ -4603,8 +6869,9 @@ class MetaManager(object):
 				# At a later point the ID is corrected on Trakt/TMDb.
 				# If the data is now refreshed, the old ID from MetaCache is used instead of the newly retrieved IDs.
 				# Hence, always replace these.
-				ids1 = season.get('id') or {}
-				ids2 = show.get('id') or {}
+				# Prefer the ID from the show over the one from the season/episode. Since sometimes IDs (eg IMDb ID) is incorrect and later gets fixed. Show metadata is more likely to get the fixed IDs, while episode metadata might still have the old ID.
+				ids1 = show.get('id') or {}
+				ids2 = season.get('id') or {}
 				value = ids1.get('imdb') or ids2.get('imdb')
 				if value: imdb = value
 				value = ids1.get('tmdb') or ids2.get('tmdb')
@@ -4635,12 +6902,12 @@ class MetaManager(object):
 				# This unique Trakt season does not have a show title, which will cause the season menu to be classified as "mixed" as the show title is added to the season label.
 				if not 'tvshowtitle' in season and title: season['tvshowtitle'] = title
 
-				if number in images and images[number]: MetaImage.update(media = MetaImage.MediaSeason, images = images[number], data = season, sort = providersImage)
-				else: imagesMissing = True
+				if numberSeason in images and images[numberSeason]: MetaImage.update(media = MetaImage.MediaSeason, images = images[numberSeason], data = season, sort = providersImage, themes = imagesThemes)
+				else: imagesMissing = numberSeason
 
 				# Do this before here already.
 				# Otherwise a bunch of regular expressions are called every time the menu is loaded.
-				self.mTools.cleanPlot(metadata = season)
+				self.mTools.cleanDescription(metadata = season)
 
 				# Calculate the rating here already, so that we have a default rating/votes if this metadata dictionary is passed around without being cleaned first.
 				# More info under meta -> tools.py -> cleanVoting().
@@ -4649,32 +6916,97 @@ class MetaManager(object):
 			# Sort so that the list is in the order of the season numbers.
 			data['seasons'].sort(key = lambda i : i['season'])
 
+			# Determine the season type.
+			# Do this after the seasons were sorted, since we need the previous/next/last season.
+			try:
+				seasonLastStandard = None
+				seasonLastOfficial = None
+				try: seasonLastStandard = data['seasons'][-1].get('season')
+				except: pass
+				if pack:
+					seasonLastStandard = pack.numberLastStandardSeason()
+					seasonLastOfficial = pack.numberLastOfficialSeason()
+				for i in range(len(data['seasons'])):
+					try:
+						season = data['seasons'][i]
+						number = season.get('season')
+						statusSeason = season.get('status')
+
+						type = None
+						status = None
+						if pack:
+							entry = pack.season(season = number, number = MetaPack.NumberStandard)
+							if entry:
+								type = pack.type(item = entry)
+								status = pack.status(item = entry)
+								status = [status] if status else [] # Add the pack status, since it is sometimes more accurate (eg Vikings S0).
+
+						try: typePrevious = (data['seasons'][i - 1].get('type') if number > 1 else None) or self.mTools.mergeType(types[number - 1], season = number)
+						except: typePrevious = None
+						try: typeNext = self.mTools.mergeType(types[number + 1], season = number)
+						except: typeNext = None
+						try: typeLast = self.mTools.mergeType(types[number][-1], season = number)
+						except: typeLast = None
+						value = self.mTools.mergeType(types.get(number), season = number, seasonLastStandard = seasonLastStandard, seasonLastOfficial = seasonLastOfficial, type = type, typePrevious = typePrevious, typeNext = typeNext, typeLast = typeLast, statusShow = parentStatus, statusSeason = statusSeason)
+						if value: season['type'] = value
+
+						try: premiered = season['time'][MetaTools.TimePremiere]
+						except: premiered = None
+						value = self.mTools.mergeStatus((statuses.get(number) or []) + (status or []), media = media, time = premiered, season = number, type = season.get('type'), status = parentStatus)
+						if value: season['status'] = value
+					except: Logger.error()
+			except: Logger.error()
+
 			# Set the show details.
 			try: season = data['seasons'][1] # Season 1
 			except:
 				try: season = data['seasons'][0] # Specials
 				except: season = None
-			if imdb: data['imdb'] = imdb
-			if tmdb: data['tmdb'] = tmdb
-			if tvdb: data['tvdb'] = tvdb
-			if trakt: data['trakt'] = trakt
-			if slug: data['slug'] = slug
-			if tvmaze: data['tvmaze'] = tvmaze
-			if tvrage: data['tvrage'] = tvrage
-			title = season['tvshowtitle'] if season and 'tvshowtitle' in season else None
+			data['media'] = media # Add this so that MetaCache knows the media without having to access the inner "seasons" list.
+			data['id'] = {}
+			if imdb: data['id']['imdb'] = data['imdb'] = imdb
+			if tmdb: data['id']['tmdb'] = data['tmdb'] = tmdb
+			if tvdb: data['id']['tvdb'] = data['tvdb'] = tvdb
+			if trakt: data['id']['trakt'] = data['trakt'] = trakt
+			if slug: data['id']['slug'] = data['slug'] = slug
+			if tvmaze: data['id']['tvmaze'] = data['tvmaze'] = tvmaze
+			if tvrage: data['id']['tvrage'] = data['tvrage'] = tvrage
+
+			title = parentTitle
+			if not title and season: title = season.get('tvshowtitle')
 			if title: data['tvshowtitle'] = data['title'] = title
-			year = season['year'] if season and 'year' in season else None
-			if year: data['year'] = year
+
+			year = parentYear
+			if not year and season: year = season.get('tvshowyear') or season.get('year')
+			if year: data['tvshowyear'] = data['year'] = year
+
+			# Add the show status for MetaCache.
+			# Use the status of the pack, in case it is newer than the status from the show metadata.
+			status = parentStatus
+			if not status in (MetaTools.StatusEnded, MetaTools.StatusCanceled):
+				statusPack = pack.status()
+				if statusPack in (MetaTools.StatusEnded, MetaTools.StatusCanceled): status = statusPack
+			data['status'] = status
+
+			# Add show niche.
+			# Currently not used, but could be used to help identify niches, such as mini-series.
+			niched = show.get('niche')
+			if not niched:
+				# Not that accurate, since it contains niches from individual seasons that might not always apply to the entire show (eg: "finale" season).
+				try: niched.extend(self.mTools.mergeNiche(niches.values()))
+				except: pass
+			niche = self.mTools.niche(niche = niched, metadata = show, show = show, pack = pack)
+			data['niche'] = niche
 
 			# Sometimes the images are not available, especially for new/future releases.
 			# This looks ugly in the menus. Mark as incomplete to re-retrieve sooner.
-			if imagesMissing:
+			if not imagesMissing is None:
 				partDone = False
 				try: partNew['tvdb']['complete'] = False
 				except: pass
 				try: partNew['fanart']['complete'] = False
 				except: pass
-				if developer: Logger.log('SEASON IMAGES INCOMPLETE: %s' % developer)
+				if developer: Logger.log('SEASON IMAGES INCOMPLETE: %s' % self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item, season = imagesMissing))
 
 			Memory.set(id = id, value = data, local = True, kodi = False)
 			if item and data: item.update(Tools.copy(data)) # Can be None if the ID was not found. Copy in case the outer item is edited before we write the data to MetaCache.
@@ -4693,14 +7025,14 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
-	def _metadataSeasonId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None):
-		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+	def _metadataSeasonId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, quick = None):
+		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, quick = quick)
 		if result: return {'complete' : True, 'data' : {'id' : result}}
 		else: return {'complete' : False, 'data' : result}
 
-	def _metadataSeasonTrakt(self, trakt = None, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
+	def _metadataSeasonTrakt(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, language = None, item = None, cache = None, threaded = None, detail = None):
 		complete = True
 		result = None
 		try:
@@ -4717,17 +7049,15 @@ class MetaManager(object):
 					except: pass
 				result = self._metadataTemporize(item = item, result = result, provider = 'trakt')
 			else: # Comes from another list, or forcefully retrieve detailed metadata.
-				id = trakt or imdb
-				if id:
+				if trakt or imdb or tmdb or tvdb or title:
 					# Trakt has an API limit of 1000 requests per 5 minutes.
 					# Retrieving all the additional metadata will very quickly consume the limit if a few pages are loaded.
 					# Only retrieve the extended metadata if enough requests are still avilable for the past 5 minutes.
-					instance = MetaTrakt.instance()
-					usagesAuthenticated = instance.usage(authenticated = True)
-					usagesUnauthenticated = instance.usage(authenticated = False)
+					usage = self.providerUsageTrakt(authenticated = False)
 
 					person = False
-					if detail == MetaTools.DetailExtended and usagesUnauthenticated < 0.3: person = True
+					if self.mModeGenerative: person = True
+					elif detail == MetaTools.DetailExtended and usage < 0.5: person = True
 
 					translation = None
 					if detail == MetaTools.DetailEssential: translation = False # Use the translations from TVDb.
@@ -4735,7 +7065,7 @@ class MetaManager(object):
 					# We already retrieve the cast (with thumbnails), translations and studios, from TMDb.
 					# Retrieving all of them here again will add little new metadata and only prolong the retrieval.
 					# translation = None: only retrieve for non-English.
-					return instance.metadataSeason(id = id, summary = True, translation = translation, person = person, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
+					return MetaTrakt.instance().metadataSeason(trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = True, translation = translation, person = person, language = language, extended = True, detail = True, cache = cache, concurrency = bool(threaded))
 		except: Logger.error()
 		return {'provider' : 'trakt', 'complete' : complete, 'data' : result}
 
@@ -4757,24 +7087,58 @@ class MetaManager(object):
 			# There is no way to efficiently retrieve all/many seasons/episodes from IMDb, only one season at a time with up to 50 episodes per season.
 			# Use this function conservatively, since it can make multiple requests, at retrieving too many IMDb pages in a short time can result in IMDb blocking requests.
 			# Only retrieve few seasons if the item does not come from MetaCache, meaning it is newley loaded, and might be part of batch requests for Trakt Progress sync.
-
-			instance = MetaImdb.instance()
-			usage = instance.usage()
+			usage = self.providerUsageImdb()
 
 			new = True
-			if item and item.get(MetaCache.Attribute, {}).get(MetaCache.AttributeStatus) in MetaCache.StatusValid: new = False
+			if item and MetaCache.valid(item): new = False
 
 			season = []
-			if item and item.get('seasons'):
-				for i in item.get('seasons'):
-					number = i.get('season')
-					if not number is None: season.append(number)
-			else:
-				season = [i for i in range(10)]
-			try: season.append(season.pop(0)) # Move the special seaosn to the back, since it typically does not exist on IMDb, and we want to retrieve it last.
+
+			# Add the season numbers from the bulk data if available.
+			# This typically contains all the seasons and is more accurate and than using the season numbers from other providers below.
+			# This also avoids the incremental retrieval of seasons below (max(season) + 1), and also avoids trying to retrieve seasons that do not exist on IMDb.
+			bulk = self._bulkImdbLookup(imdb = imdb, data = True)
+			try:
+				if bulk:
+					bulk = bulk.get('seasons')
+					if bulk:
+						season.extend(bulk.keys())
+						if season: new = False # Retrieve more seasons the first time.
+			except: Logger.error()
+
+			# Bulk data not available, or S01 is not in the bulk data yet.
+			if not season or not 1 in season:
+				if item and item.get('seasons'):
+					for i in item.get('seasons'):
+						number = i.get('season')
+						if not number is None: season.append(number)
+
+					# Add one additional season number to the end.
+					# This is a useful tool if there are inconsistencies with season numbers on IMDb.
+					# Eg: Money Heist: 3 seasons (Trakt/TMDB/TVDb) vs 5 seasons (IMDb - the midseasons were split into separate seasons).
+					# On the 1st non-new refresh, only 3 seasons will be retrieved from IMDb.
+					# On the 2nd non-new refresh, 4 seasons are retrieved.
+					# On the 3rd non-new refresh, 5 seasons are retrieved.
+					# On the 4th non-new refresh, 6 seasons are retrieved, but only 5 are returned. It will stay at this level.
+					# Hence, for these inconsistent shows, systematically retrieve more seasons on every refresh.
+					# Eg: Family Guy and South Park - IMDb has mutiple future seasons for years in advance.
+					if season: season.append(max(season) + 1)
+				else:
+					season = [i for i in range(10)]
+
+			# Remove duplicates and sort, in case bulk season numbers were used.
+			season = Tools.listUnique(season)
+			season = Tools.listSort(season)
+
+			# Move the special season to the back, since it typically does not exist on IMDb, and we want to retrieve it last.
+			try:
+				season.remove(0)
+				season.append(0)
 			except: pass
 
-			if new:
+			if self.mModeGenerative:
+				season = season[:50]
+			elif new:
 				if usage < 0.25: season = season[:4]
 				elif usage < 0.50: season = season[:3]
 				elif usage < 0.75: season = season[:2]
@@ -4787,7 +7151,7 @@ class MetaManager(object):
 				elif usage < 0.90: season = season[:5]
 				else: season = []
 
-			if season: result = instance.metadataSeason(id = imdb, season = season, language = language, cache = cache, threaded = threaded)
+			if season: result = MetaImdb.instance().metadataSeason(id = imdb, season = season, language = language, cache = cache, threaded = threaded)
 		except: Logger.error()
 		return {'provider' : 'imdb', 'complete' : complete, 'data' : result}
 
@@ -4796,7 +7160,7 @@ class MetaManager(object):
 		result = None
 		try:
 			if tvdb:
-				images = MetaFanart.show(tvdb = tvdb, season = True, cache = cache)
+				images = MetaFanart.instance().metadataShow(tvdb = tvdb, season = True, cache = cache)
 				if images is False: complete = False
 				elif images:
 					result = []
@@ -4805,20 +7169,20 @@ class MetaManager(object):
 		except: Logger.error()
 		return {'provider' : 'fanart', 'complete' : complete, 'data' : result or None}
 
-	def _metadataSeasonAggregate(self, items, threaded = None):
+	def _metadataSeasonAggregate(self, items, refresh = None, threaded = None):
 		# Do not store duplicate or non-season data in the MetaCache database, otherwise too much unnecessary storage space will be used.
 		# Check _metadataEpisodeAggregate() for more info.
 		try:
 			if items:
 				values = items if Tools.isArray(items) else [items]
-				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for mutiple shows, each containing a list of seasons.
+				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for multiple shows, each containing a list of seasons.
 
 				shows = []
 				for item in values:
 					try: shows.append({'imdb' : item.get('imdb'), 'tmdb' : item.get('tmdb'), 'tvdb' : item.get('tvdb'), 'trakt' : item.get('trakt')})
 					except: Logger.error()
 				shows = Tools.listUnique(shows)
-				shows = self.metadataShow(items = shows, pack = False, threaded = threaded) if shows else None
+				shows = self.metadataShow(items = shows, pack = False, refresh = refresh, threaded = threaded) if shows else None
 
 				if shows:
 					for item in values:
@@ -4831,6 +7195,16 @@ class MetaManager(object):
 								if (imdb and show.get('imdb') == imdb) or (tmdb and show.get('tmdb') == tmdb) or (tvdb and show.get('tvdb') == tvdb) or (trakt and show.get('trakt') == trakt):
 									# Add show images.
 									if MetaImage.Attribute in show: MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(show[MetaImage.Attribute]), data = item, category = MetaImage.MediaShow)
+
+									# Add show status used for label details in smart menus.
+									# Add the tagline for Progress menus.
+									item['serie'] = {
+										'show' : {
+											'status' : show.get('status'),
+											'tagline' : show.get('tagline'),
+										}
+									}
+
 									break
 						except: Logger.error()
 		except: Logger.error()
@@ -4846,9 +7220,9 @@ class MetaManager(object):
 	#		a. season = True: retrieve all episodes of all seasons of the show, including specials.
 	#		b. season = False: retrieve all episodes of all seasons of the show, excluding specials.
 	#	2. Pass in a season and episode: retrieve a specific episode based on the number.
-	#	3. Pass in a season, episode, and limit: retrieve mutiple consecutive episodes, starting from the given number. A negative limit means retrieve up to the end of the season.
+	#	3. Pass in a season, episode, and limit: retrieve multiple consecutive episodes, starting from the given number. A negative limit means retrieve up to the end of the season.
 	#	4. Pass in a season, episode, and next: retrieve the next "unwatched" episode in the series, based on the parameters passed in and the Trakt playback history. Used for the Progress menu.
-	def metadataEpisode(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None, limit = None, next = None, discrepancy = None, special = SpecialExclude, aggregate = True, hierarchical = False, hint = None):
+	def metadataEpisode(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, items = None, pack = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None, limit = None, next = None, discrepancy = None, special = SpecialExclude, aggregate = True, hierarchical = False, hint = None):
 		try:
 			media = Media.Episode
 
@@ -4864,12 +7238,14 @@ class MetaManager(object):
 			base = items
 			numbering = None
 
+			refreshInternal = self._metadataRefresh(refresh = refresh)
+
 			smart = False
 			if next == MetaManager.Smart:
 				next = True
 				smart = True
 
-			if items or (imdb or tmdb or tvdb or trakt) or title:
+			if items or (trakt or imdb or tmdb or tvdb) or title:
 				if pickSequential and not items:
 					numbering = episode
 					if episode is True:
@@ -4883,9 +7259,10 @@ class MetaManager(object):
 				# Do not do for "next", since we do the lookup later after the number was incremented.
 				if (pickSequential and not next) or (not items and not episode is None):
 					lookup = items
-					if not lookup and Tools.isInteger(season): lookup = {'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode}
+					if not lookup and Tools.isInteger(season):
+						lookup = {'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : season, 'episode' : episode} # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 					if lookup:
-						packLookup = self._metadataPackLookup(items = lookup, number = number, threaded = threaded, quick = quick)
+						packLookup = self._metadataPackLookup(items = lookup, number = number, refresh = refreshInternal, threaded = threaded, quick = quick)
 						if not items and (not numbering or Tools.isInteger(season)):
 							season = lookup['season']
 							episode = lookup['episode']
@@ -4898,15 +7275,15 @@ class MetaManager(object):
 
 					# Important to pass on "quick" here, when called from metadataSmart().
 					# We do not want to generate a new pack if we are in quick mode.
-					if lookup: packLookup = self._metadataPackLookup(items = lookup, number = MetaPack.ProviderTrakt, threaded = threaded, quick = quick)
+					if lookup: packLookup = self._metadataPackLookup(items = lookup, number = MetaPack.ProviderTrakt, refresh = refreshInternal, threaded = threaded, quick = quick)
 
 				if items:
 					if Tools.isArray(items):
 						if 'episode' in items[0]: pickSingles = True
 					else:
 						pickSingle = True
-						episode = items.get('episode')
 						season = items.get('season')
+						episode = items.get('episode')
 						items = [items]
 
 				elif not season is None and not episode is None and limit:
@@ -4915,11 +7292,12 @@ class MetaManager(object):
 					if not numbering and special is MetaManager.SpecialSettings: special = self.mTools.settingsShowInterleave()
 
 					# Reduce the number of seasons to retrieve if they do not exist in the first place or if they are not included in the menu.
-					packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, threaded = threaded)
+					packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, refresh = refreshInternal, threaded = threaded)
 					if packData: packInstance = MetaPack.instance(pack = packData)
 
 					ranged = self._metadataEpisodeRange(pack = packInstance, season = season, episode = episode, limit = limit, number = number)
 					if ranged:
+						 # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 						if special and not ranged.get('season').get('start') == 0: items.append({'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : 0})
 						items.extend([{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : i} for i in range(ranged.get('season').get('start'), ranged.get('season').get('end') + 1)])
 
@@ -4929,20 +7307,20 @@ class MetaManager(object):
 					items = []
 					pickMultiple = True
 
-					packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, threaded = threaded)
+					packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, refresh = refreshInternal, threaded = threaded)
 					if packData:
 						packInstance = MetaPack.instance(pack = packData)
 						total = packInstance.countSeasonTotal()
 						if total:
 							for i in range(total):
 								if i == 0 and season is False: continue
-								items.append({'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : i})
+								items.append({'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : i}) # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 
 				else:
 					pickSingle = True
 					if filter is None: filter = True
 
-					if imdb or tmdb or tvdb or trakt: items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}]
+					if trakt or imdb or tmdb or tvdb: items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year}] # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 					elif title: items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
 
 					if items:
@@ -4955,7 +7333,7 @@ class MetaManager(object):
 						# Update: The only reason why this takes so long is the call to MetaCache.settingsId() and Pool.settingMetadata() that is calculated here for the first time.
 						# But this will be calculated eventually by some other call anyways, so this should not drastically increase time.
 						if season == 1 or hint is True:
-							packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, threaded = threaded)
+							packData = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, refresh = refreshInternal, threaded = threaded)
 							if packData: packInstance = MetaPack.instance(pack = packData)
 
 				# UPDATE 1
@@ -4988,19 +7366,19 @@ class MetaManager(object):
 						itemsSingle = len(items) == 1
 						current = Time.timestamp()
 						for item in items:
-							smart = item.get(MetaManager.Smart)
+							smarted = item.get(MetaManager.Smart)
 							# Only use this if the smart increment is not older than 3 months.
 							# Otherwise if the smart increment was calculated with an old pack, newly released seasons/episodes might still have the old no-next-episode.
 							# Do not make this too short, otherwise an item than was not updated in metadataSmart() for a while will hold up the process and make the menu slower.
-							if smart and (current - (smart.get('time') or 0)) < 7776000:
-								smart = smart.get('next')
-								if smart:
-									item['season'] = smart.get('season')
-									item['episode'] = smart.get('episode')
+							if smarted and (current - (smarted.get('time') or 0)) < 7776000:
+								smarted = smarted.get('next')
+								if smarted:
+									item['season'] = smarted.get('season')
+									item['episode'] = smarted.get('episode')
 									if itemsSingle:
-										number = smart.get('number')
+										number = smarted.get('number')
 										if number: pickSequential = number == MetaPack.NumberSequential or number == MetaPack.NumberAbsolute
-								elif not smart is False:
+								elif not smarted is False:
 									itemsIncrement.append(item)
 					else: # metadataEpisodeNext()
 						itemsIncrement = items
@@ -5013,7 +7391,7 @@ class MetaManager(object):
 						if len(itemsIncrement) == 1:
 							semaphore.acquire()
 							item = itemsIncrement[0]
-							numberNew = self._metadataEpisodeIncrement(item = item, number = number, lock = lock, locks = locks, semaphore = semaphore, cache = cache, threaded = threaded, discrepancy = discrepancy)
+							numberNew = self._metadataEpisodeIncrement(item = item, number = number, lock = lock, locks = locks, semaphore = semaphore, cache = cache, refresh = refreshInternal, threaded = threaded, discrepancy = discrepancy)
 							if not number and numberNew:
 								number = numberNew
 								pickSequential = number == MetaPack.NumberSequential or number == MetaPack.NumberAbsolute
@@ -5021,7 +7399,7 @@ class MetaManager(object):
 							threadsNext = []
 							for item in itemsIncrement:
 								semaphore.acquire()
-								threadsNext.append(Pool.thread(target = self._metadataEpisodeIncrement, kwargs = {'item' : item, 'number' : number, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache, 'threaded' : threaded, 'discrepancy' : discrepancy}, start = True))
+								threadsNext.append(Pool.thread(target = self._metadataEpisodeIncrement, kwargs = {'item' : item, 'number' : number, 'lock' : lock, 'locks' : locks, 'semaphore' : semaphore, 'cache' : cache, 'refresh' : refreshInternal, 'threaded' : threaded, 'discrepancy' : discrepancy}, start = True))
 							[thread.join() for thread in threadsNext]
 
 						# Check invalid: No more episodes available.
@@ -5041,14 +7419,14 @@ class MetaManager(object):
 							items = [i for i in items if not i.get('invalid') and not i.get('episode') is None]
 
 						# Do the lookup here, after the numbers were incremented.
-						packLookup = self._metadataPackLookup(items = items, threaded = threaded, quick = quick)
+						packLookup = self._metadataPackLookup(items = items, refresh = refreshInternal, threaded = threaded, quick = quick)
 						if pickSingle and items:
 							season = items[0].get('season')
 							episode = items[0].get('episode')
 
 				if items:
 					if packInstance or (hint and not hint is True): hint = {'season' : items[0].get('season'), 'pack' : packInstance or hint} # Episodes fom a single show.
-					elif len(items) > 1: hint = {'count' : len(items)} # Episodes fom mutiple shows.
+					elif len(items) > 1: hint = {'count' : len(items)} # Episodes fom multiple shows.
 					else: hint = None
 
 					items = self._metadataCache(media = media, items = items, function = self._metadataEpisodeUpdate, quick = quick, refresh = refresh, cache = cache, threaded = threaded, hierarchical = hierarchical, hint = hint)
@@ -5081,12 +7459,32 @@ class MetaManager(object):
 											temp = i
 											break
 									picks = temp
+								elif season:
+									# For unofficial episodes caused by Trakt season-absolute-episode-numbering.
+									# Eg: One Piece S02 episode menu should end at S02E22 and not continue with Trakt absolute numbers S22E62+.
+									# Eg: One Piece S18 episode menu should end at S18E55 and not continue with Trakt absolute numbers S18E749+.
+									# Not sure if this could remove episodes from other shows that might need to stay in the episode menu. If so, change the types that are checked below.
+									# Also check this with combined episodes.
+									# Eg: Star Wars: Young Jedi Adventures S01E26-E49, check that all E4x episodes are there.
+									if packInstance:
+										temp = []
+										previous = None
+										for i in picks:
+											try:
+												# Only if the gap between two consecutive episodes is greater than 2.
+												if (previous and (i.get('episode') - previous) > 2):
+													type = packInstance.type(season = i.get('season'), episode = i.get('episode')) or {}
+													if type.get(MetaPack.NumberUnofficial) and not MetaPack.NumberStandard in type and not MetaPack.NumberSpecial in type: break
+												previous = i.get('episode')
+											except: Logger.error()
+											temp.append(i)
+										picks = temp
 
 							elif pickMultiple:
 								picks = []
 
 								# Remove sequential/absolute episodes from the Series menu.
-								# Some providers might have the episodes in an absolute season, while others have the episodes listed under mutiple seasons.
+								# Some providers might have the episodes in an absolute season, while others have the episodes listed under multiple seasons.
 								# Otherwise the same episode is listed twice, once as absolute number and once as season number.
 								#	Eg: Dragon Ball Super.
 								# Also do for Absolute menu, since seasons can have different episode counts between Trakt and TVDb.
@@ -5155,13 +7553,34 @@ class MetaManager(object):
 									# This is important for Progress submenus where Trakt and TVDb have a very different season odering.
 									# Eg: One Piece.
 									try:
-										if packInstance: numberSequential = packInstance.lookupSequential(season = season, episode = episode)
+										numberSequential = None
+										if packInstance:
+											# Do not just lookup the sequential number of the last episode on the previous page.
+											# The last episode on the previous page might be an unofficial episode from TVDb (unofficial) that maps to a later season on Trakt (official).
+											# Eg: LEGO Masters S06E01+ (Trakt) which are S05 (TVDb).
+											# This causes S06E01-S06E04 to get removed from the Series submenu on page 6, since those episodes are S05 on TVDb, with the same sequential numbers as S06E01+.
+											# We can also not just use: packInstance.lastEpisodeOfficial(season = season), since that will only work for Series submenus starting at SxxE01, and not the Progress submenus that can have an offset at an arbitrary episode.
+											# Hence, use the last number from the previous page, iterating in reverse until we find the first official episode.
+
+											#numberSequential = packInstance.lookupSequential(season = season, episode = episode)
+											numberEpisode = episode
+											while numberEpisode >= 1:
+												item = packInstance.episode(season = season, episode = numberEpisode)
+												if item:
+													if packInstance.typeUnofficial(item = item):
+														numberEpisode -= 1
+													else:
+														numberSequential = packInstance.numberSequential(item = item)
+														break
+												else: numberEpisode -= 1
+											if not numberSequential: numberSequential = packInstance.lookupSequential(season = season, episode = episode)
+
 										if numberSequential: numberSequential = numberSequential[MetaPack.PartEpisode]
 										else: numberSequential = 0
 
 										sequentialFound = {}
 										def _sequentialValid(item):
-											# Always allow specials./ They get filtered out later on in _metadataEpisodeSpecial().
+											# Always allow specials. They get filtered out later on in _metadataEpisodeSpecial().
 											if item.get('season') == 0 or item.get('episode') == 0: return True
 
 											# The if-statement has 2 parts:
@@ -5178,20 +7597,29 @@ class MetaManager(object):
 
 											try: sequentialNumber = item['number'][MetaPack.NumberSequential][MetaPack.PartEpisode]
 											except: sequentialNumber = 0
-											if (sequentialNumber >= numberSequential) and (not sequentialNumber in sequentialFound):
+											try: traktNumber = item['number'][MetaPack.ProviderTrakt][MetaPack.NumberStandard][MetaPack.PartSeason]
+											except: traktNumber = None
+											try: tvdbNumber = item['number'][MetaPack.ProviderTvdb][MetaPack.NumberStandard][MetaPack.PartSeason]
+											except: tvdbNumber = None
+											try: imdbNumber = item['number'][MetaPack.ProviderImdb][MetaPack.NumberStandard][MetaPack.PartSeason]
+											except: imdbNumber = None
+
+											allow = (sequentialNumber >= numberSequential) and (not sequentialNumber in sequentialFound)
+											if allow:
+												# Ignore unofficial TVDb episodes.
+												# Eg: My Name Is Earl S03E19+.
+												# Also do not allow unofficial episodes, except specials (eg IMDb specials).
+												# Eg: LEGO Masters S05E05+ (unofficial on TVDb).
+												type = item.get('type')
+												if type and MetaPack.NumberUnofficial in type and not MetaPack.NumberSpecial in type: allow = False
+
+											if allow:
 												sequentialFound[sequentialNumber] = True
 												return True
 											else:
 												# Allow IMDb specials.
 												# Eg: Downton Abbey S02E09.
-												try: imdbNumber = item['number'][MetaPack.ProviderImdb][MetaPack.NumberStandard][MetaPack.PartSeason]
-												except: imdbNumber = None
-												if imdbNumber:
-													try: traktNumber = item['number'][MetaPack.ProviderTrakt][MetaPack.NumberStandard][MetaPack.PartSeason]
-													except: traktNumber = None
-													try: tvdbNumber = item['number'][MetaPack.ProviderTvdb][MetaPack.NumberStandard][MetaPack.PartSeason]
-													except: tvdbNumber = None
-													if not traktNumber and not tvdbNumber: return True
+												if imdbNumber and not traktNumber and not tvdbNumber: return True
 											return False
 
 										items = [i for i in items if _sequentialValid(i)]
@@ -5215,14 +7643,24 @@ class MetaManager(object):
 											item['season'] = numberSeason
 											item['episode'] = numberEpisode
 
-							items = self._metadataPackAggregate(items = items, data = packData, pack = pack, quick = quick, cache = cache, threaded = threaded) # Do not add "refresh" here, otherwise the pack will be refreshed every time a season is refreshed.
+							# Do not add "refresh" here, otherwise the pack will be refreshed every time a season is refreshed.
+							# Only add "refreshInternal" which is either False or None.
+							items = self._metadataPackAggregate(items = items, data = packData, pack = pack, refresh = refreshInternal, quick = quick, cache = cache, threaded = threaded)
 
 							# For Progress menus, the episode aggregation can take very long (1.0-1.5 secs).
 							# This data is not really needed for any of the menu's functionality. Or is it?
 							# Still do season aggregation, since we want the show poster for the menu.
 							if aggregate:
-								if next: items = self._metadataSeasonAggregate(items = items, threaded = threaded)
-								else: items = self._metadataEpisodeAggregate(items = items, threaded = threaded)
+								# Update (2025-04): Although the images are not absolutely necessary.
+								# However, we might still want to use the season images when changing the settings for Images -> Combined Images, for anthology series (eg: White Lotus).
+								# Calling _metadataEpisodeAggregate() takes anywhere from 40-250ms, but on average around 100-150ms.
+								# This should not be a huge problem, since the first page of the Progress menu is cached and this will be done in the background.
+								# And when the user occasionally goes to the next page, waiting an additional 150ms is not the end.
+								# NB: If this is ever changed back, make sure to update the default values for the Combined Images setting.
+
+								#if next: items = self._metadataSeasonAggregate(items = items, refresh = refreshInternal, threaded = threaded)
+								#else: items = self._metadataEpisodeAggregate(items = items, refresh = refreshInternal, threaded = threaded)
+								items = self._metadataEpisodeAggregate(items = items, refresh = refreshInternal, threaded = threaded)
 
 							# Add the smart data back, needed for sorting later on.
 							# This is also important for _metadataSmartLoad() for episode Progress menus.
@@ -5237,7 +7675,7 @@ class MetaManager(object):
 		return None
 
 	#gaiafuture - make this function work with storyline specials. Ask the user during binge if they want to play the special or continue with the next official episode (eg: Downton Abbey S02E09/S00E02).
-	def metadataEpisodeNext(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, pack = None, released = True):
+	def metadataEpisodeNext(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, number = None, pack = None, refresh = None, released = True):
 		try:
 			item = {'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year, 'season' : season, 'episode' : episode}
 
@@ -5245,7 +7683,7 @@ class MetaManager(object):
 			# If an entire season was previously watched. Then the 1st three episodes are watched a second time.
 			# The next day, the user wants to watch E02 (and E03) again, since they fell asleep after E01.
 			# Otherwise when checking discrepancies, Gaia will throw an error during playback, saying no more episodes available for binge watching.
-			item = self.metadataEpisode(items = item, number = number, pack = pack, next = True, discrepancy = False)
+			item = self.metadataEpisode(items = item, number = number, pack = pack, refresh = refresh, next = True, discrepancy = False)
 
 			if item:
 				premiered = None
@@ -5255,8 +7693,10 @@ class MetaManager(object):
 		except: Logger.error()
 		return None
 
-	def _metadataEpisodeUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataEpisodeUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
+			if not self._checkInterval(mode = mode): return None
+
 			media = Media.Episode
 
 			imdb = item.get('imdb')
@@ -5268,7 +7708,7 @@ class MetaManager(object):
 			tvrage = item.get('tvrage')
 
 			title = item.get('tvshowtitle') or item.get('title')
-			year = item.get('year')
+			year = item.get('tvshowyear') or item.get('year')
 			numberSeason = originalSeason = item.get('season')
 
 			# By default we do not cache requests to disc, since it takes longer and requires more storage space.
@@ -5283,20 +7723,25 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times. Can be None if not found.
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			# Trakt requires either a Trakt or IMDb ID.
 			# TMDb requires a TMDb ID.
@@ -5310,7 +7755,7 @@ class MetaManager(object):
 					if ids:
 						ids = ids.get('id')
 						if ids:
-							if not imdb: imdb = ids.get('slug')
+							if not imdb: imdb = ids.get('imdb')
 							if not tmdb: tmdb = ids.get('tmdb')
 							if not tvdb: tvdb = ids.get('tvdb')
 							if not trakt: trakt = ids.get('trakt')
@@ -5320,19 +7765,37 @@ class MetaManager(object):
 			if not imdb and not tmdb and not tvdb and not trakt: return False
 
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item, season = numberSeason)
-			if developer: Logger.log('EPISODE METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('EPISODE METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
-			show = self.metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, threaded = threaded)
+			show = self.metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, pack = False, refresh = refresh, threaded = threaded)
 			if not show:
 				Memory.set(id = id, value = {}, local = True, kodi = False)
 				return False
 
-			season = self.metadataSeason(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = numberSeason, pack = False, threaded = threaded, hint = {'pack' : show.get('packed')})
+			# Use the IDs of the show metadata.
+			# This is useful if Trakt does not have the IMDb/TVDb ID yet.
+			# The show metadata would have already done a MetaTrakt.lookup(), so it does not have to be done here again.
+			# Always replace the values, in case the season metadata still contains old IDs or title.
+			idsShow = show.get('id')
+			if idsShow:
+				trakt = idsShow.get('trakt') or trakt
+				imdb = idsShow.get('imdb') or imdb
+				tmdb = idsShow.get('tmdb') or tmdb
+				tvdb = idsShow.get('tvdb') or tvdb
+				slug = idsShow.get('slug') or slug
+			parentTitle = title = show.get('tvshowtitle') or show.get('title') or title
+			parentYear = year = show.get('tvshowyear') or show.get('year') or year
+
+			season = self.metadataSeason(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = numberSeason, pack = False, refresh = refresh, threaded = threaded, hint = {'pack' : show.get('packed')})
 			if not season:
 				Memory.set(id = id, value = {}, local = True, kodi = False)
 				return False
 
-			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, threaded = threaded)
+			if not parentTitle: parentTitle = title = season.get('tvshowtitle')
+			if not parentYear: parentYear = year = season.get('tvshowyear')
+
+			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = refresh, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			pack = MetaPack.instance(pack = pack)
 
 			cache = cache if cache else None
@@ -5343,34 +7806,64 @@ class MetaManager(object):
 			# DetailExtended: (2*count + 5) requests (eg: 10 episodes = 25 requests) [Trakt: 2-count (summary, people for each episode), TVDb: 3-count (show summary, season summary, each episode), TMDb: 1 (summary), IMDb: 1 (summary)]
 			requests = []
 			if self.mLevel >= 0:
-				requests.append({'id' : 'trakt', 'function' : self._metadataEpisodeTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'season' : numberSeason, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
-				requests.append({'id' : 'tvdb', 'function' : self._metadataEpisodeTvdb, 'parameters' : {'tvdb' : tvdb, 'imdb' : imdb, 'season' : numberSeason, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
-				requests.append({'id' : 'imdb', 'function' : self._metadataEpisodeImdb, 'parameters' : {'imdb' : imdb, 'season' : numberSeason, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				# Sometimes the season numbers are different to the standard season number.
+				# Eg: Good times, bad times (TVDb uses the year as saeason number).
+				numberSeasonTrakt = numberSeason
+				numberSeasonTvdb = numberSeason
+				numberSeasonTmdb = numberSeason
+				numberSeasonImdb = numberSeason
+				if pack:
+					temp = pack.lookup(season = numberSeason, output = MetaPack.ProviderTrakt)
+					if not temp is None: numberSeasonTrakt = temp
+					temp = pack.lookup(season = numberSeason, output = MetaPack.ProviderTvdb)
+					if not temp is None: numberSeasonTvdb = temp
+					temp = pack.lookup(season = numberSeason, output = MetaPack.ProviderTmdb)
+					if not temp is None: numberSeasonTmdb = temp
+					temp = pack.lookup(season = numberSeason, output = MetaPack.ProviderImdb)
+					if not temp is None: numberSeasonImdb = temp
+
+				requests.append({'id' : 'trakt', 'function' : self._metadataEpisodeTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'title' : title, 'year' : year, 'season' : numberSeasonTrakt, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'tvdb', 'function' : self._metadataEpisodeTvdb, 'parameters' : {'tvdb' : tvdb, 'imdb' : imdb, 'season' : numberSeasonTvdb, 'item' : item, 'pack' : pack, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'imdb', 'function' : self._metadataEpisodeImdb, 'parameters' : {'imdb' : imdb, 'season' : numberSeasonImdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				if self.mLevel >= 2:
-					requests.append({'id' : 'tmdb', 'function' : self._metadataEpisodeTmdb, 'parameters' : {'tmdb' : tmdb, 'season' : numberSeason, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+					requests.append({'id' : 'tmdb', 'function' : self._metadataEpisodeTmdb, 'parameters' : {'tmdb' : tmdb, 'season' : numberSeasonTmdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {'episodes' : []}
+			maps = {}
+			unmaps = {}
+			remaps = {}
 			niches = {}
 			genres = {}
 			studios = {}
 			networks = {}
 			languages = {}
 			countries = {}
-			status = {}
+			statuses = {}
+			types = {}
+			typesOriginal = {}
+			typesProvider = {}
 			times = {}
+			timed = {}
 			durations = {}
 			mpaas = {}
 			images = {}
@@ -5379,6 +7872,8 @@ class MetaManager(object):
 			directors = {}
 			writers = {}
 			creators = {}
+			titles = {'imdb' : {}, 'tmdb' : {}, 'tvdb' : {}, 'trakt' : {}, 'metacritic' : {}}
+			dates = {}
 			voting = {
 				'rating' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
 				'votes' : {'imdb' : None, 'tmdb' : None, 'tvdb' : None, 'trakt' : None, 'metacritic' : None},
@@ -5391,48 +7886,91 @@ class MetaManager(object):
 			providers = ['metacritic']
 			support = pack.support(season = numberSeason)
 			if support:
-				if 'tmdb' in support: support = [i for i in support if not i == 'tmdb'] + ['tmdb'] # Always use TVDb above TMDb, even if TMDb has more episodes in the season.
+				# Always use TVDb above TMDb, even if TMDb has more episodes in the season.
+				try: indexTmdb = support.index('tmdb')
+				except: indexTmdb = -1
+				try: indexTvdb = support.index('tvdb')
+				except: indexTvdb = -1
+				if indexTmdb >= 0 and indexTvdb >= 0 and indexTmdb < indexTvdb: support.insert(indexTvdb, support.pop(indexTmdb))
 				providers.extend(reversed(support))
 			if not 'imdb' in providers: providers.insert(providers.index('metacritic') + 1, 'imdb')
 			if not 'tmdb' in providers: providers.insert(providers.index('imdb') + 1, 'tmdb')
 			if not 'fanart' in providers: providers.insert(providers.index('tmdb') + 1, 'fanart')
 			if not 'trakt' in providers: providers.append('trakt')
 			if not 'tvdb' in providers: providers.append('tvdb')
-			providersImage = providers[::-1] # Preferred providers must be placed first.
+			providersImage = ['tvdb', 'fanart', 'tmdb', 'trakt', 'imdb'] # Preferred providers must be placed first.
 
 			# Add Fanart and map to TVDb, since it uses TVDb IDs and numbering.
 			# Allow additional episodes from IMDb that are not on TVDb/TMDb/Trakt (eg: IMDb Downton Abbey S02E09, which is a special elsewhere).
 			def _lookupImdb(numberSeason, numberEpisode, episode, episodes, pack):
 				try:
-					title = episode.get('title')
+					titleEpisode = episode.get('title')
 
 					if not 'number' in episode: episode['number'] = {}
 					episode['number']['imdb'] = {MetaPack.NumberStandard : [numberSeason, numberEpisode]}
 
 					# Only do search() with expensive title matching if the episode count differs.
 					# Otherwise assume the IMDb numbering is correct.
-					if title and pack:
-						if not pack.countEpisode(season = numberSeason) == len(episodes):
+					# Also always do it for SxxE00, even if the counts match.
+					# Eg: LEGO Master S03 - IMDb has S03E00, but not S03E13, so that there are 16 episodes for S03, just like on Trakt (used in the pack).
+					if titleEpisode and pack:
+						if numberEpisode == 0 or not pack.countEpisode(season = numberSeason) == len(episodes):
 							# Only match current season and specials.
 							# Allow for "lenient" matching if the strict matching did not return a result.
 							# This allows for titles that do not have a perfect match. Eg: Downton Abbey S06E09 ("Christmas Special") vs S00E11 ("Christmas Day").
-							match = pack.search(title = title, season = [numberSeason, 0], lenient = True)
+							# NB: Exclude the show title from matching, otherwise the titles might be too similar.
+							# Eg: GoT S01E00 (IMDb): "Game of Thrones: Unaired Original Pilot" matches S00E207 (Trakt): "Game of Thrones: The Inner Circle".
+							# These 2 match, because the prefix in the title is the same.
+							# Only exclude the prefix, since the suffix might be required.
+							# Eg: "Inside Game of Thrones" or "Making Game of Thrones".
+							match = pack.search(title = titleEpisode, season = [numberSeason, 0], lenient = True, excludePrefix = title)
 							if match:
+								mapped = False
 								actualSeason = pack.numberStandardSeason(item = match)
 								actualEpisode = pack.numberStandardEpisode(item = match)
-								if actualSeason == numberSeason:
-									numberEpisode = actualEpisode
-								else:
-									# Special elsewhere (eg: Downton Abbey S02E09).
-									# Add the other numbers to the episode, so a notification can be shown during scraping that the episode might also be available under a different number.
-									number = pack.number(season = actualSeason, episode = actualEpisode, number = False)
-									if number:
-										episode['number'].update(number)
-										episode['number'][MetaPack.NumberStandard] = [numberSeason, numberEpisode]
+
+								if not(actualSeason == numberSeason and actualEpisode == actualEpisode):
+									id = pack.id(season = actualSeason, episode = actualEpisode)
+									if id:
+										if not episode.get('id'): episode['id'] = {}
+										if not episode['id'].get('episode'): episode['id']['episode'] = {}
+										ids = episode['id']['episode']
+										for k, v in id.items():
+											if not ids.get(k): ids[k] = v
+
+									if actualSeason == numberSeason:
+										numberEpisode = actualEpisode
+										mapped = True
+									else:
+										# Special elsewhere (eg: Downton Abbey S02E09).
+										# Add the other numbers to the episode, so a notification can be shown during scraping that the episode might also be available under a different number.
+										number = pack.number(season = actualSeason, episode = actualEpisode, number = False)
+										if number:
+											mapped = True
+											episode['number'].update(number)
+											episode['number'][MetaPack.NumberStandard] = [numberSeason, numberEpisode]
+
+									if mapped:
+										if not numberSeason in maps: maps[numberSeason] = {}
+										if not numberEpisode in maps[numberSeason]: maps[numberSeason][numberEpisode] = []
+										maps[numberSeason][numberEpisode].append('imdb')
 				except: Logger.error()
 				return numberSeason, numberEpisode
-			providersLookup = {'trakt' : 'trakt', 'tvdb' : 'tvdb', 'tmdb' : 'tmdb', 'fanart' : 'tvdb', 'imdb' : _lookupImdb}
+			providersLookup = {'trakt' : 'trakt', 'tvdb' : 'tvdb', 'tmdb' : 'tmdb', 'fanart' : 'tvdb', 'imdb' : ['imdb', _lookupImdb] if self._bulkImdbEnabled() else _lookupImdb}
 
+			# A season that only exists on IMDb, but none of the other providers.
+			# Episode number mappings should not be done in this case, otherwise the season is always empty.
+			# Eg: Money Heist S04 + S05.
+			imdbOnly = []
+			for i in providers:
+				if not i == 'fanart':
+					values = datas.get(i)
+					if values:
+						episodes = values[0].get('data') if Tools.isArray(values) else values.get('data')
+						if episodes: imdbOnly.append(i)
+			imdbOnly = len(imdbOnly) == 1 and 'imdb' in imdbOnly
+
+			imdbPrevious = None
 			for i in providers:
 				if i in datas:
 					values = datas[i]
@@ -5456,29 +7994,147 @@ class MetaManager(object):
 							if episodes:
 								episodes = Tools.copy(episodes) # Copy, since we do title/plot/studio replacement below in another loop.
 								for episode in episodes:
-									numberSeason = episode['season']
-									numberEpisode = episode['episode']
+									numberSeason = numberSeason2 = episode['season']
+									numberEpisode = numberEpisode2 = episode['episode']
+
+									# Used for filling in missing episodes later on.
+									titles[i][(numberSeason, numberEpisode)] = episode.get('title')
+
+									# Add IMDb dates to use as the date number later on.
+									if i == 'imdb':
+										try: idImdb = episode['id']['episode'][i]
+										except: idImdb = None
+										if idImdb: dates[idImdb] = episode.get('premiered')
 
 									# Lookup the real Gaia season/episode number using the provider's native number.
 									# This ensures that the correct dicts are updated with each other if the numbers differ on some.
 									# If there is no lookup for the current provider (eg: IMDb), continue by assuming their numbering is correct.
 									lookup = providersLookup.get(i)
-									if lookup:
+									mapped = False
+									unmapped = False
+									invalid = False
+
+									if lookup and not imdbOnly:
 										if Tools.isFunction(lookup):
 											numberSeason, numberEpisode = lookup(numberSeason = numberSeason, numberEpisode = numberEpisode, episode = episode, episodes = episodes, pack = pack)
 										else:
-											# For instance, if Trakt uses absolute episode numbering within standard seasons.
-											# Eg: One Piece (Anime) - S22E1089 instead of S22E01.
-											lookuped = pack.lookupStandard(season = numberSeason, episode = numberEpisode, input = lookup)
+											lookupInput = lookup[0] if Tools.isArray(lookup) else lookup
+
+											# Unknown alternate/unoffical episodes are now added to the provider lookup table in MetaPack.
+											# Eg: Star Wars: Young Jedi Adventures S02E22 (TVDb).
+											# This now causes the TVDb-specific episode to be returned, instead of the standard universal episode it was matched against.
+											# If such a lookup is detected, keep "lookuped" as None in order not to include the episode in the results.
+											# Old code:
+											#	# For instance, if Trakt uses absolute episode numbering within standard seasons.
+											#	# Eg: One Piece (Anime) - S22E1089 instead of S22E01.
+											#	lookuped = pack.lookupStandard(season = numberSeason, episode = numberEpisode, input = lookupInput)
+											lookuped = None
+											lookupEpisode = pack.episode(season = numberSeason, episode = numberEpisode, number = lookupInput)
+											if pack.typeUnofficial(item = lookupEpisode) and pack.type(item = lookupEpisode, type = Media.Alternate):
+												support = len(pack.support(item = lookupEpisode, default = []))
+
+												# Exclude unofficial episodes that were already added to IMDb, but not the other providers.
+												# Eg: The Tonight Show Starring Jimmy Fallon S12E141+ on IMDb, but not on Trakt/TMDb/TVDb.
+												if support == 1 and not pack.support(item = lookupEpisode) == [MetaPack.ProviderImdb]: lookupEpisode = None
+
+												# Exclude unofficial episodes where the TVDb season does not match any of the other provider's season.
+												# This can happen if the entire TVDb season maps to a different official season.
+												# Eg: One Piece S11E15 (TVDb). S11 on TVDb maps to S08 on Trakt/TMDb.
+												elif support > 1 and i == MetaPack.ProviderTvdb:
+													numberAllow = False
+													for p in [MetaPack.ProviderTrakt, MetaPack.ProviderTmdb, MetaPack.ProviderImdb]:
+														try: numberProvider = lookupEpisode[MetaPack.ProviderTrakt][MetaPack.NumberStandard][MetaPack.PartSeason]
+														except: numberProvider = None
+														if not numberProvider is None and numberProvider == numberSeason:
+															numberAllow = True
+															break
+													if not numberAllow: lookupEpisode = None
+											if lookupEpisode:
+												lookuped = pack.number(item = lookupEpisode)
+
+												# Sometime Trakt has the incorrect TVDb and/or IMDb episode ID.
+												# Remove the incorrect ID.
+												# Eg: My Name is Earl S03E06 + S03E12.
+												incorrect = pack.incorrect(item = lookupEpisode)
+												if incorrect:
+													for j in incorrect:
+														try:
+															idProvider = episode['id']['episode'][j]
+															episode['id']['episode'][j] = None
+														except: idProvider = None
+														if developer and i == 'trakt': Logger.log('EPISODE %s ID INVALID [%s]: S%02dE%02d (%s) - ID: %s | Title: %s' % (j.upper(), i.upper(), numberSeason, numberEpisode, developer, idProvider, episode.get('title')))
+
+											# Still lookup IMDb specials.
+											# This sets the IDs and numbers of other providers to the episode.
+											# The IDs/numbers might not be available from MetaPack, since IMDb's bulk dataset does not have titles that can be matched against Trakt/TMDb/TVDb S0.
+											# Eg: Lego Masters S03E00 (make sure it shows all the numbers in the dialog before scraping).
+											if Tools.isArray(lookup):
+												numberSeason2, numberEpisode2 = lookup[1](numberSeason = numberSeason, numberEpisode = numberEpisode, episode = episode, episodes = episodes, pack = pack)
+
+												if lookuped:
+													# If a new absolute episode is on IMDb, which maps to a later season on Trakt.
+													# Eg: One Piece S01E1145 (IMDb) -> S22E57 (Trakt).
+													# Do not do if the season and episode number matches in "lookuped".
+													# Eg: One Piece S02.
+													if i == 'imdb' and not numberSeason2 is None and lookuped[0] > numberSeason2 and not lookuped[0] == originalSeason:
+														invalid = True
+														lookuped = None
+												else:
+													# Do not add the IMDb episode, if it does not fall within the numbers of the pack.
+													# The pack might be a bit outdated, and there is a new episode on IMDb.
+													# Eg: One Piece S01E1135 (IMDb)
+													# Since this number cannot be mapped (since it is not yet in the pack), _lookupImdb will return it as S01E1135, which is then added incorrectly as an IMDb special to S01.
+													# If the number is larger than the known IMDb number of the last episode in the season, ignore it and do not add as an episode.
+													# Allow some deviation, if an episode is not in the pack.
+													# Eg: Lost S01E25 (maybe the pack code is later updated to accomodate this episode).
+													# Update: Allow more than 3 extra episodes.
+													# Sometimes IMDb has many more future/unaired episodes than Trakt/TMDb/TVDb.
+													# Eg: The Tonight Show Starring Jimmy Fallon S12E136-S12E163 on IMDb, but Trakt/TVDb only goes up until S12E135.
+													# Check the previous IMDb and only reject if the gap between the current and the previous episode is too great.
+													#numberLast = pack.numberLastStandardEpisode(season = numberSeason, provider = i)
+													#if numberLast and numberEpisode2 > (numberLast + 2): invalid = True
+													#else: lookuped = [numberSeason2, numberEpisode2]
+													if imdbPrevious and abs(imdbPrevious - numberEpisode2) > 3: invalid = True
+													else: lookuped = [numberSeason2, numberEpisode2]
+
+											# If the episode maps to a special S00, keep the old standard season number.
+											# Eg: Downton Abbey S02E09 (IMDb) -> S00E02.
+											if lookuped and lookuped[0] == 0 and numberSeason > 0: lookuped = None
 
 											# If a single Trakt absolute numbering maps to a TVDb multi-season numbering, stick to the Trakt absolute numbers.
-											# Eg: Dragon Ball Supper - should have 131 episodes in S01 (absolute).
+											# Eg: Dragon Ball Super - should have 131 episodes in S01 (absolute).
+											# UPDATE (2025-03-05): Is this still needed? Even without this code, Dragon Ball Super still seems to be correct.
+											# Maybe something was fixed in MetaPack which makes this obsolete.
+											# With this code, One Piece S22E01 (TVDb) maps to S22E04 (incorrect). Without the code it maps to S21E195 (correct) and will be ignore for S22.
+											# We also do not want this for One Piece S19, where TVDb would map S19E01 -> S19E25 with this code.
+											# UPDATE (2025-03-20): This is indeed still needed Dragon Ball Super S02+.
+											# Otherwise S02+ has no episodes at all, because ALL TVDb unofficial episodes match to Trakt S01 and will therefore be ignored and not added to the results.
+											# This causes numerous fails in Tester.metadataNext().
+											# Doing this only for typeUnofficial() seems to solve the problem.
+											# To verify this is working, the following mapping has to be used:
+											#	One Piece S22E01 (TVDb) -> S21E195
+											#	Dragon Ball Super S02E01 (TVDb) -> no mapping, should stay at S02E01.
+											#if lookuped and not lookuped[0] is None and not lookuped[0] == numberSeason:
+											#	lookuped = pack.lookup(season = numberSeason, episode = numberEpisode, input = MetaPack.NumberStandard, output = lookup)
+											#	if lookuped and not lookuped[0] is None and not lookuped[0] == numberSeason: lookuped = None
 											if lookuped and not lookuped[0] is None and not lookuped[0] == numberSeason:
-												lookuped = pack.lookup(season = numberSeason, episode = numberEpisode, input = MetaPack.NumberStandard, output = lookup)
-												if lookuped and not lookuped[0] is None and not lookuped[0] == numberSeason: lookuped = None
+												if pack.typeUnofficial(item = pack.episode(season = numberSeason, episode = numberEpisode, provider = MetaPack.NumberStandard)):
+													lookuped = pack.lookup(season = numberSeason, episode = numberEpisode, input = MetaPack.NumberStandard, output = lookup[0] if Tools.isArray(lookup) else lookup)
+													if lookuped and not lookuped[0] is None and not lookuped[0] == numberSeason: lookuped = None
 
 											if lookuped and not lookuped[0] is None:
-												if developer and not(numberSeason == lookuped[0] and numberEpisode == lookuped[1]): Logger.log('EPISODE NUMBER MAPPING [%s]: S%02dE%02d -> S%02dE%02d (%s)' % (i.upper(), numberSeason, numberEpisode, lookuped[0], lookuped[1], developer))
+												mapped = not(numberSeason == lookuped[0] and numberEpisode == lookuped[1])
+												if mapped:
+													if not numberSeason in maps: maps[numberSeason] = {}
+													if not numberEpisode in maps[numberSeason]: maps[numberSeason][numberEpisode] = []
+													maps[numberSeason][numberEpisode].append(i)
+
+												if lookuped[0] and numberSeason and not lookuped[0] == numberSeason:
+													if not numberSeason in remaps: remaps[numberSeason] = {}
+													if not numberEpisode in remaps[numberSeason]: remaps[numberSeason][numberEpisode] = []
+													if not i in remaps[numberSeason][numberEpisode]: remaps[numberSeason][numberEpisode].append(i)
+
+												if developer and mapped: Logger.log('EPISODE NUMBER MAPPING [%s]: S%02dE%02d -> S%02dE%02d (%s)' % (i.upper(), numberSeason, numberEpisode, lookuped[0], lookuped[1], developer))
 
 												numberSeason = lookuped[0]
 												numberEpisode = lookuped[1]
@@ -5488,82 +8144,120 @@ class MetaManager(object):
 												episode['season'] = lookuped[0]
 												episode['episode'] = lookuped[1]
 											else:
+												if pack.episodeUnofficial(season = numberSeason, episode = numberEpisode, provider = lookup):
+													if not numberSeason in unmaps: unmaps[numberSeason] = {}
+													if not numberEpisode in unmaps[numberSeason]: unmaps[numberSeason][numberEpisode] = []
+													unmaps[numberSeason][numberEpisode].append(i)
+													unmapped = True
+
 												# The pack might be outdated and not have newley aired episodes yet.
 												# Do not reject these new episodes if they cannot be found in the pack.
 												# Only reject them if they are specials, or if the number of episodes in the pack is greater than the number in the current provider season.
-												if numberSeason == 0 or pack.countEpisodeOfficial(season = numberSeason) > len(episodes):
+												# Eg: Vikings: A number of the TVDb specials.
+												if invalid or numberSeason == 0 or pack.countEpisodeOfficial(season = numberSeason) > len(episodes):
 													if developer: Logger.log('EPISODE NUMBER INVALID [%s]: S%02dE%02d (%s)' % (i.upper(), numberSeason, numberEpisode, developer))
 													continue # Eg: GoT S00E56/S00E57 on TVDb that do not exist on Trakt/TMDb. Trakt/TMDb have different specials under that number, and do not have them under any other number.
 
-									if MetaImage.Attribute in episode:
-										if not numberSeason in images: images[numberSeason] = {}
-										if not numberEpisode in images[numberSeason]: images[numberSeason][numberEpisode] = {}
-										images[numberSeason][numberEpisode] = Tools.update(images[numberSeason][numberEpisode], episode[MetaImage.Attribute], none = False, lists = True, unique = False)
-										del episode[MetaImage.Attribute]
+									if i == 'imdb': imdbPrevious = numberEpisode
 
-									if 'niche' in episode:
-										if not numberSeason in niches: niches[numberSeason] = {}
-										if not numberEpisode in niches[numberSeason]: niches[numberSeason][numberEpisode] = []
-										niches[numberSeason][numberEpisode].append(episode['niche'])
-									if 'genre' in episode:
-										if not numberSeason in genres: genres[numberSeason] = {}
-										if not numberEpisode in genres[numberSeason]: genres[numberSeason][numberEpisode] = []
-										genres[numberSeason][numberEpisode].append(episode['genre'])
-									if 'studio' in episode:
-										if not numberSeason in studios: studios[numberSeason] = {}
-										if not numberEpisode in studios[numberSeason]: studios[numberSeason][numberEpisode] = []
-										studios[numberSeason][numberEpisode].append(episode['studio'])
-									if 'network' in episode:
-										if not numberSeason in networks: networks[numberSeason] = {}
-										if not numberEpisode in networks[numberSeason]: networks[numberSeason][numberEpisode] = [[], []]
-										networks[numberSeason][numberEpisode][1 if i == 'tvdb' else 0].append(episode['network'])
-									if 'language' in episode:
-										if not numberSeason in languages: languages[numberSeason] = {}
-										if not numberEpisode in languages[numberSeason]: languages[numberSeason][numberEpisode] = []
-										languages[numberSeason][numberEpisode].append(episode['language'])
-									if 'country' in episode:
-										if not numberSeason in countries: countries[numberSeason] = {}
-										if not numberEpisode in countries[numberSeason]: countries[numberSeason][numberEpisode] = []
-										countries[numberSeason][numberEpisode].append(episode['country'])
-									if 'status' in episode:
-										if not numberSeason in status: status[numberSeason] = {}
-										if not numberEpisode in status[numberSeason]: status[numberSeason][numberEpisode] = []
-										status[numberSeason][numberEpisode].append(episode['status'])
-									if 'time' in episode:
-										if not numberSeason in times: times[numberSeason] = {}
-										if not numberEpisode in times[numberSeason]: times[numberSeason][numberEpisode] = []
-										times[numberSeason][numberEpisode].append(episode['time'])
-									if 'duration' in episode:
-										if not numberSeason in durations: durations[numberSeason] = {}
-										if not numberEpisode in durations[numberSeason]: durations[numberSeason][numberEpisode] = []
-										durations[numberSeason][numberEpisode].append(episode['duration'])
-									if 'mpaa' in episode:
-										if not numberSeason in mpaas: mpaas[numberSeason] = {}
-										if not numberEpisode in mpaas[numberSeason]: mpaas[numberSeason][numberEpisode] = []
-										mpaas[numberSeason][numberEpisode].append(episode['mpaa'])
+									if numberEpisode is None:
+										if developer: Logger.log('EPISODE NUMBER UNKNOWN [%s]: S%02d (%s)' % (i.upper(), numberSeason, developer))
+										continue # IMDb S0 ("Unknown") does not have episode numbers.
 
-									if episode.get('cast'):
-										if not numberSeason in casts: casts[numberSeason] = {}
-										if not numberEpisode in casts[numberSeason]: casts[numberSeason][numberEpisode] = []
-										casts[numberSeason][numberEpisode].append(episode['cast'])
-									if episode.get('director'):
-										if not numberSeason in directors: directors[numberSeason] = {}
-										if not numberEpisode in directors[numberSeason]: directors[numberSeason][numberEpisode] = []
-										directors[numberSeason][numberEpisode].append(episode['director'])
-									if episode.get('writer'):
-										if not numberSeason in writers: writers[numberSeason] = {}
-										if not numberEpisode in writers[numberSeason]: writers[numberSeason][numberEpisode] = []
-										writers[numberSeason][numberEpisode].append(episode['writer'])
-									if episode.get('creator'):
-										if not numberSeason in creators: creators[numberSeason] = {}
-										if not numberEpisode in creators[numberSeason]: creators[numberSeason][numberEpisode] = []
-										creators[numberSeason][numberEpisode].append(episode['creator'])
+									# Check "unmapped" here, since we do not want to add the values if the episode number between Trakt and TVDb is far off.
+									# Eg: Star Wars: Young Jedi Adventures S02E22.
+									# This is only really important for not adding the "type" if unmapped.
+									# Otherwise the type value of the Trakt episode is used for the TVDb episode (which is a totally different episode, but has the same number S02E22).
+									if not unmapped:
+										if MetaImage.Attribute in episode:
+											if not numberSeason in images: images[numberSeason] = {}
+											if not numberEpisode in images[numberSeason]: images[numberSeason][numberEpisode] = {}
+											images[numberSeason][numberEpisode] = Tools.update(images[numberSeason][numberEpisode], episode[MetaImage.Attribute], none = False, lists = True, unique = False)
+											del episode[MetaImage.Attribute]
 
-									if not numberSeason in votings: votings[numberSeason] = {}
-									if not numberEpisode in votings[numberSeason]: votings[numberSeason][numberEpisode] = Tools.copy(voting)
-									if 'rating' in episode: votings[numberSeason][numberEpisode]['rating'][provider] = episode['rating']
-									if 'votes' in episode: votings[numberSeason][numberEpisode]['votes'][provider] = episode['votes']
-									if 'userrating' in episode: votings[numberSeason][numberEpisode]['user'][provider] = episode['userrating']
+										if 'title' in episode:
+											if not numberSeason in titles: titles[numberSeason] = {}
+											if not numberEpisode in titles[numberSeason]: titles[numberSeason][numberEpisode] = []
+											titles[numberSeason][numberEpisode].append((i, episode['title'])) # Add the provider here, since we sort according to provider later on.
+										if 'niche' in episode:
+											if not numberSeason in niches: niches[numberSeason] = {}
+											if not numberEpisode in niches[numberSeason]: niches[numberSeason][numberEpisode] = []
+											niches[numberSeason][numberEpisode].append(episode['niche'])
+										if 'genre' in episode:
+											if not numberSeason in genres: genres[numberSeason] = {}
+											if not numberEpisode in genres[numberSeason]: genres[numberSeason][numberEpisode] = []
+											genres[numberSeason][numberEpisode].append(episode['genre'])
+										if 'studio' in episode:
+											if not numberSeason in studios: studios[numberSeason] = {}
+											if not numberEpisode in studios[numberSeason]: studios[numberSeason][numberEpisode] = []
+											studios[numberSeason][numberEpisode].append(episode['studio'])
+										if 'network' in episode:
+											if not numberSeason in networks: networks[numberSeason] = {}
+											if not numberEpisode in networks[numberSeason]: networks[numberSeason][numberEpisode] = [[], []]
+											networks[numberSeason][numberEpisode][1 if i == 'tvdb' else 0].append(episode['network'])
+										if 'language' in episode:
+											if not numberSeason in languages: languages[numberSeason] = {}
+											if not numberEpisode in languages[numberSeason]: languages[numberSeason][numberEpisode] = []
+											languages[numberSeason][numberEpisode].append(episode['language'])
+										if 'country' in episode:
+											if not numberSeason in countries: countries[numberSeason] = {}
+											if not numberEpisode in countries[numberSeason]: countries[numberSeason][numberEpisode] = []
+											countries[numberSeason][numberEpisode].append(episode['country'])
+										if 'status' in episode:
+											if not numberSeason in statuses: statuses[numberSeason] = {}
+											if not numberEpisode in statuses[numberSeason]: statuses[numberSeason][numberEpisode] = []
+											statuses[numberSeason][numberEpisode].append(episode['status'])
+										if 'time' in episode:
+											if not numberSeason in times: times[numberSeason] = {}
+											if not numberEpisode in times[numberSeason]: times[numberSeason][numberEpisode] = []
+											times[numberSeason][numberEpisode].append(episode['time'])
+											if not numberSeason in timed: timed[numberSeason] = {}
+											if not numberEpisode in timed[numberSeason]: timed[numberSeason][numberEpisode] = {}
+											timed[numberSeason][numberEpisode][i] = episode['time']
+										if 'duration' in episode:
+											if not numberSeason in durations: durations[numberSeason] = {}
+											if not numberEpisode in durations[numberSeason]: durations[numberSeason][numberEpisode] = []
+											durations[numberSeason][numberEpisode].append(episode['duration'])
+										if 'mpaa' in episode:
+											if not numberSeason in mpaas: mpaas[numberSeason] = {}
+											if not numberEpisode in mpaas[numberSeason]: mpaas[numberSeason][numberEpisode] = []
+											mpaas[numberSeason][numberEpisode].append(episode['mpaa'])
+
+										if 'type' in episode:
+											if not numberSeason in types: types[numberSeason] = {}
+											if not numberEpisode in types[numberSeason]: types[numberSeason][numberEpisode] = []
+											types[numberSeason][numberEpisode].append(episode['type'])
+
+											if not numberSeason2 in typesOriginal: typesOriginal[numberSeason2] = {}
+											if not numberEpisode2 in typesOriginal[numberSeason2]: typesOriginal[numberSeason2][numberEpisode2] = []
+											typesOriginal[numberSeason2][numberEpisode2].append(episode['type'])
+
+											if not numberSeason in typesProvider: typesProvider[numberSeason] = {}
+											if not numberEpisode in typesProvider[numberSeason]: typesProvider[numberSeason][numberEpisode] = {}
+											typesProvider[numberSeason][numberEpisode][i] = episode['type']
+
+										if episode.get('cast'):
+											if not numberSeason in casts: casts[numberSeason] = {}
+											if not numberEpisode in casts[numberSeason]: casts[numberSeason][numberEpisode] = []
+											casts[numberSeason][numberEpisode].append(episode['cast'])
+										if episode.get('director'):
+											if not numberSeason in directors: directors[numberSeason] = {}
+											if not numberEpisode in directors[numberSeason]: directors[numberSeason][numberEpisode] = []
+											directors[numberSeason][numberEpisode].append(episode['director'])
+										if episode.get('writer'):
+											if not numberSeason in writers: writers[numberSeason] = {}
+											if not numberEpisode in writers[numberSeason]: writers[numberSeason][numberEpisode] = []
+											writers[numberSeason][numberEpisode].append(episode['writer'])
+										if episode.get('creator'):
+											if not numberSeason in creators: creators[numberSeason] = {}
+											if not numberEpisode in creators[numberSeason]: creators[numberSeason][numberEpisode] = []
+											creators[numberSeason][numberEpisode].append(episode['creator'])
+
+										if not numberSeason in votings: votings[numberSeason] = {}
+										if not numberEpisode in votings[numberSeason]: votings[numberSeason][numberEpisode] = Tools.copy(voting)
+										if 'rating' in episode: votings[numberSeason][numberEpisode]['rating'][provider] = episode['rating']
+										if 'votes' in episode: votings[numberSeason][numberEpisode]['votes'][provider] = episode['votes']
+										if 'userrating' in episode: votings[numberSeason][numberEpisode]['user'][provider] = episode['userrating']
 
 									# NB: Use the "update" dict below to replace the updated episode numbers, and only add the episode if "numberSeason == originalSeason".
 									# Otherwise an episode that is originally from a different season (eg S0), will be used to update the dict (and numbers) and add it to the episode list.
@@ -5606,7 +8300,7 @@ class MetaManager(object):
 
 			# Some attributes might be missing. Use the show/season attributes.
 			# Eg: Most episodes, if not all, do not have a studio.
-			parentTitle = show.get('tvshowtitle')
+			parentZone = (show.get('airs') or {}).get('zone')
 			parentNetwork = season.get('network') or show.get('network')
 			parentStudio = season.get('studio') or show.get('studio')
 			parentLanguage = season.get('language') or show.get('language')
@@ -5620,20 +8314,43 @@ class MetaManager(object):
 			parentCreator = season.get('creator') or show.get('creator')
 			parentPremiere = season.get('premiered') or season.get('aired')
 			parentTime = season.get('time')
+			parentStatus = season.get('status')
+			parentType = season.get('type')
 
+			imagesMissing = None
 			lastImdb = None
+			dateImdb = {}
 			try:
 				dataImdb = datas.get('imdb')
 				if dataImdb:
 					for i in dataImdb if Tools.isArray(dataImdb) else [dataImdb]:
 						if i.get('provider') == 'imdb':
 							values = i.get('data')
-							if values: lastImdb = values[-1].get('episode')
+							if values:
+								lastImdb = max(j.get('episode') or 0 for j in values)
+								try:
+									for j in values:
+										date = j.get('premiered') or j.get('aired')
+										if date:
+											numberSeason = j.get('season')
+											if not numberSeason in dateImdb: dateImdb[numberSeason] = {}
+											dateImdb[numberSeason][j.get('episode')] =[int(date.split('-')[0]), int(date.replace('-', ''))]
+								except: Logger.error()
 							break
 			except: Logger.error()
 			if not lastImdb: lastImdb = -1
 
-			imagesMissing = False
+			# Prefer IMDb titles last, since they are often in a non-English language. Eg: Money Heist: titles are in Spanish on IMDb.
+			titleOrder = pack.support(season = originalSeason)
+			if not titleOrder: titleOrder = providers # If the season is only on IMDb and not in the pack. Eg: Money Heist S04 + S05.
+			for k1, v1 in titles.items():
+				if Tools.isInteger(k1):
+					for k2, v2 in v1.items():
+						if v2:
+							try: v2 = Tools.listSort(v2, key = lambda x : titleOrder.index(x[0]) if x[0] in titleOrder else 999)
+							except: Logger.error()
+							v1[k2] = [i[1] for i in v2]
+
 			for i in range(len(data['episodes'])):
 				episode = data['episodes'][i]
 				numberSeason = episode.get('season')
@@ -5644,18 +8361,30 @@ class MetaManager(object):
 				if not 'number' in episode: episode['number'] = {}
 				number = episode['number']
 
-				if not MetaPack.NumberStandard in number: number[MetaPack.NumberStandard] = [numberSeason, numberEpisode]
-				if not MetaPack.NumberSequential in number: number[MetaPack.NumberSequential] = [1, episode.get('sequential') or 0] # "or 0" for IMDb specials.
-				if not MetaPack.NumberAbsolute in number: number[MetaPack.NumberAbsolute] = [1, episode.get('absolute') or 0]
-
 				# Use the IDs from the pack, since the mapping between providers might have changed them.
+				type = None
+				incorrect = None
 				if pack:
 					# Do not retrieve using pack.number(), since it will use NumberUniversal for lookups, which might not always match with NumberStandard.
 					# Eg: Star Wars: Young Jedi Adventures S01E26 (NumberUniversal sees this as absolute, mapping to S02E01, while NumberStandard will retrieve the TVDb uncombined episode S01E26).
 					#numbers = pack.number(season = numberSeason, episode = numberEpisode, number = False)
+					entryAlternate = None
 					entry = pack.episode(season = numberSeason, episode = numberEpisode, number = MetaPack.NumberStandard)
-					numbers = entry.get(MetaPack.ValueNumber) if entry else None
+					if not entry and imdbOnly:
+						# For IMDb seasons that are not in the pack, because the season does not exist on Trakt/TMDb/TVDb.
+						# Eg: Money Heist S04 + S05.
+						try: idEpisode = episode['id']['episode'][MetaPack.ProviderImdb]
+						except: idEpisode = None
+						if idEpisode:
+							entry = entryAlternate = pack.search(id = idEpisode, provider = MetaPack.ProviderImdb)
+							entry = Tools.copy(entry)
+							entry['number'][MetaPack.NumberStandard] = [numberSeason, numberEpisode]
 
+					if entry:
+						type = pack.type(item = entry)
+						incorrect = pack.incorrect(item = entry)
+
+					numbers = entry.get(MetaPack.ValueNumber) if entry else None
 					if numbers:
 						numberStandard = numbers.get(MetaPack.NumberStandard)
 
@@ -5668,7 +8397,22 @@ class MetaManager(object):
 						try: del episode['absolute'] # Delete the absolute number, to force extracting it from the "number" dictionary.
 						except: pass
 
-						Tools.update(episode['number'], numbers, none = False, lists = False, unique = False)
+						# Add the IMDb date number which is not available from MetaPack.
+						try: numberImdb = numbers[MetaPack.ProviderImdb][MetaPack.NumberDate]
+						except: numberImdb = None
+						if not numberImdb or numberImdb[MetaPack.PartEpisode] is None:
+							try: idImdb = episode['id']['episode'][MetaPack.ProviderImdb]
+							except: idImdb = None
+							if idImdb:
+								date = dates.get(idImdb)
+								if date: numbers[MetaPack.ProviderImdb][MetaPack.NumberDate] = [int(date.split('-')[0]), int(date.replace('-', ''))]
+
+						# Important: lists = None
+						# This only replaces the season-episode-number lists if they are None.
+						# If they are not None, they are not replaced.
+						# This is important for the numbers set by IMDb through _lookupImdb(), otherwise they are replaced here with None, since those numbers are not in the pack.
+						# Eg: LEGO Masters S03E00 (make sure all numbers show in the dialog during scraping).
+						Tools.update(episode['number'], numbers, none = False, lists = None, unique = False)
 
 					idsEpisode = pack.id(season = numberSeason, episode = numberEpisode)
 					if not 'id' in episode: episode['id'] = {}
@@ -5682,19 +8426,31 @@ class MetaManager(object):
 						Tools.update(episode['id']['episode'], ids, none = False, lists = False, unique = False)
 
 					# Add reduced pack data for things like the episode type.
-					episode['packed'] = pack.reduce(season = numberSeason, episode = numberEpisode)
+					# Use fallback for specials that are only on IMDb (eg: Downton abbey S02E09), to use some base values from the last known episode in the season.
+					packed = pack.reduce(season = numberSeason, episode = numberEpisode, fallback = True)
+					if not packed and imdbOnly and entryAlternate: packed = pack.reduce(season = entryAlternate['number'][MetaPack.NumberStandard][MetaPack.PartSeason], episode = entryAlternate['number'][MetaPack.NumberStandard][MetaPack.PartEpisode], fallback = True, alternate = True)
+					episode['packed'] = packed
 
-				# Add missing IMDb numbers which are not avilable from the pack.
+				# Only do this AFTER the pack numbers were added.
+				if not MetaPack.NumberStandard in number: number[MetaPack.NumberStandard] = [numberSeason, numberEpisode]
+				if not MetaPack.NumberSequential in number: number[MetaPack.NumberSequential] = [1, episode.get('sequential') or 0] # "or 0" for IMDb specials.
+				if not MetaPack.NumberAbsolute in number: number[MetaPack.NumberAbsolute] = [1, episode.get('absolute') or 0]
+
+				# Add missing IMDb numbers which are not available from the pack.
 				# Only do this if IMDb was found, since IMDb might use absolute numbers and would not find anything on a season level.
 				# Eg: One Piece S02.
 				# Ignore episode numbers that do not match.
 				# Eg: Star Wars: Young Jedi Adventures S01E26.
-				if numberEpisode <= lastImdb:
+				# Do not assume the IMDb numbers are the same as the official numbers if Trakt has the incorrect TVDB/IMDb episode ID.
+				# Rather remove the numbers that are likley wrong, instead of keeping possible wrong numbers that might point to the incorrect episode.
+				# Eg: My Name is Earl S03E06 + S03E12.
+				if (not incorrect or not MetaPack.ProviderImdb in incorrect) and numberSeason > 0 and numberEpisode <= lastImdb:
 					try: numberImdb = number[MetaPack.ProviderImdb][MetaPack.NumberSequential][MetaPack.PartEpisode]
 					except: numberImdb = None
 					if numberImdb is None:
 						if not MetaPack.ProviderImdb in number: number[MetaPack.ProviderImdb] = {}
-						for j in [MetaPack.NumberStandard, MetaPack.NumberSequential]: number[MetaPack.ProviderImdb][j] = Tools.copy(number.get(j))
+						for j in [MetaPack.NumberStandard, MetaPack.NumberSequential, MetaPack.NumberAbsolute]: number[MetaPack.ProviderImdb][j] = Tools.copy(number.get(j))
+						number[MetaPack.ProviderImdb][MetaPack.NumberDate] = (dateImdb.get(numberSeason) or {}).get(numberEpisode)
 
 				# Special episodes that are on Trakt, but not on TVDb, might not have certain attributes.
 				for attribute in attributes:
@@ -5702,7 +8458,44 @@ class MetaManager(object):
 						try: episode[attribute] = values[attribute][numberSeason]
 						except: pass
 
-				value = self.mTools.mergeGenre(genres.get(numberSeason, {}).get(numberEpisode))
+				# For future/unaired episodes.
+				# Eg: a future season is already on TVDb and the episodes have proper titles. On Trakt/TMDb the new episodes are still incomplete with titles like "Episode 1", "Episode 2", etc.
+				# Do not use the proxy title from Trakt, but the real title from TVDb.
+				# IMDb also has titles like: "Episode dated 14 December 2020" (tt23626090).
+				titlePick = None
+				if not episode.get('title') or MetaPack.titleGeneric(title = episode.get('title')):
+					tba = (episode.get('title') or '').lower() == 'tba' # Rather replace "TBA" (typically from TVDb) with "Episode N" (Trakt/TMDb/IMDb).
+					value = titles.get(numberSeason, {}).get(numberEpisode)
+					if value:
+						for j in value:
+							if j and (not MetaPack.titleGeneric(title = j) or (tba and not j.lower() == 'tba')):
+								titlePick = j
+								episode['title'] = j
+								break
+				# TMDb sometimes has future/unaired episodes with titles from IMDb, probably because they scrape IMDb.
+				# Eg: Episode #12.132
+				if episode.get('title'):
+					episode['title'] = MetaImdb.cleanTitle(episode['title'])
+
+					# Remove prefixes from pilots.
+					# Eg: GoT S01E00 (IMDb): "Game of Thrones: Unaired Original Pilot"
+					if numberSeason > 0 and numberEpisode == 0:
+						titleLower = episode['title'].lower()
+						if ('pilot' in titleLower or 'premiere' in titleLower or 'unaired' in titleLower) and title and titleLower.startswith(title.lower()):
+							titleCleaned = Regex.remove(data = episode['title'], expression = '^(%s\s*(?:[\:\-]\s*)?)' % title)
+							if titleCleaned: episode['title'] = MetaImdb.cleanTitle(titleCleaned)
+
+				# If the original title is a generic title (eg: Episode 3), replace it with an alias titles that is not the main title.
+				# Eg: Money Heist S01 - there are generic titles, English titles, and some Spanish titles from IMDb. Use the English titles as "title" and the Spanish title as "originaltitle".
+				if not episode.get('originaltitle') or MetaPack.titleGeneric(title = episode.get('originaltitle')):
+					value = titles.get(numberSeason, {}).get(numberEpisode)
+					if value:
+						for j in value:
+							if j and not j == titlePick and not MetaPack.titleGeneric(title = j):
+								episode['originaltitle'] = j
+								break
+
+				value = self.mTools.mergeGenre(genres.get(numberSeason, {}).get(numberEpisode), parent = show.get('genre'))
 				if not value and parentGenre: value = Tools.copy(parentGenre)
 				if value: episode['genre'] = value
 
@@ -5733,9 +8526,6 @@ class MetaManager(object):
 				if not value and parentStudio: value = Tools.copy(parentStudio)
 				if value: episode['studio'] = value
 
-				value = self.mTools.mergeStatus(status.get(numberSeason, {}).get(numberEpisode))
-				if value: episode['status'] = value
-
 				# If there is no time for E00 and E01, use the season's time.
 				missing = False
 				if numberEpisode <= 1 and parentTime and not times.get(numberSeason, {}).get(numberEpisode):
@@ -5743,21 +8533,32 @@ class MetaManager(object):
 					if not numberSeason in times: times[numberSeason] = {}
 					if not numberEpisode in times[numberSeason]: times[numberSeason][numberEpisode] = []
 					times[numberSeason][numberEpisode].append(parentTime)
-				value = self.mTools.mergeTime(times.get(numberSeason, {}).get(numberEpisode), metadata = episode)
+				value = self.mTools.mergeTime(times.get(numberSeason, {}).get(numberEpisode), providers = timed.get(numberSeason, {}).get(numberEpisode), metadata = episode)
 				if value:
 					episode['time'] = value
+
+					premiere = None
+					accurate = True
 
 					# Some shows are only available on IMDb, but not other providers (eg: tt31566242, tt30346074).
 					# These seasons often do not have a release date.
 					# Add the date from the interpolated show date.
-					if not episode.get('premiered'):
-						premiered = parentPremiere if missing else None
-						if not premiered:
-							premiered = value.get(MetaTools.TimePremiere)
-							if premiered: premiered = Time.format(premiered, format = Time.FormatDate)
-						if premiered:
-							if not episode.get('premiered'): episode['premiered'] = premiered
-							if not episode.get('aired'): episode['aired'] = premiered
+					if not episode.get('premiered'): premiere = parentPremiere if missing else None
+
+					# Recalculate the date to accomodate timezones.
+					# Late night shows from the US that air late at night have a GMT time early in the morning of the next day on Trakt.
+					# Eg: The Tonight Show Starring Jimmy Fallon S02E44 (Trakt: 2015-03-21T03:30:00Z, actual date in the timezone of release: 2015-03-20 23:30)
+					if not premiere: premiere = value.get(MetaTools.TimePremiere)
+					if Tools.isInteger(premiere):
+						# If Trakt does not have a premiere date yet (eg: future unreleased season), do not replace the date that was calculated with the show's timezone.
+						# TVDb only has the date, but does not have the time.
+						# Hence, converting the TVDb timestamp to a date using the show's timezone (which comes from Trakt) can result in an incorrect date (off by 1 day).
+						# Eg: 2025-01-02 00:00:00 (GMT's timezone) might be converted to 2025-01-01 22:00:00 (show's timezone).
+						if not parentZone or not ((timed.get(numberSeason, {}).get(numberEpisode) or {}).get(MetaTools.ProviderTrakt) or {}).get(MetaTools.TimePremiere): accurate = False
+						premiere = Time.format(premiere, format = Time.FormatDate, zone = parentZone)
+
+					# Only update if there is no date, or there is a date and a timezone.
+					if premiere and (accurate or not episode.get('premiered')): episode['premiered'] = episode['aired'] = premiere
 
 				value = self.mTools.mergeDuration(durations.get(numberSeason, {}).get(numberEpisode))
 				if value: episode['duration'] = value
@@ -5787,13 +8588,53 @@ class MetaManager(object):
 				niche = self.mTools.niche(niche = niche, metadata = episode, show = show, pack = pack)
 				if niche: episode['niche'] = niche
 
-				if numberSeason in votings and numberEpisode in votings[numberSeason]: episode['voting'] = votings[numberSeason][numberEpisode]
+				if numberSeason in votings and numberEpisode in votings[numberSeason]:
+					voting = votings[numberSeason][numberEpisode]
+
+					# Add the IMDb rating/votes from the bulk datasets.
+					# This should only be necessary for episodes SxxE51+, since the HTML page shows up to first 50 episodes.
+					try:
+						if self._bulkImdbEnabled():
+							try: votingImdb = voting['rating']['imdb']
+							except: votingImdb = None
+							if votingImdb is None and imdb:
+								try: idImdb = episode['id']['episode']['imdb']
+								except: idImdb = None
+								if idImdb:
+									votingImdb = self._bulkImdbLookup(imdb = imdb, imdbEpisode = idImdb)
+								else:
+									try: numberImdb = episode['number']['imdb'][MetaPack.NumberStandard]
+									except: numberImdb = None
+									if numberImdb and not numberImdb[-1] is None:
+										votingImdb = self._bulkImdbLookup(imdb = imdb, season = numberImdb[MetaPack.PartSeason], episode = numberImdb[MetaPack.PartEpisode])
+								if votingImdb:
+									voting['rating']['imdb'] = votingImdb.get('rating')
+									voting['votes']['imdb'] = votingImdb.get('votes')
+					except: Logger.error()
+
+					episode['voting'] = voting
 
 				# Use the show/season average episode duration in there is no extact duration.
 				if not episode.get('duration') and parentDuration: episode['duration'] = parentDuration
 
 				# Newer unaired episodes from shows like "Coronation Street" do not always have a tvshowtitle, which causes sorting to fail.
-				if not episode.get('tvshowtitle') and parentTitle: episode['tvshowtitle'] = parentTitle
+				# Update: Always use the tvshowtitle from the show metadata and replace it in the episode metadata.
+				# The episode metadata might be outdated and contains an old/alias title for tvshowtitle.
+				# Plus the episode metadata only gets a title from TVDb/IMDb, but not from Trakt/TMDb.
+				# The tvshowtitle in the show metadata is therefore more likley to be correct/up-to-date.
+				# Eg: The tvshowtitle for the show is (correctly) "Pluribus", while the tvshowtitle for the episode (on TVDb) is "PLUR1BUS", which is an alias.
+				# This attribute is important, since it is used as the title during scarping.
+				#if not episode.get('tvshowtitle') and parentTitle: episode['tvshowtitle'] = parentTitle
+				if parentTitle: episode['tvshowtitle'] = parentTitle
+
+				# Only some providers return a year for seasons/episodes, like TVDb and IMDb.
+				# TVDb seems to typically have the show year, but IMDb can have the actual season/episode year and not the show year.
+				# If we use the season/episode metadata object to do a title+year lookup or do a scrape, the year might not be the show's year and cause incorrect results.
+				# Always explicitly store the show year.
+				episode['tvshowyear'] = parentYear or episode.get('year')
+				try: premiere = episode['time'][MetaTools.TimePremiere]
+				except: premiere = None
+				if premiere: episode['year'] = Time.year(premiere) # Add the actual season year.
 
 				data['episodes'][i] = {k : v for k, v in episode.items() if not v is None}
 				episode = data['episodes'][i]
@@ -5803,21 +8644,23 @@ class MetaManager(object):
 				# At a later point the ID is corrected on Trakt/TMDb.
 				# If the data is now refreshed, the old ID from MetaCache is used instead of the newly retrieved IDs.
 				# Hence, always replace these.
-				ids1 = episode.get('id') or {}
+				# Prefer the ID from the show over the one from the season/episode. Since sometimes IDs (eg IMDb ID) is incorrect and later gets fixed. Show metadata is more likely to get the fixed IDs, while episode metadata might still have the old ID.
+				ids1 = show.get('id') or {}
 				ids2 = season.get('id') or {}
-				value = ids1.get('imdb') or ids2.get('imdb')
+				ids3 = episode.get('id') or {}
+				value = ids1.get('imdb') or ids2.get('imdb') or ids3.get('imdb')
 				if value: imdb = value
-				value = ids1.get('tmdb') or ids2.get('tmdb')
+				value = ids1.get('tmdb') or ids2.get('tmdb') or ids3.get('tmdb')
 				if value: tmdb = value
-				value = ids1.get('tvdb') or ids2.get('tvdb')
+				value = ids1.get('tvdb') or ids2.get('tvdb') or ids3.get('tvdb')
 				if value: tvdb = value
-				value = ids1.get('trakt') or ids2.get('trakt')
+				value = ids1.get('trakt') or ids2.get('trakt') or ids3.get('trakt')
 				if value: trakt = value
-				value = ids1.get('slug') or ids2.get('slug')
+				value = ids1.get('slug') or ids2.get('slug') or ids3.get('slug')
 				if value: slug = value
-				value = ids1.get('tvmaze') or ids2.get('tvmaze')
+				value = ids1.get('tvmaze') or ids2.get('tvmaze') or ids3.get('tvmaze')
 				if value: tvmaze = value
-				value = ids1.get('tvrage') or ids2.get('tvrage')
+				value = ids1.get('tvrage') or ids2.get('tvrage') or ids3.get('tvrage')
 				if value: tvrage = value
 
 				# This is for legacy purposes, since all over Gaia the IDs are accessed at the top-level of the dictionary.
@@ -5831,43 +8674,302 @@ class MetaManager(object):
 				if tvmaze: episode['id']['tvmaze'] = episode['tvmaze'] = tvmaze
 				if tvrage: episode['id']['tvrage'] = episode['tvrage'] = tvrage
 
+				# Delete all remaining images which might have a dict instead of a URL for some images.
+				# This can happen if all TVDb episodes match to a different season.
+				# Hence the "episode" dict coming from TVDb might still have an image dict, but the if-statement for MetaImage.update() will not execute (and replace the image dict), since the episode number cannot be found.
+				# The images are already deleted in the main for-loop above. But due to all the episode merging/updates, there might still be some image dicts left, which get delete here.
+				# Eg: One Piece S11 which maps to TVDB S08.
+				try: del episode[MetaImage.Attribute]
+				except: pass
+
 				if numberSeason in images and images[numberSeason] and numberEpisode in images[numberSeason] and images[numberSeason][numberEpisode]:
 					MetaImage.update(media = MetaImage.MediaEpisode, images = images[numberSeason][numberEpisode], data = episode, sort = providersImage)
-				else:
-					imagesMissing = True
+				elif not type or type.get(MetaPack.NumberOfficial): # Ignore unofficial episodes with missing images, although this would probably not happen that often.
+					imagesMissing = (numberSeason, numberEpisode)
 
 				# Do this before here already.
 				# Otherwise a bunch of regular expressions are called every time the menu is loaded.
-				self.mTools.cleanPlot(metadata = episode)
+				self.mTools.cleanDescription(metadata = episode)
 
 				# Calculate the rating here already, so that we have a default rating/votes if this metadata dictionary is passed around without being cleaned first.
 				# More info under meta -> tools.py -> cleanVoting().
 				self.mTools.cleanVoting(metadata = episode, round = True) # Round to reduce storage space of average ratings with many decimal places.
 
+			# Add all unofficial episodes that were mapped to an official number.
+			# Otherwise when opening the season menu, only official episodes are shown.
+			# Eg: Star Wars: Young Jedi Adventures: S01E25+
+			# Otherwise only every 2nd unofficial episode for Young Jedi will show in the S01 menu, since Trakt has combined episodes and TVDB uncombined episodes.
+			# Do this at the end, once all the metadata has been filled and aggregated.
+			try:
+				extra = []
+				lookup = {(i.get('season'), i.get('episode')) : True for i in data['episodes']}
+				exclude = {'trakt' : True, 'tmdb' : True}
+				for episode in data['episodes']:
+					numbers = episode.get('number')
+					if numbers:
+						for i in providers:
+							number = numbers.get(i)
+							if number:
+								number = number.get(MetaPack.NumberStandard)
+								numberId = tuple(number)
+								if number and not number[MetaPack.PartSeason] is None and not number[MetaPack.PartEpisode] is None and number[MetaPack.PartSeason] == originalSeason and not numberId in lookup:
+									numberSeason = number[MetaPack.PartSeason]
+									numberEpisode = number[MetaPack.PartEpisode]
+
+									# Only add if the episode has a "standard" type.
+									# Eg: Exclude One Piece S02E62+ (Trakt/TMDb).
+									# Still allow unofficial episodes from TVDb.
+									# Eg: Include One Piece S17E65+ (TVDb).
+									# Eg: Include Young Jedi Adventures: S01E25+ (TVDb).
+									found = pack.episode(season = numberSeason, episode = numberEpisode, provider = i, number = MetaPack.NumberStandard)
+									if found and (pack.typeStandard(item = found) or not i in exclude):
+										entry = Tools.copy(episode)
+										entry['season'] = numberSeason
+										entry['episode'] = numberEpisode
+										lookup[numberId] = True
+										titleEpisode = titles.get(i).get(numberId)
+										if titleEpisode: entry['title'] = MetaImdb.cleanTitle(titleEpisode) # Use the uncombined title if available.
+										extra.append(entry)
+				data['episodes'].extend(Tools.listUnique(extra)) # The same unofficial episode can be added multiple times in the inner loop above.
+			except: Logger.error()
+
 			# Sort so that the list is in the order of the episode numbers.
 			data['episodes'].sort(key = lambda i : i['episode'])
 
+			# Remove unofficial episodes with episode numbers way greater than they should.
+			# Eg: Jimmy Fallon S12 has 162 episodes on Trakt/TMDb/IMDb.
+			# However, on TVDb the season finale is correct at S12E162, but it is immediatly followed by S12E1301 - S12E1305.
+			# These episodes are actually part of S13, but S13 has not been added to TVDb yet. So they seem to add the episode with their absolute numbers to S12.
+			episodes = []
+			episodePrevious = None
+			for i in data['episodes']:
+				numberEpisode = i.get('episode')
+				if episodePrevious:
+					try: unoffical = i['packed']['type'][MetaPack.NumberUnofficial]
+					except: unoffical = False
+					if unoffical and numberEpisode > (episodePrevious + 201):
+						continue
+				episodePrevious = numberEpisode
+				episodes.append(i)
+			data['episodes'] = episodes
+
+			# Determine the episode type.
+			# Do this at the end, since it requires the previous/next episode, and unofficial episodes might have been added later on with the code above.
+			try:
+				statusShow = show.get('status')
+				statusSeason = season.get('status')
+				timePack = None
+				episodePrevious = None
+				episodeLastStandard = None
+				episodeLastOfficial = None
+				seasonLastStandard = None
+				seasonLastOfficial = None
+				try: episodeLastStandard = data['episodes'][-1].get('episode')
+				except: pass
+				if pack:
+					timePack = pack.generated()
+
+					# Get a more accurate last episode.,
+					# Eg: Star Wars: Young Jedi Adventures S01E25 should be the last episode in S01, not the uncombined E26+ from TVDb.
+					episode = pack.numberLastOfficialEpisode(season = originalSeason)
+					if episode: episodeLastOfficial = episode
+					episode = pack.numberLastStandardEpisode(season = originalSeason)
+					if episode:
+						episodeLastStandard = episode
+						if not episodeLastOfficial: episodeLastOfficial = episode
+
+						# Sometimes the pack is outdated for continuing seasons where new episodes are added on a weekly basis.
+						# During pack generation, TVDb might already have the next/future episodes, while Trakt does not.
+						# This can make the last official episode in the season to be the last episode listed on Trakt, although there are more TVDb episodes.
+						# Eg: S.W.A.T. S08. The pack was created when Trakt had up to S08E18. When the episode metadata was refreshed, both Trakt and TVDb had the actual last episode S08E22. At this point S08E19+ were still unaired.
+						# However, because the pack was a bit outdated, it only had Trakt episodes until S08E18, and because S08E19-S08E22 only had a TVDb number/ID, those last episodes were marked as unofficial.
+						# This cause both S08E18 and S08E22 to be marked as series finale, at least until the pack data is refreshed.
+						# If the last standard episode number is greater than last official number, and there is a TVDb number and no Trakt number, use the last standard number as the official number.
+						if episodeLastStandard > episodeLastOfficial and not(statusShow == MetaTools.StatusEnded or statusShow == MetaTools.StatusCanceled):
+							episode = pack.lastEpisodeStandard(season = originalSeason)
+							if episode and pack.typeUnofficial(item = episode):
+								numberSeason = pack.numberStandardSeason(item = episode)
+								numberEpisode = pack.numberStandardEpisode(item = episode)
+								numberTrakt = pack.numberStandardEpisode(season = numberSeason, episode = numberEpisode, provider = MetaPack.ProviderTrakt)
+								numberTvdb = pack.numberStandardEpisode(season = numberSeason, episode = numberEpisode, provider = MetaPack.ProviderTvdb)
+								if not numberTrakt and numberTvdb:
+									# Do not do this if the last official episode is a finale.
+									# Eg: LEGO Masters S04E13 (Trakt season finale) and S04E14 (unofficial TVDb episodes).
+									lastType = pack.type(season = originalSeason, episode = episodeLastOfficial)
+									if not lastType or not(Media.Finale in lastType and (Media.Inner in lastType or Media.Outer in lastType)):
+										episodeLastOfficial = episodeLastStandard
+
+					seasonLastStandard = pack.numberLastStandardSeason()
+					seasonLastOfficial = pack.numberLastOfficialSeason()
+
+				for i in range(len(data['episodes'])):
+					try:
+						episode = data['episodes'][i]
+						numberSeason = episode.get('season')
+						numberEpisode = episode.get('episode')
+
+						# Use the IDs from the pack, since the mapping between providers might have changed them.
+						type = None
+						if pack:
+							# Do not retrieve using pack.number(), since it will use NumberUniversal for lookups, which might not always match with NumberStandard.
+							# Eg: Star Wars: Young Jedi Adventures S01E26 (NumberUniversal sees this as absolute, mapping to S02E01, while NumberStandard will retrieve the TVDb uncombined episode S01E26).
+							#numbers = pack.number(season = numberSeason, episode = numberEpisode, number = False)
+							entry = pack.episode(season = numberSeason, episode = numberEpisode, number = MetaPack.NumberStandard)
+							if entry: type = pack.type(item = entry)
+
+						# Use the proper alread-processed type from the previous episode.
+						# Eg: Vikings S06E10 and S06E11.
+						try: typePrevious = (data['episodes'][i - 1].get('type') if numberEpisode > 1 else None) or self.mTools.mergeType(types[numberSeason][numberEpisode - 1], season = numberSeason)
+						except: typePrevious = None
+						try: typeNext = self.mTools.mergeType(types[numberSeason][numberEpisode + 1], season = numberSeason)
+						except: typeNext = None
+						try: typeLast = self.mTools.mergeType(types[numberSeason][-1], season = numberSeason)
+						except: typeLast = None
+						try: typeProvider = typesProvider[numberSeason][numberEpisode]
+						except: typeProvider = None
+						try: typeProviderNext = typesProvider[numberSeason][numberEpisode + 1]
+						except: typeProviderNext = None
+						try: map = maps[numberSeason][numberEpisode]
+						except: map = None
+						try: mapNext = maps[numberSeason][numberEpisode + 1]
+						except: mapNext = None
+						try: unmap = unmaps[numberSeason][numberEpisode]
+						except: unmap = None
+						try: remap = remaps[numberSeason][numberEpisode]
+						except: remap = None
+						timeEpisode = self.mTools.time(type = MetaTools.TimePremiere, metadata = episode, estimate = False, fallback = False)
+
+						value = types.get(numberSeason, {}).get(numberEpisode) or typesOriginal.get(numberSeason, {}).get(numberEpisode)
+
+						# If the season is only on IMDb and not in the pack.
+						# Eg: Money Heist S04 + S05.
+						if imdbOnly:
+							if not value: value = []
+							value = value + [MetaPack.NumberUnofficial, Media.Alternate]
+							if numberEpisode < MetaImdb.LimitDefault and numberEpisode == lastImdb and statusSeason in MetaTools.StatusesPast: value.append(Media.Finale)
+
+						value = self.mTools.mergeType(value, season = numberSeason, seasonLastStandard = seasonLastStandard, seasonLastOfficial = seasonLastOfficial, episode = numberEpisode, episodeLastStandard = episodeLastStandard, episodeLastOfficial = episodeLastOfficial, episodePrevious = episodePrevious, type = type, typePrevious = typePrevious, typeNext = typeNext, typeLast = typeLast, typeProvider = typeProvider, typeProviderNext = typeProviderNext, map = map, mapNext = mapNext, remap = remap, unmap = unmap, timeEpisode = timeEpisode, timePack = timePack, statusShow = statusShow, statusSeason = statusSeason)
+						if value: episode['type'] = value
+
+						try: premiered = episode['time'][MetaTools.TimePremiere]
+						except: premiered = None
+						value = self.mTools.mergeStatus(statuses.get(numberSeason, {}).get(numberEpisode), media = media, season = numberSeason, episode = numberEpisode, time = premiered)
+						if value: episode['status'] = value
+
+						# Mark IMDb-exclusive episodes as storyline specials.
+						# Eg: Downton Abbey S02E09.
+						value = episode.get('special')
+						if not value or not value.get('type'):
+							beforeSeason = None
+							beforeEpisode = None
+							afterSeason = None
+							afterEpisode = None
+							type = episode.get('type') or []
+							try: idsEpisode = [k for k, v in episode['id']['episode'].items() if v]
+							except: pass
+							idsCount = len(idsEpisode)
+							if numberSeason > 0 and idsEpisode and 'imdb' in idsEpisode and (idsCount == 1 or (idsCount > 1 and Media.Special in type and Media.Alternate in type)):
+								# Specials from IMDb.
+								# Eg: Downton Abbey S02E09.
+								# There are often Trakt/TMDb/TVDb IDs for these IMDb specials. Hence, also check the special/alternate types.
+								value = [MetaData.SpecialEpisode, MetaData.SpecialImportant]
+								if numberEpisode == 0:
+									# Heroes S01E00 should be listed after S00E01 in the Series menu.
+									beforeSeason = numberSeason
+									beforeEpisode = 1
+								else:
+									# Make sure Downton Abbey S06E09 is interleaved before the movie specials in the Series menu.
+									afterSeason = numberSeason
+							elif Media.Special in type and idsEpisode and 'tvdb' in idsEpisode and ((idsCount == 1) or (idsCount == 2 and 'imdb' in idsEpisode)):
+								# Specials on TVDb.
+								# Eg: Dragon Ball Super S02E14 and S05E56.
+								# For some reason S02E14 is marked as a movie on TVDb's website. But when retrieving it through the TVDb API, the "isMovie" attribute is 0. Not sure if this is a temporary caching issue on TVDb.
+								value = [MetaData.SpecialEpisode, MetaData.SpecialImportant]
+							else:
+								# Specials from Trakt and TMDb.
+								value = MetaData.specialExtract(data = episode.get('title'), exclude = [parentTitle])
+								if not value: value = [MetaData.SpecialUnimportant]
+							if value:
+								if not episode.get('special'): episode['special'] = {}
+								if not episode['special'].get('type'): episode['special']['type'] = value
+								if episode['special'].get('story') is None: episode['special']['story'] = MetaData().specialStory(special = value)
+								if episode['special'].get('extra') is None: episode['special']['extra'] = MetaData().specialExtra(special = value)
+
+								if not beforeSeason is None or not beforeEpisode is None:
+									if not episode['special'].get('before'): episode['special']['before'] = {}
+									if not beforeSeason is None and episode['special']['before'].get('season') is None: episode['special']['before']['season'] = beforeSeason
+									if not beforeEpisode is None and episode['special']['before'].get('episode') is None: episode['special']['before']['episode'] = beforeEpisode
+								if not afterSeason is None or not afterEpisode is None:
+									if not episode['special'].get('after'): episode['special']['after'] = {}
+									if not afterSeason is None and episode['special']['after'].get('season') is None: episode['special']['after']['season'] = afterSeason
+									if not afterEpisode is None and episode['special']['after'].get('episode') is None: episode['special']['after']['episode'] = afterEpisode
+					except: Logger.error()
+			except: Logger.error()
+
 			# Set the show details.
-			if imdb: data['imdb'] = imdb
-			if tmdb: data['tmdb'] = tmdb
-			if tvdb: data['tvdb'] = tvdb
-			if trakt: data['trakt'] = trakt
-			if slug: data['slug'] = slug
-			if tvmaze: data['tvmaze'] = tvmaze
-			if tvrage: data['tvrage'] = tvrage
-			title = season['tvshowtitle'] if season and 'tvshowtitle' in season else None
+			try: episode = data['episodes'][1] # SxxE02.
+			except:
+				try: episode = data['episodes'][0] # Possibly an unaired Pilot SxxE00, otherwise SxxE01.
+				except: episode = None
+			data['media'] = media # Add this so that MetaCache knows the media without having to access the inner "episodes" list.
+			data['id'] = {}
+			if imdb: data['id']['imdb'] = data['imdb'] = imdb
+			if tmdb: data['id']['tmdb'] = data['tmdb'] = tmdb
+			if tvdb: data['id']['tvdb'] = data['tvdb'] = tvdb
+			if trakt: data['id']['trakt'] = data['trakt'] = trakt
+			if slug: data['id']['slug'] = data['slug'] = slug
+			if tvmaze: data['id']['tvmaze'] = data['tvmaze'] = tvmaze
+			if tvrage: data['id']['tvrage'] = data['tvrage'] = tvrage
+
+			title = parentTitle
+			if not title and episode: title = episode.get('tvshowtitle')
 			if title: data['tvshowtitle'] = data['title'] = title
-			year = season['year'] if season and 'year' in season else None
+
+			# Show year.
+			year = parentYear
+			if not year and episode: year = episode.get('tvshowyear') or episode.get('year')
+			if year: data['tvshowyear'] = year
+
+			# Season year.
+			year = season.get('year')
+			if not year and episode: year = episode.get('year')
 			if year: data['year'] = year
+
 			if not originalSeason is None: data['season'] = originalSeason
+
+			# Add the season status for MetaCache.
+			# Use the status of the pack, in case it is newer than the status from the season metadata.
+			status = parentStatus
+			if not status in (MetaTools.StatusEnded, MetaTools.StatusCanceled):
+				statusPack = pack.status()
+				if statusPack in (MetaTools.StatusEnded, MetaTools.StatusCanceled): status = statusPack
+			data['status'] = status
+
+			# Add the season type for MetaCache.
+			data['type'] = parentType
+
+			# Add season niche.
+			# Currently not used, but could be used to help identify niches, such as mini-series.
+			# Combine the show and season niches, since the show nich can have additional genere-based niches that are not in the season.
+			niched = []
+			nicheSeason = season.get('niche')
+			if nicheSeason: niched.extend(nicheSeason)
+			nicheShow = show.get('niche')
+			if nicheShow: niched.extend(nicheShow)
+			if not niched:
+				# Not that accurate, since it contains niches from individual episodes that might not always apply to the season (eg: "standard" episode).
+				try: niched.extend(self.mTools.mergeNiche(niches.get(originalSeason).values()))
+				except: pass
+			niche = self.mTools.niche(niche = niched, metadata = season or show, show = show, pack = pack)
+			data['niche'] = niche
 
 			# Sometimes the images are not available, especially for new/future releases.
 			# This looks ugly in the menus. Mark as incomplete to re-retrieve sooner.
-			if imagesMissing:
+			if not imagesMissing is None:
 				partDone = False
 				try: partNew['tvdb']['complete'] = False
 				except: pass
-				if developer: Logger.log('EPISODE IMAGES INCOMPLETE: %s' % developer)
+				if developer: Logger.log('EPISODE IMAGES INCOMPLETE: %s' % self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item, season = imagesMissing[0], episode = imagesMissing[1]))
 
 			Memory.set(id = id, value = data, local = True, kodi = False)
 			if item and data: item.update(Tools.copy(data)) # Can be None if the ID was not found. Copy in case the outer item is edited before we write the data to MetaCache.
@@ -5886,14 +8988,14 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
-	def _metadataEpisodeId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None):
-		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+	def _metadataEpisodeId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, quick = None):
+		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, quick = quick)
 		if result: return {'complete' : True, 'data' : {'id' : result}}
 		else: return {'complete' : False, 'data' : result}
 
-	def _metadataEpisodeTrakt(self, trakt = None, imdb = None, season = None, language = None, item = None, cache = None, threaded = None, detail = None):
+	def _metadataEpisodeTrakt(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, language = None, item = None, cache = None, threaded = None, detail = None):
 		complete = True
 		result = None
 		try:
@@ -5910,17 +9012,15 @@ class MetaManager(object):
 					except: pass
 				result = self._metadataTemporize(item = item, result = result, provider = 'trakt')
 			else: # Comes from another list, or forcefully retrieve detailed metadata.
-				id = trakt or imdb
-				if id:
+				if trakt or imdb or tmdb or tvdb or title:
 					# Trakt has an API limit of 1000 requests per 5 minutes.
 					# Retrieving all the additional metadata will very quickly consume the limit if a few pages are loaded.
 					# Only retrieve the extended metadata if enough requests are still avilable for the past 5 minutes.
-					instance = MetaTrakt.instance()
-					usagesAuthenticated = instance.usage(authenticated = True)
-					usagesUnauthenticated = instance.usage(authenticated = False)
+					usage = self.providerUsageTrakt(authenticated = False)
 
 					person = False
-					if detail == MetaTools.DetailExtended and usagesUnauthenticated < 0.3: person = True
+					if self.mModeGenerative: person = True
+					elif detail == MetaTools.DetailExtended and usage < 0.5: person = True
 
 					translation = None
 					if detail == MetaTools.DetailEssential: translation = False # Use the translations from TVDb.
@@ -5928,12 +9028,12 @@ class MetaManager(object):
 					# We already retrieve the cast (with thumbnails) and translations from TVDb.
 					# Retrieving all of them here again will add little new metadata and only prolong the retrieval.
 					# translation = None: only retrieve for non-English.
-					return instance.metadataEpisode(id = id, season = season, summary = True, translation = translation, person = person, language = language, extended = True, detail = True, cache = None if cache is False else cache, concurrency = bool(threaded))
+					return MetaTrakt.instance().metadataEpisode(trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, summary = True, translation = translation, person = person, language = language, extended = True, detail = True, cache = None if cache is False else cache, concurrency = bool(threaded))
 		except: Logger.error()
 		return {'provider' : 'trakt', 'complete' : complete, 'data' : result}
 
-	def _metadataEpisodeTvdb(self, tvdb = None, imdb = None, season = None, language = None, item = None, cache = None, threaded = None, detail = None):
-		try: return MetaTvdb.instance().metadataEpisode(tvdb = tvdb, imdb = imdb, season = season, language = language, cache = cache, threaded = threaded, detail = True)
+	def _metadataEpisodeTvdb(self, tvdb = None, imdb = None, season = None, language = None, item = None, pack = None, cache = None, threaded = None, detail = None):
+		try: return MetaTvdb.instance().metadataEpisode(tvdb = tvdb, imdb = imdb, season = season, pack = pack, language = language, cache = cache, threaded = threaded, detail = True)
 		except: Logger.error()
 		return {'provider' : 'tvdb', 'complete' : True, 'data' : None}
 
@@ -5963,12 +9063,12 @@ class MetaManager(object):
 		result = []
 		try:
 			if origin and item and 'episodes' in item:
+				current = Time.timestamp()
 				for episode in item['episodes']:
 					if episode and 'season' in episode and 'episode' in episode:
 						resultEpisode = Tools.copy(episode)
 						try: del resultEpisode['temp']
 						except: pass
-
 						resultEpisode = self._metadataTemporize(item = episode, result = resultEpisode, provider = 'imdb')
 						if resultEpisode:
 							# Check MetaImdb._extractItems() for more details.
@@ -5985,7 +9085,22 @@ class MetaManager(object):
 
 						# Newley released seasons might not have ratings for all episodes yet.
 						# Mark as incomplete in order to re-retrieve at a later stage when there are hopefully new ratings.
-						if complete: complete = bool(resultEpisode and 'rating' in resultEpisode and resultEpisode['rating'])
+						if complete:
+							if resultEpisode:
+								# Only mark as incomplete if the episode has a premiere date and it is in the recent past.
+								# If the episode does not have a premiere date, it is likley a future episode or an episode with a number above 50, meaning it is not retrieved from HTML, but from the bulk IMDb data.
+								# 1. If it comes from the IMDb bulk data, the bulk data is only updated once in a while, and redoing this function mostly does not help, since the bulk data will probably not have been updated yet and the rating will still be None.
+								# 2. If it is future episode, it also does not help redoing this function, since there will typically be no votes for unaired episodes yet.
+								# 3. If the episode is in the far past and still has no rating yet, it also does not help redoing this function, since it is probably an unpopular show and that will not get any votes soon.
+								try:
+									premiere = resultEpisode.get('premiere')
+									if premiere:
+										age = current - Time.timestamp(fixedTime = premiere, format = Time.FormatDate)
+										if age > 0 and age < 5256000: # In the past and less than 2 months ago.
+											complete = bool(resultEpisode.get('rating'))
+								except: Logger.error()
+							else:
+								complete = False
 		except: Logger.error()
 		results.append({'provider' : 'imdb', 'complete' : complete, 'data' : result or None})
 
@@ -6004,7 +9119,7 @@ class MetaManager(object):
 
 		return results
 
-	def _metadataEpisodeAggregate(self, items, threaded = None):
+	def _metadataEpisodeAggregate(self, items, refresh = None, quick = None, threaded = None, aggregate = True):
 		# Adding the previous/current/next season metadata to individual episodes in _metadataEpisodeUpdate() is a bad idea, since the metadata is saved to the MetaCache database.
 		# This increases the database size to quickly grow beyond 1GB+.
 		# Especially for shows with many seasons, and seasons with a lot of episodes (eg S00 - Specials), this can easily increase the database size by more than 50%.
@@ -6022,49 +9137,82 @@ class MetaManager(object):
 		try:
 			if items:
 				values = items if Tools.isArray(items) else [items]
-				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for mutiple shows, each containing a list of episodes.
+				if values and Tools.isArray(values[0]): values = Tools.listFlatten(values) # A list for multiple shows, each containing a list of episodes.
 
 				seasons = []
 				for item in values:
 					try: seasons.append({'imdb' : item.get('imdb'), 'tmdb' : item.get('tmdb'), 'tvdb' : item.get('tvdb'), 'trakt' : item.get('trakt')})
 					except: Logger.error()
 				seasons = Tools.listUnique(seasons)
-				seasons = self.metadataSeason(items = seasons, pack = False, threaded = threaded) if seasons else None
+				seasons = self.metadataSeason(items = seasons, pack = False, refresh = refresh, quick = quick, threaded = threaded, aggregate = aggregate) if seasons else None
 
 				if seasons:
+					fixed = None
+					for item in values:
+						try: number = item['number'][MetaPack.NumberStandard][MetaPack.PartSeason]
+						except: number = item.get('season')
+						if not number == 0:
+							fixed = number
+							break
+
 					for item in values:
 						try:
 							imdb = item.get('imdb')
 							tmdb = item.get('tmdb')
 							tvdb = item.get('tvdb')
 							trakt = item.get('trakt')
-							number = item.get('season')
+
+							# For the Sequential/Absolute menu, use the stanadrd number, since the "season" attribute is 1 for all episodes.
+							try: number = item['number'][MetaPack.NumberStandard][MetaPack.PartSeason]
+							except: number = item.get('season')
+
+							# For interleaved specials in the Series and Progress submenus, use the images of the current season and not S0.
+							# Otherwise when flipping through the menu, the fanart changes, causing a visual disruption.
+							if number == 0 and fixed: number = fixed
 
 							for season in seasons:
-								first = season[0]
-								if (imdb and first.get('imdb') == imdb) or (tmdb and first.get('tmdb') == tmdb) or (tvdb and first.get('tvdb') == tvdb) or (trakt and first.get('trakt') == trakt):
-									seasonCurrent = next((i for i in season if i['season'] == number), None)
-									seasonPrevious = next((i for i in season if i['season'] == number - 1), None)
-									seasonNext = next((i for i in season if i['season'] == number + 1), None)
-									if seasonCurrent: seasonCurrent = self.mTools.reduce(metadata = seasonCurrent, pack = True, seasons = True)
-									if seasonPrevious: seasonPrevious = self.mTools.reduce(metadata = seasonPrevious, pack = True, seasons = True)
-									if seasonNext: seasonNext = self.mTools.reduce(metadata = seasonNext, pack = True, seasons = True)
+								first = season[0] if season else None
+								if first:
+									if (imdb and first.get('imdb') == imdb) or (tmdb and first.get('tmdb') == tmdb) or (tvdb and first.get('tvdb') == tvdb) or (trakt and first.get('trakt') == trakt):
+										if number is None:
+											seasonCurrent = None
+											seasonPrevious = None
+											seasonNext = None
+										else:
+											seasonCurrent = next((i for i in season if i['season'] == number), None)
+											seasonPrevious = next((i for i in season if i['season'] == number - 1), None)
+											seasonNext = next((i for i in season if i['season'] == number + 1), None)
 
-									item['seasons'] = {
-										'previous' : seasonPrevious,
-										'current' : seasonCurrent,
-										'next' : seasonNext,
-									}
+										if seasonCurrent:
+											# Add show status used for label details in smart menus.
+											# This status from the show to the season was already aggregated in _metadataEpisodeAggregate().
+											serie = seasonCurrent.get('serie') or {}
+											serie['season'] = {
+												'status' : seasonCurrent.get('status'),
+												'tagline' : seasonCurrent.get('tagline'),
+											}
+											item['serie'] = serie
 
-									if seasonCurrent and MetaImage.Attribute in seasonCurrent:
-										MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(seasonCurrent[MetaImage.Attribute]), data = item, category = MetaImage.MediaSeason) # Add season images.
-										if MetaImage.MediaShow in seasonCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(seasonCurrent[MetaImage.Attribute][MetaImage.MediaShow]), data = item, category = MetaImage.MediaShow) # Add show images.
-									break
+										if seasonCurrent: seasonCurrent = self.mTools.reduce(metadata = seasonCurrent, pack = True, seasons = True)
+										if seasonPrevious: seasonPrevious = self.mTools.reduce(metadata = seasonPrevious, pack = True, seasons = True)
+										if seasonNext: seasonNext = self.mTools.reduce(metadata = seasonNext, pack = True, seasons = True)
+
+										item['seasons'] = {
+											'previous' : seasonPrevious,
+											'current' : seasonCurrent,
+											'next' : seasonNext,
+										}
+
+										if seasonCurrent and MetaImage.Attribute in seasonCurrent:
+											MetaImage.update(media = MetaImage.MediaSeason, images = Tools.copy(seasonCurrent[MetaImage.Attribute]), data = item, category = MetaImage.MediaSeason) # Add season images.
+											if MetaImage.MediaShow in seasonCurrent[MetaImage.Attribute]: MetaImage.update(media = MetaImage.MediaShow, images = Tools.copy(seasonCurrent[MetaImage.Attribute][MetaImage.MediaShow]), data = item, category = MetaImage.MediaShow) # Add show images.
+										break
+
 						except: Logger.error()
 		except: Logger.error()
 		return items
 
-	def _metadataEpisodeIncrement(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, item = None, number = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, discrepancy = None):
+	def _metadataEpisodeIncrement(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, item = None, number = None, provider = None, lock = None, locks = None, semaphore = None, cache = False, refresh = None, threaded = None, discrepancy = None):
 		try:
 			media = Media.Episode
 
@@ -6083,7 +9231,7 @@ class MetaManager(object):
 					if trakt: trakt = str(trakt)
 
 				if title is None: title = item.get('tvshowtitle') or item.get('title')
-				if year is None: year = item.get('year')
+				if year is None: year = item.get('tvshowyear') or item.get('year')
 
 				if season is None: season = item.get('season')
 				if episode is None: episode = item.get('episode')
@@ -6099,7 +9247,7 @@ class MetaManager(object):
 						if not trakt: trakt = ids.get('trakt')
 			if not imdb and not tvdb and not trakt and not tmdb: return False
 
-			# Important to add "number" here, since there might be mutiple lookups with different numbers (eg: standard vs sequential).
+			# Important to add "number" here, since there might be multiple lookups with different numbers (eg: standard vs sequential).
 			id = Memory.id(media = Media.Episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, episode = episode, number = number, increment = True)
 			if not locks is None:
 				if not id in locks:
@@ -6109,12 +9257,12 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if item and data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times.
+					if item and data: item.update(Tools.copy(data)) # Copy in case the memory is used multiple times.
 					return data
 
 			developer = self._metadataDeveloper(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
 
-			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, threaded = threaded)
+			pack = self.metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = refresh, threaded = threaded)
 			if not pack:
 				if developer: Logger.log('CANNOT DETERMINE NEXT EPISODE: ' + developer + (' [%s]' % Title.numberUniversal(season = season, episode = episode)))
 				return False
@@ -6144,23 +9292,47 @@ class MetaManager(object):
 
 			# Important to use "type = MetaPack.NumberOfficial" in all number lookups, otherwise unofficial episodes at the end of the season might be used, therefore not going to the next season.
 			# Eg: One Piece S21E892 - S21E1088.
-			# If the passed-in episode is not an official episode, use the stadnard number instead.
+			# If the passed-in episode is not an official episode, use the standard number instead.
 			# Eg: Dragon Ball Super S02E01.
 			type = MetaPack.NumberOfficial
 			if not pack.typeOfficial(season = season, episode = episode):
 				type = MetaPack.NumberStandard
+			else:
+				# If the standard number does not match the one requested, check if it is an unofficial episode.
+				# Eg: Star Wars: Young Jedi Adventures S01E48 -> S01E49.
+				# This will probably not be the case anymore once S03 is released, since Trakt has 48 episodes for S01+S02.
+				# Do not do this if the standard episode is the first episode in the next season.
+				# Eg: Downton Abbey S01E08 -> S01E09.
+				numberStandard = pack.numberStandard(season = season, episode = episode)
+				numberStandardSeason = numberStandard[MetaPack.PartSeason]
+				numberStandardEpisode = numberStandard[MetaPack.PartEpisode]
+				if numberStandard and not(numberStandardSeason == season and numberStandardEpisode == episode) and not(numberStandardSeason == seasonNext and numberStandardEpisode == episodeFirst):
+					if not pack.typeOfficial(item = pack.episode(season = season, episode = episode, number = MetaPack.NumberUnofficial)):
+						type = MetaPack.NumberStandard
 			if number == MetaPack.NumberOfficial or number == MetaPack.NumberUnofficial:
 				type = number
 				number = MetaPack.NumberStandard
+			elif number in MetaPack.Providers:
+				if not provider: provider = number
+				type = MetaPack.NumberStandard
+				number = MetaPack.NumberStandard
 
 			# Next episode in the same season.
-			if episodeNext <= pack.numberLastEpisode(season = season, number = number, type = type, default = -1):
+			if episodeNext <= pack.numberLastEpisode(season = season, number = number, provider = provider, type = type, default = -1):
 				seasonSelect = season
 				episodeSelect = episodeNext
 				found = 1
 
 			# First episode in the next season.
-			elif episodeFirst <= pack.numberLastEpisode(season = seasonNext, number = number, type = type, default = -1):
+			elif episodeFirst <= pack.numberLastEpisode(season = seasonNext, number = number, provider = provider, type = type, default = -1):
+				seasonSelect = seasonNext
+				episodeSelect = episodeFirst
+				found = 2
+
+			# First episode in the next season.
+			# If requested by NumberUnofficial, the next season's first episode is most likely an official episode.
+			# Eg: My Name Is Earl S03E22 (TVDb unofficial) -> S04E01 (official).
+			elif type == MetaPack.NumberUnofficial and episode == pack.numberLastEpisode(season = season, number = number, provider = provider, type = type, default = -1) and episodeFirst <= pack.numberLastEpisode(season = seasonNext, number = number, provider = provider, type = MetaPack.NumberOfficial, default = -1):
 				seasonSelect = seasonNext
 				episodeSelect = episodeFirst
 				found = 2
@@ -6169,7 +9341,7 @@ class MetaManager(object):
 			# Eg: Star Wars: Young Jedi Adventures: S01E25 -> S01E26
 			elif number == MetaPack.NumberSequential or number == MetaPack.NumberAbsolute:
 				type = number
-				if episodeNext <= pack.numberLastEpisode(season = season, number = number, type = number, default = -1):
+				if episodeNext <= pack.numberLastEpisode(season = season, number = number, provider = provider, type = number, default = -1):
 					seasonSelect = season
 					episodeSelect = episodeNext
 					found = 1
@@ -6193,6 +9365,7 @@ class MetaManager(object):
 						found = 3
 					else:
 						countNext = playback.history(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = seasonSelect, episode = episodeSelect, pack = pack, quick = True) # NB: Use quick, to reduce time.
+
 						if countNext and countNext['count']['total']: # Only do this if the next episode was already watched (aka rewatch).
 							countNext = countNext['count']['total']
 							countCurrent = countCurrent['count']['total']
@@ -6207,7 +9380,7 @@ class MetaManager(object):
 									if episodeCounter <= 0:
 										if seasonCounter == 1: break
 										seasonCounter -= 1
-										episodeCounter = pack.numberLastEpisode(season = seasonCounter, number = number, type = type, default = 0)
+										episodeCounter = pack.numberLastEpisode(season = seasonCounter, number = number, provider = provider, type = type, default = 0)
 									lookups.append({'season' : seasonCounter, 'episode' : episodeCounter})
 
 								counter = 0
@@ -6232,9 +9405,9 @@ class MetaManager(object):
 									add = True
 									end = False
 									episodeCounter += 1
-									if episodeCounter > pack.numberLastEpisode(season = seasonCounter, number = number, type = type, default = 0):
+									if episodeCounter > pack.numberLastEpisode(season = seasonCounter, number = number, provider = provider, type = type, default = 0):
 										seasonCounter += 1
-										if seasonCounter > pack.numberLastSeason(number = number, type = type, default = 0):
+										if seasonCounter > pack.numberLastSeason(number = number, provider = provider, type = type, default = 0):
 											add = False
 											end = True
 										else:
@@ -6414,7 +9587,10 @@ class MetaManager(object):
 					elif extra is False and not specialStory and specialExtra:
 						continue
 
-					if unofficial and (not 'episode' in item['id'] or not 'tvdb' in item['id']['episode'] or not item['id']['episode']['tvdb']): continue
+					# Update (2025-07): Why are only specials with a TVDb ID allowed?
+					# Eg: Money Heist S0 has full episodes specials in S0 on Trakt which are not on TVDb.
+					#if unofficial and (not 'episode' in item['id'] or not 'tvdb' in item['id']['episode'] or not item['id']['episode']['tvdb']):
+					if unofficial and (not item['id'].get('episode') or len([i for i in item['id']['episode'].values() if i]) == 0): continue
 					if duration and average and (not 'duration' in item or not item['duration'] or item['duration'] < average): continue
 
 					time = None
@@ -6423,6 +9599,7 @@ class MetaManager(object):
 					if not time:
 						try: time = item['premiered']
 						except: pass
+
 					if time:
 						time = Time.integer(time)
 						if (timeStart is None or time >= timeStart) and (timeEnd is None or time <= timeEnd):
@@ -6470,6 +9647,20 @@ class MetaManager(object):
 			else: order = 0
 			return (order, currentSeason or 0, currentEpisode or 0)
 		result = sorted(result, key = _sort)
+
+		# Filter out unofficial TVDb episodes from a previous season that maps to a later official season.
+		# Eg: LEGO Masters S05 (unofficial TVDb) vs S06 (official Trakt).
+		# Otherwise in the Progress submenus S05E07+ (unofficial) are placed after S06E06 (official).
+		temp = []
+		previousSeason = None
+		for item in result:
+			currentSeason = item.get('season')
+			if currentSeason == 0:
+				temp.append(item)
+			elif previousSeason is None or currentSeason >= previousSeason:
+				temp.append(item)
+				previousSeason = currentSeason
+		result = temp
 
 		# Specials appearing on the same day as the FIRST episode can sometimes be the same as described above.
 		# Eg: GoT 8x01 -> 0x46 Inside Episode 1
@@ -6523,7 +9714,7 @@ class MetaManager(object):
 		previousEpisode = None
 		if pack and default:
 			first = default[0]
-			if first.get('season') > 1 and first.get('episode') == 1:
+			if first.get('season') > 1 and first.get('episode') in (0, 1):
 				previous = pack.lookupStandard(season= first.get('season') - 1, episode = -1)
 				if previous:
 					previousSeason = previous[MetaPack.PartSeason]
@@ -6620,7 +9811,7 @@ class MetaManager(object):
 
 			# Add another season for Episode submenus (Progress menu).
 			# Do not do this for Series submenus, since the menu always stops at the last episode of the season, and the next page loads the next seaason.
-			# However, Episode submenus can page across mutiple seasons (aka contain episodes from two season, plus the specials), so we might also have to include a few episodes from the next season in the menu.
+			# However, Episode submenus can page across multiple seasons (aka contain episodes from two season, plus the specials), so we might also have to include a few episodes from the next season in the menu.
 			if not number == MetaPack.NumberSerie: seasonEnd += 1
 
 			specialSeason = self.mTools.settingsShowSpecialSeason()
@@ -6686,22 +9877,22 @@ class MetaManager(object):
 	# METADATA - PACK
 	##############################################################################
 
-	def metadataPack(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = False, cache = False, threaded = None):
+	def metadataPack(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, items = None, filter = None, clean = True, quick = None, refresh = None, cache = False, threaded = None):
 		try:
 			media = Media.Pack
 
 			pickSingle = False
-			pickMutiple = False
+			pickMultiple = False
 
 			if items:
 				if Tools.isArray(items):
-					pickMutiple = True
+					pickMultiple = True
 				else:
 					pickSingle = True
 					items = [items]
-			elif imdb or tmdb or tvdb or trakt:
+			elif trakt or imdb or tmdb or tvdb:
 				pickSingle = True
-				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}]
+				items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'title' : title, 'year' : year}] # Add the title/year for a possible lookup if Trakt does not have the IMDb ID yet.
 			elif title:
 				pickSingle = True
 				items = self._metadataIdLookup(media = media, title = title, year = year, list = True)
@@ -6709,12 +9900,13 @@ class MetaManager(object):
 			if items:
 				# Get into the correct format for MetaCache to update the dictionaries.
 				for item in items:
-					value = item.get('title')
+					value = item.get('tvshowtitle') or item.get('title')
 					if not value is None and not Tools.isArray(value): item['title'] = [value]
-					value = item.get('year')
+					value = item.get('tvshowyear') or item.get('year')
 					if not value is None and not Tools.isDictionary(value): item['year'] = {MetaPack.ValueMinimum : value}
 
 				items = self._metadataCache(media = media, items = items, function = self._metadataPackUpdate, quick = quick, refresh = refresh, cache = cache, threaded = threaded)
+
 				if items:
 					items = self._metadataFilter(media = media, items = items, filter = filter)
 
@@ -6726,8 +9918,10 @@ class MetaManager(object):
 		except: Logger.error()
 		return None
 
-	def _metadataPackUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, part = True):
+	def _metadataPackUpdate(self, item, result = None, lock = None, locks = None, semaphore = None, cache = False, threaded = None, mode = None, refresh = None, part = True):
 		try:
+			if not self._checkInterval(mode = mode): return None
+
 			media = Media.Pack
 
 			imdb = item.get('imdb')
@@ -6739,7 +9933,7 @@ class MetaManager(object):
 			tvrage = item.get('tvrage')
 
 			title = item.get('tvshowtitle') or item.get('title')
-			year = item.get('year')
+			year = item.get('tvshowyear') or item.get('year')
 
 			if title and Tools.isArray(title): title = title[0]
 			if year and Tools.isDictionary(year): year = year.get(MetaPack.ValueMinimum)
@@ -6756,20 +9950,31 @@ class MetaManager(object):
 				locks[id].acquire()
 				data = Memory.get(id = id, uncached = True, local = True, kodi = False)
 				if Memory.cached(data):
-					if data: item.update(Tools.copy(data)) # Copy in case the memory is used mutiple times. Can be None if not found.
+					if data:
+						# Copy in case the memory is used multiple times. Can be None if not found.
+						# Update (2025-11): Deep-copying pack data can take very long, especially for shows with a lot of episodes (eg tt0112004).
+						# Only do a very-efficient shallow-copy. This should be enough, since the internal pack dict data should not be edited afterwards and all access to the data is ready-only get.
+						# Not sure if this would create some issues, like updating and existing pack dict.
+						#item.update(Tools.copy(data))
+						item.update(Tools.copy(data, deep = False))
 					return None
 
 			# Previous incomplete metadata.
 			partDone = True
+			partStatus = None
 			partOld = {}
 			partNew = {MetaCache.AttributeFail : 0}
-			if part:
-				try:
-					partCache = item.get(MetaCache.Attribute)
-					if partCache and partCache.get(MetaCache.AttributeStatus) == MetaCache.StatusIncomplete:
+			try:
+				partCache = item.get(MetaCache.Attribute)
+				if partCache:
+					partStatus = partCache.get(MetaCache.AttributeStatus)
+					# Only do this for StatusPartial.
+					# Other non-partial statuses that cause a refresh might also have the "part" dictionary.
+					# However, in these cases the old "part" data should not be used, since as full refresh is needed and all requests should be redone.
+					if part and partStatus == MetaCache.StatusPartial:
 						partOld = partCache.get(MetaCache.AttributePart) or {}
 						partNew[MetaCache.AttributeFail] = partOld.get(MetaCache.AttributeFail, 0)
-				except: Logger.error()
+			except: Logger.error()
 
 			# Trakt requires either a Trakt or IMDb ID.
 			# TMDb requires a TMDb ID.
@@ -6792,17 +9997,32 @@ class MetaManager(object):
 							if not tvrage: tvrage = ids.get('tvrage')
 			if not imdb and not tmdb and not tvdb and not trakt: return False
 
+			# Use the IDs of the show metadata.
+			# This is useful if Trakt does not have the IMDb/TVDb ID yet.
+			# The show metadata would have already done a MetaTrakt.lookup(), so it does not have to be done here again.
+			# Always replace the values, in case the season metadata still contains old IDs or title.
+			show = self.metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, pack = False, refresh = refresh, threaded = threaded)
+			idsShow = show.get('id')
+			if idsShow:
+				trakt = idsShow.get('trakt') or trakt
+				imdb = idsShow.get('imdb') or imdb
+				tmdb = idsShow.get('tmdb') or tmdb
+				tvdb = idsShow.get('tvdb') or tvdb
+				slug = idsShow.get('slug') or slug
+			title = show.get('tvshowtitle') or show.get('title') or title
+			year = show.get('tvshowyear') or show.get('year') or year
+
 			cache = cache if cache else None
 			developer = self._metadataDeveloper(media = Media.Show, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, item = item)
-			if developer: Logger.log('PACK METADATA RETRIEVAL [%s]: %s' % (mode.upper() if mode else 'UNKNOWN', developer))
+			if developer: Logger.log('PACK METADATA RETRIEVAL [%s - %s]: %s' % (mode.upper() if mode else 'UNKNOWN', partStatus.upper() if partStatus else 'NEW', developer))
 
-			# DetailEssential: 3 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 0]
-			# DetailStandard: 4 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 1 (summary)]
-			# DetailExtended: 5 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 2 (summary, episodes)]
+			# DetailEssential: 3 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 0, IMDb: 0 (local bulk data is used)]
+			# DetailStandard: 4 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 1 (summary), IMDb: 0 (local bulk data is used)]
+			# DetailExtended: 5-7 requests [Trakt: 2 (episodes, translations), TVDb: 1 (episodes), TMDb: 2-4 (summary, episodes), IMDb: 0 (local bulk data is used)]
 			requests = []
 			if self.mLevel >= 0:
 				requests.append({'id' : 'tvdb', 'function' : self._metadataPackTvdb, 'parameters' : {'tvdb' : tvdb, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
-				requests.append({'id' : 'trakt', 'function' : self._metadataPackTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
+				requests.append({'id' : 'trakt', 'function' : self._metadataPackTrakt, 'parameters' : {'trakt' : trakt, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'title' : title, 'year' : year, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 				if self.mLevel >= 1:
 					requests.append({'id' : 'tmdb', 'function' : self._metadataPackTmdb, 'parameters' : {'tmdb' : tmdb, 'item' : item, 'cache' : cache, 'threaded' : threaded, 'language' : self.mLanguage, 'detail' : self.mDetail}})
 					if self.mLevel >= 2:
@@ -6810,15 +10030,22 @@ class MetaManager(object):
 
 			partDatas = {}
 			if partOld:
-				partRequests = []
-				for i in requests:
-					partData = partOld.get(i['id'])
-					if partData and partData.get('complete'): partDatas[i['id']] = partData
-					else: partRequests.append(i)
-				requests = partRequests
-				partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
+				# Do not use the old parts if retrieving in the foreground.
+				# Otherwise if the metadata is refreshed forcefully (eg: from the context menu), and the current MetaCache entry is incomplete, it will use the existing old parts and only refresh the previously failed/incomplete parts.
+				# Instead, refresh all parts if the refresh is in the foreground.
+				# MetaCache.StatusPartial refreshes happen by default in the background, which will still only re-retrieve the incomplete parts.
+				if not mode == MetaCache.RefreshForeground:
+					partRequests = []
+					for i in requests:
+						partData = partOld.get(i['id'])
+						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						else: partRequests.append(i)
+					requests = partRequests
+					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
 
+			if not self._checkInterval(mode = mode): return None
 			datas = self._metadataRetrieve(requests = requests, threaded = threaded)
+			if not self._checkInterval(mode = mode): return None
 			datas.update(partDatas)
 
 			data = {}
@@ -6829,31 +10056,40 @@ class MetaManager(object):
 						partNew[i] = value
 						if value['complete']:
 							data[i] = value.get('data')
-						else:
+
+						# Do not mark packs as partial if the IMDb data is missing
+						# This can happen if the bulkdata setting was disabled.
+						# Also do not do this in case the datasets are removed from IMDb in the future.
+						# Otherwise all packs will constantly be partial-refreshed, because all of them have the IMDb data missing.
+						elif not i == 'imdb':
 							partDone = False
 							if developer: Logger.log('PACK METADATA INCOMPLETE [%s]: %s' % (i.upper(), developer))
 
 			pack = MetaPack()
 			if data:
+				data['check'] = MetaPack.CheckBackground if (mode == MetaCache.RefreshBackground or self.reloadingMedia()) else MetaPack.CheckForeground
 				data = pack.generateShow(**data)
+				if data is False or not self._checkInterval(mode = mode): return None # Kodi was aborted.
 
 				# Store the reduced pack metadata (counts, durations, etc) in the show metadata.
 				# This does not require a lot of extra storage space.
 				# This allows for eg: season/episode counters in show menus (for certain skins that support it, like Aeon Nox).
 				# Only shows that the user has shown interest in, by eg opening the season menu of the show, will retrieve these detailed counters.
 				try:
-					reduce = pack.reduce()
-					if reduce:
-						metacache = MetaCache.instance()
-						show = metacache.select(type = MetaCache.TypeShow, items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}])
-						if show and show[0].get(MetaCache.Attribute, {}).get(MetaCache.AttributeStatus) in MetaCache.StatusValid: # Only if the data is already in the cache and not eg invalid or from external addon.
-							# Do not update the time, rather use the old time.
-							# Otherwise the show data has the time when the pack was last updated, and not the time the show was last updated.
-							time = show[0][MetaCache.Attribute].get(MetaCache.AttributeTime)
-							try: del show[0][MetaCache.Attribute]
-							except: pass
-							show[0]['packed'] = reduce
-							metacache.insert(type = MetaCache.TypeShow, items = show, time = time, wait = True)
+					if show:
+						reduce = pack.reduce()
+						if reduce:
+							metacache = MetaCache.instance()
+							shows = metacache.select(type = MetaCache.TypeShow, items = [{'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt}], memory = False)
+							if shows and MetaCache.valid(shows[0]): # Only if the data is already in the cache and not eg invalid or from external addon.
+								# Do not update the time, rather use the old time.
+								# Otherwise the show data has the time when the pack was last updated, and not the time the show was last updated.
+								time = shows[0][MetaCache.Attribute].get(MetaCache.AttributeTime)
+								try: del shows[0][MetaCache.Attribute]
+								except: pass
+								shows[0]['packed'] = reduce
+								shows[0]['niche'] = self.mTools.niche(niche = shows[0].get('niche'), metadata = shows[0]) # Add the release types (eg daily episode release).
+								metacache.insert(type = MetaCache.TypeShow, items = shows, time = time, wait = True, copy = False) # Update (2025-11): Copy is probably unnecessary here.
 				except: Logger.error()
 
 				if data:
@@ -6881,7 +10117,13 @@ class MetaManager(object):
 						elif tvrage: data['tvrage'] = tvrage
 
 			Memory.set(id = id, value = data, local = True, kodi = False)
-			if item and data: item.update(Tools.copy(data)) # Can be None if the ID was not found. Copy in case the outer item is edited before we write the data to MetaCache.
+			if item and data:
+				# Can be None if the ID was not found. Copy in case the outer item is edited before we write the data to MetaCache.
+				# Update (2025-11): Deep-copying pack data can take very long, especially for shows with a lot of episodes (eg tt0112004).
+				# Only do a very-efficient shallow-copy. This should be enough, since the internal pack dict data should not be edited afterwards and all access to the data is ready-only getters.
+				# Not sure if this would create some issues, like updating and existing pack dict.
+				#item.update(Tools.copy(data))
+				item.update(Tools.copy(data, deep = False))
 			elif not data: data = {}
 
 			if partDone:
@@ -6898,34 +10140,36 @@ class MetaManager(object):
 		finally:
 			if locks and id: locks[id].release()
 			if semaphore: semaphore.release()
-			self.mTools.busyFinish(media = media, item = item)
+			self._busyFinish(media = media, item = item)
 
-	def _metadataPackId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, detail = None):
-		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+	def _metadataPackId(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, quick = None):
+		result = self.mTools.idShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, quick = quick)
 		if result: return {'complete' : True, 'data' : {'id' : result}}
 		else: return {'complete' : False, 'data' : result}
 
-	def _metadataPackTrakt(self, trakt = None, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
-		try: return MetaTrakt.instance().metadataPack(trakt = trakt, imdb = imdb, cache = cache, threaded = threaded, detail = True)
-		except: Logger.error()
+	def _metadataPackTrakt(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, language = None, item = None, cache = None, threaded = None, detail = None):
+		if trakt or imdb or tmdb or tvdb or title:
+			try: return MetaTrakt.instance().metadataPack(trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, cache = cache, threaded = threaded, detail = True)
+			except: Logger.error()
 		return {'provider' : 'trakt', 'complete' : True, 'data' : None}
 
 	def _metadataPackTvdb(self, tvdb = None, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
-		try: return MetaTvdb.instance().metadataPack(tvdb = tvdb, imdb = imdb, cache = cache, threaded = threaded, detail = True)
-		except: Logger.error()
+		if tvdb or imdb:
+			try: return MetaTvdb.instance().metadataPack(tvdb = tvdb, imdb = imdb, cache = cache, threaded = threaded, detail = True)
+			except: Logger.error()
 		return {'provider' : 'tvdb', 'complete' : True, 'data' : None}
 
 	def _metadataPackTmdb(self, tmdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
-		try: return MetaTmdb.instance().metadataPack(tmdb = tmdb, cache = cache, threaded = threaded, detail = True, quick = not(detail == MetaTools.DetailExtended))
-		except: Logger.error()
+		if tmdb:
+			try: return MetaTmdb.instance().metadataPack(tmdb = tmdb, cache = cache, threaded = threaded, detail = True, quick = not(detail == MetaTools.DetailExtended))
+			except: Logger.error()
 		return {'provider' : 'tmdb', 'complete' : True, 'data' : None}
 
 	def _metadataPackImdb(self, imdb = None, language = None, item = None, cache = None, threaded = None, detail = None):
-		# IMDb currently does not have an efficient/reliable method of retrieving all, or even just many, episodes of a show.
-		# Important to add the IMDb ID.
-		# There are a bunch of new releases that are only on IMDb and not on other providers, and therefore only has an IMDb.
-		# Add the ID, to ensure that the failed pack is written to MetaCache. Otherwise the pack is never cached and is always re-retrieved in the foreground when the season/episode menus are opened on the show.
-		return {'provider' : 'imdb', 'complete' : True, 'data' : {'imdb' : imdb, 'id' : {'imdb' : imdb}}}
+		if imdb:
+			try: return MetaImdb.instance().metadataPack(imdb = imdb, detail = True)
+			except: Logger.error()
+		return {'provider' : 'imdb', 'complete' : True, 'data' : None}
 
 	def _metadataPackPrepare(self, items):
 		if Tools.isArray(items):
@@ -6934,10 +10178,10 @@ class MetaManager(object):
 			items = [items]
 		return items
 
-	def _metadataPackRetrieve(self, items = None, instance = False, quick = None, refresh = False, cache = False, threaded = None):
+	def _metadataPackRetrieve(self, items = None, instance = False, quick = None, refresh = None, cache = False, threaded = None):
 		try:
 			if items:
-				# If mutiple seasons/episodes of the same show is passed in, only retrieve the pack once for all of them.
+				# If multiple seasons/episodes of the same show is passed in, only retrieve the pack once for all of them.
 				ids = ['trakt', 'tvdb', 'tmdb', 'imdb']
 				items = self._metadataPackPrepare(items = items)
 				lookup = Tools.listUnique([{i : item.get(i) for i in ids} for item in items])
@@ -6956,7 +10200,7 @@ class MetaManager(object):
 		return None
 
 	# Add pack data to the show/season/episode items.
-	def _metadataPackAggregate(self, items = None, pack = None, data = None, quick = None, refresh = False, cache = False, threaded = None):
+	def _metadataPackAggregate(self, items = None, pack = None, data = None, quick = None, refresh = None, cache = False, threaded = None):
 		try:
 			if items:
 				if pack is None: pack = True # Add pack data by default, except if explicitly stated not to (eg: from show menus).
@@ -6984,7 +10228,7 @@ class MetaManager(object):
 		return items
 
 	# Lookup the real native season-episode numbers from other numbers, like absolute episodes.
-	def _metadataPackLookup(self, items = None, number = None, provider = None, quick = None, refresh = False, cache = False, threaded = None):
+	def _metadataPackLookup(self, items = None, number = None, provider = None, quick = None, refresh = None, cache = False, threaded = None):
 		lookup = None
 		try:
 			if items:
@@ -7098,7 +10342,21 @@ class MetaManager(object):
 			if (content == MetaManager.ContentProgress and progress == MetaTools.ProgressDefault) or content == MetaManager.ContentArrival or content == MetaManager.ContentQuick:
 				# Make sure the parameters are the same for the cache.
 				if parameters: parameters = {k : v for k, v in parameters.items() if not v is None} # Can be a dict with all values None if called from progress().
-				return self._cache('cacheRefresh', reload, self._content, media = media, niche = niche, content = content, progress = progress, **parameters)
+
+				# Update (2025-11):
+				# Even though the refresh is done in the background, it still has some impact on performance, since the reloading can be done too often.
+				# Since the episode submenus are executed in a separate invoker, every time the user navigates back from an episode submenu to the main Progress menu, the progress menu gets reloaded, since it is not cached by Kodi.
+				# Hence, if the user navigates in and out of shows from the Progress menu, the content gets reloaded every time, although the data has probably not changed and therefore does not require an immediate refresh.
+				# Therefore cache the menu for a minute to avoid these unnecessary repeated refreshes.
+				# Still force a refresh when the menu is reloaded from MetaManager.reload().
+				# Also add a delay for background refreshes, to allow any other process to execute first, such as when opening an episode submenu.
+				#return self._cache('cacheRefresh', reload, self._content, media = media, niche = niche, content = content, progress = progress, **parameters)
+				if reload:
+					return self._cache('cacheRefresh', reload, self._content, media = media, niche = niche, content = content, progress = progress, **parameters)
+				else:
+					# Make sure this has the same perameters as the cacheRefresh call above, otherwise it will be a different cache entry.
+					# Hence, __exclude__ the delay parameter from the cache ID calculation.
+					return self._cacheTimeout(Cache.TimeoutMinute1, None, self._content, media = media, niche = niche, content = content, progress = progress, delay = (Pool.DelayLong, Pool.DelayMedium), __exclude__ = 'delay', **parameters)
 
 		return self._content(media = media, niche = niche, content = content, progress = progress, page = page, limit = limit, refreshing = refresh, **parameters)
 
@@ -7162,6 +10420,7 @@ class MetaManager(object):
 
 		detail = None,
 		quick = None,
+		delay = None,
 		refreshing = None, # "refresh" is a parameter for the Cache.
 
 		submenu = None,		# The episode submenu opened from an episode in the Progress menu or from the Series menu.
@@ -7176,6 +10435,16 @@ class MetaManager(object):
 		**parameters
 	):
 		try:
+			# Delay this function, allowing other more important processes to execute first, such as menu loading.
+			# Add a minimum delay ("minimum=True"), otherwise it might get executed too quickly if the current process does not have any more work, and we should wait for any other/external invokers currently busy.
+			if delay:
+				minimum = True
+				if delay is True: delay = Pool.DelayShort
+				elif Tools.isArray(delay):
+					minimum = delay[1]
+					delay = delay[0]
+				Pool.wait(delay = delay, minimum = minimum)
+
 			data = None
 			parameters = {}
 			refresh = refreshing
@@ -7271,7 +10540,6 @@ class MetaManager(object):
 			hierarchical = Media.isEpisode(media) and not content == MetaManager.ContentEpisode
 			if filter is None: filter = {}
 			if detail is None: detail = True
-			if refresh is None: refresh = False
 			if more is True: more = None # Do not force a More item if there are no more titles available.
 			next = None
 			error = None
@@ -7298,7 +10566,7 @@ class MetaManager(object):
 			if not data.get('media') is None: media = data.get('media')
 			if not data.get('sort') is None: sort = data.get('sort')
 			if not data.get('order') is None: order = data.get('order')
-			if not data.get('limit') is None: limit = data.get('limit') # Do not use the user's custom value here, since it is already passed in to the API calls, and the provider/results determine which value to use here.
+			if not limit is False and not data.get('limit') is None: limit = data.get('limit') # Do not use the user's custom value here, since it is already passed in to the API calls, and the provider/results determine which value to use here.
 			if not data.get('submenu') is None: submenu = data.get('submenu')
 			if not data.get('special') is None: special = data.get('special')
 			if not more is False and not data.get('more') is None: more = data.get('more')
@@ -7321,7 +10589,13 @@ class MetaManager(object):
 				filters = Tools.copy(filters)
 				if Tools.isArray(filters): filter = [Tools.update(i, filter, none = False) for i in filters]
 				else: filter = Tools.update(filters, filter, none = False)
-			if not MetaTools.FilterDuplicate in filter: filter[MetaTools.FilterDuplicate] = True
+			if Tools.isArray(filter):
+				for f in filter:
+					if not MetaTools.FilterDuplicate in f:
+						f[MetaTools.FilterDuplicate] = True
+			else:
+				if not MetaTools.FilterDuplicate in filter:
+					filter[MetaTools.FilterDuplicate] = True
 
 			# For some weird reason, if we have a "filter" parameter in the plugin://... URL added to xbmcplugin.addDirectoryItems(...), the "filter" parameter gets removed from the URL.
 			# That means if we allow the user to pass in custom filters and create a next page item (more), we cannot add the parameter to the URL to also apply those filters for the next page(s).
@@ -7463,7 +10737,7 @@ class MetaManager(object):
 							except: pass
 
 				if items:
-					items = self._processSerie(media = media, items = items)
+					items = self._processAggregate(media = media, items = items)
 					if Media.isSeason(mediad) or Media.isEpisode(mediad): mediad = Media.Show
 
 					return {
@@ -7515,12 +10789,22 @@ class MetaManager(object):
 
 			for provider in providers:
 				if provider == MetaTools.ProviderTrakt:
+					#gaiaremove
+					# UPDATE (2025-12):
+					# Trakt does not seem to support paging for the search endpoint anymore, and caps the limit at 50.
+					# If this is fixed in the future, revert back to the old code.
+					# More info under MetaTrakt.search().
+					'''
 					data = self._cache('cacheLong', refresh, MetaTrakt.instance().search, media = media, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, award = award, rating = rating, votes = votes, page = page, limit = limit, internal = True)
 					items = data.get('items')
 
 					# Only set these values if the call was successful. Otherwise these adjusted parameters might be used by the fallback provider.
 					# Sometimes Trakt returns less items than the requested limit, or some items are locally filtered out. Return the initial count to add a next page to the menu (eg: if 49 items are returned, but 50 were requested).
 					if items: more = data.get('more')
+					'''
+					data = self._cache('cacheLong', refresh, MetaTrakt.instance().search, media = media, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, award = award, rating = rating, votes = votes, page = 1, limit = MetaTrakt.LimitSearch, internal = True)
+					items = data.get('items')
+					if items: more = MetaTrakt.LimitSearch
 
 				elif provider == MetaTools.ProviderImdb:
 					items = self._cache('cacheLong', refresh, MetaImdb.instance().search, media = media, niche = niche, query = query, keyword = keyword, status = status, year = year, date = date, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, network = network, group = award, rating = rating, votes = votes)
@@ -7537,7 +10821,7 @@ class MetaManager(object):
 						limit = MetaTmdb.LimitFixed # Also set limit.
 
 				if items:
-					items = self._processSerie(media = media, items = items)
+					items = self._processAggregate(media = media, items = items)
 					if Media.isSeason(mediad) or Media.isEpisode(mediad): mediad = Media.Show
 
 					return {
@@ -7631,7 +10915,7 @@ class MetaManager(object):
 
 	def _quickAssemble(self, media = None, niche = None):
 		try:
-			timer = Time(start = True)
+			timer = self._jobTimer()
 			result = []
 			helper = {}
 
@@ -7655,7 +10939,7 @@ class MetaManager(object):
 							counter += 1
 							if counter >= count: break
 
-			# The same show can appear mutiple times with different episode numbers.
+			# The same show can appear multiple times with different episode numbers.
 			# Eg: the show is added from "itemsProgress" and from "itemsArrival" or in rare cases "itemsRandom".
 			# Filter out titles that are already in "result".
 			def _duplicate(items):
@@ -7677,18 +10961,19 @@ class MetaManager(object):
 			start = Playback.percentStart()
 			end = Playback.percentEnd()
 			total = 0
+			sleepy = self.mTools.settingsSleepyDuration() # Do not show fully watched itemsa if the user disabled the sleepy duration.
 
 			# Prevent smart-reloads, since they already happen if the individual progress/arrivals menus are refreshed.
 			# Refreshing the quick menu, either from reload() or when the user opens the menu, should never make smart-reloads.
 			# Do not use self.mReloadBusy, since at the end of this function we change the value back to True, and do not want to do that to self.mReloadBusy. More info under reload().
 			self.mReloadQuick = True
 
-			itemsProgress = self.progress(media = media, niche = niche, detail = False, limit = 150, internal = True) # Internal, in order not to use the outer cache data from content().
+			itemsProgress = self.progress(media = media, niche = niche, pack = False, detail = False, limit = 150, internal = True) # Internal, in order not to use the outer cache data from content().
 			if itemsProgress:
 				itemsProgress = itemsProgress.get('items')
 				if itemsProgress: total += len(itemsProgress)
 
-			itemsArrival = self.arrival(media = media, niche = niche, detail = False, limit = 150, internal = True)
+			itemsArrival = self.arrival(media = media, niche = niche, pack = False, detail = False, limit = 150, internal = True) # Internal, in order not to use the outer cache data from content().
 			if itemsArrival:
 				itemsArrival = itemsArrival.get('items')
 				if itemsArrival: total += len(itemsArrival)
@@ -7709,8 +10994,18 @@ class MetaManager(object):
 					count = 0
 					for item in itemsProgress:
 						time = self.mTools.time(metadata = item, type = MetaTools.TimeWatched, estimate = False, fallback = False)
+
+						# Do not add fully watched shows after some time.
+						add = True
+						if time:
+							smart = item.get(MetaManager.Smart)
+							if smart and not smart.get('next'):
+								play = smart.get('play')
+								if play and int(play) == play: # Fully watched without rewatching.
+									if (current - time) > sleepy: add = False
+
 						if not time: time = self.mTools.time(metadata = item, type = MetaTools.TimePaused, estimate = False, fallback = False) # Also allow when an episode is still in rpogress without an episode being fully watched.
-						if time and (current - time) <= month:
+						if add and time and (current - time) <= month:
 							result.append(item)
 							count += 1
 							if count >= countProgress: break
@@ -7769,9 +11064,11 @@ class MetaManager(object):
 						if not item in result:
 							playcount = item.get('playcount')
 							if playcount:
-								result.append(item)
-								count += 1
-								if count >= countHistory: break
+								time = self.mTools.time(metadata = item, type = MetaTools.TimeWatched, estimate = False, fallback = False)
+								if time and (current - time) <= sleepy:
+									result.append(item)
+									count += 1
+									if count >= countHistory: break
 
 				# Fill up if there are still too few movies or shows.
 				count = len(result)
@@ -7828,6 +11125,2048 @@ class MetaManager(object):
 		return None
 
 	##############################################################################
+	# RELEASE
+	##############################################################################
+
+	@classmethod
+	def release(self, media = None, metadata = None, extract = None, refresh = None):
+		# There is a small problem with refreshing metadata from MetaCache.
+		# If a new season is released, but the locally cached season and pack metadata is outdated (does not contain the new season yet), the new season will not show up in the menus until the metadata is refreshed.
+		# Since metadata is now only refreshed every 2 months, it can take a long time until the metadata is updated and contains the new season.
+		# Eg: Last Week Tonight with John Oliver S12E01 was just released.
+		# Eg: The show is listed under the Progress menu and marked in bold, since the smart menu knows about the new S12E01 release.
+		# Eg: When opening the episode submenu or the season menu, S12 is not listed at all, since the cached season metadata only goes up to S11 and was not recently refreshed.
+		# To recude this happening, we generate a large list of more accurate release dates:
+		#	1. When smart-loading Progress, the dates from the last season in the pack is used. This will only work if the pack metadata is up-to-date and the smart item was recently processed to include the pack dates.
+		#	2. When smart-loading Arrivals, the dates for all recent season releases are used. This only works for shows that are in Arrivals and smaller less-known shows might not be included.
+		# In MetaCache._timeExtract(), when retrieving metadata from the local cache, this list of dates is used to determine which titles should be refreshed more often, instead of relying on the possibly outdated dates inside the cached metadata.
+		# This should allow more frequent metadata refreshes for most popular shows and shows in the user's progress.
+		# For any other titles that are not refreshed with this date list:
+		#	1. Either stick to the outdated metadata and wait until it is refreshed naturally, which can take a long time, since the new refresh period is 2 months.
+		#	2. Or the user manually refreshes the metadata from the context menu -> Refresh -> Refresh Menu/Season metadata.
+
+		# Title metadata is only refreshed in MetaCache every 2 months by default.
+		# The metadata might therefore be outdated, especially for new-ish releases, and has to be refreshed more frequently to get the latest metadata.
+		# Once titles are older than 1-2 years, their metadata will change little (except their rating/votes), and only refreshing on the 2-month-interval is sufficient.
+		#
+		# Incomplete metadata causes the following problems:
+		#	1.	Some metadata attributes might be missing or incomplete, such as aliases, cast, images, etc.
+		#		This metadata is non-critical and should not cause any problems if outdated.
+		#		Incomplete metadata is rare and mostly prevalent around the release dates.
+		#		So refreshing often around the release dates should solve this.
+		#	2.	Some metadata attributes might be available, but their values are outdated.
+		#		The rating/votes might be low, especially close to the premiere date, since most people have not cast their vote yet.
+		#		This metadata is only semi-critical and should not cause too many problems.
+		#		The ratings/votes are used for global and local sorting in MetaTools.sort(), and if outdated might make them move lower down the Arrivals menu.
+		#		However, the global sorting takes new releases with less votes into account, so even if outdated, the implications should be limited.
+		#	3.	Some metadata dates might be unavailable, causing critical problems.
+		#		MetaCache and MetaManager.metadataSmart() use the release dates to determine if metadata should be refreshed more frequently.
+		#		If some of these dates are missing, the metadata will not be refreshed early enough and titles might not be listed on the first page of Progress/Arrivals shortly after such a date.
+		#
+		# These missing dates cause problems in 2 menus:
+		#	1.	Movie Arrivals:
+		#		This menu is created based on the digital/physical release dates of movies, since we want proper 4K releases and not CAM/SCR releases.
+		#			Outdated metadata might not have digital/physical dates yet, and will therefore not refresh early, and only refresh around the known earlier premiere/theatrical dates.
+		#			Example: A Complete Unknown (2024)
+		#				 The movie premiered on 2024-11-20/2024-12-10 and theatrically on 2024-12-25 in the US, with many countries only getting their theatrical release in late January/February 2025.
+		#				 The digital release was on 2025-02-25 in the US, but these dates were only added to Trakt/TMDb a few days before the actual digital release. And at this point there was still no physical date yet.
+		#				 So even if the metadata was refreshed a few days prior, it would still not contain the newly added digital date.
+		#				 The movie was therefore not listed under Arrivals a few days after its digital release. It might have only shown up weeks later, or when the physical release comes out.
+		#		The digital/physical dates are not available from Trakt/TMDb/IMDb when assembling the Arrivals smart list, and all of them only return the premiere dates.
+		#			Even if we filter by date and online/watch availability on TMDb/IMDb, or on Trakt (using the "watchnow" parameter), the date filtering is applied to the premiere date, not the digital/physical date.
+		#			So even if we use the end-range of the date request parameter as an estimate of the digital/physical dates, the range/estimate is actually done on the earlier premiere date.
+		#			Example: A Complete Unknown (2024)
+		#				 On IMDb with the online-availability parameter, this movie is only listed in the date range [2025-11-01,2025-11-31], since that is when the premiere took place.
+		#				 So even if we use the "2025-11-31" date parameter as an digital date estimate, it will still be far off the actual digital release on 2025-02-25.
+		#		The only exception to this is the Trakt DVD Calendar, which returns an outer attribute which is the physical release date.
+		#			But Trakt does not have a Digital Calendar. We can filter the All Movies Calendar using the "watchnow" parameter, but this will still return the premiere dates.
+		#			Physical dates are also typically way later than the digital dates, and many do not have a physical release at all (eg Netflix Originals).
+		#			All other providers, and other Trakt calendars, only return the premiere date.
+		#			So the only way to get the updated metadata is to wait for the standard 2-month refresh interval, hope the physical date is soon and listed on Trakt to trigger a refresh, or let the user manually refresh the metadata from the context menu.
+		#			If the metadata is only refreshed weeks after the digital/physical release, this should not be a huge problem for popular movies getting listed on the first page of Arrivals.
+		#			Popular movies will remain in Arrivals for way longer, since they have a high rating and many votes. So even if they only get added to Arrivals days/weeks later, the user will still see it at some later point.
+		#			However, less popular titles with outdated dates, might never make it to the first few pages of Arrivals, since they have a low rating/votes.
+		#			They should be shown at least for a few days at the top of Arrivals, purely based on their release date. But because the metadata is outdated, their digital/physical date will have passed and the votes will not be enough to move it to the Arrival top.
+		#		Movie Progress does not have this problem. Once a movie is in this menu, because it was or is being watched, there is no urgency in refreshing the metadata.
+		#	2.	Show Progress:
+		#		Shows only have one date, the premiere date, so once we have that date, we can refresh accordingly.
+		#			Unlike movies, Show Arrivals do not have the outdated date issue.
+		#			All shows listed under Arrivals have their show premiere dates and the latest season premiere dates, which is enough for refreshing.
+		#			Items listed under the Show Arrivals are show menu entries, which do not require frequent refreshes if a new season/episode is released.
+		#		On the other hand, the problem with shows is in the Progress menu.
+		#			Season/episode/pack metadata can have missing seasons/episodes because they were not added yet before the last refresh.
+		#			This can make a new season/episode from the user's progress not show up in the Progress submenu.
+		#			Example: Last Week Tonight with John Oliver
+		#				S12 premiered on 2025-02-17. At this point, the season, episode, and pack metadata were still outdated and not containing the latest season/episode.
+		#				When opening the episode-submenu under Progress, the show only listed episodes up to S11. And when opening the show's season menu, S12 was also not listed there until the metadata was refreshed.
+		#				However, S12E01 was listed in the show Arrivals menu. This date can be used to refresh the season/episode/pack metadata earlier.
+		#
+		# Shows also make things more complex due to the different ways in which episode can be released:
+		#	1.	All episodes of a season have the same release date.
+		#		The metadata for all episodes will be available on the season premiere.
+		#		The metadata does not have to be refreshed that often, because all episode metadata is available from day one.
+		#		Only refresh occasionally to get the updated ratings/votes.
+		#	2.	Episodes are released on different days, typically one episode per week, with all metadata available from day one.
+		#		In most cases, but not always, the metadata of all episodes is available on the season premiere, even if episodes only air at a later stage.
+		#		The metadata does not have to be refreshed that often, because most metadata is complete.
+		#		Only refresh occasionally to get the updated ratings/votes.
+		#	3.	Episodes are released on different days, typically one episode per week, but not all metadata is available from day one.
+		#		The metadata of only a few future episodes, typically 2-4 episodes, is released ahead of time.
+		#		For instance, if S02E03 airs today, the metadata for S02E04-S02E06 might already be available, but not anything for S02E07 or later.
+		#		But often the future episode has missing metadata. Beside the ratings/votes, they often do not have titles and thumbnails, and are listed as eg "Episode #4".
+		#		This metadata has to be refreshed more often than the previous season types, since we need to get the updated metadata for future episodes.
+		#		However, it probably does not require a weekly refresh, since at least the episode numbers for the next few weeks are already available.
+		#	4.	Episodes are released on different days, typically one episode per week, but every episode's metadata is only added once aired.
+		#		This is typically for anime, eg One Piece, where a new episode is released every 1-2 weeks, but the metadata is sometimes only added to Trakt/TMDb/TVDb a few days before it airs.
+		#		This metadata has to be refreshed frequently, preferably once a week, so that the episode is available under Progress every week the user wants to watch the next episode.
+		#		But anime shows often have 100s of episodes per season. So refreshing the entire season's episode metadata every week requires a lot of API requests.
+		#		The pack data might require fewer API requests, but anime shows might have 1000s of episodes for the show. So refreshing packs every week might require a lot of local processing to match thousands of titles in MetaPack.
+		#		In the worst case, if we do not refresh the metadata every week, most of the time the next episode metadata will be available more than a week beforehand.
+		#		Or the user just has to wait a week or two until the metadata is refreshed naturally and the new episode becomes available.
+		#	5.	Episodes are released on different days, typically one episode per week, but there are mid-season finales.
+		#		These seasons can release all episode at once, even those after the mid-season finale.
+		#		But more typically all episodes until the mid-season finale are released, all at once or once a week, and the rest of the metadata for the 2nd half is only released months later.
+		#		This creates a problem, since the gap between consecutive episodes might not be 1-2 weeks, but rather 6-12+ months.
+		#		Hence, the metadata might not be refreshed very quickly, so when the mid-season premiere airs, it might not immediately be listed at the top of Progress.
+		#		We could just refresh the metadata on a weekly basis, but this would mean a lot of requests and processing for months where the metadata does not change.
+		#		A lot of anime does this. Most anime has a single/absolute season which is divided into arcs/stories/adventures/voyage which are then divided into mid-season finales.
+		#		Trakt/TMDb then groups these arcs into actual seasons, but there can be huge discrepancies where the premieres/finales are placed between Trakt/TMDb and TVDb.
+		#		These anime shows also often add a mid-season finale, but when the next episode is released months later, it is not added to the previous season (as a new mid-season premiere), but rather a completely new season is created.
+		#		Example: One Piece S21 finale and S22 mid-season finale.
+		#		In the worst case, episodes are not released weekly, but in arbitrary intervals, and the last episode is not marked as a finale. Then we do not know when a season has actually ended and how often we should refresh.
+		# Different metadata of shows therefore have to be refreshed as follows:
+		#	1.	Shows: Only refresh frequently around the show premiere. Refresh occasionally around the season premieres as well to get more updated ratings/votes.
+		#	2.	Seasons: Refresh frequently around every season premiere. Refreshing around new episode releases is not necessary, since the season metadata will not change a lot.
+		#	3.	Episodes: Refresh frequently around every season premiere. Depending on the show type from above, also refresh this occasionally or even weekly if a new episode is released.
+		#	4.	Packs: Refresh frequently around every season premiere. Depending on the show type from above, also refresh this occasionally or even weekly if a new episode is released. Weekly released episode numbers are needed for binging and other features.
+		#
+		# To solve the outdated metadata issue, because of the missing/outdated dates:
+		# https://www.reddit.com/r/torrents/comments/27ceeq/rss_scene_release_feed/
+		# https://www.digitalworldz.co.uk/threads/good-site-for-sceen-releases.199667/
+		# https://en.wikipedia.org/wiki/Nuke_(warez)
+		#	1.	Movies:
+		#		Retrieve the digital/physical release dates from another external source.
+		#			None of Trakt/TMDb/IMDb return these dates without requesting the detailed metadata for each individual movie. The only exception is the Trakt DVD Calendar which does return the physical, but not the digital, release date.
+		#			Hence, retrieve these dates from other sites that have those dates.
+		#			We can also use various scence release logs to check if some title has a 4K release already. But these scene logs do not have an API and their RSS feed typically only shows the releases of the past day.
+		#			This is not a perfect solution, since many unpopular movies will not be listed on any of these sites. But at least the more popular ones should be listed and therefore refreshed frequently.
+		#			Update(2025-11): Trakt has now added a streaming/digitial calendar that returns the digitial release date without having to request detailed metadata.
+		#	2.	Shows:
+		#		Technically we do not need additional dates for the Progress menu.
+		#			All show/season premieres from the Arrivals smart list should be enough to refresh the various show metadata.
+		#			However, if the user has a less popular show in his progress, that show might never get listed under Arrivals, because it has too few votes. The latest dates for refreshing will therefore not be available through Arrivals.
+		#		Additionally, many shows have mid-season finales where the next mid-season premiere might only be released months later.
+		#			Especially anime does this often, where they have a mid-season finale that only continues 6-12 months later.
+		#			Example: One Piece
+		#				S21 ended with a mid-season finale. But when the new episode came out, a new season S22 was started.
+		#				Currently S22 has a mid-season finale at S22E1122 (2024-10-13) and the next unaired episode S22E1123 (2025-04-06) will probably be added as S23 once released.
+		#			If only the show/season premieres are known, the season/episode/pack metadata will probably not be refreshed early, and the mid-season premiere might not immediately be moved to the top of Progress once aired.
+		#			Plus the shows that air weekly with episodes only added on a weekly basis, might have outdated metadata and therefore not always have the latest episodes.
+		#		Hence, also use the newest aired episode dates to more frequently refresh at least the episode and pack metadata.
+		#			The Arrivals menu only has show and season premieres, not individual episodes.
+		#			To get individual episodes, use the Trakt My Shows Calendar, which returns the latest episode number and airing date.
+		#			This should not be too heavy, since that Trakt Calendar only returns the new episodes for the user's shows, so it should not be that many.
+
+		if self == MetaManager.instance():
+			Logger.log('Releases should never be done with MetaManager.instance().', type = Logger.TypeFatal)
+			return False
+
+		items = None
+
+		if not media and metadata: media = metadata.get('media')
+
+		mediad = media
+		if Media.isSerie(media) or Media.isPack(media): mediad = Media.Show
+		elif Media.isSet(media): mediad = Media.Movie
+
+		if mediad == Media.Movie or mediad == Media.Show:
+			# Storing the items in a MetaManager class variable has no performance improvement over just using Memory.
+			# Cache for a maximum of 48h in memory. In case the user does not restart the device for a long time, so that a refresh is forced at least every other day.
+			timeout = Cache.TimeoutDay1
+			id = self._releaseId(media = mediad)
+			if not refresh: items = Memory.get(id = id, local = True, kodi = True, timeout = timeout * 2)
+
+			if not items:
+				manager = MetaManager(mode = [MetaManager.ModeAccelerate, MetaManager.ModeUndelayed])
+				manager.mReleaseMedia = mediad
+				if refresh:
+					items = manager._cacheTimeout(timeout, refresh, manager._releaseAssemble, media = mediad)
+				else:
+					# Never assemble if refreshing was not explicitly requested.
+					# Otherwise when the Progress/Arrival menus are created, retrieving metadata from MetaCache will call this function, which in turn will call progress()/arrival() causing a deadlock.
+					items = manager._cacheRetrieve(manager._releaseAssemble, media = mediad)
+				Memory.set(id = id, value = items, local = True, kodi = True)
+
+			#manager.mReleaseMedia = None # Do not reset, since the above cache call might still be busy.
+
+			if metadata:
+				id, item = self._releaseLookup(media = media, metadata = metadata, items = items)
+				if extract: item = self._releaseExtract(media = media, metadata = metadata, item = item, id = id) # Do this, even if the item cannot be found in _releaseLookup().
+				return item
+
+		return items
+
+	@classmethod
+	def _releaseLookup(self, media, metadata, items):
+		try:
+			ids = None
+			result = None
+			if items:
+				collection = Media.isSet(metadata.get('media'))
+				if 0:
+					id = Tools.get(metadata, 'id', MetaTools.ProviderTmdb)
+					if id:
+						lookup = items['collection'].get(id)
+						if lookup: result = lookup
+
+				if not result:
+					if collection: parts = metadata.get('part')
+					else: parts = [metadata]
+					if parts:
+						for part in parts:
+							id = part.get('id')
+							if id:
+								for provider in (MetaTools.ProviderTrakt, MetaTools.ProviderImdb, MetaTools.ProviderTmdb, MetaTools.ProviderTvdb):
+									idProvider = id.get(provider)
+									if idProvider:
+										lookup = items[provider].get(idProvider)
+										if lookup:
+											ids = id
+											result = lookup
+											break # Only break once found, since the lookup sub-tables of Trakt/IMDb/TMDb do not always contain the same titles.
+							if result: break
+				if result:
+					result = items['data'].get(str(result)) # The lookup ID is an integer, but the data keys are strings, so cast to string.
+					if result:
+						result = self._releaseReduce(item = result)
+						if collection:
+							# Replace the IDs if it is in the release dictionary, which has more IDs.
+							# Otherwise keep to the set metadata part IDs, which only has the TMDb ID.
+							ids2 = result.get('id')
+							if ids2: ids = ids2
+
+			return ids, result
+		except: Logger.error()
+		return None, None
+
+	@classmethod
+	def _releaseExtract(self, media, metadata, item, id):
+		try:
+			def _extract(metadata, pack = None, lookup = None, all = False, minimum = None, maximum = None):
+				if metadata:
+					values = []
+					if minimum is None and all: minimum = True
+					if maximum is None and all: maximum = True
+
+					if pack:
+						value = pack.time(item = metadata)
+						if value: values.extend(value) if Tools.isArray(value) else values.append(value)
+
+						if minimum:
+							value = pack.timeMinimumStandard()
+							if value: values.append(value)
+						if maximum:
+							value = pack.timeMaximumStandard()
+							if value: values.append(value)
+					else:
+						if Tools.isArray(metadata): parts = metadata
+						else: parts = metadata.get('seasons') or metadata.get('episodes') or metadata.get('part') # Seasons, episodes, and sets metadata.
+
+						if parts:
+							for i in parts:
+								if i:
+									value = _extract(metadata = i, lookup = lookup, all = all, minimum = minimum, maximum = maximum)
+									if value: values.extend(value)
+						else:
+							time = metadata.get('time')
+							if time and Tools.isDictionary(time):
+								for i in lookup:
+									value = time.get(i)
+									if value:
+										values.append(value)
+										if not all: break
+
+							if not values and lookup and MetaTools.TimePremiere in lookup:
+								value = metadata.get('premiered') or metadata.get('aired')
+								if value: values.append(Time.timestamp(fixedTime = value, format = Time.FormatDate))
+
+							if minimum or maximum:
+								packed = metadata.get('packed')
+								if packed:
+									packed = packed.get('time')
+									if packed:
+										if minimum:
+											value = packed if Tools.isInteger(packed) else packed.get(MetaPack.ValueMinimum)
+											if value: values.append(value)
+										if maximum:
+											value = packed if Tools.isInteger(packed) else packed.get(MetaPack.ValueMaximum)
+											if value: values.append(value)
+
+					if values: return values
+				return None
+
+			current = Time.timestamp()
+			lookup = (MetaTools.TimePremiere, MetaTools.TimeTelevision, MetaTools.TimeDigital, MetaTools.TimePhysical)
+			counts = [0, 0, 0, 0]
+			times = [[], [], [], []]
+			origin = None
+			count = None
+			period = None
+			pack = None
+			previous = None
+			closest = None
+			last = None
+			special = None
+			typeSeason = None
+			typeEpisode = None
+			number = None
+			numberSeason = None
+			numberEpisode = None
+
+			# For season/episode/pack metadata, this is the status of the show.
+			status = metadata.get('status')
+
+			# Show release interval.
+			try: interval = metadata['packed']['interval']
+			except: interval = None
+
+			# Legacy, before the media for packs was "show", which is now added as the "content" attribute and the "media" attribute is now "pack".
+			# Use the media passed in from MetaCache.
+			if not media:
+				media = metadata.get('media')
+				if not media: # Legacy, before the media was added to the outer season and metadata dicts.
+					if metadata.get('seasons'): media = Media.Season
+					elif metadata.get('episodes'): media = Media.Episode
+
+			if item:
+				# Important to copy here, since the dictionary is edited below.
+				# Otherwise when retrieving different metadata (show/season/episode/pack) for the same show, the same global count dictionary is used and updated by all of them.
+				count = Tools.copy(item.get('count'))
+
+				origin = item.get('origin')
+				previous = item.get('previous')
+				closest = item.get('closest')
+				last = item.get('last')
+				special = item.get('special')
+
+				number = item.get('number') or {}
+				numberSeason = number.get('season')
+				numberEpisode = number.get('episode')
+
+				# Add the dates from external sources.
+				# Only do this for episode metadata if the season matches.
+				if not media == Media.Episode or numberSeason == metadata.get('season'):
+					values = item.get('time')
+					if values:
+						for i in range(len(values)):
+							value = values[i]
+							if value:
+								if Tools.isArray(value): times[i].extend(value)
+								else: times[i].append(value)
+
+					# If a special is the most recently released episode, its time is used for the closest episode time[2].
+					# In such a case, check if time[2] is the same as the special time, and if so, replace it with one of the other times.
+					# For other media (shows/seasons/packs), having the special in time[2] is acceptable, since we only care amount the most recent episode, irrespective if it is a special or not.
+					if media == Media.Episode and not numberSeason == 0 and special:
+						specialTime = special.get('time')
+						if specialTime:
+							episodeTime = times[2]
+							if specialTime in episodeTime:
+								if closest: episodeTime.append(closest.get('time'))
+								if previous: episodeTime.append(previous.get('time'))
+								if last: episodeTime.append(last.get('time'))
+								episodeTime = [i for i in episodeTime if i and not i == specialTime]
+								if not episodeTime: episodeTime = [specialTime] # If a standard episode has the same date as the special.
+								times[2] = episodeTime
+
+			if not count: count = {}
+
+			# MOVIES + SETS
+			#	1. Debut dates (premiere)
+			#	2. Launch dates (limited/theatrical)
+			#	3. Home dates (digital/physical/television)
+			#	4. Other (scene/unknown)
+			if media == Media.Movie or media == Media.Set:
+				# Use a fallback for sets, which only have the premiere date in the individual movies/parts.
+				value = _extract(metadata = metadata, lookup = (MetaTools.TimeDebut, MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision))
+				if value: times[0].extend(value)
+
+				value = _extract(metadata = metadata, lookup = (MetaTools.TimeLaunch, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision))
+				if value: times[1].extend(value)
+
+				value = _extract(metadata = metadata, lookup = (MetaTools.TimeHome, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision))
+				if value: times[2].extend(value)
+
+				if media == Media.Set: count = len(metadata.get('part') or [])
+
+			# SHOWS
+			#	1. Show premiere (S01)
+			#	2. Show premiere (S01)
+			#	3. Show premiere and finale (or last available episode) (Sxx)
+			#	4. None
+			elif media == Media.Show:
+				value = _extract(metadata = metadata, lookup = lookup, minimum = True)
+				if value: [times[i].extend(value) for i in (0, 1)]
+
+				value = _extract(metadata = metadata, lookup = lookup, minimum = True, maximum = True)
+				if value: times[2].extend(value)
+
+			# SEASONS
+			#	1. Show premiere (S01)
+			#	2. All season premieres (Sxx)
+			#	3. Standard season premieres and finales (or last available episode) (Sxx)
+			#	4. Special season (S00)
+			elif media == Media.Season:
+				seasons = metadata.get('seasons')
+				if seasons:
+					# Use the last season's release interval, since it can change from season to season, and refreshing matters for the last season.
+					for i in reversed(seasons):
+						try:
+							interval = i['packed']['interval']
+							if interval: break
+						except: pass
+
+					for i in seasons:
+						season = i.get('season')
+						if not season is None:
+							index = []
+							if season == 1: index.append({'index' : 0, 'minimum' : True})
+							if season >= 0: index.append({'index' : 1, 'minimum' : True})
+							if season >= 1: index.append({'index' : 2, 'minimum' : True, 'maximum' : True}) # Not for specials.
+							if season == 0: index.append({'index' : 3, 'minimum' : True})
+							if index:
+								for j in index:
+									counts[j['index']] += 1 # Count even if there is no time.
+									value = _extract(metadata = i, lookup = lookup, minimum = j.get('minimum'), maximum = j.get('maximum'))
+									if value: times[j['index']].extend(value)
+					typeSeason = seasons[-1].get('type') or []
+
+				try: count[Media.Season] = max(count.get(Media.Season) or 0, counts[2]) # Use counts[2] and not counts[1], since it should exclude S0.
+				except: pass
+				try: count[Media.Special] = max(count.get(Media.Special) or 0, 1 if counts[3] else 0)
+				except: pass
+
+			# EPISODES
+			#	1. Season premieres (SxxE01)
+			#	2. Season, midseason, and alternative premieres (SxxEyy)
+			#	3. All standard episodes (SxxEyy)
+			#	4. Special episodes (SxxE00 and S00Eyy)
+			elif media == Media.Episode:
+				episodes = metadata.get('episodes')
+				if episodes:
+					try: interval = episodes[0]['packed']['interval']
+					except: pass
+
+					for i in episodes:
+						season = i.get('season')
+						episode = i.get('episode')
+						if not episode is None:
+							index = []
+							typed = i.get('type') or []
+							if episode == 1: index.append(0)
+							if episode == 1 or Media.Premiere in typed: index.append(1)
+							if episode >= 1: index.append(2)
+							if episode == 0 or Media.Special in typed: index.append(3)
+							if index:
+								for j in index: counts[j] += 1 # Count even if there is no time.
+								value = _extract(metadata = i, lookup = lookup)
+								if value:
+									for j in index: times[j].extend(value)
+					typeEpisode = episodes[-1].get('type') or []
+
+					# Trakt season absolute-episode numbers.
+					# Eg: One Piece S22 starts at E1089.
+					# The episode count from release calendars are based on the last aired episode number.
+					# Eg: One Piece S22E1155. S22 is seen as having 1155 episodes.
+					# Subtract the first episode number to get the actual count.
+					# Eg: One Piece S22E1155 - S22E1089 + 1 = 67 episodes.
+					# Currently episode releases only come from the Trakt calendar and from the Arrivals.
+					try:
+						if origin and MetaManager.OriginTrakt in origin:
+							first = None
+							try: first = episodes[0]['number'][MetaPack.ProviderTrakt][MetaPack.NumberStandard][MetaPack.PartEpisode]
+							except: pass
+							if first is None:
+								try: first = episodes[0].get('episode')
+								except: pass
+							if first and first > 1:
+								total = count.get(Media.Episode) - first + 1
+								if total > 0: count[Media.Episode] = total
+					except: Logger.error()
+
+				try: count[Media.Episode] = max(count.get(Media.Episode) or 0, counts[2])
+				except: pass
+				try: count[Media.Special] = max(count.get(Media.Special) or 0, counts[3])
+				except: pass
+
+				# Only if requesting the latests season.
+				if not numberSeason is None and numberSeason == metadata.get('season'): typeSeason = metadata.get('type')
+
+			# PACKS
+			#	1. Show premieres (S01E01)
+			#	2. Season, midseason, and alternative premieres (SxxEyy)
+			#	3. All standard episodes (SxxEyy)
+			#	4. Special episodes (SxxE00 and S00Eyy)
+			elif media == Media.Pack:
+				pack = MetaPack.instance(metadata)
+
+				if pack:
+					status = pack.status()
+					interval = pack.interval()
+
+					lastSeason = pack.lastSeasonOfficial() or pack.lastSeasonStandard()
+					numberLast = pack.numberSeason(item = lastSeason) if lastSeason else None
+
+					# The for-loop can take a few 100ms for packs with a few 1000 episodes.
+					# Technically not all episodes are needed, only the recent ones.
+					# This reduces the show Progress menu loading time for 15 shows (with at least one large show) for this function from 300-500ms down to 80-100ms.
+					#episodes = pack.episode()
+					episodes = []
+					numbers = [0] # Always include S0, since there might be new specials.
+					numberMaximum = []
+
+					if numberSeason: # Add the season of the current release.
+						numbers.append(numberSeason)
+						numberMaximum.append(numberSeason)
+					if numberLast: # Add the last available season.
+						numbers.append(numberLast)
+						numberMaximum.append(numberLast)
+					if not numberSeason and not numberLast: # Add S01 if there are no other numbers.
+						numbers.append(1)
+						numberMaximum.append(1)
+
+					# Add other seasons that are currently running or are in the future.
+					numberMaximum = [i for i in numberMaximum if i]
+					if numberMaximum:
+						numberMaximum = max(numberMaximum)
+						if numberMaximum and not numberMaximum in numbers:
+							for i in range(numberMaximum, 0, -1):
+								timeSeason = pack.timeMaximum(season = i)
+								if not timeSeason: timeSeason = pack.timeMinimum(season = i)
+								numbers.append(i)
+								if timeSeason and timeSeason < current: break
+
+					for i in Tools.listUnique(numbers):
+						episodes2 = pack.episode(season = i)
+						if episodes2: episodes.extend(episodes2)
+
+					# Always include the first episode for the show premiere.
+					if not 1 in numbers:
+						episode2 = pack.episode(season = 1, episode = 1)
+						if episode2: episodes.append(episode2)
+
+					if episodes:
+						for i in episodes:
+							numberStandard = pack.numberStandard(item = i)
+							if numberStandard:
+								try: season = numberStandard[MetaPack.PartSeason]
+								except: season = None
+								try: episode = numberStandard[MetaPack.PartEpisode]
+								except: episode = None
+								if not season is None and not episode is None:
+									index = []
+									type = pack.type(item = i)
+									if season == 1 and episode == 1: index.append(0)
+									if season >= 1 and (episode == 1 or (type and type.get(Media.Premiere))): index.append(1)
+									if season >= 1 and episode >= 1: index.append(2)
+									if season == 0 or episode == 0 or (type and type.get(Media.Special)): index.append(3)
+									if index:
+										value = _extract(metadata = i, pack = pack)
+										if value:
+											for j in index: times[j].extend(value)
+
+					typeSeason = pack.type(item = lastSeason)
+					typeEpisode = pack.type(item = pack.lastEpisodeOfficial() or pack.lastEpisodeStandard())
+
+					# Sometimes Trakt does not have the TVDb IDs of newly released episodes.
+					# This makes all TVDb episodes extra unofficial episodes.
+					# The total/standard episode count can therefore be substantially higher, up to twice as many episodes, since the unofficial episodes are counted as well.
+					# Certain unofficial episodes should still be counted, such as a few extra IMDb specials at the end of the season.
+					# Hence, if the standard count is substantially higher than the official count, rather use the official count.
+					def _count(media, count, countAll, countOfficial):
+						try: count[media] = max(count.get(media) or 0, countOfficial if (countAll > countOfficial * 1.5) else countAll)
+						except: pass
+					_count(media = Media.Pack, count = count, countAll = pack.countEpisode(), countOfficial = pack.countEpisodeOfficial())
+					_count(media = Media.Season, count = count, countAll = pack.countSeasonStandard(), countOfficial = pack.countSeasonOfficial())
+					_count(media = Media.Episode, count = count, countAll = pack.countEpisodeStandard(), countOfficial = pack.countEpisodeOfficial())
+					_count(media = Media.Special, count = count, countAll = pack.countSpecial(), countOfficial = pack.countSpecial())
+
+			# Get the IDs if this title is old and therefore not in the releases anymore.
+			if not id and metadata: id = metadata.get('id')
+
+			# Calculate the season and episode types.
+			types = (Media.Premiere, Media.Finale, Media.Special, Media.Standard, Media.Outer, Media.Inner, Media.Middle)
+			if typeSeason: typeSeason = [i for i in typeSeason if i in types]
+			if not typeSeason: typeSeason = None
+			if typeEpisode: typeEpisode = [i for i in typeEpisode if i in types]
+			if not typeEpisode: typeEpisode = None
+
+			# Calculate the release period.
+			value = _extract(metadata = metadata, pack = pack, lookup = (MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision, MetaTools.TimeEnded), all = True) # TimeEnded for the season's last episode.
+			if not value: value = []
+			for i in (0, 1, 2): value.extend(times[i])
+			minimum = min(value) if value else None
+			maximum = max(value) if value else None
+
+			if status in MetaTools.StatusesFuture: period = MetaCache.PeriodFuture
+			elif status in MetaTools.StatusesPresent: period = MetaCache.PeriodPresent
+			elif status in MetaTools.StatusesPast: period = MetaCache.PeriodPast
+
+			# If the movie does not have a home release date yet and its premiere date is within the past few years, mark it as PeriodPresent.
+			# Since movies are StatusReleased (aka PeriodPast) right after having premiered, even if it was not released for home yet.
+			# Also mark home release dates within the past few weeks as PeriodPresent, so that MetaCache._releaseLevel() picks a higher level while the movie is new (for home).
+			if media == Media.Movie and period == MetaCache.PeriodPast:
+				value = _extract(metadata = metadata, lookup = (MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision))
+				if not value and (not maximum or maximum > (current - 63115200)): period = MetaCache.PeriodPresent # 2 years. No home release date and the premiere date is within the past few years.
+				elif value and maximum and maximum > (current - 4838400): period = MetaCache.PeriodPresent # 8 weeks. Home release date is within the past few weeks.
+
+			# Do not set the period to PeriodPast based solely on the time when the status is PeriodPresent.
+			# Otherwise if season metadata is outdated and does not have the latest unreleased season, it will be set to PeriodPast instead of PeriodPresent.
+			finished = not period == MetaCache.PeriodPresent
+			if not finished and typeEpisode and Media.Finale in typeEpisode:
+				if media == Media.Episode:
+					if Media.Inner in typeEpisode or Media.Outer in typeEpisode: finished = True
+				if media == Media.Season or media == Media.Pack:
+					if Media.Outer in typeEpisode: finished = True
+			if maximum and maximum < current and finished:
+				period = MetaCache.PeriodPast
+				status = MetaTools.StatusEnded
+			elif minimum and minimum <= current and maximum and maximum >= current:
+				period = MetaCache.PeriodPresent
+				status = MetaTools.StatusContinuing
+			elif minimum and minimum >= current:
+				period = MetaCache.PeriodFuture
+			# The current seasons has ended, but the show is returning for a new season at some point in the future.
+			# Sometimes StatusReturning is used for currently running seasons (present). Therefore, also check the time to see if the season ended.
+			# StatusReturning can also be an outdated status before the new season was released. Now that the new season started, the updated status would be StatusContinuing.
+			# Not sure if this can create problems, when the currently running season is StatusReturning, but the maximum time is in the past, but unaired/future episodes in the season do not have metadata yet.
+			elif status == MetaTools.StatusReturning and maximum and maximum < current:
+				# For daily shows, the last episode (maximum) has to aired at least 2 weeks ago to be considered PeriodPast.
+				# Sometimes Trakt does not have the most recent episodes for daily shows, while IMDb (and sometimes TVDb) has more future/unaired episodes.
+				# Eg: The Tonight Show Starring Jimmy Fallon - Trakt only goes up to S13E19 (aired 5 days ago) while IMDb goes until S13E53 (future episodes without a date).
+				if not interval == MetaPack.IntervalDaily or abs(maximum - current) > 1209600: # 2 weeks.
+					period = MetaCache.PeriodPast
+
+			# Calculate the closest dates.
+			tools = MetaTools.instance()
+			past, future = self._releaseClosest(media = media)
+			times = [tools.timeClosest(times = i, time = current, past = past, future = future, fallback = True) for i in times]
+
+			if times:
+				result = {'id' : id, 'status' : status, 'period' : period}
+				if Media.isSerie(media): result['interval'] = interval
+				result['time'] = times
+				result['count'] = count or None
+
+				if Media.isSerie(media):
+					if number: result['number'] = number
+					if previous: result['previous'] = previous
+					if closest: result['closest'] = closest
+					if last:
+						result['last'] = Tools.copy(last) # Edited below.
+					elif not numberSeason is None:
+						result['last'] = {'season' : numberSeason}
+						if not numberEpisode is None: result['last']['episode'] = numberEpisode
+					else:
+						result['last'] = {}
+					result['last']['type'] = {'season' : typeSeason, 'episode' : typeEpisode}
+					if special: result['special'] = special
+
+				return result
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def _releaseClear(self, media = None):
+		if media:
+			Memory.clear(id = self._releaseId(media = media), local = True, kodi = True)
+		else:
+			Memory.clear(id = self._releaseId(media = Media.Movie), local = True, kodi = True)
+			Memory.clear(id = self._releaseId(media = Media.Show), local = True, kodi = True)
+
+	@classmethod
+	def _releaseId(self, media):
+		return MetaManager.PropertyRelease + media
+
+	@classmethod
+	def _releaseClosest(self, media):
+		# future: The maximum allowed time into the future. Titles further into the future will be ingored if there are past dates.
+		# past: The maximum allowed time into the past. Titles older than this will allow dates further into the future than specified with the "future" parameter.
+		# Do not go too far into the future, otherwise a future physical date might be preferred above a recently past digital date.
+		if Media.isSerie(media):
+			# Less than half a week in case the previous aired episode was released a week before, still refresh according to the past episode's date.
+			# Eg: The past episode aired 2 days ago, while the new episode is 5 days into the future. In this case, use the past date's refresh rate.
+			future = 259200 # 3 days
+			# If the previous aired episode is more than a week ago, allow dates further than the "future" parameter into the future.
+			# Eg: The past episode aired a year ago, while the new episode is 2 weeks into the future. In this case, use the future date's refresh rate.
+			past = 691200 # 8 days
+		else:
+			# In case 2 dates (eg digital and physical) are close to each other.
+			future = 604800 # 1 week.
+			# Assume that the past date has been refreshed within this period, after which we allow further future dates as well.
+			past = 1209600 # 2 weeks.
+
+		return past, future
+
+	def _releaseAssemble(self, media):
+		try:
+			timer = self._jobTimer()
+
+			itemsExternal = []
+			itemsProgress = []
+			itemsArrival = []
+			movie = Media.isFilm(media)
+			serie = Media.isSerie(media)
+			current = Time.timestamp()
+			collections = None
+			order = [MetaTools.ProviderTrakt, MetaTools.ProviderImdb, MetaTools.ProviderTmdb, MetaManager.OriginOfficial, MetaManager.OriginScene, MetaManager.OriginArrival, MetaManager.OriginProgress]
+
+			results = []
+			result = {MetaTools.ProviderTrakt : {}, MetaTools.ProviderImdb : {}, MetaTools.ProviderTmdb : {}, MetaTools.ProviderTvdb : {}, 'slug' : {}}
+			if movie: result['collection'] = {}
+
+			# Make sure that any parameters passed into this function does not cause a different cache call, since the cache parameters are different.
+			# Meaning these calls should always retrieve the same data as the normal menu and reload calls.
+			# limit=False: return all items.
+			# internal=True: in order not to use the outer cache data from content().
+			progress = self.progress(media = media, pack = False, detail = False, limit = False, internal = True)
+			if progress: itemsProgress = progress.get('items')
+			arrival = self.arrival(media = media, pack = False, detail = False, limit = False, internal = True)
+			if arrival: itemsArrival = arrival.get('items')
+
+			external = self._releaseExternal(media = media)
+			if external: itemsExternal = external
+
+			# The calculated times (debut, launch, etc) are not available if the item was not smart-loaded yet.
+			if movie:
+				types = (
+					(MetaTools.TimeDebut, MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision),
+					(MetaTools.TimeLaunch, MetaTools.TimeTheatrical, MetaTools.TimeLimited, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision),
+					(MetaTools.TimeHome, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision),
+				)
+				typesAll = (MetaTools.TimePremiere, MetaTools.TimeLimited, MetaTools.TimeTheatrical, MetaTools.TimeDigital, MetaTools.TimePhysical, MetaTools.TimeTelevision, MetaTools.TimeCustom)
+
+				# Extract the collection ID from items that have it (Arrivals) so that it can be used for those that do not have the collection ID (scene/official/etc).
+				collections = {MetaTools.ProviderTrakt : {}, MetaTools.ProviderImdb : {}, MetaTools.ProviderTmdb : {}}
+				for item in (itemsExternal + itemsProgress + itemsArrival):
+					collection = Tools.get(item, 'id', 'collection', MetaTools.ProviderTmdb)
+					if collection:
+						for i in collections.keys():
+							id = item.get(i)
+							if id: collections[i][id] = collection
+
+			# NB: Sometimes the official releases return a DVD/Bluray release for a season that is far into the past.
+			# Eg: One Piece S14 (physical release) while the current airing season is S22.
+			# These are skipped inside the for-loop based on the season/episode numbers.
+			# However, this requires "entry" to have a number from a previous loop-iteration, before we get to OriginOfficial.
+			# Hence, first process OriginTrakt/OriginProgress/OriginArrivals to make sure the later number is added to "entry", before processing OriginOfficial/OriginScene with these earlier/incorrect numbers.
+			# This is needed for the skipping code inside the for-loop, underneath "if originExternal:".
+			itemsTrakt = []
+			itemsOfficial = []
+			itemsScene = []
+			itemsOther = []
+			for item in itemsExternal:
+				origin = item.get('origin')
+				if origin == MetaManager.OriginTrakt: itemsTrakt.append(item)
+				elif origin == MetaManager.OriginOfficial: itemsOfficial.append(item)
+				elif origin == MetaManager.OriginScene: itemsScene.append(item)
+				else: itemsOther.append(item) # This should never happen, except if there is a bug.
+
+			for origin, items in ((None, itemsTrakt), (MetaManager.OriginProgress, itemsProgress), (MetaManager.OriginArrival, itemsArrival), (None, itemsOfficial), (None, itemsScene), (None, itemsOther)):
+				for item in items:
+					trakt = item.get(MetaTools.ProviderTrakt)
+					imdb = item.get(MetaTools.ProviderImdb)
+					tmdb = item.get(MetaTools.ProviderTmdb)
+					tvdb = item.get(MetaTools.ProviderTvdb)
+
+					collection = None
+					if movie:
+						collection = Tools.get(item, 'id', 'collection', MetaTools.ProviderTmdb)
+						if not collection:
+							for i in collections.keys():
+								id = item.get(i)
+								if id:
+									collection = collections[i].get(id)
+									if collection: break
+
+					# Also add the slug, for quicker lookups for the official/scene releases.
+					# Recalculate the slug, in case the Trakt slug was passed in from the smart lists (should not be the case).
+					title = item.get('tvshowtitle') or item.get('title')
+					slug = Tools.replaceNotAlphaNumeric(title).lower() if title else None
+					if not slug: slug = item.get('slug')
+
+					lookup = [('slug', slug), (MetaTools.ProviderTrakt, trakt), (MetaTools.ProviderImdb, imdb), (MetaTools.ProviderTmdb, tmdb), (MetaTools.ProviderTvdb, tvdb), ('collection', collection)]
+					lookup = [i for i in lookup if not i[1] is None]
+
+					# Item can appear in both Progress and Arrivals.
+					# Or they appear in both the smart lists and the external sources.
+					entry = None
+					for i in lookup:
+						entry = result[i[0]].get(i[1])
+						if entry: break
+					if not entry:
+						# 4 sets of time:
+						#	Movies: [premiere (earliest release) | limited/theatrical | digital/physical/tv | last release (eg 4k or anniversary release) ]
+						#	Shows: [show premiere S01E01 | latests season premiere SxxE01 | latests episode aired SxxEyy | latests special aired S00Eyy]
+						# 4 subsets of time, ordered from most important/exact to least important/exact:
+						#	[known/exact/Trakt dates | official non-Trakt dates | estimated/scene/unknwon-number dates | unknown/very-inexact dates from request parameters]
+						entry = {'origin' : [], 'time' : [[[], [], [], []], [[], [], [], []], [[], [], [], []], [[], [], [], []]]}
+
+						# If the movie belongs to a collection, add the movie IDs.
+						# These are needed in _releaseLookup() and later in MetaCache._releasePartial() to determine which movie is the latest one in the collection.
+						# Do not add the IDs for all titles, since they are not needed and just increase storage space.
+						if collection: entry['id'] = {MetaTools.ProviderTrakt : trakt, MetaTools.ProviderImdb : imdb, MetaTools.ProviderTmdb : tmdb, 'collection' : collection}
+
+						results.append(entry)
+						for i in lookup: result[i[0]][i[1]] = entry
+
+					smart = Tools.get(item, MetaManager.Smart, 'release') or {}
+					type = item.get('type')
+
+					time = item.get('time')
+					timeSingle = time
+					if Tools.isArray(timeSingle): timeSingle = self.mTools.timeClosest(times = timeSingle, time = current, future = True)
+					elif Tools.isDictionary(timeSingle): timeSingle = timeSingle.get(MetaTools.TimePremiere)
+
+					# Always replace the origin if one of the items comes from Trakt, since Trakt has the most accurate data.
+					# This is also used in other places, like in _metadataSmartRelease() to sort titles that on the Trakt calendar to the top.
+					if origin is None: origin = item.get('origin') # Only for external sources.
+					originInternal = origin == MetaManager.OriginArrival or origin == MetaManager.OriginProgress
+					originExternal = origin == MetaManager.OriginOfficial or origin == MetaManager.OriginScene
+
+					origins = entry.get('origin')
+					origins.append(origin)
+					origins = Tools.listSort(Tools.listUnique([i for i in origins if i]), order = order)
+					entry['origin'] = origins
+
+					index = None
+					season = None
+					episode = None
+					unknown = None
+
+					if movie:
+						if type == MetaTools.TimePremiere: index = [0]
+						elif type in MetaTools.TimesCinema: index = [1]
+						elif type in MetaTools.TimesHome: index = [2]
+						else: index = [2] # Digital/physical date.
+
+						# Add the accurate digitial/physical release dates.
+						# Used by the smart menus in _metadataSmartRelease().
+						# Since time[2] can be a physical date in the future, while there is a digital date in the past.
+						# And sometimes we specifically want the past date, instead of the closest past/future date.
+						home = item.get('home')
+						if home: entry['home'] = Tools.listSort(Tools.listUnique(home))
+					elif serie:
+						season = item.get('season')
+						episode = item.get('episode')
+
+						entryNumber = entry.get('number')
+						if entryNumber is None: entry['number'] = entryNumber = {}
+
+						# Sometimes the official releases return a DVD/Bluray release for a season that is far into the past.
+						# Skip these and do not replace the higher numbers.
+						# Eg: One Piece S14 (physical release) while the current airing season is S22.
+						if originExternal:
+							existingSeason = entryNumber.get('season')
+							existingEpisode = entryNumber.get('episode')
+							if not existingSeason is None and not season is None:
+								if season < existingSeason: continue
+								if not existingEpisode is None and not episode is None:
+									if season == existingSeason and episode < existingEpisode: continue
+
+						# Add the previously aired and last known episodes.
+						# Do not use specials for previous/closest/last.
+						special = []
+						existingSpecial = entry.get('special')
+						if existingSpecial: special.append(existingSpecial)
+						if season == 0: special.append({'season' : season, 'episode' : episode, 'time' : timeSingle})
+
+						# Last aired episode.
+						# Is always in the past and closest to the current time.
+						previous = item.get('previous')
+						if previous:
+							if previous.get('season') == 0:
+								special.append(previous)
+								previous = None
+							else:
+								# NB: Only change the previous entry, if the new item was aired AFTER the time of the existing entry.
+								# Otherwise if the Trakt official calendar has the previous episode as S22E10, but the user has only watched until S04E03 (from OriginProgress), then S22E10 is incorrectly replaced by the years-earlier S04E03.
+								try: existing = entry['previous']['time']
+								except: existing = None
+								if not existing or (previous.get('time') or 0) > existing: entry['previous'] = previous
+								else: previous = None
+
+						# Episode closest to the current time.
+						# Can be the previously aired episode, or the next unaired/future episode.
+						closest = item.get('closest')
+						if closest:
+							if closest.get('season') == 0:
+								special.append(closest)
+								closest = None
+							else:
+								# NB: Only change the closest entry, if the time of the new item is closer to the time of the existing entry.
+								# Otherwise if the Trakt official calendar has the closest episode as S22E10, but the user has only watched until S04E03 (from OriginProgress), then S22E10 is incorrectly replaced by the years-earlier S04E03.
+								try: existing = entry['closest']['time']
+								except: existing = None
+								if not existing or closest.get('time') == self.mTools.timeClosest(times = [existing, closest.get('time') or 0], time = current, future = True): entry['closest'] = closest
+								else: closest = None
+
+						# The last known episode in the season, typically in the future.
+						# Is often the season finale, but does not have to be if episode's metadata is released eg weekly, shortly before they air.
+						last = item.get('last')
+						if last:
+							if last.get('season') == 0:
+								special.append(last)
+								last = None
+							else:
+								try: existing = entry['last']['time']
+								except: existing = None
+								if not existing or (last.get('time') or 0) > existing: entry['last'] = last
+								else: last = None
+
+						# The last known special episode, past or future.
+						if special:
+							try:
+								if len(special) == 1:
+									special = special[0]
+								else:
+									timeSpecial = self.mTools.timeClosest(times = [i.get('time') for i in special if i.get('time')], time = current, future = True)
+									if timeSpecial: special = next(i for i in special if i.get('time') == timeSpecial)
+									else: special = max(special, key = lambda i : (i.get('episode') or -1))
+							except: Logger.error()
+							if special:
+								if Tools.isArray(special): special = special[-1]
+								entry['special'] = special
+
+						# If the show is not in the user's Trakt progress, but only comes from Arrivals.
+						# Interpolate missing details as far as possible.
+						try:
+							if not previous:
+								episodes = [closest, {'season' : season, 'episode' : episode or 1, 'time' : timeSingle}, last]
+								episodes = [i for i in episodes if i and not i.get('season') == 0 and i.get('time') and i.get('time') < current]
+
+								# NB: Only change the previous entry, if the new item was aired AFTER the time of the existing entry.
+								# Otherwise if the Trakt official calendar has the previous episode as S22E10, but the user has only watched until S04E03 (from OriginProgress), then S22E10 is incorrectly replaced by the years-earlier S04E03.
+								if episodes:
+									itemPrevious = max(episodes, key = lambda i : (i.get('episode') or -1))
+									try: existing = entry['previous']['time']
+									except: existing = None
+									if not existing or (itemPrevious.get('time') or 0) > existing:
+										previous = itemPrevious
+										if previous: entry['previous'] = previous
+						except: Logger.error()
+						try:
+							if not closest:
+								episodes = [previous, {'season' : season, 'episode' : episode or 1, 'time' : timeSingle}, last]
+								episodes = [i for i in episodes if i and not i.get('season') == 0 and i.get('time')]
+								if episodes:
+									# NB: Only change the closest entry, if the time of the new item is closer to the time of the existing entry.
+									# Otherwise if the Trakt official calendar has the closest episode as S22E10, but the user has only watched until S04E03 (from OriginProgress), then S22E10 is incorrectly replaced by the years-earlier S04E03.
+									timeClosest = self.mTools.timeClosest(times = [i.get('time') for i in episodes], time = current, future = True)
+									try: existing = entry['closest']['time']
+									except: existing = None
+									if not existing or timeClosest == self.mTools.timeClosest(times = [existing, timeClosest or 0], time = current, future = True):
+										if timeClosest: closest = next(i for i in episodes if i.get('time') == timeClosest)
+										else: closest = episodes[0]
+										if closest: entry['closest'] = closest
+						except: Logger.error()
+
+						# Do not use the maximum number to determine the index.
+						# Otherwise if a show is released on DVD (from official), it will be added as an episode date.
+						unknown = season is None and episode is None
+						specialIs = not season is None and season == 0
+						if specialIs: index = [3]
+						elif season is None or episode is None: index = [1]
+						elif season == 1 and episode == 1: index = [0, 1, 2]
+						elif season > 1 and episode == 1: index = [1, 2]
+						else: index = [2]
+
+						# Pick the highest season/episode number if there are multiple seasons/episodes for the same show.
+						numbers = [
+							(item.get('season'), item.get('episode')),					# Arrivals/Progress: last watched episode. Official/Scene: last released or unreleased season/episode (past or future).
+							(smart.get('season'), smart.get('episode')),				# Arrivals/Progress: last known episode of the show (past or future). Official/Scene: None.
+							(entryNumber.get('season'), entryNumber.get('episode')),	# Previous entry.
+						]
+						numbersSpecial = Tools.copy(numbers)
+
+						# Arrivals/Progress can contain future/unaired episodes.
+						# Hence, the number might not be the closest episode, but a future episode or even the last episode of the season.
+						# Use the maximum number that is lower than the previously aired episode.
+						if previous:
+							previousSeason = previous.get('season')
+							previousEpisode = previous.get('episode')
+							if not previousSeason is None:
+								numbers.append((previousSeason, previousEpisode))
+								numbersSpecial.append((previousSeason, previousEpisode))
+								numbers = [i for i in numbers if (i[0] or 0) <= previousSeason]
+								if not previousEpisode is None:
+									maximumEpisode = None
+									if closest and not closest.get('season') == 0: maximumEpisode = closest.get('episode') # Exclude specials returned by Trakt sometimes.
+									if maximumEpisode is None: maximumEpisode = (previousEpisode + 1) # The closest (possible future) episode after the previously aired episode.
+									numbers = [i for i in numbers if (i[1] or 0) <= maximumEpisode]
+						number = max(numbers, key = lambda i : (i[0] or -1, i[1] or -1))
+						season = 1 if number[0] is None else number[0]
+						episode = 1 if number[1] is None else number[1]
+
+						if origin == MetaTools.ProviderTrakt:
+							season2 = item.get('season')
+							episode2 = item.get('episode')
+							if not season2 is None and not episode2 is None:
+								if not season2 == 0: # Exclude specials returned by Trakt sometimes.
+									season = season2
+									episode = episode2
+
+						entryNumber['season'] = season
+						entryNumber['episode'] = episode
+
+						# Specials are often added after a season ends, or even weeks/months/years after the show has ended.
+						# Eg: tt0165581 ended in 2007, but a new special (S00E10) was added in 2021.
+						# Add the special number, so that S0 can be refreshed if a new special comes out, even if the season/episode number points to the last standard episode in the show.
+						# Specials are only be available from the Trakt episode calendar.
+						if specialIs:
+							number = max(numbersSpecial, key = lambda i : (0 if i[0] == 0 else -1, i[1] or -1))
+							if number and number[0] == 0 and number[1]: entryNumber['special'] = number[1]
+
+						# Pick the maximum counts.
+						countSeason = [season, item.get('season'), smart.get('season'), entryNumber.get('season')]
+						countEpisode = [episode, item.get('episode'), smart.get('episode'), entry.get('episode')]
+						if previous:
+							countSeason.append(previous.get('season'))
+							countEpisode.append(previous.get('episode'))
+						if closest:
+							countSeason.append(closest.get('season'))
+							countEpisode.append(closest.get('episode'))
+						if last:
+							countSeason.append(last.get('season'))
+							countEpisode.append(last.get('episode'))
+						countSeason = max(countSeason, key = lambda i : i or 0)
+						countEpisode = max(countEpisode, key = lambda i : i or 0)
+
+						count = {
+							Media.Pack : 1, # Total number of episodes in the entire show. Actual count is unknown, only the first episode is known.
+							Media.Season : countSeason, # Total number of seasons, excluding S0.
+							Media.Episode : countEpisode or 1, # Total number of episodes in the latests season. Actual count is unknown, only the first episode is known.
+							Media.Special : entryNumber.get('special') or (1 if specialIs else None), # Total number of specials in S0. Do not assume S0 exists, otherwise there might be constant season refreshes if the metadata only contains S1 and only S1 (but not S0) exists on Trakt/TVDb.
+						}
+
+						counted = entry.get('count') or {}
+						smarted  = smart.get('count') or {}
+						if counted or smarted:
+							for i in count.keys():
+								count[i] = max(counted.get(i) or 0, smarted.get(i) or 0, count.get(i) or 0)
+						entry['count'] = count
+
+					if time:
+						if Tools.isDictionary(time): # Arrivals/Progress.
+							if movie:
+								for i in range(len(types)):
+									# Add the exact/known dates first.
+									value = None
+									for j in types[i]:
+										value = time.get(j)
+										if value:
+											entry['time'][i][0].append(value)
+											break
+
+									# Add the estimated dates.
+									if not value:
+										value = self.mTools.timeEstimate(type = types[i][0], times = time, metadata = item)
+										if value: entry['time'][i][2].append(value)
+
+								# Add last/closest (re-)release date for movies.
+								all = []
+								for i in typesAll:
+									# Do not include the custom movie date from Arrivals/Progress, since it already comes from release() iteself.
+									# Ignore it, in case the old date is still in the smart Arrivals/Progress list, because of old code, even though it is not in release() anymore.
+									if i == MetaTools.TimeCustom and originInternal: continue
+
+									value = time.get(i)
+									if value: all.append(value)
+								entry['time'][3][0].extend(all)
+							elif serie:
+								# Show, season, or episode premieres.
+								value = time.get(MetaTools.TimePremiere)
+								if value:
+									if Tools.isArray(value):
+										for i in index: entry['time'][i][0].extend(value)
+									elif Tools.isInteger(value):
+										for i in index: entry['time'][i][0].append(value)
+
+								# Season premieres.
+								value = time.get(MetaTools.TimeCustom)
+								if value:
+									if Tools.isArray(value):
+										entry['time'][1][0].extend(value)
+									elif Tools.isInteger(value):
+										entry['time'][1][0].append(value)
+									# If there is a custom time, the premiere time should be the show's premiere.
+									value = time.get(MetaTools.TimePremiere)
+									if value:
+										if Tools.isArray(value):
+											entry['time'][0][0].extend(value)
+										elif Tools.isInteger(value):
+											entry['time'][0][0].append(value)
+
+								# Additional dates from the pack added by the show progress smart-list.
+								if smart:
+									value = smart.get('time')
+									if value:
+										for i in range(len(value)):
+											if Tools.isArray(value[i]): entry['time'][i][0].extend(value[i])
+											else: entry['time'][i][0].append(value[i])
+
+							# Add the unknown dates last.
+							# For shows add this as a season premiere, since Arrivals calendars are only new shows/seasons, not new episodes.
+							value = time.get(MetaTools.TimeUnknown)
+							if value: entry['time'][2 if movie else 1][3].append(value)
+
+						else: # External sources.
+							# Add scene releases to the back, because they sometimes are not close to the actual release date (although many are released within a few days of the date).
+							# Also add official releases without a season/episode number to the back. These are later DVD releases from Official2/Official3 which can be released years after the show has ended.
+							# Eg: dvdsreleasedates.com had a new BluRay release for tt0165581 in Dec 2024. Do not add this as primary date.
+							# Do not add official non-Trakt dates to front, since sometimes there are DVD/BluRay releases months or years after the actual physical release date (eg: new 4KL remastered or deluxe editions).
+							# Eg: dvdsreleasedates.com had a new SteelBook 4K release for tt15239678 on 19 Nov 2024 (more than half a year after the official home release date).
+							if origin == MetaManager.OriginScene or unknown: section = 2 # Scene and unknown releases.
+							elif item.get('trakt'): section = 0 # Official Trakt releases.
+							else: section = 1 # Official non-Trakt releases.
+							if Tools.isArray(time):
+								for i in index: entry['time'][i][section].extend(time)
+							elif Tools.isInteger(time):
+								for i in index: entry['time'][i][section].append(time)
+
+							# Add last/closest (re-)release date for movies.
+							if movie:
+								if Tools.isArray(time): entry['time'][3][0].extend(time)
+								elif Tools.isInteger(time): entry['time'][3][0].append(time)
+
+			# There can be dates in the same category that are very far apart, especially the 3rd time entries.
+			#	Movies: The Trakt calendar only returns premiere/physical dates, but no digital dates. The scene releases might also not come out on the exact digital/physical release dates.
+			#	Episodes: There can be airing dates of multiple/all episodes in a season.
+			# Instead of having a complex process to determine which of those dates to use (eg: digital vs physical vs scene dates), keep the selection simple.
+			# Simply pick the date that is closest to today. This list gets refreshed every day, so the time difference between the release date and today are recalculated regularly and should be accurate enough.
+			# Also limit how far into the future dates can be used. If today is between the digital date (in the past) and the physical date (in the future), only pick the future date (if it is closer to today) if it is not too far into the future.
+			# This might cause some movies to be refreshed a few extra times. Eg: a refresh triggered on the digital release date, and a few days later again when the scene release comes out.
+			# But this will not happen too often, only happen for newish releases, and even if it happens, refreshing a movie 2-3 times more is not too expensive.
+			past, future = self._releaseClosest(media = media)
+			for item in results:
+				remove = False
+
+				time = item.get('time')
+				if time:
+					for i in range(len(time)):
+						for j in range(len(time[i])):
+							value = [k for k in time[i][j] if k]
+
+							# Add the more accurate Trakt digital/physical release dates to time[2][0].
+							if movie and i == 2 and j == 0:
+								home = item.get('home')
+								if home: value.extend(home)
+
+							time[i][j] = self.mTools.timeClosest(times = value, time = current, future = future, past = past, fallback = True) if value else None
+
+						# Pick the date that is most accurate.
+						# Only pick ones from the back of the list if there are no dates in the front.
+						#	1. Exact/known dates. These should be accurate dates.
+						#	2. Official non-Trakt releases that sometimes can have a DVD release a lot later than the actual physical release date.
+						#	3. Scene releases, official releases without a season/episode number, and estimated dates, which are mostly slightly inaccurate.
+						#	4. Unknown dates added as request parameters, which are mostly very inaccurate.
+						time[i] = time[i][0] or time[i][1] or time[i][2] or time[i][3] # Replace the date list with a single date.
+
+					if serie:
+						# If no episode time is available yet, because it was not smart loaded yet (the air date is not available in the Trakt Progress), assume the season/show premiere as episode premiere.
+						if not time[2]: time[2] = time[1] or time[0]
+
+					# Remove if all dates are None.
+					if not remove:
+						value = any(time)
+						if not value: remove = True
+
+					# Remove if the digital/physical, or the last episode, was released more than a year ago.
+					if not remove:
+						value = time[2]
+						if value and (current - value) > 31557600: remove = True
+
+					# Remove if the closest available date is more than 1.5 years ago.
+					if not remove:
+						value = self.mTools.timeClosest(times = time, time = current, future = True)
+						if value and (current - value) > 47336400: remove = True
+
+					# For movies, remove if the premiere date was years ago. They are only listed here, since they have a recent physical release.
+					if not remove:
+						if movie:
+							value = time[0]
+							if value and (current - value) > 78894000: remove = True # Premiered more than 2.5 years ago.
+				else:
+					remove = True
+
+				if remove: item['remove'] = True
+
+			# Do not store the slug lookup, to save space.
+			# Lookups should also be done on IDs only to keep things efficient.
+			# If an item has only a slug, but no ID, it will not be used.
+			del result['slug']
+
+			# Remove old entries to save space and make lookups more efficient.
+			# Items are removed if they have not date or the date is far into the past.
+			for k, v in result.items():
+				for x in list(v.keys()): # Since we delete while iterating.
+					if v[x].get('remove'): del v[x]
+
+			# Limit the maximum number of items in the lookup table, to reduce storage space and lookup time.
+			# Older values already get removed if they have an old date.
+			# But in case there is a bug, or simply many releases within a year, that makes the lookup table grow continuously.
+			# The titles removed here are the oldest ones (months ago), which we probably do not need in any case.
+			limit = 5000
+			for k, v in result.items():
+				values = Tools.listSort(v.values(), key = lambda x : min([(i or 0) for i in (x['time'] or [0])]), reverse = True)
+				for item in values[:limit]:
+					if not 'remove' in item: item['remove'] = False
+				for item in values[limit:]:
+					if not 'remove' in item: item['remove'] = True
+			for k, v in result.items():
+				for x in list(v.keys()): # Since we delete while iterating.
+					if v[x].get('remove'):
+						del v[x]
+					else:
+						try: del v[x]['remove']
+						except: pass
+
+			# The release dictionary can grow very large, easily a few MB per media.
+			# This dictionary can then take long to load from Memory and JSON-decode when metadata is retrieved from cache, even if it is only done once per invoker.
+			# Reduce the size of the dictionary as follows:
+			#	1. Instead of storing each item seperatley under trakt/imdb/tmdb/tvdb, store it once in the "data" lookup and then assign an ID to it, which is added to the trakt/imdb/tmdb/tvdb lookup.
+			#	2. Change all keys to a single letter, to reduce storage space.
+			# Both these changes have to be inversed in _releaseLookup().
+			# This reduces the dictionary size to a third.
+			id0 = 0
+			ids = {}
+			data = {}
+			for provider, values in result.items():
+				for id, value in values.items():
+					id1 = Tools.id(value)
+					id2 = ids.get(id1)
+					if not id2:
+						id0 += 1
+						id2 = id0
+						ids[str(id1)] = id2
+						data[str(id2)] = self._releaseReduce(item = value, inverse = True)
+					values[id] = id2
+			result['data'] = data
+
+			Logger.log('SMART RELEASES (%s | %dms): Total: %d' % (media.capitalize(), timer.elapsed(milliseconds = True), max([len(i.keys()) for i in result.values()])))
+			return result
+		except: Logger.error()
+		return None
+
+	@classmethod
+	def _releaseReduce(self, item, inverse = False):
+		# Make the dict reduced-key : full-key.
+		# So that the inverse mapping below does not have to be done from _releaseLookup() which is called often, but only in _releaseAssemble(), which is not called that often.
+		keys = {
+			'o'	: 'origin',
+			't'	: 'time',
+
+			# Movies (if it is part of a colelction)
+			'i'	: 'id',
+			'f'	: 'trakt',
+			'g'	: 'imdb',
+			'h'	: 'tmdb',
+			'j'	: 'tvdb',
+			'k'	: 'collection',
+
+			# Shows
+			'n'	: 'number',
+			's'	: 'season',
+			'e'	: 'episode',
+			'x'	: 'special',
+			'p'	: 'pack',
+			'c'	: 'count',
+			'r'	: 'previous',
+			'l'	: 'closest',
+			'a'	: 'last',
+
+			'z'	: 'home',
+		}
+		if inverse: keys = {v : k for k, v in keys.items()}
+
+		result = {}
+		for k1, v1 in item.items():
+			if Tools.isDictionary(v1):
+				value = {}
+				for k2, v2 in v1.items():
+					key = keys.get(k2)
+					if not key:
+						key = k2
+						Logger.log('RELEASE REDUCE: Unknown key "%s"' % key)
+					value[key] = v2
+			else:
+				value = v1
+
+			key = keys.get(k1)
+			if not key:
+				key = k1
+				Logger.log('RELEASE REDUCE: Unknown key "%s"' % key)
+			result[key] = value
+
+		return result
+
+	def _releaseExternal(self, media, items = None, refresh = None):
+		# Takes about 15-20 secs for the initial retrieval, and about 5 secs for daily retrievals.
+
+		def _release(result, function, rank, refresh):
+			result[rank] = function(refresh = refresh)
+
+		threads = []
+		official = [None, None, None]
+		scene = [None, None, None]
+
+		#gaiafuture - Add another official release calendar.
+		#	https://www.releases.com/calendar/movies?f=v%3A4K%20Blu-ray
+		# But this is probably not needed, since there are already so many calendars.
+		# Plus Trakt now has a streaming calendar and this would not add much.
+
+		functions = [
+			# https://trakt.tv
+			# Refreshed daily [Initial: 39 requests | Daily: 6 requests | Not refreshed for a few days: 6-18 requests]
+			# Disk/streaming movie releases and new episode releases.
+			# Returns around 400 movies + whatever shows the user has for the intial 2x13 pages.
+			self._releaseExternalOfficial1,
+
+			# https://dvdsreleasedates.com
+			# Refreshed every 3 days [Initial: 26 requests | Every 3 days: 4 requests | Not refreshed for a few days: 4-12 requests]
+			# Digital and disk releases with IMDb ID, but not that many titles listed.
+			# Returns around 700 titles for the intial 2x13 pages.
+			self._releaseExternalOfficial2,
+
+			# https://blu-ray.com
+			# Refreshed every 3 days [Initial: 39 requests | Every 3 days: 6 requests | Not refreshed for a few days: 6-18 requests]
+			# Digital and disk releases without IMDb ID and only a title, but has more titles listed.
+			# Returns around 4500 titles for the intial 3x13 pages.
+			self._releaseExternalOfficial3,
+		]
+		threads.extend([Pool.thread(target = _release, kwargs = {'result' : official, 'function' : functions[i], 'rank' : i, 'refresh' : refresh}, start = True) for i in range(len(functions))])
+
+		functions = [
+			# https://rlsbb.cc
+			# Refreshed daily [Initial: 20 requests | Daily: 2 requests | Not refreshed for a few days: 2-15 requests]
+			# Has multiple subdomains and can therefore attempt extra requests if a subdomain is down.
+			# Returns around 150 titles for the intial 20 pages.
+			self._releaseExternalScene1,
+
+			# https://predb.me
+			# Refreshed daily [Initial: 20 requests | Daily: 2 requests | Not refreshed for a few days: 2-15 requests]
+			# Sometimes has sporadic Cloudflare protection and might not return results.
+			# Returns around 100 titles for the intial 20 pages.
+			self._releaseExternalScene2,
+
+			# https://pre.corrupt-net.org
+			# Refreshed daily [Initial: 6 requests | Daily: 4 requests | Not refreshed for a few days: 4-6 requests]
+			# Does not return many titles, since most listed on the pages are old, shows, or foreign titles.
+			# Returns around 20 titles for the intial 2x3 pages.
+			self._releaseExternalScene3,
+		]
+		threads.extend([Pool.thread(target = _release, kwargs = {'result' : scene, 'function' : functions[i], 'rank' : i, 'refresh' : refresh}, start = True) for i in range(len(functions))])
+
+		Pool.join(instance = threads)
+
+		result = []
+		for i in (official + scene):
+			i = i.get(media)
+			if i: result.extend(i)
+		return result
+
+	def _releaseExternalAssemble(self, function, links, domains = None, pages = None, cache = None, refresh = None):
+		def _release(dummy, scene):
+			try:
+				current = Time.timestamp()
+
+				# Get the previous cached data.
+				result = self._cacheRetrieve(_release, dummy, scene)
+
+				# First call will not have any results yet.
+				new = False
+				last = None
+				if result:
+					times = []
+					for v1 in result.values():
+						for v2 in v1:
+							t = v2.get('time')
+							if t: times.append(t)
+					if times: last = max(times)
+				else:
+					new = True
+					result = {Media.Movie : [], Media.Show : []}
+
+				# Start each link in a separate thread to speed up the process.
+				# Individual months are retrieved sequentially inside _releaseRetrieve().
+				target = self._releaseExternalScene if scene else self._releaseExternalOfficial
+				threads = [Pool.thread(target = target, kwargs = {'result' : result, 'function' : function, 'link' : link, 'domains' : domains, 'pages' : pages, 'new' : new, 'last' : last}, start = True) for link in links]
+				Pool.join(instance = threads)
+
+				# Remove duplicate entries.
+				# The old cached data and the new retrievals often contain the same titles.
+				lookup = (MetaTools.ProviderImdb, MetaTools.ProviderTrakt, MetaTools.ProviderTmdb, MetaTools.ProviderTvdb, 'slug')
+				items1 = {Media.Movie : {}, Media.Show : {}}
+				items2 = {Media.Movie : [], Media.Show : []}
+				for k, v in result.items():
+					for x in v:
+						existing = None
+						for i in lookup:
+							value = x.get(i)
+							if value:
+								existing = items1[k].get(i + '_' + value)
+								if existing: break
+						if existing:
+							# Add both the digital and physical dates from Trakt.
+							if k == Media.Movie and x.get('origin') == MetaManager.OriginTrakt:
+								existing['home'].append(x.get('time'))
+
+							time = [existing.get('time'), x.get('time')]
+							if scene: time = min(time) # Pick the first scene release, which will be closest to the actual digital/physical release date.
+							else: time = self.mTools.timeClosest(times = [existing.get('time'), x.get('time')], time = current) # Use the closest time for official releases, to use either the digital or physical date.
+							existing['time'] = time
+
+							# There can mutiple episodes for the same show in the calendar.
+							# Keep track of the previous aired episode, since it is needed in MetaCache._releaseOutdated().
+							# Since the "time" attribute above is the closest time and can therefore be a future episodes.
+							if k == Media.Show:
+								time1 = x.get('time')
+								season1 = x.get('season')
+								episode1 = x.get('episode')
+
+								# Set the numbers of the closest episode (past or future).
+								if time == x.get('time'):
+									existing['season'] = season1
+									existing['episode'] = episode1
+									if not season1 == 0: existing['closest'] = {'season' : season1, 'episode' : episode1, 'time' : time1}
+
+								# Previously aired episode.
+								previous = existing.get('previous')
+								time2 = previous.get('time')
+								season2 = previous.get('season')
+								episode2 = previous.get('episode')
+								if time1 <= current:
+									if not season2 is None and not season1 is None:
+										replace = False
+										if not episode2 is None and not episode1 is None:
+											if (season1 > season2) or (season1 == season2 and episode1 > episode2) or (season1 == season2 and episode1 < episode2 and time2 > current): replace = True
+										else:
+											if (season1 > season2) or (season1 <= season2 and time2 > current): replace = True
+										if replace: existing['previous'] = {'season' : season1, 'episode' : episode1, 'time' : time1}
+
+								# Last known episode. Might not have aired yet.
+								last = existing.get('last')
+								season2 = last.get('season')
+								episode2 = last.get('episode')
+								if not season2 is None and not season1 is None:
+									replace = False
+									if not episode2 is None and not episode1 is None:
+										if (season1 > season2) or (season1 == season2 and episode1 > episode2): replace = True
+									else:
+										if (season1 > season2): replace = True
+									if replace: existing['last'] = {'season' : season1, 'episode' : episode1, 'time' : time1}
+						else:
+							# Add both the digital and physical dates from Trakt.
+							if k == Media.Movie and x.get('origin') == MetaManager.OriginTrakt:
+								x['home'] = [x.get('time')]
+
+						 	# More info in the comments above.
+							elif k == Media.Show:
+								base = {'season' : x.get('season'), 'episode' : x.get('episode'), 'time' : x.get('time')}
+								x['previous'] = Tools.copy(base)
+								x['closest'] = Tools.copy(base)
+								x['last'] = Tools.copy(base)
+
+							items2[k].append(x)
+							for i in lookup:
+								items1[k][i + '_' + value] = x
+				result = items2
+
+				# Remove old entries to save storage space.
+				limitMovie = current - 63115200 # 2 years. Higher, since movies can have longer periods between the cinema and home release dates.
+				limitShow = current - 39447000 # 1.25 year. Lower, since a new season can already arrive within a year.
+				for k, v in result.items(): result[k] = [i for i in v if (i.get('time') or 0) > (limitMovie if k == Media.Movie else limitShow)]
+
+				# Limit the maximum number of items in the lookup table, to reduce storage space and processing time.
+				# Older values already get removed if they have an old date.
+				# But in case there is a bug, or simply many releases within a year, that makes the lookup table grow continuously.
+				# Keep the limit high, since further reductions are done when the lookup table is created.
+				limit = 7500
+				for k, v in result.items():
+					values = Tools.listSort(v, key = lambda x : x['time'], reverse = True)
+					result[k] = values[:limit]
+
+				return result
+			except: Logger.error()
+			return None
+
+		# Official: release dates are added ahead of time, often even a month into the future. Hence, do not refresh every day.
+		# Scene: release are added on a daily basis. Hence, refresh every day.
+		# Add the function ID, so that the cache is unique for each child function that calls this.
+		scene = MetaManager.OriginScene in repr(function).lower()
+		if cache is None: cache = cache.TimeoutDay1 if scene else Cache.TimeoutDay3
+
+		return self._cacheTimeout(cache, refresh, _release, self.mCache.id(function), scene)
+
+	def _releaseExternalOfficial(self, result, function, link, domains, pages, new, last):
+		try:
+			# A page has a month of releases.
+			maximum = pages
+			pages = 2
+			if new:
+				# If never retrieved before, get a full year of releases (plus next month).
+				pages = 13
+			elif last:
+				# If not refreshed in a long time, get more months.
+				last = abs(Time.timestamp() - last)
+				last = int(last / 2628000)
+				pages = max(2, min(6, last))
+			if maximum: pages = min(pages, maximum)
+
+			year = Time.year()
+			month = Time.month() + 1 # Start at next/future month.
+			if month > 12:
+				year += 1
+				month = 1
+
+			type = None
+			if Tools.isDictionary(link):
+				type = link.get('type')
+				link = link.get('link')
+
+			for i in range(pages):
+				success = function(result = result, link = link, year = year, month = month, type = type)
+				if not success: break # If a request fails, do not continue to the next month.
+				month -= 1
+				if month < 1:
+					year -= 1
+					month = 12
+		except: Logger.error()
+
+	def _releaseExternalScene(self, result, function, link, domains, pages, new, last):
+		try:
+			page = 1
+			domain = None
+
+			# A page has 1 - 1.5 days of releases.
+			maximum = pages
+			pages = 2
+			if new:
+				# If never retrieved before, get more pages.
+				pages = 20
+			elif last:
+				# If not refreshed in a long time, get more pages.
+				last = abs(Time.timestamp() - last)
+				last = int(last / 86400)
+				pages = max(2, min(15, last))
+			if maximum: pages = min(pages, maximum)
+
+			type = None
+			if Tools.isDictionary(link):
+				type = link.get('type')
+				link = link.get('link')
+
+			for i in range(pages):
+				success = False
+
+				# Try different subdomains in case one is down.
+				# If a previous call worked with a specific domain, stick to that domain.
+				if not domains:
+					success = function(result = result, link = link, page = page, type = type)
+				elif domain:
+					success = function(result = result, link = link % domain, page = page, type = type)
+				else:
+					for j in domains:
+						success = function(result = result, link = link % j, page = page, type = type)
+						if success:
+							domain = j
+							break
+
+				if not success: break # If a request fails with all subdomains, do not continue to the next month.
+				page += 1
+		except: Logger.error()
+
+	def _releaseExternalProcess(self, result, media, name, time, type = None):
+		if name and time:
+			if (
+				Regex.match(data = name, expression = '[\s\.\-\_\[\(]((?:1080|2160|3160|4096|4320)[ip]?|[468]k|uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must be HD releases.
+				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(]((?:(?:hd|dvd|bd).?)?(?:cam|scr|tc|tele.?cine|ts|tele.?sync)(?:.?rip)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be CAM/SCR/TS/TC releases.
+				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(](hc|dub(?:bed|bing)?|pcm|theater|theatre|record(?:ing|ed)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be HC/dubbed/PCM/theater releases. Eg: Nuremberg 2025 1080p Theater HEVC PCM 5.1-NaNi
+				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(](s\d+(?:e\d+))(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be shows (present in the x264 category of corrupt-net.org). Most of then are in any case old or German/Dutch releases.
+			):
+				# Update: Now do very strict matching of movie scene releases.
+				# If there is an improper scene release that is detected as a proper HD release, but contains some keyword that is not in the regex above, the scene date is added as a digital release date and can mess things up.
+				# Eg: Nuremberg 2025 1080p Theater HEVC PCM 5.1-NaNi
+				# Eg: Previously the "Theater" keyword was not detected. Hence, this date was added as a digital date 2 months before the actual digital release. Now the movie shows up in Arrivals way too early.
+				# Hence, do a stricter match and only allow filenames that overwhelmingly point to a proper HD release.
+				# This will reduce the total detected scene titles, but this is more accurate and should not be a problem, since Trakt now has a proper streaming calendar with more accurate dates.
+				# If this still allows improper titles to slip through, add this to _releaseAssemble() where the movie index list is determined:
+				#	if origin == MetaManager.OriginScene: index = [3] # Add this line.
+				#	elif type == MetaTools.TimePremiere: index = [0]
+				#	elif type in MetaTools.TimesCinema: index = [1]
+				#	elif type in MetaTools.TimesHome: index = [2]
+				#	else: index = [2]
+				# This will therefore not add scene dates as digital/physical dates anymore, but rather as an unknown date. This would essentially remove the scene dates from being used in release() and only rely on Trakt and Official calendars.
+				allow = True
+				if media == Media.Movie:
+					allow = False
+					count = 0
+					expressions = [
+						'[\s\.\-\_\[\(](?:hdr(?:[\s\.\-\_]?\d+(?:\+|plus)?)?|dv|dolby.?vision)(?:$|[\s\.\-\_\]\)])', # HDR/DV.
+						'[\s\.\-\_\[\(](?:(?:2160|3160|4096|4320)[ip]?|[468]k)(?:$|[\s\.\-\_\]\)])', # 4K+ and not 1080p.
+						'[\s\.\-\_\[\(](?:uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', # Disk/web rip.
+						'[\s\.\-\_\[\(](?:atmos|7\.1)(?:$|[\s\.\-\_\]\)])', # HQ audio.
+					]
+					for expression in expressions:
+						if Regex.match(data = name, expression = expression, cache = True):
+							count += 1
+							if count >= 2: # Must match at least 2 of the expressions.
+								allow = True
+								break
+
+				if allow:
+					match = Regex.extract(data = name, expression = '\s*(.*?)[\s\.\-\_\[\(]*((?:19|2[01])\d{2})(?:$|[\s\.\-\_\]\)])', group = None, all = True, cache = True) # Year.
+					if match:
+						match = match[0]
+						title = match[0].replace('.', ' ')
+
+						# Bleach Thousand Year Blood War Vol 01 D01
+						# Im Quitting Heroing Vol 02
+						# The Dreaming Boy Is a Realist D01
+						new = Regex.extract(data = title, expression = '(.*?)\s*((?:vol(?:ume|\.)?)\s*\d+|d(?:is[ck])?\s*\d+)', cache = True)
+						if new: title = new
+
+						year = int(match[1])
+						self._releaseExternalAdd(result = result, media = media, title = title, year = year, time = time, type = type, origin = MetaManager.OriginScene)
+
+	def _releaseExternalAdd(self, result, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, episode = None, time = None, type = None, extra = None, origin = None):
+		if (imdb or tmdb or tvdb or trakt or title) and time:
+
+			# Official2 and Official3.
+			if not media and title:
+				# Shangri-La Frontier: Season 1, Part 1
+				# Shameless: The Complete Series
+				# Frasier - Season Two
+				# The Unwanted Undead Adventurer: The Complete Season
+				# The Penguin: The Complete First Season
+				# The Last of Us: The Complete First Season 4K (SteelBook)
+				# Jujutsu Kaisen: Season 2 - Shibuya Incident
+				# Star Trek: Lower Decks: The Final Season
+				# One Piece: Season 14 Voyage 3
+				# All Creatures Great and Small Season 5
+				# The Rising of the Shield Hero: Season Three
+				# Welcome to Demon School Iruma-kun: Season 2
+				# he Unwanted Undead Adventurer: The Complete Season
+				# All Creatures Great and Small: Season 5
+				# Spy x Family: Season Two
+				# A Sign of Affection: The Complete Season
+				# The Apothecary Diaries: Season 1, Part 2
+				# The 100 Girlfriends Who Really, Really, Really, Really, Really Love You: Season 1
+				# Jujutsu Kaisen: Season 2 - Hidden Inventory/Premature Death
+				# Chained Soldier: Season 1 Complete Collection
+				# My Teen Romantic Comedy SNAFU: Complete Three Season Collection
+				# Bucchigiri?!: The Complete Season
+				# Doctor Who: Sylvester McCoy: Complete Season Two
+				# Tales of Wedding Rings: Season 1
+				# Many more formats.
+				if Regex.match(data = title, expression = '(seasons?|series?)', cache = True):
+					media = Media.Show
+
+					# Sometimes the season is only given in the extended/extra attributes.
+					for i in [title, extra]:
+						if i:
+							if not season:
+								extract = Regex.extract(data = title, expression = '(?:seasons?|series?)\s*(\d+)(?![a-z])', cache = True)
+								if extract: season = int(extract)
+							if not season:
+								extract = Regex.extract(data = title, expression = '(?:(?:seasons?|series?)\s*(one|two|three|four|five|six|seven|eight|nine|ten)|(one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*(?:seasons?|series?))', cache = True)
+								if extract:
+									if extract == 'one' or extract == 'first' or extract == '1st': season = 1
+									elif extract == 'two' or extract == 'second' or extract == '2nd': season = 2
+									elif extract == 'three' or extract == 'third' or extract == '3rd': season = 3
+									elif extract == 'four' or extract == 'fourth' or extract == '4th': season = 4
+									elif extract == 'five' or extract == 'fifth' or extract == '5th': season = 5
+									elif extract == 'six' or extract == 'sixth' or extract == '6th': season = 6
+									elif extract == 'seven' or extract == 'seventh' or extract == '7th': season = 7
+									elif extract == 'eight' or extract == 'eighth' or extract == '8th': season = 8
+									elif extract == 'nine' or extract == 'ninth' or extract == '9th': season = 9
+									elif extract == 'ten' or extract == 'tenth' or extract == '10th': season = 10
+							if season: break
+
+					# Remove trailing descriptions.
+					# Star Trek: Section 31 [DVD]
+					title = Regex.remove(data = title, expression = '(\s*(?:[\:\-]\s*(?:(?:the)?\s*(?:final|last|full|complete|one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*)*(?:seasons?|series?)|\s+(?:seasons?|series?)\s*\d+).*)$', cache = True)
+				else:
+					media = Media.Movie
+
+				# Remove trailing descriptions.
+				# The Wages of Fear 4K
+				# Den of Thieves: 2-Film Collection 4K (SteelBook)
+				# Djabe & Steve Hackett: Freya - Arctic Jam (DigiPack)
+				# Star Trek: Lower Decks - The Complete Series (SteelBook)
+				# Last of the Red Hot Lovers (Mediabook)
+				# Jethro Tull: Curious Ruminant (Hardback Book)
+				# Cheyenne: The Complete Series
+				# The Divergent Series: 3-Film Collection
+				# Den of Thieves: 2-Film Collection 4K (SteelBook)
+				# The World Is Still Beautiful: Complete Collection
+				# Morning Show Mysteries: Complete Movie Collection
+				# Hallmark Dayspring 2-Movie Collection
+				# Star Trek: Section 31 [DVD]
+				title = Regex.remove(data = title, expression = '([\s\-\_\:]+(?:\s*(?:[\:\-]|\d+\-)\s*(?:4k|\([a-z\d\s\-]+\)|(?:the\s*)?(?:(?:\d+|one|two|three|four|five)[\-\s])?(?:(?:final|last|first|second|third|fourth|fifth|complete|movie|film|collection|series?|seasons?)\s)+)|4k|\([a-z\d\s\-]+\)|(?:series?|seasons?)\s\d|[\[\(]?(?:dvd|blur.?ray)[\]\)]?).*)$', cache = True)
+
+			if Media.isSerie(media) or not year or year >= (Time.year() - 3): # Do not add old titles for movies.
+				item = {'origin' : origin or MetaManager.OriginOfficial, 'time' : time, 'type' : type}
+
+				ids = []
+				if imdb: ids.append((MetaTools.ProviderImdb, imdb))
+				if trakt: ids.append((MetaTools.ProviderTrakt, trakt))
+				if tmdb: ids.append((MetaTools.ProviderTmdb, tmdb))
+				if tvdb: ids.append((MetaTools.ProviderTvdb, tvdb))
+				for i in ids: item[i[0]] = i[1]
+
+				if title:
+					item['slug'] = Tools.replaceNotAlphaNumeric(title).lower()
+					item['title'] = title
+
+				if year: item['year'] = year
+				if not season is None: item['season'] = season
+				if not episode is None: item['episode'] = episode
+
+				result[media].append(item)
+
+	# Trakt DVD/Streaming Calendar.
+	# Is already part of the Arrivals, but add here again as a backup to create a full lookup table. Plus this includes future months not in Arrivals.
+	def _releaseExternalOfficial1(self, refresh = None):
+		def _release(result, link, year, month, type = None):
+			media = link
+			serie = Media.isSerie(media)
+
+			valid = True
+			error = None
+
+			start = '%d-%02d-01' % (year, month)
+			month += 1
+			if month > 12:
+				year += 1
+				month = 1
+			end = '%d-%02d-01' % (year, month)
+
+			if serie:
+				releases = [
+					# Only shows that the user is watching, otherwise there will be too many episodes added.
+					{'media' : Media.Episode, 'release' : MetaTrakt.ReleaseNew, 'date' : MetaTools.TimePremiere, 'user' : True},
+				]
+			else:
+				releases = [
+					{'media' : media, 'release' : MetaTrakt.ReleaseDigital, 'date' : MetaTools.TimeDigital, 'user' : False},
+					{'media' : media, 'release' : MetaTrakt.ReleasePhysical, 'date' : MetaTools.TimePhysical, 'user' : False},
+				]
+
+			# future: allow future dates.
+			# duplicate: allow multiple episodes from the same show released in the same period.
+			for release in releases:
+				data = MetaTrakt.instance().release(media = release['media'], release = release['release'], user = release['user'], date = [start, end], future = True, duplicate = True)
+				try:
+					for i in data:
+						try:
+							time = i['time'][release['date']]
+							if time: self._releaseExternalAdd(origin = MetaManager.OriginTrakt, result = result, media = media, imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), title = i.get('tvshowtitle') or i.get('title'), year = i.get('tvshowyear') or i.get('year'), season = i.get('season'), episode = i.get('episode'), time = time, type = release['date'])
+						except: error = 'ITEM'
+				except: error = 'ITEMS'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID OFFICIAL1 [%s]: %s' % (error, media))
+			return valid
+
+		links = [Media.Movie, Media.Show]
+		return self._releaseExternalAssemble(function = _release, links = links, refresh = refresh, cache = Cache.TimeoutDay1)
+
+	# https://dvdsreleasedates.com
+	# Digital and disk releases with IMDb ID, but not that many titles listed.
+	def _releaseExternalOfficial2(self, refresh = None):
+		def _release(result, link, year, month, type):
+			from lib.modules.parser import Parser
+			from lib.modules.convert import ConverterTime
+
+			valid = False
+			error = None
+
+			networker = Networker()
+			link = networker.linkJoin(link, year, month) + '/' # Must end with a /.
+			data = networker.requestText(link = link)
+
+			# Should not have Cloudflare protection. But still check in case it is added later on.
+			if networker.responseErrorType() == Networker.ErrorCloudflare:
+				error = 'CLOUDFLARE'
+			elif data:
+				data = Parser(data = data, parser = Parser.ParserHtml5) # Use HTML5, since there are some bugs in the markup.
+				if data:
+					data = original = data.find(class_ = 'fieldtable')
+					if data:
+						valid = True
+						data = data.find_all(class_ = 'fieldtable-inner')
+				if data:
+					for values in data:
+						try:
+							time = values.find(class_ = 'reldate').find(text = True) # Not nested text.
+							time = Regex.extract(data = time, expression = '(\w+\s+\d.*?\d{4})', cache = True) # Remove weekday.
+							time = time = ConverterTime(time, format = ConverterTime.FormatDateAmerican, utc = True).timestamp()
+							for value in values.find_all(class_ = 'dvdcell'):
+								try:
+									imdb = value.find(class_ = 'imdblink').find('a')['href']
+									imdb = Regex.extract(data = imdb, expression = '\/(tt\d+)')
+									try: title = value.find_all('a')[1].text
+									except: title = None
+									self._releaseExternalAdd(result = result, imdb = imdb, title = title, time = time, type = type)
+								except:
+									Logger.error()
+									error = 'ITEM'
+						except:
+							Logger.error()
+							error = 'ITEMS'
+				else:
+					# Future months sometimes do not have any data, showing this error:
+					#	 Sorry, nothing currently available. Check back often for updates.
+					# Do not mark this as a struct error.
+					try: text = original.text
+					except: text = None
+					if not original or not text or not 'nothing currently available' in text.lower(): error = 'STRUCT'
+			else: error = 'DATA'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID OFFICIAL2 [%s]: %s' % (error, link))
+			return valid
+
+		# Must have www subdomain, otherwise always redirects to the current month.
+		links = [
+			{'type' : MetaTools.TimeDigital, 'link' : 'https://www.dvdsreleasedates.com/digital-releases/'}, # Digital release dates.
+			{'type' : MetaTools.TimePhysical, 'link' : 'https://www.dvdsreleasedates.com/releases/'}, # BluRay and 4K release dates.
+		]
+		return self._releaseExternalAssemble(function = _release, links = links, refresh = refresh, cache = Cache.TimeoutDay3)
+
+	# https://blu-ray.com
+	# Digital and disk releases without IMDb ID and only a title, but has more titles listed.
+	def _releaseExternalOfficial3(self, refresh = None):
+		def _release(result, link, year, month, type):
+			from lib.modules.tools import Converter
+			from lib.modules.convert import ConverterTime
+
+			valid = False
+			error = None
+
+			networker = Networker()
+			link = networker.linkCreate(link = link, parameters = {'year' : year, 'month' : month})
+			data = networker.requestText(link = link)
+
+			# Should not have Cloudflare protection. But still check in case it is added later on.
+			if networker.responseErrorType() == Networker.ErrorCloudflare:
+				error = 'CLOUDFLARE'
+			elif data:
+				try:
+					data = str(data)
+
+					# Even if there is no titles listes (eg next month's future releases), still check if the page is correct.
+					valid = Regex.match(data = data, expression = '<a\s.*?title\s*=\s*[\'\"]blu\-ray\.com', cache = True)
+
+					values = Regex.extract(data = data, expression = 'movies\[\d.*?(\{.*?\})\s*;', group = None, all = True, cache = True)
+					if values:
+						for value in values:
+							try:
+								if value:
+									# Double quotes inside a string.
+									# Eg: 'Limited Box Set, 2 180g LP Gatefold, 3 exclusive 10" Vinyl records, XL T-Shirt, Exclusive Plectrums, Lanyard, Art Print'
+									value = Regex.replace(data = value, expression = '"', replacement = '\\\\\\"', all = True, cache = True)
+
+									# Strings are in escaped single quotes.
+									value = Regex.replace(data = value, expression = '(:\s*)\\\\\'(.*?)\\\\\'([\,\]\}])', replacement = r'\1"\2"\3', all = True, cache = True)
+
+									# Replace escaped quotes internal to string.
+									for i in range(3): value = Regex.replace(data = value, expression = '(\\\\\')', replacement = '\'', all = True, cache = True)
+
+									# The keys do not have quotes.
+									# Do multiple times, otherwise not all keys are quoted.
+									for i in range(3): value = Regex.replace(data = value, expression = '([\[\{]\s*|(?:\"|:\s*\d+)\s*,\s*)((?=\D)\w+):', replacement = r'\1"\2":', all = True, cache = True)
+
+									# Unescape hex-escaped characters in the string.
+									# Eg: Arz\xe9 -> Arzé
+									value = Converter.unicodeUnescape(value)
+
+									original = value
+									value = Converter.jsonFrom(value)
+									if value:
+										title = value.get('title')
+										year = value.get('year')
+										year = int(year) if year else None
+										time = ConverterTime(value.get('releasedate'), format = ConverterTime.FormatDateAmerican, utc = True).timestamp()
+										extra = value.get('extended')
+										self._releaseExternalAdd(result = result, title = title, year = year, time = time, type = type, extra = extra)
+									else: error = 'ITEM'
+							except:
+								Logger.error()
+								error = 'ITEM'
+					else: error = 'ITEMS'
+				except:
+					Logger.error()
+					error = 'STRUCT'
+			else: error = 'DATA'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID OFFICIAL3 [%s]: %s' % (error, link))
+			return valid
+
+		links = [
+			{'type' : MetaTools.TimeDigital, 'link' : 'https://www.blu-ray.com/digital/releasedates.php'}, # Digital release dates (medium).
+			{'type' : MetaTools.TimePhysical, 'link' : 'https://www.blu-ray.com/movies/releasedates.php'}, # BluRay and 4K release dates (many).
+			{'type' : MetaTools.TimePhysical, 'link' : 'https://www.blu-ray.com/dvd/releasedates.php'}, # DVD release dates (few).
+		]
+		return self._releaseExternalAssemble(function = _release, links = links, refresh = refresh, cache = Cache.TimeoutDay3)
+
+	# https://rlsbb.cc
+	def _releaseExternalScene1(self, refresh = None):
+		def _release(result, link, page, type):
+			from lib.modules.parser import Parser
+			from lib.modules.convert import ConverterTime
+
+			valid = False
+			error = None
+
+			networker = Networker()
+			link = link if page == 1 else networker.linkJoin(link, 'page', page) # First page cannot have a page number.
+			data = networker.requestText(link = link, cookies = {'serach_mode' : 'light'}) # Add light-search cookie, otherwise the blog HTML is returned.
+
+			# Should not have Cloudflare protection. But still check in case it is added later on.
+			if networker.responseErrorType() == Networker.ErrorCloudflare:
+				error = 'CLOUDFLARE'
+			elif data:
+				data = Parser(data = data, parser = Parser.ParserHtml5)
+				if data:
+					data = data.find(id = 'resultdiv')
+					if data:
+						valid = True
+						try:
+							for value in data.find_all('tr'):
+								try:
+									cells = value.find_all('td')
+									name = cells[-1].find('a').text
+									time = ConverterTime(cells[0].text, format = ConverterTime.FormatDate, utc = True).timestamp()
+									self._releaseExternalProcess(result = result, media = Media.Movie, name = name, time = time, type = type)
+								except:
+									Logger.error()
+									error = 'ITEM'
+						except:
+							Logger.error()
+							error = 'ITEMS'
+					else: error = 'STRUCT'
+				else: error = 'PARSE'
+			else: error = 'DATA'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID SCENE1 [%s]: %s' % (error, link))
+			return valid
+
+		domains = ['cc', 'to', 'com', 'ru']
+		links = [{'type' : MetaTools.TimeDigital, 'link' : 'https://search.rlsbb.%s/category/movies/'}]
+		return self._releaseExternalAssemble(function = _release, links = links, domains = domains, refresh = refresh, cache = Cache.TimeoutDay1)
+
+	# https://predb.me
+	def _releaseExternalScene2(self, refresh = None):
+		def _release(result, link, page, type):
+			from lib.modules.parser import Parser
+
+			valid = False
+			error = None
+
+			networker = Networker()
+			link = networker.linkCreate(link, parameters = {'page' : page})
+			data = networker.requestText(link = link)
+
+			# Sometimes Cloudflare blocks the request.
+			if networker.responseErrorType() == Networker.ErrorCloudflare:
+				error = 'CLOUDFLARE'
+			elif data:
+				data = Parser(data = data, parser = Parser.ParserHtml5)
+				if data:
+					data = data.find(class_ = 'pl-body')
+					if data:
+						valid = True
+						try:
+							for value in data.find_all(class_ = 'post'):
+								try:
+									name = value.find(class_ = 'p-title').find(text = True)
+									time = int(value.find(class_ = 'p-time')['data'])
+									self._releaseExternalProcess(result = result, media = Media.Movie, name = name, time = time, type = type)
+								except:
+									Logger.error()
+									error = 'ITEM'
+						except:
+							Logger.error()
+							error = 'ITEMS'
+					else: error = 'STRUCT'
+				else: error = 'PARSE'
+			else: error = 'DATA'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID SCENE2 [%s]: %s' % (error, link))
+			return valid
+
+		links = [{'type' : MetaTools.TimeDigital, 'link' : 'https://predb.me/?cats=movies'}]
+		return self._releaseExternalAssemble(function = _release, links = links, refresh = refresh, cache = Cache.TimeoutDay1)
+
+	# https://pre.corrupt-net.org
+	# Does not return many titles, since most are very old or episodes.
+	def _releaseExternalScene3(self, refresh = None):
+		def _release(result, link, page, type):
+			from lib.modules.parser import Parser
+			from lib.modules.convert import ConverterTime
+
+			valid = False
+			error = None
+
+			networker = Networker()
+			link = networker.linkCreate(link = link, parameters = {'page' : page}) # When adding a page number, the data is returned as semi-strcutured corrupt HTML.
+			data = networker.requestText(link = link)
+
+			# Should not have Cloudflare protection. But still check in case it is added later on.
+			if networker.responseErrorType() == Networker.ErrorCloudflare:
+				error = 'CLOUDFLARE'
+			elif data:
+				valid = data.startswith('<tr')
+				if valid:
+					data = Parser(data = data, parser = Parser.ParserHtml) # Do not use HTML5, otherwise the corrupt HTML is rearrnaged.
+					if data:
+						try:
+							for value in data.find_all('tr'):
+								try:
+									cells = value.find_all('td')
+									name = cells[1].find(text = True) # Not nested text.
+									time = ConverterTime(cells[-1].find(text = True), format = ConverterTime.FormatDateTime, utc = True).timestamp()
+									self._releaseExternalProcess(result = result, media = Media.Movie, name = name, time = time, type = type)
+								except:
+									Logger.error()
+									error = 'ITEM'
+						except:
+							Logger.error()
+							error = 'ITEMS'
+					else: error = 'PARSE'
+				else: error = 'STRUCT'
+			else: error = 'DATA'
+
+			if error and self.mDeveloper: Logger.log('RELEASE INVALID SCENE3 [%s]: %s' % (error, link))
+			return valid
+
+		# Other types available under the "Filters" toggle on https://pre.corrupt-net.org/live.php
+		# Limit the maximum number of pages, since most results are useless in any case and only waste time.
+		links = [
+			{'type' : MetaTools.TimePhysical, 'link' : 'https://pre.corrupt-net.org/search.php?search=type:bluray'},
+			{'type' : MetaTools.TimeDigital, 'link' : 'https://pre.corrupt-net.org/search.php?search=type:x264'},
+			#{'type' : MetaTools.TimePhysical, 'link' : 'https://pre.corrupt-net.org/search.php?search=type:dvdr'}, # Mostly series, old releases, or German/Dutch/etc releases.
+		]
+		return self._releaseExternalAssemble(function = _release, links = links, pages = 3, refresh = refresh, cache = Cache.TimeoutDay1)
+
+	def releasing(self):
+		if self.mReleaseMedia: return True
+		return False
+
+	def releasingMedia(self):
+		return self.mReleaseMedia
+
+	##############################################################################
 	# PROGRESS
 	##############################################################################
 
@@ -7857,7 +13196,7 @@ class MetaManager(object):
 
 			# Try to avoid the cache function execution (refreshing in the background) if we are reloading mixed menus.
 			# More info in reload().
-			if self.reloadingMixed(): data = self._cacheRetrieve(self._progressAssemble, media = media)
+			if self.reloadingMixed() or self.releasing(): data = self._cacheRetrieve(self._progressAssemble, media = media)
 
 			# NB: Do not pass in any parameters to the cache call that might cause a separate cache entry to be saved.
 			# Eg: niche, progress, filter, sort, order.
@@ -7869,7 +13208,8 @@ class MetaManager(object):
 			# We then filter and sort them outside below, the cache call, which should not take that long, even for larger Trakt histories.
 			# This might not be perfect all the time. For instance, ProgressRewatch will only be accurate once a lot of items were smart-loaded, and would initially not have good sorting, since it is sorted in reverse and the first items in this list might not have been smart-loaded for dates yet.
 			# However, overall this should improve performance, save disk space, and make things easier.
-			if not data: data = self._cache('cacheShort', refresh, self._progressAssemble, media = media)
+			# NB: Do not call this when executing release(), otherwise it might deadlock. Eg: MetaManager.progress() -> MetaCache._releaseInitialize() -> MetaManager.release() -> MetaManager.progress() -> ...
+			if not data and not self.releasing(): data = self._cache('cacheShort', refresh, self._progressAssemble, media = media)
 
 			if data:
 				items = data.get('items')
@@ -7878,7 +13218,7 @@ class MetaManager(object):
 
 					# Retrieve more detailed metadata, even if the above list is loaded from cache.
 					# Do not execute if we only reload the cached menu from reload(), otherwise there are too many requests.
-					if not self.reloading() and not self.mModeAccelerate: self._metadataSmartReload(media = media, content = MetaManager.ContentProgress, cache = time, **data)
+					if not self.reloading() and not self.releasing() and not self.mModeAccelerate: self._metadataSmartReload(media = media, content = MetaManager.ContentProgress, cache = time, **data)
 
 					result.update({
 						'provider'	: MetaTrakt.id(),
@@ -7898,7 +13238,7 @@ class MetaManager(object):
 		return None
 
 	def _progressAssemble(self, media):
-		timer = Time(start = True)
+		timer = self._jobTimer()
 		from lib.modules.playback import Playback
 
 		# Ratings are only needed for ProgressRewatch sorting, but retrieve them, since all progress types are created from the same data.
@@ -8012,7 +13352,7 @@ class MetaManager(object):
 	def arrival(self, media = None, niche = None, unknown = None, filter = None, sort = None, order = None, page = None, limit = None, detail = None, quick = None, reload = None, refresh = None, more = None, **parameters):
 		return self.content(content = MetaManager.ContentArrival, media = media, niche = niche, unknown = unknown, filter = filter, sort = sort, order = order, page = page, limit = limit, detail = detail, quick = quick, reload = reload, refresh = refresh, more = more, **parameters)
 
-	def _arrival(self, media = None, niche = None, unknown = None, filter = None, sort = None, order = None, page = None, limit = None, refresh = None, **parameters):
+	def _arrival(self, media = None, niche = None, unknown = None, filter = None, sort = None, order = None, page = None, limit = None, refresh = None, detail = None, **parameters):
 		try:
 			if media is None or Media.isMixed(media):
 				data1 = self._arrival(media = Media.Show, limit = 0.5, niche = niche, unknown = unknown, filter = filter, sort = sort, order = order, page = page, refresh = refresh, **parameters)
@@ -8039,18 +13379,19 @@ class MetaManager(object):
 
 			# Try to avoid the cache function execution (refreshing in the background) if we are reloading mixed menus.
 			# More info in reload().
-			if self.reloadingMixed(): data = self._cacheRetrieve(self._arrivalAssemble, media = media, niche = niche)
+			if self.reloadingMixed() or self.releasing(): data = self._cacheRetrieve(self._arrivalAssemble, media = media, niche = niche)
 
-			if not data: data = self._cache('cacheBasic', refresh, self._arrivalAssemble, media = media, niche = niche)
+			# NB: Do not call this when executing release(), otherwise it might deadlock. Eg: MetaManager.arrival() -> MetaCache._releaseInitialize() -> MetaManager.release() -> MetaManager.arrival() -> ...
+			if not data and not self.releasing(): data = self._cache('cacheBasic', refresh, self._arrivalAssemble, media = media, niche = niche)
 
 			if data:
 				items = data.get('items')
 				if items:
-					result = self._arrivalProcess(items = items, media = media, niche = niche, unknown = unknown, filter = filter, sort = sort, order = order, page = page, limit = limit)
+					result = self._arrivalProcess(items = items, media = media, niche = niche, unknown = unknown, filter = filter, sort = sort, order = order, page = page, limit = limit, detail = detail)
 
 					# Retrieve more detailed metadata, even if the above list is loaded from cache.
 					# Do not execute if we only reload the cached menu from reload(), otherwise there are too many requests.
-					if not self.reloading() and not self.mModeAccelerate: self._metadataSmartReload(media = media, content = MetaManager.ContentArrival, cache = time, **data)
+					if not self.reloading() and not self.releasing() and not self.mModeAccelerate: self._metadataSmartReload(media = media, content = MetaManager.ContentArrival, cache = time, **data)
 
 					result.update({
 						'next'		: MetaManager.Smart,
@@ -8066,23 +13407,13 @@ class MetaManager(object):
 		return None
 
 	def _arrivalAssemble(self, media, niche = None):
-		timer = Time(start = True)
+		timer = self._jobTimer()
 
 		itemsNew = self._arrivalRetrieve(media = media, niche = niche)
 
 		# Retrieve the current smart-list from cache. To be updated.
 		itemsCurrent = self._cacheRetrieve(self._arrivalAssemble, media = media, niche = niche)
 		itemsCurrent = itemsCurrent.get('items') if itemsCurrent else None
-
-		#gaiaremove - #gaiafix - this can be removed a few weeks after v7.1.2 was released.
-		if self.mFix and Media.isSerie(media) and itemsCurrent:
-			itemsFixed = []
-			for item in itemsCurrent:
-				try:
-					if not item.get('season') or item.get('season') <= 1:
-						itemsFixed.append(item)
-				except: pass
-			itemsCurrent = itemsFixed
 
 		# NB: Do not remove based on the smart list length. Eg: 1000.
 		# Otherwise, every time _metadataSmart() is called, a bunch of "new" items are added.
@@ -8097,6 +13428,7 @@ class MetaManager(object):
 		return self._metadataSmart(media = media, items = itemsCurrent, new = itemsNew, sort = MetaTools.SortGlobal, remove = remove, detail = False, timer = timer, content = MetaManager.ContentArrival)
 
 	def _arrivalRetrieve(self, media, niche):
+		functions = None # Used in _add().
 
 		def _votes(votes):
 			return int(votes * 0.1) if niche else votes
@@ -8104,6 +13436,7 @@ class MetaManager(object):
 		def _add(values, base, **parameters):
 			base = Tools.copy(base)
 			if parameters: base.update(parameters)
+			base['origin'] = functions.get(base.get('function'))
 			values.append(base)
 
 		def _forward(year, month):
@@ -8144,10 +13477,16 @@ class MetaManager(object):
 
 		# MOVIES
 		#	Items: +-3000 (+-5000 with duplicates)
-		#	Requests: 122 + niche requests
+		#	Requests: 136 + niche requests
 		# SHOWS
 		#	Items: +-2000 (+-4500 with duplicates)
 		#	Requests: 77 + niche requests
+
+		# When using Gaia regularly for 6+ months, only 50-60% of the Arrivals have been cached.
+		#	Movies: 2772 (accumulated over time) - 2429 (total at the end of the function)
+		#	Shows: 3316 (accumulated over time) - 1954 (total at the end of the function)
+		# Reduce the total items being retrieved to allow caching to complete earlier.
+		# Reduction from the previous values is this function are marked as "reduced".
 
 		movie = Media.isFilm(media)
 		show = Media.isSerie(media)
@@ -8187,6 +13526,12 @@ class MetaManager(object):
 		year = Time.year()
 		month = Time.month()
 
+		# Trakt and TMDb can return movies that are decades old.
+		# This is because those old movies get a new 4k/BluRay release, which gives them a new release date.
+		# The date parameter then applies to the new digital/physical release date and not the premiere date which can be very long ago.
+		# Do not do this for shows, since there can be new episodes released for very old shows that started years ago.
+		years = [year - 3, year] if movie else None
+
 		# Only retrieve decent titles, since most users will not be interested in bad titles.
 		# At the end we retrieve a few of the worst titles.
 		if niche:
@@ -8211,6 +13556,7 @@ class MetaManager(object):
 		base = {
 			'function'	: trakt,
 			'timeout'	: timeout,
+			'year'		: years,
 			'rating'	: best,
 			'sort'		: MetaTrakt.SortPopular,
 			'limit'		: 250,
@@ -8225,6 +13571,7 @@ class MetaManager(object):
 			'function'	: tmdb,
 			'timeout'	: timeout,
 			'time'		: time,
+			'year'		: years,
 			'serie'		: MetaTmdb.SerieMini if mini else True,
 			'rating'	: best,
 			'votes'		: _votes(10 if show else 100),
@@ -8257,15 +13604,42 @@ class MetaManager(object):
 		timeout = durationWeek3
 
 		if movie:
-			# TRAKT
+			# TRAKT (Physical Releases)
+			# The Trakt DVD Calendar only contains physical releases, no digital releases.
+			# Hence, if a title already has a digital date, but no physical date, it will not show up here.
 			#	Movies:	300-700 items (12 requests - 30-70 per request)
 			date1 = _forward(year = year, month = month)
 			date2 = _backward(year = year, month = month)
 			base = {
 				'function'	: trakt,
 				'timeout'	: timeout,
-				'release'	: MetaTrakt.ReleaseHome,
+				'release'	: MetaTrakt.ReleasePhysical,
+				'year'		: years,
 				#'rating'	: best, # No rating, since already few titles are returned.
+			}
+			for i in range(12):
+				_increase(values = primary, base = base, date = date1)
+				_decrease(values = delete, base = base, date = date2)
+
+			# TRAKT (Digital Releases)
+			# Trakt only has a Premiere Calendar and a DVD Calendar, but no Digital Calendar.
+			# Hence, if a title already has a digital date, but no physical date, it will not show up in the DVD Calendar.
+			# Digital releases can be filtered in the Calendars using the "watchnow" parameter, which is not in the API docs, but is used on Trakt's website for movie calendars.
+			# This is not that useful, since doing this returns digital releases, but they only have premiere dates, not the digital dates (unlike the DVD Calendar also has the physical release dates).
+			# The digital date is used to refresh the MetaCache metadata for new digital/physical release dates.
+			# Since the digital date is not available here, these values add little to Arrivals.
+			# But the query date range is used to "estimate" the digital date, which is better than nothing.
+			# Update (2025-09): Trakt has added a new movie streaming calendar API endpoint, which also returns the digital release date.
+			#	Movies:	300-700 items (12 requests - 40-70 per request)
+			date1 = _forward(year = year, month = month)
+			date2 = _backward(year = year, month = month)
+			base = {
+				'function'	: trakt,
+				'timeout'	: timeout,
+				'release'	: MetaTrakt.ReleaseDigital,
+				'year'		: years,
+				'rating'	: best,
+				'votes'		: _votes(250), # (reduced: 200 -> 250) Reduce the number of titles returned.
 			}
 			for i in range(12):
 				_increase(values = primary, base = base, date = date1)
@@ -8279,9 +13653,10 @@ class MetaManager(object):
 				'function'	: tmdb,
 				'timeout'	: timeout,
 				'release'	: MetaTmdb.ReleaseHome,
+				'year'		: years,
 				'serie'		: MetaTmdb.SerieMini if mini else True,
 				'rating'	: best,
-				'votes'		: _votes(100),
+				'votes'		: _votes(150), # (reduced: 100 -> 150)
 				'sort'		: MetaTmdb.SortPopularity,
 				'limit'		: MetaTmdb.limit(3),
 			}
@@ -8299,7 +13674,7 @@ class MetaManager(object):
 				'release'	: MetaImdb.ReleaseHome,
 				'language'	: True, # Otherwise too many Indian titles are returned.
 				'rating'	: best,
-				'votes'		: _votes(100),
+				'votes'		: _votes(200), # (reduced: 100 -> 200)
 				'sort'		: MetaImdb.SortPopularity,
 			}
 			for i in range(12):
@@ -8323,8 +13698,9 @@ class MetaManager(object):
 			'function'	: trakt,
 			'timeout'	: timeout,
 			'release'	: MetaTrakt.ReleaseNew,
+			'year'		: years,
 			'rating'	: best,
-			'votes'		: _votes(30 if show else 50),
+			'votes'		: _votes(50 if show else 70), # (reduced: 30 -> 50 if show else 50 -> 70)
 		}
 		for i in range(12):
 			_increase(values = secondary, base = base, date = date1)
@@ -8339,9 +13715,10 @@ class MetaManager(object):
 			'function'	: tmdb,
 			'timeout'	: timeout,
 			'release'	: MetaTmdb.ReleaseNew,
+			'year'		: years,
 			'serie'		: MetaTmdb.SerieMini if mini else True,
 			'rating'	: best,
-			'votes'		: _votes(10 if show else 100),
+			'votes'		: _votes(30 if show else 150), # (reduced: 10 -> 30 if show else 100 -> 150)
 			'sort'		: MetaTmdb.SortPopularity,
 			'limit'		: MetaTmdb.limit(2),
 		}
@@ -8371,7 +13748,7 @@ class MetaManager(object):
 				'timeout'	: timeout,
 				'media'		: Media.Season,
 				'rating'	: best,
-				'votes'		: _votes(25),
+				'votes'		: _votes(40), # (reduced: 25 -> 40)
 			}
 			for i in range(12):
 				_increase(values = primary, base = base, date = date1)
@@ -8425,18 +13802,22 @@ class MetaManager(object):
 		time = durationMonth1
 
 		# TRAKT
-		#	Movies:	250-350 items (2 requests - 10-300 per request)
+		#	Movies:	100-350 items (3 requests - 10-300 per request)
 		#	Shows:	100-200 items (2 requests - 100-200 per request)
 		base = {
 			'function'	: trakt,
 			'timeout'	: timeout,
 			'time'		: time,
+			'year'		: years,
 			'rating'	: best,
-			'votes'		: _votes(5),
+			'votes'		: _votes(10), # (reduced: 5 -> 10)
 		}
 		_add(values = secondary, base = base, release = MetaTrakt.ReleaseNew)
-		if movie: _add(values = primary, base = base, release = MetaTrakt.ReleaseHome)
-		elif show: _add(values = primary, base = base, release = MetaTrakt.ReleaseNew, media = Media.Season)
+		if movie:
+			_add(values = primary, base = base, release = MetaTrakt.ReleaseDigital)
+			_add(values = primary, base = base, release = MetaTrakt.ReleasePhysical)
+		elif show:
+			_add(values = primary, base = base, release = MetaTrakt.ReleaseNew, media = Media.Season)
 
 		# TMDB
 		#	Movies:	120 items (6 requests - 20 per request)
@@ -8445,6 +13826,7 @@ class MetaManager(object):
 			'function'	: tmdb,
 			'timeout'	: timeout,
 			'time'		: time,
+			'year'		: years,
 			'serie'		: MetaTmdb.SerieMini if mini else True,
 			'rating'	: best,
 			'votes'		: _votes(5),
@@ -8463,7 +13845,7 @@ class MetaManager(object):
 			'time'		: time,
 			'language'	: True, # Otherwise too many Indian titles are returned.
 			'rating'	: best,
-			'votes'		: _votes(5),
+			'votes'		: _votes(15), # (reduced: 5 -> 15)
 			'sort'		: MetaImdb.SortPopularity,
 		}
 		_add(values = primary, base = base, release = MetaImdb.ReleaseHome)
@@ -8484,10 +13866,11 @@ class MetaManager(object):
 		base = {
 			'function'	: trakt,
 			'timeout'	: timeout,
+			'year'		: years,
 			'rating'	: worst,
-			'votes'		: _votes(100),
+			'votes'		: _votes(150 if show else 200), # (reduced: 100 -> 150/200)
 			'sort'		: MetaTrakt.SortPopular,
-			'limit'		: 100,
+			'limit'		: 50, # (reduced: 100 -> 50)
 		}
 		_add(values = secondary, base = base, year = year) # Can return future releases.
 		_add(values = delete, base = base, year = year - 1)
@@ -8499,6 +13882,7 @@ class MetaManager(object):
 			'function'	: tmdb,
 			'timeout'	: timeout,
 			'time'		: time,
+			'year'		: years,
 			'serie'		: MetaTmdb.SerieMini if mini else True,
 			'rating'	: worst,
 			'sort'		: MetaTmdb.SortVotes,
@@ -8516,7 +13900,7 @@ class MetaManager(object):
 			'language'	: True, # Otherwise too many Indian titles are returned.
 			'rating'	: worst,
 			'sort'		: MetaImdb.SortVotes,
-			'limit'		: 100,
+			'limit'		: 50, # (reduced: 100 -> 50)
 		}
 		_add(values = secondary, base = base)
 
@@ -8563,12 +13947,16 @@ class MetaManager(object):
 					'function'	: trakt,
 					'timeout'	: timeout,
 					'time'		: time,
+					'year'		: years,
 					'votes'		: _votes(3),
 					'niche'		: i,
 				}
 				_add(values = secondary, base = base, release = MetaTrakt.ReleaseNew)
-				if movie: _add(values = secondary, base = base, release = MetaTrakt.ReleaseHome)
-				elif show: _add(values = secondary, base = base, release = MetaTrakt.ReleaseNew, media = Media.Season)
+				if movie:
+					_add(values = secondary, base = base, release = MetaTrakt.ReleaseDigital)
+					_add(values = secondary, base = base, release = MetaTrakt.ReleasePhysical)
+				elif show:
+					_add(values = secondary, base = base, release = MetaTrakt.ReleaseNew, media = Media.Season)
 
 		############################################
 		# RETRIEVE
@@ -8591,18 +13979,53 @@ class MetaManager(object):
 		#		If the date range would be passed in, the parameters to the cache are different each time, meaning a new cache entry would be created every time.
 		#		Now the dynamic date range is only calculated INSIDE the cache function execution.
 		#		For instance, the cache entry for [7 days] will be different today than tomorrow or the next week, because the internal date range is calculated from the current date.
-		for item in primary + secondary: # Add the home releases before the new releases to the results, since they are more likley to have a digitial/physical release date and show up in the menu.
+		for item in primary + secondary: # Add the home releases before the new releases to the results, since they are more likley to have a digital/physical release date and show up in the menu.
 			# Skip unsupported providers for certain niches.
 			provider = functions.get(item.get('function'))
 			if provider and not provider in providers: continue
 
 			item['items'] = items
-			if not 'media' in item: item['media'] = media
+			if not item.get('media'): item['media'] = media
 			if 'niche' in item: item['niche'] = Media.add(item['niche'], niche)
 			else: item['niche'] = niche
 
 			threads.append(Pool.thread(target = self._arrivalCache, kwargs = item, synchronizer = synchronizer, start = True))
 		[thread.join() for thread in threads]
+
+		# Add the origin of the title.
+		# This helps to better sort Arrivals by increasing the sorting weight if the title appears on Trakt.
+		try:
+			origins = {i : {} for i in functions.values()}
+			order = list(origins.keys())
+
+			for item in items:
+				existing = None
+				origin = item.get('origin')
+				ider = '%s_' + str(item.get('season'))
+				for provider in origins.keys():
+					id = item['id'].get(provider)
+					if id:
+						existing = origins[provider].get(ider % id)
+						if existing: break
+				if existing:
+					if Tools.isArray(origin): existing.extend(origin)
+					else: existing.append(origin)
+					item['origin'] = existing
+				else:
+					if not Tools.isArray(origin): origin = [origin]
+					item['origin'] = origin
+					for provider in origins.keys():
+						id = item['id'].get(provider)
+						if id: origins[provider][ider % id] = origin
+
+			for item in items:
+				origin = item.get('origin')
+				if origin:
+					origin = Tools.listFlatten(origin)
+					origin = Tools.listUnique([i for i in origin if i])
+					origin = Tools.listSort(origin, order = order)
+				item['origin'] = origin
+		except: Logger.error()
 
 		# Many shows can have more than one season premiered within the past year.
 		# Eg: tt11612120 S02 and S03.
@@ -8624,28 +14047,61 @@ class MetaManager(object):
 		return items
 
 	def _arrivalCache(self, items, function, timeout, media, **parameters):
-		def _arrivalCache(result, date = None):
-			if result:
-				# Smart reduce here already, otherwise the cache for thousands of titles has tons of unnecessary data, filling up disk space.
-				result = self._metadataSmartReduce(media = media, items = result, full = False)
+		def _arrivalCache(result, date = None, origin = None):
+			try:
+				if result:
+					# Smart reduce here already, otherwise the cache for thousands of titles has tons of unnecessary data, filling up disk space.
+					result = self._metadataSmartReduce(media = media, items = result, full = False)
 
-				# Titles from IMDb do not have a date.
-				# This causes the items to always be "new" in _metadataSmart(), since they are filtered out at the end.
-				# Add an estimated date based on the date parameter to ensure they are kept in the smart list.
-				if date:
+					# Titles from IMDb do not have a date.
+					# This causes the items to always be "new" in _metadataSmart(), since they are filtered out at the end.
+					# Add an estimated date based on the date parameter to ensure they are kept in the smart list.
+					# Trakt only returns physical release dates, but not digital release dates.
+					# TMDb does not return physical or digital release dates, only premiere dates.
+					# Add the end of the date-range, so we at least have an approximation.
+					# This extra date can be used to refresh titles more frequently if they are close to their physical/digital release.
+					# Update: This date can be still far from the actual physical/digital dates.
+					# The Trakt/IMDb digital retrieval will apply the date range parameter to the premiere date and only filter by digital-watch options, but it will not apply the date parameter to the digital date.
+					# Update (2025-03): IMDb was updated and now returns the premiere date. There might be 1 or 2 titles from IMDb that only haver a year, but no date. But 99.9% should now have a date.
+					if date:
+						date1 = date[-1] if (date[1] - date[0]) <= 3024000 else None # Only if the parameter range is lower than 35 days.
+						date2 = date[-1]
+					else:
+						date1 = None
+						date2 = None
+
+					movie = Media.isMovie(media)
 					for item in result:
-						if not item.get('time'): item['time'] = {MetaTools.TimeUnknown : date[-1]}
+						times = item.get('time')
+						if not times: times = item['time'] = {}
 
-			return result
+						premiere = None
+						if not times.get(MetaTools.TimePremiere):
+							premiere = item.get('aired') or item.get('premiered')
+							if premiere:
+								premiere = Time.timestamp(premiere, format = Time.FormatDate, utc = True)
+								times[MetaTools.TimePremiere] = premiere
+
+						if not times.get(MetaTools.TimePremiere) or (movie and (not times.get(MetaTools.TimeDigital) or not times.get(MetaTools.TimePhysical))):
+							time = date1 or premiere or date2
+							if time: times[MetaTools.TimeUnknown] = time
+
+						item['origin'] = origin
+
+				return result
+			except: Logger.error()
 
 		if parameters.get('time'):
 			def _arrivalCache1(time, **parameters):
+				origin = parameters.get('origin')
+				try: del parameters['origin']
+				except: pass
 				try: offset = parameters.pop('offset')
 				except: offset = 0
 				end = Time.timestamp() - offset
 				parameters['date'] = [Time.past(timestamp = end, seconds = time), end]
 				result = function(**parameters)
-				return _arrivalCache(result = result, date = parameters.get('date'))
+				return _arrivalCache(result = result, date = parameters.get('date'), origin = origin)
 			execute = _arrivalCache1
 		else:
 			# Randomize the cache timeout with +-8 hours.
@@ -8655,14 +14111,18 @@ class MetaManager(object):
 			if timeout > 172800: timeout += Math.random(start = -28800, end = 28800)
 
 			def _arrivalCache2(**parameters):
+				origin = parameters.get('origin')
+				try: del parameters['origin']
+				except: pass
 				result = function(**parameters)
-				return _arrivalCache(result = result, date = parameters.get('date'))
+				return _arrivalCache(result = result, date = parameters.get('date'), origin = origin)
 			execute = _arrivalCache2
 
 		data = self._cache('cacheSeconds', None, function = execute, timeout = timeout, media = media, **parameters)
+
 		if data:
+			data = self._processAggregate(media = media, items = data)
 			if Media.isSerie(media):
-				data = self._processSerie(media = media, items = data)
 				for item in data:
 					item['media'] = Media.Show # Replace season releases.
 					if item.get('season') is None: item['season'] = 1
@@ -8677,7 +14137,7 @@ class MetaManager(object):
 			else: item['niche'] = niche
 			self._cacheDelete(**item)
 
-	def _arrivalProcess(self, items, media = None, niche = None, unknown = None, filter = None, sort = None, order = None, page = None, limit = None):
+	def _arrivalProcess(self, items, media = None, niche = None, unknown = None, filter = None, sort = None, order = None, page = None, limit = None, detail = None):
 		if unknown is None: unknown = True
 		if limit is None: limit = self.limit(media = media, content = MetaManager.ContentArrival)
 		elif Tools.isFloat(limit): limit = int(limit * self.limit(media = media, content = MetaManager.ContentArrival))
@@ -8685,7 +14145,19 @@ class MetaManager(object):
 
 		# Filter niche menus, like Anime, Originals, and Minis.
 		# Filter by the niche list itself, not the derived filters, since this is faster are more reliable than possible incomplete detailed metadata attributes, like secondary companies or genres.
-		filter = self._processorNiche(niche = niche, filter = filter, generic = True)
+		filterBefore = self._processorNiche(niche = niche, filter = filter, generic = True)
+
+		# Filter out items without a plot or poster.
+		# Items without a plot are useless if we do not know what the movie is about.
+		# Items without a poster look ugly in the menus, and are typically not high-calibre titles.
+		# Some movies have no plot, some have no poster, and some have no plot and poster.
+		# Only do this for the after-filters, since before retrieving the detailed metadata, the plot/images might not be available yet.
+		# Do not partial-filter if "limit=False", since it specifically means to retrieve all titles. Also not for "detail=False", since non-detailed metadata typically do not have a plot/poster. Used by preload() and release().
+		filterAfter = {}
+		if not limit is False and not detail is False: filterAfter.update({MetaTools.FilterPartial : {'plot' : True, 'poster' : True}})
+		filterAfter.update(filterBefore)
+
+		filter = [filterBefore, filterAfter]
 
 		if items:
 			# Filter out items marked as "removed".
@@ -8703,7 +14175,7 @@ class MetaManager(object):
 			# Not all items can be filtered out here, if they have not detailed metadata yet.
 			# Leave the final sorting to content() after the detailed metadata was retrieved.
 			# This should only take a few ms, even for large lists.
-			niched = filter.get(MetaTools.FilterNiche) # Only use the company ID, not the company type, otherwise too few titles might be returned.
+			niched = filterBefore.get(MetaTools.FilterNiche) # Only use the company ID, not the company type, otherwise too few titles might be returned.
 			if niched:
 				# Do not allow unknowns when a niche is specified.
 				# Otherwise all shows which were not smart-loaded yet, are added to it.
@@ -8711,17 +14183,28 @@ class MetaManager(object):
 				# Even if some are filtered out, after a little while the smart-list will be full enough to list more under the niche menus.
 				items = self.mTools.filterNiche(items = items, include = niched, unknown = unknown)
 
-			# There can be shows with 2+ seasons released within a year, and might therefore show up mutiple times in the list.
+			# There can be shows with 2+ seasons released within a year, and might therefore show up multiple times in the list.
 			# Filter them out and keep the one with the highest season/episode number.
 			# This should not be done during smart-loading. Otherwise one of the seasons is always removed, and therefore it ends up in the "new" list again, every time the list is refreshed.
 			# Hence, keep both seasons in the smart-list and only filter them out here.
 			items = self.mTools.filterDuplicate(items = items, id = True, title = False, number = False, merge = 'number')
 
+			# Sometimes a title can appear mutiple times in Arrivals.
+			# Once from Trakt/TMDb which still holds the old/outdated IMDb ID, but does not have the "imdx" ID set (yet).
+			# And once from IMDb with the new/updated IMDb ID.
+			# Filter out these duplicates and merge by "idimdb" to use the Trakt/TMDb item, but update its IMDb ID from the item coming from IMDb (which probably has the new/updated ID).
+			# Eg: Home Sweet Home: Rebirth 2025
+			#	Trakt: {'imdb': 'tt29425837', 'tmdb': '1353117', 'trakt': '1104128', 'slug': 'home-sweet-home-rebirth-2025'}
+			#	IMDb: {'imdb': 'tt29425792', 'imdx': 'tt29425792'}
+			#	Merged: {'imdb': 'tt29425792', 'imdx': 'tt29425837', 'tmdb': '1353117', 'trakt': '1104128', 'slug': 'home-sweet-home-rebirth-2025'}
+			# Takes about 10-20ms.
+			items = self.mTools.filterDuplicate(items = items, id = False, title = True, number = True, merge = 'idimdb')
+
 			# Reduce the number of items returned.
 			# This reduces later filtering/sorting time, and we probably do not need more than this.
 			# The items are already sorted, so the first N items should be the best ones.
 			# This ensures linear processing time, to counter the smart list growing very large over time.
-			items = items[:2000]
+			if not limit is False and not self.releasing(): items = items[:2000]
 
 		return {
 			'items'		: items,
@@ -8982,6 +14465,12 @@ class MetaManager(object):
 					# Many are not that new, many are porn, and most have no images or other metadata.
 					items = Tools.listReverse(items)
 
+				elif set == MetaTools.SetSearch:
+					# The order returned by TMDb set searches is not great.
+					# When searching "Avatar" it shows two other sets before the one we actually want.
+					# Manually sort by total votes instead.
+					if sort is None: sort = MetaTools.SortVotes
+
 				elif set == MetaTools.SetRandom:
 					items = Tools.listShuffle(items)
 
@@ -9186,6 +14675,8 @@ class MetaManager(object):
 							timestamp = Time.timestamp(date, format = Time.FormatDateTime, utc = True)
 							parameters['date'] = [Time.past(timestamp = timestamp, years = 1, utc = True), timestamp]
 						elif list == MetaTools.ListWatchlist:
+							# This allows the retrieval of shows, seasons, and individual episodes from the watchlist, instead of just shows.
+							if Media.isSerie(media): parameters['media'] = mediad = [Media.Show, Media.Season, Media.Episode]
 							function = instance.listWatch
 							timeout = 'cacheShort'
 						elif list == MetaTools.ListFavorite:
@@ -9264,7 +14755,7 @@ class MetaManager(object):
 
 							# Aggregate these attributes, otherwise the menu (eg Trakt Calendar) shows the details for the show, instead of the episode.
 							aggregate = {}
-							for i in ['title', 'originaltitle', 'tagline', 'plot', 'year', 'premiered', 'aired', 'time', 'rating', 'votes', 'voting', 'duration', 'status']:
+							for i in ['tvshowtitle', 'title', 'originaltitle', 'tagline', 'plot', 'tvshowyear', 'year', 'premiered', 'aired', 'time', 'rating', 'votes', 'voting', 'duration', 'status']:
 								value = item.get(i)
 								if value: aggregate[i] = value
 							item['aggregate'] = aggregate

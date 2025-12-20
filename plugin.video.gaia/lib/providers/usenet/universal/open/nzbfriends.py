@@ -32,4 +32,9 @@ class Provider(ProviderNzbreader2):
 		ProviderNzbreader2.initialize(self,
 			name	= 'NZBFriends',
 			link	= Provider._Link,
+
+			# Update (2025-12):
+			# The website does not return any results anymore: "No collections found".
+			# More info under nzbID.
+			status	= ProviderNzbreader2.StatusImpaired,
 		)

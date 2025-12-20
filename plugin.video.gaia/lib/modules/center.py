@@ -280,7 +280,7 @@ class Center(object):
 
 		if not parameters: parameters = {}
 
-		# Adding UserId as a parameter seems only to be neccessary in Jellyfin. Emby always worked without it, since the UserId is set in the headers.
+		# Adding UserId as a parameter seems only to be necessary in Jellyfin. Emby always worked without it, since the UserId is set in the headers.
 		parameters['UserId'] = self.mServers[index]['authentication']['userid']
 
 		# Important, otherwise the transcode parameters are ignored.
@@ -726,7 +726,7 @@ class Center(object):
 		self.mResults = []
 		self._execute(self._search, media, title, year, numberSeason, numberEpisode, exact)
 
-		# Emby can return mutiple item IDs, but all items have the same source ID.
+		# Emby can return multiple item IDs, but all items have the same source ID.
 		# Seems to be episodes that can be listed multiple times (show, season, episode, etc).
 		ids = []
 		results = []

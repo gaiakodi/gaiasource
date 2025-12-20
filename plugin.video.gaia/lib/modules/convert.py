@@ -476,7 +476,7 @@ class ConverterDuration(ConverterBase):
 	FormatWordLong = 'formatwordlong' # 1 year, 2 months, 16 days, 2 hours, 1 minute, 20 seconds
 	FormatWordFixed = 'formatwordfixed' # Fixed according to unit. Eg: 1523 seconds or 1.6 hours
 
-	FormatAbbreviationOptimal = 'formatabbreviationoptimal' # 1 yr or 5 days (either years or days)
+	FormatAbbreviationOptimal = 'formatabbreviationoptimal' # 1 yr or 5 dys (either years or days)
 	FormatAbbreviationMinimal = 'formatabbreviationminimal' # 4 mins or 1.5 dys
 	FormatAbbreviationShort = 'formatabbreviationshort' # 123 hrs, 1 min, 20 secs
 	FormatAbbreviationMedium = 'formatabbreviationmedium' # 256 dys, 2 hrs, 1 min, 20 secs
@@ -844,7 +844,7 @@ class ConverterTime(ConverterBase):
 		'%Y-%m-%dT%H:%M:%S',		# TNTFork
 		'%Y-%m-%dT%H:%M:%S%z',
 
-		#'%Y-%m-%dT%H:%M:%S%:z',	# Knaben (API) - %:z is only supported in Python 3.12 and later.
+		#'%Y-%m-%dT%H:%M:%S%:z',	# Knaben (API) + TorrentDatabase - %:z is only supported in Python 3.12 and later.
 
 		'%d-%m-%Y %H:%M:%S',		# ETTV
 		'%d-%m-%Y',					# EliteTorrent
@@ -869,6 +869,8 @@ class ConverterTime(ConverterBase):
 		'%a, %d-%b-%Y (%H:%M)',		# NzbServer and NzbStars
 		'%d-%b-%Y (%H:%M)',			# NzbServer and NzbStars
 		'%d-%b-%Y',					# Binsearch
+
+		'%d %B %Y',					# EXTTorrents
 
 		# Too many inconsistencies in TorrentGalaxy formatting. Do not use.
 		#'%B %d, %Y, %H:%M %p',		# TorrentGalaxy

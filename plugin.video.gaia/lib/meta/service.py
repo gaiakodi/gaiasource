@@ -18,7 +18,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from lib.modules.tools import Tools, Logger, Country, Language
+from lib.modules.tools import Tools, Logger, Country, Language, Time
 from lib.modules.concurrency import Pool, Lock, Semaphore
 from lib.modules.cache import Cache
 from lib.modules.network import Networker
@@ -113,11 +113,26 @@ class MetaService(object):
 	###################################################################
 
 	@classmethod
-	def _cache(self, timeout, function, result = [], threading = True, semaphore = None, *args, **kwargs):
+	def _cache(self, timeout, function, result = [], threading = True, semaphore = None, retry = None, *args, **kwargs):
 		# Use a lock when retrieving from cache.
 		# If the cache is empty (new installation or cache was just cleared), multiple equal requests might be executed in parallel.
 		# For instance, the TVDB authentication (token retrieval) might execute multiple times, since it is not in the cache yet.
 		# Using a cache makes sure that these kinds of requests are only executed once.
+
+		if not kwargs: kwargs = {}
+
+		# Exclude the "cache" parameter from the cache-ID generation.
+		# Otherwise if we call these in sequence:
+		#	a = MetaTvdb.instance().metadataPack(id = ..., cache = Cache.TimeoutDay1)
+		#	b = MetaTvdb.instance().metadataPack(id = ..., cache = Cache.TimeoutClear)
+		#	c = MetaTvdb.instance().metadataPack(id = ..., cache = Cache.TimeoutDay1)
+		# a and c will be the same, instead of c and b being the same as expected from the 2nd call.
+		# This is because the "cache" parameter is passed on to the sub-function-calls.
+		# The "cache" parameter is therefore used for the cache-ID calculation.
+		# This means that b and c are seen as two different function calls, because their parameters differ.
+		# We could remove the "cache" parameter from kwargs altogether, but this will then not pass the parameter on to the sub-function-calls.
+		# Instead, add Cache.Exclude to the kwargs. This will exclude "cache" from the cache-ID calculation. The Cache.Exclude parameter itself will get removed and not passed on to the function call.
+		kwargs[Cache.Exclude] = 'cache'
 
 		cache = Cache.instance()
 		id = cache.id(function = function, **kwargs)
@@ -133,7 +148,6 @@ class MetaService(object):
 				if not id in MetaService.CacheLocks: MetaService.CacheLocks[id] = Lock()
 				MetaService.CacheLock.release()
 
-			if not kwargs: kwargs = {}
 			kwargs['function_'] = function
 			kwargs['threading'] = threading
 
@@ -146,10 +160,24 @@ class MetaService(object):
 			# If this is ever enabled again, note that any calls to Manager.movie(), Manager.show(), etc, will not cache the data. So the processing always has to be redone.
 			#	if function == MetaService._request or function == MetaService._requestJson: data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
 			#	else: data = self._cacheThread(*args, **kwargs)
-			if timeout is False: data = self._cacheThread(*args, **kwargs)
-			else: data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
+			if timeout is False:
+				kwargs2 = Tools.copy(kwargs)
+				del kwargs2[Cache.Exclude] # Remove, since it is called directly without the Cache.
+				data = self._cacheThread(*args, **kwargs2)
+			else:
+				data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
 
-			MetaService.CacheData[id] = data
+			# Check Tvdb._authenticationToken() for more info.
+			success = True
+			if retry and timeout:
+				success = data and data.get('success')
+				if not success:
+					cache.cacheDelete(self._cacheThread, *args, **kwargs)
+					Time.sleep(0.1)
+					data = cache.cacheSeconds(timeout, self._cacheThread, *args, **kwargs)
+					success = data and data.get('success')
+
+			if success: MetaService.CacheData[id] = data
 			MetaService.CacheLocks[id].release()
 
 		if semaphore: semaphore.release()
@@ -268,8 +296,8 @@ class MetaService(object):
 	###################################################################
 
 	@classmethod
-	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
-		if not cache is None: return self._cache(threaded = threaded, timeout = cache, function = MetaService._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies)
+	def _request(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, retry = None, threaded = None):
+		if not cache is None: return self._cache(threaded = threaded, timeout = cache, retry = retry, function = MetaService._request, link = link, method = method, data = data, type = type, headers = headers, cookies = cookies)
 
 		result = None
 		try:
@@ -280,10 +308,18 @@ class MetaService(object):
 		return result
 
 	@classmethod
-	def _requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, threaded = None):
-		response = MetaService._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, cache = cache, threaded = threaded)
-		if response: return Networker.dataJson(response['data'])
-		else: return None
+	def _requestJson(self, link = None, method = None, data = None, type = None, headers = None, cookies = None, cache = None, retry = None, threaded = None, extended = False):
+		response = MetaService._request(link = link, method = method, data = data, type = type, headers = headers, cookies = cookies, cache = cache, retry = retry, threaded = threaded)
+
+		if extended:
+			if response:
+				try: error = response['error']
+				except: error = None
+				return Networker.dataJson(response['data']), error
+			else: return None, None
+		else:
+			if response: return Networker.dataJson(response['data'])
+			else: return None
 
 	@classmethod
 	def _requestLock(self):

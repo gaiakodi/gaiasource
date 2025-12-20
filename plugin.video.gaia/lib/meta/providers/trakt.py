@@ -66,13 +66,14 @@
 
 '''
 
-from lib.modules.tools import Media, Logger, Tools, Media, Audience, Regex, Time, Converter, Math, Language
+from lib.modules.tools import Media, Logger, Tools, Media, Audience, Regex, Time, Converter, Math, Country, Language, System
 from lib.modules.network import Networker
-from lib.modules.cache import Cache
+from lib.modules.cache import Cache, Memory
 from lib.modules.concurrency import Pool
 from lib.modules import trakt as Core
 from lib.meta.provider import MetaProvider
 from lib.meta.tools import MetaTools
+from lib.meta.image import MetaImage
 
 class MetaTrakt(MetaProvider):
 
@@ -333,6 +334,30 @@ class MetaTrakt(MetaProvider):
 								MetaTools.StatusCanceled		: StatusCanceled,
 							}
 
+	# IMAGE
+
+	ImagePoster				= 'poster'		# Movie, Show, Season
+	ImageFanart				= 'fanart'		# Movie, Show, Person (not documented, but often returned)
+	ImageBanner				= 'banner'		# Movie, Show, Season
+	ImageLogo				= 'logo'		# Movie, Show
+	ImageClearart			= 'clearart'	# Movie, Show
+	ImageThumb				= 'thumb'		# Movie, Show, Season
+	ImageScreenshot			= 'screenshot'	# Episode
+	ImageHeadshot			= 'headshot'	# Person
+	ImageCharacter			= 'character'	# Person
+
+	Images 					= {
+								ImagePoster		: MetaImage.TypePoster,
+								ImageFanart		: MetaImage.TypeFanart,
+								ImageBanner		: MetaImage.TypeBanner,
+								ImageLogo		: MetaImage.TypeClearlogo,
+								ImageClearart	: MetaImage.TypeClearart,
+								ImageThumb		: MetaImage.TypeThumb,
+								ImageScreenshot	: MetaImage.TypeThumb,
+								ImageHeadshot	: MetaImage.TypePhoto,
+								ImageCharacter	: MetaImage.TypePhoto,
+							}
+
 	# RELEASE
 
 	ReleasePremiere			= 'premiere'
@@ -351,6 +376,7 @@ class MetaTrakt(MetaProvider):
 	CalendarFinale			= 'finales'				# Show finales airing (EpisodeFinaleShow/EpisodeFinaleSeason/EpisodeFinaleMiddle).
 	CalendarMovie			= 'movies'				# All movies released.
 	CalendarDvd				= 'dvd'					# All movies with a home release Trakt states "DVD" releases, but this probably also includes digital releases, since the movies/id/releases endpoint states all release dates come from TMDb.
+	CalendarStreaming		= 'streaming'			# All movies with a digitial release. This seems to be a new API endpoint (2025-09).
 
 	# EPISODE
 	# Many shows are not labeled at all with mid season premieres/finales: https://trakt.tv/shows/vikings/seasons/5
@@ -425,6 +451,15 @@ class MetaTrakt(MetaProvider):
 	RoleStar				= 'star'				# Star actor.
 	RoleGuest				= 'guest'				# Guest actor.
 
+	# WATCH
+	# Not officially documented in the API docs.
+	# But these parameters exist on the website Movie Calendar.
+	# Individual streaming service slugs can also be used.
+
+	WatchAny				= 'any'			# Any streaming services.
+	WatchFree				= 'free'		# Free streaming services.
+	WatchDvd				= 'dvd'			# DVD release.
+
 	# LIST
 
 	ListAll					= 'all'					# All lists.
@@ -489,6 +524,7 @@ class MetaTrakt(MetaProvider):
 	SortWatched				= 'watched'		# Highest number of plays (single play per user).
 	SortCollected			= 'collected'	# Highest number of users collected (single collection per user).
 	SortAnticipated			= 'anticipated'	# Highest number of list appearances.
+	SortShuffle				= 'shuffle'		# Internal. Randomize list. Make sure this is the same as in MetaTools.
 
 	# Sort method for user Watchtlists and Favorites API endpoints.
 	SortRank				= 'rank'
@@ -516,6 +552,7 @@ class MetaTrakt(MetaProvider):
 	ExtendedMeta			= 'metadata'	# Retrieve additional video and audio info for collections only.
 	ExtendedEpisode			= 'episodes'	# Retrieve all episodes of a season. NB: This can return a lot of data.
 	ExtendedGuest			= 'guest_stars'	# Retrieve guest stars of the last episode in the show/season. NB: This can return a lot of data.
+	ExtendedImages			= 'images'		# Retrieve images.
 
 	ExtendedBasic			= 'basic'		# Not an official value.
 
@@ -535,6 +572,8 @@ class MetaTrakt(MetaProvider):
 
 	LimitFixed				= 10				# Trakt page limit if no limit parameter was added.
 	LimitDefault			= 50				# Default limit to use instead.
+	LimitSearch				= 50				# Maximum limit for the search endpoint. New (unofficial) limit added by Trakt around 2025-12.
+	LimitGeneral			= 250				# Maximum limit for the popular/etc endpoints. New (unofficial) limit added by Trakt around 2025-12.
 	LimitRecommendation		= 100				# Maximum limit for the recommendation endpoint.
 	LimitHome				= 30				# How many days into the past a title is considered to have a home/digital release.
 	LimitFuture				= 1					# How many days into the future a title is considered to be a future release.
@@ -563,10 +602,14 @@ class MetaTrakt(MetaProvider):
 	#	1. Authenticated API calls: when the user is involved, eg retrieving user lists and ratings.
 	#	2. Unauthenticated API calls: when authentication is not required, like discover, search, and metadata.
 	# Authentication can be added to unauthenticated API calls can, so technically we have 1000+1000 = 2000 requests per 5 minutes.
+	# Update (2025-12): The combined total of 2000 p/5m for auth/unauth calls might not work anymore. Check _request() -> _waitUpdate() for more details.
 	UsageAuthenticatedRequest		= 1000
 	UsageAuthenticatedDuration		= 300
 	UsageUnauthenticatedRequest		= 1000
 	UsageUnauthenticatedDuration	= 300
+
+	# Global properties.
+	PropertyLookup					= 'GaiaTraktLookup'
 
 	##############################################################################
 	# CONSTRUCTOR
@@ -603,27 +646,59 @@ class MetaTrakt(MetaProvider):
 					# Clear cache for failed requests, eg temporary Trakt server problems.
 					if failsafe and result and (result.get('error') or {}).get('type') in Networker.ErrorNetwork: self._cacheDelete(function = self._request, link = link, user = user, sort = sort, data = data)
 			except:
-				self._error()
+				self._logError()
 			finally:
 				if lock: self._unlock(limit = lock)
 
 			items = self._extract(data = result, extract = extract, **parameters)
-			if detail: return items, result.get('sort')
+			if detail: return items, result.get('sort'), result.get('error')
 			else: return items
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _request(self, link, user = None, sort = None, data = None):
 		try:
 			# Use authenticated API requests if required (eg: retrieve user-specific lists).
 			# Or use authenticated API requests if the unauthenticated API calls are used up, so we can get an additional 1000 requests.
+			# Update (2025-12): This might not work anymore. Check _waitUpdate() below.
 			direct = True
 			if user: direct = False
 			elif self.usage(authenticated = False) > 0.95 and self.usage(authenticated = True) < 0.9: direct = False
 			self._usageUpdate(authenticated = not direct)
 
+			# UPDATE (2025-11-15)
+			# When the link does not end with a slash, the search/trending/etc endpoints now ingores the parameters.
+			# All filters (genre/years/studio_ids/etc) are ignored without a slash. The only parameter that still seems to work is "limit".
+			# When adding the slash at the end, the filter parameters work again.
+			# Pretty sure that when a slash was added before, a HTTP error was returned.
+			# Maybe this is a "bug" on Trakt's side when they made recent API changes. Might change in the future back to the old way.
+			# UPDATE (2025-12-15)
+			# Now adding the slash for the search endpoint also does not work. Most parameters (years, etc) are ignored, including the limit and page parameter.
+			# It seems the limit parameter is still applied to the search endpoint, but only if it is a value below 50. Any value above 50 is reduced to 50. And the page parameter is still ingored.
+			# More info under search().
+			if not link.endswith('/'): link += '/'
+
 			data, headers, error = Core.getTrakt(method = Networker.MethodGet, url = link, post = data, direct = direct, extended = True)
 			data = Converter.jsonFrom(data)
+
+			if not data and error:
+				if error.get('trakt'): self._errorUpdate() # Rate limit reached, or temporary server problems.
+				if error.get('code') == 429:
+					# Update (2025-12):
+					# Add the wait timestamp as well. This is important for MetaManager.generate() and MetaManager.reload() to not reach the Trakt API limit.
+					# Trakt does not seem to always return the X-Ratelimit header, only the Retry-After header. Maybe this is new, since they possibly changed the way the limits work?
+					# The usage counters calculated locally with _usageUpdate() also do not seem to work anymore.
+					# 	Either Trakt has changed their API rate limits/durations from the "1000 calls every 5 minutes" stated in the docs.
+					# 	Or Trakt now handles auth/unauth requests differently, not allowing a combined total of 2000 anymore.
+					# 	Or Trakt now counts auth/unauth requests together? Or counts all non-user-endpoint calls made with authentication towards "unauth" and not as previously towards "auth".
+					# It is probably the last one. Check the limits in MetaManager._batchStart() for more info.
+					#	If the requests are only stopped after 50% (even just above 50-55%), then the Trakt limits are hit all the time.
+					#	If the requests are already stopped after 45-50%, then the Trakt limits are not hit.
+					# 	This would indicate that the combined auth/unauth total of 2000 does not apply anymore, but rather just below 1000.
+					#	So either Trakt now uses the same limit for both auth/unauth, or counts all authed non-user calls towards the unauth limit.
+					self._waitUpdate(Core.limitWait())
+
+					if System.developer(): Logger.log('TRAKT RATE LIMIT REACHED: %s Request' % ('Unauthenticated' if direct else 'Authenticated'))
 
 			# Always sort if headers are available.
 			if not sort is False:
@@ -631,14 +706,14 @@ class MetaTrakt(MetaProvider):
 				data = Core.sortList(data = data, headers = headers) # Default user lists (eg: a user's rating list) do not have sort parameters.
 
 			return {'data' : data, 'headers' : headers, 'error' : error, 'sort' : sort}
-		except: self._error()
+		except: self._logError()
 		return None
 
 	##############################################################################
 	# EXECUTE
 	##############################################################################
 
-	def _execute(self, iterator, function = None, interleave = True, sort = True, order = None, concurrency = None, lock = True, **parameters):
+	def _execute(self, iterator, function = None, interleave = True, sort = True, order = None, concurrency = None, lock = True, detail = None, exit = None, **parameters):
 		internal = parameters.get('internal')
 		try:
 			iterator = [i for i in iterator if i]
@@ -648,15 +723,22 @@ class MetaTrakt(MetaProvider):
 			if concurrency is True and len(iterator) == 1: concurrency = False
 
 			items = {} if separate else []
+			errors = {} if separate else []
 			count = {}
 			threads = []
 
 			for i in iterator:
-				kwargs = {'function' : function or self._retrieve, 'items' : items, 'count' : count, 'result' : i.get('link'), 'lock' : lock}
+				kwargs = {'function' : function or self._retrieve, 'items' : items, 'errors' : errors, 'count' : count, 'result' : i.get('link'), 'lock' : lock, 'detail' : detail, 'sort' : sort, 'order' : order}
 				kwargs.update(Tools.copy(dict(**parameters)))
 				kwargs.update(i)
-				if concurrency: threads.append(Pool.thread(target = self._executeIteration, kwargs = kwargs, start = True))
-				else: self._executeIteration(**kwargs)
+				if concurrency:
+					threads.append(Pool.thread(target = self._executeIteration, kwargs = kwargs, start = True))
+				else:
+					self._executeIteration(**kwargs)
+					# Exit and do not continue with the other requests if the request was successful.
+					if exit:
+						if separate and items.get(kwargs.get('result')): break
+						elif not separate and items[-1]: break
 			[thread.join() for thread in threads]
 
 			if not separate and items:
@@ -668,14 +750,19 @@ class MetaTrakt(MetaProvider):
 					elif Tools.isArray(sort): items = Tools.listSort(items, key = lambda i : Tools.dictionaryGet(i, sort), reverse = order == MetaTools.OrderDescending)
 					else: items = self.mMetatools.sort(items = items, sort = sort, order = order, inplace = True)
 
-			return self._internal(items = items, internal = internal, **count)
-		except: self._error()
-		return self._internal(internal = internal)
+			return self._internal(items = items, errors = errors, detail = detail, internal = internal, **count)
+		except: self._logError()
+		return self._internal(internal = internal, detail = detail)
 
-	def _executeIteration(self, function, items, count = None, result = None, lock = None, **parameters):
+	def _executeIteration(self, function, items, errors, count = None, result = None, lock = None, **parameters):
 		try:
 			if lock: self._lock(limit = lock)
-			data = function(**parameters)
+			error = None
+			if function == self._retrieve and parameters.get('detail'):
+				parameters['detail'] = True
+				data, _, error = function(**parameters)
+			else:
+				data = function(**parameters)
 
 			if parameters.get('internal'):
 				if data:
@@ -693,8 +780,13 @@ class MetaTrakt(MetaProvider):
 			else: # Allow metadata() to determine if the request was completed.
 				if Tools.isArray(result): self._dataSet(item = items, key = result, value = data)
 				elif result: items[result] = data
+
+			# Add errors, such as HTTP 404.
+			if Tools.isArray(result): self._dataSet(item = errors, key = result, value = error)
+			elif result: errors[result] = error
+			else: errors.append(error)
 		except:
-			self._error()
+			self._logError()
 		finally:
 			if lock: self._unlock(limit = lock)
 
@@ -899,7 +991,9 @@ class MetaTrakt(MetaProvider):
 		language = None,			# String: single language, 2-digit code | List: multiple languages, ORed
 		country = None,				# String: single country, 2-digit code | List: multiple countries, ORed
 		certificate = None,			# String: single certificate, US MPAA | List: multiple certificates, ORed
+
 		status = None,				# String: single status, Trakt status slug only for shows | List: multiple statuses, ORed
+		watch = None,				# String: single watch status | List: multiple watch statuses, ORed
 		episode = None,				# String: single episode type, Trakt episode slug only for episodes | List: multiple episode types, ORed
 
 		studio = None,				# String: single studio, Trakt studio ID | List: multiple studios, ORed
@@ -918,7 +1012,7 @@ class MetaTrakt(MetaProvider):
 		page = None,				# Integer: page number
 		limit = None,				# Integer: page limit
 		sort = None,				# Boolean: sort according to the headers
-		extended = None,			# Boolean: extended details | String: type of extended details | List: mutiple extended details (eg: extended=full,episodes)
+		extended = None,			# Boolean: extended details | String: type of extended details | List: multiple extended details (eg: extended=full,episodes)
 		field = None,				# Boolean: all applicable search fields | String: single search field | List: multiple search field
 		list = None,				# String: the type of lists to retrieve
 		search = None,				# String: the types to retrieve for ID lookups
@@ -959,11 +1053,16 @@ class MetaTrakt(MetaProvider):
 		if language: result['languages'] = self._parameterList(values = language)
 		if country: result['countries'] = self._parameterList(values = country)
 		if certificate: result['certifications'] = self._parameterList(values = self._convertCertificate(certificate = certificate)).lower() # Must be lower case.
+
 		if status:
 			if status is True: status = MetaTrakt.StatusAvailable
 			elif status is False: status = MetaTrakt.StatusUnavailable
 			else: status = self._convertStatus(status = status)
 			result['status'] = self._parameterList(values = status)
+		if watch:
+			if watch is True: status = MetaTrakt.WatchAny
+			elif watch is False: status = MetaTrakt.WatchFree
+			result['watchnow'] = self._parameterList(values = watch)
 		if episode and not Tools.isInteger(episode): result['episode_types'] = self._parameterList(values = episode) # Do not add episode numbers to the episode types.
 
 		if studio: result['studio_ids'] = self._parameterList(values = studio)
@@ -983,7 +1082,7 @@ class MetaTrakt(MetaProvider):
 		if limit: result['limit'] = str(limit)
 
 		if extended:
-			if Tools.isArray(extended): # Although not documented, mutiple extended infos can be passed. Eg: extended=full,episodes.
+			if Tools.isArray(extended): # Although not documented, multiple extended infos can be passed. Eg: extended=full,episodes.
 				extended = [i for i in extended if i and not i == MetaTrakt.ExtendedBasic]
 				if extended: result['extended'] = ','.join(extended)
 			elif Tools.isString(extended):
@@ -1322,6 +1421,8 @@ class MetaTrakt(MetaProvider):
 			else: extra.append(keyword)
 		if extra: query = self._parameterQuery(query = query, extra = extra)
 
+		yeared = year[0] if (year and Tools.isArray(year)) else year
+		past = not date and yeared and yeared <= Time.year() # Check before date is changed below.
 		if date or year:
 			currentDate = Time.timestamp()
 			currentYear = Time.year()
@@ -1334,7 +1435,7 @@ class MetaTrakt(MetaProvider):
 				date = [None, currentDate]
 			elif date is False or date == MetaTrakt.ReleaseFuture:
 				date = [Time.future(day = MetaTrakt.LimitFuture), None]
-			elif date == MetaTrakt.ReleaseHome:
+			elif date == MetaTrakt.ReleaseHome or date == MetaTrakt.ReleaseDigital or date == MetaTrakt.ReleasePhysical:
 				date = [None, currentDate if Media.isSerie(media) else Time.past(day = MetaTrakt.LimitHome)]
 			elif Tools.isString(date):
 				date = [None, Time.timestamp(fixedTime = date, format = Time.FormatDate, utc = True)]
@@ -1363,7 +1464,7 @@ class MetaTrakt(MetaProvider):
 		if (company or Media.isEnterprise(niche)) and not studio and not network: support = False # Eg: network not supported for movies. Or Originals not available for a company, since there are no studios.
 
 		# Explore
-		rating, votes = self._voting(media = media, niche = niche, release = release, year = year, date = date, genre = genre, language = language, country = country, certificate = certificate, company = studio or network, status = status, rating = rating, votes = votes, active = False) # active=False: not that many votes compared to other platforms like IMDb.
+		rating, votes = self._voting(media = media, niche = niche, release = release, year = year, date = date, past = past, genre = genre, language = language, country = country, certificate = certificate, company = studio or network, status = status, rating = rating, votes = votes, active = False) # active=False: not that many votes compared to other platforms like IMDb.
 		if Media.isAll(niche):
 			# Search endpoint, which seems to be the same the the Popularity endpoint.
 			# Sorted by popularity, so low ratings/votes should in any case not appear.
@@ -1497,413 +1598,415 @@ class MetaTrakt(MetaProvider):
 		# Otherwise importing this class has an initialization overhead.
 		# Only create on demand.
 		if MetaTrakt.Companies is None:
+			from lib.meta.company import MetaCompany
+
 			MetaTrakt.Companies = {
-				MetaTools.Company20thcentury : {
+				MetaCompany.Company20thcentury : {
 					MetaProvider.CompanyStudio	: ['50', '42', '95', '25519', '5039', '3965', '95378', '68257', '13260', '5168', '103387', '6254', '39950', '39532', '150785', '67348', '126816'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: ['1569'],
 				},
-				MetaTools.CompanyAbc : {
+				MetaCompany.CompanyAbc : {
 					MetaProvider.CompanyStudio	: ['125476', '29', '3328', '457', '128742', '1178', '361', '3500', '36654', '496', '5647', '67160', '53385', '30451', '94804', '973', '38090', '177437', '162298', '1154'],
 					MetaProvider.CompanyNetwork	: ['16', '9', '425', '1561', '986', '1754', '2931'],
 					MetaProvider.CompanyVendor	: ['2260', '808'],
 				},
-				MetaTools.CompanyAe : {
+				MetaCompany.CompanyAe : {
 					MetaProvider.CompanyStudio	: ['1072', '7913', '20259', '38080', '100570', '182433', '129828'],
 					MetaProvider.CompanyNetwork	: ['44', '1752', '2547', '2226', '2742', '2495', '3624', '3216'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyAcorn : {
+				MetaCompany.CompanyAcorn : {
 					MetaProvider.CompanyStudio	: ['2341', '161589', '136323'],
 					MetaProvider.CompanyNetwork	: ['557', '2316', '2288'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyAdultswim : {
+				MetaCompany.CompanyAdultswim : {
 					MetaProvider.CompanyStudio	: ['259', '12260', '89195'],
 					MetaProvider.CompanyNetwork	: ['104', '3571', '2334', '3020'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyAmazon : {
+				MetaCompany.CompanyAmazon : {
 					MetaProvider.CompanyStudio	: ['179', '158509'],
 					MetaProvider.CompanyNetwork	: ['47', '2501', '2392', '2256', '3205', '3596', '2385', '2385', '2214'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyAmc : {
+				MetaCompany.CompanyAmc : {
 					MetaProvider.CompanyStudio	: ['289', '3789', '2808', '18519', '11389', '11703', '10257', '159017', '12295', '65890'],
 					MetaProvider.CompanyNetwork	: ['107', '194', '467', '173', '153', '546', '1955', '1858', '2768', '151', '3647', '1761'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyApple : {
+				MetaCompany.CompanyApple : {
 					MetaProvider.CompanyStudio	: ['142848'],
 					MetaProvider.CompanyNetwork	: ['256'],
 					MetaProvider.CompanyVendor	: ['685', '638'],
 				},
-				MetaTools.CompanyArd : {
+				MetaCompany.CompanyArd : {
 					MetaProvider.CompanyStudio	: ['1629', '1187', '2919', '2916', '2918', '1587', '10128', '1371', '269', '5018', '26657', '9198', '7954', '3373', '2292', '14182', '22344', '6988', '69625', '15170', '30132', '22294', '97309', '12989', '89260', '153470'],
 					MetaProvider.CompanyNetwork	: ['265', '268', '270', '568', '492', '271', '106', '345', '654', '346', '76638', '871', '269', '428', '2325', '3417', '2507', '2070', '2995', '1804', '2595', '1703', '1594', '3143', '2814', '3843', '2071', '3635', '3195', '2883'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyAubc : {
+				MetaCompany.CompanyAubc : {
 					MetaProvider.CompanyStudio	: ['401', '426', '166275', '108530'],
 					MetaProvider.CompanyNetwork	: ['60', '138', '135', '193', '2057', '1327', '141', '1228'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyBbc : {
+				MetaCompany.CompanyBbc : {
 					MetaProvider.CompanyStudio	: ['1149', '3510', '1012', '1200', '3383', '2080', '2080', '13491', '120', '114813', '2032', '27566', '11055', '57894', '13992', '2807', '1442', '91307', '2808', '2873', '1895', '2253', '50067', '76598', '108941', '88204', '38914', '108532', '30777', '20472', '30777', '85965', '33592', '104679', '2748', '219', '1763', '41817', '32272', '17351', '81883', '70448', '70448', '18003', '73598', '165545', '162938', '72707', '70416', '171670', '138224', '104679', '84100', '47824', '170766', '167937', '10236', '61433', '33006', '165372', '146600', '109660', '95633', '66174', '56143', '126759', '126758'],
 					MetaProvider.CompanyNetwork	: ['77', '33', '121', '278', '137', '486', '616', '909', '279', '173', '618', '455', '736', '2689', '2607', '3001', '1118', '3172', '1127', '460', '2179', '3242', '2857', '2625', '2402', '838', '3709', '3688', '3592', '3568', '3071', '3048', '2319', '2191', '900', '899', '3718', '3717', '246', '2448', '2186', '1992', '1692', '1598', '1217', '1076'],
 					MetaProvider.CompanyVendor	: ['3501', '1661'],
 				},
-				MetaTools.CompanyBoomerang : {
+				MetaCompany.CompanyBoomerang : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['254', '2257', '3600', '3066'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyBravo : {
+				MetaCompany.CompanyBravo : {
 					MetaProvider.CompanyStudio	: ['38665', '1920', '157883', '43510'],
 					MetaProvider.CompanyNetwork	: ['84', '117'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyBritbox : {
+				MetaCompany.CompanyBritbox : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['553'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCartoonnet : {
+				MetaCompany.CompanyCartoonnet : {
 					MetaProvider.CompanyStudio	: ['1321', '129704', '1329', '40089', '96727'],
 					MetaProvider.CompanyNetwork	: ['120', '1061', '234', '1945', '2979', '1151', '1209', '3204', '3788', '3191', '3164', '3008', '2665', '2582', '1388', '1386', '989', '2518', '1961', '1882'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCbc : {
+				MetaCompany.CompanyCbc : {
 					MetaProvider.CompanyStudio	: ['900', '106097'],
 					MetaProvider.CompanyNetwork	: ['97', '163', '1686', '1747', '3881'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCbs : {
+				MetaCompany.CompanyCbs : {
 					MetaProvider.CompanyStudio	: ['733', '203', '738', '33269', '77016', '4493', '40809', '168927', '75125', '24674', '1744', '173345', '3159', '121407', '19212', '139167', '100902'],
 					MetaProvider.CompanyNetwork	: ['22', '149', '818', '2477', '1725', '4001', '839', '3736', '2511', '1226'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyChannel4 : {
+				MetaCompany.CompanyChannel4 : {
 					MetaProvider.CompanyStudio	: ['1328', '5512', '3661', '4500', '129465', '52611'],
 					MetaProvider.CompanyNetwork	: ['150', '294', '124', '718', '3285', '2889'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyChannel5 : {
+				MetaCompany.CompanyChannel5 : {
 					MetaProvider.CompanyStudio	: ['2995', '66981'],
 					MetaProvider.CompanyNetwork	: ['409', '511', '2205', '3593', '916', '3939', '2005', '3326', '2676', '2165', '1999'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCineflix : {
+				MetaCompany.CompanyCineflix : {
 					MetaProvider.CompanyStudio	: ['1654'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCinemax : {
+				MetaCompany.CompanyCinemax : {
 					MetaProvider.CompanyStudio	: ['3190', '41495', '34297'],
 					MetaProvider.CompanyNetwork	: ['52'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyColumbia : {
+				MetaCompany.CompanyColumbia : {
 					MetaProvider.CompanyStudio	: ['865', '69', '443', '10649', '9766', '21614', '13897', '13366', '14283', '45819', '26163', '28419', '30269', '21402', '115848'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyComedycen : {
+				MetaCompany.CompanyComedycen : {
 					MetaProvider.CompanyStudio	: ['1663', '5444'],
 					MetaProvider.CompanyNetwork	: ['45', '649', '903', '841', '604', '1528', '1117', '2626', '2096', '2065', '1313', '1573', '950', '3981', '2492', '1728', '2757'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyConstantin : {
+				MetaCompany.CompanyConstantin : {
 					MetaProvider.CompanyStudio	: ['1829', '1579', '44700', '151477'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCrave : {
+				MetaCompany.CompanyCrave : {
 					MetaProvider.CompanyStudio	: ['4785', '106096'],
 					MetaProvider.CompanyNetwork	: ['401', '935', '3652'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCrunchyroll : {
+				MetaCompany.CompanyCrunchyroll : {
 					MetaProvider.CompanyStudio	: ['15770', '147379', '155485'],
 					MetaProvider.CompanyNetwork	: ['502'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyCw : {
+				MetaCompany.CompanyCw : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['18', '640', '843', '1762', '3970', '3377'],
 					MetaProvider.CompanyVendor	: ['945'],
 				},
-				MetaTools.CompanyDarkhorse : {
+				MetaCompany.CompanyDarkhorse : {
 					MetaProvider.CompanyStudio	: ['696', '61823'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyDccomics : {
+				MetaCompany.CompanyDccomics : {
 					MetaProvider.CompanyStudio	: ['167', '60', '134194', '26741', '121146'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: ['36'],
 				},
-				MetaTools.CompanyDimension : {
+				MetaCompany.CompanyDimension : {
 					MetaProvider.CompanyStudio	: ['2247', '1503'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyDiscovery : {
+				MetaCompany.CompanyDiscovery : {
 					MetaProvider.CompanyStudio	: ['2069', '3313', '20112', '17469', '1786', '7638', '43448', '1061', '72759', '67423'],
 					MetaProvider.CompanyNetwork	: ['108', '248', '1662', '725', '314', '1937', '352', '1993', '1807', '1695', '601', '1971', '628', '728', '1541', '1826', '2219', '762', '733', '2200', '228', '2042', '315', '2025', '2668', '2599', '2283', '2884', '1968', '1165', '3038', '1749', '952', '2916', '2589', '1733', '1321', '3316', '3151', '3138', '2604', '2516', '2483', '2398', '2309', '1967', '3041', '2386', '2308', '1392', '1343', '1279'],
 					MetaProvider.CompanyVendor	: ['2087'],
 				},
-				MetaTools.CompanyDisney : {
+				MetaCompany.CompanyDisney : {
 					MetaProvider.CompanyStudio	: ['897', '3542', '244', '145', '4156', '9882', '6809', '114864', '76390', '120781', '5677', '12814', '33725', '80365', '113755', '9951', '9951', '23614', '74559', '128651', '11001', '90039', '116243', '17991', '15644', '126396', '74242', '173936', '151455', '134465', '117047', '93807', '74241', '162834', '127553'],
 					MetaProvider.CompanyNetwork	: ['41', '93', '105', '48', '133', '760', '2026', '1536', '176', '798', '2567', '1368', '1265', '1530', '2566', '1951', '853', '1189', '606', '1744', '1603', '3331', '2766', '2478', '2286', '2077', '1948', '3744', '3622', '3119', '2845', '2835', '2692', '2418', '2107', '171', '1519', '3710', '2716', '2597', '2519', '2282', '2018', '1845', '1837', '1433', '1316'],
 					MetaProvider.CompanyVendor	: ['2357'],
 				},
-				MetaTools.CompanyDreamworks : {
+				MetaCompany.CompanyDreamworks : {
 					MetaProvider.CompanyStudio	: ['249', '335', '252', '56', '12040'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyFacebook : {
+				MetaCompany.CompanyFacebook : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['434', '1002', '1738'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyFox : {
+				MetaCompany.CompanyFox : {
 					MetaProvider.CompanyStudio	: ['50', '42', '4413', '5039', '3965', '6068', '16', '1570', '1570', '68257', '107', '17', '9574', '106306', '20983', '5168', '112608', '144304', '110', '7', '1780', '2998', '4213', '7531', '593', '155752', '6254', '155810', '137334', '155817', '155821', '155809', '11610', '84751', '68794', '150785', '109665', '155826', '155818', '136447', '131257'],
 					MetaProvider.CompanyNetwork	: ['5', '29', '7', '1045', '2109', '11', '10', '326', '25', '1315', '764', '35', '28', '2743', '13', '1175', '484', '26', '2569', '24', '2413', '574', '32', '2805', '2164', '1958', '1902', '1181', '1174', '1079', '734', '388', '3199', '2526', '23', '2259', '2108', '1981', '1936', '12', '829', '2263', '1901'],
 					MetaProvider.CompanyVendor	: ['1653'],
 				},
-				MetaTools.CompanyFreevee : {
+				MetaCompany.CompanyFreevee : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['2392', '1628', '3205', '923', '3596', '2230', '1517'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyFx : {
+				MetaCompany.CompanyFx : {
 					MetaProvider.CompanyStudio	: ['4'],
 					MetaProvider.CompanyNetwork	: ['2', '4', '1885', '2409', '1642'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyGaumont : {
+				MetaCompany.CompanyGaumont : {
 					MetaProvider.CompanyStudio	: ['1995', '4871', '2805', '78921', '5310', '1941', '4745', '22722', '630', '159271', '1945', '154611', '69335', '8267', '15543', '22325', '40478', '88654', '91022', '33189', '150081'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyGoogle : {
+				MetaCompany.CompanyGoogle : {
 					MetaProvider.CompanyStudio	: ['49108'],
 					MetaProvider.CompanyNetwork	: ['1446'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyHayu : {
+				MetaCompany.CompanyHayu : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyHbo : {
+				MetaCompany.CompanyHbo : {
 					MetaProvider.CompanyStudio	: ['1030', '2764', '2531', '6471', '2866', '1357', '1357', '88810', '81327', '32065', '2205', '83538', '721'],
 					MetaProvider.CompanyNetwork	: ['1', '514', '2934', '2224', '487', '1355', '212', '2227', '340', '3563', '1364', '83', '3897', '2228', '1585', '244', '3826', '2346', '2358', '3757', '2351', '3551', '2844', '2394', '2360', '1780', '1098', '3564'],
 					MetaProvider.CompanyVendor	: ['487', '1355', '212', '340', '1364', '83', '244', '2360', '1780'],
 				},
-				MetaTools.CompanyHistory : {
+				MetaCompany.CompanyHistory : {
 					MetaProvider.CompanyStudio	: ['13860'],
 					MetaProvider.CompanyNetwork	: ['198', '1000', '1334', '293', '1715', '1018', '3673', '2711', '2664', '2455', '1400', '1373'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyHulu : {
+				MetaCompany.CompanyHulu : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['87', '635', '3710'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyItv : {
+				MetaCompany.CompanyItv : {
 					MetaProvider.CompanyStudio	: ['2394', '1332', '22623', '194', '14352', '19698', '71', '2367', '2365', '2365', '12737', '489', '2236', '116493', '69163', '82190', '16749', '56999', '43445', '2366', '112075', '102835'],
 					MetaProvider.CompanyNetwork	: ['68', '207', '167', '2502', '1138', '318', '605', '3579', '1001', '329', '113', '3435', '3877', '3590', '2369'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyLionsgate : {
+				MetaCompany.CompanyLionsgate : {
 					MetaProvider.CompanyStudio	: ['538', '12', '4867', '19564', '102047', '173996', '173852'],
 					MetaProvider.CompanyNetwork	: ['2229', '2701', '3632', '3166', '2638'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyLucasfilm : {
+				MetaCompany.CompanyLucasfilm : {
 					MetaProvider.CompanyStudio	: ['174', '186'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyMarvel : {
+				MetaCompany.CompanyMarvel : {
 					MetaProvider.CompanyStudio	: ['181', '183', '46', '974', '146', '7159', '45', '109306', '3225', '2483'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyMgm : {
+				MetaCompany.CompanyMgm : {
 					MetaProvider.CompanyStudio	: ['123', '236', '158509', '9864', '21264', '81503', '2269', '83', '29551', '1463', '140095', '89259', '72762', '64428', '160118', '26288', '21495'],
 					MetaProvider.CompanyNetwork	: ['334', '2639', '3159', '1991'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyMiramax : {
+				MetaCompany.CompanyMiramax : {
 					MetaProvider.CompanyStudio	: ['332'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyMtv : {
+				MetaCompany.CompanyMtv : {
 					MetaProvider.CompanyStudio	: ['3537', '10908', '2363', '3520', '97024', '1456', '23361', '2364', '23548', '23318', '27021', '2491', '1457', '78156', '171314', '61353', '131403'],
 					MetaProvider.CompanyNetwork	: ['94', '390', '459', '488', '1233', '1004', '1112', '1013', '1048', '958', '912', '1073', '646', '2564', '1157', '3002', '2517', '1776', '1689', '3299', '2720', '2719', '2718'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyNationalgeo : {
+				MetaCompany.CompanyNationalgeo : {
 					MetaProvider.CompanyStudio	: ['1392', '2321', '138750', '138750', '127133'],
 					MetaProvider.CompanyNetwork	: ['80', '185', '567', '1880', '1755', '446', '1985', '3315', '1557', '2914', '2403', '3726', '3247', '3137', '3024', '1756', '2382'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyNbc : {
+				MetaCompany.CompanyNbc : {
 					MetaProvider.CompanyStudio	: ['8037', '1311', '313', '1071', '304', '2443', '7862', '111102', '44641', '1896', '2756', '155816', '70892', '75288', '41837', '138024'],
 					MetaProvider.CompanyNetwork	: ['21'],
 					MetaProvider.CompanyVendor	: ['209', '469', '201', '3414', '2602', '1671'],
 				},
-				MetaTools.CompanyNetflix : {
+				MetaCompany.CompanyNetflix : {
 					MetaProvider.CompanyStudio	: ['127791', '120480'],
 					MetaProvider.CompanyNetwork	: ['53', '1465'],
 					MetaProvider.CompanyVendor	: ['53', '1465'],
 				},
-				MetaTools.CompanyNewline : {
+				MetaCompany.CompanyNewline : {
 					MetaProvider.CompanyStudio	: ['1227', '5610', '2191'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyNickelodeon : {
+				MetaCompany.CompanyNickelodeon : {
 					MetaProvider.CompanyStudio	: ['1119', '1533', '4568', '84694', '151752', '24136', '70634'],
 					MetaProvider.CompanyNetwork	: ['230', '330', '403', '761', '612', '999', '845', '2755', '1036', '3559', '281', '231', '1135', '877', '2823', '1439', '1121', '3903', '3782', '3697', '1719', '1711', '2922', '1438', '1026'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyParamount : {
+				MetaCompany.CompanyParamount : {
 					MetaProvider.CompanyStudio	: ['455', '352', '7085', '5793', '4071', '41123', '44425', '168927', '4569', '150364', '3130', '22388', '12500', '13240', '163403', '151215', '151548', '45935', '91489', '137858'],
 					MetaProvider.CompanyNetwork	: ['34', '1623', '2579', '118', '2232', '2269', '2239', '2790', '2876', '1778', '2631', '440', '3097', '1324', '614', '2605', '2005', '2970', '2444'],
 					MetaProvider.CompanyVendor	: ['1111', '3354', '2192', '1989'],
 				},
-				MetaTools.CompanyPeacock : {
+				MetaCompany.CompanyPeacock : {
 					MetaProvider.CompanyStudio	: ['19161'],
 					MetaProvider.CompanyNetwork	: ['550', '3027'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyPhilo : {
+				MetaCompany.CompanyPhilo : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyPixar : {
+				MetaCompany.CompanyPixar : {
 					MetaProvider.CompanyStudio	: ['1690'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyPluto : {
+				MetaCompany.CompanyPluto : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['744', '3133'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyRegency : {
+				MetaCompany.CompanyRegency : {
 					MetaProvider.CompanyStudio	: ['4659', '4662', '2589', '5947', '13896', '15831'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyRko : {
+				MetaCompany.CompanyRko : {
 					MetaProvider.CompanyStudio	: ['3490', '17058', '7103', '17698', '117985'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyRoku : {
+				MetaCompany.CompanyRoku : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['3853', '1867'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyScreengems : {
+				MetaCompany.CompanyScreengems : {
 					MetaProvider.CompanyStudio	: ['391', '376', '59039', '51582'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyShowtime : {
+				MetaCompany.CompanyShowtime : {
 					MetaProvider.CompanyStudio	: ['191', '43380', '125949', '25867', '12808', '36301', '69830'],
 					MetaProvider.CompanyNetwork	: ['50', '2737', '326', '2876', '1834', '42814'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanySky : {
+				MetaCompany.CompanySky : {
 					MetaProvider.CompanyStudio	: ['1208', '78934', '75014', '136528', '12080', '3192', '9581', '7006', '2779', '32502', '2276', '74838', '8184', '46389', '1874', '162046', '65407', '16105', '65406', '166142', '115008'],
 					MetaProvider.CompanyNetwork	: ['187', '695', '284', '1022', '2082', '617', '1601', '750', '1682', '1071', '583', '496', '1046', '2737', '678', '2347', '2237', '2050', '1424', '1996', '3346', '2496', '1159', '802', '545', '891', '3179', '2421', '3823', '3817', '3685', '3597', '3070', '2953', '2464', '2100', '1116', '3550', '2905', '2521', '2372', '2292', '2241'],
 					MetaProvider.CompanyVendor	: ['2680', '3914', '3813', '949'],
 				},
-				MetaTools.CompanySony : {
+				MetaCompany.CompanySony : {
 					MetaProvider.CompanyStudio	: ['8', '11799', '1968', '3342', '2305', '10723', '10753', '6617', '2392', '48497', '105856', '20585', '27372', '2457', '1929', '75899', '41016', '168161', '36601', '144379', '11918', '173773', '80195'],
 					MetaProvider.CompanyNetwork	: ['309', '1322', '1051', '3025', '2379', '3797', '3755', '3501', '3378', '3335', '3213'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyStarz : {
+				MetaCompany.CompanyStarz : {
 					MetaProvider.CompanyStudio	: ['19655'],
 					MetaProvider.CompanyNetwork	: ['272', '2700', '1053', '3323', '2270', '2298'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanySyfy : {
+				MetaCompany.CompanySyfy : {
 					MetaProvider.CompanyStudio	: ['253', '1871', '17816'],
 					MetaProvider.CompanyNetwork	: ['17', '2167', '1219'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTbs : {
+				MetaCompany.CompanyTbs : {
 					MetaProvider.CompanyStudio	: ['38744', '53929', '110634', '45876'],
 					MetaProvider.CompanyNetwork	: ['161', '3572', '2514', '3899', '3682', '2909', '1953', '1892'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTnt : {
+				MetaCompany.CompanyTnt : {
 					MetaProvider.CompanyStudio	: ['2027', '5006', '15890'],
 					MetaProvider.CompanyNetwork	: ['382', '320', '1356', '1110', '497', '910', '3117'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTouchstone : {
+				MetaCompany.CompanyTouchstone : {
 					MetaProvider.CompanyStudio	: ['3800', '32'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTristar : {
+				MetaCompany.CompanyTristar : {
 					MetaProvider.CompanyStudio	: ['3595', '443', '188', '21614', '14283', '82509', '21402', '140649'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTrutv : {
+				MetaCompany.CompanyTrutv : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['69', '1522'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTubi : {
+				MetaCompany.CompanyTubi : {
 					MetaProvider.CompanyStudio	: [],
 					MetaProvider.CompanyNetwork	: ['2166'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyTurner : {
+				MetaCompany.CompanyTurner : {
 					MetaProvider.CompanyStudio	: ['2027', '8665', '1523', '2762', '66219', '31337', '69727', '69654', '58702', '54310'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyUniversal : {
+				MetaCompany.CompanyUniversal : {
 					MetaProvider.CompanyStudio	: ['937', '64', '3565', '21822', '189', '4492', '28448', '7331', '23680', '1071', '34467', '839', '67776', '1361', '293', '2443', '1896', '30650', '11852', '155816', '70892', '31159', '35010', '98984', '98983', '75288', '69970', '40271', '29867', '145816', '31546', '79732', '134886', '13486', '114586'],
 					MetaProvider.CompanyNetwork	: ['145', '1458', '859', '3613', '1449', '1192'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyUsa : {
+				MetaCompany.CompanyUsa : {
 					MetaProvider.CompanyStudio	: ['312', '57011', '6648', '18350', '8505', '67775', '0016587'],
 					MetaProvider.CompanyNetwork	: ['51'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyWarner : {
+				MetaCompany.CompanyWarner : {
 					MetaProvider.CompanyStudio	: ['113', '51', '76', '4615', '3062', '4841', '512', '5342', '9955', '7241', '15782', '21788', '7835', '4757', '998', '59370', '51994', '14866', '2297', '131941', '6863', '28691', '555', '37897', '83538', '75435', '2461', '147701', '113193', '63462', '61428', '137523', '48347', '131813', '161686', '139432'],
 					MetaProvider.CompanyNetwork	: ['27', '2570', '2343', '2218', '3178', '2993', '2982', '2549', '1588'],
 					MetaProvider.CompanyVendor	: ['2097', '1549'],
 				},
-				MetaTools.CompanyWeinstein : {
+				MetaCompany.CompanyWeinstein : {
 					MetaProvider.CompanyStudio	: ['613'],
 					MetaProvider.CompanyNetwork	: [],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyYoutube : {
+				MetaCompany.CompanyYoutube : {
 					MetaProvider.CompanyStudio	: ['10650', '93922', '3067'],
 					MetaProvider.CompanyNetwork	: ['49', '240', '1205', '2908', '2907', '2248', '2149'],
 					MetaProvider.CompanyVendor	: [],
 				},
-				MetaTools.CompanyZdf : {
+				MetaCompany.CompanyZdf : {
 					MetaProvider.CompanyStudio	: ['1628', '5028', '12725', '175124', '175071', '136686'],
 					MetaProvider.CompanyNetwork	: ['139', '268', '178', '482', '2325', '1201', '3861', '2704'],
 					MetaProvider.CompanyVendor	: [],
@@ -2037,6 +2140,19 @@ class MetaTrakt(MetaProvider):
 			extended = parameters.get('extended')
 			if extended and MetaTrakt.ExtendedEpisode in extended: media = Media.Episode
 
+		# Update (2025-12):
+		# Trakt now returns images with some list endpoints, like "popular", even though the images were not requested.
+		# This causes the list returned to the menus to contain image dictionaries which then cause various errors because they cannot be merged and Tools.listUnique().
+		# Remove these images from list entries and only allow if a specific movie/show/season/episode/person is requested.
+		try:
+			try: image = MetaTrakt.ExtendedImages in parameters['extended']
+			except: image = False
+			if not image:
+				for i in result if Tools.isArray(result) else [result]:
+					try: del i[MetaImage.Attribute]
+					except: pass
+		except: Logger.error()
+
 		# Aggregate metadata.
 		if result and not type in [MetaTrakt.TypeRelease, MetaTrakt.TypeTranslation, MetaTrakt.TypeAlias, MetaTrakt.TypeRating]:
 			for i in result if Tools.isArray(result) else [result]:
@@ -2095,27 +2211,31 @@ class MetaTrakt(MetaProvider):
 					if result:
 						if Tools.isArray(result): results.extend(result)
 						else: results.append(result)
-				except: self._error()
+				except: self._logError()
 
 		return self._extractMeta(items = results, headers = data['headers'])
 
 	def _extractBase(self, data):
 		try:
+			# Important to remove the time dictionary.
+			# Otherwise if some future episodes in the season do not have a date yet, it will use the season's premiere date for the episodes' dates instead.
+			# This incorrect date will cause issues in MetaPack, such as making the release interval "daily", which should rather use the dates from TVDb if they are available there.
 			item = Tools.copy(data)
-			for k in ['title', 'originaltitle', 'year', 'tagline', 'plot', 'premiered', 'aired', 'status', 'duration', 'rating', 'userrating', 'votes', 'trailer', 'homepage']:
+			for k in ['title', 'originaltitle', 'year', 'tagline', 'plot', 'status', 'duration', 'rating', 'userrating', 'votes', 'trailer', 'homepage', 'premiered', 'aired', 'time']:
 				try: del item[k]
 				except: pass
 			return item
-		except: self._error()
+		except: self._logError()
 		return None
 
-	def _extractId(self, data):
+	def _extractId(self, data = None, **parameters):
 		result = {}
+		types = ('imdb', 'tmdb', 'tvdb', 'trakt', 'tvrage', 'slug')
 
 		if data:
 			ids = data.get('ids')
 			if ids:
-				for i in ['imdb', 'tmdb', 'tvdb', 'trakt', 'tvrage', 'slug']:
+				for i in types:
 					id = ids.get(i)
 					if id: result[i] = str(id)
 
@@ -2125,6 +2245,12 @@ class MetaTrakt(MetaProvider):
 				if description:
 					id = Regex.extract(data = description, expression = 'themoviedb\.org\/collection\/(\d+)')
 					if id: result['tmdb'] = str(id)
+
+		# If IDs are missing, add them from the request parameters.
+		# This is useful of Trakt does not have an IMDb/TVDb ID yet, and a title lookup is done.
+		if parameters:
+			for i in types:
+				if not result.get(i) and parameters.get(i): result[i] = str(parameters.get(i))
 
 		return result
 
@@ -2230,7 +2356,7 @@ class MetaTrakt(MetaProvider):
 					if time: break
 				if time: result[k] = time
 			if result: return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractMeta(self, items, headers):
@@ -2267,7 +2393,7 @@ class MetaTrakt(MetaProvider):
 
 				if meta:
 					for item in items: self._tempSet(item = item, key = 'list', value = meta, copy = True)
-		except: self._error()
+		except: self._logError()
 		return items
 
 	def _extractTitle(self, data, media = None, niche = None, type = None, calendar = None, **parameters):
@@ -2379,12 +2505,37 @@ class MetaTrakt(MetaProvider):
 					resultEpisode['niche'] = self.mMetatools.niche(metadata = resultEpisode, media = Media.Episode, niche = niche)
 					resultDetail[Media.Episode] = resultEpisode
 
+				# If the show does not have a time, use the season/episode date.
+				# Eg: for release() when retrieving show objects.
+				if resultSeason:
+					try: premiere = resultSeason['time'][MetaTools.TimePremiere]
+					except: premiere = None
+					if not premiere:
+						if resultEpisode and resultEpisode.get('season') == resultSeason.get('season') and resultEpisode.get('episode') == 1:
+							resultSeason['premiered'] = resultEpisode.get('premiered')
+							resultSeason['aired'] = resultEpisode.get('aired')
+							resultSeason['time'] = Tools.copy(resultEpisode.get('time'))
+				if resultShow:
+					try: premiere = resultShow['time'][MetaTools.TimePremiere]
+					except: premiere = None
+					if not premiere:
+						if resultSeason and resultSeason.get('season') == 1:
+							resultShow['premiered'] = resultSeason.get('premiered')
+							resultShow['aired'] = resultSeason.get('aired')
+							resultShow['time'] = Tools.copy(resultSeason.get('time'))
+						elif resultEpisode and resultEpisode.get('season') == 1 and resultEpisode.get('episode') == 1:
+							resultShow['premiered'] = resultEpisode.get('premiered')
+							resultShow['aired'] = resultEpisode.get('aired')
+							resultShow['time'] = Tools.copy(resultEpisode.get('time'))
+
 				# Store this in temp, since it will later be deleted by the indexer.
 				# Otherwise, if it is stored directly in the object, it will not be deleted and gets saved in the local cache, unnecessarily increasing the database size.
 				if resultDetail: self._tempSet(item = result, key = 'detail', value = resultDetail)
 
 				return result
 			else:
+				current = Time.timestamp()
+
 				# For certain endpoints that have a fixed movie or show media (eg: movies/trending), Trakt does not wrap the object in a type-subobject.
 				# Use the media that was used for the request instead.
 				if not type: type = parameters.get('type')
@@ -2400,10 +2551,15 @@ class MetaTrakt(MetaProvider):
 				dataItem = data.get(type) or data
 				dataShow = data.get(MetaTrakt.TypeShow)
 
+
+				season = None
+				episode = None
 				if Media.isSerie(media) or type == MetaTrakt.TypeShow or type == MetaTrakt.TypeSeason or type == MetaTrakt.TypeEpisode:
-					if dataShow: resultTemp['id'] = self._extractId(data = dataShow)
+					if dataShow: resultTemp['id'] = self._extractId(data = dataShow, **parameters)
+					elif type == MetaTrakt.TypeSeason or type == MetaTrakt.TypeEpisode: resultTemp['id'] = self._extractId(**parameters)
 					if (type == MetaTrakt.TypeShow and not dataShow) or type == MetaTrakt.TypeSeason or type == MetaTrakt.TypeEpisode:
-						id = self._extractId(data = dataItem)
+						if type == MetaTrakt.TypeShow: id = self._extractId(data = dataItem, **parameters)
+						else: id = self._extractId(data = dataItem)
 						if id:
 							if not 'id' in resultTemp: resultTemp['id'] = {}
 							if type == MetaTrakt.TypeShow: resultTemp['id'] = id
@@ -2429,7 +2585,7 @@ class MetaTrakt(MetaProvider):
 						title = data.get('title')
 						if title: result['tvshowtitle'] = title
 				else:
-					resultTemp['id'] = self._extractId(data = dataItem)
+					resultTemp['id'] = self._extractId(data = dataItem, **parameters)
 
 				resultTemp.update({k : v for k, v in resultTemp.get('id', {}).items() if not Tools.isDictionary(v)})
 				resultTemp.update(result)
@@ -2454,6 +2610,8 @@ class MetaTrakt(MetaProvider):
 				# Movies have a normal date without a timezone.
 				#	premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
 				#	time = Time.timestamp(fixedTime = premiered, format = Time.FormatDate)
+				# All dates from Trakt are returned as GMT/UTC.
+				#	https://trakt.docs.apiary.io/#introduction/dates
 
 				premiered = dataItem.get('released')
 				if premiered:
@@ -2467,6 +2625,7 @@ class MetaTrakt(MetaProvider):
 					if premiered:
 						result['premiered'] = premiered
 						self._dataSet(item = result, key = ['time', MetaTools.ReleasePremiere], value = time)
+						premiered = time # Used later on.
 
 				aired = dataItem.get('first_aired')
 				if aired:
@@ -2480,10 +2639,11 @@ class MetaTrakt(MetaProvider):
 					if aired:
 						result['premiered'] = result['aired'] = aired
 						self._dataSet(item = result, key = ['time', MetaTools.ReleasePremiere], value = time)
+						premiered = time # Used later on.
 
 				# The disc release date for calendars/all/dvd.
 				# Do not do this for other calendars, since their release date is the premiere.
-				if calendar == MetaTrakt.CalendarDvd:
+				if calendar == MetaTrakt.CalendarDvd or calendar == MetaTrakt.CalendarStreaming:
 					released = data.get('released')
 					if released:
 						time = None
@@ -2491,7 +2651,7 @@ class MetaTrakt(MetaProvider):
 						if not time:
 							released = Regex.extract(data = released, expression = '(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
 							time = Time.timestamp(fixedTime = released, format = Time.FormatDate, utc = True)
-						if time: self._dataSet(item = result, key = ['time', MetaTools.ReleasePhysical], value = time)
+						if time: self._dataSet(item = result, key = ['time', MetaTools.ReleaseDigital if calendar == MetaTrakt.CalendarStreaming else MetaTools.ReleasePhysical], value = time)
 
 				airs = dataItem.get('airs')
 				if airs:
@@ -2505,6 +2665,12 @@ class MetaTrakt(MetaProvider):
 
 					airsZone = airs.get('timezone')
 					if airsZone: result['airs']['zone'] = airsZone
+
+					# Check MetaManager._metadataShowUpdate() for more info.
+					resultTrakt['offset'] = True
+					if airsTime and not ':00' in airsTime:
+						airing = dataItem.get('first_aired') or dataItem.get('released')
+						if airing and ':00:00.000Z' in airing: resultTrakt['offset'] = False
 
 				mpaa = dataItem.get('certification')
 				if mpaa: result['mpaa'] = self._convertCertificate(mpaa, inverse = True)
@@ -2529,8 +2695,7 @@ class MetaTrakt(MetaProvider):
 				# Remove these fake ratings if it is a new/future release. Otherwise, for older titles, assume it is actually a 1.0 rating.
 				voting = resultTrakt.get('voting')
 				if voting and voting.get('rating') == 1 and voting.get('votes') == 1:
-					premiered = result.get('premiered')
-					if premiered and Time.timestamp(premiered, format = Time.FormatDate, utc = True) > (Time.timestamp() - 604800):
+					if premiered and premiered > (Time.timestamp() - 604800):
 						voting['rating'] = result['rating'] = None
 						voting['votes'] = result['votes'] = None
 
@@ -2541,9 +2706,11 @@ class MetaTrakt(MetaProvider):
 
 				finished = False
 				status = dataItem.get('status')
+				if status: status = self._convertStatus(status = status, inverse = True)
+				else: status = self.mMetatools.mergeStatus(media = media, season = season, episode = episode, time = premiered, status = dataShow.get('status') if dataShow else None)
 				if status:
 					if status == MetaTrakt.StatusEnded or status == MetaTrakt.StatusCanceled: finished = True
-					result['status'] = self._convertStatus(status = status, inverse = True)
+					result['status'] = status
 
 				network = dataItem.get('network')
 				if network:
@@ -2558,10 +2725,10 @@ class MetaTrakt(MetaProvider):
 					else: result['studio'].append(studio)
 
 				country = dataItem.get('country')
-				if country: result['country'] = [country.lower()]
+				if country: result['country'] = Country.codes([country.lower()])
 
 				language = dataItem.get('languages')
-				if language: result['language'] = [i.lower() for i in language] if Tools.isArray(language) else [language.lower()]
+				if language: result['language'] = Language.codes([i.lower() for i in language] if Tools.isArray(language) else [language.lower()])
 
 				genre = dataItem.get('genres')
 				if genre: result['genre'] = self._convertGenre(genre = genre, inverse = True, default = True)
@@ -2572,33 +2739,40 @@ class MetaTrakt(MetaProvider):
 				homepage = dataItem.get('homepage')
 				if homepage: result['homepage'] = self._extractLink(homepage)
 
-				episodetype = dataItem.get('episode_type')
-				if episodetype:
-					if episodetype == MetaTrakt.EpisodeStandard: episodetype = [Media.Standard]
-					elif episodetype == MetaTrakt.EpisodePremiereShow: episodetype = [Media.Premiere, Media.Outer]
-					elif episodetype == MetaTrakt.EpisodePremiereSeason: episodetype = [Media.Premiere, Media.Inner]
-					elif episodetype == MetaTrakt.EpisodePremiereMiddle: episodetype = [Media.Premiere, Media.Middle]
-					elif episodetype == MetaTrakt.EpisodeFinaleShow: episodetype = [Media.Finale, Media.Outer]
-					elif episodetype == MetaTrakt.EpisodeFinaleSeason: episodetype = [Media.Finale, Media.Inner]
-					elif episodetype == MetaTrakt.EpisodeFinaleMiddle: episodetype = [Media.Finale, Media.Middle]
-					else: episodetype = None
-					if episodetype: result['type'] = episodetype
+				serietype = None
+				if type == MetaTrakt.TypeEpisode:
+					serietype = dataItem.get('episode_type')
+					if serietype:
+						if serietype == MetaTrakt.EpisodeStandard: serietype = [Media.Standard]
+						elif serietype == MetaTrakt.EpisodePremiereShow: serietype = [Media.Premiere, Media.Outer]
+						elif serietype == MetaTrakt.EpisodePremiereSeason: serietype = [Media.Premiere, Media.Inner]
+						elif serietype == MetaTrakt.EpisodePremiereMiddle: serietype = [Media.Premiere, Media.Middle]
+						elif serietype == MetaTrakt.EpisodeFinaleShow: serietype = [Media.Finale, Media.Outer]
+						elif serietype == MetaTrakt.EpisodeFinaleSeason: serietype = [Media.Finale, Media.Inner]
+						elif serietype == MetaTrakt.EpisodeFinaleMiddle: serietype = [Media.Finale, Media.Middle]
+						else: serietype = None
+					else: serietype = None
+				if serietype:
+					serietype = self.mMetatools.mergeType(values = serietype, season = season, episode = episode)
+					if serietype:result['type'] = serietype
 
 				count = dataItem.get('episode_count')
 				if not count is None:
 					if not 'count' in result: result['count'] = {}
-					result['count']['total'] = count
+					if not 'episode' in result['count']: result['count']['episode'] = {}
+					result['count']['episode']['total'] = count
 
 				count = dataItem.get('aired_episodes')
 				if not count is None:
 					if not 'count' in result: result['count'] = {}
-					result['count']['released'] = count
+					if not 'episode' in result['count']: result['count']['episode'] = {}
+					result['count']['episode']['released'] = count
 
-				if finished and result.get('count'):
-					if result['count'].get('total') is None: result['count']['total'] = result['count'].get('released')
-					if result['count'].get('released') is None: result['count']['released'] = result['count'].get('total')
-					try: result['count']['unreleased'] = result['count'].get('total') - result['count'].get('released')
-					except: result['count']['unreleased'] = None
+				if finished and result.get('count') and result.get('count').get('episode'):
+					if result['count']['episode'].get('total') is None: result['count']['episode']['total'] = result['count']['episode'].get('released')
+					if result['count']['episode'].get('released') is None: result['count']['episode']['released'] = result['count']['episode'].get('total')
+					try: result['count']['episode']['unreleased'] = result['count']['episode'].get('total') - result['count']['episode'].get('released')
+					except: result['count']['episode']['unreleased'] = None
 
 				progress = dataItem.get('progress')
 				if progress:
@@ -2618,19 +2792,19 @@ class MetaTrakt(MetaProvider):
 				comments = dataItem.get('comment_count')
 				if not comments is None:
 					if not 'count' in resultTrakt: resultTrakt['count'] = {}
-					resultTrakt['count']['comments'] = comments
+					resultTrakt['count']['comment'] = comments
 
 				# Additional attributes for recommendations.
 				favorited = dataItem.get('favorited_by')
 				if not favorited is None:
 					if not 'count' in resultTrakt: resultTrakt['count'] = {}
-					resultTrakt['count']['favorited'] = len(favorited)
+					resultTrakt['count']['favorite'] = len(favorited)
 
 				# Additional attributes for recommendations.
 				recommended = dataItem.get('recommended_by')
 				if not recommended is None:
 					if not 'count' in resultTrakt: resultTrakt['count'] = {}
-					resultTrakt['count']['recommended'] = len(recommended)
+					resultTrakt['count']['recommend'] = len(recommended)
 
 				# Additional attributes for history.
 				action = data.get('action')
@@ -2640,7 +2814,14 @@ class MetaTrakt(MetaProvider):
 				if id: resultList['id'] = id
 
 				rank = data.get('rank')
-				if rank is None and 'score' in data: rank = 1001 - data.get('score', 1000) # For search, but highest values are first.
+				if rank is None and 'score' in data:
+					# For search, but highest values are first.
+					# Sometimes with query searches, Trakt returns very large scores.
+					# Eg: 1736172819517538427
+					score = data.get('score')
+					if not score: rank = 1
+					elif score <= 1000: rank = 1001 - score
+					else: rank = 10000000000000000001 - score
 				if rank: resultList['rank'] = rank
 
 				time = data.get('listed_at')
@@ -2650,6 +2831,9 @@ class MetaTrakt(MetaProvider):
 
 				description = data.get('notes')
 				if description: resultList['description'] = description
+
+				# Images
+				self._extractImage(media = media, data = data, result = result)
 
 				if result:
 					self._tempSet(item = result, value = resultTrakt)
@@ -2710,7 +2894,7 @@ class MetaTrakt(MetaProvider):
 								results.append(item)
 							result = results
 				return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractPerson(self, data, media, **parameters):
@@ -2759,11 +2943,13 @@ class MetaTrakt(MetaProvider):
 			if rank is None and 'score' in data: rank = 1001 - data.get('score', 1000) # For search, but highest values are first.
 			if rank: resultList['rank'] = rank
 
+			self._extractImage(media = Media.Person, data = dataItem, result = result)
+
 			if result:
 				self._tempSet(item = result, value = resultTrakt)
 				if resultList: self._tempSet(item = result, key = 'list', value = resultList)
 				return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractStudio(self, data, media, **parameters):
@@ -2778,10 +2964,10 @@ class MetaTrakt(MetaProvider):
 			if name: result['name'] = name
 
 			country = dataItem.get('country')
-			if country: result['country'] = country
+			if country: result['country'] = Country.codes(country)
 
 			if result: return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractRelease(self, data):
@@ -2800,12 +2986,12 @@ class MetaTrakt(MetaProvider):
 
 			result['type'] = releases.get(data.get('release_type'), MetaTrakt.ReleaseUnknown)
 			result['time'] = Time.timestamp(fixedTime = data.get('release_date'), format = Time.FormatDate, utc = True)
-			result['country'] = data.get('country')
+			result['country'] = Country.codes(data.get('country')) if data.get('country') else None
 			result['certificate'] = data.get('certification')
 			result['description'] = data.get('note')
 
 			return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractTranslation(self, data):
@@ -2822,13 +3008,13 @@ class MetaTrakt(MetaProvider):
 			if plot: result['plot'] = self._extractDescription(plot)
 
 			language = data.get('language')
-			if language: result['language'] = language
+			if language: result['language'] = Language.codes(language)
 
 			country = data.get('country')
-			if country: result['country'] = country
+			if country: result['country'] = Country.codes(country)
 
 			return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractAlias(self, data):
@@ -2839,10 +3025,10 @@ class MetaTrakt(MetaProvider):
 			if title: result['title'] = title
 
 			country = data.get('country')
-			if country: result['country'] = country
+			if country: result['country'] = Country.codes(country)
 
 			return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractRating(self, data):
@@ -2866,7 +3052,7 @@ class MetaTrakt(MetaProvider):
 				result['distribution'] = values
 
 			return result
-		except: self._error()
+		except: self._logError()
 		return None
 
 	def _extractList(self, data, media, **parameters):
@@ -2893,21 +3079,22 @@ class MetaTrakt(MetaProvider):
 			items = dataItem.get('item_count')
 			if not items is None:
 				if not 'count' in resultTrakt: resultTrakt['count'] = {}
-				resultTrakt['count']['items'] = items
+				resultTrakt['count']['item'] = items
 
 				 # For sets. The "released" attribute is set in detail().
 				if not 'count' in result: result['count'] = {}
-				result['count']['total'] = items
+				if not 'movie' in result['count']: result['count']['movie'] = {}
+				result['count']['movie']['total'] = items
 
 			comments = dataItem.get('comment_count')
 			if not comments is None:
 				if not 'count' in resultTrakt: resultTrakt['count'] = {}
-				resultTrakt['count']['comments'] = comments
+				resultTrakt['count']['comment'] = comments
 
 			likes = dataItem.get('likes')
 			if not likes is None:
 				if not 'count' in resultTrakt: resultTrakt['count'] = {}
-				resultTrakt['count']['likes'] = likes
+				resultTrakt['count']['like'] = likes
 
 			user = dataItem.get('user')
 			if user:
@@ -2951,25 +3138,62 @@ class MetaTrakt(MetaProvider):
 			if not Media.isList(media) and type == MetaTrakt.ListOfficial: result['media'] = Media.Set
 			elif not Media.isSet(media): result['media'] = Media.List
 
-			if result.get('title'):
-				if Media.isSet(media):
-					# When searching "avatar" sets, there are a bunch of official lists returned named "Avatar Collection copy".
-					# Most of these lists return 404 (probably deleted), and one redirects to a personal user list.
-					# Maybe these lists are users who copy the official list and create their own personal list, but Trakt foregets to update the "type" attribute from the original "offical" to the new "personal".
-					# Remove any copied list from the results.
-					#	https://trakt.tv/lists/25075602
-					#	https://trakt.tv/lists/25629401
-					#	https://trakt.tv/lists/26068972
-					if Regex.match(data = result['title'], expression = 'collection(\s*[\:\-]+\s*)*\s*copy$'): return None
-
-					result['title'] = Regex.remove(data = result['title'], expression = '(\s*[\:\-]+\s*)*\s+collection$')
+			if result.get('title') and Media.isSet(media):
+				# When searching "avatar" sets, there are a bunch of official lists returned named "Avatar Collection copy".
+				# Most of these lists return 404 (probably deleted), and one redirects to a personal user list.
+				# Maybe these lists are users who copy the official list and create their own personal list, but Trakt foregets to update the "type" attribute from the original "offical" to the new "personal".
+				# Remove any copied list from the results.
+				#	https://trakt.tv/lists/25075602
+				#	https://trakt.tv/lists/25629401
+				#	https://trakt.tv/lists/26068972
+				if Regex.match(data = result['title'], expression = 'collection(\s*[\:\-]+\s*)*\s*copy$'): return None
 
 			if result:
 				self._tempSet(item = result, value = resultTrakt)
 				if resultList: self._tempSet(item = result, key = 'list', value = resultList)
 				return result
-		except: self._error()
+		except: self._logError()
 		return None
+
+	def _extractImage(self, media, data, result = None):
+		# Trakt now supports images in their API.
+		# All images are returned in WEBP format. This seems to be supported in Kodi.
+		# No rating, language, or other grouping or sorting attribute is provided with the image data.
+
+		# Sometimes some images return a 404 error.
+		# Eg: Avatar (clearart): https://media.trakt.tv/images/movies/000/012/269/cleararts/medium/9e6bb0d8d0.png.webp
+
+		# Retrieving images from Trakt can be useful.
+		# Firstly, it does not require a separate API call, since it is returned with "extended" metadata.
+		# Secondly, if the user has only Standard-detailed metadata, episodes only retrieve images from TVDb, but not from TMDb/IMDb. And Fanart does not have episode thumbs.
+		# If there are no images on TVDb, or there is a season-number mismatch on Trakt, some episodes might end up without a thumb.
+		# Eg: One Piece S21E197 (1088 on Trakt) is S22E03 (TVDb). Due to the episode being in a different season, with Standard-detailed metadata and without Trakt images, this episode would not have a thumb.
+
+		images = {}
+		if data:
+			photos1 = []
+			photos2 = []
+			imageData = data.get('images')
+			if imageData:
+				for typed, links in imageData.items():
+					if links:
+						type = MetaTrakt.Images.get(typed)
+						if type:
+							for link in links:
+								if link:
+									image = MetaImage.create(link = 'https://' + link, provider = MetaImage.ProviderTrakt)
+									if image:
+										if not type in images: images[type] = []
+										if typed == MetaTrakt.ImageHeadshot: photos1.append(image)
+										elif typed == MetaTrakt.ImageCharacter: photos2.append(image)
+										else: images[type].append(image)
+
+				if images:
+					# Prefer the actor photo over the character photo.
+					if photos1 or photos2: images[MetaImage.TypePhoto] = photos1 + photos2
+
+					if result: result[MetaImage.Attribute] = images
+		return images or None
 
 	##############################################################################
 	# PROCESS
@@ -3047,7 +3271,7 @@ class MetaTrakt(MetaProvider):
 				if result is None: result = items
 				elif multi: result.extend(items)
 				else: result.update(items)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processPerson(self, media, items, result = None, temp = True):
@@ -3183,11 +3407,17 @@ class MetaTrakt(MetaProvider):
 									elif j.get('division') == MetaTrakt.DivisionCast:
 										character.append(j.get('character', None)) # The role is often not known.
 
+								# Images
+								try: thumbnail = i[MetaImage.Attribute][MetaImage.TypePhoto][0]['link']
+								except: thumbnail = None
+
 								# Creators
 								if creator:
 									order = (100000000 - (people['creator']['count'] * 1000)) + len(creator) + (len(profession) / 100.0)
+									entry = {'name' : i['name'], 'order' : order, 'job' : jobs}
+									if thumbnail: entry['thumbnail'] = thumbnail
 									people['creator']['count'] += 1
-									people['creator']['person'].append({'name' : i['name'], 'order' : order, 'job' : jobs})
+									people['creator']['person'].append(entry)
 
 								# Directors
 								if director[0] or director[1]:
@@ -3195,7 +3425,9 @@ class MetaTrakt(MetaProvider):
 									for k in [0, 1]:
 										if director[k]:
 											director[k] = Tools.listSort(director[k])
-											people['director']['person'][k].append({'name' : i['name'], 'order' : director[k][-1] + (1.0 - (people['director']['count'] / 10000.0)) + (len(profession) / 100000.0), 'job' : jobs})
+											entry = {'name' : i['name'], 'order' : director[k][-1] + (1.0 - (people['director']['count'] / 10000.0)) + (len(profession) / 100000.0), 'job' : jobs}
+											if thumbnail: entry['thumbnail'] = thumbnail
+											people['director']['person'][k].append(entry)
 
 								# Writers
 								if writer[0] or writer[1] or writer[2]:
@@ -3203,15 +3435,19 @@ class MetaTrakt(MetaProvider):
 									for k in [0, 1, 2]:
 										if writer[k]:
 											writer[k] = Tools.listSort(writer[k])
-											people['writer']['person'][k].append({'name' : i['name'], 'order' : writer[k][-1] + (1.0 - (people['writer']['count'] / 10000.0)) + (len(profession) / 100000.0), 'job' : jobs})
+											entry = {'name' : i['name'], 'order' : writer[k][-1] + (1.0 - (people['writer']['count'] / 10000.0)) + (len(profession) / 100000.0), 'job' : jobs}
+											if thumbnail: entry['thumbnail'] = thumbnail
+											people['writer']['person'][k].append(entry)
 
 								# Cast
 								if character:
 									character = [k for k in character if k] # Filter out those without a role.
 									order = (100000000 - (people['cast']['count'] * 1000)) + len(character) + (len(profession) / 100.0)
 									if character and any('uncredit' in k for k in character): order -= 100 # Uncredited characters.
+									entry = {'name' : i['name'], 'role' : ' / '.join(character) if character else None, 'order' : order, 'job' : jobs}
+									if thumbnail: entry['thumbnail'] = thumbnail
 									people['cast']['count'] += 1
-									people['cast']['person'].append({'name' : i['name'], 'role' : ' / '.join(character) if character else None, 'order' : order, 'job' : jobs})
+									people['cast']['person'].append(entry)
 
 						# Creators
 						if people['creator']['count']:
@@ -3247,7 +3483,7 @@ class MetaTrakt(MetaProvider):
 								result['cast'] = cast
 
 						if temp: self._tempSet(item = result, key = 'person', value = items, clean = True)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processStudio(self, media, items, result = None, temp = True):
@@ -3278,7 +3514,7 @@ class MetaTrakt(MetaProvider):
 
 					if studio: result['studio'] = studio
 					if temp: self._tempSet(item = result, key = 'studio', value = items, clean = True)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processTranslation(self, media, items, result = None, language = None, country = None, temp = True):
@@ -3315,7 +3551,7 @@ class MetaTrakt(MetaProvider):
 						isLanguage = language and language == itemLanguage
 						isCountry = country and country == itemCountry
 
-						# Update the dicts, since there can be mutiple entries for the same language/country, each with only partial values.
+						# Update the dicts, since there can be multiple entries for the same language/country, each with only partial values.
 						# Eg: [{"title":"أفاتار: طريق المياه","overview":" لينهيا م...","tagline":null,"language":"ar","country":"ae"},{"title":"أفاتار: طريق المياه","overview":" لينهيا م...","tagline":"العودة إلى باندورا","language":"ar","country":"sa"},{"title":"Avatar 2","overview":"","tagline":"","language":"de","country":null},{"title":null,"overview":"Mehr als zehn Jahre ...","tagline":"Rückkehr nach Pandora","language":"de","country":"de"}]
 						if isLanguage and isCountry: match['both'].update(item)
 						elif isLanguage: match['language'].update(item)
@@ -3344,7 +3580,7 @@ class MetaTrakt(MetaProvider):
 					for k, v in title.items(): title[k] = Tools.listUnique(v)
 					self._dataSet(item = result, key = 'alias', value = title)
 					if temp: self._tempSet(item = result, key = 'translation', value = items)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processAlias(self, media, items, result = None, temp = True):
@@ -3366,7 +3602,7 @@ class MetaTrakt(MetaProvider):
 					for k, v in title.items(): title[k] = Tools.listUnique(v)
 					self._dataSet(item = result, key = ['alias', 'country'], value = title)
 					if temp: self._tempSet(item = result, key = 'alias', value = items)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processRating(self, media, items, result = None, temp = True):
@@ -3408,7 +3644,7 @@ class MetaTrakt(MetaProvider):
 					if distribution: self._dataSet(item = result, key = 'distribution', value = distribution)
 
 					if temp: self._tempSet(item = result, key = ['voting', 'distribution'], value = items.get('distribution'))
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processRelease(self, media, items, result, local = None, origin = None, temp = True):
@@ -3441,7 +3677,7 @@ class MetaTrakt(MetaProvider):
 					time = self.mMetatools.timeGenerate(release = items, metadata = result, local = local, origin = origin)
 					self._dataSet(item = result, key = 'time', value = time) # Some values might have already been set from extractTitle(), eg: premiere date.
 					if temp: self._tempSet(item = result, key = 'release', value = items)
-		except: self._error()
+		except: self._logError()
 		return result
 
 	def _processSet(self, media, items = None, parts = None, result = None, temp = True):
@@ -3508,10 +3744,10 @@ class MetaTrakt(MetaProvider):
 						if value: genre.extend(value)
 
 						value = part.get('language')
-						if value: language.extend(value)
+						if value: language.extend(Language.codes(value))
 
 						value = part.get('country')
-						if value: country.extend(value)
+						if value: country.extend(Country.codes(value))
 
 						value = part.get('mpaa')
 						if value: mpaa.append(value)
@@ -3524,7 +3760,7 @@ class MetaTrakt(MetaProvider):
 						if status and status.lower() == MetaTrakt.StatusReleased: released += 1
 
 					total = len(parts)
-					pack['count'] = {'total' : total, 'released' : released, 'unreleased' : total - released}
+					pack['count'] = {'movie' : {'total' : total, 'released' : released, 'unreleased' : total - released}}
 					self._dataSet(item = result, value = pack, copy = True) # Add the counts to the main dict, similar to episode counts.
 
 					year = [i for i in year if i]
@@ -3616,7 +3852,7 @@ class MetaTrakt(MetaProvider):
 					self._dataSet(item = result, key = parent + ['part'], value = parts)
 					self._dataSet(item = result, key = parent + ['pack'], value = pack)
 
-		except: self._error()
+		except: self._logError()
 		return result
 
 	##############################################################################
@@ -3734,7 +3970,7 @@ class MetaTrakt(MetaProvider):
 				items = self.mMetatools.filterDuplicate(items = items, id = True, title = False, number = False, last = duplicate == MetaTrakt.DuplicateLast, merge = 'number' if duplicate == MetaTrakt.DuplicateMerge else False)
 
 			# Move more important jobs to the front.
-			# Some people might have mutiple professions for the same title (eg: actor and director).
+			# Some people might have multiple professions for the same title (eg: actor and director).
 			if items and items[0].get('profession'):
 				departments = [MetaTrakt.DepartmentActing, MetaTrakt.DepartmentCreating, MetaTrakt.DepartmentDirecting, MetaTrakt.DepartmentWriting, MetaTrakt.DepartmentEditing, MetaTrakt.DepartmentProducing, MetaTrakt.DepartmentCamera, MetaTrakt.DepartmentVisual, MetaTrakt.DepartmentSound, MetaTrakt.DepartmentCostume, MetaTrakt.DepartmentLighting, MetaTrakt.DepartmentArt, MetaTrakt.DepartmentCrew]
 				departments = [i.title() for i in departments]
@@ -3809,7 +4045,7 @@ class MetaTrakt(MetaProvider):
 							if not niche or Media.isMedia(media = valueNiche, type = niche):
 								# Retrieving by "mini-series" genre does not work, so we retrieve using a query keyword "mini series".
 								# This does retreive mini-series, but also returns normal series (eg: that have the keywrod "mini" in their title/plot).
-								# Filter these out by number of episodes. Anything above 25 episodes is considered mutiple seasons.
+								# Filter these out by number of episodes. Anything above 25 episodes is considered multiple seasons.
 								# This is not perfect, since some series (eg: tt0361243) have 25 episodes over multiple seasons.
 								if mini:
 									status = item.get('status')
@@ -3817,15 +4053,17 @@ class MetaTrakt(MetaProvider):
 										status = status.lower()
 										if 'return' in status or 'continue' in status: continue
 
-									episodes = item.get('airs', {}).get('episodes')
-									if episodes:
-										episodes = episodes.get('total') or episodes.get('aired')
-										if not episodes is None and episodes > 25: continue
+									count = item.get('count')
+									if count:
+										count = count.get('episode')
+										if count:
+											count = count.get('total') or count.get('released')
+											if not count is None and count > 25: continue
 
 								result.append(item)
 					elif unknown: result.append(item)
 				items = result
-		except: self._error()
+		except: self._logError()
 		return items
 
 	def _filterRange(self, items, attribute, filter, range = None, unknown = False):
@@ -3847,7 +4085,7 @@ class MetaTrakt(MetaProvider):
 					elif unknown:
 						result.append(item)
 				items = result
-		except: self._error()
+		except: self._logError()
 		return items
 
 	def _filterList(self, items, attribute, filter, unknown = False):
@@ -3900,7 +4138,7 @@ class MetaTrakt(MetaProvider):
 								break
 					elif unknown: result.append(item)
 				items = result
-		except: self._error()
+		except: self._logError()
 		return items
 
 	def _filterValue(self, items, attribute, filter, unknown = False):
@@ -3916,14 +4154,14 @@ class MetaTrakt(MetaProvider):
 							result.append(item)
 					elif unknown: result.append(item)
 				items = result
-		except: self._error()
+		except: self._logError()
 		return items
 
 	##############################################################################
 	# INTERNAL
 	##############################################################################
 
-	def _internal(self, items = None, initial = None, filter = None, structure = None, final = None, limit = None, more = None, internal = True):
+	def _internal(self, items = None, errors = None, initial = None, filter = None, structure = None, final = None, limit = None, more = None, detail = None, internal = True):
 		if internal:
 			if final is None: final = self._internalCount(items = items)
 
@@ -3937,6 +4175,7 @@ class MetaTrakt(MetaProvider):
 
 			return {
 				'items' : items,
+				'errors' : errors,
 				'more'	: bool(more),
 				'count' : {
 					'limit'		: limit,
@@ -3946,7 +4185,9 @@ class MetaTrakt(MetaProvider):
 					'final'		: final,
 				},
 			}
-		return items
+		else:
+			if detail: return items, errors
+			else: return items
 
 	def _internalCount(self, items = None):
 		try: return len(items)
@@ -3990,8 +4231,175 @@ class MetaTrakt(MetaProvider):
 								except: pass
 								if values: self._tempSet(item = item, key = 'detail', value = values)
 								items[i] = item
-		except: self._error()
+		except: self._logError()
 		return items
+
+	##############################################################################
+	# LOOKUP
+	##############################################################################
+
+	# Efficiently lookup by ID or title.
+	# deviation: also search one year before and after the specified year.
+	# match: do an additional local string match when doing a title lookup, in case Trakt returns partial (incorrect) matches. Note that this will eliminate alias/translation matches, since they are not returned with the metadata.
+	def lookup(self, media, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, deviation = None, match = True, extended = None, concurrency = False, cache = True, memory = True, detail = False):
+		if memory and not detail: # Only summarized data is stored in memory.
+			result = self._lookupGet(media = media, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+			if result: return result
+
+		# cache=False: returns the current cached data and does a refresh in the background. There is no real usecase for this, so always refresh in the foreground (cache=None).
+		if cache is False: cache = None
+		elif cache is True: cache = Cache.TimeoutDay3 # This is the default timeout, but explicitly set it here to ensure it is cached for more than a day.
+
+		iterator = []
+
+		# Lookup by ID first.
+		ids = (('trakt', trakt), ('imdb', imdb), ('tmdb', tmdb), ('tvdb', tvdb))
+		for i in ids: # Order by likelihood of finding by this ID.
+			if i[1]: iterator.append({'link' : MetaTrakt.LinkSearchId, 'type' : media, 'search' : media, 'provider' : i[0], 'id' : i[1], 'result' : i[0]}) # Important to add "search", which is added as the "type" parameter.
+
+		# Lookup by title if the IDs were not found.
+		if title:
+			lookup = {'link' : MetaTrakt.LinkSearchQuery, 'type' : media, 'query' : title, 'result' : 'title'}
+			if year: lookup['year'] = [year - 1, year + 1] if deviation else [year, year]
+			iterator.append(lookup)
+
+		# concurrency=False and exit=True: execute sequentially until the a result is found.
+		data = self._execute(iterator = iterator, media = media, extended = extended, cache = cache, concurrency = concurrency, exit = True)
+
+		result = None
+		if data:
+			for i in ids:
+				result = data.get(i[0])
+				if result: break
+
+			if not result:
+				if match:
+					from lib.modules.tools import Matcher
+					def matcher(metadata, strict = True):
+						if title:
+							threshold = 0.9 if strict else 0.8
+							for i in ('title', 'originaltitle', 'tvshowtitle'):
+								title2 = metadata.get(i)
+								if title2:
+									# Also match Jaro, since Levenshtein is sometimes too strict.
+									# Eg: "Plur1bus" vs "Pluribus".
+									if Matcher.levenshtein(title, title2, ignoreCase = True, ignoreSpace = False, ignoreNumeric = False, ignoreSymbol = True) >= threshold: return True
+									elif Matcher.jaro(title, title2, ignoreCase = True, ignoreSpace = False, ignoreNumeric = False, ignoreSymbol = True) >= threshold: return True
+						return False
+
+				results = data.get('title')
+				if results:
+					# Prefer the first one with the exact year.
+					if deviation and year:
+						# First do a strict match.
+						if not result:
+							for i in results:
+								if i.get('year') == year:
+									if not match or matcher(i, strict = True):
+										result = i
+										break
+
+						# Then do a lenient match.
+						if not result and match:
+							for i in results:
+								if i.get('year') == year:
+									if not match or matcher(i, strict = False):
+										result = i
+										break
+
+					# Otherwise pick the first item.
+					if not result and (not match or matcher(results[0], strict = True)): result = results[0]
+
+					# Otherwise pick the first item with lenient matching
+					if not result and match and matcher(results[0], strict = False): result = results[0]
+
+		if result:
+			result = result[0] if Tools.isArray(result) else result
+
+			if memory:
+				data = self._lookupSet(media = media, data = result, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+				if not detail: return data
+
+			if detail: return result
+			else: return self._lookupData(media = media, data = result, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+		return None
+
+	def lookupMovie(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, deviation = None, match = True, extended = None, concurrency = False, cache = True):
+		return self.lookup(media = Media.Movie, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, deviation = deviation, match = match, extended = extended, concurrency = concurrency, cache = cache)
+
+	def lookupShow(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, deviation = None, match = True, extended = None, concurrency = False, cache = True):
+		return self.lookup(media = Media.Show, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, deviation = deviation, match = match, extended = extended, concurrency = concurrency, cache = cache)
+
+	def lookupEpisode(self, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, deviation = None, match = True, extended = None, concurrency = False, cache = True):
+		return self.lookup(media = Media.Episode, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, deviation = deviation, match = match, extended = extended, concurrency = concurrency, cache = cache)
+
+	def _lookupData(self, data, media = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None):
+		try:
+			result = {'media' : media}
+			try: result['media'] = data['media']
+			except: pass
+			try: result.update(data['id'])
+			except: pass
+
+			# Add known IDs if not on Trakt.
+			# Especially since lookups are done specifically if Trakt does not have the IMDb yet.
+			if trakt and not result.get('trakt'): result['trakt'] = trakt
+			if tmdb and not result.get('tmdb'): result['tmdb'] = tmdb
+			if tvdb and not result.get('tvdb'): result['tvdb'] = tvdb
+
+			# If the IMDb changed.
+			# The lookup ID is still the old one, while Trakt has a new ID.
+			if imdb:
+				if not result.get('imdb'): result['imdb'] = imdb
+				elif not imdb == result.get('imdb'): result['imdx'] = imdb
+
+			# Prefer the searched title/year, since Trakt can return a different title or deviated year.
+			result['title'] = title or data.get('title')
+			result['year'] = year or data.get('year')
+
+			return result
+		except: Logger.error()
+
+	def _lookupGet(self, media, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None):
+		try:
+			lookup = Memory.get(fixed = MetaTrakt.PropertyLookup, local = True, kodi = True)
+			if lookup:
+				lookup = lookup.get(media)
+				if lookup:
+					for i in (('trakt', trakt), ('imdb', imdb), ('tmdb', tmdb), ('tvdb', tvdb)):
+						if i[1]:
+							try: return lookup[i[0]][i[1]]
+							except: pass
+					if title:
+						try: return lookup['title'][title + '_' + str(year)]
+						except: pass
+		except: Logger.error()
+		return None
+
+	def _lookupSet(self, media, data, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None):
+		try:
+			lookup = Memory.get(fixed = MetaTrakt.PropertyLookup, local = True, kodi = True)
+			if lookup is None: lookup = {}
+			if not media in lookup: lookup[media] = {}
+			lookuped = lookup.get(media)
+
+			data = self._lookupData(media = media, data = data, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+
+			for i in ('trakt', 'imdb', 'imdx', 'tmdb', 'tvdb'):
+				id = data.get(i)
+				if id:
+					if i == 'imdx': i = 'imdb'
+					if not i in lookuped: lookuped[i] = {}
+					lookuped[i][id] = data
+
+			if data.get('title'):
+				if not 'title' in lookuped: lookuped['title'] = {}
+				lookuped['title'][data.get('title') + '_' + str(data.get('year'))] = data
+
+			Memory.set(fixed = MetaTrakt.PropertyLookup, value = lookup, local = True, kodi = True)
+			return data
+		except: Logger.error()
+		return None
 
 	##############################################################################
 	# SEARCH
@@ -4016,7 +4424,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Episode + Person + List
 			False:		Movie + Show + Person
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below. Certain combinations of medias, especially Level-1 and Level-2, might not work correctly (eg [Movie + Set] or [Short + Mini]).
+			List:		Multiple medias from the list below. Certain combinations of medias, especially Level-1 and Level-2, might not work correctly (eg [Movie + Set] or [Short + Mini]).
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -4058,8 +4466,45 @@ class MetaTrakt(MetaProvider):
 				List:			Date range. Can be timestamps or date strings.
 			sort:				Sorting is only applied post-request to a single page.
 	'''
-	def search(self, media = None, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, list = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
+	def search(self, media = None, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, list = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None, split = None, **parameters): # parameters: since "detail" is added in _execute().
 		try:
+			#gaiaremove
+			# UPDATE (2025-12):
+			# NB: The search endpoint has changed and does not work as it previously did.
+			#	1. The limit is now capped at 50.
+			#	2. Paging is not possible anymore.
+			#	3. If the limit is above 50, the request is now split (see below MetaTrakt.LimitSearch). However, since paging does not work anymore, every page returns the same results.
+			#	4. Trakt seems to now only use the "query" and "limit" parameters. Everything else is ignored.
+			# Check this in regular intervals to see if Trakt has fixed this.
+			# 	Eg: Make a call with a limit of 100 and check if 100 items are returned.
+			# 	Eg: Make a call with a year and check if the returned items are within that year.
+			# If this is fixed, also revert the code in MetaManager._search().
+
+			# Update (2025-12):
+			# Trakt has now introduced a hard upper limit of 50.
+			# If more items are requested, it caps the results at 50.
+			# Split the query over multiple requests and add paging.
+			if limit and limit > MetaTrakt.LimitSearch and split is None:
+				pages = Math.roundUp(limit / MetaTrakt.LimitSearch)
+				limitOriginal = limit
+				limit = MetaTrakt.LimitSearch
+
+				items = self._execute(function = self.search, iterator = [{'page' : i + 1} for i in range(pages)], split = False, structure = None, media = media, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
+				countInitial = self._internalCount(items = items)
+
+				items = self._filter(
+					items = items,
+					sort = sort, order = order,
+					limit = limitOriginal,
+				)
+				countFilter = self._internalCount(items = items)
+
+				# Change the returned structure for shows/seasons/episodes.
+				items = self._structure(items, structure = structure, media = media)
+				countStructure = self._internalCount(items = items)
+
+				return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
+
 			# When doing a global search over multiple medias, only include certain types.
 			# Do not include the following media (in addition to Movie/Show/Person):
 			#	Episode:
@@ -4081,7 +4526,8 @@ class MetaTrakt(MetaProvider):
 				media = media, medias = medias, niche = niche, query = query or '', list = list, # query = '', otherwise Trakt returns HTTP 400.
 				year = year, duration = duration,
 				genre = genre, language = language, country = country, certificate = certificate,
-				status = status, episode = episode, studio = studio, network = network,
+				status = status, watch = watch, episode = episode,
+				studio = studio, network = network,
 				rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating,
 				page = page, limit = limit, extended = extended, field = field,
 			)
@@ -4104,44 +4550,44 @@ class MetaTrakt(MetaProvider):
 			countStructure = self._internalCount(items = items)
 
 			return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
-	def searchMovie(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
-		return self.search(media = Media.Movie, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
+	def searchMovie(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
+		return self.search(media = Media.Movie, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Theater and television feature movies.
-	def searchFeature(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
-		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
+	def searchFeature(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
+		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, watch = watch, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Theater and television short films.
-	def searchShort(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
-		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
+	def searchShort(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
+		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Theater and television specials.
-	def searchSpecial(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
-		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
+	def searchSpecial(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
+		return self.searchMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Movie sets.
 	def searchSet(self, niche = None, query = None, keyword = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
 		return self.search(media = Media.Set, niche = niche, query = query, keyword = keyword, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Multi-season shows and single-season mini-series.
-	def searchShow(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
-		return self.search(media = Media.Show, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
+	def searchShow(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
+		return self.search(media = Media.Show, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
 
 	# Multi-season shows (will most likely include mini-series).
-	def searchMulti(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
-		return self.searchShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
+	def searchMulti(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
+		return self.searchShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
 
 	# Single-season mini-series (does not work well).
-	def searchMini(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
-		return self.searchShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
+	def searchMini(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
+		return self.searchShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
 
 	# Show episodes.
-	def searchEpisode(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
-		return self.search(media = Media.Episode, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
+	def searchEpisode(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None):
+		return self.search(media = Media.Episode, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal)
 
 	# People.
 	def searchPerson(self, query = None, keyword = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
@@ -4176,7 +4622,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show
 			False:		Movie + Show
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below. Does not support sorting. Certain combinations of medias, especially Level-1 and Level-2, might not work correctly (eg [Movie + Set] or [Short + Mini]).
+			List:		Multiple medias from the list below. Does not support sorting. Certain combinations of medias, especially Level-1 and Level-2, might not work correctly (eg [Movie + Set] or [Short + Mini]).
 
 			MOVIE
 				FeatureTheater:		Level-0 support with sorting.
@@ -4219,7 +4665,7 @@ class MetaTrakt(MetaProvider):
 			sort:				SortTrending/SortPopular/SortAnticipated/SortFavorited/SortPlayed/SortWatched/SortCollected is done pre-request. Other sorting options are only applied post-request to a single page.
 	'''
 
-	def discover(self, media = None, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, period = None, structure = None, cache = None, internal = None, concurrency = None):
+	def discover(self, media = None, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, period = None, structure = None, cache = None, internal = None, concurrency = None, split = None, **parameters): # parameters: since "detail" is added in _execute().
 		try:
 			# Do not call release() if a year was specified (eg: New/Home Releases menu for the Years/Decades menus).
 			if release or date or ((Media.isNew(niche) or Media.isHome(niche)) and not year):
@@ -4227,7 +4673,32 @@ class MetaTrakt(MetaProvider):
 					if Media.isNew(niche): release = MetaTrakt.ReleaseNew
 					elif Media.isHome(niche): release = MetaTrakt.ReleaseHome
 					else: release = MetaTrakt.ReleaseNew
-				return self.release(media = media, niche = niche, release = release, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+				return self.release(media = media, niche = niche, release = release, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+
+			# Update (2025-12):
+			# Trakt has now introduced a hard upper limit of 250.
+			# If more items are requested, it caps the results at 250.
+			# Split the query over multiple requests and add paging.
+			if limit and limit > MetaTrakt.LimitGeneral and split is None:
+				pages = Math.roundUp(limit / MetaTrakt.LimitGeneral)
+				limitOriginal = limit
+				limit = MetaTrakt.LimitGeneral
+
+				items = self._execute(function = self.discover, iterator = [{'page' : i + 1} for i in range(pages)], split = False, structure = None, media = media, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, period = period, cache = cache, internal = internal, concurrency = concurrency)
+				countInitial = self._internalCount(items = items)
+
+				items = self._filter(
+					items = items,
+					sort = sort, order = order,
+					limit = limitOriginal,
+				)
+				countFilter = self._internalCount(items = items)
+
+				# Change the returned structure for shows/seasons/episodes.
+				items = self._structure(items, structure = structure, media = media)
+				countStructure = self._internalCount(items = items)
+
+				return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
 
 			if sort is None:
 				if Media.isBest(niche) or Media.isPrestige(niche) or Media.isPopular(niche): sort = MetaTrakt.SortPopular
@@ -4250,6 +4721,25 @@ class MetaTrakt(MetaProvider):
 						sort = None
 						order = None
 
+			#gaiaremove
+			# UPDATE (2025-12):
+			# The search endpoint now ignores all parameters and is essentially useless for discovering.
+			# More info under search().
+			# The next best option is to use the popular endpoint.
+			# This endpoint seems to still allow higher limits, paging, and includes all the added parameters (eg year/genre/etc).
+			# The only disadvantage is that this always returns the most popular items, instead of random discovery.
+			# For now, redirect all discovery calls top the popular endpoint.
+			# Check this in regular intervals to see if the search endpoint is fixed by Trakt.
+			# If so, this code can be removed again (or just commented out, since this issues might return in the future).
+			if link is None:
+				if not Tools.isArray(media) and (not Tools.isArray(medias) or len(medias) == 1):
+					if Media.isMovie(media) or Media.isShow(media):
+						link = MetaTrakt.LinkDiscover
+						sorting = MetaTrakt.SortPopular
+						sort = MetaTrakt.SortShuffle # At least create some kind of randomness, since the popular endpoint are ordered by rating/votes.
+						order = None
+						period = ''
+
 			# It seems the search endpoint returns the titles in the same order as SortPopular.
 			if link is None:
 				return self.search(imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, extended = extended, cache = cache, internal = internal, **original)
@@ -4259,7 +4749,8 @@ class MetaTrakt(MetaProvider):
 				media = media, medias = medias, niche = niche, query = query, list = list,
 				year = year, duration = duration,
 				genre = genre, language = language, country = country, certificate = certificate,
-				status = status, episode = episode, studio = studio, network = network,
+				status = status, watch = watch, episode = episode,
+				studio = studio, network = network,
 				rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating,
 				page = page, limit = limit, extended = extended, field = field, period = period, sort = sorting,
 			)
@@ -4282,44 +4773,44 @@ class MetaTrakt(MetaProvider):
 			countStructure = self._internalCount(items = items)
 
 			return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
-	def discoverMovie(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
-		return self.discover(media = Media.Movie, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverMovie(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
+		return self.discover(media = Media.Movie, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Theater and television feature movies.
-	def discoverFeature(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
-		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverFeature(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
+		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Theater and television short films.
-	def discoverShort(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
-		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverShort(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
+		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Theater and television specials.
-	def discoverSpecial(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
-		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverSpecial(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, company = None, studio = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None, concurrency = None):
+		return self.discoverMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, company = company, studio = studio, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Movie sets.
 	def discoverSet(self, niche = None, query = None, keyword = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
 		return self.discover(media = Media.Set, niche = niche, query = query, keyword = keyword, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
 
 	# Multi-season shows and single-season mini-series.
-	def discoverShow(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
-		return self.discover(media = Media.Show, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverShow(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
+		return self.discover(media = Media.Show, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Multi-season shows (will most likely include mini-series).
-	def discoverMulti(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
-		return self.discoverShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverMulti(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
+		return self.discoverShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Single-season mini-series (does not work well).
-	def discoverMini(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
-		return self.discoverShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverMini(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
+		return self.discoverShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 
 	# Show episodes.
-	def discoverEpisode(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, episode = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
-		return self.discover(media = Media.Episode, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, episode = episode, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
+	def discoverEpisode(self, niche = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, watch = None, episode = None, company = None, studio = None, network = None, release = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, award = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, structure = None, cache = None, internal = None, concurrency = None):
+		return self.discover(media = Media.Episode, niche = niche, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, watch = watch, episode = episode, company = company, studio = studio, network = network, release = release, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, award = award, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 
 	# People.
 	def discoverPerson(self, query = None, keyword = None, page = None, limit = None, sort = None, order = None, extended = None, filter = None, field = None, cache = None, internal = None):
@@ -4343,7 +4834,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show (2 separate requests)
 			False:		Movie + Show (2 separate requests)
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -4423,7 +4914,7 @@ class MetaTrakt(MetaProvider):
 				return self._internal(items = items, initial = countInitial, filter = countFilter, internal = internal)
 			else:
 				return self.searchPerson(query = query, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, field = field, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -4478,7 +4969,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show (2 separate requests).
 			False:		Movie + Show (2 separate requests).
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below (multiple separate requests).
+			List:		Multiple medias from the list below (multiple separate requests).
 
 			MOVIE
 				FeatureTheater:			Level-0 support.
@@ -4533,7 +5024,7 @@ class MetaTrakt(MetaProvider):
 				String:		Convert to a specific structure: StructureShow/StructureSeason/StructureEpisode.
 	'''
 
-	def release(self, media = None, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, offset = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, internal = None, concurrency = None):
+	def release(self, media = None, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, offset = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, internal = None, concurrency = None):
 		items = None
 		try:
 			day = 86400 # Number of seconds in a day.
@@ -4547,9 +5038,9 @@ class MetaTrakt(MetaProvider):
 			if not support: return self._internal(internal = internal)
 
 			if not release: release = MetaTrakt.ReleaseNew
-			future = release == MetaTrakt.ReleaseFuture
-			if not sort: sort = MetaTools.SortHome if (Media.isMovie(media) and release == MetaTrakt.ReleaseHome) else MetaTools.SortLaunch
-			if not order: order = MetaTools.OrderAscending if future else None
+			futured = release == MetaTrakt.ReleaseFuture
+			if not sort: sort = MetaTools.SortHome if (Media.isMovie(media) and (release == MetaTrakt.ReleaseHome or release == MetaTrakt.ReleaseDigital or release == MetaTrakt.ReleasePhysical)) else MetaTools.SortLaunch
+			if not order: order = MetaTools.OrderAscending if futured else None
 
 			if date is None:
 				date = month # By default Trakt returns 7 days. Set the default to a full month.
@@ -4560,12 +5051,12 @@ class MetaTrakt(MetaProvider):
 				if Media.isAnime(niche) or Media.isDonghua(niche): date *= 4
 				elif Media.isMood(niche) or Media.isAudience(niche) or Media.isRegion(niche): date *= 2
 
-			if not Tools.isArray(date): date = [None, date] if future else [date, None]
+			if not Tools.isArray(date): date = [None, date] if futured else [date, None]
 			elif len(date) == 1: date.append(None)
 			for i in range(len(date)):
 				value = date[i]
-				if value is None: value = Time.future(days = 1) if future else Time.timestamp()
-				elif Tools.isInteger(value) and value < 10000: value = Time.future(days = value) if future else Time.past(days = value)
+				if value is None: value = Time.future(days = 1) if futured else Time.timestamp()
+				elif Tools.isInteger(value) and value < 10000: value = Time.future(days = value) if futured else Time.past(days = value)
 				elif Tools.isString(value): value = Time.timestamp(fixedTime = value, format = Time.FormatDate, utc = True)
 				date[i] = value
 
@@ -4578,7 +5069,7 @@ class MetaTrakt(MetaProvider):
 					dates = []
 					start = None
 					end = None
-					if future:
+					if futured:
 						start = date[0]
 						while True:
 							end = Time.timestamp(fixedTime = Time.format(timestamp = start, format = Time.FormatDate), format = Time.FormatDate) + interval # Convert to date, to reduce to a full day (aka ignore hours/minutes/seconds).
@@ -4623,7 +5114,7 @@ class MetaTrakt(MetaProvider):
 
 				return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal, more = more)
 			else:
-				if future: release = MetaTrakt.ReleaseNew
+				if futured: release = MetaTrakt.ReleaseNew
 
 				if media is None:
 					if release == MetaTrakt.ReleaseFinale: media = Media.Episode
@@ -4635,11 +5126,28 @@ class MetaTrakt(MetaProvider):
 				if filter >= MetaProvider.FilterLenient and Media.isMovie(media) and year is None and date:
 					year = [Time.year(date[0]) - 5, Time.year(date[-1]) + 1]
 
+				# Update (2025-09): Trakt has added a new streaming movie calendar API endpoint.
+				# This endpoint now returns the digital release dates and also returns more titles than the DVD calendar.
+				# Hence, use the streaming calendar for ReleaseHome.
 				calendar = None
-				if release == MetaTrakt.ReleaseHome and Media.isSerie(media): release = MetaTrakt.ReleaseNew
+				if release == MetaTrakt.ReleaseDigital:
+					# The DVD Calendar only returns physical releases, but not digital releases.
+					# There is no Digital Calendar.
+					# But we can use the normal premiere/new Calendar and filter by the "watchnow" parameter (which is not in the API docs, but available on the website under the Movie Calendar).
+
+					# Changes due to the new streaming calendar.
+					#release = MetaTrakt.ReleaseNew
+					#if not watch: watch = MetaTrakt.WatchAny
+					release = MetaTrakt.ReleaseHome
+				elif release == MetaTrakt.ReleasePhysical:
+					# Changes due to the new streaming calendar.
+					#release = MetaTrakt.ReleaseHome
+					release = MetaTrakt.ReleasePhysical
+				elif release == MetaTrakt.ReleaseHome and Media.isSerie(media):
+					release = MetaTrakt.ReleaseNew
 				if Media.isEpisode(media):
 					# It seems the "episode_types" parameter is ignored by the calendar endpoints, maybe because it is seen as a "show" endpoint, not an "episode" endpoint, that does not support this parameter.
-					if release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome:
+					if release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome or release == MetaTrakt.ReleaseDigital or release == MetaTrakt.ReleasePhysical:
 						if Media.isPremiere(niche):
 							if Media.isOuter(niche): calendar = MetaTrakt.CalendarNew # Do not use CalendarPremiere, since it also returns season premieres.
 							elif Media.isInner(niche): calendar = MetaTrakt.CalendarPremiere
@@ -4652,15 +5160,21 @@ class MetaTrakt(MetaProvider):
 				elif Media.isSeason(media):
 					if Media.isPremiere(niche): calendar = MetaTrakt.CalendarNew
 					elif Media.isFinale(niche) or release == MetaTrakt.ReleaseFinale: calendar = MetaTrakt.CalendarFinale
-					elif release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome: calendar = MetaTrakt.CalendarPremiere
+					elif release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome or release == MetaTrakt.ReleaseDigital or release == MetaTrakt.ReleasePhysical: calendar = MetaTrakt.CalendarPremiere
 					else: calendar = MetaTrakt.CalendarPremiere
 				elif Media.isSerie(media):
-					if release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome: calendar = MetaTrakt.CalendarNew
+					if release == MetaTrakt.ReleaseNew or release == MetaTrakt.ReleaseHome or release == MetaTrakt.ReleaseDigital or release == MetaTrakt.ReleasePhysical: calendar = MetaTrakt.CalendarNew
 					elif release == MetaTrakt.ReleaseFinale: calendar = MetaTrakt.CalendarFinale
 					else: calendar = MetaTrakt.CalendarNew
 				else:
 					if release == MetaTrakt.ReleaseNew: calendar = MetaTrakt.CalendarMovie
-					elif release == MetaTrakt.ReleaseHome: calendar = MetaTrakt.CalendarDvd
+
+					# Changes due to the new streaming calendar.
+					#elif release == MetaTrakt.ReleaseHome: calendar = MetaTrakt.CalendarDvd
+					elif release == MetaTrakt.ReleaseHome: calendar = MetaTrakt.CalendarStreaming
+					elif release == MetaTrakt.ReleaseDigital: calendar = MetaTrakt.CalendarStreaming
+					elif release == MetaTrakt.ReleasePhysical: calendar = MetaTrakt.CalendarDvd
+
 					else: calendar = MetaTrakt.CalendarMovie
 				if not calendar: return self._internal(internal = internal)
 
@@ -4724,18 +5238,18 @@ class MetaTrakt(MetaProvider):
 					if increase: days = max(1, min(full, int(Math.roundUp(days * 2))))
 
 					if offset:
-						if future:
-							months = ((page - 1) * offset) # Also incorporate the offset, since sometimes (eg Anime) we retrieve mutiple months in one go. Otherwise the offset for page 2+ is wrong.
+						if futured:
+							months = ((page - 1) * offset) # Also incorporate the offset, since sometimes (eg Anime) we retrieve multiple months in one go. Otherwise the offset for page 2+ is wrong.
 							date = date[0] + (days * day * months)
 							if days == full: date -= day * (((page - 1) * offset) + Math.roundUp(months / 2.0)) # (+ day), because Trakt sees the last date as exclusive. (months / 2.0) since only every 2nd month has 31 days.
 						else:
-							months = ((page - 1) * offset) + 1 # Also incorporate the offset, since sometimes (eg Anime) we retrieve mutiple months in one go. Otherwise the offset for page 2+ is wrong.
+							months = ((page - 1) * offset) + 1 # Also incorporate the offset, since sometimes (eg Anime) we retrieve multiple months in one go. Otherwise the offset for page 2+ is wrong.
 							date = date[1] - (days * day * months)
 							if days == full: date += day * (page + Math.roundUp(months / 2.0)) # (+ day), because Trakt sees the last date as exclusive. (months / 2.0) since only every 2nd month has 31 days.
 							else: date += day
 						if int(Time.format(date, format = '%m')) == 3: date -= 2 * day # February has less days. Add additional days if we the previous month is January. Assume non-leap year.
 					else:
-						if future: date = date[0] + (days * day * (page - 1))
+						if futured: date = date[0] + (days * day * (page - 1))
 						else: date = date[1] - (days * day * page) + day # (+ day), because Trakt sees the last date as exclusive.
 				else:
 					# Trakt is able to retrieve up to 33 days.
@@ -4749,7 +5263,7 @@ class MetaTrakt(MetaProvider):
 					date = date[0]
 
 				# In case the 33 days include future days.
-				if not future:
+				if not future and not futured:
 					current = Time.timestamp(fixedTime = Time.format(format = Time.FormatDate) + ' 23:59:59', format = Time.FormatDateTime)
 					while days > 0 and (date + ((days - 1) * day)) > current: days -= 1 # (days - 1), because Trakt sees the last date as exclusive.
 					if days <= 0: return self._internal(internal = internal)
@@ -4769,7 +5283,8 @@ class MetaTrakt(MetaProvider):
 					mode = mode, calendar = calendar, date = date, days = days, query = query,
 					year = year, duration = duration,
 					genre = genre, language = language, country = country, certificate = certificate,
-					status = status, episode = episode, studio = studio, network = network,
+					status = status, watch = watch, episode = episode,
+					studio = studio, network = network,
 					rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating,
 					extended = extended,
 				)
@@ -4807,44 +5322,44 @@ class MetaTrakt(MetaProvider):
 				countStructure = self._internalCount(items = items)
 
 				return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal, more = more)
-		except: self._error()
+		except: self._logError()
 		return self._internal(items = items, internal = internal)
 
 	# Feature, short, and special movies.
-	def releaseMovie(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
-		return self.release(media = Media.Movie, niche = niche, release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
+	def releaseMovie(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
+		return self.release(media = Media.Movie, niche = niche, release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
 
 	# Theater and television feature movies.
-	def releaseFeature(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
-		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
+	def releaseFeature(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
+		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Feature), release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
 
 	# Theater and television short films.
-	def releaseShort(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
-		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
+	def releaseShort(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
+		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Short), release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
 
 	# Theater and television specials.
-	def releaseSpecial(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
-		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
+	def releaseSpecial(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, company = None, studio = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, cache = None, concurrency = None):
+		return self.releaseMovie(niche = self._parameterNiche(niche = niche, extension = Media.Special), release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, company = company, studio = studio, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, cache = cache, concurrency = concurrency)
 
 	# Multi-season shows and single-season mini-series.
-	def releaseShow(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
-		return self.release(media = Media.Show, release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
+	def releaseShow(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
+		return self.release(media = Media.Show, release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
 
 	# Multi-season shows (will most likely include mini-series).
-	def releaseMulti(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
-		return self.releaseShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
+	def releaseMulti(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
+		return self.releaseShow(niche = self._parameterNiche(niche = niche, extension = Media.Multi), release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
 
 	# Single-season mini-series (does not work well).
-	def releaseMini(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
-		return self.releaseShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
+	def releaseMini(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
+		return self.releaseShow(niche = self._parameterNiche(niche = niche, extension = Media.Mini), release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
 
 	# Show seasons.
-	def releaseSeason(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
-		return self.release(media = Media.Season, niche = niche, release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
+	def releaseSeason(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
+		return self.release(media = Media.Season, niche = niche, release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
 
 	# Show episodes.
-	def releaseEpisode(self, niche = None, release = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
-		return self.release(media = Media.Episode, niche = niche, release = release, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
+	def releaseEpisode(self, niche = None, release = None, future = None, user = None, query = None, keyword = None, date = None, year = None, duration = None, genre = None, language = None, country = None, certificate = None, status = None, watch = None, episode = None, company = None, studio = None, network = None, rating = None, votes = None, imdbRating = None, imdbVotes = None, tmdbRating = None, tmdbVotes = None, rtRating = None, rtMeter = None, mcRating = None, page = None, limit = None, sort = None, order = None, extended = None, duplicate = None, filter = None, structure = None, cache = None, concurrency = None):
+		return self.release(media = Media.Episode, niche = niche, release = release, future = future, user = user, query = query, keyword = keyword, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, watch = watch, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, imdbRating = imdbRating, imdbVotes = imdbVotes, tmdbRating = tmdbRating, tmdbVotes = tmdbVotes, rtRating = rtRating, rtMeter = rtMeter, mcRating = mcRating, page = page, limit = limit, sort = sort, order = order, extended = extended, duplicate = duplicate, filter = filter, structure = structure, cache = cache, concurrency = concurrency)
 
 	##############################################################################
 	# RECOMMENDATION
@@ -4864,7 +5379,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show (2 separate requests).
 			False:		Movie + Show (2 separate requests).
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below (multiple separate requests).
+			List:		Multiple medias from the list below (multiple separate requests).
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -4937,7 +5452,7 @@ class MetaTrakt(MetaProvider):
 				countFilter = self._internalCount(items = items)
 
 			return self._internal(items = items, initial = countInitial, filter = countFilter, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -4997,7 +5512,7 @@ class MetaTrakt(MetaProvider):
 					page = page, limit = limit,
 				)
 				return items
-		except: self._error()
+		except: self._logError()
 		return None
 
 	##############################################################################
@@ -5021,7 +5536,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode + Person
 			False:		Movie + Show + Season + Person
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5068,7 +5583,7 @@ class MetaTrakt(MetaProvider):
 
 			if sort is None: sort = True # Trigger sorting using the Trakt headers.
 
-			items, sorted = self._retrieve(
+			items, sorted, _ = self._retrieve(
 				link = MetaTrakt.LinkUserListItem if user else MetaTrakt.LinkListItem, cache = cache,
 				media = media, medias = medias, niche = niche,
 				user = user, id = id,
@@ -5097,7 +5612,7 @@ class MetaTrakt(MetaProvider):
 			countStructure = self._internalCount(items = items)
 
 			return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -5159,7 +5674,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode + Person.
 			False:		Movie + Show + Season + Episode.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5215,7 +5730,7 @@ class MetaTrakt(MetaProvider):
 			if media is None: media = '' # If no category is added, all media is returned.
 			if media is None or not sort: sort = '' # Sort only works if the media/category was provided.
 
-			items, sorted = self._retrieve(
+			items, sorted, _ = self._retrieve(
 				link = link, cache = cache,
 				media = media, medias = medias, niche = niche, category = category,
 				user = user, section = section, date = date,
@@ -5248,7 +5763,7 @@ class MetaTrakt(MetaProvider):
 			countStructure = self._internalCount(items = items)
 
 			return self._internal(items = items, initial = countInitial, filter = countFilter, structure = countStructure, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	##############################################################################
@@ -5268,7 +5783,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode.
 			False:		Movie + Show + Season.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5369,7 +5884,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5456,7 +5971,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5512,7 +6027,7 @@ class MetaTrakt(MetaProvider):
 				if not order: order = MetaTools.OrderDescending
 
 			return self.listUser(link = MetaTrakt.LinkUserRating, support = support, media = media, niche = niche, category = category, user = user, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -5572,7 +6087,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5620,7 +6135,7 @@ class MetaTrakt(MetaProvider):
 			if Tools.isArray(media):
 				# Technically we can retrieve shows/seasons/episodes in one request, since seasons and episodes are nested objects in the show.
 				# But this would complicate the code logic too much (making a single request and processing it in differnt ways).
-				# So just make mutiple requests if we want to retrieve shows/seasons/episodes in one request.
+				# So just make multiple requests if we want to retrieve shows/seasons/episodes in one request.
 				return self._execute(function = self.listCollection, iterator = [{'media' : i} for i in media], niche = niche, user = user, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 			else:
 				# Manually specify the category, since we still need the media for extracting and filtering.
@@ -5631,7 +6146,7 @@ class MetaTrakt(MetaProvider):
 					elif Media.isSerie(media): category = MetaTrakt.CategoryShow
 
 				return self.listUser(link = MetaTrakt.LinkUserCollection, support = support, media = media, niche = niche, category = category, user = user, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -5688,7 +6203,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5731,7 +6246,7 @@ class MetaTrakt(MetaProvider):
 			if Tools.isArray(media):
 				# Technically we can retrieve shows/seasons/episodes in one request, since seasons and episodes are nested objects in the show.
 				# But this would complicate the code logic too much (making a single request and processing it in differnt ways).
-				# So just make mutiple requests if we want to retrieve shows/seasons/episodes in one request.
+				# So just make multiple requests if we want to retrieve shows/seasons/episodes in one request.
 				return self._execute(function = self.listWatched, iterator = [{'media' : i} for i in media], niche = niche, user = user, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal, concurrency = concurrency)
 			else:
 				# Manually specify the category, since we still need the media for extracting and filtering.
@@ -5742,7 +6257,7 @@ class MetaTrakt(MetaProvider):
 					elif Media.isSerie(media): category = MetaTrakt.CategoryShow
 
 				return self.listUser(link = MetaTrakt.LinkUserWatched, support = support, media = media, niche = niche, category = category, user = user, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -5803,7 +6318,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Season + Episode.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5865,7 +6380,7 @@ class MetaTrakt(MetaProvider):
 				if not order: order = MetaTools.OrderDescending
 
 			return self.listUser(link = MetaTrakt.LinkUserHistory, support = support, media = media, niche = niche, category = category, user = user, action = action, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -5921,7 +6436,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Episode.
 			False:		Movie + Episode.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -5974,7 +6489,7 @@ class MetaTrakt(MetaProvider):
 					media = Media.Episode
 
 			return self.listUser(link = MetaTrakt.LinkUserProgress, support = support, media = media, niche = niche, category = category, user = user, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -6030,7 +6545,7 @@ class MetaTrakt(MetaProvider):
 			True:		Movie + Show + Episode.
 			False:		Movie + Show.
 			String:		Single media from the list below.
-			List:		Mutiple medias from the list below.
+			List:		Multiple medias from the list below.
 
 			MOVIE
 				FeatureTheater:		Level-0 support.
@@ -6086,7 +6601,7 @@ class MetaTrakt(MetaProvider):
 					if media == Media.Episode: media = Media.Show
 
 			return self.listUser(link = MetaTrakt.LinkUserHidden, support = support, media = media, niche = niche, section = section, date = date, year = year, duration = duration, genre = genre, language = language, country = country, certificate = certificate, status = status, episode = episode, company = company, studio = studio, network = network, rating = rating, votes = votes, page = page, limit = limit, sort = sort, order = order, extended = extended, filter = filter, duplicate = duplicate, structure = structure, cache = cache, internal = internal)
-		except: self._error()
+		except: self._logError()
 		return self._internal(internal = internal)
 
 	# Feature, short, and special movies.
@@ -6215,17 +6730,33 @@ class MetaTrakt(MetaProvider):
 				None:				Do not return details, only the metadata.
 				True:				Return the details.
 				False:				Do not return details, only the metadata.
-			concurrency:			If mutiple requests should be run concurrently in threads.
+			concurrency:			If multiple requests should be run concurrently in threads.
 				None:				Use concurrency if needed.
 				True:				Use concurrency if needed.
 				False:				Do not use concurrency.
 	'''
 
-	def metadata(self, media, id, season = None, episode = None, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+	def metadata(self, media, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
 		result = None
 		complete = True
 
 		try:
+			if not id: id = trakt or imdb
+
+			# More info in the comments below at self.lookup().
+			# Use a previous lookup to avoid trying to retrieve with the (non-existing) IMDb ID that will in any case fail.
+			if not trakt and (not id or id.startswith('tt')):
+				if Media.isMovie(media) or Media.isSerie(media):
+					if id:
+						if not imdb and id.startswith('tt'): imdb = id
+						elif not trakt and not id.startswith('tt'): trakt = id
+					lookup = self._lookupGet(media = Media.Show if Media.isSerie(media) else media, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+					if lookup and lookup.get('trakt'):
+						id = trakt = lookup.get('trakt')
+						imdb = lookup.get('imdb') or imdb
+						tmdb = lookup.get('tmdb') or tmdb
+						tvdb = lookup.get('tvdb') or tvdb
+
 			if media == Media.Season:
 				if season is None: season = True
 			elif media == Media.Episode:
@@ -6262,17 +6793,41 @@ class MetaTrakt(MetaProvider):
 			iterator.append(self._metadataAlias(media = media, alias = alias, id = id, extended = False))
 			iterator.append(self._metadataRelease(media = media, release = release, id = id, extended = False)) # Sometimes returns HTTP 500 if "extended=full" is passed in. Eg: 300 (2007).
 			if early:
-				iterator.append(self._metadataPerson(media = media, person = person, season = season, episode = episode, extended = extended)) # People for sets, mutiple seasons, and mutiple episodes are retrieved later, since the summary is needed for it.
+				iterator.append(self._metadataPerson(media = media, person = person, season = season, episode = episode, extended = extended)) # People for sets, multiple seasons, and multiple episodes are retrieved later, since the summary is needed for it.
 				if not translate: iterator.append(self._metadataTranslation(media = media, translation = translation, summary = summary, id = id, season = season, episode = episode, language = language, extended = False))
 				iterator.append(self._metadataRating(media = media, rating = rating, id = id, season = season, episode = episode, extended = False))
 
-			data = self._execute(iterator = iterator, media = media, id = id, extended = extended, cache = cache, concurrency = concurrency, page = False, limit = False)
+			data, errors = self._execute(iterator = iterator, media = media, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, extended = extended, cache = cache, concurrency = concurrency, page = False, limit = False, detail = True)
 
 			if MetaTrakt.TypeSummary in data:
 				items = data[MetaTrakt.TypeSummary]
 				if items: result = self._processSummary(media = media, items = items, result = result, id = id, season = season)
 				elif items is None: complete = False
 			if result is None: result = {}
+
+			# Trakt quite often does not have the IMDb ID of relatively new titles (yet), typically for less popular titles.
+			# When retrieving the detailed metadata using the IMDb ID, a HTTP 404 error is returned.
+			# It is important to have the Trakt metadata, especially for the (Standard/Essential)-detail metadata level that mostly relies on Trakt metadata, and even for the Extended-detail metadata level, in order to mark-as-watched and rate titles on Trakt.
+			# Sometimes even weeks after the premiere, there is still no IMDb ID, and the IMDb button on Trakt's website just redirects to a title-search on IMDb. This happens even if Trakt says the metadata was refreshed today.
+			# In very rare cases, this can also mean that Trakt does not have a movie at all that is already on IMDb. But this does not happen often. Typically Trakt has the title, but just has not linked it to IMDb.
+			# It seems that the TMDb ID is typically available in these cases, since the Trakt data comes from TMDb.
+			# In such a case, do a lookup with the TMDb/TVDb ID (if available), or the title/year, and try to retrieve again with the Trakt ID.
+			if not complete and errors and id and id.startswith('tt'):
+				if Media.isMovie(media) or Media.isSerie(media):
+					# Only do this if there is no Trakt ID.
+					# Otherwise the retry call below with self.metadata() might get called recursively if the title does not exist or Trakt returns a 404 error because of some other reason.
+					if not trakt and (tmdb or tvdb or title):
+						try: error = errors[MetaTrakt.TypeSummary]['code']
+						except: error = None
+						if error == 404:
+							# Do not search by IMDb ID, because it already did not return results above.
+							lookup = self.lookup(media = Media.Show if Media.isSerie(media) else media, trakt = None, imdb = None, tmdb = tmdb, tvdb = tvdb, title = title, year = year)
+							if lookup and lookup.get('trakt'):
+								trakt = lookup.get('trakt')
+								imdb = lookup.get('imdb') or imdb
+								tmdb = lookup.get('tmdb') or tmdb
+								tvdb = lookup.get('tvdb') or tvdb
+								return self.metadata(media = media, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, season = season, episode = episode, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, set = set, release = release, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
 			# LATE - SEASON + EPISODE
 			# People and translations for seasons/episodes can only be retrieved with separate requests per season/episode.
@@ -6353,7 +6908,7 @@ class MetaTrakt(MetaProvider):
 					items = data[type]
 
 					# Check if requests failed.
-					# Sets, mutiple seasons and episodes can have nested dictionaries with an integer key being the set ID, or season/episode numbers.
+					# Sets, multiple seasons and episodes can have nested dictionaries with an integer key being the set ID, or season/episode numbers.
 					if items is None:
 						complete = False
 					elif Tools.isDictionary(items) and Tools.isInteger(list(items.keys())[0]):
@@ -6371,32 +6926,31 @@ class MetaTrakt(MetaProvider):
 						parameters = {'media' : media, 'items' : items, 'result' : result}
 						parameters.update(process['parameters'])
 						result = process['function'](**parameters)
-
-		except: self._error()
+		except: self._logError()
 		return {'provider' : self.id(), 'complete' : complete, 'data' : result} if detail else result
 
-	def metadataMovie(self, id, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Movie, id = id, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, set = set, release = release, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataMovie(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Movie, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, set = set, release = release, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataSet(self, id, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Set, id = id, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, set = set, release = release, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataSet(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, set = None, release = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Set, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, set = set, release = release, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataShow(self, id, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Show, id = id, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataShow(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, summary = None, person = None, studio = None, translation = None, alias = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Show, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, summary = summary, person = person, studio = studio, translation = translation, alias = alias, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataSeason(self, id, season = None, summary = None, person = None, translation = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Season, id = id, season = season, summary = summary, person = person, translation = translation, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataSeason(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, summary = None, person = None, translation = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Season, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, summary = summary, person = person, translation = translation, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataEpisode(self, id, season = None, episode = None, summary = None, person = None, translation = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Episode, id = id, season = season, episode = episode, summary = summary, person = person, translation = translation, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataEpisode(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, season = None, episode = None, summary = None, person = None, translation = None, rating = None, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Episode, id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, season = season, episode = episode, summary = summary, person = person, translation = translation, rating = rating, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataPerson(self, id, summary = None, extended = None, cache = None, detail = None, concurrency = None):
-		return self.metadata(media = Media.Person, id = id, summary = summary, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
+	def metadataPerson(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, summary = None, extended = None, cache = None, detail = None, concurrency = None):
+		return self.metadata(media = Media.Person, id = id, strakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, summary = summary, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
 	def metadataSummary(self, media, id, season = None, episode = None, summary = True, language = None, country = None, extended = None, cache = None, detail = None, concurrency = None):
 		return self.metadata(media = media, id = id, season = season, episode = episode, summary = summary, language = language, country = country, extended = extended, cache = cache, detail = detail, concurrency = concurrency)
 
-	def metadataPeople(self, media, id, season = None, episode = None, person = True,extended = None, cache = None, detail = None, concurrency = None):
+	def metadataPeople(self, media, id, season = None, episode = None, person = True, extended = None, cache = None, detail = None, concurrency = None):
 		return self._metadataSection(detail = detail, temp = 'person', data = {'director' : True, 'writer' : True, 'cast' : True}, metadata = self.metadata(media = media, id = id, season = season, episode = episode, person = person, extended = extended, cache = cache, detail = detail, concurrency = concurrency))
 
 	def metadataStudio(self, media, id, studio = True, extended = None, cache = None, detail = None, concurrency = None):
@@ -6432,14 +6986,14 @@ class MetaTrakt(MetaProvider):
 				return self._metadataSection(metadata = metadata, detail = None, temp = temp)
 		return metadata
 
-	def _metadataExtended(self, value, extended = None, none = True):
+	def _metadataExtended(self, value, extended = None, image = None, none = True):
 		result = False
 		episodes = Tools.isArray(value) and MetaTrakt.ExtendedEpisode in value
 
 		if (not extended is False or episodes) and not extended == MetaTrakt.ExtendedBasic and not value == MetaTrakt.ExtendedBasic:
 			result = []
 
-			# Trakt allows to add mutiple "extended" values (eg: "extended=full,episodes").
+			# Trakt allows to add multiple "extended" values (eg: "extended=full,episodes").
 			if not value is False:
 				if extended is True or (none and extended is None): result.append(MetaTrakt.ExtendedFull)
 				elif Tools.isString(extended): result.append(extended)
@@ -6447,6 +7001,8 @@ class MetaTrakt(MetaProvider):
 
 			if Tools.isString(value): result.append(value)
 			elif Tools.isArray(value): result.extend(value)
+
+			if image: result.append(MetaTrakt.ExtendedImages)
 
 			result = Tools.listUnique(result)
 
@@ -6485,7 +7041,7 @@ class MetaTrakt(MetaProvider):
 
 			if data:
 				if id: data['id'] = id
-				if not 'extended' in data: data['extended'] = self._metadataExtended(value = summary, extended = extended, none = True)
+				if not 'extended' in data: data['extended'] = self._metadataExtended(value = summary, extended = extended, image = True, none = True)
 				if translation: data['translation'] = translation
 				data['result'] = MetaTrakt.TypeSummary
 
@@ -6530,7 +7086,7 @@ class MetaTrakt(MetaProvider):
 				if id: data['id'] = id
 				if not 'extended' in data:
 					if extended is True and Media.isSerie(media): extended = [MetaTrakt.ExtendedFull, MetaTrakt.ExtendedGuest] # Also retrieve guest stars.
-					data['extended'] = self._metadataExtended(value = person, extended = extended, none = False) # none = False: all the extra info is unnecessary for Kodi menus/dialogs.
+					data['extended'] = self._metadataExtended(value = person, extended = extended, image = True, none = False) # none = False: all the extra info is unnecessary for Kodi menus/dialogs.
 
 				result = [MetaTrakt.TypePerson]
 				if Media.isSeason(media) or Media.isEpisode(media): result.append(season)
@@ -6663,7 +7219,7 @@ class MetaTrakt(MetaProvider):
 	# However, it can make the pack more accurate, when Trakt and TVDb pack data is combined, and both have different episode numbering.
 	# In such a case the episode titles are matched to determine which episode number from Trakt belongs to which episode number of TVDb.
 	# Eg: Dragon Ball Super. Has different numbering on Trakt and TVDb. Plus the default titles on TVDb are in Japanese, whereas the default Trakt title is English.
-	def metadataPack(self, id = None, trakt = None, imdb = None, dataShow = None, dataEpisode = None, translation = True, threaded = None, cache = None, detail = None):
+	def metadataPack(self, id = None, trakt = None, imdb = None, tmdb = None, tvdb = None, title = None, year = None, dataShow = None, dataEpisode = None, translation = True, threaded = None, cache = None, detail = None):
 		complete = True
 		result = None
 		try:
@@ -6674,11 +7230,34 @@ class MetaTrakt(MetaProvider):
 				def _packNumber(season, episode):
 					return int(('%06d' % season) + ('%06d' % episode))
 
-				if dataShow is None: dataShow = self.metadataShow(id = id, cache = cache) # No transaltions needed for this.
+				if dataShow is None: dataShow = self.metadataShow(id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, cache = cache) # No translations needed for this.
 				if dataShow:
 					current = Time.timestamp()
 					seasons = []
-					if dataEpisode is None: dataEpisode = self.metadataEpisode(id = id, cache = cache, translation = translation, extended = True) # Extended for the time and duration.
+
+					# In case they were retrieved by lookup in metadataShow()
+					if not trakt:
+						try: trakt = dataShow['id']['trakt']
+						except: pass
+					if not imdb:
+						try: imdb = dataShow['id']['imdb']
+						except: pass
+					if not tmdb:
+						try: tmdb = dataShow['id']['tmdb']
+						except: pass
+					if not tvdb:
+						try: tvdb = dataShow['id']['tvdb']
+						except: pass
+					id = trakt or imdb
+
+					try: country = dataShow['country']
+					except: country = None
+					try: zone = dataShow['airs']['zone']
+					except: zone = None
+					if not country and not zone: zone = 'UTC' # Trakt returns dates in GMT/UTC timezone.
+
+					if dataEpisode is None:
+						dataEpisode = self.metadataEpisode(id = id, trakt = trakt, imdb = imdb, tmdb = tmdb, tvdb = tvdb, title = title, year = year, cache = cache, translation = translation, extended = True) # Extended for the time and duration.
 					if dataEpisode:
 						order = []
 						dataSeason = {} # Dict for avoiding duplicates.
@@ -6698,27 +7277,57 @@ class MetaTrakt(MetaProvider):
 						order = {order[i] : i + 1 for i in range(len(order))}
 
 						dataSeason = Tools.listSort(list(dataSeason.values()), key = lambda i : i.get('season'))
-						for season in dataSeason:
+						for i in range(len(dataSeason)):
+							season = dataSeason[i]
 							numberSeason = season.get('season')
 							numbersSeason = {MetaPack.NumberStandard : numberSeason}
 							if not MetaPack.NumberAbsolute in numbersSeason: numbersSeason[MetaPack.NumberAbsolute] = 1 if numberSeason > 0 else 0
 							if not MetaPack.NumberSequential in numbersSeason: numbersSeason[MetaPack.NumberSequential] = 1 if numberSeason > 0 else 0
 
+							# Sometimes Trakt has clearly incorrect absolute numbers.
+							# Eg: My Name is Earl S03E01+ has absolute number 1+.
+							# This is probably the absolute number within S03 instead of the entire show, since TVDb has a bunch of extra split/double episodes.
+							absolute = True
+							if numberSeason and numberSeason > 1:
+								# Still allow it if the first episode does not start at E01, for absolute-episode numbers.
+								# Eg: One Piece S02+.
+								try: first = season['episodes'][0]
+								except: first = None
+								if first and first.get('absolute') == first.get('episode') and first.get('episode') == 1: absolute = False
+
 							episodes = []
+							aliases = []
 							times = []
+							types = []
 							durations = []
 							counter = 0
+							previous = 0
+
 							for episode in season['episodes']:
-								counter += 1
 								numberEpisode = episode.get('episode')
 								numberAbsolute = episode.get('absolute')
+
+								if not absolute: numberAbsolute = None
 								numbersEpisode = {MetaPack.NumberStandard : [numberSeason, numberEpisode], MetaPack.NumberAbsolute : [1, numberAbsolute or 0]}
 
-								# Add this for shows where Trakt uses season-numbering for seasons, but within each season, episodes are numbered absolutely.
-								# Eg: One Piece first episode of S02 is S02E62, not S02E01.
-								# Do not do for specials, since Trakt might have specials missing.
-								# Eg: GoT S00E08
-								if numberSeason > 0: numbersEpisode[MetaPack.NumberCustom] = [numberSeason, counter]
+								if numberSeason > 0:
+									counter += 1
+
+									# Sometimes Trakt has a missing episode.
+									# Increase the counter, so that the custom episode still matches with the standard episode number.
+									# Eg: The Tonight Show Starring Jimmy Fallon S01E174 (missing on both Trakt and TMDb).
+									# Only do this up to 3 missing episodes, since Trakt/TMDb can sometimes have entire blocks of episodes missing.
+									if previous:
+										difference = abs(previous - numberEpisode)
+										if difference > 1 and difference <= 3: counter += (difference - 1)
+
+									# Add this for shows where Trakt uses season-numbering for seasons, but within each season, episodes are numbered absolutely.
+									# Eg: One Piece first episode of S02 is S02E62, not S02E01.
+									# Do not do for specials, since Trakt might have specials missing.
+									# Eg: GoT S00E08
+									numbersEpisode[MetaPack.NumberCustom] = [numberSeason, counter]
+
+									previous = numberEpisode
 
 								if not MetaPack.NumberSequential in numbersEpisode:
 									if numberSeason == 0:
@@ -6735,11 +7344,36 @@ class MetaTrakt(MetaProvider):
 								time = episode.get('time', {}).get('premiere')
 								times.append(time if time else 0)
 
+								date = Time.format(timestamp = time, format = Time.FormatDate, zone = zone, country = country) if time else None
+
 								status = episode.get('status')
-								if not status and time: status = MetaPack.StatusEnded if time <= current else MetaPack.StatusUpcoming
+								if not status: status = self.mMetatools.mergeStatus(media = Media.Episode, season = numberSeason, episode = numberEpisode, time = time)
+
+								type = episode.get('type')
+
+								# Trakt sometimes marks premieres as standard episodes.
+								# Eg: One Piece: many SxxE01
+								# Probably because Trakt looks for SxxE01 as premieres, but if abolsute episode numbers are used, the premiere has a different number.
+								# Eg: One Piece S04E01 (S04E92 on Trakt).
+								# Also use "counter" instead of "numberEpisode", because of exactly this reason.
+								if not type or (numberSeason and counter == 1 and not Media.Premiere in type): type = [Media.Premiere, Media.Outer if numberSeason == 1 else Media.Inner]
+								types.append(type)
 
 								duration = episode.get('duration')
 								if duration: durations.append(duration)
+
+								# This is an absolute horrible solution, but not sure if there is a better option.
+								# Trakt sometimes has the incorrect alias for an episode, so that two different episodes have the same alias title.
+								# Eg: Dragon Ball Super S01E109 vs S01E110 - same Japanese alias.
+								# Before those two episodes had the correct aliases. But then Trakt updated the metadata of that show (2025-05-09) and suddenly those two episodes had the same title.
+								# This causes matching problems in MetaPack so that S01E110 is seen as an unofficial episode using Trakt's number S01E109 (instead of S01E110), since it matches S01E109's title as well.
+								# Maybe this was caused by Trakt scraping TVDb and TVDb having added specials to the standard seasons, causing an incorrect episode offset on Trakt. More info at MetaTvdb.metadataEpisode(pack = ...).
+								# Hacky solution: if we see an alias appear twice for different episodes in the same season, just ignore the subsequent aliases.
+								# Maybe this is something that will be fixed on Trakt in the future.
+								alias = episode.get('alias')
+								if alias:
+									alias = {k : [x for x in v if x and not x in aliases] for k, v in alias.items() if v}
+									for x in alias.values(): aliases.extend(x)
 
 								episodes.append({
 									'id' : {
@@ -6750,11 +7384,13 @@ class MetaTrakt(MetaProvider):
 										'slug'	: id.get('slug'),
 									},
 									'title'		: title,
-									'alias'		: episode.get('alias'),
+									'alias'		: alias,
 									'number'	: numbersEpisode,
 									'year'		: Time.year(timestamp = time) if time else episode.get('year'),
+									'date'		: date,
 									'time'		: time,
 									'status'	: status,
+									'serie'		: type,
 									'duration'	: duration,
 								})
 
@@ -6763,15 +7399,22 @@ class MetaTrakt(MetaProvider):
 							title = season.get('title')
 							if title and not Tools.isArray(title): title = [title]
 
-							# Trakt only has a status for shows, but not for seasons. Calculate the status based on the episode release dates.
-							status = season.get('status')
-							if not status:
-								if times and times[-1] > 0 and max(times) < current: status = MetaPack.StatusEnded
-								elif not times or min(times) > current: status = MetaPack.StatusUpcoming
-								else: status = MetaPack.StatusContinuing
+							type = season.get('type')
 
 							time = season.get('time', {}).get('premiere')
 							if not time and times: time = min(times)
+							date = Time.format(timestamp = time, format = Time.FormatDate, zone = zone, country = country) if time else None
+
+							# Trakt only has a status for shows, but not for seasons. Calculate the status based on the episode release dates.
+							status = season.get('status')
+							if not status:
+								# Do not mark the season as ended purley on time.
+								# Since the season might still continue, although the last episode has already been aired, but there are new unaired episodes that were not scraped by Trakt yet.
+								try: timeNext = dataSeason[i + 1]['episodes'][0]['time']['premiere']
+								except: timeNext = None
+								try: timeLast = dataSeason[-1]['episodes'][-1]['time']['premiere']
+								except: timeLast = None
+								status = self.mMetatools.mergeStatus(media = Media.Season, season = numberSeason, time = time, timeSeasonLast = timeLast, timeSeasonNext = timeNext, timeEpisode = times, type = type, typeEpisode = types, status = dataShow.get('status'))
 
 							duration = season.get('duration')
 							if not duration and durations: duration = int(sum(durations) / float(len(durations)))
@@ -6788,8 +7431,10 @@ class MetaTrakt(MetaProvider):
 								'alias'		: season.get('alias'),
 								'number'	: numbersSeason,
 								'year'		: Time.year(timestamp = time) if time else season.get('year'),
+								'date'		: date,
 								'time'		: time,
 								'status'	: status,
+								'serie'		: type,
 								'duration'	: duration,
 								'episodes'	: episodes,
 							})
@@ -6800,18 +7445,23 @@ class MetaTrakt(MetaProvider):
 					title = dataShow.get('title')
 					if title and not Tools.isArray(title): title = [title]
 
+					time = None
+					date = dataShow.get('premiered')
+					if date: time = Time.timestamp(fixedTime = date, format = Time.FormatDate, utc = True)
+
 					result = {
 						'id' : {
-							'imdb'	: id.get('imdb'),
-							'tmdb'	: id.get('tmdb'),
-							'tvdb'	: id.get('tvdb'),
+							'imdb'	: id.get('imdb') or imdb, # If Trakt does not have the IMDb yet.
+							'tmdb'	: id.get('tmdb') or tmdb,
+							'tvdb'	: id.get('tvdb') or tvdb,
 							'trakt'	: id.get('trakt'),
 							'slug'	: id.get('slug'),
 						},
 						'title'		: title,
 						'alias'		: dataShow.get('alias'),
 						'year'		: dataShow.get('year'),
-						'time'		: dataShow.get('premiered'),
+						'date'		: date,
+						'time'		: time,
 						'status'	: dataShow.get('status'),
 						'duration'	: dataShow.get('duration'),
 						'language'	: dataShow.get('language'),

@@ -462,6 +462,9 @@ class Core(base.Core):
 		elif error == Core.ErrorPack:
 			title = 'Pack Error'
 			message = 'File Not In Pack Or Mislabeled'
+		elif error == Core.ErrorFormat:
+			title = 'Unsupported File'
+			message = 'File Format Not Supported'
 		else:
 			# Premiumize sometimes returns the error attribute, even when everything went fine:
 			#	{"id":"xxxxx","name":"xxxxxx","message":"","status":"error","progress":0,"folder_id":"xxxxx","file_id":null,"src":"https://www.premiumize.me/api/job/src?id=xxxxx"}
@@ -1921,12 +1924,20 @@ class Core(base.Core):
 			return Core.ErrorPremiumize
 
 	##############################################################################
+	# SUPPORT
+	##############################################################################
+
+	@classmethod
+	def supportedModes(self):
+		return {Core.ModeTorrent : True, Core.ModeUsenet : True, Core.ModeHoster : True}
+
+	##############################################################################
 	# CACHED
 	##############################################################################
 
 	@classmethod
 	def cachedModes(self):
-		return {Core.ModeHoster, Core.ModeTorrent}
+		return {Core.ModeTorrent : True, Core.ModeHoster : True}
 
 	# id: single hash or list of hashes.
 	def cachedIs(self, id, timeout = None):

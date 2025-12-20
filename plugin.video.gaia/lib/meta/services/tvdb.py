@@ -23,7 +23,7 @@
 from lib.meta.data import MetaData
 from lib.meta.service import MetaService
 
-from lib.modules.tools import Converter, Settings, System, Language, Country, Tools, Regex, Logger, Media
+from lib.modules.tools import Converter, Settings, System, Language, Country, Tools, Regex, Logger, Media, Time
 from lib.modules.network import Networker
 from lib.modules.account import Tvdb as Account
 from lib.modules.cache import Cache
@@ -105,13 +105,20 @@ class MetaTvdb(MetaService):
 	VoteWorst				= -1
 	VoteMaximum				= 99999
 
+	# Finale
+	# https://thetvdb.github.io/v4-api/#/  -  EpisodeExtendedRecord
+
+	FinaleSeason			= 'season'
+	FinaleMidseason			= 'midseason'
+	FinaleSeries			= 'series'
+
 	# Special
 	# Cannot find these in the API.
 	# https://thetvdb.com/taxonomy
 	Special					= {
 		277					: MetaData.SpecialImportant,
 		278					: MetaData.SpecialUnimportant,
-		4447				: MetaData.SpecialBehind,
+		4447				: MetaData.SpecialProduction,
 		4448				: MetaData.SpecialBlooper,
 		4449				: MetaData.SpecialInterview,
 		4450				: MetaData.SpecialCrossover,
@@ -172,7 +179,7 @@ class MetaTvdb(MetaService):
 	###################################################################
 
 	@classmethod
-	def _request(self, parts, data = None, method = None, authentication = True, cache = None):
+	def _request(self, parts, data = None, method = None, authentication = True, cache = None, retry = None):
 		link = Networker.linkJoin(MetaTvdb.LinkApi, parts)
 
 		headers = None
@@ -184,7 +191,12 @@ class MetaTvdb(MetaService):
 				if Tools.isArray(value):
 					data[key] = ','.join(value)
 
-		result = self._requestJson(link = link, headers = headers, data = data, method = method if method else Networker.MethodGet, type = Networker.DataJson, cache = cache)
+		result, error = self._requestJson(link = link, headers = headers, data = data, method = method if method else Networker.MethodGet, type = Networker.DataJson, cache = cache, retry = retry, extended = True)
+
+		# Hacky way to directly add TVDb requests errors, without having to pass it along to MetaTvdb(MetaProvider).
+		if error and error.get('type') in Networker.ErrorServer:
+			from lib.meta.providers.tvdb import MetaTvdb as MetaTvdbProvider
+			MetaTvdbProvider.instance()._errorUpdate()
 
 		# Do not check the status, since company requests returns a 500 error, although the (partial) data is returned.
 		# Might be a temporary problem.
@@ -237,9 +249,28 @@ class MetaTvdb(MetaService):
 
 	@classmethod
 	def _authenticationToken(self, key = None, pin = None):
+		# Update (2025-04)
+		# A working token expired (from the cache after MetaTvdb.CacheToken seconds) and this function made a new login request to get a new token.
+		# However, the login request failed, probably due to a temporary issue on the TVDb server.
+		# The login request returned the following:
+		#	'error': {'type': 'connection', 'code': None, 'message': 'Failed to establish a new connection: [Errno 111] Connection refused', 'description': "HTTPSConnectionPool(host='api4.thetvdb.com', port=443): Max retries exceeded with url: /v4/login (Caused by NewConnectionError('<externals.urllib3.connection.HTTPSConnection object at 0x358f920>: Failed to establish a new connection: [Errno 111] Connection refused'))"}
+		# This error now got cached in MetaService._cache().
+		# Every time a TVDb API call was made, the request failed, because no token was available:
+		#	lib/modules/account.py", line 161, in headerBearer    return {\'Authorization\' : \'Bearer \' + token}   'TypeError: can only concatenate str (not "NoneType") to str
+		# And because the failed login request is now cached for MetaTvdb.CacheToken seconds, no TVDb API call will work until the cache expires in the future and the login request is made again.
+		#
+		# This caused massive problems.
+		# Just after watching one episode during binging, the concurrency thread message was shown (no new threads can be created, please restart Kodi).
+		# This got so bad that after restarting Kodi and then opening the show Progress menu, the concurrency error message was shown before even scraping a new episode.
+		# Not entirely sure why this happened. But probably the playbackReload process got stuck because all TVDb requests failed.
+		# Then all the threads started during smart-reloading did not finish properly (eg: exited with an exception due to the account.py error above), and those threads might not have been returned to the pool, and therefore the device ran out of threads.
+		#
+		# To solve this, retry the login request if it fails.
+		# The retry happens in MetaService._cache().
+
 		if key is None: key = self._authenticationKey()
 		if pin is None: pin = self._authenticationPin()
-		data = self._request(cache = MetaTvdb.CacheToken, parts = MetaTvdb.ParameterLogin, data = {'apikey' : key, 'pin' : pin}, method = Networker.MethodPost, authentication = False)
+		data = self._request(cache = MetaTvdb.CacheToken, parts = MetaTvdb.ParameterLogin, data = {'apikey' : key, 'pin' : pin}, method = Networker.MethodPost, authentication = False, retry = True)
 		try: return data['token']
 		except: return None
 
@@ -249,7 +280,11 @@ class MetaTvdb(MetaService):
 			MetaTvdb.AuthenticationLock.acquire()
 			if MetaTvdb.AuthenticationHeader is None:
 				if token is None: token = self._authenticationToken()
-				MetaTvdb.AuthenticationHeader = Account.headerBearer(token = token)
+				if token: MetaTvdb.AuthenticationHeader = Account.headerBearer(token = token)
+				else:
+					# If the login request fails, eg due to temporary TVDb server issues.
+					# The login request will be retried, but if it fails on the retry as well, set the global var to False to avoid this function getting executed over and over again during the same process execution, since it checks for None.
+					MetaTvdb.AuthenticationHeader = False
 			MetaTvdb.AuthenticationLock.release()
 		return MetaTvdb.AuthenticationHeader
 
@@ -597,6 +632,7 @@ class MetaTvdb(MetaService):
 			'artworks',
 			'artwork',	# Season
 		])
+
 		if artworks:
 			sortId = len(artworks)
 			for i in range(len(artworks)): artworks[i]['index'] = sortId - i # For index-based sorting, before we sort by ID below.
@@ -624,8 +660,15 @@ class MetaTvdb(MetaService):
 					if not language: language = MetaData.LanguageUnknown
 					image['language'] = language
 
+					# Some images still have a language associated with it, although the new "includesText" might indicate that there is no text.
+					# Eg: https://thetvdb.com/artwork/1377886
+					if self._extract(data = artwork, type = 'includesText') is False: # Only if specifically set to False.
+						language = None
+						image['language'] = MetaData.LanguageUnknown
+
 					vote = self._extract(data = artwork, type = 'score')
 					if vote:
+						if vote >= 100000: vote -= 100000 # New TVDb scores seem to start at 100000.
 						try: vote = max(vote, image['vote'])
 						except: pass
 						image['vote'] = vote
@@ -748,12 +791,17 @@ class MetaTvdb(MetaService):
 		media = None
 		vote = None
 		sort = None
+		width = None
+		height = None
 
 		# To avoid incorrect classification (art and banner).
 		path = Networker.linkPath(link = link, parameters = True)
 		path = Tools.stringRemovePrefix(path, 'banners')
 
-		if data: id = self._extract(data = data, type = 'id')
+		if data:
+			id = self._extract(data = data, type = 'id')
+			width = self._extract(data = data, type = 'width')
+			height = self._extract(data = data, type = 'height')
 
 		match = Regex.extract(data = path, expression = '\/?([a-z]+)(?<!posters)\/', cache = True)
 		if match: media = MetaData.mediaExtract(match)
@@ -858,8 +906,9 @@ class MetaTvdb(MetaService):
 			'language' : MetaData.LanguageUnknown,
 			'media' : media if media else MetaData.mediaExtract(path),
 			'type' : MetaData.imageTypeExtract(data = path),
-			'quality' : MetaData.imageQualityExtract(data = path),
 			'opacity' : MetaData.imageOpacityExtract(data = path),
+			'quality' : MetaData.imageQualityExtract(data = path), # NB: Do not use the resolution here to determine the quality. Since we use this attribute to filter out all image thumbs ending in "_t".
+			'resolution' : {'quality' : MetaData.imageQualityExtract(data = path, width = width, height = height), 'width' : width, 'height' : height},
 		}
 
 		# Some photos might seem like an actor photo instead of a person photo.
@@ -871,7 +920,30 @@ class MetaTvdb(MetaService):
 			type = self._typeImage(id = type)
 			if type: result.update(type)
 
-		result['decor'] = MetaData.imageDecorExtract(data = path, type = result['type'])
+		# There are backgrounds with text that look ugly in the menus.
+		# Eg: TBBT season fanart/backgrounds.
+		# If a language was set on these images, assume that they contain text and are therefore landscape/poster (with decor/text) and not fanart/keyart (without decor/text).
+		# There are a bunch of fanart that has a language set, although they do not have any decor/text.
+		# But is better to incorrectly clasify these in order to change the decor attribute for those that do have text.
+		# Even if the fanart is changed to landscape, the landscape can later be used by MetaManager/MetaImage if no other provider has an approriate fanart.
+		# Update: TVDb added a new attribute "includesText" which seems to be pretty accurate. Hence, not need to use the inacurate language anymore.
+		language = None
+		text = None
+		if data:
+			#language = Language.code(self._extract(data = data, type = 'language')) if (result['type'] == MetaData.ImageTypeBackground or result['type'] == MetaData.ImageTypePoster) else None
+			text = self._extract(data = data, type = 'includesText')
+
+			# Some images still have a language associated with it, although the new "includesText" might indicate that there is no text.
+			# Eg: https://thetvdb.com/artwork/1377886
+			# On the other hand, sometimes "includesText" is set, but language is None and the image does not actually contain text.
+			# Eg: https://thetvdb.com/artwork/62670453
+			if text is False:
+				language = None
+				result['language'] = MetaData.LanguageUnknown
+			elif text is True and not self._extract(data = data, type = 'language'):
+				text = False
+
+		result['decor'] = MetaData.imageDecorExtract(data = path, type = result['type'], text = text, language = language)
 
 		return result
 
@@ -943,10 +1015,66 @@ class MetaTvdb(MetaService):
 		except: return None
 
 	@classmethod
+	def _extractType(self, data, media, special = None, story = None, extra = None):
+		try:
+			if media == MetaData.MediaEpisode:
+				season = data.get('seasonNumber')
+				episode = data.get('number')
+				finale = data.get('finaleType')
+
+				if season == 0:
+					# A special can also be a season finale.
+					# Return both values.
+					# Used by MetaPack.
+					# Eg: Downton Abbey S00E02.
+					if finale == MetaTvdb.FinaleSeries: base = MetaData.SerieTypeFinaleShow
+					elif finale == MetaTvdb.FinaleSeason: base = MetaData.SerieTypeFinaleSeason
+					elif finale == MetaTvdb.FinaleMidseason: base = MetaData.SerieTypeFinaleMiddle
+					else: base = None
+
+					# Sometimes specials are marked as finales, but the are actually not.
+					# They are probably marked as season finales, because they are storyline specials aired after the season finale, and is therefore the "new" season finale.
+					# Set the episode type to special, and the special type to [MetaData.SpecialEpisode, MetaData.SpecialImportant] in _extractSpecial().
+					# Eg: Vikings S00E07 + S00E08
+					if story and not data.get('tagOptions') and not data.get('isMovie'): return [MetaData.SerieTypeSpecial, base] if base else MetaData.SerieTypeSpecial
+
+					# Sometimes specials are marked as finales, but the tagOptions indicate an extra special.
+					# Eg: Downton Abbey S00E14 (marked as "season finale", but is actually a "Behind the Scenes/ Makings Of").
+					elif extra: return [MetaData.SerieTypeSpecial, base] if base else MetaData.SerieTypeSpecial
+
+				# TVDb sets the "finaleType" attribute if it is a finale in any of the orders, nbot only the aired order.
+				# Eg: One Piece: many of the SxxE01.
+				# Eg: One Piece S07E01
+				if season and episode == 1 and finale in (MetaTvdb.FinaleSeries, MetaTvdb.FinaleSeason, MetaTvdb.FinaleMidseason): finale = None
+
+				if finale == MetaTvdb.FinaleSeries: return MetaData.SerieTypeFinaleShow
+				elif finale == MetaTvdb.FinaleSeason: return MetaData.SerieTypeFinaleSeason
+				elif finale == MetaTvdb.FinaleMidseason: return MetaData.SerieTypeFinaleMiddle
+
+				if season == 1 and episode == 1: return MetaData.SerieTypePremiereShow
+				elif season and season > 1 and episode == 1: return MetaData.SerieTypePremiereSeason
+				elif season == 0 or data.get('isMovie'): return MetaData.SerieTypeSpecial
+
+				return MetaData.SerieTypeStandard
+			elif media == MetaData.MediaSeason:
+				season = data.get('number')
+				episodes = data.get('episodes')
+				finale = episodes[-1].get('finaleType') if episodes else None
+
+				if finale == MetaTvdb.FinaleSeries:
+					if season == 1: return MetaData.SerieTypePremiereFinale
+					else: return MetaData.SerieTypeFinaleShow
+				elif season == 1: return MetaData.SerieTypePremiereShow
+				elif season == 0: return MetaData.SerieTypeSpecial
+
+				return MetaData.SerieTypeStandard
+		except: pass
+		return None
+
+	@classmethod
 	def _extractSpecial(self, data, media, show = None, season = None):
 		try:
 			special = []
-
 			if 'tagOptions' in data and data['tagOptions']:
 				for i in data['tagOptions']:
 					try: special.append(MetaTvdb.Special[i['id']])
@@ -954,6 +1082,7 @@ class MetaTvdb(MetaService):
 
 			if 'isMovie' in data and data['isMovie']: special.append(MetaData.SpecialMovie)
 
+			extracted = None
 			if 'name' in data and data['name']:
 				# Maybe not absolutely necessary to exclude show titles from detection, but it might be useful in rare cases where these keywords appear in the title.
 				exclude = None
@@ -968,6 +1097,22 @@ class MetaTvdb(MetaService):
 
 				extracted = MetaData.specialExtract(data = data['name'], exclude = exclude)
 				if extracted: special.extend(extracted)
+
+			# Some specials are marked as season finales, although they are not actual season finales.
+			# They are storyline specials that are aired after the season finale.
+			# Eg: Vikings S00E07 + S00E08.
+			# Eg: House S00E05.
+			if not special and data.get('finaleType'):
+				# Sometimes a making-of special is incorrectly labeled as a season finale.
+				# Eg: True Detective S00E04, S00E05.
+				if not(extracted == MetaData.SpecialProduction or extracted == MetaData.SpecialMaking):
+					special.extend([MetaData.SpecialEpisode, MetaData.SpecialImportant])
+
+			# There can be multiple special types, one from the IDs and one from the title extraction.
+			# Eg: SpecialUnimportant, SpecialProduction
+			# Move SpecialUnimportant to the back, for menu media labels.
+			try: special.append(special.pop(special.index(MetaData.SpecialUnimportant)))
+			except: pass
 
 			before = {}
 			season = data.get('airsBeforeSeason')
@@ -1012,7 +1157,7 @@ class MetaTvdb(MetaService):
 			return {'time' : result, 'zone' : None}
 		else:
 			result = self._extract(data = data, type = ['airsTimeUTC'])
-			if result: return {'time' : result, 'zone' : MetaData.AirZoneUtc}
+			if result: return {'time' : result, 'zone' : MetaData.ZoneUtc}
 		return None
 
 	@classmethod
@@ -1085,8 +1230,8 @@ class MetaTvdb(MetaService):
 	@classmethod
 	def _processContent(self, metadata, data, show = None, season = None):
 		self._processShow(metadata = metadata, data = data)
-		self._processSeason(metadata = metadata, data = data)
-		self._processEpisode(metadata = metadata, data = data)
+		self._processSeason(metadata = metadata, data = data, show = show)
+		self._processEpisode(metadata = metadata, data = data, show = show)
 
 		self._processId(metadata = metadata, data = data)
 		self._processSlug(metadata = metadata, data = data)
@@ -1108,6 +1253,7 @@ class MetaTvdb(MetaService):
 		self._processVote(metadata = metadata, data = data)
 		self._processStatus(metadata = metadata, data = data)
 		self._processSpecial(metadata = metadata, data = data, show = show)
+		self._processType(metadata = metadata, data = data) # After _processSpecial().
 		self._processDuration(metadata = metadata, data = data)
 		self._processMoney(metadata = metadata, data = data)
 		self._processCertificate(metadata = metadata, data = data)
@@ -1123,7 +1269,7 @@ class MetaTvdb(MetaService):
 		except: self._error()
 
 	@classmethod
-	def _processSeason(self, metadata, data):
+	def _processSeason(self, metadata, data, show = None):
 		try:
 			if 'seasons' in data and data['seasons']:
 				primary = self._typeSeasonPrimary()
@@ -1145,7 +1291,7 @@ class MetaTvdb(MetaService):
 						seasons = []
 						for i in data['seasons']:
 							if i['type']['id'] == type:
-								season = self._process(media = MetaData.MediaSeason, data = i)
+								season = self._process(media = MetaData.MediaSeason, data = i, show = show)
 								if season: seasons.append(season)
 						if seasons: metadata.seasonSet(value = seasons)
 				elif metadata.mediaEpisode():
@@ -1158,18 +1304,18 @@ class MetaTvdb(MetaService):
 						try: season = data['seasons'][0]
 						except: pass
 					if not season is None:
-						season = self._process(media = MetaData.MediaSeason, data = season)
+						season = self._process(media = MetaData.MediaSeason, data = season, show = show)
 						if season: metadata.seasonSet(value = season)
 		except: self._error()
 
 	@classmethod
-	def _processEpisode(self, metadata, data):
+	def _processEpisode(self, metadata, data, show = None):
 		try:
 			if 'episodes' in data and data['episodes']:
 				if metadata.mediaShow() or metadata.mediaSeason():
 					episodes = []
 					for i in data['episodes']:
-						episode = self._process(media = MetaData.MediaEpisode, data = i)
+						episode = self._process(media = MetaData.MediaEpisode, data = i, show = show)
 						if episode: episodes.append(episode)
 					if episodes: metadata.episodeSet(value = episodes)
 		except: self._error()
@@ -1389,6 +1535,10 @@ class MetaTvdb(MetaService):
 		metadata.statusSet(value = self._extractStatus(data = data, media = metadata.media()))
 
 	@classmethod
+	def _processType(self, metadata, data):
+		metadata.typeSet(value = self._extractType(data = data, media = metadata.media(), special = metadata.special(), story = metadata.specialStory(), extra = metadata.specialExtra()))
+
+	@classmethod
 	def _processSpecial(self, metadata, data, show = None):
 		metadata.specialSet(value = self._extractSpecial(data = data, media = metadata.media(), show = show))
 
@@ -1407,7 +1557,7 @@ class MetaTvdb(MetaService):
 		if metadata.mediaTelevision():
 			# Used by date functions below.
 			time = self._extractReleaseTime(data = data)
-			if time: metadata.releaseTimeSet(value = time['time'], zone = time['zone'])
+			if time: metadata.releaseTimeSet(value = time['time'], zone = zone or time['zone'])
 
 			metadata.releaseDateFirstSet(value = self._extractReleaseFirst(data = data), zone = zone)
 			metadata.releaseDateLastSet(value = self._extractReleaseLast(data = data), zone = zone)
@@ -1435,7 +1585,12 @@ class MetaTvdb(MetaService):
 		parts = [type]
 		if sub is True: parts.append(MetaTvdb.ParameterTypes)
 		elif sub: parts.append(sub)
-		return self._request(parts = parts, cache = MetaTvdb.CacheTypes)
+
+		# NB: retry=True
+		# If the previous cached request was done with an outdated API token, the requests fails and no results are returned.
+		# This then caches the None result and any subsequent call to this function returns the cached failed None value.
+		# Retry to delete the cached entry on failure and retrieve anew.
+		return self._request(parts = parts, cache = MetaTvdb.CacheTypes, retry = True)
 
 	@classmethod
 	def _typeProvider(self, id = None):
@@ -1649,7 +1804,13 @@ class MetaTvdb(MetaService):
 	def _language(self):
 		try:
 			result = []
-			data = self._request(parts = MetaTvdb.ParameterLanguages)
+
+			# NB: retry=True
+			# If the previous cached request was done with an outdated API token, the requests fails and no results are returned.
+			# This then caches the None result and any subsequent call to this function returns the cached failed None value.
+			# Retry to delete the cached entry on failure and retrieve anew.
+			data = self._request(parts = MetaTvdb.ParameterLanguages, retry = True)
+
 			if data:
 				for item in data:
 					item = Language.code(item['id'])

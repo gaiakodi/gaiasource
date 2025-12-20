@@ -63,6 +63,26 @@ class MetaProvider(object):
 	ConvertInverse					= False
 	Convert							= {}
 
+	# USAGE
+	UsageProperty					= 'GaiaProviderRequest'
+	UsageAuthenticatedRequest		= 1000						# Can be overwritten by subclasses.
+	UsageAuthenticatedDuration		= 300						# Can be overwritten by subclasses.
+	UsageUnauthenticatedRequest		= 1000						# Can be overwritten by subclasses.
+	UsageUnauthenticatedDuration	= 300						# Can be overwritten by subclasses.
+	UsageCacheTimeout				= 30						# How long to cache usage data by default.
+	UsageCacheData					= {}
+
+	# ERROR
+	ErrorProperty					= 'GaiaProviderError'
+	ErrorDuration					= 180						# Can be overwritten by subclasses.
+	ErrorCacheTimeout				= 30						# How long to cache error data by default.
+	ErrorCacheData					= {}
+
+	# WAIT
+	WaitProperty					= 'GaiaProviderWait'
+	WaitCacheTimeout				= 30						# How long to cache error data by default.
+	WaitCacheData					= {}
+
 	# REGION
 	Language						= Language.CodeEnglish		# Default language.
 	Country							= Country.CodeUnitedStates	# Default country.
@@ -76,18 +96,12 @@ class MetaProvider(object):
 	# CACHE
 	Cache							= Cache.TimeoutExtended		# Default cache timeout.
 
-	# USAGE
-	UsageProperty					= 'GaiaRequests'
-	UsageAuthenticatedRequest		= 1000						# Can be overwritten by subclasses.
-	UsageAuthenticatedDuration		= 300						# Can be overwritten by subclasses.
-	UsageUnauthenticatedRequest		= 1000						# Can be overwritten by subclasses.
-	UsageUnauthenticatedDuration	= 300						# Can be overwritten by subclasses.
-
 	# OTHER
 	Id								= None
 	Name							= None
 	Lock							= Lock()
 	Instance						= {}
+	Providers						= None
 
 	##############################################################################
 	# CONSTRUCTOR
@@ -117,6 +131,8 @@ class MetaProvider(object):
 	@classmethod
 	def reset(self, settings = True):
 		MetaProvider.Instance = {} # Clear instances, accounts, and class member variables in subclasses.
+		MetaProvider.UsageCacheData = {}
+		MetaProvider.ErrorCacheData = {}
 
 	##############################################################################
 	# ID
@@ -207,23 +223,113 @@ class MetaProvider(object):
 		except: Logger.error()
 
 	##############################################################################
-	# USAGE
+	# PROVIDER CACHE
 	##############################################################################
 
 	@classmethod
-	def usageGlobal(self, authenticated = False, full = False):
-		from lib.meta.providers.trakt import MetaTrakt
-		from lib.meta.providers.imdb import MetaImdb
-		from lib.meta.providers.tmdb import MetaTmdb
-		providers = [MetaTrakt, MetaImdb, MetaTmdb]
-		usage = {i.id() : i.instance().usage(authenticated = authenticated) for i in providers}
-		maximum = max(usage.values())
-		if full:
-			usage['global'] = maximum
-			return usage
-		return maximum
+	def _provider(self, provider = None, list = False):
+		if provider is None or provider is True:
+			provider = self._providers()
+		elif provider:
+			if Tools.isString(provider):
+				id = provider
+				provider = None
+				for i in self._providers():
+					if i.id() == id:
+						provider = i
+						break
+			elif Tools.isArray(provider) and Tools.isString(provider[0]):
+				id = provider
+				provider = []
+				for i in self._providers():
+					if i.id() in id:
+						provider.append(i)
 
-	def usage(self, authenticated = False, count = False):
+		# NB: Do not create instances of the providers.
+		# Creating an instance will load the provider account data from settings, which can take some time.
+		# An instance is not needed, since all functions can be done directly on the class.
+		# Important from MetaCache._timeRedo() which is called often, and sometimes does not require the instantiation of the provider during the entire execution.
+		#if provider:
+		#	if Tools.isArray(provider): provider = [i.instance() for i in provider]
+		#	elif list: provider = [provider.instance()]
+		#	else: provider = provider.instance()
+		if provider and list and not Tools.isArray(provider): provider = [provider]
+
+		return provider
+
+	@classmethod
+	def _providers(self):
+		if MetaProvider.Providers is None:
+			from lib.meta.providers.trakt import MetaTrakt
+			from lib.meta.providers.tmdb import MetaTmdb
+			from lib.meta.providers.tvdb import MetaTvdb
+			from lib.meta.providers.imdb import MetaImdb
+			from lib.meta.providers.fanart import MetaFanart
+			MetaProvider.Providers = (MetaTrakt, MetaTmdb, MetaTvdb, MetaImdb, MetaFanart)
+		return MetaProvider.Providers
+
+	@classmethod
+	def _providerCache(self, cache, id, timeout = None):
+		if Tools.isList(id): id = tuple(id)
+		result = cache.get(id)
+		if result:
+			if timeout and Time.timestamp() - result['time'] > timeout: return None
+			return result['data']
+		return None
+
+	@classmethod
+	def _providerCacheUpdate(self, cache, id, data):
+		if Tools.isList(id): id = tuple(id)
+		cache[id] = {'time' : Time.timestamp(), 'data' : data}
+
+	@classmethod
+	def _providerId(self, property, *args):
+		id = [property, self.id()]
+		if args: id.extend([str(i) for i in args])
+		return '_'.join(id)
+
+	@classmethod
+	def _providerUpdate(self, id, duration, time = None, maximum = None):
+		data = self._providerClean(data = Memory.get(id = id, local = True, kodi = True), duration = duration)
+		data.append(time or Time.timestamp())
+		if maximum: data = [max(data)]
+		Memory.set(id = id, value = data, local = True, kodi = True)
+
+	@classmethod
+	def _providerClean(self, data, duration):
+		if data:
+			threshold = Time.timestamp() - duration - 1
+			return [i for i in data if i > threshold]
+		return []
+
+	##############################################################################
+	# USAGE
+	##############################################################################
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def usageGlobal(self, authenticated = False, full = False, provider = None, cache = False):
+		id = provider
+		if cache:
+			result = self._usageCache(id = id, timeout = cache)
+			if result: return result if full else result.get('global')
+
+		provider = self._provider(provider = provider, list = True)
+		usage = {i.id() : i.usage(authenticated = authenticated) for i in provider}
+		usage['global'] = maximum = max(usage.values())
+
+		if cache: self._usageCacheUpdate(id = id, data = usage)
+		return usage if full else maximum
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def usage(self, authenticated = False, count = False, cache = False):
+		id = None
+		if cache:
+			id = (self.id(), authenticated, count)
+			result = self._usageCache(id = id, timeout = cache)
+			if not result is None: return result
+
 		requests = []
 		total = 0.0
 
@@ -235,24 +341,170 @@ class MetaProvider(object):
 			requests.extend(self._usageClean(Memory.get(id = self._usageId(authenticated = False), local = True, kodi = True)))
 			total += self.UsageUnauthenticatedRequest
 
-		if count: return len(requests)
-		elif total: return len(requests) / total
-		else: return 0.0
+		if count: result = len(requests)
+		elif total: result = len(requests) / total
+		else: result = 0.0
 
+		if cache: self._usageCacheUpdate(id = id, data = result)
+
+		return result
+
+	@classmethod
+	def _usageCache(self, id, timeout = None):
+		return self._providerCache(cache = MetaProvider.UsageCacheData, id = id, timeout = MetaProvider.UsageCacheTimeout if timeout is True else timeout)
+
+	@classmethod
+	def _usageCacheUpdate(self, id, data):
+		return self._providerCacheUpdate(cache = MetaProvider.UsageCacheData, id = id, data = data)
+
+	@classmethod
 	def _usageId(self, authenticated = False):
-		return '%s_%s_%s' % (self.UsageProperty, self.id(), str(authenticated))
+		return self._providerId(self.UsageProperty, authenticated)
 
+	@classmethod
+	def _usageDuration(self, authenticated = False):
+		return self.UsageAuthenticatedDuration if authenticated else self.UsageUnauthenticatedDuration
+
+	@classmethod
 	def _usageUpdate(self, authenticated = False):
-		id = self._usageId(authenticated = authenticated)
-		requests = self._usageClean(Memory.get(id = id, local = True, kodi = True))
-		requests.append(Time.timestamp())
-		Memory.set(id = id, value = requests, local = True, kodi = True)
+		return self._providerUpdate(id = self._usageId(authenticated = authenticated), duration = self._usageDuration(authenticated = authenticated))
 
-	def _usageClean(self, requests, authenticated = False):
-		if requests:
-			threshold = Time.timestamp() - (self.UsageAuthenticatedDuration if authenticated else self.UsageUnauthenticatedDuration) - 1
-			return [i for i in requests if i > threshold]
-		return []
+	@classmethod
+	def _usageClean(self, data, authenticated = False):
+		return self._providerClean(data = data, duration = self._usageDuration(authenticated = authenticated))
+
+	##############################################################################
+	# ERROR
+	##############################################################################
+
+	# This keeps track of temporary provider errors that will hopefully be resolved in the near future.
+	# These errors include:
+	#	1. API rate limit reached.
+	#	2. Temporary server errors.
+	#	3. Server timeouts.
+	#	4. Other server connection issues.
+	# This can be used to redo certain things if the provider server is temporarily inaccessible.
+	# Eg: refreshing incomplete metadata from MetaCache.
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def errorGlobal(self, full = False, provider = None, cache = False):
+		id = provider
+		if cache:
+			result = self._errorCache(id = id, timeout = cache)
+			if result: return result if full else result.get('global')
+
+		provider = self._provider(provider = provider, list = True)
+		error = {i.id() : i.error() for i in provider}
+		error['global'] = maximum = max(error.values())
+
+		if cache: self._errorCacheUpdate(id = id, data = error)
+		return error if full else maximum
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def error(self, cache = False):
+		id = None
+		if cache:
+			id = self.id()
+			result = self._errorCache(id = id, timeout = cache)
+			if not result is None: return result
+
+		error = self._errorClean(Memory.get(id = self._errorId(), local = True, kodi = True))
+		if error: result = len(error)
+		else: result = 0
+
+		if cache: self._errorCacheUpdate(id = id, data = result)
+
+		return result
+
+	@classmethod
+	def _errorCache(self, id, timeout = None):
+		return self._providerCache(cache = MetaProvider.ErrorCacheData, id = id, timeout = MetaProvider.ErrorCacheTimeout if timeout is True else timeout)
+
+	@classmethod
+	def _errorCacheUpdate(self, id, data):
+		return self._providerCacheUpdate(cache = MetaProvider.ErrorCacheData, id = id, data = data)
+
+	@classmethod
+	def _errorId(self):
+		return self._providerId(self.ErrorProperty)
+
+	@classmethod
+	def _errorDuration(self):
+		return self.ErrorDuration
+
+	@classmethod
+	def _errorUpdate(self):
+		return self._providerUpdate(id = self._errorId(), duration = self._errorDuration())
+
+	@classmethod
+	def _errorClean(self, data):
+		return self._providerClean(data = data, duration = self._errorDuration())
+
+	##############################################################################
+	# WAIT
+	##############################################################################
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def waitGlobal(self, full = False, provider = None, cache = False):
+		id = provider
+		if cache:
+			result = self._waitCache(id = id, timeout = cache)
+			if result: return result if full else result.get('global')
+
+		provider = self._provider(provider = provider, list = True)
+		wait = {i.id() : i.wait() for i in provider}
+
+		try: maximum = max([i for i in wait.values() if not i is None])
+		except: maximum = None
+		wait['global'] = maximum
+
+		if cache: self._waitCacheUpdate(id = id, data = wait)
+		return wait if full else maximum
+
+	# cache=True: only cached in local memory for current process execution.
+	@classmethod
+	def wait(self, cache = False):
+		id = None
+		if cache:
+			id = self.id()
+			result = self._waitCache(id = id, timeout = cache)
+			if not result is None: return result
+
+		wait = self._waitClean(Memory.get(id = self._waitId(), local = True, kodi = True))
+		result = wait[-1] if wait else None
+
+		if cache: self._waitCacheUpdate(id = id, data = result)
+
+		return result
+
+	@classmethod
+	def _waitCache(self, id, timeout = None):
+		return self._providerCache(cache = MetaProvider.WaitCacheData, id = id, timeout = MetaProvider.WaitCacheTimeout if timeout is True else timeout)
+
+	@classmethod
+	def _waitCacheUpdate(self, id, data):
+		return self._providerCacheUpdate(cache = MetaProvider.WaitCacheData, id = id, data = data)
+
+	@classmethod
+	def _waitId(self):
+		return self._providerId(self.WaitProperty)
+
+	@classmethod
+	def _waitDuration(self):
+		# The wait duration is a timestamp in the future.
+		# Remove the momement the timestamp is in the past.
+		return 1
+
+	@classmethod
+	def _waitUpdate(self, time):
+		return self._providerUpdate(id = self._waitId(), duration = self._waitDuration(), time = time, maximum = True)
+
+	@classmethod
+	def _waitClean(self, data):
+		return self._providerClean(data = data, duration = self._waitDuration())
 
 	##############################################################################
 	# CONVERT
@@ -317,6 +569,15 @@ class MetaProvider(object):
 		return self._convert(values = self.Status, value = status, inverse = inverse, default = default)
 
 	@classmethod
+	def _convertType(self, type, inverse = False, default = None, list = False):
+		type = self._convert(values = self.Types, value = type, inverse = inverse, default = default)
+		if list:
+			if not type is None and not Tools.isList(type): type = Tools.list(type) # Do not use isArray(), since tuples are otherwise not converted to lists.
+		else:
+			if Tools.isArray(type): type = type[0] if type else None
+		return type
+
+	@classmethod
 	def _convertCertificate(self, certificate, inverse = False, default = None):
 		if not certificate: return certificate
 		elif Tools.isArray(certificate): return [self._convertCertificate(certificate = i, inverse = inverse, default = default) for i in certificate]
@@ -373,7 +634,8 @@ class MetaProvider(object):
 		if niche:
 			niche = Media.stringFrom(niche)
 			if Media.isEnterprise(niche):
-				for i in MetaTools.company().keys():
+				from lib.meta.company import MetaCompany
+				for i in MetaCompany.company().keys():
 					if Media.isMedia(media = niche, type = i):
 						_add(name = i, type = Media.type(media = niche, type = Media.Enterprise))
 
@@ -438,7 +700,7 @@ class MetaProvider(object):
 		Logger.log(data, data1, data2, data3, type = type)
 
 	@classmethod
-	def _error(self):
+	def _logError(self):
 		Logger.error(self.id().upper())
 
 	##############################################################################
@@ -518,7 +780,7 @@ class MetaProvider(object):
 			if key:
 				# Clean if nested objects are empty.
 				if clean:
-					key = Tools.copy(key)# Copy the key, since since values are deleted from it, and the key is reused if this function is called with mutiple items.
+					key = Tools.copy(key)# Copy the key, since since values are deleted from it, and the key is reused if this function is called with multiple items.
 					while key:
 						value = item
 						for i in key[:-1]:
@@ -592,7 +854,7 @@ class MetaProvider(object):
 	##############################################################################
 
 	@classmethod
-	def _voting(self, media, niche, release = None, year = None, date = None, genre = None, language = None, country = None, certificate = None, company = None, status = None, rating = None, votes = None, sort = None, active = None):
+	def _voting(self, media, niche, release = None, year = None, date = None, past = None, genre = None, language = None, country = None, certificate = None, company = None, status = None, rating = None, votes = None, sort = None, active = None):
 		exceptionAll = None
 		exceptionDate = None
 		exceptionVote = None
@@ -615,7 +877,9 @@ class MetaProvider(object):
 		try: dateDifference = abs(Time.timestamp() - (dateEnd or dateStart))
 		except: dateDifference = None
 
-		if date and not isFuture:
+		# Exclude if the original call only had a year, but no date.
+		# Since the date can be calculated from the year and incorrectly be detected as a future release.
+		if date and not isFuture and not past:
 			future = Time.timestamp(fixedTime = Time.future(days = 1, format = Time.FormatDate), format = Time.FormatDate)
 			isFuture = any(not i is None and i > future for i in (date if Tools.isArray(date) else [date]))
 

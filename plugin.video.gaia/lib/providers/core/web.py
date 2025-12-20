@@ -29,10 +29,15 @@ class ProviderWeb(ProviderBase):
 	# Term
 
 	TermTitle						= '{title}'				# Movie or show title
+	TermTitleRaw					= '{title_raw}'			# Movie or show title unprocessed with symbols
 	TermTitleMovie					= '{title_movie}'		# Movie title
+	TermTitleMovieRaw				= '{title_movie_raw}'	# Movie title unprocessed with symbols
 	TermTitleCollection				= '{title_collection}'	# Movie collection title
+	TermTitleCollectionRaw			= '{title_collection_raw}'	# Movie collection title unprocessed with symbols
 	TermTitleShow					= '{title_show}'		# Show title
+	TermTitleShowRaw				= '{title_show_raw}'	# Show title unprocessed with symbols
 	TermTitleEpisode				= '{title_episode}'		# Episode title
+	TermTitleEpisodeRaw				= '{title_episode_raw}'	# Episode title unprocessed with symbols
 	TermYear						= '{year}'				# Year
 	TermSeason						= '{season}'			# Season number without leading 0s
 	TermSeasonZero					= '{season_zero}'		# Season number with leading 0s
@@ -96,6 +101,9 @@ class ProviderWeb(ProviderBase):
 	QueryModeFull					= 'full'	# Use all available keywords. Takes longer to scrape all the different queries.
 	QueryModeQuick					= 'quick'	# Only use a subset of keywords. Reduces scraping time. Only available for some queries and languages.
 
+	# Query - Niche
+	QueryNiche						= [Media.Anime, Media.Donghua]	# For which niches special queries should be generated.
+
 	# Queries
 	# Universal and English queries are always included.
 
@@ -119,8 +127,26 @@ class ProviderWeb(ProviderBase):
 											},
 										},
 
+										# Anime and Donghua.
+										# Anime sites often use "batch" to indicate packs.
+										# Anime sites often use use the absolute episode number without a season number or episode label.
+										Language.CodeUnknown : {
+											QueryTypeCollection : {
+												QueryModeFull : ['%s batch' % TermTitleCollection],
+												QueryModeQuick : ['%s batch' % TermTitleCollection],
+											},
+											QueryTypeShow : {
+												QueryModeFull : ['%s batch' % TermTitleShow],
+												QueryModeQuick : ['%s batch' % TermTitleShow],
+											},
+											QueryTypeEpisode : {
+												QueryModeFull : ['%s %s' % (TermTitleShow, TermEpisode)], #gaiaremove - make this absolute/sequential number.
+												QueryModeQuick : ['%s %s' % (TermTitleShow, TermEpisode)],
+											},
+										},
+
 										# English
-										Language.EnglishCode : {
+										Language.CodeEnglish : {
 											# Most English movie collections contain the keyword "collection", followed by "complete".
 											QueryTypeCollection : {
 												QueryModeFull : ['%s collection' % TermTitleCollection, '%s complete' % TermTitleCollection, '%s pack' % TermTitleCollection, '%s trilogy' % TermTitleCollection],
@@ -252,6 +278,7 @@ class ProviderWeb(ProviderBase):
 	FormatEncodeQuote				= 'quote'	# URL encoding with special symbols and spaces escaped with %XX.
 	FormatEncodePlus				= 'plus'	# URL encoding with special symbols escaped with %XX and spaces escaped with a plus sign.
 	FormatEncodeMinus				= 'minus'	# Same as FormatEncodePlus, but "+" is replaced with "-".
+	FormatEncodeDot					= 'dot'		# Spaces are replaced with ".".
 	FormatEncodeDefault				= FormatEncodePlus
 
 	# Format - Case
@@ -292,7 +319,7 @@ class ProviderWeb(ProviderBase):
 	# And Russian titles often have a bunch of other keywords early in the file name.
 	# Eg: Аватар / Avatar (Джеймс Кэмерон) [2009, фантастика, боевик, триллер, драма, приключения, BDRip 1080p]
 	# Eg: Аватар 3Д / Avatar 3D (Джеймс Кэмерон / James Cameron) [2009 г., фантастика, боевик, триллер, драма, приключения, BDrip 720p] OverUnder / Вертикальная стереопара
-	# UPDATE: This does not seem neccessary anymore with the new title validation code.
+	# UPDATE: This does not seem necessary anymore with the new title validation code.
 	# Using 0.7 is too low, causing many incorrect links for "Oppenheimer" to be accepted.
 	# Eg: Покончить со всеми войнами: Оппенгеймер и атомная бомба / To End All War: Oppenheimer & the Atomic Bomb (2023) WEB-DL [H.264/1080p] [EN / RU, EN, SPA Sub]
 	# Eg: Кунг-фу жеребец / Long ma jing shen (2023) WEB-DL 1080p от ELEKTRI4KA | D
@@ -302,8 +329,12 @@ class ProviderWeb(ProviderBase):
 	StreamAdjustRussian				= None
 
 	# Request - Error
-	RequestError					= {}
-	RequestCloudflare				= {}
+	RequestErrorLevel0				= None
+	RequestErrorLevel1				= 1
+	RequestErrorLevel2 				= 2
+	RequestErrorLevel3 				= 3
+	RequestErrorsProvider			= {}
+	RequestErrorsCloudflare			= {}
 
 	# Request - Count
 	RequestCountSemaphore			= {}
@@ -635,8 +666,8 @@ class ProviderWeb(ProviderBase):
 
 	@classmethod
 	def reset(self, settings = True):
-		ProviderWeb.RequestError = {}
-		ProviderWeb.RequestCloudflare = {}
+		ProviderWeb.RequestErrorsProvider = {}
+		ProviderWeb.RequestErrorsCloudflare = {}
 		ProviderWeb.RequestCountSemaphore = {}
 		ProviderWeb.RequestDelayLock = {}
 		ProviderWeb.RequestDelayCurrent = {}
@@ -651,14 +682,14 @@ class ProviderWeb(ProviderBase):
 	##############################################################################
 
 	def verifyScrapeStatus(self):
-		if self.id() in ProviderWeb.RequestCloudflare: return ProviderWeb.VerifyLimited, ProviderWeb.VerifyCloudflare
+		if self.id() in ProviderWeb.RequestErrorsCloudflare: return ProviderWeb.VerifyLimited, ProviderWeb.VerifyCloudflare
 		return None, None
 
 	##############################################################################
 	# REQUEST
 	##############################################################################
 
-	def request(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, retries = None, scrape = False):
+	def request(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, retries = None, scrape = False, details = False):
 		try:
 			if not self.timerCheck(): return None
 
@@ -668,7 +699,7 @@ class ProviderWeb(ProviderBase):
 			id = self.id()
 
 			# Previous request failed with a Cloudflare error.
-			if id in ProviderWeb.RequestError: return None
+			if id in ProviderWeb.RequestErrorsCloudflare: return None
 
 			networker = Networker()
 			set = False
@@ -692,12 +723,18 @@ class ProviderWeb(ProviderBase):
 			if certificate and ProviderBase.RequestCurve in certificate: curve = certificate[ProviderBase.RequestCurve]
 
 			retryCount = self.retryCount()
+			retryError = None
+			retryDelay = None
 			if retryCount:
 				retryDelay = self.retryDelay()
 				if not retryDelay: retryDelay = 0
 				retryError = self.retryError()
 				if retryError and not retryError is True: retryError = tuple(retryError)
 				retryExpression = self.retryExpression()
+
+			enabled = None
+			limit = None
+			counter = None
 
 			fixed = not link is None
 			if fixed:
@@ -731,8 +768,7 @@ class ProviderWeb(ProviderBase):
 			headersNew = None
 			cookiesNew = None
 			dataNew = None
-
-			error = False
+			error = None
 
 			while link:
 				timeout = self.timerRequest()
@@ -749,8 +785,8 @@ class ProviderWeb(ProviderBase):
 
 				domain = Networker.linkDomain(link = link, subdomain = False, topdomain = True, ip = True, scheme = False)
 
-				# Previous request failed with a timeout error.
-				if domain in ProviderWeb.RequestError: break
+				# Previous request failed with a Cloudflare, timeout, or other server error.
+				if domain in ProviderWeb.RequestErrorsProvider: break
 
 				replacementsNew = Tools.dictionaryMerge(replacements, {
 					self.replaceClean(ProviderWeb.TermLinkFull) : link,
@@ -761,9 +797,12 @@ class ProviderWeb(ProviderBase):
 				})
 
 				if headers:
-					headersNew = self.replace(data = Tools.copy(headers), replacements = replacementsNew)
+					# skip: remove skipped/invalid values.
+					# Eg: optional account authentication with SolidTorrents/BitSearch.
+					headersNew = self.replace(data = Tools.copy(headers), replacements = replacementsNew, skip = False)
 				if cookies:
-					cookiesNew = self.replace(data = Tools.copy(cookies), replacements = replacementsNew)
+					# skip: remove skipped/invalid values.
+					cookiesNew = self.replace(data = Tools.copy(cookies), replacements = replacementsNew, skip = False)
 				if data:
 					dataNew = self.replace(data = Tools.copy(data), replacements = replacementsNew, json = type == ProviderBase.RequestTypeJson)
 
@@ -782,21 +821,14 @@ class ProviderWeb(ProviderBase):
 				self.statisticsUpdateSearch(request = True)
 				networker.request(link = linkNew, method = method, type = type, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
-				# If there are Cloudflare errors, prevent all future requests to the domain, since they will most likley also fail with a Cloudflare error.
-				# Rather do this on a per-provider basis, instead of a per-domain basis, since mirror domains typically point to the same server.
-				# Specifically for: Detected a Cloudflare version 2 challenge, This feature is not available in the opensource (free) version.
-				# Queries with alias titles are execute concurrently and will not benefit from this.
-				if networker.responseErrorCloudflare():
-					ProviderWeb.RequestError[id] = True
-					ProviderWeb.RequestCloudflare[id] = True
-					error = True
-					break
-				# If there are timeout errors, add the domain, since other domains might not have the issue.
-				# Timeouts (eg: 45 seconds) can drastically increase scraping time, since some providers might take very long to finish.
-				elif networker.responseErrorTimeout():
-					ProviderWeb.RequestError[domain] = True
-					error = True
-					break
+				#gaiaremove
+				#self.log('______________________: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s] - Error [%s] = %s' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew), str(self.requestError(networker = networker, id = id, domain = domain)), str(networker.responseDataText())[:200]))#gaiaremove
+				#self.log('______________________: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s] - Error [%s] - details[%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew), str(self.requestError(networker = networker, id = id, domain = domain, details = details)), str(details)))#gaiaremove
+
+				# Break on Cloudflare errors to not continue with retries or mirror domains, since other mirror domains will probably go through the same Cloudflare process and return the same errors.
+				# Do not break on other errors and continue with the next mirror domain, since other mirror domains might not have the same errors.
+				error = self.requestError(networker = networker, id = id, domain = domain, details = details)
+				if error == ProviderWeb.RequestErrorLevel1: break
 
 				if retryCount:
 					retryIndex = 0
@@ -833,13 +865,13 @@ class ProviderWeb(ProviderBase):
 										retry = True
 										retryIndex = i
 										break
-									elif errorCode.startswith(retryError[i]):
+									elif not retryError is True and errorCode.startswith(retryError[i]):
 										retry = True
 										retryIndex = i
 										break
 							else:
 								if retryError is True and errorType: retry = True
-								elif errorCode.startswith(retryError): retry = True
+								elif not retryError is True and errorCode.startswith(retryError): retry = True
 
 						# Expressions
 						if not retry and retryExpression:
@@ -873,28 +905,34 @@ class ProviderWeb(ProviderBase):
 						#self.log('PROVIDER RETRY: Method [%s] - Link [%s] - Data [%s] - Headers [%s] - Cookies [%s]' % (str(method), str(linkNew), Converter.jsonTo(dataNew), Converter.jsonTo(headersNew), Converter.jsonTo(cookiesNew)), developer = True)
 						networker.request(link = linkNew, method = method, type = type, data = dataNew, headers = headersNew, cookies = cookiesNew, curve = curve, encode = False, charset = set, timeout = Networker.timeoutAdjust(timeout), concurrency = concurrency, debug = self.name())
 
-						if networker.responseErrorCloudflare():
-							ProviderWeb.RequestError[id] = True
-							error = True
-							break
-						elif networker.responseErrorTimeout():
-							ProviderWeb.RequestError[domain] = True
-							error = True
-							break
+						# Break on Cloudflare errors.
+						# This only breaks the inner retry loop, not the outer loop.
+						# Also break on timeout and connection errors, since if the error is returned on a retry, another retry will probably not help and only prolong the scraping (especially for timeout requests).
+						# Do not break on HTTP 5xx errors, since those might be part of the "retryError" codes.
+						error = self.requestError(networker = networker, id = id, domain = domain, details = details)
+						if error == ProviderWeb.RequestErrorLevel1 or (error == ProviderWeb.RequestErrorLevel2 and not retryError is True): break
 
-				if fixed or error or networker is None:
+				# Only break for Cloudflare errors, but not any of the other errors, since they should continue with the mirror domains.
+				# This Cloudflare error is caused by the nested retry loop.
+				if fixed or error == ProviderWeb.RequestErrorLevel1 or networker is None:
 					break
 				else:
 					result, _ = self.linkVerifyConnection(networker, special = not scrape)
 					if result:
 						self.linkPreviousSet(link)
 						break
-					elif not enabled or counter > limit or not self.timerAllow() or self.stopped():
+					elif not enabled or (not limit is None and counter > limit) or not self.timerAllow() or self.stopped():
 						break
-
-				# Do not continue with mirror domains if the error was caused by servers rejecting too many simultaneous connections.
-				# Because too many connections means the domain is working and we do not want to waste time iterating over mirrors.
-				if networker and networker.responseErrorConnections(): break
+					elif details:
+						# If requesting details subpages, some pages can fail sporadically.
+						# Either because a single subpage is corrupt or inaccessible, or because too many requests are submitted in a short time, so that the server starts dropping some connections.
+						# In such a case, do not continue and retry with a mirror domain.
+						# Just ignore this single link/subpage and try to get the other links/subpages.
+						break
+					elif networker and networker.responseErrorConnections():
+						# Do not continue with mirror domains if the error was caused by servers rejecting too many simultaneous connections.
+						# Because too many connections means the domain is working and we do not want to waste time iterating over mirrors.
+						break
 
 				if requestDelay: Time.sleep(requestDelay)
 
@@ -914,18 +952,17 @@ class ProviderWeb(ProviderBase):
 			self.logError()
 			return None
 
-	def requestText(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
+	def requestText(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False, details = False):
 		# Use bytes and not text, since there are special characters (like the yellow star) in file names. Returning responseDataText() converts these characters to some other weird characters.
 		# Do not work with bytes, because providers do string processing on the var (eg: TorrentProject -> processRequest()).
 		# Instead, get the bytes and manual convert to unicode. The special icon characters are in any case removed in streams.py.
-		#try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape).responseDataBytes()
+		#try: return self.request(link = link, path = path, subdomain = subdomain, method = method, data = data, headers = headers, cookies = cookies, scrape = scrape, details = details).responseDataBytes()
 		#except: return None
-
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataText()
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape, details = details).responseDataText()
 		except: return None
 
-	def requestJson(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False):
-		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape).responseDataJson()
+	def requestJson(self, link = None, path = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, certificate = None, scrape = False, details = False):
+		try: return self.request(link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies, certificate = certificate, scrape = scrape, details = details).responseDataJson()
 		except: return None
 
 	def requestExtract(self, data = None, request = None, extract = None, fixed = None):
@@ -951,7 +988,7 @@ class ProviderWeb(ProviderBase):
 							if not result: break
 						if result: break
 				if result: result = ''.join(result)
-				return result
+				return None # Do not return an empty array. When using X-Request-Token (BitLord).
 
 			if data:
 				if not request:
@@ -975,7 +1012,7 @@ class ProviderWeb(ProviderBase):
 			if Tools.isDictionary(request): networker = self.request(**request)
 			else: networker = self.request(link = request)
 			result['networker'] = networker
-			bytes = networker.responseDataText()
+			bytes = networker.responseDataText() if networker else None
 
 			try: data = extract[ProviderBase.RequestData]
 			except: data = None
@@ -997,7 +1034,7 @@ class ProviderWeb(ProviderBase):
 									value = Regex.extract(data = values, expression = value)
 								if not value is None: result[ProviderBase.RequestData][key] = value
 				else:
-					values = networker.responseDataJson()
+					values = networker.responseDataJson() if networker else None
 					if values:
 						data = _requestExtractClean(data)
 						for key, value in data.items():
@@ -1011,7 +1048,7 @@ class ProviderWeb(ProviderBase):
 				except: data = None
 				if data:
 					if Tools.isString(data): data = {data : data}
-					values = networker.response()[type]
+					values = networker.response()[type] if networker else None
 
 					# The User-Agent is only in the request and not in the response headers.
 					# Add it here, since some providers need it.
@@ -1057,6 +1094,59 @@ class ProviderWeb(ProviderBase):
 		if self.requestDelay():
 			ProviderWeb.RequestDelayCurrent[id] = 0
 			if not id in ProviderWeb.RequestDelayLock: ProviderWeb.RequestDelayLock[id] = Lock()
+
+	def requestError(self, networker, id, domain, details = False):
+		error = ProviderWeb.RequestErrorLevel0
+
+		# NB: details
+		# Do not set the entire domain as failed if we are requesting the details subpages.
+		# Some subpages might timeout, especially if we make tons of requests for subpages.
+		# Just because one subpage timed out, does not mean we should stop all other mainpage or subpage requests.
+		# Eg: TorLock starts having timeouts after 20+ subpages have been requested.
+		# These are mostly timeout errors, but every now and then there are also certificate and some other connection errors.
+
+		# If there are Cloudflare errors, prevent all future requests to the domain, since they will most likley also fail with a Cloudflare error.
+		# Rather do this on a per-provider basis, instead of a per-domain basis, since mirror domains typically point to the same server.
+		# Specifically for: Detected a Cloudflare version 2 challenge, This feature is not available in the opensource (free) version.
+		# Queries with alias titles are execute concurrently and will not benefit from this.
+		if networker.responseErrorCloudflare():
+			ProviderWeb.RequestErrorsProvider[domain] = True
+			ProviderWeb.RequestErrorsCloudflare[id] = True
+			error = ProviderWeb.RequestErrorLevel1
+
+		# If there are timeout errors, add the domain, since other domains might not have the issue.
+		# Timeouts (eg: 45 seconds) can drastically increase scraping time, since some providers might take very long to finish.
+		elif networker.responseErrorTimeout():
+			if not details: ProviderWeb.RequestErrorsProvider[domain] = True
+			error = ProviderWeb.RequestErrorLevel2
+
+		# Other connection, network, and certificate errors.
+		# Eg: Network Error [Error Type: Connection | Debug: Torrentify | Link: https://torrentify.buzz/...]: Failed to resolve 'torrentify.buzz' ([Errno -2] Name or service not known)"
+		# Eg: Network Error [Error Type: Connection | Debug: FileListing | Link: https://filelisting.com/...]: Connection aborted
+		# Eg: Network Error [Error Type: Certificate | Debug: BitCQ | Link: https://bitcq.com/...]: EOF occurred in violation of protocol (_ssl.c:1006)
+		elif networker.responseErrorNetwork():
+			if not details: ProviderWeb.RequestErrorsProvider[domain] = True
+			error = ProviderWeb.RequestErrorLevel2
+
+		# Other server errors which probably applies to alkl requests for that domain.
+		# Eg: 500 - Internal Server Error
+		# Eg: 503 - Service Unavailable
+		# Exclude 503 errors, since they are generally a temporary issue.
+		# Eg: LimeTorrents sometimes return a 503 error, but subsequent requests often work again, maybe because too many parallel requests were imitated at once?
+		elif networker.responseError5xx(exclude = 503):
+			ProviderWeb.RequestErrorsProvider[domain] = True
+			error = ProviderWeb.RequestErrorLevel3 # Might be temporary issues.
+
+		# Successful requests.
+		# In case a request retry suddenly works, reset the errors for the provider and domain.
+		elif networker.responseSuccess():
+			try: del ProviderWeb.RequestErrorsProvider[domain]
+			except: pass
+			try: del ProviderWeb.RequestErrorsCloudflare[id]
+			except: pass
+			error = ProviderWeb.RequestErrorLevel0
+
+		return error
 
 	##############################################################################
 	# CERTIFICATE
@@ -1104,7 +1194,7 @@ class ProviderWeb(ProviderBase):
 		except: self.logError()
 		return result
 
-	def replace(self, data, replacements, nested = False, json = False):
+	def replace(self, data, replacements, nested = False, json = False, skip = None):
 		if data:
 			if not json:
 				for key, value in replacements.items():
@@ -1141,6 +1231,10 @@ class ProviderWeb(ProviderBase):
 								else: value = str(value).format(**replacements)
 							result[str(key).format(**replacements)] = value
 						except: result[key] = ProviderBase.Skip
+
+				# Remove skipped/invalid entries.
+				if skip is False: result = {key : value for key, value in result.items() if not key == ProviderBase.Skip and not value == ProviderBase.Skip}
+
 				data = result
 			elif Tools.isArray(data): # If the GET path is an array (eg: Lapumia provider).
 				for i in range(len(data)):
@@ -1219,7 +1313,8 @@ class ProviderWeb(ProviderBase):
 		if self.linkHas():
 			retries = [0]
 			networker = self.request(retries = retries)
-			type = networker.responseErrorType()
+			try: type = networker.responseErrorType()
+			except: type = Networker.ErrorUnknown
 			if type == Networker.ErrorConnection: return ProviderBase.VerifyFailure, type
 			elif type and networker.responseError4xx() and not type == Networker.ErrorCloudflare: return ProviderBase.VerifySuccess, None # Ignore HTTP 4xx errors (eg 403 with TorrentApi). Server is up, just misformed request. Still detect Cloudflare 4xx errors.
 			elif retries[0] > 0 or type: return ProviderBase.VerifyLimited, type # Ignore HTTP 4xx errors (eg 403 with TorrentApi).
@@ -1248,25 +1343,25 @@ class ProviderWeb(ProviderBase):
 	def querySpecial(self):
 		return self.mData['query']['special']['data']
 
-	def queryInitialize(self, language = None):
+	def queryInitialize(self, niche = None, language = None):
 		try:
 			if not self.mData['query']['movie']['data']:
 				self.lock() # Lock, since this function can be called multiple times for each subquery.
 				if not self.mData['query']['movie']['data']:
 					data = self.mData['query']
-					self.mData['query']['movie']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeMovieYear if data['movie']['template']['year'] else ProviderWeb.QueryTypeMovie, default = data['movie']['template']['custom'], extra = data['movie']['template']['extra'], language = language)
-					self.mData['query']['collection']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeCollection, default = data['collection']['template']['custom'], extra = data['collection']['template']['extra'], language = language)
-					self.mData['query']['show']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeShow, default = data['show']['template']['custom'], extra = data['show']['template']['extra'], language = language)
-					self.mData['query']['season']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSeason, default = data['season']['template']['custom'], extra = data['season']['template']['extra'], language = language)
-					self.mData['query']['episode']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeEpisode, default = data['episode']['template']['custom'], extra = data['episode']['template']['extra'], language = language)
-					self.mData['query']['special']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSpecial, default = data['special']['template']['custom'], extra = data['special']['template']['extra'], language = language)
+					self.mData['query']['movie']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeMovieYear if data['movie']['template']['year'] else ProviderWeb.QueryTypeMovie, default = data['movie']['template']['custom'], extra = data['movie']['template']['extra'], niche = niche, language = language)
+					self.mData['query']['collection']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeCollection, default = data['collection']['template']['custom'], extra = data['collection']['template']['extra'], niche = niche, language = language)
+					self.mData['query']['show']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeShow, default = data['show']['template']['custom'], extra = data['show']['template']['extra'], niche = niche, language = language)
+					self.mData['query']['season']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSeason, default = data['season']['template']['custom'], extra = data['season']['template']['extra'], niche = niche, language = language)
+					self.mData['query']['episode']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeEpisode, default = data['episode']['template']['custom'], extra = data['episode']['template']['extra'], niche = niche, language = language)
+					self.mData['query']['special']['data'] = self._queryInitialize(type = ProviderWeb.QueryTypeSpecial, default = data['special']['template']['custom'], extra = data['special']['template']['extra'], niche = niche, language = language)
 				self.unlock()
 		except: self.logError()
 
-	def _queryInitialize(self, type, default, extra = None, language = None):
+	def _queryInitialize(self, type, default, extra = None, niche = None, language = None):
 		result = []
 
-		def _add(language = None, mode = None, universal = False, original = False, queries = None):
+		def _add(niche = None, language = None, mode = None, universal = None, original = False, queries = None):
 			if queries is None:
 				try: queries = ProviderWeb.Queries[language][type][mode]
 				except:
@@ -1278,12 +1373,17 @@ class ProviderWeb(ProviderBase):
 				if not Tools.isArray(queries): queries = [queries]
 
 			if queries:
+				if language == Language.CodeUnknown: language = Language.UniversalCode
 				for query in queries:
-					result.append({'template' : query, 'language' : language, 'mode' : mode, 'universal' : universal, 'original' : original})
+					result.append({'template' : query, 'language' : language, 'mode' : mode, 'universal' : universal, 'original' : original, 'niche' : niche})
 
 		if default is None:
 			# Always include Universal queries.
 			_add(language = Language.UniversalCode, mode = ProviderWeb.QueryModeFull, universal = True)
+
+			# Add special queries for Anime/Donghua.
+			for i in ProviderWeb.QueryNiche:
+				if Media.isMedia(niche, type = i): _add(niche = i, language = Language.CodeUnknown, mode = ProviderWeb.QueryModeFull, universal = True)
 
 			if self.settingsGlobalKeywordEnabled():
 				settingsEnglish = self.settingsGlobalKeywordEnglish()
@@ -1324,8 +1424,10 @@ class ProviderWeb(ProviderBase):
 		queries = []
 		queryTitles = []
 		try:
-			self.queryInitialize(language = language)
+			self.queryInitialize(niche = niche, language = language)
 
+			try: mainRaw = titles['main']
+			except: mainRaw = None
 			try: mainProcessed = titles['processed']['main']
 			except: mainProcessed = []
 			try: originalProcessed = titles['processed']['original']
@@ -1340,7 +1442,7 @@ class ProviderWeb(ProviderBase):
 						yearDefault = years[i]
 						break
 
-			def _queryGenerate(search = None, query = None, format = None, title = None, year = None, pack = None, priority = None, universal = None, original = None, indexTitle = 0, indexQuery = 0):
+			def _queryGenerate(search = None, query = None, format = None, title = None, year = None, pack = None, priority = None, universal = None, original = None, rawed = None, indexTitle = 0, indexQuery = 0):
 				try:
 					'''
 						We try to push the queries that are likley to return better results before those who are less likley to return good results.
@@ -1476,6 +1578,7 @@ class ProviderWeb(ProviderBase):
 						if search is None: search = self.replace(data = query['template'], replacements = format)
 						if universal is None: universal = query['universal']
 						if original is None: original = query['original']
+						if rawed is None: rawed = query['template'] and '_raw' in query['template']
 
 					originalIs = False
 					originalRank = 0
@@ -1500,7 +1603,7 @@ class ProviderWeb(ProviderBase):
 					# Only add original keywords to original titles/queries.
 					# Also do not add English keywords to non-English titles/queries.
 					# Eg: Do not add French keywords to the English titles. Only add French keywords to French titles.
-					# NB: Check orignalSame, since we do not want to do this if the original title is the sasme as the other alias titles. Eg: the sshow "Dark".
+					# NB: Check orignalSame, since we do not want to do this if the original title is the same as the other alias titles. Eg: the show "Dark".
 					if universal is False and not orignalSame:
 						if original is True and not originalIs: return
 						elif original is False and originalIs: return
@@ -1556,10 +1659,12 @@ class ProviderWeb(ProviderBase):
 
 						'search' : search,
 						'raw' : search,
+						'rawed' : rawed,
 						'pack' : bool(pack),
 						'special' : bool((not numberSeason is None) and numberSeason == 0 and numberEpisode),
 						'universal' : universal,
 						'original' : original,
+
 						'year' : None if pack else year if year else yearDefault,
 						'time' : None if pack else time,
 						'id' : {
@@ -1577,28 +1682,31 @@ class ProviderWeb(ProviderBase):
 					})
 				except: self.logError()
 
-			def _queryEncode(value, caseLower, caseUpper, set, encodeQuote, encodePlus, encodeMinus, includeBasic, includeEncode, includeHas, formatTitles, formatExpression1, formatExpression2):
+			def _queryEncode(value, raw, caseLower, caseUpper, set, encodeQuote, encodePlus, encodeMinus, encodeDot, includeBasic, includeEncode, includeHas, formatTitles, formatExpression1, formatExpression2):
 				if not value: return None
-				value = self._queryClean(value)
 
-				# If FormatIncludeBasic or FormatIncludeEncode, unicode characters are removed from the string.
-				# Do not use the query if the title contains only unicode characters, which will lead to the query only having the year or season/episode numbers and the title will be removed.
-				if includeHas:
-					valueLower = value.lower()
-					for title in formatTitles:
-						if title in valueLower:
-							title = Regex.remove(data = title, expression = formatExpression1, all = True)
-							if not title: return None
+				if not raw:
+					value = self._queryClean(value)
 
-				if caseLower: value = value.lower()
-				elif caseUpper: value = value.upper()
+					# If FormatIncludeBasic or FormatIncludeEncode, unicode characters are removed from the string.
+					# Do not use the query if the title contains only unicode characters, which will lead to the query only having the year or season/episode numbers and the title will be removed.
+					if includeHas:
+						valueLower = value.lower()
+						for title in formatTitles:
+							if title in valueLower:
+								title = Regex.remove(data = title, expression = formatExpression1, all = True)
+								if not title: return None
 
-				# Must be before the encoding, otherwise the unicode characters are replaced with % url.
-				if includeHas: value = Regex.remove(data = value, expression = formatExpression2, all = True)
+					if caseLower: value = value.lower()
+					elif caseUpper: value = value.upper()
 
-				if encodeQuote or encodePlus or encodeMinus:
-					value = Networker.linkQuote(data = value, plus = (encodePlus or encodeMinus))
+					# Must be before the encoding, otherwise the unicode characters are replaced with % url.
+					if includeHas: value = Regex.remove(data = value, expression = formatExpression2, all = True)
+
+				if encodeQuote or encodePlus or encodeMinus or encodeDot:
+					value = Networker.linkQuote(data = value, plus = (encodePlus or encodeMinus or encodeDot))
 					if encodeMinus: value = value.replace('+', '-')
+					elif encodeDot: value = value.replace('+', '.')
 
 				return value
 
@@ -1651,6 +1759,8 @@ class ProviderWeb(ProviderBase):
 					if Media.isSerie(media):
 						if self.supportShow() and (self.supportSpecial() or not(numberSeason is None and numberEpisode is None)):
 							format = {
+								'title_raw' : mainRaw,
+								'title_show_raw' : mainRaw,
 								'year' : yearDefault,
 								'season' : numberSeason,
 								'season_zero' : None if numberSeason is None else ('%02d' % numberSeason),
@@ -1659,6 +1769,22 @@ class ProviderWeb(ProviderBase):
 							}
 							try: format['title_episode'] = titles['search']['episode'][0]
 							except: format['title_episode'] = None
+							try: format['title_episode_raw'] = titles['episode']
+							except: format['title_episode_raw'] = None
+
+							# Movie Anime/Donghua queries to the front.
+							# Anime/Donghua sites most use absolute numbers or the "batch" keyword.
+							niched = None
+							for i in ProviderWeb.QueryNiche:
+								if Media.isMedia(niche, type = i):
+									niched = i
+									break
+							if niched:
+								priorityEpisode = [0, 2999, 1000]
+								priorityPack = [1, 2999, 1000]
+							else:
+								priorityEpisode = None
+								priorityPack = None
 
 							# Episode Queries.
 							for i in range(len(titlesSearch)):
@@ -1668,7 +1794,7 @@ class ProviderWeb(ProviderBase):
 									format['title_show'] = title
 									queryEpisode = self.queryEpisode()
 									for j in range(len(queryEpisode)):
-										try: _queryGenerate(priority = [0, 3000, 1001], query = queryEpisode[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
+										try: _queryGenerate(priority = priorityEpisode if (priorityEpisode and queryEpisode[j]['niche'] in ProviderWeb.QueryNiche) else [2, 3000, 1001], query = queryEpisode[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'raw' : format['title_raw'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 										except: pass
 								except: pass
 
@@ -1682,7 +1808,7 @@ class ProviderWeb(ProviderBase):
 										format['title_episode'] = title
 										querySpecial = self.querySpecial()
 										for j in range(len(querySpecial)):
-											try: _queryGenerate(priority = [1000, 6000, 1002], query = querySpecial[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
+											try: _queryGenerate(priority = [1000, 6000, 1002], query = querySpecial[j], format = format, title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'raw' : format['title_raw'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1695,7 +1821,7 @@ class ProviderWeb(ProviderBase):
 										format['title_show'] = title
 										querySeason = self.querySeason()
 										for j in range(len(querySeason)):
-											try: _queryGenerate(priority = [2000, 9000, 1003], query = querySeason[j], format = format, pack = 'season', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
+											try: _queryGenerate(priority = [2000, 9000, 1003], query = querySeason[j], format = format, pack = 'season', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'raw' : format['title_raw'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1708,7 +1834,7 @@ class ProviderWeb(ProviderBase):
 										format['title_show'] = title
 										queryShow = self.queryShow()
 										for j in range(len(queryShow)):
-											try: _queryGenerate(priority = [3000, 12000, 1004], query = queryShow[j], format = format, pack = 'show', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
+											try: _queryGenerate(priority = priorityPack if (priorityPack and queryShow[j]['niche'] in ProviderWeb.QueryNiche) else [3000, 12000, 1004], query = queryShow[j], format = format, pack = 'show', title = {'query' : title, 'main' : format['title'], 'show' : format['title_show'], 'raw' : format['title_raw'], 'episode' : format['title_episode']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1716,9 +1842,14 @@ class ProviderWeb(ProviderBase):
 							queryTitles.append(format['title_episode'])
 					else:
 						if self.supportMovie():
-							format = {}
+							format = {
+								'title_raw' : mainRaw,
+								'title_movie_raw' : mainRaw,
+							}
 							try: format['title_collection'] = titles['search']['collection'][0]
 							except: format['title_collection'] = None
+							try: format['title_collection_raw'] = titles['collection']
+							except: format['title_collection_raw'] = None
 
 							# Movie Queries.
 							if years and 'all' in years and years['all']:
@@ -1731,7 +1862,7 @@ class ProviderWeb(ProviderBase):
 											format['year'] = year
 											queryMovie = self.queryMovie()
 											for j in range(len(queryMovie)):
-												try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, year = year, indexTitle = i, indexQuery = j)
+												try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'raw' : format['title_raw'], 'collection' : format['title_collection']}, year = year, indexTitle = i, indexQuery = j)
 												except: pass
 										except: pass
 							else:
@@ -1743,7 +1874,7 @@ class ProviderWeb(ProviderBase):
 										format['title_movie'] = title
 										queryMovie = self.queryMovie()
 										for j in range(len(queryMovie)):
-											try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
+											try: _queryGenerate(priority = [0, 1000, 1001], query = queryMovie[j], format = format, title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'raw' : format['title_raw'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
 											except: pass
 									except: pass
 
@@ -1758,7 +1889,7 @@ class ProviderWeb(ProviderBase):
 										format['title_collection'] = title
 										queryCollection = self.queryCollection()
 										for j in range(len(queryCollection)):
-											try: _queryGenerate(priority = [1000, 4000, 1002], query = queryCollection[j], format = format, pack = 'movie', title = {'query' : title, 'main' : format['title'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
+											try: _queryGenerate(priority = [1000, 4000, 1002], query = queryCollection[j], format = format, pack = 'movie', title = {'query' : title, 'main' : format['title'], 'raw' : format['title_raw'], 'movie' : format['title_movie'], 'collection' : format['title_collection']}, indexTitle = i, indexQuery = j)
 											except: pass
 								except: pass
 
@@ -1775,6 +1906,7 @@ class ProviderWeb(ProviderBase):
 			encodeQuote = encode == ProviderWeb.FormatEncodeQuote
 			encodePlus = encode == ProviderWeb.FormatEncodePlus
 			encodeMinus = encode == ProviderWeb.FormatEncodeMinus
+			encodeDot = encode == ProviderWeb.FormatEncodeDot
 
 			include = self.formatInclude()
 			includeBasic = include == ProviderWeb.FormatIncludeBasic
@@ -1793,20 +1925,21 @@ class ProviderWeb(ProviderBase):
 					if encodeQuote: formatExpression = '%'
 					elif encodePlus: formatExpression = '\+'
 					elif encodeMinus: formatExpression = '\-'
+					elif encodeDot: formatExpression = '\.'
 				formatExpression1 = '[^a-z\d]'
 				formatExpression2 = '[^a-z\d\s%s]' % formatExpression
 
 			queries = Tools.listSort(data = queries, key = lambda x : x['priority'])
 			result = []
 			for query in queries:
-				value = _queryEncode(value = query['search'], caseLower = caseLower, caseUpper = caseUpper, set = set, encodeQuote = encodeQuote, encodePlus = encodePlus, encodeMinus = encodeMinus, includeBasic = includeBasic, includeEncode = includeEncode, includeHas = includeHas, formatTitles = formatTitles, formatExpression1 = formatExpression1, formatExpression2 = formatExpression2)
+				value = _queryEncode(value = query['search'], raw = query['rawed'], caseLower = caseLower, caseUpper = caseUpper, set = set, encodeQuote = encodeQuote, encodePlus = encodePlus, encodeMinus = encodeMinus, encodeDot = encodeDot, includeBasic = includeBasic, includeEncode = includeEncode, includeHas = includeHas, formatTitles = formatTitles, formatExpression1 = formatExpression1, formatExpression2 = formatExpression2)
 				if value is None: continue
 				query['raw'] = query['search']
 				query['search'] = value
 
 				# Encode the titles as well, since some providers (eg: Newznab) might use the title instead of the query for searching.
 				for key, value in query['title'].items():
-					value = _queryEncode(value = value, caseLower = caseLower, caseUpper = caseUpper, set = set, encodeQuote = encodeQuote, encodePlus = encodePlus, encodeMinus = encodeMinus, includeBasic = includeBasic, includeEncode = includeEncode, includeHas = includeHas, formatTitles = formatTitles, formatExpression1 = formatExpression1, formatExpression2 = formatExpression2)
+					value = _queryEncode(value = value, raw = key == 'raw', caseLower = caseLower, caseUpper = caseUpper, set = set, encodeQuote = encodeQuote, encodePlus = encodePlus, encodeMinus = encodeMinus, encodeDot = encodeDot, includeBasic = includeBasic, includeEncode = includeEncode, includeHas = includeHas, formatTitles = formatTitles, formatExpression1 = formatExpression1, formatExpression2 = formatExpression2)
 					if not value is None: query['title'][key] = value
 
 				result.append(query)
@@ -1991,6 +2124,9 @@ class ProviderWeb(ProviderBase):
 		except: self.logError()
 		return False
 
+	def accountAuthorization(self, type, value = None, username = None, password = None):
+		return Networker.authorizationHeader(type = type, value = value, username = username, password = password)
+
 	def accountRequest(self, request):
 		try:
 			if request:
@@ -2008,10 +2144,11 @@ class ProviderWeb(ProviderBase):
 					if ProviderBase.RequestCookies in request[ProviderBase.ProcessExtract] and request[ProviderBase.ProcessExtract][ProviderBase.RequestCookies]:
 						if len(self.links()) > 1:
 							networker = self.request()
-							response = networker.response()
-							linkRequest = Networker.linkDomain(link = response['request']['link'], subdomain = False, topdomain = True, ip = True, scheme = False)
-							linkResponse = Networker.linkDomain(link = response['link'], subdomain = False, topdomain = True, ip = True, scheme = False)
-							if not linkRequest == linkResponse: self.linkRedirectSet(Networker.linkDomain(link = response['link'], subdomain = True, topdomain = True, ip = True, scheme = True))
+							if networker:
+								response = networker.response()
+								linkRequest = Networker.linkDomain(link = response['request']['link'], subdomain = False, topdomain = True, ip = True, scheme = False)
+								linkResponse = Networker.linkDomain(link = response['link'], subdomain = False, topdomain = True, ip = True, scheme = False)
+								if not linkRequest == linkResponse: self.linkRedirectSet(Networker.linkDomain(link = response['link'], subdomain = True, topdomain = True, ip = True, scheme = True))
 
 				# Dynamic
 				if ProviderBase.ProcessRequest in request and request[ProviderBase.ProcessRequest]:
@@ -2029,7 +2166,7 @@ class ProviderWeb(ProviderBase):
 				else:
 					values = self.accountAuthenticate()
 					if not values is None and not values is False:
-						if Tools.isDictionary(value):
+						if Tools.isDictionary(values):
 							found = False
 							for type in types:
 								if type in values:
@@ -2058,9 +2195,9 @@ class ProviderWeb(ProviderBase):
 						if authorization == ProviderWeb.AccountAuthorizationBasic:
 							username = self.accountUsername()
 							if not username: username = self.accountEmail()
-							header = Networker.authorizationHeader(type = authorization, username = username, password = self.accountPassword())
+							header = self.accountAuthorization(type = authorization, username = username, password = self.accountPassword())
 						elif authorization == ProviderWeb.AccountAuthorizationBearer:
-							header = Networker.authorizationHeader(type = authorization, value = self.accountKey())
+							header = self.accountAuthorization(type = authorization, value = self.accountKey())
 						if header: result[ProviderBase.RequestHeaders].update(header)
 
 				# Validate
@@ -2081,11 +2218,13 @@ class ProviderWeb(ProviderBase):
 								if Tools.isDictionary(check):
 									for key, value in check.items():
 										if key in data:
-											if not Regex.match(data = data[key], expression = value, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines): return None
+											if not Regex.match(data = data[key] or '', expression = value, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines): # Value can be None.
+												return None
 								else:
 									try: data = ' '.join(list(data.values()))
 									except: pass
-									if not Regex.match(data = data, expression = check, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines): return None
+									if not Regex.match(data = data or '', expression = check, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines): # Value can be None.
+										return None
 				else:
 					try:
 						if not result['networker'].responseSuccess(): return None
@@ -2095,6 +2234,7 @@ class ProviderWeb(ProviderBase):
 
 				try: del result['networker']
 				except: pass
+
 				return result
 		except: self.logError()
 		return None
@@ -2108,11 +2248,15 @@ class ProviderWeb(ProviderBase):
 
 	def accountVerify(self, open = False):
 		# Ignore accounts for open providers (eg: TorrentApi/Torrentz2k that uses accountless tokens).
-		if self.accountHas() and (open or not self.accessOpen()):
+		if self.accountHas() and (self.accountOptional() or open or not self.accessOpen()):
 			authenticationHas = self.accountAuthenticationHas()
 			verificationHas = self.accountVerificationHas()
 			if authenticationHas or verificationHas:
-				if self.accountAuthenticationUpdate():
+				# The account is optional and no account was added.
+				# Eg: SolidTorrents/BitSearch.
+				if self.accountOptional() and not self.accountEnabled():
+					return ProviderBase.VerifyOptional
+				elif self.accountAuthenticationUpdate():
 					verification = self.accountVerification()
 					if not verification or self.accountRequest(verification): return True
 				return False
@@ -2188,8 +2332,8 @@ class ProviderWeb(ProviderBase):
 	def searchCategoryShow(self):
 		return self.mData['search']['category']['show']
 
-	def searchRequest(self, path = None, link = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None):
-		return self.requestText(scrape = True, link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies)
+	def searchRequest(self, path = None, link = None, subdomain = None, method = None, type = None, data = None, headers = None, cookies = None, details = None):
+		return self.requestText(scrape = True, details = details, link = link, path = path, subdomain = subdomain, method = method, type = type, data = data, headers = headers, cookies = cookies)
 
 	def searchExtract(self, item, data = None, details = None, entry = None):
 		try:
@@ -2703,7 +2847,7 @@ class ProviderWeb(ProviderBase):
 					ProviderWeb.DetailsData[id][value] = True
 					ProviderBase.ResultLock[id].release()
 
-					details = self.searchRequest(**details)
+					details = self.searchRequest(**details, details = True)
 					if not details: return
 					details = self.extractData(data = details, details = True)
 
@@ -2819,8 +2963,11 @@ class ProviderWeb(ProviderBase):
 
 				if offset is None or not added[0]: break
 				elif not self.timerAllow() or not self.scrapeRequestAllow() or self.stopped() or self.verifyBusy(): break
-				elif self.processOffset(data = result, items = items) == ProviderBase.Skip: break
-				else: offset += self.offsetIncrease()
+				else:
+					offsetted = self.processOffset(data = result, items = items)
+					if offsetted == ProviderBase.Skip: break
+					elif not offsetted is None and not offsetted is False: offset = offsetted # Allow for a custom offset (eg: TorrentsCsv).
+					else: offset += self.offsetIncrease()
 		except:
 			self.logError()
 			self.priorityEnd(lock = lock)
@@ -3257,6 +3404,10 @@ class ProviderWeb(ProviderBase):
 	# Ideal for checking if the scraping of the next page should stop.
 	# There is another mechanism to retrieve the next page and stop if it does not contain usable results. But this requires an additional page to be retrieved.
 	# Some providers already know from the current page that no more results are availble.
+	# The following values can be returned:
+	#	1. None/False: continue with the normal offset increment as specified with the initialization parameters "offsetIncrease".
+	#	2. ProviderBase.Skip: stop and do not continue with the next page.
+	#	3. Any other value: a custom offset value returned by the provider, such as an ID or some other value that cannot be incremented like a page number (eg: TorrentsCsv).
 	def processOffset(self, data, items):
 		return None
 

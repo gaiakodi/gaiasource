@@ -621,7 +621,7 @@ class Downloader(Database):
 		xbmcvfs.mkdirs(path)
 		counter = 0
 
-		if self._fileExists(path):
+		if self._fileExistsDirectory(path):
 			fileName = title + '.' + extension
 			filePath = os.path.join(path, fileName)
 			counter = 1
@@ -717,7 +717,7 @@ class Downloader(Database):
 		# os.exists can not handle network (smb) paths.
 		if path:
 			if extension:
-				return xbmcvfs.exists(path)
+				return xbmcvfs.exists(path) or xbmcvfs.exists(xbmcvfs.translatePath(path))
 			else:
 				title = os.path.splitext(os.path.basename(path))[0]
 				directory = os.path.dirname(path)
@@ -728,9 +728,14 @@ class Downloader(Database):
 		return False
 
 	def _fileExistsDirectory(self, path):
-		if not path.endswith('/') and not path.endswith('\\'):
-			path += '/'
-		return xbmcvfs.exists(path)
+		if path:
+			if not path.endswith('/') and not path.endswith('\\'):
+				path += '/'
+			# For some reason xbmcvfs.exists() cannot detect existing folders anymore.
+			# Maybe this is only an issue in Flatpak.
+			# But the translated pathy does work.
+			return xbmcvfs.exists(path) or xbmcvfs.exists(xbmcvfs.translatePath(path))
+		return False
 
 	def _fileFind(self, path, title, exact = True):
 		directories, files = self._fileList(path)
@@ -1273,13 +1278,20 @@ class Downloader(Database):
 			menu.append((self._translate(33393), 'RunPlugin(%s?action=copy&link=%s)' % (addon, self.mDownloadPath)))
 			item.addContextMenuItems(menu)
 
+			fanart = None
 			try:
-				#gaiaremove - remove old images and other obsolute metadata attributes.
-				fanart = self.mDownloadMetadata['fanart'] if 'fanart' in self.mDownloadMetadata else self.mDownloadMetadata['fanart2'] if 'fanart2' in self.mDownloadMetadata else self.mDownloadMetadata['fanart3'] if 'fanart3' in self.mDownloadMetadata else None
-				if fanart == None or fanart == '':
-					raise Exception()
-			except:
-				fanart = self._background()
+				for i in ['fanart', 'landscape']:
+					for j in [None, 'show', 'season']:
+						if j:
+							try: fanart = self.mDownloadMetadata['image'][j][i][0]
+							except: pass
+						else:
+							try: fanart = self.mDownloadMetadata['image'][i][0]
+							except: pass
+						if fanart: break
+					if fanart: break
+			except: pass
+			if not fanart: fanart = self._background()
 			item.setProperty('Fanart_Image', fanart)
 
 			xbmcplugin.addDirectoryItem(handle = handle, url = url, listitem = item, isFolder = False)
@@ -1697,16 +1709,19 @@ class Downloader(Database):
 				return False
 
 			# Image
-			if not image:
-				if not metadata is None:
-					#gaiaremove - remove old images and other obsolute metadata attributes.
-					keys = ['poster', 'poster1', 'poster2', 'poster3', 'thumb', 'thumb1', 'thumb2', 'thumb3', 'icon', 'icon1', 'icon2', 'icon3']
-					for key in keys:
-						if key in metadata:
-							value = metadata[key]
-							if not value == None and not value == '':
-								image = value
-								break
+			if not image and metadata:
+				try:
+					for i in ['poster', 'keyart', 'thumb', 'clearlogo', 'clearart', 'discart']:
+						for j in [None, 'show', 'season']:
+							if j:
+								try: image = metadata['image'][j][i][0]
+								except: pass
+							else:
+								try: image = metadata['image'][i][0]
+								except: pass
+							if image: break
+						if image: break
+				except: pass
 			self.mDownloadImage = image
 
 			notification = True

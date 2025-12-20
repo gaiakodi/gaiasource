@@ -1878,6 +1878,66 @@ class Torbox(Resolver):
 		)
 
 ###################################################################
+# DEBRIDER
+###################################################################
+
+class Debrider(Premium):
+
+	Link	= 'https://debrider.app'
+
+	def __init__(self):
+		Premium.__init__(self,
+			id = 'debrider',
+			mode = Premium.ModeKey,
+
+			name = 36833,
+
+			linkDirect = Debrider.Link,
+
+			level = 0,
+			rank = 3,
+
+			color = 'FFFFDF41',
+			icon = {'small' : True},
+		)
+
+	def _default(self):
+		return Translation.string(33216)
+
+	def _label(self):
+		return Settings.idDataLabel(self.settingsIdAuthentication())
+
+	def settings(self, enabled = False):
+		return Premium.settings(self, enabled = enabled) # False by default, since the value was not updated yet.
+
+	def enabled(self):
+		return Settings.getString(id = self._label()) == self._default()
+
+	def _verify(self, data = None):
+		from lib.debrid.external import Debrider
+		if Debrider.accountVerify(data = data): return {Account.AttributeLabel : self._default()}
+		return False
+
+	def _authenticate(self):
+		Dialog.confirm(title = self.name(), message = 'Debrider is currently only supported through Orion. In order to stream, you also have to authenticate your Debrider account on Orion\'s website.')
+		if not Orion().authenticated(): return False
+		self._authenticateMessage({
+			'type' : Dialog.TypeDetails, 'text' : False, 'items' : [
+				{'type' : 'text', 'value' : 'Authenticate with your API key which can be found on Debrider\'s website after you subscribed:'},
+				{'type' : 'link', 'value' : Debrider.Link},
+			]})
+
+	def authenticate(self, help = True, settings = True):
+		Premium.authenticate(self, functionNew = self._authenticate, functionVerify = self._verify, functionHelp = self.help if help else None, settings = settings)
+
+	def update(self, token = None, refresh = None, label = None, username = None, email = None, password = None, key = None, pin = None, secret = None, cookie = None, id = None, type = None, version = None, data = None):
+		data = Premium.update(self, token = token, refresh = refresh, label = label, username = username, email = email, password = password, key = key, pin = pin, secret = secret, cookie = cookie, id = id, type = type, version = version, data = data)
+		if data:
+			label = data[Account.AttributeLabel]
+			Settings.set(id = self._label(), value = label)
+		return data
+
+###################################################################
 # EASYDEBRID
 ###################################################################
 

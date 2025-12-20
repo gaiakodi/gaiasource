@@ -849,7 +849,7 @@ class ProviderOffline(ProviderBase):
 				if not current or not current['release']['time'] == meta['release']['time']:
 					# The minimum space required: download ZIP stored temporarily + extracted database size + at least 100MB free for other OS/Kodi functionality.
 					storageRequired = meta['size']['download'] + meta['size']['storage'] + 104857600
-					storageFree = Hardware.storageUsageFreeBytes()
+					storageFree = Hardware.detectStorageUsage()['free']['bytes']
 					if storageFree and storageFree < storageRequired:
 						message = [
 							Translation.string(36365),

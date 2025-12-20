@@ -33,8 +33,9 @@ from lib.modules.account import Trakt as Account
 TraktId = None
 TraktClient = None
 TraktAccount = None
-TraktLimit = None
 TraktCache = None
+TraktLimit = None
+TraktWait = None
 
 def reset(settings = True):
 	global TraktCache
@@ -81,7 +82,7 @@ def getTraktToken():
 def getTraktRefresh():
 	return getTraktAccount().dataRefresh()
 
-def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong, limit = None):
+def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, extended = False, direct = False, method = None, authentication = None, timeout = network.Networker.TimeoutLong, limit = None, full = None):
 	try:
 		if not url.startswith('https://api.trakt.tv'):
 			url = network.Networker.linkJoin('https://api.trakt.tv', url)
@@ -106,12 +107,36 @@ def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, e
 		# Do not do this for GET requests from MetaTrakt.
 		if post and not tools.Tools.isString(post) and not method == network.Networker.MethodGet: post = tools.Converter.jsonTo(post)
 
+		# Some features, like searching, can be done without user authentication.
+		# Actually, all endpoints not associated with a user (eg mark as watched, sync rating, etc) do NOT require authentication.
+		# So getting movie/show/people summary, searching, getting external IDs, etc can be done without authentication.
 		if direct or not valid:
-			# Some features, like searching, can be done without user authentication.
-			# Actually, all endpoints not associated with a user (eg mark as watched, sync rating, etc) do NOT require authentication.
-			# So getting movie/show/people summary, searching, getting external IDs, etc can be done without authentication.
 			result = network.Networker().request(method = method, link = url, data = post, headers = headers, timeout = timeout)
+
+			try: code = result['error']['code']
+			except: code = None
+			if code is None:
+				try: code = result['status']['code']
+				except: code = None
+			if not code:
+				try: error = result['error']['type']
+				except: error = None
+				if error == network.Networker.ErrorConnection or error == network.Networker.ErrorTimeout:
+					code = -1 # This should hopefully be set if the Trakt server is down.
+			code = code if tools.Tools.isNumber(code) else 0
+
 			data = network.Networker.dataText(result['data'])
+
+			if code == 429: # Rate limit reached.
+				limit = _limit(url = url, data = result, wait = limit)
+				if limit:
+					return getTrakt(url = url, post = post, retry = retry, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
+				else:
+					if extended and result['error']: result['error']['trakt'] = 'limit'
+			elif (not data and code == -1) or (not data and code >= 300 and not(code == 404 or code == 401 or code == 405)) or (code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data): # Server errors.
+				_error(url = url, post = post, timestamp = timestamp, retry = retry, message = 33676)
+				if extended and result['error']: result['error']['trakt'] = 'server'
+
 			if extended: return data, result['headers'], result['error']
 			else: return data
 
@@ -140,11 +165,15 @@ def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, e
 			if limit:
 				return getTrakt(url = url, post = post, retry = retry, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
 			else:
-				if extended: return None, result['headers'], result['error']
+				if extended:
+					if result['error']: result['error']['trakt'] = 'limit'
+					return None, result['headers'], result['error']
 				else: return None
 		elif (not data and code == -1) or (not data and code >= 300 and not(code == 404 or code == 401 or code == 405)) or (code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data): # Server errors.
 			_error(url = url, post = post, timestamp = timestamp, retry = retry, message = 33676)
-			if extended: return None, result['headers'], result['error']
+			if extended:
+				if result['error']: result['error']['trakt'] = 'server'
+				return None, result['headers'], result['error']
 			else: return None
 		elif data and not(code == 401 or code == 405): # Returned valid data without failing authorization.
 			if extended: return data, result['headers'], result['error']
@@ -162,7 +191,6 @@ def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, e
 		opost = {'client_id': getTraktId(), 'client_secret': getTraktClient(), 'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob', 'grant_type': 'refresh_token', 'refresh_token': refresh}
 
 		result = network.Networker().request(link = oauth, type = network.Networker.DataJson, data = opost, headers = headers, timeout = timeout)
-
 		try: code = result['error']['code']
 		except: code = None
 		if code is None:
@@ -182,14 +210,23 @@ def getTrakt(url, post = None, headers = None, retry = True, timestamp = None, e
 			if limit:
 				return getTrakt(url = url, post = post, retry = retry, timestamp = timestamp, extended = extended, direct = direct, method = method, authentication = authentication, timeout = timeout, limit = limit)
 			else:
-				if extended: return None, result['headers'], result['error']
+				if extended:
+					if result['error']: result['error']['trakt'] = 'limit'
+					return None, result['headers'], result['error']
 				else: return None
 		elif (not data and code == -1) or (not data and code >= 300 and not(code == 404 or code == 401 or code == 405)) or (code >= 500 and code <= 599) or (data and tools.Tools.isString(data) and '<html' in data): # Server errors.
 			_error(url = url, post = post, timestamp = timestamp, retry = retry, message = 33676)
-			if extended: return None, result['headers'], result['error']
+			if extended:
+				if result['error']: result['error']['trakt'] = 'server'
+				return None, result['headers'], result['error']
 			else: return None
 		elif code == 401 or code == 405 or (code == 400 and data and tools.Tools.isString(data) and 'invalid_grant' in data): # Oauth token failed.
 			_error(url = url, post = post, timestamp = timestamp, retry = False, message = 33677)
+			if not full is None: # Used from authenticationCheck().
+				full['data'] = data
+				full['headers'] = result['headers']
+				full['error'] = result['error']
+				full['code'] = code
 			if extended: return None, result['headers'], result['error']
 			else: return None
 		elif code == 404: # Movie/show cannot be found.
@@ -293,6 +330,12 @@ def _limit(url = None, data = None, wait = False):
 	# https://trakt.docs.apiary.io/#introduction/rate-limiting
 	# Trakt does not strictly enforce these limits. Sometimes a few thousand requests can be made before Trakt returns HTTP 429.
 
+	# Update (2025-12):
+	# NB: It seems that Trakt does not always include the X-Ratelimit header.
+	# Often only Retry-After=xxx and Status=429 headers are returned.
+	# Maybe once the limit was reached and continues requests are being made, the header is not added anymore?
+	# But even the first request hitting the limit does not seem to have this header anymore.
+	# Maybe they permanently removed it?
 	try: limit = tools.Converter.jsonFrom(data['headers']['X-Ratelimit'])
 	except: limit = None
 	try: seconds = int(data['headers']['Retry-After'])
@@ -303,9 +346,13 @@ def _limit(url = None, data = None, wait = False):
 		wait = TraktLimit
 		if wait is None and not seconds is None:
 			if (limit and 'name' in limit and limit['name'] == 'AUTHED_API_POST_LIMIT'):
-				wait = 10 # Retry 10 times, sincer this is important (eg update watched status, progress, etc).
+				wait = 10 # Retry 10 times, since this is important (eg update watched status, progress, etc).
 			elif (seconds < 2):
 				wait = 1 # Retry only once, and then fail.
+
+	if not seconds is None:
+		global TraktWait
+		TraktWait = max(TraktWait or 0, tools.Time.timestamp() + seconds + (1 if seconds > 2 else 0))
 
 	if wait and not seconds is None:
 		seconds += (0.5 if seconds < 3 else 1 if seconds < 10 else 2)
@@ -316,6 +363,7 @@ def _limit(url = None, data = None, wait = False):
 
 		tools.Logger.log('Trakt rate limit reached. Retrying %s in %d secs.' % (retry, seconds))
 		tools.Logger.log('     Link: %s' % str(url))
+		tools.Logger.log('     Wait: %s secs' % str(seconds))
 		tools.Logger.log('     Response: %s' % tools.Converter.jsonTo(limit))
 
 		tools.Time.sleep(seconds)
@@ -324,20 +372,27 @@ def _limit(url = None, data = None, wait = False):
 		if result:
 			tools.Logger.log('Retrying after Trakt rate limit reached.')
 			tools.Logger.log('     Link: %s' % str(url))
+			tools.Logger.log('     Wait: %s secs' % str(seconds))
 		else:
 			tools.Logger.log('Not retrying after Trakt rate limit reached.')
 			tools.Logger.log('     Link: %s' % str(url))
+			tools.Logger.log('     Wait: %s secs' % str(seconds))
 
 		return result
 	else:
 		tools.Logger.log('Trakt rate limit reached. Aborting request without retrying.')
 		tools.Logger.log('     Link: %s' % str(url))
+		tools.Logger.log('     Wait: %s secs' % str(seconds))
 		tools.Logger.log('     Response: %s' % tools.Converter.jsonTo(limit))
 		return False
 
 def _limitEnable(enabled = True):
 	global TraktLimit
 	TraktLimit = enabled
+
+def limitWait():
+	global TraktWait
+	return TraktWait
 
 def authentication(settings = True):
 	def _authenticationInitiate():
@@ -376,6 +431,25 @@ def authentication(settings = True):
 def authenticationVerify():
 	profile = getTraktAsJson('/users/me')
 	return profile and 'username' in profile and bool(profile['username'])
+
+# Check if the access token still works and otherwise show the authentication dialog.
+def authenticationCheck(loader = False):
+	if authenticated():
+		full = {}
+
+		if loader: interface.Loader.show()
+		data, headers, error = getTrakt(url = '/sync/last_activities', extended = True, full = full)
+		if loader: interface.Loader.hide()
+
+		code = full.get('code')
+		data = full.get('data')
+		if code == 401 or code == 405 or (code == 400 and data and tools.Tools.isString(data) and 'invalid_grant' in data):
+			interface.Dialog.confirm(title = 32315, message = 36907)
+			getTraktAccount().clear()
+			return authentication(settings = False)
+		else:
+			return True
+	return None
 
 def authenticated():
 	return getTraktAccount().authenticated()
@@ -742,72 +816,73 @@ def sortHas(headers):
 
 def sortList(data, sort = None, order = None, headers = None):
 	try:
-		# NB: Trakt seems to switch asc/desc value in the list settings.
-		# Eg: Edit the list settings to use asc. Then reload the list website witrhout any GET parameter. Trakt now sets it to desc instead of asc.
-		# Just test with the sort functions below and make sure that after changing the settings, the Gaia list has the same order as on Trakt's website.
-		if headers:
-			headers = dict((k.lower(), v) for k, v in headers.items())
-			sort = headers.get('x-sort-by')
-			order = headers.get('x-sort-how')
+		if data and tools.Tools.isArray(data):
+			# NB: Trakt seems to switch asc/desc value in the list settings.
+			# Eg: Edit the list settings to use asc. Then reload the list website witrhout any GET parameter. Trakt now sets it to desc instead of asc.
+			# Just test with the sort functions below and make sure that after changing the settings, the Gaia list has the same order as on Trakt's website.
+			if headers:
+				headers = dict((k.lower(), v) for k, v in headers.items())
+				sort = headers.get('x-sort-by')
+				order = headers.get('x-sort-how')
 
-		if sort == 'random':
-			data = tools.Tools.listShuffle(data)
-		else:
-			forward = order == 'desc'
-			backward = order is None or order == 'desc'
+			if sort == 'random':
+				data = tools.Tools.listShuffle(data)
+			else:
+				forward = order == 'desc'
+				backward = order is None or order == 'desc'
 
-			function = None
-			reverse = None
+				function = None
+				reverse = None
 
-			if sort == 'rank':
-				function = sortRank
-				reverse = forward
-			elif sort == 'title':
-				function = sortTitle
-				reverse = forward
-			elif sort == 'released':
-				function = sortReleased
-				reverse = backward
-			elif sort == 'runtime':
-				function = sortRuntime
-				reverse = backward
-			elif sort == 'popularity':
-				function = sortPopularity
-				reverse = backward
-			elif sort == 'percentage':
-				function = sortPercentage
-				reverse = backward
-			elif sort == 'votes':
-				function = sortVotes
-				reverse = backward
-			elif sort == 'my_rating':
-				function = sortMyrating
-				reverse = backward
-			elif sort == 'added':
-				function = sortAdded
-				reverse = backward
-			elif sort == 'watched':
-				function = sortWatched
-				reverse = backward
-			elif sort == 'collected':
-				function = sortCollected
-				reverse = backward
-			elif sort == 'updated':
-				function = sortUpdated
-				reverse = backward
-			elif sort == 'time':
-				# Some endpoints just return "time" as x-sort-by, without explicitly stating what time to use.
-				# Eg: /users/id/watched/type
-				if data and data[0]:
-					item = data[0]
-					for i in [sortCollected, sortWatched, sortRated, sortAdded, sortUpdated]:
-						if i(item):
-							function = i
-							break
-				if not function: function = sortUpdated
-				reverse = backward
+				if sort == 'rank':
+					function = sortRank
+					reverse = forward
+				elif sort == 'title':
+					function = sortTitle
+					reverse = forward
+				elif sort == 'released':
+					function = sortReleased
+					reverse = backward
+				elif sort == 'runtime':
+					function = sortRuntime
+					reverse = backward
+				elif sort == 'popularity':
+					function = sortPopularity
+					reverse = backward
+				elif sort == 'percentage':
+					function = sortPercentage
+					reverse = backward
+				elif sort == 'votes':
+					function = sortVotes
+					reverse = backward
+				elif sort == 'my_rating':
+					function = sortMyrating
+					reverse = backward
+				elif sort == 'added':
+					function = sortAdded
+					reverse = backward
+				elif sort == 'watched':
+					function = sortWatched
+					reverse = backward
+				elif sort == 'collected':
+					function = sortCollected
+					reverse = backward
+				elif sort == 'updated':
+					function = sortUpdated
+					reverse = backward
+				elif sort == 'time':
+					# Some endpoints just return "time" as x-sort-by, without explicitly stating what time to use.
+					# Eg: /users/id/watched/type
+					if data and data[0]:
+						item = data[0]
+						for i in [sortCollected, sortWatched, sortRated, sortAdded, sortUpdated]:
+							if i(item):
+								function = i
+								break
+					if not function: function = sortUpdated
+					reverse = backward
 
-			if function: data = tools.Tools.listSort(data, key = lambda i : function(i), reverse = reverse)
+				if function: data = tools.Tools.listSort(data, key = lambda i : function(i), reverse = reverse)
 	except: tools.Logger.error()
 	return data
 
@@ -1460,7 +1535,7 @@ def historyClearShow(wait = True):
 # HISTORY - REFRESH
 ##############################################################################
 
-# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if neccessary.
+# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if necessary.
 def historyRefresh(media = None, force = False, sync = True, reload = True, wait = True):
 	def _historyRefresh(media, force, sync, reload, wait):
 		historyDataRefresh(media = media, force = force, sync = sync, wait = wait)
@@ -1964,7 +2039,7 @@ def progressClearShow(wait = True):
 # PROGRESS - REFRESH
 ##############################################################################
 
-# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if neccessary.
+# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if necessary.
 def progressRefresh(media = None, force = False, sync = True, reload = True, wait = True):
 	def _progressRefresh(media, force, sync, wait):
 		progressDataRefresh(media = media, force = force, sync = sync, wait = wait)
@@ -2272,7 +2347,7 @@ def ratingClearEpisode(wait = True):
 # RATING - REFRESH
 ##############################################################################
 
-# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if neccessary.
+# force: False = no forceful refresh of anything, True = forcefully refresh sync and data. None = forcefully refresh sync, but only data if necessary.
 def ratingRefresh(media = None, force = False, sync = True, wait = True):
 	def _ratingRefresh(media, force, sync, wait):
 		ratingDataRefresh(media = media, force = force, sync = sync, wait = wait)
@@ -2388,7 +2463,7 @@ def ratingUpdate(rating, media = None, imdb = None, tmdb = None, tvdb = None, tr
 		# Do not update the rating if it did not change, in order to keep the old/original rating date.
 		if not force:
 			current = ratingRetrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
-			if current == rating: return None
+			if current == rating: return current
 
 		media, type = ratingType(media = media, season = season, episode = episode, general = True)
 		items = request(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, rating = rating, items = items)

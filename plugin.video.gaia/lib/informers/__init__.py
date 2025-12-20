@@ -225,7 +225,7 @@ class Informer(object):
 					except: title = None
 
 				try:
-					year = metadata['year']
+					year = metadata.get('tvshowyear') or metadata['year']
 					if year == '': year = None
 				except: year = None
 				try:
@@ -296,7 +296,7 @@ class Informer(object):
 				if not tvdb: tvdb = metadata.get('tvdb')
 				if not trakt: trakt = metadata.get('trakt')
 				if not title: title = metadata.get('tvshowtitle') or metadata.get('title')
-				if not year: year = metadata.get('year')
+				if not year: year = metadata.get('tvshowyear') or metadata.get('year')
 				if season is None: season = metadata.get('season')
 				if episode is None: episode = metadata.get('episode')
 

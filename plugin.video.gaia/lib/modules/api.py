@@ -96,34 +96,47 @@ class Api(object):
 		return self.id(tools.Platform.identifier())
 
 	@classmethod
-	def request(self, type = None, action = None, parameters = {}, raw = False, cache = False):
+	def request(self, type = None, action = None, parameters = {}, raw = False, cache = False, retry = True):
 		# Do not use the caching in Networking, since each API requests gets a timestamp, which will change the lookup ID for the cache.
 		if cache is False:
-			return self._request(type = type, action = action, parameters = parameters, raw = raw)
+			return self._request(type = type, action = action, parameters = parameters, raw = raw, retry = retry)
 		else:
 			if tools.Tools.isFunction(cache):
-				return cache(function = self._request, type = type, action = action, parameters = parameters, raw = raw)
+				return cache(function = self._request, type = type, action = action, parameters = parameters, raw = raw, retry = retry, __exclude__ = 'retry')
 			else:
 				if tools.Tools.isNumber(cache): time = cache
 				else: time = Cache.TimeoutMedium
-				return Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, type = type, action = action, parameters = parameters, raw = raw)
+				return Cache.instance().cache(mode = None, timeout = time, refresh = None, function = self._request, type = type, action = action, parameters = parameters, raw = raw, retry = retry, __exclude__ = 'retry')
 
 	@classmethod
-	def _request(self, type = None, action = None, parameters = {}, raw = False, cache = False):
+	def _request(self, type = None, action = None, parameters = {}, raw = False, retry = True):
 		if not type is None: parameters[Api.ParameterType] = type
 		if not action is None: parameters[Api.ParameterAction] = action
 
 		time = tools.Time.timestamp()
+		if retry is True: retry = 2 # 3 times (1 standard + 2 retries).
+
 		parameters[Api.ParameterKey] = tools.Hash.sha256(tools.Converter.unicode(tools.System.obfuscate(tools.Settings.getString(tools.Converter.base64From('aW50ZXJuYWwua2V5LmdhaWE='), raw = True), 15 % 10)) + str(time) + tools.System.name().lower())
 		parameters[Api.ParameterTime] = time
 		try:
 			# Sometimes the SSL cerificate is outdated, causing the API calls to take long and then finally fail. Disable the certificate check.
 			# Update: Even with "certificate = False" this can still happen. Refresh the server SSL certificate.
-			result = network.Networker().requestText(link = tools.Settings.getString('internal.link.api', raw = True), data = parameters, agent = network.Networker.AgentAddon, cache = cache, certificate = False)
+			networker = network.Networker()
+			result = networker.requestText(link = tools.Settings.getString('internal.link.api', raw = True), data = parameters, agent = network.Networker.AgentAddon, certificate = False)
+
 			if raw:
 				return result
 			else:
 				result = tools.Converter.jsonFrom(result)
+
+				# The Gaia domain sometimes fails to DNS resolve, for some weird and sporadic reasons.
+				# This causes API requests to fail, typically with a timeout error.
+				# A few seconds/minutes later it suddenly works again. This does not seem to be a server errors, but rather a DNS or nameserver issue.
+				# Retry a few times in the hope that a later call works.
+				if not result and networker.responseErrorServer() and retry:
+					tools.Time.sleep(3)
+					return self._request(type = type, action = action, parameters = parameters, raw = raw, retry = retry - 1)
+
 				if result['success']: return result['data']
 				else: return None
 		except: return None
@@ -184,55 +197,55 @@ class Api(object):
 			self.lotteryDialog()
 
 	@classmethod
-	def donation(self, currency = None, cache = False):
+	def donation(self, currency = None, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutLong
 		parameters = {}
 		if not currency is None: parameters[Api.ParameterCurrency] = currency
-		return self.request(type = Api.TypeDonation, action = Api.ActionRetrieve, parameters = parameters, cache = cache)
+		return self.request(type = Api.TypeDonation, action = Api.ActionRetrieve, parameters = parameters, cache = cache, retry = retry)
 
 	@classmethod
-	def announcement(self, last = None, version = None, count = 1, cache = False):
+	def announcement(self, last = None, version = None, count = 1, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutMedium
 		parameters = {}
 		if not last is None and not last == '': parameters[Api.ParameterLast] = last
 		if not version is None and not version == '': parameters[Api.ParameterVersion] = version
 		if not count is None and not count == '': parameters[Api.ParameterCount] = count
-		return self.request(type = Api.TypeAnnouncement, action = Api.ActionRetrieve, parameters = parameters, cache = cache)
+		return self.request(type = Api.TypeAnnouncement, action = Api.ActionRetrieve, parameters = parameters, cache = cache, retry = retry)
 
 	@classmethod
-	def promotion(self, cache = False):
+	def promotion(self, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutMedium
-		return self.request(type = Api.TypePromotion, action = Api.ActionRetrieve, cache = cache)
+		return self.request(type = Api.TypePromotion, action = Api.ActionRetrieve, cache = cache, retry = retry)
 
 	@classmethod
-	def supportCategories(self, cache = False):
+	def supportCategories(self, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutLong
-		return self.request(type = Api.TypeSupport, action = Api.ActionCategories, cache = cache)
+		return self.request(type = Api.TypeSupport, action = Api.ActionCategories, cache = cache, retry = retry)
 
 	@classmethod
-	def supportList(self, category = None, cache = False):
+	def supportList(self, category = None, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutLong
 		parameters = {}
 		if not category is None and not category == '': parameters[Api.ParameterId] = category
-		return self.request(type = Api.TypeSupport, action = Api.ActionList, parameters = parameters, cache = cache)
+		return self.request(type = Api.TypeSupport, action = Api.ActionList, parameters = parameters, cache = cache, retry = retry)
 
 	@classmethod
-	def supportQuestion(self, id, cache = False):
+	def supportQuestion(self, id, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutLong
 		parameters = {}
 		parameters[Api.ParameterId] = id
-		return self.request(type = Api.TypeSupport, action = Api.ActionRetrieve, parameters = parameters, cache = cache)
+		return self.request(type = Api.TypeSupport, action = Api.ActionRetrieve, parameters = parameters, cache = cache, retry = retry)
 
 	@classmethod
-	def speedtestAdd(self, data):
+	def speedtestAdd(self, data, retry = True):
 		data['device'] = self.idDevice()
 		parameters = {}
 		parameters[Api.ParameterData] = tools.Converter.jsonTo(data)
-		result = self.request(type = Api.TypeSpeedtest, action = Api.ActionAdd, parameters = parameters)
+		result = self.request(type = Api.TypeSpeedtest, action = Api.ActionAdd, parameters = parameters, retry = retry)
 		self._lotteryUpdate(result)
 
 	@classmethod
-	def speedtestRetrieve(self, service, selection, continent, country, region, city, cache = False):
+	def speedtestRetrieve(self, service, selection, continent, country, region, city, cache = False, retry = True):
 		if cache is True: cache = Cache.TimeoutLong
 		parameters = {}
 		if not service == Api.ServiceNone: parameters[Api.ParameterService] = service
@@ -241,4 +254,4 @@ class Api(object):
 		parameters[Api.ParameterCountry] = country
 		parameters[Api.ParameterRegion] = region
 		parameters[Api.ParameterCity] = city
-		return self.request(type = Api.TypeSpeedtest, action = Api.ActionRetrieve, parameters = parameters, cache = cache)
+		return self.request(type = Api.TypeSpeedtest, action = Api.ActionRetrieve, parameters = parameters, cache = cache, retry = retry)

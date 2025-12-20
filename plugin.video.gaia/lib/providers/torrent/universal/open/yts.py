@@ -24,8 +24,8 @@ from lib.providers.core.json import ProviderJson
 
 class Provider(ProviderJson):
 
-	_Link					= ['https://yts.mx', 'https://yts.pm', 'https://yts.vc', 'https://yts.lt', 'https://yts.am', 'https://yts.ag']
-	_Mirror					= ['https://fossbytes.com/yify-proxy-list-yts-proxy-mirror-sites', 'https://yts.mx/blog/yts-mx-is-the-only-new-official-domain-for-yify-movies']
+	_Link					= ['https://yts.lt', 'https://yts.gg', 'https://yts.am', 'https://yts.ag']
+	_Mirror					= ['https://yifystatus.com', 'https://ytsproxies.com', 'https://yts.mx/blog/yts-mx-is-the-only-new-official-domain-for-yify-movies']
 	_Unblock				= {ProviderJson.UnblockFormat1 : 'yts', ProviderJson.UnblockFormat2 : 'yts', ProviderJson.UnblockFormat3 : 'ytss2', ProviderJson.UnblockFormat4 : 'yts'}
 	_Path					= 'api/v2/list_movies.json'
 

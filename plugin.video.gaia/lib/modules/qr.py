@@ -206,135 +206,154 @@ class Qr(object):
 
 		truncate = True,					# Truncate if the data is too long.
 		extended = False,					# Instead of returning the QR path, return a dictionary with extra information.
+		fallback = None,					# If the image cannot be generated in Kodi's temp directory, use the addon profile directory instead.
 		cache = CacheDefault,				# Reuse the image if it already exists.
 		result = {},						# For thread usage.
 	):
-		image = None
-		path = None
 		try:
-			if data is None: return None
-			qrcode = Importer.moduleQrCode(error = self._error)
-			qrdrawers = Importer.moduleQrDrawers(error = self._error)
-
-			parameters = Tools.copy({
-				'data' : data,
-				'colorFront' : colorFront,
-				'colorBack' : colorBack,
-				'colorBorder' : colorBorder,
-				'borderRadius' : borderRadius,
-				'borderSize' : borderSize,
-				'correction' : correction,
-				'detail' : detail,
-				'style' : style,
-				'styleAdjust' : styleAdjust,
-				'padding' : padding,
-				'quality' : quality,
-				'resolution' : resolution,
-				'icon' : icon,
-				'imager' : imager,
-			})
-
-			truncated = False
-			if truncate:
-				sizeBefore = len(data)
-				data = self._data(data = data)
-				sizeAfter = len(data)
-				truncated = not sizeBefore == sizeAfter
-
-			path = self._path(cache = cache, **parameters)
-			if cache and File.exists(path):
-				result[data] = path
-				return {'path' : path, 'data' : data, 'truncated' : truncated} if  extended else path
-
-			colorBorder = self._color(color = colorBorder, default = colorFront)
-			colorFront = self._color(color = colorFront)
-			colorBack = self._color(color = colorBack)
-
-			if correction == Qr.CorrectionLow: correction = qrcode.constants.ERROR_CORRECT_L
-			elif correction == Qr.CorrectionMedium: correction = qrcode.constants.ERROR_CORRECT_M
-			elif correction == Qr.CorrectionHigh: correction = qrcode.constants.ERROR_CORRECT_Q
-			else: correction = qrcode.constants.ERROR_CORRECT_H
-
-			if detail: detail = min(Qr.DetailMaximum, max(Qr.DetailMinimum, detail))
-			else: detail = Qr.DetailDefault
-
-			# When using StyledPilImage with a large quality, generating the image can take 30+ seconds on a fast CPU.
-			# Calculate the quality to get a close a possibler to the target resolution.
-			if quality is Qr.QualityAutomatic: quality = min(40, max(5, int(resolution / ((0.262 * len(data)) + 33))))
-
-			if padding is Qr.PaddingAutomatic: padding = Qr.PaddingDefault * max(1, len(data) / 300.0)
-			else: padding = Qr.PaddingDefault
-
-			styler = None
-			if qrdrawers:
-				if style == Qr.StyleSquare:
-					styler = qrdrawers.SquareModuleDrawer()
-				elif style == Qr.StyleRound:
-					if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustRound
-					if not styleAdjust is None:
-						try: styler = qrdrawers.RoundedModuleDrawer(styleAdjust)
-						except: pass
-					if styler is None: styler = qrdrawers.RoundedModuleDrawer()
-				elif style == Qr.StyleGap:
-					if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustGap
-					if not styleAdjust is None:
-						try: styler = qrdrawers.GappedSquareModuleDrawer(styleAdjust)
-						except: pass
-					if styler is None: styler = qrdrawers.GappedSquareModuleDrawer()
-				elif style == Qr.StyleCircle:
-					styler = qrdrawers.CircleModuleDrawer()
-				elif style == Qr.StyleVertical:
-					if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustVertical
-					if not styleAdjust is None:
-						try: styler = qrdrawers.VerticalBarsDrawer(styleAdjust)
-						except: pass
-					if styler is None: styler = qrdrawers.VerticalBarsDrawer()
-				elif style == Qr.StyleHorizontal:
-					if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustHorizontal
-					if not styleAdjust is None:
-						try: styler = qrdrawers.HorizontalBarsDrawer(styleAdjust)
-						except: pass
-					if styler is None: styler = qrdrawers.HorizontalBarsDrawer()
-
-			if icon and (icon.isalpha()): icon = File.joinPath(System.pathResources(), 'resources', 'media', 'qr', icon + '.png')
-
-			factory = None
-			mask = None
-			if imager == Qr.ImagerPymaging:
-				factory = Importer.moduleQrPymaging()
-				if colorFront and Tools.isArray(colorFront) and Tools.isArray(colorFront[0]): colorFront = colorFront[1]
-			elif icon or styler:
-				factory = Importer.moduleQrStyledPil()
-
-				# Must use a mask with StyledPilImage, otherwise the colors do not work.
-				# If the alpha channel is full (255), only pass in RGB, otherwise the QR code is covered by the background color.
-				if self._gradient(colorFront): mask = Importer.moduleQrGradiant()(center_color = colorFront[0], edge_color = colorFront[1], back_color = colorBack[:3] if colorBack[3] == 255 else colorBack)
-				else: mask = Importer.moduleQrFill()(front_color = colorFront, back_color = colorBack[:3] if colorBack[3] == 255 else colorBack)
-
-			qr = qrcode.QRCode(error_correction = correction, box_size = quality, border = padding, version = detail)
-			qr.add_data(data)
-			qr.make(fit = True)
-			image = qr.make_image(image_factory = factory, module_drawer = styler, fill_color = colorFront, back_color = colorBack, color_mask = mask, embeded_image_path = icon)
-		except Exception as exception:
 			image = None
 			path = None
-			self._error(error = exception)
+			try:
+				if data is None: return None
+				qrcode = Importer.moduleQrCode(error = self._error)
+				qrdrawers = Importer.moduleQrDrawers(error = self._error)
 
-		# In case the QR generation fails, fall back to Pymaging (which is pure Python PNG code) instead of PIL.
-		# PIL should generally work, but there are some old posts that say PIL module could not be found (eg: on Android), but this should be fixed in the new Kodi.
-		# First try PIL and if something fails, try Pymaging.
-		if image and path:
-			if imager == Qr.ImagerPymaging:
-				image.save(path)
+				parameters = Tools.copy({
+					'data' : data,
+					'colorFront' : colorFront,
+					'colorBack' : colorBack,
+					'colorBorder' : colorBorder,
+					'borderRadius' : borderRadius,
+					'borderSize' : borderSize,
+					'correction' : correction,
+					'detail' : detail,
+					'style' : style,
+					'styleAdjust' : styleAdjust,
+					'padding' : padding,
+					'quality' : quality,
+					'resolution' : resolution,
+					'icon' : icon,
+					'imager' : imager,
+				})
+
+				truncated = False
+				if truncate:
+					sizeBefore = len(data)
+					data = self._data(data = data)
+					sizeAfter = len(data)
+					truncated = not sizeBefore == sizeAfter
+
+				path = self._path(cache = cache, profile = bool(fallback), **parameters)
+				if cache and File.exists(path):
+					result[data] = path
+					return {'path' : path, 'data' : data, 'truncated' : truncated} if  extended else path
+
+				colorBorder = self._color(color = colorBorder, default = colorFront)
+				colorFront = self._color(color = colorFront)
+				colorBack = self._color(color = colorBack)
+
+				if correction == Qr.CorrectionLow: correction = qrcode.constants.ERROR_CORRECT_L
+				elif correction == Qr.CorrectionMedium: correction = qrcode.constants.ERROR_CORRECT_M
+				elif correction == Qr.CorrectionHigh: correction = qrcode.constants.ERROR_CORRECT_Q
+				else: correction = qrcode.constants.ERROR_CORRECT_H
+
+				if detail: detail = min(Qr.DetailMaximum, max(Qr.DetailMinimum, detail))
+				else: detail = Qr.DetailDefault
+
+				# When using StyledPilImage with a large quality, generating the image can take 30+ seconds on a fast CPU.
+				# Calculate the quality to get a close a possibler to the target resolution.
+				if quality is Qr.QualityAutomatic: quality = min(40, max(5, int(resolution / ((0.262 * len(data)) + 33))))
+
+				if padding is Qr.PaddingAutomatic: padding = Qr.PaddingDefault * max(1, len(data) / 300.0)
+				else: padding = Qr.PaddingDefault
+
+				styler = None
+				if qrdrawers:
+					if style == Qr.StyleSquare:
+						styler = qrdrawers.SquareModuleDrawer()
+					elif style == Qr.StyleRound:
+						if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustRound
+						if not styleAdjust is None:
+							try: styler = qrdrawers.RoundedModuleDrawer(styleAdjust)
+							except: pass
+						if styler is None: styler = qrdrawers.RoundedModuleDrawer()
+					elif style == Qr.StyleGap:
+						if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustGap
+						if not styleAdjust is None:
+							try: styler = qrdrawers.GappedSquareModuleDrawer(styleAdjust)
+							except: pass
+						if styler is None: styler = qrdrawers.GappedSquareModuleDrawer()
+					elif style == Qr.StyleCircle:
+						styler = qrdrawers.CircleModuleDrawer()
+					elif style == Qr.StyleVertical:
+						if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustVertical
+						if not styleAdjust is None:
+							try: styler = qrdrawers.VerticalBarsDrawer(styleAdjust)
+							except: pass
+						if styler is None: styler = qrdrawers.VerticalBarsDrawer()
+					elif style == Qr.StyleHorizontal:
+						if styleAdjust is Qr.AdjustAutomatic: styleAdjust = Qr.AdjustHorizontal
+						if not styleAdjust is None:
+							try: styler = qrdrawers.HorizontalBarsDrawer(styleAdjust)
+							except: pass
+						if styler is None: styler = qrdrawers.HorizontalBarsDrawer()
+
+				if icon and (icon.isalpha()): icon = File.joinPath(System.pathResources(), 'resources', 'media', 'qr', icon + '.png')
+
+				factory = None
+				mask = None
+				if imager == Qr.ImagerPymaging:
+					factory = Importer.moduleQrPymaging()
+					if colorFront and Tools.isArray(colorFront) and Tools.isArray(colorFront[0]): colorFront = colorFront[1]
+				elif icon or styler:
+					factory = Importer.moduleQrStyledPil()
+
+					# Must use a mask with StyledPilImage, otherwise the colors do not work.
+					# If the alpha channel is full (255), only pass in RGB, otherwise the QR code is covered by the background color.
+					if self._gradient(colorFront): mask = Importer.moduleQrGradiant()(center_color = colorFront[0], edge_color = colorFront[1], back_color = colorBack[:3] if colorBack[3] == 255 else colorBack)
+					else: mask = Importer.moduleQrFill()(front_color = colorFront, back_color = colorBack[:3] if colorBack[3] == 255 else colorBack)
+
+				qr = qrcode.QRCode(error_correction = correction, box_size = quality, border = padding, version = detail)
+				qr.add_data(data)
+				qr.make(fit = True)
+				image = qr.make_image(image_factory = factory, module_drawer = styler, fill_color = colorFront, back_color = colorBack, color_mask = mask, embeded_image_path = icon)
+			except Exception as exception:
 				image = None
-			image = self._border(image = image, path = path, radius = borderRadius, size = borderSize, color = colorBorder, resolution = resolution)
-			image.save(path)
-			if not File.exists(path): path = None
-			result[data] = path
-			return {'path' : path, 'data' : data, 'truncated' : truncated} if  extended else path
-		elif not imager == Qr.ImagerPymaging:
-			parameters['imager'] = Qr.ImagerPymaging
-			return self._generate(truncate = truncate, extended = extended, cache = cache, result = result, **parameters)
+				path = None
+				self._error(error = exception)
+
+			# In case the QR generation fails, fall back to Pymaging (which is pure Python PNG code) instead of PIL.
+			# PIL should generally work, but there are some old posts that say PIL module could not be found (eg: on Android), but this should be fixed in the new Kodi.
+			# First try PIL and if something fails, try Pymaging.
+			if image and path:
+				try:
+					if imager == Qr.ImagerPymaging:
+						image.save(path)
+						image = None
+					image = self._border(image = image, path = path, radius = borderRadius, size = borderSize, color = colorBorder, resolution = resolution)
+					image.save(path)
+				except PermissionError:
+					# (2025-05-01) A user reported this on Android:
+					#	... "/storage/emulated/0/Android/data/org.xbmc.kodi/files/.kodi/addons/plugin.video.gaia/lib/modules/qr.py", line 331, in _generate
+					#		image.save(path)
+					#	File "/data/user/0/org.xbmc.kodi/cache/apk/assets/addons/script.module.pil/lib/PIL/Image.py", line 2237, in save
+					#		fp = builtins.open(filename, "w+b")
+					#	PermissionError: [Errno 13] Permission denied: /storage/emulated/0/Android/data/org.xbmc.kodi/files/.kodi/temp/gaia/qr/0AF8ED8F4705A971945D80D0D445CE68EF4DAAEA36C1958945D80570A5B03EB1.png
+					# The Kodi temp directory should always be writable, so not sure why there are permission errors.
+					# If it fails, try to save the file in the addon's profile temp directory.
+					if fallback is None: return self._generate(truncate = truncate, extended = extended, cache = cache, result = result, fallback = True, **parameters)
+					else: Logger.error()
+				except:
+					Logger.error()
+				if not File.exists(path): path = None
+				result[data] = path
+				return {'path' : path, 'data' : data, 'truncated' : truncated} if extended else path
+			elif not imager == Qr.ImagerPymaging:
+				parameters['imager'] = Qr.ImagerPymaging
+				return self._generate(truncate = truncate, extended = extended, cache = cache, result = result, fallback = fallback, **parameters)
+		except:
+			Logger.error()
+			return None
 
 	@classmethod
 	def clean(self, cache = CachePermanent):
@@ -363,17 +382,16 @@ class Qr(object):
 		return data
 
 	@classmethod
-	def _path(self, cache, make = True, data = None, **kwargs):
+	def _path(self, cache, make = True, profile = False, data = None, **kwargs):
 		if data is None: name = None
 		else: name = Hash.sha256(data + str(kwargs)) + '.png'
-
 		if cache == Qr.CachePermanent:
 			path = File.joinPath(System.profile(), 'Qr')
 			if make: File.makeDirectory(path)
 			if name: return File.joinPath(path, name)
 			else: return path
 		else:
-			return System.temporary(directory = 'qr', file = name, gaia = True, make = True, clear = False)
+			return System.temporary(directory = 'qr', file = name, gaia = not profile, make = True, clear = False, profile = profile)
 
 	@classmethod
 	def _color(self, color, default = None):

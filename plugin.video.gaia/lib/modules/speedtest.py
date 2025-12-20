@@ -781,13 +781,16 @@ class SpeedTesterGlobal(SpeedTester):
 			if not self.mTester:
 				from lib.modules.external import Importer
 				Speedtest = Importer.moduleSpeedTest()
+				error = False
 				for i in range(5):
 					# Sometimes error 503 is returned. Try a few times.
+					# If used too many times, can also return a 403 error.
 					try:
 						self.mTester = Speedtest()
 						break
 					except:
-						tools.Logger.error()
+						if not error: tools.Logger.error()
+						error = True
 						time.sleep(1)
 
 				if not self.mTester:

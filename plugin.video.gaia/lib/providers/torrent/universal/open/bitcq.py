@@ -22,7 +22,7 @@ from lib.providers.core.html import ProviderHtml, Html, HtmlLink, HtmlDiv, HtmlR
 
 class Provider(ProviderHtml):
 
-	_Link					= ['https://bitcq.com']
+	_Link					= ['https://bitcq.com', 'https://bitcq.org']
 	_Path					= 'search'
 
 	_Category				= [1] # 1 = Video
@@ -46,7 +46,11 @@ class Provider(ProviderHtml):
 			description				= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has some missing trivial metadata.',
 			rank					= 3,
 			performance				= ProviderHtml.PerformanceGood,
-			status					= ProviderHtml.StatusDead, # Update (2024-07-08): seems to be down for a while now.
+
+			# Update (2024-07): seems to be down for a while now.
+			# Update (2025-06): .com domain still down. There is a new .org domain, but searches return an HTTP error.
+			# Update (2025-06): both domains are up again and working.
+			status					= ProviderHtml.StatusOperational,
 
 			link					= Provider._Link,
 

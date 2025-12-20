@@ -32,4 +32,9 @@ class Provider(ProviderNzbreader1):
 		ProviderNzbreader1.initialize(self,
 			name	= 'FindNZB',
 			link	= Provider._Link,
+
+			# Update (2025-12):
+			# The website does not return any results anymore: "No collections found".
+			# More info under nzbID.
+			status	= ProviderNzbreader1.StatusImpaired,
 		)

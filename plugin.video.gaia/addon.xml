@@ -14,7 +14,7 @@
 		<import addon="repository.gaia.core" version="999.999.999" optional="true" />
 		<import addon="repository.gaia.full" version="999.999.999" optional="true" />
 
-		<import addon="script.module.orion" version="5.0.0" />
+		<import addon="script.module.orion" version="5.1.3" />
 
 		<!--
 		PIL is used to generate QR codes.

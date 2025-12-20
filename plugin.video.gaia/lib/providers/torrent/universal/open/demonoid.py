@@ -62,7 +62,13 @@ class Provider(ProviderHtml):
 			description					= '{name} is one of the oldest {container} sites. The site contains results in various languages, but most of them are in English. {name} requests subpages in order to extract the magnet link, which substantially increases scraping time. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.' ,
 			rank						= 3,
 			performance					= ProviderHtml.PerformanceGood - ProviderHtml.PerformanceStep,
-			status						= ProviderHtml.StatusImpaired, # Cloudflare.
+
+			# Cloudflare. Update (2025-06): domain is down.
+			# From Reddit is seems to be down for 6+ months.
+			# From Internet Archives it seems that the last time the domain was working was April 2024.
+			# https://web.archive.org/web/20250000000000*/demonoid.is
+			#status						= ProviderHtml.StatusCloudflare,
+			status						= ProviderHtml.StatusDead,
 
 			link						= Provider._Link,
 			unblock						= Provider._Unblock,

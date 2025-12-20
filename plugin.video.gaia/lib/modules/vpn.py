@@ -785,7 +785,7 @@ class Vpn(object):
 	@classmethod
 	def killMonitor(self):
 		if Vpn.KillEventPlayback is None:
-			lock = Pool.globalLock()
+			lock = Pool.lockGlobal()
 			lock.acquire()
 			if Vpn.KillEventPlayback is None:
 				Vpn.KillEventPlayback = Event()
@@ -809,7 +809,7 @@ class Vpn(object):
 	@classmethod
 	def killProgress(self):
 		if Vpn.KillThreadReconnect is None:
-			lock = Pool.globalLock()
+			lock = Pool.lockGlobal()
 			lock.acquire()
 			if Vpn.KillThreadReconnect is None:
 				Vpn.KillThreadReconnect = Pool.thread(target = self._killProgress)

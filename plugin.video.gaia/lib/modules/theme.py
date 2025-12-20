@@ -163,6 +163,7 @@ class Theme(object):
 								result = path + i
 								break
 
+
 		if result is False: result = System.info('icon')
 		return Memory.set(id = Theme.IdPoster, value = result, local = True, kodi = True)
 

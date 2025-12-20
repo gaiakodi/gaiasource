@@ -563,46 +563,15 @@ action = tools.System.redirect(parameters = parameters) or action
 
 if developer: tools.Logger.log('EXECUTION STARTED [Action: %s]' % str(action))
 
-# Execute on first launch.
-# Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
-if action is None or action == 'home' or action == 'menu' or action == 'search' or action == 'scrape' or action == 'play' or action.startswith('oracle'): tools.System.launch()
-
-quick = False
-
-# Reduce processing time for menus that are in any case loaded in a new Python process, because they were launched as an "action" instead of a "folder" and therefore do not have a Kodi handle.
-# Importing and doing all the advanced initialization below is not needed for a "wrapper" process like this.
-# This can save around 100ms.
-# Use when opening show/season and other series submenus.
-# More info in MetaTools._items().
-if action == 'menu':
-	from lib.meta.menu import MetaMenu
-	quick = MetaMenu.menuExternal(**parameters)
+# Prepare important things for every new Python process/invoker.
+quick = tools.System.prepare(action = action, parameters = parameters)
 
 if not quick:
-	# For Gaia Eminence.
-	tools.System.navigationResolve(action = action, parameters = parameters)
-
-	# Otherwise importing modules in sub-threads might cause the execution to deadlock.
-	# Check the modulePrepare() function for more info.
-	# The deadlock can happen from various places in the indexers (navigator/movies/shows/season/episodes).
-	#	Eg: navigator -> History -> Seasons (sporadic - sometimes it works).
-	#	Eg: movies/shows/season/episodes -> metadata().
-	# There are too many sporadic deadlocks at various places, so it seems better to just place it here.
-	# Although it takes about 250-300ms, most plugin calls will probably use some of the Networker features anyways, and will then have to import the modules at a later stage.
-	# UPDATE (2024-11): This is probably not needed anymore. Everything seems to run smoothly without the import here.
-	# The deadlock might have been caused by too many threads being used during scraping to process the streams (fixed now).
-	# Maybe one thread started to import the modules, then gets paused and another thread is started, which now deadlocks, because the previous thread has not finished the import yet.
-	#from lib.modules.network import Networker
-	#Networker.modulePrepare()
-
 	#gaiaremove - too much data passed via command-line. Maybe use a Stream ID as parameter. Then lookup the stream from streams.db or global var. Similar to how the metadata is handled now.
 	source = parameters.get('source')
 	if not source is None:
 		source = tools.Converter.dictionary(source)
 		if tools.Tools.isArray(source): source = source[0]
-
-	from lib.modules.shortcut import Shortcut
-	Shortcut.process(parameters)
 
 ####################################################
 # HOME
@@ -683,6 +652,7 @@ elif action.startswith('scrape'):
 				tvshowtitle = parameters.get('tvshowtitle')
 
 				year = parameters.get('year')
+				tvshowyear = parameters.get('tvshowyear')
 				premiered = parameters.get('premiered')
 
 				season = parameters.get('season')
@@ -703,15 +673,17 @@ elif action.startswith('scrape'):
 				if title == 'None': title = None
 				if tvshowtitle == 'None': tvshowtitle = None
 				if year == 'None': year = None
+				if tvshowyear == 'None': tvshowyear = None
 				if premiered == 'None': premiered = None
 				if season == 'None': season = None
 				if episode == 'None': episode = None
 
 				if year: year = int(year)
+				if tvshowyear: tvshowyear = int(tvshowyear)
 				if not season is None: season = int(season)
 				if not episode is None: episode = int(episode)
 
-				core.Core(media = media, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, premiered = premiered, autopack = autopack, autoplay = autoplay, preset = preset, binge = binge, cache = cache, items = items)
+				core.Core(media = media, silent = silent).scrape(title = title, tvshowtitle = tvshowtitle, year = year, tvshowyear = tvshowyear, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, premiered = premiered, autopack = autopack, autoplay = autoplay, preset = preset, binge = binge, cache = cache, items = items)
 			except: tools.Logger.error()
 			tools.System.windowPropertyClear(property)
 
@@ -914,17 +886,22 @@ elif action.startswith('refresh'):
 		interface.Loader.show()
 
 		media = parameters.get('media')
+		level = parameters.get('level')
+		level = int(level) if level else 0
+		notification = parameters.get('notification')
+
 		imdb = parameters.get('imdb')
 		tmdb = parameters.get('tmdb')
 		tvdb = parameters.get('tvdb')
 		trakt = parameters.get('trakt')
+
 		season = parameters.get('season')
 		if not season is None: season = int(season)
 		episode = parameters.get('episode')
 		if not episode is None: episode = int(episode)
 
 		from lib.meta.manager import MetaManager
-		MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, refresh = True)
+		MetaManager.instance().metadataRefresh(level = level, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, notification = notification)
 
 		interface.Loader.hide() # Hide before, since Kodi will show its own laoder when refreshing the directory.
 
@@ -1159,17 +1136,19 @@ elif action.startswith('playback'):
 		progress = tools.Converter.boolean(parameters.get('progress'))
 		rating = tools.Converter.boolean(parameters.get('rating'))
 		arrival = tools.Converter.boolean(parameters.get('arrival'))
+		bulk = tools.Converter.boolean(parameters.get('bulk'))
 		accelerate = tools.Converter.boolean(parameters.get('accelerate'))
+		launch = tools.Converter.boolean(parameters.get('launch'))
 		force = tools.Converter.boolean(parameters.get('force'))
-		Playback.instance().reload(media = media, history = history, progress = progress, rating = rating, arrival = arrival, accelerate = accelerate, force = force, wait = True)
+		Playback.instance().reload(media = media, history = history, progress = progress, rating = rating, arrival = arrival, bulk = bulk, accelerate = accelerate, launch = launch, force = force, wait = True)
 
 ####################################################
-# CLEAN
+# CLEANUP
 ####################################################
 
-elif action.startswith('clean'):
+elif action.startswith('cleanup'):
 
-	if action == 'clean':
+	if action == 'cleanup':
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		tools.Cleanup.clean(settings = settings)
 
@@ -1254,9 +1233,7 @@ elif action.startswith('download'):
 
 					metadata = MetaManager.instance().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode)
 					if metadata:
-						image = MetaImage.getPoster(data = metadata)
-						image = image[0] if image else None
-
+						image = MetaImage.imagePoster(data = metadata)
 						title = tools.Title.title(media = media, metadata = metadata)
 						downer.download(media = Downloader.MediaShow if tools.Media.isSerie(media) else Downloader.MediaMovie if tools.Media.isFilm(media) else Downloader.MediaOther, title = title, link = link, image = image, metadata = metadata, source = tools.Converter.jsonTo(source), refresh = refresh)
 			else:
@@ -1543,6 +1520,18 @@ elif action.startswith('realdebrid'):
 
 	elif action == 'realdebridSettings':
 		tools.Settings.launch(id = 'premium.realdebrid.enabled')
+
+####################################################
+# DEBRIDER
+####################################################
+
+elif action.startswith('debrider'):
+
+	if action == 'debriderAuthentication':
+		from lib.modules.account import Debrider
+		help = tools.Converter.boolean(parameters.get('help'))
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Debrider().authenticate(help = help, settings = settings)
 
 ####################################################
 # EASYDEBRID
@@ -2225,8 +2214,9 @@ elif action.startswith('settings'):
 		tools.Settings.launch(id = id)
 
 	elif action == 'settingsWizard':
-		from lib.modules import window
-		window.WindowWizard.show()
+		from lib.modules.window import WindowWizard
+		type = parameters.get('type')
+		WindowWizard.launch(type = type)
 
 	elif action == 'settingsOptimization':
 		from lib.providers.core.manager import Manager
@@ -2308,16 +2298,6 @@ elif action.startswith('settings'):
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		View.settings(media = media, content = content, previous = previous, settings = settings)
 
-	elif action == 'settingsMetaDetail':
-		from lib.meta.tools import MetaTools
-		settings = tools.Converter.boolean(parameters.get('settings'))
-		MetaTools.settingsDetailShow(settings = settings)
-
-	elif action == 'settingsMetaExternal':
-		from lib.meta.tools import MetaTools
-		settings = tools.Converter.boolean(parameters.get('settings'))
-		MetaTools.settingsExternalShow(settings = settings)
-
 	elif action == 'settingsImage':
 		from lib.meta.image import MetaImage
 		mode = parameters.get('mode')
@@ -2329,6 +2309,11 @@ elif action.startswith('settings'):
 		from lib.modules.interface import Font
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		Font.iconSettings(settings = settings)
+
+	elif action == 'settingsCompany':
+		from lib.meta.company import MetaCompany
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		MetaCompany.settingsSelect(settings = settings)
 
 	elif action == 'settingsInterpreter':
 		settings = tools.Converter.boolean(parameters.get('settings'))
@@ -2351,6 +2336,46 @@ elif action.startswith('settings'):
 		from lib.modules.environment import Environment
 		settings = tools.Converter.boolean(parameters.get('settings'))
 		Environment.test(settings = settings)
+
+	elif action == 'settingsDetailMediaMenu':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsMediaMenuUpdate(settings = settings)
+
+	elif action == 'settingsDetailMediaFormat':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsMediaFormatUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityMenu':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityMenuUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityFormat':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityFormatUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityPlay':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityPlayUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityProgress':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityProgressUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityRating':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityRatingUpdate(settings = settings)
+
+	elif action == 'settingsDetailActivityAir':
+		from lib.modules.interface import Detail
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		Detail.settingsActivityAirUpdate(settings = settings)
 
 ####################################################
 # DONATIONS
@@ -2720,9 +2745,50 @@ elif action.startswith('cloudflare'):
 
 elif action.startswith('metadata'):
 
-	if action == 'metadataGenerate':
+	if action == 'metadataSettings':
+		tools.Settings.launch(tools.Settings.CategoryMetadata)
+
+	elif action == 'metadataDetail':
+		from lib.meta.tools import MetaTools
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		MetaTools.settingsDetailShow(settings = settings)
+
+	elif action == 'metadataBulk':
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		if settings:
+			from lib.meta.providers.imdb import MetaImdb
+			MetaImdb.bulkSettingsShow(settings = settings)
+		else:
+			from lib.meta.manager import MetaManager
+			selection = tools.Converter.boolean(parameters.get('selection'), none = True)
+			MetaManager.instance().bulkImdbRefresh(selection = selection, force = True, refresh = True, silent = False, wait = True)
+
+	elif action == 'metadataExternal':
+		from lib.meta.tools import MetaTools
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		MetaTools.settingsExternalShow(settings = settings)
+
+	elif action == 'metadataPreload':
+		from lib.meta.tools import MetaTools
+		clean = tools.Converter.boolean(parameters.get('clean'), none = True) # If not provided, ask the user if the cache should be cleaned.
+		settings = tools.Converter.boolean(parameters.get('settings'))
+		MetaTools.settingsPreloadShow(clean = clean, settings = settings)
+
+	elif action == 'metadataGenerate':
 		from lib.meta.manager import MetaManager
 		MetaManager.generate()
+
+####################################################
+# SOUND
+####################################################
+
+elif action.startswith('sound'):
+
+	if action == 'soundPlay':
+		mode = parameters.get('mode')
+		time = parameters.get('time')
+		delay = tools.Converter.boolean(parameters.get('delay'), none = True)
+		tools.Sound.execute(mode = mode, time = time, delay = delay)
 
 ####################################################
 # DUMMY
@@ -2742,6 +2808,80 @@ elif action.startswith('debug'):
 	if action == 'debug':
 		from lib.modules.tester import Tester
 		Tester.test()
+
+####################################################
+# DEVELOPER
+####################################################
+
+elif action.startswith('developer'):
+
+	if action == 'developer':
+
+		from lib.meta.manager import MetaManager
+		from lib.meta.cache import MetaCache
+		from lib.meta.tools import MetaTools
+		from lib.meta.pack import MetaPack
+		from lib.meta.image import MetaImage
+
+		from lib.meta.provider import MetaProvider
+		from lib.meta.providers.trakt import MetaTrakt
+		from lib.meta.providers.tmdb import MetaTmdb
+		from lib.meta.providers.tvdb import MetaTvdb
+		from lib.meta.providers.imdb import MetaImdb
+		from lib.meta.providers.fanart import MetaFanart
+
+		from lib.modules.tester import Tester
+		from lib.modules.stream import Stream
+		from lib.modules.playback import Playback
+		from lib.modules.cache import Cache, Memory
+		from lib.modules.clipboard import Clipboard
+
+		# TESTER
+
+		#Tester.test()
+
+		# STREAM
+
+		'''
+		metaMedia = tools.Media.Show
+		metaNiche = []
+		metaTitle = 'xxx'
+		metaYear = 2005
+		metaSeason = 1
+		metaEpisode = 1
+		metaPack = metaPack
+		metaCountry = ['us']
+		metaLanguage = ['en']
+		metaNetwork = ['amc']
+		metaStudio = []
+		fileName = 'xxx'
+
+		stream = Stream.load(fileName = fileName, metaMedia = metaMedia, metaNiche = metaNiche, metaTitle = metaTitle, metaYear = metaYear, metaSeason = metaSeason, metaEpisode = metaEpisode, metaPack = metaPack, metaCountry = metaCountry, metaLanguage = metaLanguage, metaNetwork = metaNetwork, metaStudio = metaStudio)
+		tools.Logger.log("Stream Info: " + str(stream))
+
+		number = Stream.numberShowExtract(data = fileName)
+		tools.Logger.log("Stream Number: " + str(number))
+		'''
+
+		# PACK
+
+		packTrakt = None
+		packTmdb = None
+		packTvdb = None
+		packImdb = None
+
+		# One Piece
+		'''packTrakt = MetaTrakt.instance().metadataPack(imdb = 'tt0388629', cache = True)
+		packTmdb = MetaTmdb.instance().metadataPack(id = '37854', cache = True)
+		packTvdb = MetaTvdb.instance().metadataPack(id ='81797', cache = True)
+		packImdb = MetaImdb.instance().metadataPack(id = 'tt0388629')'''
+
+		'''pack = MetaPack()
+		data = pack.generateShow(trakt = packTrakt, tmdb = packTmdb, tvdb = packTvdb, imdb = packImdb, check = MetaPack.CheckForeground)
+		#Clipboard.copy(tools.Converter.jsonTo(data))
+
+		#tools.Logger.log("Episode Info: "+str(pack.episode(season = 1, episode = 2, number = MetaPack.NumberSequential)))
+		'''
 
 ####################################################
 # EXECUTION

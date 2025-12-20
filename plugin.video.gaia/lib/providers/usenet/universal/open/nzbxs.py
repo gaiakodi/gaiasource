@@ -33,7 +33,10 @@ class Provider(ProviderSpotJson):
 			name					= 'NZBXS',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
 			rank					= 4,
-			status					= ProviderSpotJson.StatusDead, # Website is down.
+
+			# Website is down since 2021.
+			# Update (2025-12): Still down.
+			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,
 

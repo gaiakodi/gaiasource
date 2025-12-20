@@ -29,7 +29,7 @@ msgid "Plays"
 msgstr ""
 
 msgctxt "#32007"
-msgid "[GAIA-NO-LABEL]"
+msgid "Short Series"
 msgstr ""
 
 msgctxt "#32008"
@@ -157,7 +157,7 @@ msgid "Connection Limit"
 msgstr ""
 
 msgctxt "#32039"
-msgid "[GAIA-NO-LABEL]"
+msgid "Returning"
 msgstr ""
 
 msgctxt "#32040"
@@ -373,7 +373,7 @@ msgid "Tip"
 msgstr ""
 
 msgctxt "#32321"
-msgid "[GAIA-NO-LABEL]"
+msgid "Canceled"
 msgstr ""
 
 msgctxt "#32322"
@@ -521,11 +521,11 @@ msgid "Secondary Language"
 msgstr ""
 
 msgctxt "#32358"
-msgid "Details Placement"
+msgid "Details Format"
 msgstr ""
 
 msgctxt "#32359"
-msgid "Label Details"
+msgid "Activity Details"
 msgstr ""
 
 msgctxt "#32401"
@@ -549,15 +549,15 @@ msgid "Seconds"
 msgstr ""
 
 msgctxt "#32406"
-msgid "Details Style"
+msgid "Progress Media"
 msgstr ""
 
 msgctxt "#32407"
-msgid "Details Decoration"
+msgid "Rating Media"
 msgstr ""
 
 msgctxt "#32408"
-msgid "Details Color"
+msgid "Airing Media"
 msgstr ""
 
 msgctxt "#32501"
@@ -621,7 +621,7 @@ msgid "Remove %s"
 msgstr ""
 
 msgctxt "#32531"
-msgid "Details Level"
+msgid "Menu Details"
 msgstr ""
 
 msgctxt "#32532"
@@ -636,6 +636,10 @@ msgctxt "#32534"
 msgid "Hide Discrepancies"
 msgstr ""
 
+msgctxt "#32535"
+msgid "Alternate Episode"
+msgstr ""
+
 # [GAIACODE]
 
 msgctxt "#33000"
@@ -643,7 +647,7 @@ msgid "Favorites"
 msgstr ""
 
 msgctxt "#33001"
-msgid "[GAIA-NO-LABEL]"
+msgid "Upcoming"
 msgstr ""
 
 msgctxt "#33002"
@@ -879,7 +883,7 @@ msgid "%s Progress"
 msgstr ""
 
 msgctxt "#33060"
-msgid "Refresh Kodi Menu"
+msgid "Refresh Menu Activity"
 msgstr ""
 
 msgctxt "#33061"
@@ -911,7 +915,7 @@ msgid "The provided %s link is invalid."
 msgstr ""
 
 msgctxt "#33068"
-msgid "The %s download location is invalid. Ensure the location provided in the settings is accessible and writable."
+msgid "The \"%s\" download location is invalid. Ensure the location provided in the settings is accessible and writable."
 msgstr ""
 
 msgctxt "#33069"
@@ -2243,15 +2247,11 @@ msgid "Do you want to unrate the single [B]episode[/B] (%s), the full [B]season[
 msgstr ""
 
 msgctxt "#33401"
-msgid "[GAIA-NO-LABEL]"
+msgid "Alternate Endings"
 msgstr ""
 
 msgctxt "#33402"
-msgid "[GAIA-NO-LABEL]"
-msgstr ""
-
-msgctxt "#33407"
-msgid ""
+msgid "Alternative endings for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#33403"
@@ -2271,15 +2271,15 @@ msgid "Source"
 msgstr ""
 
 msgctxt "#33407"
-msgid "[GAIA-NO-LABEL]"
+msgid "Director Comments"
 msgstr ""
 
 msgctxt "#33408"
-msgid "[GAIA-NO-LABEL]"
+msgid "Bonus Content"
 msgstr ""
 
 msgctxt "#33409"
-msgid "[GAIA-NO-LABEL]"
+msgid "Preview Trailers"
 msgstr ""
 
 msgctxt "#33410"
@@ -2351,7 +2351,7 @@ msgid "Playing Native Sound"
 msgstr ""
 
 msgctxt "#33427"
-msgid "[GAIA-NO-LABEL]"
+msgid "Media Details"
 msgstr ""
 
 msgctxt "#33428"
@@ -2391,7 +2391,7 @@ msgid "Children (8)"
 msgstr ""
 
 msgctxt "#33437"
-msgid "[GAIA-NO-LABEL]"
+msgid "Ended"
 msgstr ""
 
 msgctxt "#33438"
@@ -2495,7 +2495,7 @@ msgid "Skip Intro"
 msgstr ""
 
 msgctxt "#33463"
-msgid "[GAIA-NO-LABEL]"
+msgid "Plot"
 msgstr ""
 
 msgctxt "#33464"
@@ -2659,7 +2659,7 @@ msgid "Changelog"
 msgstr ""
 
 msgctxt "#33504"
-msgid "[GAIA-NO-LABEL]"
+msgid "Alternate"
 msgstr ""
 
 msgctxt "#33505"
@@ -2747,7 +2747,7 @@ msgid "Refresh Episode Metadata"
 msgstr ""
 
 msgctxt "#33526"
-msgid "Refresh Menu Metadata"
+msgid "Refresh Menu List"
 msgstr ""
 
 msgctxt "#33527"
@@ -3547,7 +3547,7 @@ msgid "Optional Addon"
 msgstr ""
 
 msgctxt "#33726"
-msgid "[GAIA-NO-LABEL]"
+msgid "Replace"
 msgstr ""
 
 msgctxt "#33727"
@@ -3671,7 +3671,7 @@ msgid "Resolvers might select the wrong file from packs."
 msgstr ""
 
 msgctxt "#33757"
-msgid "The stream is an unsupported %s archive"
+msgid "Unsupported %s File Format"
 msgstr ""
 
 msgctxt "#33758"
@@ -3999,7 +3999,7 @@ msgid "The VPN is [B]reconnecting[/B] and you are [B]not anonymous[/B] yet."
 msgstr ""
 
 msgctxt "#33839"
-msgid "Retrieving [B]Extended[/B] metadata takes longer than [B]Standard[/B] metadata, increasing loading times of menus when opened for the [B]first[/B] time. Do you want to keep the current metadata level or reduce it for faster menu loading?"
+msgid "It is highly recommended to complete the metadata preloading to ensure smooth menu loading. Are you sure you want to terminate the preloading?"
 msgstr ""
 
 msgctxt "#33840"
@@ -4355,7 +4355,7 @@ msgid "Unwatched Counter"
 msgstr ""
 
 msgctxt "#33928"
-msgid "[GAIA-NO-LABEL]"
+msgid "Extras"
 msgstr ""
 
 msgctxt "#33929"
@@ -4603,11 +4603,11 @@ msgid "Cleanup"
 msgstr ""
 
 msgctxt "#33990"
-msgid "Reaction"
+msgid "Viewer Reactions"
 msgstr ""
 
 msgctxt "#33991"
-msgid "Reactions of season %s of %s."
+msgid "Viewer responses and reactions to [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#33992"
@@ -4667,7 +4667,7 @@ msgid "In the next steps you can authenticate various accounts for[CR]additional
 msgstr ""
 
 msgctxt "#34006"
-msgid "In the next steps you can configure various aspects of the metadata[CR]which is used in menus and many other places throughout Gaia.[CR][CR]Metadata is retrieved from external sources and is the root cause[CR]for slow menus, but this improves over time as data is cached locally."
+msgid "In the next steps you can configure various aspects of the metadata[CR]which is used in menus and many other places throughout Gaia.[CR][CR]Metadata is retrieved from external sources and is the main reason[CR]why menus are slow, but this improves over time as data is cached locally."
 msgstr ""
 
 msgctxt "#34007"
@@ -5335,7 +5335,7 @@ msgid "Adjust the time to wait before retrying a failed provider. A value of [I]
 msgstr ""
 
 msgctxt "#34173"
-msgid "Validate SSL and TLS certificates when making requests to websites or APIs. The [I]Strict[/I] option is the most secure and any certificate problem will cause the request to fail. The [I]Moderate[/I] option is slightly less secure, but allows certificates that are expired or have a different domain. The [I]Lenient[/I] option is the least secure and uses the old TLSv1 to accommodate various certificate limitations. The [I]Disabled[/I] option completely disables any certificate checks."
+msgid "Validate SSL and TLS certificates when making requests to websites or APIs. The [I]Strict[/I] option is the most secure and any certificate problem will cause the request to fail. The [I]Moderate[/I] option is slightly less secure, but allows certificates that are expired or have a different domain. The [I]Lenient[/I] option is the least secure and uses the old TLSv1 to accommodate various certificate limitations. The [I]Disabled[/I] option completely disables any certificate checks and therefore allows more requests to execute successfully. Validating certificates is no important in Gaia, since no sensitive data is exchanged. Some providers also have outdated or invalid certificates, and ignoring certificate validation might therefore return better scraping results."
 msgstr ""
 
 msgctxt "#34174"
@@ -5495,7 +5495,7 @@ msgid "Automatically optimize the scraping timeout, limits, and parameters based
 msgstr ""
 
 msgctxt "#34213"
-msgid "Show the airing time of episodes in the menu labels if available."
+msgid "Show the airing time of shows in the menu details if available."
 msgstr ""
 
 msgctxt "#34214"
@@ -5503,7 +5503,7 @@ msgid "Convert the airing time to your local timezone, the native timezone where
 msgstr ""
 
 msgctxt "#34215"
-msgid "Show your own rating in the menu labels if available."
+msgid "Show your own rating in the menu details if available."
 msgstr ""
 
 msgctxt "#34216"
@@ -5515,7 +5515,7 @@ msgid "Change the format of the weekday, either as full name or as abbreviation.
 msgstr ""
 
 msgctxt "#34218"
-msgid "Show the number of plays in the menu labels if available."
+msgid "Show the number of plays in the menu details if available."
 msgstr ""
 
 msgctxt "#34219"
@@ -5615,7 +5615,7 @@ msgid "List future episodes under the show menus that were not yet aired. Most f
 msgstr ""
 
 msgctxt "#34243"
-msgid "The addon is adds studio and network icons to the menus. Some Kodi skins might not support these icons."
+msgid "The addon adds studio and network icons to the menus. Some Kodi skins might not support these icons."
 msgstr ""
 
 msgctxt "#34244"
@@ -5919,11 +5919,11 @@ msgid "Change the provider, decor, and language for different episode image type
 msgstr ""
 
 msgctxt "#34319"
-msgid "Add additional info that is not natively supported by Kodi and skins to the menu labels. For most custom skins, this requires changing the [B]Force Label[/B] setting under the [B]Menus[/B] section to be enabled."
+msgid "Add additional activity details that are not natively supported in Kodi to the menus, including play, progress, rating, and airing info."
 msgstr ""
 
 msgctxt "#34320"
-msgid "Change the placement of the details. The metadata can be [B]appended[/B] or [B]prepended[/B] to either the [B]title[/B] or the [B]plot[/B]."
+msgid "Add additional media and activity details to the menus."
 msgstr ""
 
 msgctxt "#34321"
@@ -6031,7 +6031,7 @@ msgid "Verify that a subcategory of providers or a specific provider works as in
 msgstr ""
 
 msgctxt "#34347"
-msgid "Providers are grouped into different subcategories, each of which can be toggled. Providers are customizable through common settings that are available in all providers and optional custom settings that are unique to providers.[CR][CR]Providers have a rating out of five (%s) next to their name indicating their quality, such as the availability of links, the scraping speed, and other problems that might impede the scraping process. Providers with a red icon (%s) have no working domain or are known not to be working anymore. Providers with a yellow icon (%s) have strong Cloudflare protection that cannot be bypassed, are inaccessible from some countries or VPNs, or are in some other way impaired. Providers with a green icon (%s) are operational and should work as intended."
+msgid "Providers are grouped into different subcategories, each of which can be toggled. Providers are customizable through common settings that are available in all providers and optional custom settings that are unique to providers.[CR][CR]Providers have a rating out of five (%s) next to their name indicating their quality, such as the availability of links, the scraping speed, and other problems that might impede the scraping process. Providers with a red icon (%s) have no working domain or are known not to be working anymore. Providers with an orange icon (%s) have server constraints, are inaccessible from some countries or VPNs, or are in some other way impaired. Providers with a yellow icon (%s) have strong Cloudflare protection that can often not be bypassed, especially if a VPN is active. Providers with a green icon (%s) are operational and should work as intended."
 msgstr ""
 
 msgctxt "#34348"
@@ -6075,7 +6075,7 @@ msgid "Specify how videos are retrieved from YouTube. Directly play the best ava
 msgstr ""
 
 msgctxt "#34358"
-msgid "Settings related to metadata and ratings."
+msgid "Settings related to metadata, region, and ratings."
 msgstr ""
 
 msgctxt "#34359"
@@ -6239,11 +6239,11 @@ msgid "Force customly generated labels to be used as titles. Menu entries have a
 msgstr ""
 
 msgctxt "#34409"
-msgid "Style the details label. Either apply no style or use a [B]bold[/B], [I]italics[/I], or [LIGHT]light[/LIGHT] font. Note that some light fonts are not distinguishable from the normal fonts."
+msgid "Change the label layout of season recaps and extras. The [I]Default[/I] option automatically selects the best layout for your current Kodi skin. The [I]Native[/I] option lets your current Kodi skin handle the label formatting."
 msgstr ""
 
 msgctxt "#34410"
-msgid "Decorate the details label. Either apply no decoration, add a [B]full[/B] or [B]abbreviated[/B] label, or add an [B]icon[/B]. Note that icons depend on the font you are using and most fonts to not contain icon characters."
+msgid "Change the label layout of sets. The [I]Default[/I] option automatically selects the best layout for your current Kodi skin. The [I]Native[/I] option lets your current Kodi skin handle the label formatting."
 msgstr ""
 
 msgctxt "#34411"
@@ -6287,7 +6287,7 @@ msgid "Change the limit, preferred and fallback selections for different special
 msgstr ""
 
 msgctxt "#34421"
-msgid "Change the limit, preferred and fallback selections for different multiple image types. Certain menus, such as arrivals or new releases, contain episodes from different shows. These multi-episode menus might look better with show images instead of season or episode images. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
+msgid "Change the limit, preferred and fallback selections for different smart image types. The Quick, Progress, and Arrivals menus are constructed with episodes and seasons that are displayed as either season or show entries. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
 msgstr ""
 
 msgctxt "#34422"
@@ -6763,15 +6763,15 @@ msgid "Only show the play count if the number is greater or equal to this thresh
 msgstr ""
 
 msgctxt "#34540"
-msgid "Show the current playback progress in the menu labels if available."
+msgid "Show the current playback progress in the menu details if available."
 msgstr ""
 
 msgctxt "#34541"
-msgid "Color the details label. Either apply [B]no[/B] color, use the [B]primary[/B] or [B]secondary[/B] color, or use a [B]mixed[/B] color palette with different colors for each attribute."
+msgid "Inspect the Debrider cache to determine if files are instantly available. The [I]Native[/I] option looks up the cache from your local device, which is unrestricted and generally faster. The [I]Orion[/I] option uses Orion for lookups, which is subject to daily limits and requires your debrid account to be authenticated with Orion."
 msgstr ""
 
 msgctxt "#34542"
-msgid "Adjust the level at which details are shown. The [B]Essential[/B] option only displays details for movies and episodes. The [B]Standard[/B] option displays details for movies, shows, and episodes. The [B]Extended[/B] option displays details for movies, shows, seasons, and episodes. The [B]Disabled[/B] option removes all extra labels and only uses label formatting for releases."
+msgid "Authenticate a Debrider account with an external resolver addon. Only cache lookups and basic streaming is available. Advanced features are not supported."
 msgstr ""
 
 msgctxt "#34543"
@@ -6887,11 +6887,11 @@ msgid "Add a [I]Trakt[/I], [I]YouTube[/I], and [I]Orion[/I]  account for the bes
 msgstr ""
 
 msgctxt "#34571"
-msgid "Display studio and network icons in menus. This is typically a icon added to the menu bar. The icon is only supported by some Kodi skins and requires the third-party [I]StudioIcons[/I]  addon."
+msgid "Display studio and network icons in menus. This is typically an icon added to the menu bar. The icon is only supported by some Kodi skins and requires the third-party [I]StudioIcons[/I]  addon."
 msgstr ""
 
 msgctxt "#34572"
-msgid "[I]Extended[/I]  metadata takes longer to retrieve the first time a menu is opened.[CR]However, the extra detail, more accurate ratings, and improved aesthetics make it worth the while."
+msgid "[I]Extended[/I]  metadata takes longer to retrieve the first time a menu is opened.[CR]However, the extra detail, more accurate ratings, and improved aesthetics make it worthwhile."
 msgstr ""
 
 msgctxt "#34573"
@@ -6899,7 +6899,7 @@ msgid "The preprocessed meta database requires a download and extra storage, but
 msgstr ""
 
 msgctxt "#34574"
-msgid "[I]Standard[/I]  scraping is recommended for most people, since it is the optimal combination of speed and[CR]results, based on your hardware. Do not go [I]Crazy[/I]  on low-end devices, like those with an ARM processor."
+msgid "[I]Standard[/I]  scraping is recommended for most people, since it is the optimal trade-off between speed[CR]and results, based on your hardware. Do not go [I]Crazy[/I]  on low-end devices, like those with an ARM processor."
 msgstr ""
 
 msgctxt "#34575"
@@ -7243,23 +7243,23 @@ msgid "Format the progress as an percentage or integer."
 msgstr ""
 
 msgctxt "#34660"
-msgid "Add label details for Quick menus."
+msgid "Adjust menus to allow easy access to titles that were fully watched. Titles remain in menus for a bit longer so that if you fell asleep while watching, you can quickly rewatch them the next day."
 msgstr ""
 
 msgctxt "#34661"
-msgid "Add label details for Progress menus."
+msgid "Adjust how many previously watched episodes are listed in the episode submenus."
 msgstr ""
 
 msgctxt "#34662"
-msgid "Add label details for Arrivals menus."
+msgid "Adjust the number of days that watched titles remain in the menus. A value of [I]0[/I] will remove titles immediately after being watched. An [I]empty[/I] value will reset to default."
 msgstr ""
 
 msgctxt "#34663"
-msgid "Add label details for mixed media menus."
+msgid "Show the media content type in the player's description. The [I]Essential[/I] option shows the episode type. The [I]Standard[/I] option shows the the episode and movie types."
 msgstr ""
 
 msgctxt "#34664"
-msgid "Add label details for all other menus."
+msgid "Show the ratings and votes in the player's description. The [I]Essential[/I] option shows the average rating and votes across providers. The [I]Standard[/I] option shows the ratings for individual providers. The [I]Extended[/I] option shows ratings and votes for individual providers."
 msgstr ""
 
 msgctxt "#34665"
@@ -7267,8 +7267,101 @@ msgid "Settings related to menu and stream label customization."
 msgstr ""
 
 msgctxt "#34666"
-msgid "Change the label color for future unreleased titles. This is useful if your skin does not support [I]italics[/I] fonts. The [B]Disabled[/B] custom color under the [B]Theme[/B] section is used for this."
+msgid "Change the label color for future unreleased titles and unofficial episodes. This is useful if your skin does not support [I]italics[/I] fonts. The [B]Disabled[/B] custom color under the [B]Theme[/B] section is used for this."
 msgstr ""
+
+msgctxt "#34667"
+msgid "Specify how alternative ending videos are retrieved from YouTube. Directly play the best available video without user interaction, manually select a video from a list, or automatically try to select the best video and fall back to manual selection if none can be found. This feature requires a YouTube account."
+msgstr ""
+
+msgctxt "#34668"
+msgid "Specify how videos are retrieved from YouTube when accessed from the context menu. Directly play the best available video without user interaction, manually select a video from a list, automatically try to select the best video and fall back to manual selection if none can be found, or use the custom options from the [I]Video Retrieval[/I] setting. This feature requires a YouTube account."
+msgstr ""
+
+msgctxt "#34669"
+msgid "Configure the menus for which the details are added. The details can be toggled for each menu, media, and placement. The [B]Enabled[/B] option adds the details. The [B]Disabled[/B] option removes the details. The [B]Partial[/B] option only adds the details for specific items. Note that some skins do not support taglines for seasons and episodes."
+msgstr ""
+
+msgctxt "#34670"
+msgid "Customize the placement, separator, brackets, style, and color used for the details. Note that some light fonts are indistinguishable from normal fonts. Some skins and fonts might also not support italics or light styles."
+msgstr ""
+
+msgctxt "#34671"
+msgid "Add additional media details to the menus, including the media, release, genre, season and episode types."
+msgstr ""
+
+msgctxt "#34672"
+msgid "Configure the media types for which the play details are added."
+msgstr ""
+
+msgctxt "#34673"
+msgid "Configure the media types for which the progress details are added."
+msgstr ""
+
+msgctxt "#34674"
+msgid "Configure the media types for which the rating details are added."
+msgstr ""
+
+msgctxt "#34675"
+msgid "Configure the media types for which the airing details are added."
+msgstr ""
+
+msgctxt "#34676"
+msgid "Change the limit, preferred and fallback selections for different base image types. Base images are used in various places in the interface, such as the loading, scraping, streams, rating, and binging dialogs. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
+msgstr ""
+
+msgctxt "#34677"
+msgid "Change the limit, preferred and fallback selections for different player image types. Player images are used in the Kodi player and the Kore app. An attempt will be made to select the preferred image, and if not available, the fallback image will be used instead."
+msgstr ""
+
+msgctxt "#34678"
+msgid "Change the Python module used as the bypasser. [B]CfScrape[/B] is a legacy module that has not been updated in years and will therefore not solve most Cloudflare challenges. [B]CloudScraper[/B] is a considerable better module with more recent updates and better bypassing."
+msgstr ""
+
+msgctxt "#34679"
+msgid "Change the module version used as the bypasser. The [B]Legacy[/B] version is the stable and reliable release, although it is slightly outdated and can therefore not solve newer Cloudflare challenges. The [B]Latests[/B] version is the newer release which was updated  recently and can therefore solve newer Cloudflare challenges. However, since the [B]Latests[/B] version is new, it is still unstable, can cause various issues, and since it does not support asynchronous requests at the moment, it can be considerably slower. If you run into any problems, switch back to the [B]Legacy[/B] version."
+msgstr ""
+
+msgctxt "#34680"
+msgid "Preload metadata and smart menus. The more metadata is preloaded, the more accurate and faster menus will be. This is not required, as any metadata that is not preloaded, will still be loaded in small chunks in the background over time. Preloading can take long time, as metadata providers have API rate limits that throttle how much metadata can be retrieved at once. Preloading can be paused and resumed at any time."
+msgstr ""
+
+msgctxt "#34681"
+msgid "[I]Premiumize[/I]  currently provides the best experience, followed by [I]OffCloud[/I], [I]TorBox[/I], [I]Debrider[/I]  and [I]EasyDebrid[/I].[CR][I]RealDebrid[/I], [I]AllDebrid[/I], and [I]DebridLink[/I] all work, but do not allow cache lookups anymore and are otherwise limited."
+msgstr ""
+
+msgctxt "#34682"
+msgid "The primary language is used for metadata and images in menus and for various other features throughout Gaia.[CR]Stick to [I]English[/I]  as the primary language for the best experience and add other proficient languages as alternatives."
+msgstr ""
+
+msgctxt "#34683"
+msgid "Once the [I]Skip[/I]  button appears, enough metadata has been loaded and you can skip some steps if you are in a hurry.[CR]The longer you preload, the better. The remainder of the metadata will be loaded in the background over time as you use Gaia."
+msgstr ""
+
+msgctxt "#34684"
+msgid "Download bulk IMDb data containing IMDb IDs and ratings to supplement metadata were these values are missing. This requires substantial processing, some free storage space, and a lot of free memory, once every few weeks."
+msgstr ""
+
+msgctxt "#34685"
+msgid "Show notifications if there are issues with the bulk data, such as insufficient free storage space or memory. The [I]Foreground[/I] option shows the notifications in a foreground dialog. The [I]Background[/I] option shows the notifications in a background dialog. The [I]Disabled[/I] option will not show any notifications."
+msgstr ""
+
+msgctxt "#34686"
+msgid "Show the progress of the bulk data download and processing. The [I]Foreground[/I] option shows the progress in a foreground dialog. The [I]Background[/I] option shows the progress in a background dialog. The [I]Disabled[/I] option will not show any progress."
+msgstr ""
+
+msgctxt "#34687"
+msgid "Initiate the bulkdata refresh during Kodi launch. The [I]Automatic[/I] option automatically starts the refresh process. The [I]Selection[/I] option asks whether or not to start the refresh process."
+msgstr ""
+
+msgctxt "#34688"
+msgid "Execute an action after the bulkdata refresh has concluded. The [I]Disabled[/I] option will not do anything. The [I]Notification[/I] option will show a summary notification. The [I]Selection[/I] option will show a summary and ask you for a further action. The [I]Restart[/I] option will automatically restart the device. The [I]Memory[/I] option will automatically restart the device, but only if there is not enough free memory. Restarting the device can be useful to free up any used memory and ensure that your device runs smoothly."
+msgstr ""
+
+msgctxt "#34689"
+msgid "Most IMDb metadata is already available with [I]Extended[/I]  metadata. [I]Bulkdata[/I]  only supplements occasional missing IMDb IDs and ratings.[CR]Bulkdata needs free memory and disk space, and takes a few minutes to process once every few weeks. Disabling this will not hamper any features."
+msgstr ""
+
 
 # [/GAIACODE]
 
@@ -7441,7 +7534,7 @@ msgid "Playback Rating"
 msgstr ""
 
 msgctxt "#35042"
-msgid "%s Rated At [B]%.1f[/B]"
+msgid "%s Rated As [B]%s[/B] At [B]%.1f[/B]"
 msgstr ""
 
 msgctxt "#35043"
@@ -7741,11 +7834,11 @@ msgid "Disagree"
 msgstr ""
 
 msgctxt "#35117"
-msgid "Future Seasons"
+msgid "Future Season"
 msgstr ""
 
 msgctxt "#35118"
-msgid "Future Episodes"
+msgid "Future Episode"
 msgstr ""
 
 msgctxt "#35119"
@@ -8017,7 +8110,7 @@ msgid "Dolby Vision"
 msgstr ""
 
 msgctxt "#35186"
-msgid "You are trying to play a Dolby Vision (%s) video. Your device and TV must support this format, otherwise the video will not play or have a purple-greenish tint. You can remove %s files from the list using the filter settings. Do you want to [B]cancel[/B] playback, [B]ignore[/B] this message in the future, or [B]continue[/B] and show this message again?"
+msgid "You are trying to play a Dolby Vision (%s) video. Some of these videos might have a purple-greenish tint if your device or TV does not support the format. You can remove %s files from the list using the filter settings. Do you want to [B]cancel[/B] playback, [B]ignore[/B] this message in the future, or [B]continue[/B] and show this message again?"
 msgstr ""
 
 msgctxt "#35187"
@@ -8653,7 +8746,7 @@ msgid "You rated this item as [B]%.1f[/B] on [B]%s[/B]. Do you want to [B]keep[/
 msgstr ""
 
 msgctxt "#35345"
-msgid "%s Rated At [B]%.1f[/B] On Trakt"
+msgid "%s Rated As [B]%s[/B] At [B]%.1f[/B] On Trakt"
 msgstr ""
 
 msgctxt "#35346"
@@ -9097,7 +9190,7 @@ msgid "Filtered"
 msgstr ""
 
 msgctxt "#35456"
-msgid "A summary of what happened previously in Season %s of [I]%s[/I]."
+msgid "Details Menu"
 msgstr ""
 
 msgctxt "#35457"
@@ -9293,7 +9386,7 @@ msgid "CivitasScrapers"
 msgstr ""
 
 msgctxt "#35505"
-msgid "Future Color"
+msgid "Label Color"
 msgstr ""
 
 msgctxt "#35506"
@@ -9413,7 +9506,7 @@ msgid "Set"
 msgstr ""
 
 msgctxt "#35535"
-msgid "Recap"
+msgid "Story Recaps"
 msgstr ""
 
 msgctxt "#35536"
@@ -9433,7 +9526,7 @@ msgid "Scraping"
 msgstr ""
 
 msgctxt "#35540"
-msgid "Other Menu"
+msgid "Generic Menu"
 msgstr ""
 
 msgctxt "#35541"
@@ -9533,7 +9626,7 @@ msgid "Best Supporting Actress"
 msgstr ""
 
 msgctxt "#35565"
-msgid "[GAIA-NO-LABEL]"
+msgid "Anime Providers"
 msgstr ""
 
 msgctxt "#35566"
@@ -9577,11 +9670,11 @@ msgid "Some"
 msgstr ""
 
 msgctxt "#35576"
-msgid "%s Rating Unchanged At [B]%.1f[/B]"
+msgid "%s Rating Unchanged As [B]%s[/B] At [B]%.1f[/B]"
 msgstr ""
 
 msgctxt "#35577"
-msgid "%s Rating Unchanged At [B]%.1f[/B] On Trakt"
+msgid "%s Rating Unchanged As [B]%s[/B] At [B]%.1f[/B] On Trakt"
 msgstr ""
 
 msgctxt "#35578"
@@ -9665,7 +9758,7 @@ msgid "Episode Style"
 msgstr ""
 
 msgctxt "#35598"
-msgid "Multiple Images"
+msgid "Smart Images"
 msgstr ""
 
 msgctxt "#35599"
@@ -9869,19 +9962,19 @@ msgid "Bonus Menu"
 msgstr ""
 
 msgctxt "#35649"
-msgid "Additional videos for Season %s of [I]%s[/I]."
+msgid "Additional scenes and extra videos for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35650"
-msgid "Making"
+msgid "Behind The Scenes"
 msgstr ""
 
 msgctxt "#35651"
-msgid "Review"
+msgid "Critic Reviews"
 msgstr ""
 
 msgctxt "#35652"
-msgid "Explanation"
+msgid "Ending Explanations"
 msgstr ""
 
 msgctxt "#35653"
@@ -9889,47 +9982,47 @@ msgid "Extra"
 msgstr ""
 
 msgctxt "#35654"
-msgid "Deleted"
+msgid "Deleted Scenes"
 msgstr ""
 
 msgctxt "#35655"
-msgid "Interview"
+msgid "Cast Interviews"
 msgstr ""
 
 msgctxt "#35656"
-msgid "Trailers for Season %s of %s."
+msgid "Trailers and teaser previews for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35657"
-msgid "Recaps for Season %s of %s."
+msgid "Summaries of what happened previously in [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35658"
-msgid "Reviews for Season %s of %s."
+msgid "Critic and viewer reviews for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35659"
-msgid "Extra scenes from Season %s of %s."
+msgid "Additional scenes and extras for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35660"
-msgid "Deleted scenes from Season %s of %s."
+msgid "Unreleased and deleted scenes for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35661"
-msgid "Behind the scenes from Season %s of %s."
+msgid "The production and making of [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35662"
-msgid "Director commentary for Season %s of %s."
+msgid "The director's commentary for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35663"
-msgid "Interviews for Season %s of %s."
+msgid "Cast and crew interviews for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35664"
-msgid "Ending explanation of Season %s of %s."
+msgid "The ending explained for [I]Season %s[/I]  of [I]%s[/I]."
 msgstr ""
 
 msgctxt "#35665"
@@ -10597,7 +10690,7 @@ msgid "Mirrors"
 msgstr ""
 
 msgctxt "#35831"
-msgid "[GAIA-NO-LABEL]"
+msgid "Sequential"
 msgstr ""
 
 msgctxt "#35832"
@@ -10796,73 +10889,88 @@ msgctxt "#35880"
 msgid "Download Location"
 msgstr ""
 
+msgctxt "#35881"
+msgid "Notification"
+msgstr ""
 
+msgctxt "#35882"
+msgid "Elapsed"
+msgstr ""
+
+msgctxt "#35883"
+msgid "Old"
+msgstr ""
+
+
+msgctxt "#35884"
+msgid "[GAIAREMOVE]"
+msgstr ""
 
 
 
 
 msgctxt "#36000"
-msgid "[GAIA-NO-LABEL]"
+msgid "Premiere"
 msgstr ""
 
 msgctxt "#36001"
-msgid "[GAIA-NO-LABEL]"
+msgid "Series Premiere"
 msgstr ""
 
 msgctxt "#36002"
-msgid "[GAIA-NO-LABEL]"
+msgid "Season Premiere"
 msgstr ""
 
 msgctxt "#36003"
-msgid "[GAIA-NO-LABEL]"
+msgid "Midseason Premiere"
 msgstr ""
 
 msgctxt "#36004"
-msgid "[GAIA-NO-LABEL]"
+msgid "Alternate Premiere"
 msgstr ""
 
 msgctxt "#36005"
-msgid "[GAIA-NO-LABEL]"
+msgid "Finale"
 msgstr ""
 
 msgctxt "#36006"
-msgid "[GAIA-NO-LABEL]"
+msgid "Series Finale"
 msgstr ""
 
 msgctxt "#36007"
-msgid "[GAIA-NO-LABEL]"
+msgid "Season Finale"
 msgstr ""
 
 msgctxt "#36008"
-msgid "[GAIA-NO-LABEL]"
+msgid "Midseason Finale"
 msgstr ""
 
 msgctxt "#36009"
-msgid "[GAIA-NO-LABEL]"
+msgid "Alternate Finale"
 msgstr ""
 
 msgctxt "#36010"
-msgid "[GAIA-NO-LABEL]"
+msgid "Standard Episode"
 msgstr ""
 
 msgctxt "#36011"
-msgid "[GAIA-NO-LABEL]"
+msgid "Storyline Special"
 msgstr ""
 
 msgctxt "#36012"
-msgid "[GAIA-NO-LABEL]"
+msgid "Season Extra"
 msgstr ""
 
 msgctxt "#36013"
-msgid "[GAIA-NO-LABEL]"
+msgid "TV Film"
 msgstr ""
 
 msgctxt "#36014"
-msgid "[GAIA-NO-LABEL]"
+msgid "TV Special"
 msgstr ""
 
 msgctxt "#36015"
-msgid "[GAIA-NO-LABEL]"
+msgid "Short Film"
 msgstr ""
 
 msgctxt "#36016"
@@ -11626,7 +11734,7 @@ msgid "Welcome to Gaia"
 msgstr ""
 
 msgctxt "#36206"
-msgid "The setup wizard will guide you through a step-wise process to[CR]configure the most important settings for the addon. Individual[CR]settings can be adjusted afterwards in the settings dialog.[CR][CR][I]Tips[/I]  on how to get the most out of Gaia are given in the footnotes,[CR]while a more detailed explanation is available from the [I]Help[/I]  button."
+msgid "[I]Tips[/I]  on how to get the most out of Gaia are given in the footnotes,[CR]while a more detailed explanation is available from the [I]Help[/I]  button."
 msgstr ""
 
 msgctxt "#36207"
@@ -11774,7 +11882,7 @@ msgid "Authenticate debrid accounts on Orion's website, which can be used for ca
 msgstr ""
 
 msgctxt "#36243"
-msgid "[GAIA-NO-LABEL]"
+msgid "Video Context"
 msgstr ""
 
 msgctxt "#36244"
@@ -12017,10 +12125,6 @@ msgctxt "#36305"
 msgid "Orion Debrid"
 msgstr ""
 
-msgctxt "#36305"
-msgid "[GAIA-NO-LABEL]"
-msgstr ""
-
 msgctxt "#36306"
 msgid "Show the menu with the detected titles"
 msgstr ""
@@ -12238,7 +12342,7 @@ msgid "The provider should work as expected and return links."
 msgstr ""
 
 msgctxt "#36360"
-msgid "The provider might be impaired and not return any links. Strong Cloudflare protection, country or ISP domain blocking, or other restrictions might limit access to the provider."
+msgid "The provider might be impaired and not return any links. Server constraints, country or ISP domain blocking, or other restrictions might limit access to the provider."
 msgstr ""
 
 msgctxt "#36361"
@@ -12398,7 +12502,7 @@ msgid "Environment"
 msgstr ""
 
 msgctxt "#36400"
-msgid "[GAIA-NO-LABEL]"
+msgid "Set Info"
 msgstr ""
 
 msgctxt "#36401"
@@ -12642,7 +12746,7 @@ msgid "Standby"
 msgstr ""
 
 msgctxt "#36461"
-msgid "[GAIA-NO-LABEL]"
+msgid "Feature Film"
 msgstr ""
 
 msgctxt "#36462"
@@ -12770,7 +12874,7 @@ msgid "Rating Short"
 msgstr ""
 
 msgctxt "#36493"
-msgid "[GAIA-NO-LABEL]"
+msgid "Mini Series"
 msgstr ""
 
 msgctxt "#36494"
@@ -13711,4 +13815,724 @@ msgstr ""
 
 msgctxt "#36728"
 msgid "For DebridLink, AllDebrid, TorBox, and RapidPremium"
+msgstr ""
+
+msgctxt "#36729"
+msgid "Play Media"
+msgstr ""
+
+msgctxt "#36730"
+msgid "Film Collection"
+msgstr ""
+
+msgctxt "#36731"
+msgid "White"
+msgstr ""
+
+msgctxt "#36732"
+msgid "Force White"
+msgstr ""
+
+msgctxt "#36733"
+msgid "Force Color"
+msgstr ""
+
+msgctxt "#36734"
+msgid "Studio icons are available in [B]white[/B] or [B]color[/B]. Most skins only support white icons, although it is possible to use color icons in unsupported skins. [B]Install[/B] the white icons only or find help and additional choices under [B]Options[/B]."
+msgstr ""
+
+msgctxt "#36735"
+msgid "Detailed explanation on how studio icons work"
+msgstr ""
+
+msgctxt "#36736"
+msgid "Install the white studio icons only"
+msgstr ""
+
+msgctxt "#36737"
+msgid "Install the color studio icons only"
+msgstr ""
+
+msgctxt "#36738"
+msgid "Install both the white and color studio icons"
+msgstr ""
+
+msgctxt "#36739"
+msgid "Do you want to [B]replace[/B] the texture file from the [B]%s[/B] studio icons addon with those from the [B]%s[/B] studio icons addon, which is useful for skins that nativley only support one of them. Or do you want to [B]reset[/B] to the original texture?"
+msgstr ""
+
+msgctxt "#36740"
+msgid "The updated textures will only be loaded once Kodi is restarted. Do you want to [B]restart[/B] Kodi now or [B]later[/B]?"
+msgstr ""
+
+msgctxt "#36741"
+msgid "Remove the studios completely to hide all icons"
+msgstr ""
+
+msgctxt "#36742"
+msgid "Use a single studio without any optimization"
+msgstr ""
+
+msgctxt "#36743"
+msgid "Detect icons and apply generic optimizations"
+msgstr ""
+
+msgctxt "#36744"
+msgid "Optimize the studios specifically for white icons"
+msgstr ""
+
+msgctxt "#36745"
+msgid "Optimize the studios specifically for color icons"
+msgstr ""
+
+msgctxt "#36746"
+msgid "Replace color icons with white icons"
+msgstr ""
+
+msgctxt "#36747"
+msgid "Replace white icons with color icons"
+msgstr ""
+
+msgctxt "#36748"
+msgid "Studio icons are available in [B]white[/B] or [B]color[/B]. Some skins do not support studio icons at all, others support only white icons, while others might support both."
+msgstr ""
+
+msgctxt "#36749"
+msgid "Multiple"
+msgstr ""
+
+msgctxt "#36750"
+msgid "Use all studios without any optimization"
+msgstr ""
+
+msgctxt "#36751"
+msgid "Base Images"
+msgstr ""
+
+msgctxt "#36752"
+msgid "Player Images"
+msgstr ""
+
+msgctxt "#36753"
+msgid "QR Image[CR][CR][CR][CR][CR]Generation Failed"
+msgstr ""
+
+msgctxt "#36754"
+msgid "Continuing"
+msgstr ""
+
+msgctxt "#36755"
+msgid "Interleaved Series"
+msgstr ""
+
+msgctxt "#36756"
+msgid "Absolute Series"
+msgstr ""
+
+msgctxt "#36757"
+msgid "Tagline"
+msgstr ""
+
+msgctxt "#36758"
+msgid "Bonus"
+msgstr ""
+
+msgctxt "#36759"
+msgid "Series Specials"
+msgstr ""
+
+msgctxt "#36760"
+msgid "Mini Season"
+msgstr ""
+
+msgctxt "#36761"
+msgid "Standard Season"
+msgstr ""
+
+msgctxt "#36762"
+msgid "Premiere Season"
+msgstr ""
+
+msgctxt "#36763"
+msgid "Finale Season"
+msgstr ""
+
+msgctxt "#36764"
+msgid "Special Season"
+msgstr ""
+
+msgctxt "#36765"
+msgid "Premiered"
+msgstr ""
+
+msgctxt "#36766"
+msgid "Sleepy Menus"
+msgstr ""
+
+msgctxt "#36767"
+msgid "Sleepy Limit"
+msgstr ""
+
+msgctxt "#36768"
+msgid "Sleepy Duration"
+msgstr ""
+
+msgctxt "#36769"
+msgid "Media Rating"
+msgstr ""
+
+msgctxt "#36770"
+msgid "Refresh Metadata"
+msgstr ""
+
+msgctxt "#36771"
+msgid "Refresh Full Metadata"
+msgstr ""
+
+msgctxt "#36772"
+msgid "Refresh Latest Metadata"
+msgstr ""
+
+msgctxt "#36773"
+msgid "Refresh Set Metadata"
+msgstr ""
+
+msgctxt "#36774"
+msgid "Refresh Pack Metadata"
+msgstr ""
+
+msgctxt "#36775"
+msgid "Refreshing [B]Set[/B] and [B]Movie[/B] metadata."
+msgstr ""
+
+msgctxt "#36776"
+msgid "Refreshing core [B]Set[/B] metadata."
+msgstr ""
+
+msgctxt "#36777"
+msgid "Refreshing core [B]Movie[/B] metadata."
+msgstr ""
+
+msgctxt "#36778"
+msgid "Refreshing core [B]Show[/B] metadata."
+msgstr ""
+
+msgctxt "#36779"
+msgid "Refreshing all [B]Season[/B] metadata."
+msgstr ""
+
+msgctxt "#36780"
+msgid "Refreshing %s [B]Episode[/B] metadata."
+msgstr ""
+
+msgctxt "#36781"
+msgid "Refreshing summary [B]Pack[/B] metadata."
+msgstr ""
+
+msgctxt "#36782"
+msgid "Refreshing [B]Show[/B], [B]Season[/B], [B]Pack[/B], and core [B]Episode[/B] metadata."
+msgstr ""
+
+msgctxt "#36783"
+msgid "Refreshing [B]Show[/B], [B]Season[/B], [B]Pack[/B], and latest [B]Episode[/B] metadata."
+msgstr ""
+
+msgctxt "#36784"
+msgid "Refreshing menu [B]Activity[/B] data."
+msgstr ""
+
+msgctxt "#36785"
+msgid "Refreshing menu [B]List[/B] data."
+msgstr ""
+
+msgctxt "#36786"
+msgid "This refreshes the [B]Activity[/B] data from the Trakt playback history. A moderate amount of data has to be retrieved, which should be relativity fast."
+msgstr ""
+
+msgctxt "#36787"
+msgid "This refreshes the overall [B]List[/B] data of the menu, without refreshing the metadata of individual items. A moderate amount of data has to be retrieved, which should be relativity fast."
+msgstr ""
+
+msgctxt "#36788"
+msgid "This refreshes the metadata of a single [B]Movie[/B]. Only a small amount of data has to be retrieved, which should be very fast."
+msgstr ""
+
+msgctxt "#36789"
+msgid "This refreshes the metadata of a single [B]Set[/B]. Only a small amount of data has to be retrieved, which should be very fast."
+msgstr ""
+
+msgctxt "#36790"
+msgid "This refreshes the metadata of a single [B]Set[/B] and all of its [B]Movies[/B]. A moderate amount of data has to be retrieved, which should be relativity fast."
+msgstr ""
+
+msgctxt "#36791"
+msgid "This refreshes the metadata of a single [B]Show[/B], without refreshing the metadata of the pack, seasons, or episodes. Only a small amount of data has to be retrieved, which should be very fast."
+msgstr ""
+
+msgctxt "#36792"
+msgid "This refreshes the metadata of all [B]Seasons[/B] of a single show, without refreshing the metadata of the pack or episodes. A moderate amount of data has to be retrieved, which should be relativity fast."
+msgstr ""
+
+msgctxt "#36793"
+msgid "This refreshes the metadata of all [B]Episodes[/B] of a single season, without refreshing the metadata of the pack. A moderate amount of data has to be retrieved, which should be relativity fast."
+msgstr ""
+
+msgctxt "#36794"
+msgid "This refreshes the metadata of the [B]Pack[/B] of a single show, creating a global summary of all episode numbers used for binging and navigation. A large amount of data has to be retrieved, which can be slow."
+msgstr ""
+
+msgctxt "#36795"
+msgid "This refreshes the metadata of a single [B]Show[/B], its [B]Pack[/B], all [B]Seasons[/B], and all [B]Episodes[/B] of the most recent seasons. A huge amount of data has to be retrieved, which can be very slow."
+msgstr ""
+
+msgctxt "#36796"
+msgid "This refreshes the metadata of a single [B]Show[/B], its [B]Pack[/B], all [B]Seasons[/B], and all [B]Episodes[/B] of core seasons, which might not include all seasons. A huge amount of data has to be retrieved, which can be very slow."
+msgstr ""
+
+msgctxt "#36797"
+msgid "Variant"
+msgstr ""
+
+msgctxt "#36798"
+msgid "Bonus Titles"
+msgstr ""
+
+msgctxt "#36799"
+msgid "Set Titles"
+msgstr ""
+
+msgctxt "#36800"
+msgid "Planned"
+msgstr ""
+
+msgctxt "#36801"
+msgid "Producing"
+msgstr ""
+
+msgctxt "#36802"
+msgid "Horrible"
+msgstr ""
+
+msgctxt "#36803"
+msgid "Terrible"
+msgstr ""
+
+msgctxt "#36804"
+msgid "Mediocre"
+msgstr ""
+
+msgctxt "#36805"
+msgid "Perfect"
+msgstr ""
+
+msgctxt "#36806"
+msgid "The provider might be impaired by Cloudflare and not return any links. Cloudflare might limit or even completely block access to certain providers, especially if a VPN is active."
+msgstr ""
+
+msgctxt "#36807"
+msgid "Bypass Module"
+msgstr ""
+
+msgctxt "#36808"
+msgid "CfScrape"
+msgstr ""
+
+msgctxt "#36809"
+msgid "CloudScraper"
+msgstr ""
+
+msgctxt "#36810"
+msgid "Bypass Version"
+msgstr ""
+
+msgctxt "#36811"
+msgid "Legacy"
+msgstr ""
+
+msgctxt "#36812"
+msgid "Unknown Title"
+msgstr ""
+
+msgctxt "#36813"
+msgid "Season Premiere Special"
+msgstr ""
+
+msgctxt "#36814"
+msgid "Season Finale Special"
+msgstr ""
+
+msgctxt "#36815"
+msgid "Midseason Premiere Special"
+msgstr ""
+
+msgctxt "#36816"
+msgid "Midseason Finale Special"
+msgstr ""
+
+msgctxt "#36817"
+msgid "Storyline Movie Special"
+msgstr ""
+
+msgctxt "#36818"
+msgid "Storyline Premiere Special"
+msgstr ""
+
+msgctxt "#36819"
+msgid "Storyline Finale Special"
+msgstr ""
+
+msgctxt "#36820"
+msgid "Storyline Midseason Premiere Special"
+msgstr ""
+
+msgctxt "#36821"
+msgid "Storyline Midseason Finale Special"
+msgstr ""
+
+msgctxt "#36822"
+msgid "Movie Special"
+msgstr ""
+
+msgctxt "#36823"
+msgid "Alternate Season"
+msgstr ""
+
+msgctxt "#36824"
+msgid "Alternate Midseason Finale"
+msgstr ""
+
+msgctxt "#36825"
+msgid "Alternate Midseason Premiere"
+msgstr ""
+
+msgctxt "#36826"
+msgid "Alternate Series Finale"
+msgstr ""
+
+msgctxt "#36827"
+msgid "Alternate Series Premiere"
+msgstr ""
+
+msgctxt "#36828"
+msgid "Alternate Season Finale"
+msgstr ""
+
+msgctxt "#36829"
+msgid "Alternate Season Premiere"
+msgstr ""
+
+msgctxt "#36830"
+msgid "Alternate Standard Episode"
+msgstr ""
+
+msgctxt "#36831"
+msgid "Storyline Episode Special"
+msgstr ""
+
+msgctxt "#36832"
+msgid "Standard Episode Special"
+msgstr ""
+
+msgctxt "#36833"
+msgid "Debrider"
+msgstr ""
+
+msgctxt "#36834"
+msgid "Debrider Inspection"
+msgstr ""
+
+msgctxt "#36835"
+msgid "Premiere Special"
+msgstr ""
+
+msgctxt "#36836"
+msgid "Finale Special"
+msgstr ""
+
+msgctxt "#36837"
+msgid "Birth Place"
+msgstr ""
+
+msgctxt "#36838"
+msgid "This episode is a full-length movie special. You might find more streams when searching the movie instead of the episode special. Do you want to search for the [B]movie[/B] or scrape the [B]episode[/B]?"
+msgstr ""
+
+msgctxt "#36839"
+msgid "Loaded"
+msgstr ""
+
+msgctxt "#36840"
+msgid "Detail"
+msgstr ""
+
+msgctxt "#36841"
+msgid "Preload Metadata"
+msgstr ""
+
+msgctxt "#36842"
+msgid "Enough metadata was preloaded. You can [B]Skip[/B] if you do not want to wait."
+msgstr ""
+
+msgctxt "#36843"
+msgid "Skipping some steps. Preloading of essential data will continue."
+msgstr ""
+
+msgctxt "#36844"
+msgid "Enough metadata has been loaded and you can skip some steps if you are in a hurry. The longer you preload, the better. The remainder of the metadata will be loaded in the background over time as you use Gaia. Are you sure you want to skip the optional preloading?"
+msgstr ""
+
+msgctxt "#36845"
+msgid "Your cache is a bit old and might benefit from a clean, in order to unclutter menus from old content. This will only clear your temporary cache, but keep your metadata cache intact. Gaia might be a bit slow for a few hours after cleaning until the cache is filled up again.[CR]     [B]Cache Size:[/B] %s[CR]     [B]Cache Age:[/B] %s[CR]     [B]Cache Clean:[/B] [B]%s[/B] (%s)[CR]Do you want to clear the cache now?"
+msgstr ""
+
+msgctxt "#36846"
+msgid "Highly recommended"
+msgstr ""
+
+msgctxt "#36847"
+msgid "Moderately recommended"
+msgstr ""
+
+msgctxt "#36848"
+msgid "Somewhat recommended"
+msgstr ""
+
+msgctxt "#36849"
+msgid "Not necessary"
+msgstr ""
+
+msgctxt "#36850"
+msgid "Cache Cleanup"
+msgstr ""
+
+msgctxt "#36851"
+msgid "Do you wan to clear the entire database and remove [B]all[/B] records, or only clear [B]old[/B] unused records from the database? It is advised to first clear only the old records to see if that resolves any issues. By removing old unused records, the database size is reduced without removing newer records that might still be in use."
+msgstr ""
+
+msgctxt "#36852"
+msgid "Updating IMDb Bulkdata"
+msgstr ""
+
+msgctxt "#36853"
+msgid "This will take %s minutes and your device might be slow during this time."
+msgstr ""
+
+msgctxt "#36854"
+msgid "Increase"
+msgstr ""
+
+msgctxt "#36855"
+msgid "Decrease"
+msgstr ""
+
+msgctxt "#36856"
+msgid "[B]Extended[/B] metadata is more comprehensive and provides the best experience."
+msgstr ""
+
+msgctxt "#36857"
+msgid "[B]Standard[/B] metadata has the best trade-off between performance and quality."
+msgstr ""
+
+msgctxt "#36858"
+msgid "[B]Essential[/B] metadata uses only basic info and is for old and very slow devices."
+msgstr ""
+
+msgctxt "#36859"
+msgid "Do you want to [B]keep[/B] the current metadata detail for the best experience or [B]decrease[/B] it for faster menu loading?"
+msgstr ""
+
+msgctxt "#36860"
+msgid "Do you want to [B]keep[/B] the current metadata detail for fast menu loading or [B]increase[/B] it for a better experience?"
+msgstr ""
+
+msgctxt "#36861"
+msgid "Your device might struggle to handle the extra processing. You should consider [B]decreasing[/B] the detail or stick with [B]%s[/B] if you prioritize quality over performance."
+msgstr ""
+
+msgctxt "#36862"
+msgid "Your device should be able to handle more processing. You should consider [B]increasing[/B] the detail for a better experience or stick with [B]%s[/B] if you prioritize performance over quality."
+msgstr ""
+
+msgctxt "#36863"
+msgid "Your device should be able to handle the extra processing. You should stick with [B]%s[/B] for now and only decrease the detail in the future if there are continuous performance issues."
+msgstr ""
+
+msgctxt "#36864"
+msgid "Your device might struggle to handle more processing. You should stick with [B]%s[/B] for now and only increase the detail in the future if performance stays stable."
+msgstr ""
+
+msgctxt "#36865"
+msgid "Your device's hardware could not be detected and not recommendation could therefore be made regarding the detail level. [B]Extended[/B] detail is recommended if you want the best experience and have a decent device and internet connection. Otherwise stick with [B]Standard[/B] detail."
+msgstr ""
+
+msgctxt "#36866"
+msgid "Do you want to launch the full [B]Setup[/B] wizard or the condensed [B]Version[/B] upgrade wizard?"
+msgstr ""
+
+msgctxt "#36867"
+msgid "Setup"
+msgstr ""
+
+msgctxt "#36868"
+msgid "Ordinary"
+msgstr ""
+
+msgctxt "#36869"
+msgid "The setup wizard will guide you through a step-wise process to[CR]configure the most important settings for the addon. Individual[CR]settings can be adjusted afterwards in the settings dialog."
+msgstr ""
+
+msgctxt "#36870"
+msgid "The version wizard will guide you through a step-wise process to[CR]migrate to the new version of Gaia. Various things will be cleaned[CR] and reoptimized to allow a smooth transition to the new update."
+msgstr ""
+
+msgctxt "#36871"
+msgid "Metadata Preload"
+msgstr ""
+
+msgctxt "#36872"
+msgid "In the next step you can reconfigure the metadata level which regulates the[CR]sources and detail of metadata used in menus and other places throughout Gaia.[CR][CR][I]Extended[/I]  metadata provides the best overall experience, but also[CR]takes longer to load and requires a decent device to handle the processing."
+msgstr ""
+
+msgctxt "#36873"
+msgid "You are all upgraded and ready to stream![CR][CR]Gaia might be laggy for a few days, since the menu cache was[CR]cleared during the upgrade and needs some time to fill up again."
+msgstr ""
+
+msgctxt "#36874"
+msgid "Corrupted Providers"
+msgstr ""
+
+msgctxt "#36875"
+msgid "Provider settings got corrupted. Attempting to automatically fix this."
+msgstr ""
+
+msgctxt "#36876"
+msgid "Provider settings successfully fixed and reinstated."
+msgstr ""
+
+msgctxt "#36877"
+msgid "The provider settings got corrupted and could not be fixed automatically. Manually reinitializing the providers should repair it. If this continues to happen, please open a support ticket. Do you want to reinitialize the providers now?"
+msgstr ""
+
+msgctxt "#36878"
+msgid "Reinitialize"
+msgstr ""
+
+msgctxt "#36879"
+msgid "IMDb Bulkdata"
+msgstr ""
+
+msgctxt "#36880"
+msgid "Bulkdata"
+msgstr ""
+
+msgctxt "#36881"
+msgid "Disable Bulkdata"
+msgstr ""
+
+msgctxt "#36882"
+msgid "Essential Bulkdata"
+msgstr ""
+
+msgctxt "#36883"
+msgid "Standard Bulkdata"
+msgstr ""
+
+msgctxt "#36884"
+msgid "Extended Bulkdata"
+msgstr ""
+
+msgctxt "#36885"
+msgid "Refreshes"
+msgstr ""
+
+msgctxt "#36886"
+msgid "Refreshes Every %s"
+msgstr ""
+
+msgctxt "#36887"
+msgid "Free Memory"
+msgstr ""
+
+msgctxt "#36888"
+msgid "Bulk Notifications"
+msgstr ""
+
+msgctxt "#36889"
+msgid "Bulk Progress"
+msgstr ""
+
+msgctxt "#36890"
+msgid "Insufficient Free [B]Storage[/B]"
+msgstr ""
+
+msgctxt "#36891"
+msgid "Insufficient Free [B]Memory[/B]"
+msgstr ""
+
+msgctxt "#36892"
+msgid "Your device has insufficient [B]storage space[/B] to generate the IMDb bulkdata. At least %s is needed, but only %s is free. Refreshing the bulkdata is deferred to the next Kodi launch if enough storage space is available then."
+msgstr ""
+
+msgctxt "#36893"
+msgid "Your device has insufficient [B]memory[/B] to generate the IMDb bulkdata. At least %s is needed, but only %s is free. Refreshing the bulkdata is deferred to the next Kodi launch if enough memory is available then."
+msgstr ""
+
+msgctxt "#36894"
+msgid "IMDb Bulkdata Updated"
+msgstr ""
+
+msgctxt "#36895"
+msgid "Are you sure you want to cancel the IMDb bulkdata update? Refreshing the bulkdata will be deferred to the next Kodi launch."
+msgstr ""
+
+msgctxt "#36896"
+msgid "Bulk Refresh"
+msgstr ""
+
+msgctxt "#36897"
+msgid "Bulk"
+msgstr ""
+
+msgctxt "#36898"
+msgid "Do you want to refresh the IMDb bulkdata? This requires %s free storage space and %s free memory. This can take %s and your device might be slow during this time."
+msgstr ""
+
+msgctxt "#36899"
+msgid "Bulk Action"
+msgstr ""
+
+msgctxt "#36900"
+msgid "It is [B]highly advised[/B] to restart Kodi to free up memory and ensure your device runs smoothly. If Kodi does not automatically relaunch in a few seconds, restart Kodi manually or reboot your device. Do you want to restart Kodi now?"
+msgstr ""
+
+msgctxt "#36901"
+msgid "A lot of memory was used during the bulkdata processing."
+msgstr ""
+
+msgctxt "#36902"
+msgid "The IMDb bulkdata is now ready and will be used to supplement metadata. You will be prompted to refresh the bulkdata every few weeks."
+msgstr ""
+
+msgctxt "#36903"
+msgid "In the next step you can reconfigure the IMDb bulkdata which only[CR]supplements IMDb IDs and ratings that are not available otherwise.[CR][CR]The bulkdata requires additional storage, memory, and processing. It is[CR]not necessary for any core features and can be disabled without concern."
+msgstr ""
+
+msgctxt "#36904"
+msgid "Your device might have too little memory to process the datasets. At least %s free memory is needed, while you have %s. If you run out of memory when the bulkdata is being updated, Kodi might crash or your device might freeze up, and you should disable this setting."
+msgstr ""
+
+msgctxt "#36905"
+msgid "Your device might have too little disk space to process the datasets. At least %s free disk space is needed, while you have %s. If you run out of disk space, Kodi and addons might not work correctly."
+msgstr ""
+
+msgctxt "#36906"
+msgid "The IMDb bulkdata could not be updated. Please try again later. Open a support ticket if this issue persists."
+msgstr ""
+
+msgctxt "#36907"
+msgid "The Trakt token has expired and you have to reauthenticate your Trakt account."
+msgstr ""
+
+msgctxt "#36908"
+msgid "The IMDb bulkdata is outdated and needs a refresh. This requires %s free storage space and %s free memory. This can take %s and your device might be slow during this time. The refresh is not urgent and can be done later. Do you want to refresh the bulkdata now?"
 msgstr ""

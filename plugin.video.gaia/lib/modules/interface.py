@@ -229,6 +229,14 @@ class Skin(object):
 	def supportLabelCustom(self, default = None):
 		return self._support(definitions = Skin.SupportLabelCustom, default = default)
 
+	@classmethod
+	def dependencies(self, detail = True):
+		try:
+			result = tools.System.addonDetails(id = self.id(), dependencies = True)['dependencies']
+			if not detail: result = [i.get('addonid') for i in result]
+			return result
+		except: tools.Logger.error()
+		return None
 
 class Font(object):
 
@@ -240,6 +248,8 @@ class Font(object):
 	IconWatched		= 'watched'
 	IconProgress	= 'progress'
 	IconCalendar	= 'calendar'
+	IconLeft		= 'left'
+	IconRight		= 'right'
 	IconUp			= 'up'
 	IconDown		= 'down'
 
@@ -276,6 +286,8 @@ class Font(object):
 		IconWatched		: '⸙',
 		IconProgress	: '¤',
 		IconCalendar	: '※',
+		IconLeft		: '←',
+		IconRight		: '→',
 		IconUp			: '↑',
 		IconDown		: '↓',
 
@@ -313,6 +325,8 @@ class Font(object):
 		IconWatched		: '\uf00c',
 		IconProgress	: '\uf252',
 		IconCalendar	: '\uf073',
+		IconLeft		: '\uf060',
+		IconRight		: '\uf061',
 		IconUp			: '\uf062',
 		IconDown		: '\uf063',
 
@@ -423,6 +437,8 @@ class Font(object):
 				Font.IconWatched,
 				Font.IconProgress,
 				Font.IconCalendar,
+				Font.IconLeft,
+				Font.IconRight,
 				Font.IconUp,
 				Font.IconDown,
 			])
@@ -943,6 +959,539 @@ class Icon(object):
 				tools.Settings.set('theme.general.icon', items[choice])
 				Icon.ThemeData = {}
 				Directory.refresh() # Does not reload new icons, probably because images are cached?
+
+class Detail(object):
+
+	MenuGeneric				= 'generic'
+	MenuQuick				= 'quick'
+	MenuProgress			= 'progress'
+	MenuArrival				= 'arrival'
+
+	TypeLabel				= 'label'
+	TypeTagline				= 'tagline'
+	TypePlot				= 'plot'
+
+	ModeEnabled				= 'enabled'
+	ModeDisabled			= 'disabled'
+	ModePartial				= 'partial'
+	Modes					= [ModeEnabled, ModeDisabled]
+	ModesPartial			= [ModeEnabled, ModePartial, ModeDisabled] # Place partial before disabled.
+
+	Placement				= 'placement'
+	PlacementPrepend		= 'prepend'
+	PlacementAppend			= 'append'
+	Placements				= [PlacementPrepend, PlacementAppend]
+
+	Separator				= 'separator'
+	SeparatorNone			= 'none'
+	SeparatorDash			= 'dash'
+	SeparatorDot			= 'dot'
+	SeparatorBar			= 'bar'
+	SeparatorSlash			= 'slash'
+	SeparatorSpace			= 'space'
+	SeparatorLine			= 'line'
+	SeparatorGap			= 'gap'
+	Separators				= [SeparatorNone, SeparatorDash, SeparatorDot, SeparatorBar, SeparatorSlash, SeparatorSpace, SeparatorLine, SeparatorGap]
+
+	Bracket					= 'bracket'
+	BracketNone				= 'none'
+	BracketRound			= 'round'
+	BracketSquare			= 'square'
+	BracketCurly			= 'curly'
+	Brackets				= [BracketNone, BracketRound, BracketSquare, BracketCurly]
+
+	Decoration				= 'decoration'
+	DecorationNone			= 'none'
+	DecorationIcon			= 'icon'
+	DecorationAbbreviate	= 'abbreviate'
+	DecorationComplete		= 'complete'
+	Decorations				= [DecorationNone, DecorationIcon, DecorationAbbreviate, DecorationComplete]
+
+	Style					= 'style'
+	StyleNone				= 'none'
+	StyleBold				= 'bold'
+	StyleItalic				= 'italic'
+	StyleLight				= 'light'
+	Styles					= [StyleNone, StyleBold, StyleItalic, StyleLight]
+
+	Color					= 'color'
+	ColorNone				= 'none'
+	ColorPalette			= 'palette'
+	ColorPrimary			= 'primary'
+	ColorSecondary			= 'secondary'
+	ColorTertiary			= 'tertiary'
+	ColorDisabled			= 'disabled'
+	Colors					= [ColorNone, ColorPalette, ColorPrimary, ColorSecondary, ColorTertiary, ColorDisabled]
+
+	Format					= 'format'
+
+	SettingMediaMenu		= 'label.detail.media.menu'
+	SettingMediaFormat		= 'label.detail.media.format'
+	SettingActivityMenu		= 'label.detail.activity.menu'
+	SettingActivityFormat	= 'label.detail.activity.format'
+	SettingActivityPlay		= 'label.detail.activity.play.media'
+	SettingActivityProgress	= 'label.detail.activity.progress.media'
+	SettingActivityRating	= 'label.detail.activity.rating.media'
+	SettingActivityAir		= 'label.detail.activity.air.media'
+
+	@classmethod
+	def format(self, data, format, color = True):
+		try: format = format[Detail.Format]
+		except: pass
+		return Format.font(data, bold = format.get(Detail.StyleBold), italic = format.get(Detail.StyleItalic), light = format.get(Detail.StyleLight), color = format.get(Detail.Color) if color is True else color)
+
+	# Color for brackets and join icons.
+	@classmethod
+	def color(self, format):
+		color = format[Detail.Color]
+		if color == Detail.ColorPalette or color == Detail.ColorDisabled: return Format.colorDisabled()
+		else: return False
+
+	@classmethod
+	def _join(self, detail, prepend = False):
+		result = []
+		for i in detail:
+			value = i[0]
+			format = i[1]
+
+			bracket = format[Detail.Bracket]
+			if bracket and not bracket == Detail.BracketNone:
+				bracket = self._bracket(format = format)
+				value = bracket[0] + value.strip() + bracket[1]
+
+			separator = format[Detail.Format][Detail.Separator]
+			value = tools.Tools.stringRemoveSuffix(value, remove = separator.strip())
+			if prepend: result.append(tools.Tools.stringRemoveSpace(value + separator))
+			else: result.append(tools.Tools.stringRemoveSpace(separator + value))
+
+		separator = format[Detail.Separator]
+		if separator == Detail.SeparatorLine or separator == Detail.SeparatorGap: divide = ''
+		else: divide = ' '
+
+		return tools.Tools.stringRemoveSpace(' '.join(result)), divide
+
+	@classmethod
+	def joinBefore(self, data, detail):
+		if not detail: return data
+		result, divide = self._join(detail = detail, prepend = True)
+		if data: result = result.rstrip() + divide + data.lstrip()
+		return result
+
+	@classmethod
+	def joinAfter(self, data, detail):
+		if not detail: return data
+		result, divide = self._join(detail = detail)
+		if data: result = data.rstrip() + divide + result.lstrip()
+		return result
+
+	@classmethod
+	def _bracket(self, format, color = None):
+		bracket = format[Detail.Format][Detail.Bracket]
+		if color is None:
+			if format[Detail.Color] in (Detail.ColorPalette, Detail.ColorDisabled): color = Format.colorDisabled()
+			elif not Detail.Decoration in format: color = format[Detail.Format][Detail.Color] # Only for media details.
+		return self.format(data = bracket[0], format = format, color = color), self.format(data = bracket[1], format = format, color = color)
+
+	@classmethod
+	def _label(self, value, color = True):
+		if value == Detail.ModeEnabled: return Format.fontColor(32301, Format.colorExcellent()) if color else 32301
+		elif value == Detail.ModeDisabled: return Format.fontColor(32302, Format.colorBad()) if color else 32302
+		elif value == Detail.ModePartial: return Format.fontColor(33165, Format.colorMedium()) if color else 33165
+
+		elif value == Detail.MenuGeneric: return 35540
+		elif value == Detail.MenuQuick: return 36016
+		elif value == Detail.MenuProgress: return 36017
+		elif value == Detail.MenuArrival: return 36018
+
+		elif value == tools.Media.Mixed: return 36052
+		elif value == tools.Media.Movie: return 32001
+		elif value == tools.Media.Set: return 33527
+		elif value == tools.Media.Show: return 32002
+		elif value == tools.Media.Season: return 32054
+		elif value == tools.Media.Episode: return 32326
+		elif value == tools.Media.Extra: return 36758
+
+		elif value == Detail.TypeLabel: return 36129
+		elif value == Detail.TypeTagline: return 36757
+		elif value == Detail.TypePlot: return 33463
+
+		elif value: return Translation.string(value).capitalize()
+
+		return None
+
+	@classmethod
+	def _settingsMenu(self, id):
+		data = tools.Settings.getData(id = id)
+		if not data: data = self._settingsMenuDefault(id = id)
+		return data
+
+	@classmethod
+	def _settingsMenuDefault(self, id):
+		if id == Detail.SettingActivityMenu:
+			return {
+				Detail.MenuGeneric : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Set		: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Season	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Episode	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Extra	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+				},
+				Detail.MenuQuick : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+				},
+				Detail.MenuProgress : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+				},
+				Detail.MenuArrival : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeDisabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+				},
+			}
+		else:
+			return {
+				Detail.MenuGeneric : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Set		: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Season	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeDisabled},
+					tools.Media.Episode	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Extra	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+				},
+				Detail.MenuQuick : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+				},
+				Detail.MenuProgress : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+				},
+				Detail.MenuArrival : {
+					tools.Media.Mixed	: {Detail.TypeLabel : Detail.ModeEnabled,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Movie	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+					tools.Media.Show	: {Detail.TypeLabel : Detail.ModePartial,	Detail.TypeTagline : Detail.ModeDisabled,	Detail.TypePlot : Detail.ModeEnabled},
+				},
+			}
+
+	@classmethod
+	def _settingsMenuUpdate(self, id, partial = False, settings = False):
+		self.tData = self._settingsMenu(id = id)
+		self.tMenu = None
+		self.tMedia = None
+
+		def _default(menu = None, media = None):
+			data = self._settingsMenuDefault(id = id)
+			if menu: self.tData[menu][media] = data[menu][media]
+			else: self.tData = data
+
+		def _back():
+			self.tMenu = None
+			self.tMedia = None
+
+		def _select(menu, media):
+			self.tMenu = menu
+			self.tMedia = media
+
+		def _toggle(menu, media, type):
+			modes = Detail.ModesPartial if partial else Detail.Modes
+			value = self.tData[menu][media][type]
+			index = modes.index(value)
+			try: value = modes[index + 1]
+			except: value = modes[0]
+			self.tData[menu][media][type] = value
+
+		def _items():
+			if self.tMenu is None:
+				items = [
+					{'title' : Dialog.prefixBack(33486), 'bold' : True, 'color' : True, 'close' : True},
+					{'title' : Dialog.prefixNext(33564), 'bold' : True, 'color' : True, 'action' : _default},
+				]
+				for k1, v1 in self.tData.items():
+					item = []
+					for k2, v2 in v1.items():
+						value = v2.values()
+						if Detail.ModePartial in value or list(value).count(Detail.ModeDisabled) == 2: value = Detail.ModePartial
+						elif Detail.ModeEnabled in value: value = Detail.ModeEnabled
+						else: value = Detail.ModeDisabled
+						item.append({'title' : self._label(k2), 'value' : self._label(value), 'action' : _select, 'parameters' : {'menu' : k1, 'media' : k2}})
+					items.append({'title' : self._label(k1), 'items' : item})
+			else:
+				item = []
+				for k, v in self.tData[self.tMenu][self.tMedia].items():
+					item.append({'title' : self._label(k), 'value' : self._label(v), 'action' : _toggle, 'parameters' : {'menu' : self.tMenu, 'media' : self.tMedia, 'type' : k}})
+				items = [
+					{'title' : Dialog.prefixBack(35374), 'bold' : True, 'color' : True, 'back' : True, 'action' : _back},
+					{'title' : Dialog.prefixNext(33564), 'bold' : True, 'color' : True, 'action' : _default, 'parameters' : {'menu' : self.tMenu, 'media' : self.tMedia}},
+					{'title' : self._label(Detail.Placement), 'items' : item},
+				]
+
+			return items
+
+		Dialog.information(title = 35456, items = _items(), refresh = _items, reselect = Dialog.ReselectMenu)
+
+		tools.Settings.setData(id = id, value = self.tData, label = Translation.string(33564 if self.tData == self._settingsMenuDefault(id = id) else 35233))
+		if settings: tools.Settings.launchData(id = id)
+
+	@classmethod
+	def settingsMediaMenu(self):
+		return self._settingsMenu(id = Detail.SettingMediaMenu)
+
+	@classmethod
+	def settingsMediaMenuUpdate(self, settings = False):
+		return self._settingsMenuUpdate(id = Detail.SettingMediaMenu, partial = True, settings = settings)
+
+	@classmethod
+	def settingsActivityMenu(self):
+		return self._settingsMenu(id = Detail.SettingActivityMenu)
+
+	@classmethod
+	def settingsActivityMenuUpdate(self, settings = False):
+		return self._settingsMenuUpdate(id = Detail.SettingActivityMenu, settings = settings)
+
+	@classmethod
+	def _settingsFormat(self, id, prepare = False):
+		data = tools.Settings.getData(id = id)
+		if not data: data = self._settingsFormatDefault(id = id)
+
+		if prepare:
+			for k, v in data.items():
+				format = {}
+
+				separator = v[Detail.Separator]
+				if separator == Detail.SeparatorDash: separator = ' - '
+				elif separator == Detail.SeparatorDot: separator = Format.iconSeparator(pad = True, color = True)
+				elif separator == Detail.SeparatorBar: separator = ' | '
+				elif separator == Detail.SeparatorSlash: separator = ' / '
+				elif separator == Detail.SeparatorSpace: separator = ' '
+				elif separator == Detail.SeparatorLine: separator = Format.newline()
+				elif separator == Detail.SeparatorGap: separator = Format.newline() * 2
+				else: separator = ''
+				format[Detail.Separator] = separator
+
+				bracket = v[Detail.Bracket]
+				if bracket == Detail.BracketRound: bracket = ('(', ')')
+				elif bracket == Detail.BracketSquare: bracket = ('[', ']')
+				elif bracket == Detail.BracketCurly: bracket = ('{', '}')
+				else: bracket = ('', '')
+				format[Detail.Bracket] = bracket
+
+				style = v[Detail.Style]
+				if style == Detail.StyleBold: format[Detail.StyleBold] = True
+				elif style == Detail.StyleItalic: format[Detail.StyleItalic] = True
+				elif style == Detail.StyleLight: format[Detail.StyleLight] = True
+
+				color = v[Detail.Color]
+				if color == Detail.ColorPrimary: color = Format.colorPrimary()
+				elif color == Detail.ColorSecondary: color = Format.colorSecondary()
+				elif color == Detail.ColorTertiary: color = Format.colorTertiary()
+				elif color == Detail.ColorDisabled: color = Format.colorDisabled()
+				else: color = None
+				format[Detail.Color] = color
+
+				v[Detail.Format] = format
+
+		return data
+
+	@classmethod
+	def _settingsFormatDefault(self, id):
+		if id == Detail.SettingActivityFormat:
+			return {
+				Detail.TypeLabel : {
+					Detail.Placement	: Detail.PlacementPrepend,
+					Detail.Decoration	: Detail.DecorationNone,
+					Detail.Separator	: Detail.SeparatorSpace,
+					Detail.Bracket		: Detail.BracketSquare,
+					Detail.Style		: Detail.StyleBold,
+					Detail.Color		: Detail.ColorPalette,
+				},
+				Detail.TypeTagline : {
+					Detail.Placement	: Detail.PlacementPrepend,
+					Detail.Decoration	: Detail.DecorationNone,
+					Detail.Separator	: Detail.SeparatorSpace,
+					Detail.Bracket		: Detail.BracketSquare,
+					Detail.Style		: Detail.StyleBold,
+					Detail.Color		: Detail.ColorPalette,
+				},
+				Detail.TypePlot : {
+					Detail.Placement	: Detail.PlacementPrepend,
+					Detail.Decoration	: Detail.DecorationNone,
+					Detail.Separator	: Detail.SeparatorSpace,
+					Detail.Bracket		: Detail.BracketSquare,
+					Detail.Style		: Detail.StyleBold,
+					Detail.Color		: Detail.ColorPalette,
+				},
+			}
+		else:
+			return {
+				Detail.TypeLabel : {
+					Detail.Placement	: Detail.PlacementAppend,
+					Detail.Separator	: Detail.SeparatorDash,
+					Detail.Bracket		: Detail.BracketNone,
+					Detail.Style		: Detail.StyleItalic,
+					Detail.Color		: Detail.ColorNone,
+				},
+				Detail.TypeTagline : {
+					Detail.Placement	: Detail.PlacementAppend,
+					Detail.Separator	: Detail.SeparatorDash,
+					Detail.Bracket		: Detail.BracketNone,
+					Detail.Style		: Detail.StyleBold,
+					Detail.Color		: Detail.ColorNone,
+				},
+				Detail.TypePlot : {
+					Detail.Placement	: Detail.PlacementPrepend,
+					Detail.Separator	: Detail.SeparatorGap,
+					Detail.Bracket		: Detail.BracketNone,
+					Detail.Style		: Detail.StyleBold,
+					Detail.Color		: Detail.ColorNone,
+				},
+			}
+
+	@classmethod
+	def _settingsFormatUpdate(self, id, decoration = False, palette = False, settings = False):
+		self.tData = self._settingsFormat(id = id)
+
+		def _default():
+			self.tData = self._settingsFormatDefault(id = id)
+
+		def _toggle(type, option):
+			value = self.tData[type][option]
+
+			if option == Detail.Placement: options = Detail.Placements
+			elif option == Detail.Decoration: options = Detail.Decorations
+			elif option == Detail.Separator: options = Detail.Separators
+			elif option == Detail.Bracket: options = Detail.Brackets
+			elif option == Detail.Style: options = Detail.Styles
+			elif option == Detail.Color: options = Detail.Colors if palette else [i for i in Detail.Colors if not i == Detail.ColorPalette]
+
+			index = options.index(value)
+			try: value = options[index + 1]
+			except: value = options[0]
+
+			self.tData[type][option] = value
+
+		def _items():
+			items = [
+				{'title' : Dialog.prefixBack(33486), 'bold' : True, 'color' : True, 'close' : True},
+				{'title' : Dialog.prefixNext(33564), 'bold' : True, 'color' : True, 'action' : _default},
+			]
+			for k1, v1 in self.tData.items():
+				item = []
+				for k2, v2 in v1.items():
+					if not decoration and k2 == Detail.Decoration: continue
+					item.append({'title' : self._label(k2), 'value' : self._label(v2, color = False), 'action' : _toggle, 'parameters' : {'type' : k1, 'option' : k2}})
+				items.append({'title' : self._label(k1), 'items' : item})
+			return items
+
+		Dialog.information(title = 32358, items = _items(), refresh = _items, reselect = Dialog.ReselectMenu)
+
+		tools.Settings.setData(id = id, value = self.tData, label = Translation.string(33564 if self.tData == self._settingsFormatDefault(id = id) else 35233))
+		if settings: tools.Settings.launchData(id = id)
+
+	@classmethod
+	def settingsMediaFormat(self, prepare = False):
+		return self._settingsFormat(id = Detail.SettingMediaFormat, prepare = prepare)
+
+	@classmethod
+	def settingsMediaFormatUpdate(self, settings = False):
+		return self._settingsFormatUpdate(id = Detail.SettingMediaFormat, decoration = False, palette = False, settings = settings)
+
+	@classmethod
+	def settingsActivityFormat(self, prepare = False):
+		return self._settingsFormat(id = Detail.SettingActivityFormat, prepare = prepare)
+
+	@classmethod
+	def settingsActivityFormatUpdate(self, settings = False):
+		return self._settingsFormatUpdate(id = Detail.SettingActivityFormat, decoration = True, palette = True, settings = settings)
+
+	@classmethod
+	def _settingsMedia(self, id):
+		data = tools.Settings.getData(id = id)
+		if not data: data = self._settingsMediaDefault(id = id)
+		return data
+
+	@classmethod
+	def _settingsMediaDefault(self, id):
+		return {
+			tools.Media.Mixed	: Detail.ModeEnabled,
+			tools.Media.Movie	: Detail.ModeEnabled,
+			tools.Media.Set		: Detail.ModeEnabled,
+			tools.Media.Show	: Detail.ModeEnabled,
+			tools.Media.Season	: Detail.ModeEnabled,
+			tools.Media.Episode	: Detail.ModeEnabled,
+		}
+
+	@classmethod
+	def _settingsMediaUpdate(self, id, film = True, serie = True, settings = False):
+		self.tData = self._settingsMedia(id = id)
+
+		def _default(media = None):
+			self.tData = self._settingsMediaDefault(id = id)
+
+		def _toggle(media):
+			value = self.tData[media]
+			index = Detail.Modes.index(value)
+			try: value = Detail.Modes[index + 1]
+			except: value = Detail.Modes[0]
+			self.tData[media] = value
+
+		def _items():
+			items = [
+				{'title' : Dialog.prefixBack(33486), 'bold' : True, 'color' : True, 'close' : True},
+				{'title' : Dialog.prefixNext(33564), 'bold' : True, 'color' : True, 'action' : _default},
+			]
+			item = []
+			for k, v in self.tData.items():
+				if not film and (tools.Media.isMixed(k) or tools.Media.isMovie(k) or tools.Media.isSet(k)): continue
+				if not serie and (tools.Media.isMixed(k) or tools.Media.isSerie(k)): continue
+				item.append({'title' : self._label(k), 'value' : self._label(v), 'action' : _toggle, 'parameters' : {'media' : k}})
+			items.append({'title' : 35235, 'items' : item})
+			return items
+
+		Dialog.information(title = 36729, items = _items(), refresh = _items, reselect = Dialog.ReselectMenu)
+
+		tools.Settings.setData(id = id, value = self.tData, label = Translation.string(33564 if self.tData == self._settingsMediaDefault(id = id) else 35233))
+		if settings: tools.Settings.launchData(id = id)
+
+	@classmethod
+	def settingsActivityPlay(self):
+		return self._settingsMedia(id = Detail.SettingActivityPlay)
+
+	@classmethod
+	def settingsActivityPlayUpdate(self, settings = False):
+		return self._settingsMediaUpdate(id = Detail.SettingActivityPlay, settings = settings)
+
+	@classmethod
+	def settingsActivityProgress(self):
+		return self._settingsMedia(id = Detail.SettingActivityProgress)
+
+	@classmethod
+	def settingsActivityProgressUpdate(self, settings = False):
+		return self._settingsMediaUpdate(id = Detail.SettingActivityProgress, settings = settings)
+
+	@classmethod
+	def settingsActivityRating(self):
+		return self._settingsMedia(id = Detail.SettingActivityRating)
+
+	@classmethod
+	def settingsActivityRatingUpdate(self, settings = False):
+		return self._settingsMediaUpdate(id = Detail.SettingActivityRating, settings = settings)
+
+	@classmethod
+	def settingsActivityAir(self):
+		return self._settingsMedia(id = Detail.SettingActivityAir)
+
+	@classmethod
+	def settingsActivityAirUpdate(self, settings = False):
+		return self._settingsMediaUpdate(id = Detail.SettingActivityAir, film = False, settings = settings)
 
 class Format(object):
 
@@ -3684,16 +4233,18 @@ class Context(object):
 	EnabledPresets = None
 	EnabledAutoplay = None
 	EnabledBinge = None
+	EnabledVideoContext = None
 	EnabledVideoTrailer = None
 	EnabledVideoRecap = None
 	EnabledVideoReview = None
-	EnabledVideoExtra = None
+	EnabledVideoReaction = None
+	EnabledVideoBonus = None
 	EnabledVideoDeleted = None
-	EnabledVideoMaking = None
-	EnabledVideoDirector = None
+	EnabledVideoProduction = None
+	EnabledVideoDirection = None
 	EnabledVideoInterview = None
 	EnabledVideoExplanation = None
-	EnabledVideoReaction = None
+	EnabledVideoAlternation = None
 	EnabledDownloadCloud = None
 	EnabledDownloadManual = None
 	EnabledDownloadCache = None
@@ -3752,6 +4303,7 @@ class Context(object):
 		provider = None,
 		library = None,
 		playlist = None,
+		mixed = None,
 
 		video = None,
 		source = None,
@@ -3762,7 +4314,7 @@ class Context(object):
 		loader = False
 	):
 		if loader: Loader.show()
-		if not mode == self.ModeNone: self._load(mode = mode, items = items, media = media, niche = niche, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, season = season, episode = episode, title = title, year = year, set = set, plays = plays, rating = rating, progress = progress, query = query, link = link, provider = provider, library = library, playlist = playlist, video = video, source = source, metadata = metadata, orion = orion, shortcut = shortcut)
+		if not mode == self.ModeNone: self._load(mode = mode, items = items, media = media, niche = niche, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, season = season, episode = episode, title = title, year = year, set = set, plays = plays, rating = rating, progress = progress, query = query, link = link, provider = provider, library = library, playlist = playlist, mixed = mixed, video = video, source = source, metadata = metadata, orion = orion, shortcut = shortcut)
 
 	##############################################################################
 	# RESET
@@ -3780,7 +4332,7 @@ class Context(object):
 	# GENERAL
 	##############################################################################
 
-	def _load(self, mode = ModeNone, items = None, media = None, niche = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, season = None, episode = None, title = None, year = None, set = None, plays = None, rating = None, progress = None, query = None, link = None, provider = None, library = None, playlist = None, video = None, source = None, metadata = None, orion = None, shortcut = None):
+	def _load(self, mode = ModeNone, items = None, media = None, niche = None, imdb = None, tmdb = None, tvdb = None, trakt = None, slug = None, season = None, episode = None, title = None, year = None, set = None, plays = None, rating = None, progress = None, query = None, link = None, provider = None, library = None, playlist = None, mixed = None, video = None, source = None, metadata = None, orion = None, shortcut = None):
 		try:
 			from lib.modules.shortcut import Shortcut
 			from lib.meta.tools import MetaTools
@@ -3805,6 +4357,7 @@ class Context(object):
 			self.mProvider = provider
 			self.mLibrary = link if library is True else library
 			self.mPlaylist = playlist
+			self.mMixed = mixed
 
 			#gaiaremove - in a future version we have to get rid of self.mSource.
 			#gaiaremove - it is too large and slows down stream window loading, since each item in the window has to JSON+URL/BASE64 encode a large source object, just for the context menu.
@@ -3870,7 +4423,7 @@ class Context(object):
 							self.mTitle = metadata[i]
 							break
 
-				try: self.mYear = metadata['year']
+				try: self.mYear = metadata.get('tvshowyear') or metadata.get('year')
 				except: pass
 
 				try: self.mSeason = metadata['season']
@@ -3956,16 +4509,18 @@ class Context(object):
 			Context.EnabledAutoplay = data['enabled']['autoplay']
 			Context.EnabledBinge = data['enabled']['binge']
 
+			Context.EnabledVideoContext = data['enabled']['video']['context']
 			Context.EnabledVideoTrailer = data['enabled']['video']['trailer']
 			Context.EnabledVideoRecap = data['enabled']['video']['recap']
 			Context.EnabledVideoReview = data['enabled']['video']['review']
-			Context.EnabledVideoExtra = data['enabled']['video']['extra']
+			Context.EnabledVideoReaction = data['enabled']['video']['reaction']
+			Context.EnabledVideoBonus = data['enabled']['video']['bonus']
 			Context.EnabledVideoDeleted = data['enabled']['video']['deleted']
-			Context.EnabledVideoMaking = data['enabled']['video']['making']
-			Context.EnabledVideoDirector = data['enabled']['video']['director']
+			Context.EnabledVideoProduction = data['enabled']['video']['production']
+			Context.EnabledVideoDirection = data['enabled']['video']['direction']
 			Context.EnabledVideoInterview = data['enabled']['video']['interview']
 			Context.EnabledVideoExplanation = data['enabled']['video']['explanation']
-			Context.EnabledVideoReaction = data['enabled']['video']['reaction']
+			Context.EnabledVideoAlternation = data['enabled']['video']['alternation']
 
 			Context.EnabledDownloadCloud = data['enabled']['download']['cloud']
 			Context.EnabledDownloadManual = data['enabled']['download']['manual']
@@ -4030,16 +4585,18 @@ class Context(object):
 				'binge' : tools.Binge.enabled(),
 
 				'video' : {
+					'context' : video.Video.settingContext(),
 					'trailer' : video.Trailer.enabled(),
 					'recap' : video.Recap.enabled(),
 					'review' : video.Review.enabled(),
-					'extra' : video.Extra.enabled(),
+					'reaction' : video.Reaction.enabled(),
+					'bonus' : video.Bonus.enabled(),
 					'deleted' : video.Deleted.enabled(),
-					'making' : video.Making.enabled(),
-					'director' : video.Director.enabled(),
+					'production' : video.Production.enabled(),
+					'direction' : video.Direction.enabled(),
 					'interview' : video.Interview.enabled(),
 					'explanation' : video.Explanation.enabled(),
-					'reaction' : video.Reaction.enabled(),
+					'alternation' : video.Alternation.enabled(),
 				},
 
 				'download' : {
@@ -4194,7 +4751,7 @@ class Context(object):
 
 	def dataTo(self, force = False):
 		# NB: Do not create full commands for each action in the context menu.
-		# NB: If mutiple actions contain the source/metadata attribute, the context menu JSON can become very large and can take very long to generate.
+		# NB: If multiple actions contain the source/metadata attribute, the context menu JSON can become very large and can take very long to generate.
 		# NB: Instead, create a barebone context menu and append all parameters ONCE. The plugin commands are then dynamically created ONLY if they are called.
 		if force or self.mData is None:
 			self.mData = {
@@ -4224,6 +4781,7 @@ class Context(object):
 				'provider' : self.mProvider,
 				'library' : self.mLibrary,
 				'playlist' : self.mPlaylist,
+				'mixed' : self.mMixed,
 
 				'video' : self.mVideo,
 				'source' : self.mSource,
@@ -4287,11 +4845,12 @@ class Context(object):
 		title = extract('title', info.getTitle(), parameters, metadata)
 		tvshowtitle = extract('tvshowtitle', info.getTVShowTitle(), parameters, metadata)
 		year = extract('year', info.getYear(), parameters, metadata)
+		tvshowyear = extract('tvshowyear', info.getYear(), parameters, metadata)
 		season = extract('season', info.getSeason(), parameters, metadata)
 		episode = extract('episode', info.getEpisode(), parameters, metadata)
 
 		from lib.meta.meny import MetaMenu
-		context = MetaMenu(media = media, niche = niche).buildContext(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle if tvshowtitle else title, year = year, season = season, episode = episode)
+		context = MetaMenu(media = media, niche = niche).buildContext(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = tvshowtitle or title, year = tvshowyear or year, season = season, episode = episode)
 
 		context.show()
 		Loader.hide()
@@ -4312,6 +4871,20 @@ class Context(object):
 
 	def commandInformationMovie(self):
 		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear})
+
+	def commandInformationSet(self):
+		trakt = None
+		tmdb = None
+		if self.mSet:
+			if tools.Tools.isDictionary(self.mSet):
+				trakt = self.mSet.get('trakt')
+				tmdb = self.mSet.get('tmdb')
+			elif tools.Tools.isString(self.mSet) or tools.Tools.isInteger(self.mSet): # Deprecated. Previously the TMDb ID was stored directly under the metadata['collection']['id'] attribute. Now the IDs are stored as a dictionary.
+				tmdb = self.mSet
+		elif tools.Media.isSet(self.mMedia):
+			trakt = self.mTrakt
+			tmdb = self.mTmdb
+		if trakt or tmdb: return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Set, 'trakt' : trakt, 'tmdb' : tmdb})
 
 	def commandInformationShow(self):
 		return self._commandPlugin(action = 'informerDialog', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'title' : self.mTitle, 'year' : self.mYear})
@@ -4385,13 +4958,17 @@ class Context(object):
 	def commandVideo(self, video = None):
 		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
-	def commandVideoManual(self):
+	def commandVideoDirect(self, video = None):
 		from lib.modules.video import Video
-		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'selection' : Video.ModeManual, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video or self.mVideo, 'selection' : Video.ModeDirect, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
-	def commandVideoAutomatic(self):
+	def commandVideoManual(self, video = None):
 		from lib.modules.video import Video
-		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : self.mVideo, 'selection' : Video.ModeAutomatic, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video or self.mVideo, 'selection' : Video.ModeManual, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
+
+	def commandVideoAutomatic(self, video = None):
+		from lib.modules.video import Video
+		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video or self.mVideo, 'selection' : Video.ModeAutomatic, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandBrowse(self, season = False):
 		# Important for "parameters=False" to avoid pulling int he parameters of the current menu.
@@ -4441,15 +5018,15 @@ class Context(object):
 
 	def commandPlayDefault(self):
 		from lib.modules.handler import Handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeDefault, 'source' : self.mSource})
+		return self._commandPlugin(action = 'play', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeDefault, 'reload' : not self.mMixed, 'source' : self.mSource})
 
 	def commandPlaySelection(self):
 		from lib.modules.handler import Handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeSelection, 'source' : self.mSource})
+		return self._commandPlugin(action = 'play', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeSelection, 'reload' : not self.mMixed, 'source' : self.mSource})
 
 	def commandPlayFile(self):
 		from lib.modules.handler import Handler
-		return self._commandPlugin(action = 'play', parameters = {'handleMode' : Handler.ModeFile, 'source' : self.mSource})
+		return self._commandPlugin(action = 'play', parameters = {'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'handleMode' : Handler.ModeFile, 'reload' : not self.mMixed, 'source' : self.mSource})
 
 	def commandFileAdd(self):
 		return self._commandPlugin(action = 'fileAdd')
@@ -4481,20 +5058,33 @@ class Context(object):
 	def commandOrionRemove(self):
 		return self._commandPlugin(action = 'orionRemove', parameters = {'idItem' : self.mOrion['item'], 'idStream' : self.mOrion['stream']})
 
-	def commandRefreshMenu(self):
-		return self._commandPlugin(action = 'refreshMenu', parameters = {'media' : self.mMedia, 'playback' : True, 'container' : self._container()})
+	def commandRefreshMovie(self, level = None):
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'level' : level, 'container' : self._container(), 'notification' : True})
 
-	def commandRefreshMovie(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Movie, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container()})
+	def commandRefreshSet(self, level = None):
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Set, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'level' : level, 'container' : self._container(), 'notification' : True})
 
 	def commandRefreshShow(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container()})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container(), 'notification' : True})
 
 	def commandRefreshSeason(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Season, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'container' : self._container()})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Season, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'container' : self._container(), 'notification' : True})
 
 	def commandRefreshEpisode(self):
-		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Episode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'container' : self._container()})
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Episode, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'episode' : self.mEpisode, 'container' : self._container(), 'notification' : True})
+
+	def commandRefreshPack(self):
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Pack, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'container' : self._container(), 'notification' : True})
+
+	def commandRefreshSerie(self, level = None):
+		return self._commandPlugin(action = 'refreshMetadata', parameters = {'media' : tools.Media.Show, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'level' : level, 'container' : self._container(), 'notification' : True})
+
+	def commandRefreshMenu(self):
+		from lib.meta.menu import MetaMenu
+		if MetaMenu.instance().notification(content = 'refresh', type = 'menu', background = False):
+			Dialog.notification(title = 33060, message = 36784, icon = Dialog.IconInformation, time = 7000)
+			return self._commandPlugin(action = 'refreshMenu', parameters = {'media' : self.mMedia, 'playback' : True, 'container' : self._container()})
+		return None
 
 	def commandRefreshList(self):
 		# There are different ways we can reload the directory:
@@ -4503,10 +5093,19 @@ class Context(object):
 		#	3. ReplaceWindow(videos,path): Works, but replaces the entire menu history. Also shows and empty window while the new metadata is retrieved.
 		#	4. _commandPlugin(): As if this was just a standard command. Refreshing metadata works, but when recreating the menu with interface.Directory, it complaints that the handle is invalid/-1, since the command was launched from the context instead of the normal directory navigation.
 		#	5. _commandPlugin(): Execute the command to refresh the metadata, but do not create as menu with interface.Directory. Instead, just call Container.Refresh to let Kodi update the directory with the latests metadata.
-		from lib.meta.menu import MetaMenu
 
-		# NB: "full=False". Otherwise it this is called from the context of a movie entry, it will add the movie's niche to the refresh command to refresh the menu with, which is not what we want.
-		return self._commandPlugin(parameters = MetaMenu.commandCreateRefresh(container = self._container(), parameters = self.mQuery), full = False)
+		from lib.meta.menu import MetaMenu
+		if MetaMenu.instance().notification(content = 'refresh', type = 'list', background = False):
+			Dialog.notification(title = 33526, message = 36785, icon = Dialog.IconInformation, time = 7000)
+
+			# If the query is encoded, decode it first before calling MetaMenu.commandCreateRefresh().
+			# This is the case if we use the context menu -> Browse -> Browse Show -> then in the show menu open the context menu on a season -> Refresh -> Refresh Menu Metadata.
+			if tools.Tools.isDictionary(self.mQuery): query = tools.System.commandResolve(self.mQuery)
+			else: query = self.mQuery
+
+			# NB: "full=False". Otherwise it this is called from the context of a movie entry, it will add the movie's niche to the refresh command to refresh the menu with, which is not what we want.
+			return self._commandPlugin(parameters = MetaMenu.commandCreateRefresh(container = self._container(), parameters = query), full = False)
+		return None
 
 	def commandProvider(self, provider = None):
 		if provider:
@@ -4542,10 +5141,18 @@ class Context(object):
 	def commandSettingsGaia(self):
 		return self._commandPlugin(action = 'settingsAdvanced')
 
+	def _commandSettingsClose(self):
+		from lib.modules.window import WindowStreams
+		if WindowStreams.visible():
+			WindowStreams.close()
+			tools.Time.sleep(0.01)
+
 	def commandSettingsSkin(self):
+		self._commandSettingsClose()
 		return 'ActivateWindow(skinsettings)'
 
 	def commandSettingsKodi(self):
+		self._commandSettingsClose()
 		return 'ActivateWindow(settings)'
 
 	def commandNetworkInfo(self):
@@ -4585,7 +5192,7 @@ class Context(object):
 		return self._commandPlugin(action = 'systemPower')
 
 	def commandSystemCleanup(self):
-		return self._commandPlugin(action = 'clean')
+		return self._commandPlugin(action = 'cleanup')
 
 	def commandLogScrape(self):
 		return self._commandPlugin(action = 'logScrape')
@@ -4647,6 +5254,7 @@ class Context(object):
 		try:
 			self.addInformation()
 			if self.mMedia == tools.Media.Set:
+				self.addVideos()
 				self.addLink()
 			elif not self.mMedia == tools.Media.Person:
 				self.addVideos()
@@ -4713,7 +5321,10 @@ class Context(object):
 				if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
 				if self.mImdb or self.mTmdb or self.mTvdb or self.mTrakt: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
 			elif tools.Media.isFilm(self.mMedia):
+				if self.mSet: items.insert(0, {'label' : 36400, 'command' : 'commandInformationSet', 'loader' : True})
 				if (self.mImdb or self.mTmdb or self.mTvdb or self.mTrakt) and self.mSeason is None and self.mEpisode is None: items.insert(0, {'label' : 35506, 'command' : 'commandInformationMovie', 'loader' : True})
+			elif tools.Media.isSet(self.mMedia):
+				items.insert(0, {'label' : 36400, 'command' : 'commandInformationSet', 'loader' : True})
 
 		if self.mMode == Context.ModeStream: items.insert(0, {'label' : 33415, 'command' : 'commandInformationStream', 'loader' : True})
 
@@ -4781,21 +5392,27 @@ class Context(object):
 		])
 
 	def addVideos(self):
-		from lib.modules import video
-		spoilers = Translation.string(35533)
-		spoilers = ' (%s)' % spoilers
-		self.add(label = 35351, icon = Font.IconVideo, items = [
-			{'label' : Translation.string(video.Trailer.Label), 'command' : 'commandVideo', 'parameters' : video.Trailer.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoTrailer or not tools.Media.isSerie(self.mMedia) else None,
-			{'label' : Translation.string(video.Recap.Label), 'command' : 'commandVideo', 'parameters' : video.Recap.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoRecap else None,
-			{'label' : Translation.string(video.Review.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Review.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReview else None,
-			{'label' : Translation.string(video.Extra.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Extra.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoExtra else None,
-			{'label' : Translation.string(video.Deleted.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Deleted.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoDeleted else None,
-			{'label' : Translation.string(video.Making.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Making.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoMaking else None,
-			{'label' : Translation.string(video.Director.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Director.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoDirector else None,
-			{'label' : Translation.string(video.Interview.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Interview.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoInterview else None,
-			{'label' : Translation.string(video.Explanation.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Explanation.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoExplanation else None,
-			{'label' : Translation.string(video.Reaction.Label) + spoilers, 'command' : 'commandVideo', 'parameters' : video.Reaction.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReaction else None,
-		])
+		if Context.EnabledVideoContext:
+			from lib.modules import video
+			spoilers = ' (%s)' % Translation.string(35533)
+			spoilers = '' # Remove the spoilers label for now.
+			if Context.EnabledVideoContext == 1: command = 'commandVideoDirect'
+			elif Context.EnabledVideoContext == 2: command = 'commandVideoAutomatic'
+			elif Context.EnabledVideoContext == 3: command = 'commandVideoManual'
+			else: command = 'commandVideo'
+			self.add(label = 35351, icon = Font.IconVideo, items = [
+				{'label' : Translation.string(video.Trailer.Label), 'command' : command, 'parameters' : video.Trailer.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoTrailer or not tools.Media.isSerie(self.mMedia) else None,
+				{'label' : Translation.string(video.Recap.Label) + spoilers, 'command' : command, 'parameters' : video.Recap.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoRecap else None,
+				{'label' : Translation.string(video.Review.Label) + spoilers, 'command' : command, 'parameters' : video.Review.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReview else None,
+				{'label' : Translation.string(video.Reaction.Label) + spoilers, 'command' : command, 'parameters' : video.Reaction.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoReaction else None,
+				{'label' : Translation.string(video.Bonus.Label) + spoilers, 'command' : command, 'parameters' : video.Bonus.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoBonus else None,
+				{'label' : Translation.string(video.Deleted.Label) + spoilers, 'command' : command, 'parameters' : video.Deleted.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoDeleted else None,
+				{'label' : Translation.string(video.Production.Label) + spoilers, 'command' : command, 'parameters' : video.Production.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoProduction else None,
+				{'label' : Translation.string(video.Direction.Label) + spoilers, 'command' : command, 'parameters' : video.Direction.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoDirection else None,
+				{'label' : Translation.string(video.Interview.Label) + spoilers, 'command' : command, 'parameters' : video.Interview.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoInterview else None,
+				{'label' : Translation.string(video.Explanation.Label) + spoilers, 'command' : command, 'parameters' : video.Explanation.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoExplanation else None,
+				{'label' : Translation.string(video.Alternation.Label) + spoilers, 'command' : command, 'parameters' : video.Alternation.Id, 'close' : True, 'loader' : True} if Context.EnabledVideoAlternation else None,
+			])
 
 	def addSelection(self):
 		self.add(label = 35143, icon = Font.IconVideo, items = [
@@ -4805,15 +5422,25 @@ class Context(object):
 
 	def addRefresh(self):
 		items = [
-			{'label' : 33060, 'command' : 'commandRefreshMenu', 'loader' : True},
 			{'label' : 33526, 'command' : 'commandRefreshList', 'loader' : True},
+			{'label' : 33060, 'command' : 'commandRefreshMenu', 'loader' : True},
 		]
 		if tools.Media.isFilm(self.mMedia):
-			items.append({'label' : 33522, 'command' : 'commandRefreshMovie', 'loader' : True})
+			items.append({'label' : 33522, 'command' : 'commandRefreshMovie', 'parameters' : 0, 'loader' : True})
+			if self.mSet:
+				items.append({'label' : 36773, 'command' : 'commandRefreshMovie', 'parameters' : 1, 'loader' : True})
+				items.append({'label' : 36771, 'command' : 'commandRefreshMovie', 'parameters' : 2, 'loader' : True})
+		elif tools.Media.isSet(self.mMedia):
+			items.append({'label' : 36773, 'command' : 'commandRefreshSet', 'parameters' : 0, 'loader' : True})
+			items.append({'label' : 33522, 'command' : 'commandRefreshSet', 'parameters' : 1, 'loader' : True})
+			items.append({'label' : 36771, 'command' : 'commandRefreshSet', 'parameters' : 2, 'loader' : True})
 		elif tools.Media.isSerie(self.mMedia):
-			if not self.mEpisode is None: items.append({'label' : 33525, 'command' : 'commandRefreshEpisode', 'loader' : True})
-			if not self.mSeason is None: items.append({'label' : 33524, 'command' : 'commandRefreshSeason', 'loader' : True})
 			items.append({'label' : 33523, 'command' : 'commandRefreshShow', 'loader' : True})
+			items.append({'label' : 33524, 'command' : 'commandRefreshSeason', 'loader' : True})
+			if not self.mSeason is None: items.append({'label' : 33525, 'command' : 'commandRefreshEpisode', 'loader' : True})
+			items.append({'label' : 36774, 'command' : 'commandRefreshPack', 'loader' : True})
+			items.append({'label' : 36772, 'command' : 'commandRefreshSerie', 'parameters' : 1, 'loader' : True})
+			items.append({'label' : 36771, 'command' : 'commandRefreshSerie', 'parameters' : 2, 'loader' : True})
 
 		self.add(label = 32072, icon = Font.IconRefresh, items = items, loader = True)
 

@@ -56,13 +56,17 @@ class Provider(ProviderUsenetHtml):
 			rank						= 5,
 
 			# Update (2025-01): main page loads, but search page returns an error "Page unavailable".
+			# Update (2025-06): Website is working again.
 			#performance				= ProviderUsenetHtml.PerformanceGood,
-			performance					= ProviderUsenetHtml.PerformanceMedium,
+			#performance				= ProviderUsenetHtml.PerformanceMedium,
+			performance					= ProviderUsenetHtml.PerformanceGood,
 
 			# Website is down since the start of Nov 2022, but admins said they have to take down the server "for a while", so might come back up.
 			# Mark only as Impaired. If offline for a few months, change the status to Dead.
 			# https://www.reddit.com/r/usenet/comments/yk8bpj/nzbkingcom_shutting_down_for_uncertain_time/
-			status						= ProviderUsenetHtml.StatusImpaired,
+			# Update (2025-06): Website is working again.
+			#status						= ProviderUsenetHtml.StatusImpaired,
+			status						= ProviderUsenetHtml.StatusOperational,
 
 			link						= Provider._Link,
 

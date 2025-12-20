@@ -22,7 +22,7 @@ try:
 	from lib.modules.tools import System, Tools, Time, Settings, File, Extension, Regex, Converter, Logger
 	from lib.modules.interface import Translation, Directory, Format, Dialog, Loader
 	from lib.modules.network import Networker
-	from lib.modules.stream import Stream
+	from lib.modules.stream import Stream, Filters
 	from lib.modules.cache import Cache
 	from lib.modules.concurrency import Pool, Lock
 
@@ -50,6 +50,7 @@ try:
 		DebridPremiumize = Orion.DebridPremiumize
 		DebridOffcloud = Orion.DebridOffcloud
 		DebridTorbox = Orion.DebridTorbox
+		DebridDebrider = Orion.DebridDebrider
 		DebridEasydebrid = Orion.DebridEasydebrid
 		DebridRealdebrid = Orion.DebridRealdebrid
 		DebridAlldebrid = Orion.DebridAlldebrid
@@ -748,10 +749,10 @@ try:
 				# Sleep, to allow the main Gaia thread to continue loading streams and doing other things, before the Orion code is exeucte.
 				# Forces Python to execute other code while this thread is sleeping.
 				# Do not wait too long, otherwise with autoplay/bingeplay, the stream-vote call might end up being executed before this call.
-				Time.sleep(3)
+				if System.abortWait(timeout = 3): return False
 
 				item = self._streamUpdateMeta(meta)
-				item['filter'] = {'default' : Stream.thresholdNameDefault(), 'threshold' : Stream.thresholdName()}
+				item['filter'] = {'default' : Stream.thresholdNameDefault(), 'threshold' : Stream.thresholdName(), 'custom' : Filters.custom()}
 				item['streams'] = []
 				item['invalid'] = []
 
@@ -821,6 +822,7 @@ try:
 				data['access']['premiumize'] = stream.accessCachePremiumize(exact = Stream.ExactYes)
 				data['access']['offcloud'] = stream.accessCacheOffcloud(exact = Stream.ExactYes)
 				data['access']['torbox'] = stream.accessCacheTorbox(exact = Stream.ExactYes)
+				data['access']['debrider'] = stream.accessCacheDebrider(exact = Stream.ExactYes)
 				data['access']['easydebrid'] = stream.accessCacheEasydebrid(exact = Stream.ExactYes)
 				data['access']['realdebrid'] = stream.accessCacheRealdebrid(exact = Stream.ExactYes)
 				data['access']['alldebrid'] = stream.accessCacheAlldebrid(exact = Stream.ExactYes)
@@ -1064,7 +1066,13 @@ try:
 		def streamsCount(self, streams):
 			return self.mOrion.streamsCount(streams = streams, quality = self.mOrion.FilterSettings)
 
-		def streamVote(self, idItem, idStream, vote = VoteUp, automatic = False, notification = False):
+		def streamVote(self, idItem, idStream, vote = VoteUp, automatic = False, notification = False, wait = False):
+			Pool.thread(target = self._streamVote, kwargs = {'idItem' : idItem, 'idStream' : idStream, 'vote' : vote, 'automatic' : automatic, 'notification' : notification}, start = True, join = wait)
+
+		def _streamVote(self, idItem, idStream, vote = VoteUp, automatic = False, notification = False):
+			# Sleep, to allow more important code to execute first.
+			if automatic and System.abortWait(timeout = 5): return False
+
 			if idItem and idStream:
 				try:
 					self.mOrion.streamVote(idItem = idItem, idStream = idStream, vote = vote, automatic = automatic, notification = notification)
@@ -1076,7 +1084,13 @@ try:
 							if System.developer(): Logger.error()
 					elif System.developer(): Logger.error()
 
-		def streamRemove(self, idItem, idStream, automatic = False, notification = False):
+		def streamRemove(self, idItem, idStream, automatic = False, notification = False, wait = False):
+			Pool.thread(target = self._streamRemove, kwargs = {'idItem' : idItem, 'idStream' : idStream, 'automatic' : automatic, 'notification' : notification}, start = True, join = wait)
+
+		def _streamRemove(self, idItem, idStream, automatic = False, notification = False):
+			# Sleep, to allow more important code to execute first.
+			if automatic and System.abortWait(timeout = 5): return False
+
 			if idItem and idStream:
 				try:
 					self.mOrion.streamRemove(idItem = idItem, idStream = idStream, automatic = automatic, notification = notification)
@@ -1249,7 +1263,7 @@ try:
 						{'type' : 'title', 'value' : '2. Orion'},
 						{'type' : 'text', 'value' : 'Use the debrid features through the Orion API. This is the second-best option, supporting most features in the debrid APIs.'},
 						{'type' : 'list', 'number' : False, 'value' : [
-							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, EasyDebrid, RealDebrid, DebridLink, AllDebrid'},
+							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, Debrider, EasyDebrid, RealDebrid, DebridLink, AllDebrid'},
 							{'title' : 'Stream Types', 'value' : 'Full (Torrents, Usenet, Hosters)'},
 							{'title' : 'Cache Lookups', 'value' : 'Full (External)'},
 							{'title' : 'File Selection', 'value' : 'Full (External)'},
@@ -1259,7 +1273,7 @@ try:
 						{'type' : 'title', 'value' : '3. External'},
 						{'type' : 'text', 'value' : 'Use debrid features through an external addon, such as ResolveUrl and UrlResolver. Use this if there is no native or Orion support for your debrid service. These addons have limited functionality.'},
 						{'type' : 'list', 'number' : False, 'value' : [
-							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, EasyDebrid, RealDebrid, DebridLink, AllDebrid, LinkSnappy, MegaDebrid, RapidPremium, SimplyDebrid, Smoozed'},
+							{'title' : 'Supported Services', 'value' : 'Premiumize, OffCloud, TorBox, Debrider, EasyDebrid, RealDebrid, DebridLink, AllDebrid, LinkSnappy, MegaDebrid, RapidPremium, SimplyDebrid, Smoozed'},
 							{'title' : 'Stream Types', 'value' : 'Limited (Torrents, Hosters)'},
 							{'title' : 'Cache Lookups', 'value' : 'Limited (Native)'},
 							{'title' : 'File Selection', 'value' : 'Limited (External)'},
@@ -1286,6 +1300,19 @@ try:
 
 		def debridStream(self, link = None, output = Orion.OutputData, ip = None, details = True):
 			return self.mOrion.debridStream(link = link, output = output, ip = ip, details = details)
+
+		def debridUpdate(self, idItem, idStream, type = None, access = None, data = None, automatic = False, wait = False):
+			Pool.thread(target = self._debridUpdate, kwargs = {'idItem' : idItem, 'idStream' : idStream, 'type' : type, 'access' : access, 'data' : data, 'automatic' : automatic}, start = True, join = wait)
+
+		def _debridUpdate(self, idItem, idStream, type = None, access = None, data = None, automatic = False):
+			# Sleep, to allow more important code to execute first.
+			if automatic and System.abortWait(timeout = 5): return False
+
+			if idItem and idStream and (type or data):
+				try:
+					self.mOrion.debridUpdate(idItem = idItem, idStream = idStream, type = type, access = access, data = data)
+				except Exception as error:
+					if System.developer(): Logger.error()
 
 except ImportError:
 

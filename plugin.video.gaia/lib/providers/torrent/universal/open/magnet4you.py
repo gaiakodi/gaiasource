@@ -52,7 +52,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a well-known {container} site. The site contains many English results, but also results in various other languages. {name} has many high-quality results with mostly good metadata.',
 			rank						= 5,
 			performance					= ProviderHtml.PerformanceGood,
-			status						= ProviderHtml.StatusDead, # Cloudflare says host is unreachable. Rechecked after a few weeks, still the same problem.
+			status						= ProviderHtml.StatusDead, # Cloudflare says host is unreachable. Rechecked after a few weeks, still the same problem. Update (2025-06): domain has been down completely for a long time.
 
 			link						= Provider._Link,
 			unblock						= Provider._Unblock,

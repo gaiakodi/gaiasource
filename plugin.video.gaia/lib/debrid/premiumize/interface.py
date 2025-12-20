@@ -168,12 +168,14 @@ class Interface(base.Interface):
 		elif result['id'] and not result['error'] == core.Core.ErrorSelection:
 			return self._addLink(result, title = title, year = year, season = season, episode = episode, close = close, pack = pack, strict = strict, type = type, select = select)
 		else:
-			details = self.mDebrid.errorDetails(error = result['error'])
+			details = self.mDebrid.errorDetails(error = result['error'], data = result)
 			title = details['title']
 			message = details['message']
 
-		self._addError(title = title, message = message)
-		result['notification'] = True
+		if not result['error'] == core.Core.ErrorFormat:
+			self._addError(title = title, message = message)
+			result['notification'] = True
+
 		return result
 
 	def _addSelect(self, result, type = None):

@@ -81,6 +81,30 @@ class Playback(Database):
 	AdjustInternal		= True
 	AdjustSettings		= 'settings'
 
+	# Tag
+	TagHorrible			= 'horrible'
+	TagTerrible			= 'terrible'
+	TagBad				= 'bad'
+	TagPoor				= 'poor'
+	TagMediocre			= 'mediocre'
+	TagFair				= 'fair'
+	TagGood				= 'good'
+	TagGreat			= 'great'
+	TagExcellent		= 'excellent'
+	TagPerfect			= 'perfect'
+	Tags				= {
+		TagHorrible		: 36802,
+		TagTerrible		: 36803,
+		TagBad			: 35244,
+		TagPoor			: 35243,
+		TagMediocre		: 36804,
+		TagFair			: 36608,
+		TagGood			: 35242,
+		TagGreat		: 36607,
+		TagExcellent	: 35241,
+		TagPerfect		: 36805,
+	}
+
 	# Error
 	ErrorTrakt			=' trakt'
 
@@ -386,6 +410,18 @@ class Playback(Database):
 		elif media == Media.Episode: label = 33028
 		return Translation.string(label)
 
+	@classmethod
+	def tag(self, tag = None, rating = None, translate = False):
+		if tag is None and not rating is None: tag = list(Playback.Tags.keys())[int(rating) - 1]
+		if tag:
+			label = Playback.Tags.get(tag)
+			if label: return Translation.string(label) if translate else label
+		else:
+			label = list(Playback.Tags.values())
+			if translate: return [Translation.string(i) for i in label]
+			else: return label
+		return None
+
 	##############################################################################
 	# SETTINGS
 	##############################################################################
@@ -596,14 +632,16 @@ class Playback(Database):
 						countSpecial = packed.get(MetaPack.NumberSpecial)
 					else:
 						# For Progress menu where only summarized smart pack data is available for episodes.
-						packed = metadata.get('smart').get('pack')
+						packed = metadata.get('smart')
 						if packed:
-							packed = packed.get('count')
+							packed = packed.get('pack')
 							if packed:
-								packed = packed.get(MetaPack.NumberOfficial)
+								packed = packed.get('count')
 								if packed:
-									countOfficial = packed.get(MetaPack.ValueEpisode)
-									countSpecial = packed.get(MetaPack.ValueSpecial)
+									packed = packed.get(MetaPack.NumberOfficial)
+									if packed:
+										countOfficial = packed.get(MetaPack.ValueEpisode)
+										countSpecial = packed.get(MetaPack.ValueSpecial)
 
 			if plays or countOfficial:
 				if not plays: plays = {}
@@ -629,6 +667,7 @@ class Playback(Database):
 				full = total + 1
 				remaining = [{'season' : k[0], 'episode' : k[1], 'plays' : v} for k, v in plays.items() if v < full]
 				if len(remaining) == len(plays): remaining = None # All episodes have been watched the same number of times.
+
 				return total, remaining
 
 		return None, None
@@ -658,7 +697,7 @@ class Playback(Database):
 				pack = self.pack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, metadata = metadata, pack = pack)
 				if pack:
 					last = False
-					numberLast = pack.numberLastStandard()
+					numberLast = pack.numberLastStandard(season = season)
 					if numberLast and numberLast[MetaPack.PartSeason] == season:
 						ended = pack.status(season = numberLast[MetaPack.PartSeason]) == MetaPack.StatusEnded
 
@@ -858,7 +897,9 @@ class Playback(Database):
 
 		return result
 
-	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, binge = False, internal = None, external = None, indication = False, refresh = True, timeout = False, loader = None, power = False, qr = True, continues = False):
+	def dialogRate(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, binge = False, internal = None, external = None, indication = False, refresh = True, timeout = False, loader = None, power = False, qr = True, continues = False, image = None):
+		from lib.meta.image import MetaImage
+
 		if loader is None: loader = not binge
 		if loader: Loader.show()
 		Sound.executeRatingStart()
@@ -875,6 +916,8 @@ class Playback(Database):
 		rating = self.rating(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, internal = internal, external = external, full = True)
 		metadata = self.metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number)
 
+		if metadata and not image and Tools.isDictionary(image): image.update(MetaImage.image(data = metadata, default = None, custom = MetaImage.CustomBase))
+
 		# This allows us to cast ratings if the rating dialog does not auto-close (according to the settings).
 		def _dialogRate(rating, current = None, result = None, loader = False, refresh = False):
 			if rating:
@@ -883,6 +926,7 @@ class Playback(Database):
 				except: pass
 				if rating:
 					rating = max(1, min(10, int(rating)))
+					tag = self.tag(rating = rating, translate = True)
 					if loader: Loader.show()
 					rated = self.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, internal = internal, external = external, detail = True, wait = True)
 					if loader: Loader.hide()
@@ -890,10 +934,10 @@ class Playback(Database):
 						Dialog.notification(title = title, message = Translation.string(33943), icon = Dialog.IconWarning)
 						rated = False
 					elif rated:
-						Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, rating), icon = Dialog.IconSuccess, sound = sound)
+						Dialog.notification(title = title, message = Translation.string(35345 if alternative else 35042) % (label, tag, rating), icon = Dialog.IconSuccess, sound = sound)
 						if refresh: Directory.refresh(wait = False)
 					elif rated is None:
-						Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, rating), icon = Dialog.IconInformation, sound = sound)
+						Dialog.notification(title = title, message = Translation.string(35577 if alternative else 35576) % (label, tag, rating), icon = Dialog.IconInformation, sound = sound)
 					else:
 						Dialog.notification(title = title, message = Translation.string(35347 if alternative else 35044) % label, icon = Dialog.IconWarning, sound = sound)
 					if not result is None:
@@ -919,7 +963,10 @@ class Playback(Database):
 			if binge: callback = lambda input : Pool.thread(target = _dialogRate, kwargs = {'rating' : input, 'current' : rating, 'result' : result, 'loader' : loader, 'refresh' : not binge}, start = True, delay = True)
 			else: callback = lambda input : _dialogRate(rating = input, current = rating, result = result, loader = loader, refresh = not binge)
 
-			rating = WindowRating.show(metadata = metadata, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = callback, wait = True)
+			try: background = image[MetaImage.TypeFanart]
+			except: background = None
+
+			rating = WindowRating.show(metadata = metadata, background = background, rating = rating, indication = indication, binge = binge, continues = continues, timeout = timeout, power = power, qr = qr, callback = callback, wait = True)
 			if rating:
 				if 'timeout' in rating and rating['timeout'] and 'interacted' in rating and not rating['interacted']: autoclosed = True
 				elif 'action' in rating and rating['action'] == WindowRating.ActionPower: return False
@@ -1012,14 +1059,19 @@ class Playback(Database):
 					rateShow = lastEpisode and (not ratedShow or lastSeason or lastAired)
 				else: rateShow = False
 
+				# Pass in an image dictionary.
+				# This ensure that when the rating dialogs are shown after playback, that they all (episode, season, show) use the same images.
+				# Otherwise the episode and season rating would use the season fanart, while the show rating would use the show fanart.
+				image = {}
+
 				if rateEpisode and not episode is None and self._ratingRerate(media = Media.Episode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, number = number, internal = internal, external = external, force = forceEpisode):
-					rate.append({'media' : Media.Episode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'number' : number, 'internal' : internal, 'external' : external, 'refresh' : False})
+					rate.append({'media' : Media.Episode, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'episode' : episode, 'number' : number, 'image' : image, 'internal' : internal, 'external' : external, 'refresh' : False})
 
 				if rateSeason and not season is None and self._ratingRerate(media = Media.Season, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, number = number, internal = internal, external = external, force = forceSeason):
-					rate.append({'media' : Media.Season, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'number' : number, 'internal' : internal, 'external' : external, 'refresh' : False})
+					rate.append({'media' : Media.Season, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'number' : number, 'image' : image, 'internal' : internal, 'external' : external, 'refresh' : False})
 
 				if rateShow and self._ratingRerate(media = Media.Show, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, internal = internal, external = external, force = forceShow):
-					rate.append({'media' : Media.Show, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'internal' : internal, 'external' : external, 'refresh' : False})
+					rate.append({'media' : Media.Show, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'image' : image, 'internal' : internal, 'external' : external, 'refresh' : False})
 
 			multiple = len(rate) > 1
 			for i in rate:
@@ -1170,18 +1222,18 @@ class Playback(Database):
 			return True
 		return False
 
-	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, accelerate = False, force = False, wait = False):
+	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, bulk = False, accelerate = False, launch = False, force = False, wait = False):
 		# The menu reloading could take place in a thread, but this could hold up other important code, since some menus can take a long time to refresh.
 		# Even if we add a delay/sleep to the reload thread, allowing other code to execute first, eventually the reloading execution will catch up.
 		# Smart-reloading will also background retrieve metadata and has to do a lot of processing to smart-assemble the menus, which is all too much for a "quick" reload.
 		# Instead, reload in its own process, so that it does not hold up other code, and has its own core for execution.
 		if wait:
-			self._reload(media = media, history = history, progress = progress, arrival = arrival, accelerate = accelerate, force = force)
+			self._reload(media = media, history = history, progress = progress, arrival = arrival, bulk = bulk, accelerate = accelerate, launch = launch, force = force)
 		else:
-			#Pool.thread(target = self._reload, kwargs = {'media' : media, 'history' : history, 'progress' : progress, 'rating' : rating, 'arrival' : arrival, 'accelerate' : accelerate, 'force' : force}, start = True)
-			System.executePlugin(action = 'playbackReload', parameters = {'media' : media, 'history' : history, 'progress' : progress, 'rating' : rating, 'arrival' : arrival, 'accelerate' : accelerate, 'force' : force})
+			#Pool.thread(target = self._reload, kwargs = {'media' : media, 'history' : history, 'progress' : progress, 'rating' : rating, 'arrival' : arrival, 'bulk' : bulk, 'accelerate' : accelerate, 'launch' : launch, 'force' : force}, start = True)
+			System.executePlugin(action = 'playbackReload', parameters = {'media' : media, 'history' : history, 'progress' : progress, 'rating' : rating, 'arrival' : arrival, 'bulk' : bulk, 'accelerate' : accelerate, 'launch' : launch, 'force' : force})
 
-	def _reload(self, media = None, history = False, progress = False, rating = False, arrival = False, accelerate = False, force = False):
+	def _reload(self, media = None, history = False, progress = False, rating = False, arrival = False, bulk = False, accelerate = False, launch = False, force = False):
 		from lib.modules.cache import Memory
 		from lib.modules.tools import Eminence
 
@@ -1202,15 +1254,15 @@ class Playback(Database):
 		# Since execution for each indexer can take long, do the important ones (Shows and Movies) first, since we might need to refresh the Kodi menu with the new data.
 		if not reload:
 			reload = {
-				Media.Show	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0},
-				Media.Movie	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0},
-				Media.Mixed	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0},
+				Media.Show	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0, 'bulk' : 0},
+				Media.Movie	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0, 'bulk' : 0},
+				Media.Mixed	: {'history' : 0, 'progress' : 0, 'rating' : 0, 'arrival' : 0, 'bulk' : 0},
 			}
 
 		allow = {
-			Media.Show	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False},
-			Media.Movie	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False},
-			Media.Mixed	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False},
+			Media.Show	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False, 'bulk' : False},
+			Media.Movie	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False, 'bulk' : False},
+			Media.Mixed	: {'history' : False, 'progress' : False, 'rating' : False, 'arrival' : False, 'bulk' : False},
 		}
 
 		update = {}
@@ -1230,6 +1282,8 @@ class Playback(Database):
 					# This will not refresh any data, only reload the mixed menus using the previously refreshed movie/show metadata.
 					if media == Media.Show or media == Media.Movie: allow[Media.Mixed][i] = value
 
+		if bulk: allow[Media.Mixed]['bulk'] = True # Only do this for mixed media.
+
 		# Set the global variable before actually reloading the menus.
 		# In case another reload process is started, to prevent double execution.
 		for key in allow.keys():
@@ -1237,25 +1291,49 @@ class Playback(Database):
 				if allow[key][i]: reload[key][i] = time
 		Memory.set(id = id, value = reload, local = True, kodi = True)
 
+		# Do bulk reloading first, since it will show a dialog and require a reload afterwards.
+		for key, value in allow.items():
+			if value['bulk']:
+				value['bulk'] = False # Do not do again below.
+				MetaManager.reload(media = key, accelerate = accelerate, launch = launch, bulk = True) # Only do bulk here.
+
 		for key, value in allow.items():
 			if any(value.values()):
 				# NB: Do not use the MetaManager singleton instance.
 				# During reloading, the MetaManager sets a custom cache delay that should not be set globally for the singleton.
 				#manager = self._manager()
-				MetaManager.reload(media = key, accelerate = accelerate, **value)
+				MetaManager.reload(media = key, accelerate = accelerate, launch = launch, **value)
 
 				# Reload the list content in the widget of the Quick view.
 				Eminence.widgetReload(media = key)
 
-	# wait=None: only wait for the Trakt refresh, but not the menu reloading.
-	def launch(self, refresh = True, reload = True, force = False, delay = None, wait = None):
-		if wait or wait is None: self._launch(refresh = refresh, reload = reload, force = force, delay = delay, wait = wait)
-		else: Pool.thread(target = self._launch, kwargs = {'refresh' : refresh, 'reload' : reload, 'force' : force, 'delay' : delay, 'wait' : None}, start = True)
+	def preload(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, number = None, metadata = None, delay = True, wait = False):
+		if wait or wait is None: self._preload(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, number = number, metadata = metadata, delay = delay)
+		else: Pool.thread(target = self._preload, kwargs = {'media' : media, 'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'season' : season, 'number' : number, 'metadata' : metadata, 'delay' : delay}, start = True)
 
-	def _launch(self, refresh = True, reload = True, force = False, delay = None, wait = True):
-		if delay: Time.sleep(3 if delay is True else delay)
+	def _preload(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, number = None, metadata = None, delay = None):
+		if delay: Pool.wait(delay = 10.0 if delay is True else delay, minimum = True)
+
+		if metadata:
+			if not media: media = metadata.get('media')
+			if not imdb: imdb = metadata.get('imdb')
+			if not tmdb: tmdb = metadata.get('tmdb')
+			if not tvdb: tvdb = metadata.get('tvdb')
+			if not trakt: trakt = metadata.get('trakt')
+			if season is None: season = metadata.get('season') # Allow S0.
+
+		self._manager().metadata(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, number = number)
+
+	# wait=None: only wait for the Trakt refresh, but not the menu reloading.
+	def launch(self, refresh = True, reload = True, bulk = False, force = False, delay = None, wait = None):
+		if wait or wait is None: self._launch(refresh = refresh, reload = reload, bulk = bulk, force = force, delay = delay, wait = wait)
+		else: Pool.thread(target = self._launch, kwargs = {'refresh' : refresh, 'reload' : reload, 'bulk' : bulk, 'force' : force, 'delay' : delay, 'wait' : None}, start = True)
+
+	def _launch(self, refresh = True, reload = True, bulk = False, force = False, delay = None, wait = True):
+		if delay: Pool.wait(delay = 3.0 if delay is True else delay, minimum = True)
 		if refresh: self.refresh(history = True, progress = True, rating = True, force = force, reload = False, wait = True if wait is None else wait) # Do not reload, since we reload below.
-		if reload: self.reload(history = True, progress = True, arrival = True, force = force, wait = False if wait is None else wait)
+		if bulk: self.reload(history = False, progress = False, arrival = False, bulk = True, launch = True, force = force, wait = False if wait is None else wait) # Only do this when Gaia is launched in the foreground, since it might show a dialog and requires a restart.
+		if reload: self.reload(history = True, progress = True, arrival = True, bulk = False, launch = True, force = force, wait = False if wait is None else wait)
 
 	def retrieve(self, media, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, metadata = None, pack = None, adjust = False, internal = None, external = None, quick = None, detail = False):
 		result = {}
@@ -1400,6 +1478,9 @@ class Playback(Database):
 	def lookupTrakt(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, metadata = None, pack = None, quick = False, strict = False, detail = False):
 		return self.lookup(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, input = number, output = MetaPack.ProviderTrakt, metadata = metadata, pack = pack, quick = quick, strict = strict, detail = detail)
 
+	def lookupTvdb(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, number = None, metadata = None, pack = None, quick = False, strict = False, detail = False):
+		return self.lookup(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, episode = episode, input = number, output = MetaPack.ProviderTvdb, metadata = metadata, pack = pack, quick = quick, strict = strict, detail = detail)
+
 	def lookupNumbers(self, media = None, imdb = None, tmdb = None, tvdb = None, trakt = None, season = None, episode = None, metadata = None, pack = None, specials = True, quick = False):
 		items = []
 		if Media.isSerie(media) and episode is None:
@@ -1413,6 +1494,7 @@ class Playback(Database):
 					# NB: Also allow non-official seasons, but then all episode in that season should have the same type.
 					# Eg: Dragon Ball Super S02 (only on TVDb, but not on Trakt).
 					official = pack.typeOfficial(item = i)
+					unofficial = pack.typeUnofficial(item = i)
 					standard = False if official else pack.typeStandard(item = i)
 
 					# Eg: Dragon Ball Super (Series and Absolute menu).
@@ -1424,6 +1506,7 @@ class Playback(Database):
 						if (specials or not numberSeason == 0) and (season is None or season == numberSeason):
 							for j in pack.episode(season = numberSeason, default = []):
 								if not specials and pack.typeSpecial(item = j): add = False
+								elif unofficial and season is None: add = False # Update (2025-03). Eg: Dragon Ball Super S02+. Otherwise the Series/Absolute menus do not get a watched checkmark if all episodes were watched. Do not do this for season menus.
 								elif universal: add = pack.typeUniversal(item = j) or (standard and pack.typeStandard(item = j))
 								elif season is None: add = pack.typeOfficial(item = j)
 								elif season == 0: add = pack.typeOfficial(item = j)
@@ -1470,7 +1553,7 @@ class Playback(Database):
 											if not seasonNew in alternative: alternative[seasonNew] = []
 											alternative[seasonNew].append(j)
 
-							# If Trakt has only one absolute season, while TVDb has mutiple seasons.
+							# If Trakt has only one absolute season, while TVDb has multiple seasons.
 							# The Trakt data will only have 1 season, but after number conversion it might turn out there are more seasons.
 							# Manually add these seasons after lookup.
 							# Needed in self.count() to correctly determine season history.
@@ -1494,8 +1577,15 @@ class Playback(Database):
 										})
 
 						elif 'episodes' in item: # For season history.
+							unoffical = pack.typeUnofficial(season = season)
 							for i in item['episodes']:
-								seasonNew, episodeNew = self.lookupStandard(media = Media.Episode, season = i.get('season'), episode = i.get('episode'), number = MetaPack.ProviderTrakt, metadata = metadata, pack = pack)
+								if unoffical and not i.get('season') == season:
+									# Dragon Ball super S02+.
+									# Otherwise the unoffical TVDb seasons for S02+ are not marked as watched if all S01E01-S01E131 were watched.
+									seasonNew, episodeNew = self.lookupTvdb(media = Media.Episode, season = i.get('season'), episode = i.get('episode'), number = MetaPack.ProviderTrakt, metadata = metadata, pack = pack)
+								else:
+									seasonNew, episodeNew = self.lookupStandard(media = Media.Episode, season = i.get('season'), episode = i.get('episode'), number = MetaPack.ProviderTrakt, metadata = metadata, pack = pack)
+
 								if not seasonNew is None and not episodeNew is None:
 									if not season == seasonNew: alternative = True
 									i['season'] = seasonNew
@@ -2115,6 +2205,11 @@ class Playback(Database):
 					if result or result is None: result = True
 					elif detail and result is False: result = Playback.ErrorTrakt # Trakt server might be down.
 
+			# Preload S0 metadata if S01E01 (or the entire S01) was watched.
+			# This ensures that if the show Progress menu is opened for the first time AFTER starting a new show, the episode submenu does not need time to load first, because it has to interleave S0 specials.
+			if (media == Media.Season and season == 1) or (media == Media.Episode and season == 1 and episode == 1):
+				self.preload(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = 0, delay = True, wait = False)
+
 			# There should not be a reason to wait for the reload here?
 			# The Trakt history is already updated. So even after watching and item from the context menu or after playback, the watched status should be correct, even if the various smart menus have not reloaded yet.
 			self.reload(media = media, history = True, wait = False)
@@ -2353,6 +2448,7 @@ class Playback(Database):
 				ratings = None
 				data = self._retrieve(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = seasonStandard, episode = episodeStandard, single = True, attribute = 'rating')
 				if data: ratings = data['rating']
+				if ratings and ratings[0] and ratings[0].get('rating') == rating: result = None # Already rated with unchaged rating.
 				if not ratings: ratings = []
 				ratings.insert(0, {'time' : time, 'rating' : rating})
 
@@ -2368,7 +2464,8 @@ class Playback(Database):
 				# Eg: Dragon Ball Super S02+.
 				if (not Media.isSeason(media) or not seasonTrakt is None) and (not Media.isEpisode(media) or not episodeTrakt is None):
 					result = Trakt.ratingUpdate(rating = rating, media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = seasonTrakt, episode = episodeTrakt, time = time, wait = True)
-					if result or result is None: result = True
+					if Tools.isInteger(result): result = None # Already rated with unchaged rating.
+					elif result or result is None: result = True
 					elif detail and result is False: result = Playback.ErrorTrakt # Trakt server might be down.
 
 		except:
@@ -2553,7 +2650,7 @@ class Playback(Database):
 							# Replace specials with normal episodes. In case the user watched a special, we do not want to list the specials season in the Progress menu.
 							if seasonOther == 0 or episodeOther == 0: replace = True
 
-							# Items coming from the internal database have a timestmap for ['time']['watched'] even if the item was not fully watched, but just started the playback progress.
+							# Items coming from the internal database have a timestamp for ['time']['watched'] even if the item was not fully watched, but just started the playback progress.
 							# Only replace a higher-numbered episode with a lower-numbered episode if it has a higher play count, even if its watched time is earlier.
 							elif not externalOther or ((countCurrent or 0) > (countOther or 0)):
 

@@ -139,7 +139,11 @@ class History(Database):
 			if tmdb is None: tmdb = metadata.get('tmdb')
 			if tvdb is None: tvdb = metadata.get('tvdb')
 			if trakt is None: trakt = metadata.get('trakt')
-			if set is None: set = metadata.get('collection', {}).get('id')
+			if set is None:
+				try:
+					set = metadata['collection']['id'] # Old metadata stored the TMDb ID in "id".
+					set = set['tmdb'] # New metadata stores the IDs as a dictionary.
+				except: pass
 			if season is None: season = metadata.get('season')
 			if episode is None: episode = metadata.get('episode')
 		return media, niche, imdb, tmdb, tvdb, trakt, set, season, episode

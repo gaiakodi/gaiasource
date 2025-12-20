@@ -674,7 +674,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,1)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Horrible)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag1)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),1)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),1)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -728,7 +728,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,2)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Terrible)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag2)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !Integer.IsEqual(Window.Property(GaiaPreviousRating),2)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + Integer.IsEqual(Window.Property(GaiaPreviousRating),2)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -782,7 +782,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,3)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Bad)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag3)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),3)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),3)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -836,7 +836,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,4)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Poor)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag4)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),4)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),4)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -890,7 +890,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,5)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Mediocre)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag5)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),5)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),5)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -944,7 +944,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,6)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Fair)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag6)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),6)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),6)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -998,7 +998,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,7)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Good)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag7)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),7)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),7)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -1052,7 +1052,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,8)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Great)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag8)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),8)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),8)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -1106,7 +1106,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,9)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Excellent)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag9)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),9)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),9)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>
@@ -1160,7 +1160,7 @@
 								<texturefocus></texturefocus>
 
 								<onfocus>SetProperty(GaiaRatingValue,10)</onfocus>
-								<onfocus>SetProperty(GaiaRatingLabel,Perfect)</onfocus>
+								<onfocus>SetProperty(GaiaRatingLabel,$INFO[Window.Property(GaiaRatingTag10)])</onfocus>
 
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + !String.IsEqual(Window.Property(GaiaPreviousRating),10)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorPrimary)],Home)</onfocus>
 								<onfocus condition="Integer.IsEqual(Window.Property(GaiaInitialized),1) + String.IsEqual(Window.Property(GaiaPreviousRating),10)">SetProperty(GaiaColorDefault,$INFO[Window(Home).Property(GaiaColorRated)],Home)</onfocus>

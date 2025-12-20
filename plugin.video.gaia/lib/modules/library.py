@@ -44,7 +44,7 @@ class Library(object):
 
 	DurationUpdate = 60000
 	DurationNoUpdate = 4000
-	DurationMonitor = 10800 # 3 hours. Number of seconds between library updates by the service.
+	DurationMonitor = 7200 # 2 hours. Number of seconds between library updates by the service.
 
 	##############################################################################
 	# CONSTRUCTORS
@@ -379,7 +379,7 @@ class Library(object):
 
 				library = System.executeJson(method = 'VideoLibrary.GetTVShows', parameters = {'properties' : ['imdbnumber', 'title', 'year']})
 				library = library['result']['tvshows']
-				library = [i['title'] for i in library if str(i['imdbnumber']) in id or (i['title'] == items[0].get('tvshowtitle') and str(i['year']) == str(items[0].get('year')))]
+				library = [i['title'] for i in library if str(i['imdbnumber']) in id or (i['title'] == items[0].get('tvshowtitle') and str(i['year']) == str(items[0].get('tvshowyear') or items[0].get('year')))]
 
 				if library:
 					library = library[0]
@@ -403,7 +403,7 @@ class Library(object):
 					if self.mPrecheck:
 						if i.get('episode') == 1:
 							self.mBlock = True
-							streams = self._checkSources(imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), season = i.get('season'), episode = i.get('episode'), tvshowtitle = i.get('tvshowtitle'), title = i.get('title'), year = i.get('year'), premiered = i.get('premiered'), metadata = i)
+							streams = self._checkSources(imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), season = i.get('season'), episode = i.get('episode'), tvshowtitle = i.get('tvshowtitle'), title = i.get('title'), year = i.get('tvshowyear') or i.get('year'), premiered = i.get('premiered'), metadata = i)
 							if streams: self.mBlock = False
 						if self.mBlock: continue
 
@@ -489,7 +489,7 @@ class Library(object):
 				if 'episode' in i:
 					itemsEpisodes.append(i)
 				else:
-					kwargs = {'imdb' : i.get('imdb'), 'tmdb' : i.get('tmdb'), 'tvdb' : i.get('tvdb'), 'trakt' : i.get('trakt'), 'title' : i.get('tvshowtitle') or i.get('title'), 'year' : i.get('year')}
+					kwargs = {'imdb' : i.get('imdb'), 'tmdb' : i.get('tmdb'), 'tvdb' : i.get('tvdb'), 'trakt' : i.get('trakt'), 'title' : i.get('tvshowtitle') or i.get('title'), 'year' : i.get('tvshowyear') or i.get('year')}
 					if 'season' in i:
 						kwargs['season'] = i.get('season')
 						threads.append(Pool.thread(target = resolveEpisodes, kwargs = kwargs, start = True))
@@ -500,7 +500,7 @@ class Library(object):
 			for i in itemsEpisodes:
 				try:
 					if System.aborted(): return System.exit()
-					value = self._televisionAddSingle(imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), title = i.get('tvshowtitle') or i.get('title'), year = i.get('year'), season = i.get('season'), episode = i.get('episode'), metadata = i, multiple = True)
+					value = self._televisionAddSingle(imdb = i.get('imdb'), tmdb = i.get('tmdb'), tvdb = i.get('tvdb'), trakt = i.get('trakt'), title = i.get('tvshowtitle') or i.get('title'), year = i.get('tvshowyear') or i.get('year'), season = i.get('season'), episode = i.get('episode'), metadata = i, multiple = True)
 					if value > 0: count += value
 				except: Logger.error()
 
@@ -526,14 +526,14 @@ class Library(object):
 			season = item.get('season')
 			episode = item.get('episode')
 			tvshowtitle = item.get('tvshowtitle')
-			title = item.get('title') or item.get('year')
+			title = item.get('title') or item.get('tvshowtitle')
 
 			# Get the show year, not the season or episode year.
 			year = None
 			if not year:
 				for i in [metadata, item]:
 					try:
-						year = i.get('show').get('year')
+						year = i.get('show').get('tvshowyear') or i.get('show').get('year')
 						if year: break
 					except: pass
 			if not year:
@@ -545,7 +545,7 @@ class Library(object):
 			if not year:
 				for i in [metadata, item]:
 					try:
-						year = i.get('year')
+						year = i.get('tvshowyear') or i.get('year')
 						if year: break
 					except: pass
 
@@ -660,7 +660,7 @@ class Library(object):
 					tmdb = params.get('tmdb')
 					tvdb = params.get('tvdb')
 					trakt = params.get('trakt')
-					try: year = int(params.get('year'))
+					try: year = int(params.get('tvshowyear') or params.get('year'))
 					except: year = None
 
 					imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
@@ -718,17 +718,17 @@ class Library(object):
 
 			try:
 				if it is None:
-					it = manager.metadataEpisode(imdb = item.get('imdb'), tmdb = item.get('tmdb'), tvdb = item.get('tvdb'), trakt = item.get('trakt'), title = item.get('tvshowtitle'), year = item.get('year'), season = True) # Retrieve all episodes.
+					it = manager.metadataEpisode(imdb = item.get('imdb'), tmdb = item.get('tmdb'), tvdb = item.get('tvdb'), trakt = item.get('trakt'), title = item.get('tvshowtitle'), year = item.get('year') or item.get('tvshowyear'), season = True) # Retrieve all episodes.
 					if it:
 						status = (it[0].get('pack', {}).get('status') or it[-1].get('status')).lower()
-						it = [{'imdb' : i.get('imdb'), 'tmdb' : i.get('tmdb'), 'tvdb' : i.get('tvdb'), 'trakt' : i.get('trakt'), 'season' : i.get('season'), 'episode' : i.get('episode'), 'tvshowtitle' : i.get('tvshowtitle'), 'title' : i.get('title'), 'year' : item.get('year'), 'premiered' : item.get('premiered')} for i in it]
+						it = [{'imdb' : i.get('imdb'), 'tmdb' : i.get('tmdb'), 'tvdb' : i.get('tvdb'), 'trakt' : i.get('trakt'), 'season' : i.get('season'), 'episode' : i.get('episode'), 'tvshowtitle' : i.get('tvshowtitle'), 'title' : i.get('title'), 'year' : item.get('tvshowyear') or item.get('year'), 'premiered' : item.get('premiered')} for i in it]
 						if not status == MetaTools.StatusContinuing: base._insert('INSERT INTO shows (idImdb, idTmdb, idTvdb, idTrakt, data) VALUES (?, ?, ?, ?, ?);', parameters = (item.get('imdb'), item.get('tmdb'), item.get('tvdb'), item.get('trakt'), Converter.jsonTo(it)))
 			except: Logger.error()
 
 			try:
 				id = [i for i in [item.get('imdb'), item.get('tvdb'), item.get('tmdb')] if i]
 
-				episode = [x['title'] for x in library if str(x['imdbnumber']) in id or (x['title'] == item.get('tvshowtitle') and str(x['year']) == str(item.get('year')))][0]
+				episode = [x['title'] for x in library if str(x['imdbnumber']) in id or (x['title'] == item.get('tvshowtitle') and str(x['year']) == str(item.get('tvshowyear') or item.get('year')))][0]
 				episode = System.executeJson(method = 'VideoLibrary.GetEpisodes', parameters = {'filter' : {'and' : [{'field' : 'tvshow', 'operator' : 'is', 'value' : episode}]}, 'properties' : ['season', 'episode']})
 				episode = episode.get('result', {}).get('episodes', {})
 				episode = [{'season': int(i['season']), 'episode': int(i['episode'])} for i in episode]
@@ -886,7 +886,7 @@ class Library(object):
 			metadata = Converter.jsonFrom(metadata)
 		if metadata:
 			title = metadata.get('tvshowtitle') or metadata.get('title') or metadata.get('originaltitle')
-			year = metadata.get('year')
+			year = metadata.get('tvshowyear') or metadata.get('year')
 
 		isAddon = link and link.startswith(System.PluginPrefix)
 		isLink = link and Networker.linkIs(link)

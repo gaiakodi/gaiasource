@@ -43,6 +43,7 @@ class Provider(ProviderJson):
 
 	_AttributeList			= 'results'
 	_AttributeItem			= 'torrent'
+	_AttributeMeta			= 'torrentMetadata'
 	_AttributeLink			= 'torrentMagnet'
 	_AttributeHash			= 'torrentHash'
 	_AttributeName			= 'name'
@@ -91,15 +92,15 @@ class Provider(ProviderJson):
 			searchCategoryShow		= Provider._CategoryShow,
 
 			extractList				= Provider._AttributeList,
-			extractLink				= [Provider._AttributeItem, Provider._AttributeLink],
-			extractHash				= [Provider._AttributeItem, Provider._AttributeHash],
-			extractFileName			= [Provider._AttributeItem, Provider._AttributeName],
-			extractFileSize			= [Provider._AttributeItem, Provider._AttributeSize],
+			extractLink				= [Provider._AttributeItem, Provider._AttributeMeta, Provider._AttributeLink],
+			extractHash				= [Provider._AttributeItem, Provider._AttributeMeta, Provider._AttributeHash],
+			extractFileName			= [Provider._AttributeItem, Provider._AttributeMeta, Provider._AttributeName],
+			extractFileSize			= [Provider._AttributeItem, Provider._AttributeMeta, Provider._AttributeSize],
 			extractSourceTime		= [Provider._AttributeItem, Provider._AttributeTime],
 			extractSourceSeeds		= [Provider._AttributeItem, Provider._AttributeSeeds],
 			extractSourceLeeches	= [Provider._AttributeItem, Provider._AttributeLeeches],
 			extractSourceApproval	= [Provider._AttributeItem, Provider._AttributeDownloads],
-			extractReleaseUploader	= [Provider._AttributeItem, Provider._AttributeUploader],
+			extractReleaseUploader	= [Provider._AttributeItem, Provider._AttributeMeta, Provider._AttributeUploader],
 		)
 
 	##############################################################################

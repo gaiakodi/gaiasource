@@ -23,6 +23,7 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderHtml):
 
+	# https://github.com/btmet/home
 	_Link					= ['https://btmet.com']
 	_Path					= 'search.php'
 
@@ -79,7 +80,7 @@ class Provider(ProviderHtml):
 			description					= '{name} is a less-known {container} site. The site contains results in various languages, but most of them are in English. {name} has a lot of missing trivial metadata and contains a number of fake uploads. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank						= 2,
 			performance					= ProviderHtml.PerformanceMedium - ProviderHtml.PerformanceStep,
-			status						= ProviderHtml.StatusImpaired, # Cloudflare.
+			status						= ProviderHtml.StatusDead, # Cloudflare. Update (2025-06): Domain is down.
 
 			link						= Provider._Link,
 

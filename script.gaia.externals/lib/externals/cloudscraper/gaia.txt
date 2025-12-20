@@ -1,70 +1,11 @@
 #########################################################################################################################
 
-Download:			https://github.com/VeNoMouS/cloudscraper
-Current Version:		1.2.71 (2024-11-29)
-Used By:			Gaia
+Update (2025-06):
 
-#########################################################################################################################
+A new version 3.0.0 has been released that claims to solve all Cloudflare challenges.
+However, the new version is very unstable and does not work at all at the moment.
+Once the developer has fixed everything and gotten it to stable, we can switch over to the new version.
 
-find ./ -type f -exec sed -i -e 's/from requests_toolbelt/from externals.requeststoolbelt/g' {} \;
-find ./ -type f -exec sed -i -e 's/import requests/import externals.requests as requests/g' {} \;
-find ./ -type f -exec sed -i -e 's/from requests/from externals.requests/g' {} \;
-find ./ -type f -exec sed -i -e 's/from urllib3/from externals.urllib3/g' {} \;
-find ./ -type f -exec sed -i -e 's/import js2py/import externals.js2py as js2py/g' {} \;
-
-#########################################################################################################################
-
-NB: In __init__.py in the request() function, add self.response for every line where the response is set.
-This is needed, otherwise the reponse will not be accessible if the function throws an Exception.
-
-NB: In __init__.py there are multiple "# Gaia - Disable SSL" statements that are needed to disable SSL validation. This can be switched on/off in the addon settings. If SSL is validated (by default) and the SSL certificate is invalid/outdated, the request will fail. In the main cloudflare code we cannot just say "scraper.request(verify = False)", since urllib3 complaints with "Cannot set verify_mode to CERT_NONE when check_hostname is enabled."
-
-#########################################################################################################################
-
-NB: In user_agent/__init__.py, make sure the JSON file is only read once. Otherwise this is a huge performance degradation, especially if many threaded requests are made in parallel.
-NB: Do not add the user agents as a global XBMC property, since this can cause deadlocks if requests are made from different threads or processes.
-
-Do not use:
-
-	open(os.path.join(os.path.dirname(__file__), 'browsers.json'), 'r')
-
-On Android (Nvidia Shield), the following error is thrown:
-
-	.kodi/addons/script.gaia.externals/lib/externals/cloudscraper/user_agent/__init__.py", line 90, in loadUserAgent\n    fp = open(os.path.join(os.path.dirname(__file__), \'browsers.json\'), \'r\')\n', "KeyError: '_bootlocale'\n"]
-
-It seems that "os.path.dirname(__file__)" is not possible on these devices.
-
-UPDATE: _bootlocale remain after this change. maybe it is the open() function that causes this. Just add fallback for hard-coded user agents if reading the file fails.
-
-#########################################################################################################################
-
-It seems there are issues with the SSLContext in some Python versions.
-	https://stackoverflow.com/questions/71548899/cloudscraper-returns-attributeerror-sslcontext-object-has-no-attribute-orig
-
-In __init__.py there is an error:
-	plugin.video.gaia/lib/externals/cloudscraper/__init__.py", line 81, in __init__
-	self.ssl_context.orig_wrap_socket = self.ssl_context.wrap_socket
-	AttributeError: 'SSLContext' object has no attribute 'orig_wrap_socket'
-
-Even when storing orig_wrap_socket as another variable, there is another error:
-	plugin.video.gaia/lib/externals/cloudscraper/__init__.py", line 83, in __init__
-	self.ssl_context.wrap_socket = self.wrap_socket
-	AttributeError: 'SSLContext' object attribute 'wrap_socket' is read-only
-
-If all else fails, ingore the new wrap_socket() function added to Cloudflare.
-It seems that the custom function set "self.ssl_context.check_hostname", which is done by the Gaia code "if self.ssl_verify <= 2: ..." as well.
-
-#########################################################################################################################
-
-Add "shell = True" to all "subprocess" calls, otherwise a CMD window pops up in Windows.
-Commands must be a string, not a list, when shell=True.
-
-#########################################################################################################################
-
-Add the gaiaCommand() calls.
-
-#########################################################################################################################
-
-Do a Cloudflare verification (Tools -> Verification -> Cloudflare) to make sure everything is working.
+More info at external.py -> Importer.moduleCloudscraper()
 
 #########################################################################################################################

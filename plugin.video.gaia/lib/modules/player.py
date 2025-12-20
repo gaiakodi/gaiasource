@@ -21,7 +21,6 @@
 import xbmc
 import xbmcvfs
 
-from lib import debrid
 from lib.modules import trakt
 from lib.modules import tools
 from lib.modules import interface
@@ -34,6 +33,8 @@ from lib.modules.playback import Playback
 from lib.modules.stream import Stream
 from lib.modules.theme import Theme
 from lib.modules.concurrency import Pool, Lock
+
+from lib.debrid import Debrid
 
 from lib.meta.image import MetaImage
 from lib.meta.tools import MetaTools
@@ -136,7 +137,7 @@ class Player(xbmc.Player):
 				if not self.idTvdb: self.idTvdb = metadata.get('tvdb')
 				if not self.idTrakt: self.idTrakt = metadata.get('trakt')
 				if not self.title: self.title = metadata.get('title')
-				if not self.year: self.year = metadata.get('year')
+				if not self.year: self.year = metadata.get('tvshowyear') or metadata.get('year')
 
 			try: self.idSet = metadata['collection']['id']
 			except: self.idSet = None
@@ -204,7 +205,6 @@ class Player(xbmc.Player):
 					else: self.service = 'Direct'
 				else:
 					if self.handle:
-						from lib.debrid import Debrid
 						debrid = Debrid.meta(id = self.handle)
 						if debrid: self.service = debrid['name']
 						else: self.service = None
@@ -220,7 +220,7 @@ class Player(xbmc.Player):
 
 			self.metatools = MetaTools.instance()
 			self.metadata = metadata
-			item = self.metatools.item(metadata = metadata, command = self.url, context = False, label = False) # Do not create custom label with episode number.
+			item = self.metatools.item(metadata = metadata, command = self.url, context = False, label = False, detail = False, playable = True) # Do not create custom label with episode number.
 			self.item = item['item']
 			self.metadataCleaned = item['metadata']
 
@@ -243,6 +243,7 @@ class Player(xbmc.Player):
 			self.sizeCurrent = 0
 			self.sizeProgress = 0
 			self.dialog = None
+			self.voted = False
 			self.resumeTime = resume
 			self.resumedTime = None
 
@@ -449,18 +450,18 @@ class Player(xbmc.Player):
 	def _detailsUpdate(self):
 		try:
 			threads = []
-			if tools.Settings.getInteger('playback.details.description.production') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateProduction, start = True))
-			if tools.Settings.getInteger('playback.details.description.service') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateService, start = True))
-			if tools.Settings.getInteger('playback.details.description.device') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateDevice, start = True))
-			if tools.Settings.getInteger('playback.details.description.server') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateServer, start = True))
-			if tools.Settings.getInteger('playback.details.description.name') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateName, start = True))
-			if tools.Settings.getInteger('playback.details.description.link') > 0:
-				threads.append(Pool.thread(target = self._detailsUpdateLink, start = True))
+
+			if tools.Settings.getInteger('playback.details.description.device') > 0: threads.append(Pool.thread(target = self._detailsUpdateDevice, start = True))
+			if tools.Settings.getInteger('playback.details.description.server') > 0: threads.append(Pool.thread(target = self._detailsUpdateServer, start = True))
+
+			# These do not need threads.
+			if tools.Settings.getInteger('playback.details.description.production') > 0: self._detailsUpdateProduction()
+			if tools.Settings.getInteger('playback.details.description.type') > 0: self._detailsUpdateType()
+			if tools.Settings.getInteger('playback.details.description.rating') > 0: self._detailsUpdateRating()
+			if tools.Settings.getInteger('playback.details.description.service') > 0: self._detailsUpdateService()
+			if tools.Settings.getInteger('playback.details.description.name') > 0: self._detailsUpdateName()
+			if tools.Settings.getInteger('playback.details.description.link') > 0: self._detailsUpdateLink()
+
 			[self.join(thread) for thread in threads]
 			self.detailsSet()
 		except: tools.Logger.error()
@@ -482,6 +483,54 @@ class Player(xbmc.Player):
 			if details:
 				for k, v in details.items():
 					if v: self.details[k] = interface.Format.iconJoin(v[:4])
+		except: tools.Logger.error()
+
+	def _detailsUpdateType(self):
+		try:
+			setting = tools.Settings.getInteger('playback.details.description.type')
+			details = []
+
+			metadata = tools.Tools.copy(self.metadata)
+			details = self.metatools.itemDetail(media = self.media, metadata = metadata)
+
+			if details:
+				if (setting == 1 and tools.Media.isSerie(self.media)) or setting >= 2: self.details['type'] = details
+		except: tools.Logger.error()
+
+	def _detailsUpdateRating(self):
+		try:
+			setting = tools.Settings.getInteger('playback.details.description.rating')
+			details = []
+
+			voting = self.metadata.get('voting') or {}
+			provider = {
+				MetaTools.RatingImdb : 32034,
+				MetaTools.RatingTrakt : 32315,
+				MetaTools.RatingTmdb : 33508,
+				MetaTools.RatingTvdb : 35668,
+				MetaTools.RatingMetacritic : 35719,
+			}
+
+			if setting >= 1:
+				details.append({'rating' : self.metadata.get('rating'), 'votes' : self.metadata.get('votes')})
+			if setting >= 2:
+				for k, v in provider.items():
+					try: rating = voting['rating'][k]
+					except: rating = None
+					try: votes = voting['votes'][k]
+					except: votes = None
+					if rating:
+						if not votes and k == MetaTools.RatingMetacritic: votes = MetaTools.RatingVotes
+						details.append({'provider' : v, 'rating' : rating, 'votes' : votes})
+
+			if details:
+				details = tools.Tools.listSort(details, key = lambda i : i.get('votes') or 0, reverse = True)
+				if setting == 2:
+					details = ['%.1f (%s)' % (i.get('rating'), interface.Translation.string(i.get('provider') or tools.Math.thousand(i.get('votes') or 1))) for i in details if i and i.get('rating')]
+					if details: details = [{'value' : interface.Format.iconJoin(details)}]
+				else:
+					details = [{'label' : interface.Translation.string(i.get('provider') or 35187), 'value' : '%.1f (%s)' % (i.get('rating'), tools.Math.thousand(i.get('votes') or 1))} for i in details if i and i.get('rating')]
+				if details: self.details['rating'] = details
 		except: tools.Logger.error()
 
 	def _detailsUpdateService(self):
@@ -560,20 +609,24 @@ class Player(xbmc.Player):
 
 				details = []
 
-				if 'creator' in self.details: details.append((35685, self.details['creator']))
-				if 'director' in self.details: details.append((35377, self.details['director']))
-				if 'writer' in self.details: details.append((35684, self.details['writer']))
-				if 'network' in self.details: details.append((33719, self.details['network']))
-				if 'studio' in self.details: details.append((35811, self.details['studio']))
+				if self.details.get('creator'): details.append((35685, self.details['creator']))
+				if self.details.get('director'): details.append((35377, self.details['director']))
+				if self.details.get('writer'): details.append((35684, self.details['writer']))
+				details.append(None) # New line.
+				if self.details.get('network'): details.append((33719, self.details['network']))
+				if self.details.get('studio'): details.append((35811, self.details['studio']))
+				details.append(None) # New line.
+				if self.details.get('type'): details.append((35235, self.details['type']))
+				if self.details.get('rating'): [details.append((i.get('label') or 35187, i.get('value'))) for i in self.details.get('rating')]
+				details.append(None) # New line.
+				if self.details.get('speed'): details.append((35418, self.details['speed']))
+				if self.details.get('service'): details.append((35420, self.details['service']))
+				if self.details.get('device'): details.append((35419, self.details['device']))
+				if self.details.get('server'): details.append((35207, self.details['server']))
+				if self.details.get('name'): details.append((35724, self.details['name']))
+				if self.details.get('link'): details.append((33702, self.details['link']))
 
-				if 'speed' in self.details: details.append((35418, self.details['speed']))
-				if 'service' in self.details: details.append((35420, self.details['service']))
-				if 'device' in self.details: details.append((35419, self.details['device']))
-				if 'server' in self.details: details.append((35207, self.details['server']))
-				if 'name' in self.details: details.append((35724, self.details['name']))
-				if 'link' in self.details: details.append((33702, self.details['link']))
-
-				details = newline.join([interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1] for i in details])
+				details = newline.join([(interface.Format.fontBold(interface.Translation.string(i[0]) + ': ') + i[1]) if i else '' for i in details])
 
 				# There is a weird sporadic error in the Kore remote app.
 				# After binging a few episodes, the Kore app suddenly says it is not connected to Kodi anymore. Restarting Kore does not help.
@@ -587,12 +640,19 @@ class Player(xbmc.Player):
 				if force or not details == self.detailsPrevious:
 					self.detailsPrevious = details
 					metadata = tools.Tools.copy(self.metadataCleaned)
-					if not 'plot' in metadata or not metadata['plot']: metadata['plot'] = ''
-					metadata['plot'] = metadata['plot'].strip('\n').strip('\r')
-					separator = (newline * 2) if metadata['plot'] else ''
 
-					if tools.Settings.getInteger('playback.details.description') == 1: metadata['plot'] = details + separator + metadata['plot'] + newline
-					else: metadata['plot'] = metadata['plot'] + separator + details + newline
+					plot = metadata.get('plot') or ''
+					plot = plot.strip('\n').strip('\r')
+
+					separator3 = newline * 3
+					separator2 = newline * 2
+					separator = separator2 if plot else ''
+
+					if tools.Settings.getInteger('playback.details.description') == 1: plot = details + separator + plot + newline
+					else: plot = plot + separator + details + newline
+
+					while separator3 in plot: plot = plot.replace(separator3, separator2) # Remove tripple newlines if some details were disabled.
+					metadata['plot'] = plot
 
 					try:
 						self.metatools.itemInfo(item = self.item, metadata = metadata)
@@ -763,7 +823,7 @@ class Player(xbmc.Player):
 		return False
 
 	def _debridClear(self):
-		debrid.Debrid.deletePlayback(link = self.url, source = self.source)
+		Debrid.deletePlayback(link = self.url, source = self.source)
 
 	def _downloadStop(self):
 		self._downloadClear(delete = False)
@@ -970,7 +1030,7 @@ class Player(xbmc.Player):
 	def _bingeScrape(self):
 		try:
 			from lib.meta.manager import MetaManager
-			self.bingeMetadata = MetaManager.instance().metadataEpisodeNext(title = self.metadata['tvshowtitle'], year = self.metadata['year'], imdb = self.metadata['imdb'], tmdb = self.metadata['tmdb'], tvdb = self.metadata['tvdb'], trakt = self.metadata['trakt'], season = self.metadata['season'], episode = self.metadata['episode'])
+			self.bingeMetadata = MetaManager.instance().metadataEpisodeNext(title = self.metadata['tvshowtitle'], year = self.metadata.get('tvshowyear') or self.metadata.get('year'), imdb = self.metadata['imdb'], tmdb = self.metadata['tmdb'], tvdb = self.metadata['tvdb'], trakt = self.metadata['trakt'], season = self.metadata['season'], episode = self.metadata['episode'])
 			if self.bingeMetadata:
 				tools.System.executePlugin(action = 'scrape', parameters = {
 					'silent' : True,
@@ -979,6 +1039,7 @@ class Player(xbmc.Player):
 					'title' : self.bingeMetadata['title'],
 					'tvshowtitle' : self.bingeMetadata['tvshowtitle'],
 					'year' : self.bingeMetadata['year'],
+					'tvshowyear' : self.bingeMetadata.get('tvshowyear'),
 					'imdb' : self.bingeMetadata['imdb'],
 					'tvdb' : self.bingeMetadata['tvdb'],
 					'trakt' : self.bingeMetadata['trakt'],
@@ -1057,7 +1118,7 @@ class Player(xbmc.Player):
 					if self.bingeDialogNone:
 						self.bingeContinue = True
 					else:
-						images = MetaImage.setEpisode(data = self.bingeMetadata, season = False, episode = False)
+						images = MetaImage.setEpisode(data = self.bingeMetadata, season = False, episode = False, custom = MetaImage.CustomBase)
 
 						background = None
 						try: background = images['fanart']
@@ -1144,6 +1205,7 @@ class Player(xbmc.Player):
 						'title' : self.bingeMetadata['title'],
 						'tvshowtitle' : self.bingeMetadata['tvshowtitle'],
 						'year' : self.bingeMetadata['year'],
+						'tvshowyear' : self.bingeMetadata.get('tvshowyear'),
 						'imdb' : self.bingeMetadata['imdb'],
 						'tvdb' : self.bingeMetadata['tvdb'],
 						'trakt' : self.bingeMetadata['trakt'],
@@ -1400,9 +1462,13 @@ class Player(xbmc.Player):
 				# If the video clip is below 30 seconds, assume it is not a valid one, and do not mark progress, binge watch, etc.
 				if self.timeTotal and self.timeTotal > 30:
 					try:
-						if self.timeProgress >= self.playbackEnd and not self.playbackWatched:
-							try: orionoid.Orionoid().streamVote(idItem = self.source['stream'].idOrionItem(), idStream = self.source['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteUp, automatic = True)
+						if not self.voted and self.timeProgress > 0.2:
+							try:
+								self.voted = True
+								orionoid.Orionoid(silent = True).streamVote(idItem = self.source['stream'].idOrionItem(), idStream = self.source['stream'].idOrionStream(), vote = orionoid.Orionoid.VoteUp, automatic = True)
 							except: pass
+
+						if not self.playbackWatched and self.timeProgress >= self.playbackEnd:
 							self.playbackWatched = True
 							if addLibrary: library.Library(media = self.media).add(title = self.title, year = self.year, imdb = self.idImdb, tmdb = self.idTmdb, tvdb = self.idTvdb, trakt = self.idTrakt, season = self.season, episode = self.episode, metadata = self.metadata)
 							self._updateLibrary()

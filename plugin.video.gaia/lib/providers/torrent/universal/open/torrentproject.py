@@ -23,7 +23,11 @@ from lib.modules.tools import Regex
 
 class Provider(ProviderJson):
 
-	_Link					= ['https://torrentproject.cc', 'https://torrentproject2.com', 'https://torrentproject2.se', 'http://torrentproject2.org', 'https://torrentproject.info']
+	# Update (2025-12):
+	# Previously the .cc domain was used as the main domain.
+	# However, this domain now has very strong Cloudflare protection with a captcha.
+	# Use the .info/.org domains, since they seem to not have any Cloudflare protection.
+	_Link					= ['https://torrentproject.info', 'http://torrentproject2.org', 'https://torrentproject.cc', 'https://torrentproject2.com']
 
 	_LimitApproval			= 2
 
@@ -56,7 +60,7 @@ class Provider(ProviderJson):
 	def initialize(self):
 		ProviderJson.initialize(self,
 			name					= 'TorrentProject',
-			description				= '{name} is a less-known {container} indexer that scrapes other sites. The site contains results in various languages, but most of them are in English. {name} indexes other torrent sites.',
+			description				= '{name} is a less-known {container} indexer that scrapes other sites. The site contains results in various languages, but most of them are in English. {name} indexes other torrent sites. {name} has strong Cloudflare protection that might not be bypassable and cause scraping to fail.',
 			rank					= 4,
 			performance				= ProviderJson.PerformanceGood,
 
@@ -91,6 +95,7 @@ class Provider(ProviderJson):
 			extractSourceSeeds		= Provider._AttributeSeeds,
 			extractSourceLeeches	= Provider._AttributeLeeches,
 			extractSourceApproval	= Provider._AttributeApproval,
+			extractReleaseUploader	= Provider._AttributeUploader,
 		)
 
 	##############################################################################

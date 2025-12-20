@@ -289,7 +289,7 @@ class Subtitle(object):
 					if File.exists(path):
 						subtitle['path'] = path
 
-						# Decoding should not be neccessary anymore in the new OpenSubtitles, according to their docs:
+						# Decoding should not be necessary anymore in the new OpenSubtitles, according to their docs:
 						#	Subtitle file in temporary URL will be always in UTF-8 encoding.
 						subtitle['decoded'] = None
 						# Certain languages (eg: Chinese, Hebrew, etc) have to be decoded so that they can be correctly encoded with UTF-8.

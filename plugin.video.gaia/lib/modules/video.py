@@ -20,7 +20,7 @@
 
 import re
 
-from lib.modules.tools import Media, System, Settings, Extension, Tools, Converter, Logger, Time, Math, Regex, Playlist
+from lib.modules.tools import Media, System, Settings, Extension, Tools, Converter, Logger, Time, Math, Regex, Playlist, Matcher
 from lib.modules.interface import Dialog, Player, Loader, Format, Translation, Item
 from lib.modules.network import Networker
 from lib.modules.database import Database
@@ -102,6 +102,12 @@ class Video(object):
 	def setting(self):
 		setting = Settings.getInteger('stream.youtube.retrieval')
 		if setting == Video.ModeCustom: setting = Settings.getInteger('stream.youtube.retrieval.' + self.Id)
+		return setting
+
+	@classmethod
+	def settingContext(self):
+		setting = Settings.getInteger('stream.youtube.context')
+		if setting == Video.ModeCustom: setting = self.setting()
 		return setting
 
 	@classmethod
@@ -221,6 +227,44 @@ class Video(object):
 			excludes = Video.Clean
 		return [i for i in data if not i in excludes]
 
+	def _sort(self, items):
+		size = len(items)
+		for i in range(size):
+			item = items[i]
+			sort = 0
+
+			match = item.get('match')
+			if match:
+				total = 0
+				matches = 0
+				for j in match.values():
+					total += 1
+					if j: matches += 1
+				if match.get('title'):
+					total += 5
+					matches += 5
+				if match.get('official'):
+					total += 1
+					matches += 1
+				if match.get('prefer'):
+					total += 1
+					matches += 1
+				if not match.get('exclude'):
+					matches -= 3
+				if match.get('season') is True:
+					matches += 2
+				elif match.get('season') is False:
+					matches -= 2
+				sort += (matches / float(total)) * 10
+
+			sort += (item.get('similarity') or 0) * 10
+			sort += (item.get('popularity') or 0) # Low weight. Some official trailers that are newly released have very few comments/votes.
+			sort += (size - i) / float(size) # Original order returned by queries.
+
+			item['sort'] = sort
+
+		return Tools.listSort(data = items, key = lambda i : i['sort'], reverse = True)
+
 	def _filter(self, items, filters = None, single = True):
 		result = []
 		for i in range(len(items)):
@@ -240,9 +284,9 @@ class Video(object):
 					else: items[i]['play'] = True
 		return result if result else None
 
-	def _search(self, query, title = None, selection = None, prefer = None, include = None, exclude = None, single = True):
+	def _search(self, query, title = None, year = None, season = None, selection = None, prefer = None, include = None, exclude = None, single = True):
 		try:
-			from lib.modules import cache
+			from lib.modules.cache import Cache
 
 			if selection is None:
 				selection = self.setting()
@@ -251,53 +295,66 @@ class Video(object):
 			key = self.key(internal = self.mInternal)
 			if not key: return None
 
+			cache = Cache.instance()
+			serie = Media.isSerie(self.mMedia)
+
 			# Search videos.
 			items = []
 			if not Tools.isArray(query): query = [query]
+
+			# Remove "... Collection" keyword for sets, otherwise too few results are found.
+			if Media.isSet(self.mMedia):
+				expression = '(\scollection)(?:$|[\"\'])'
+				title = Regex.remove(data = title, expression = expression, group = 1, cache = True)
+				query = [Regex.remove(data = i, expression = expression, group = 1, cache = True) for i in query]
+
 			for q in query:
 				link = Video.LinkSearch % (key, Networker.linkQuote(q, plus = True))
-				result = cache.Cache.instance().cacheMedium(Networker().requestJson, link = link)
+				result = cache.cacheMedium(Networker().requestJson, link = link)
 				if result and 'items' in result: items.extend(result['items'])
 
 			# Extra details.
-			link = Video.LinkDetails % (key, ','.join([i['id']['videoId'] for i in items]))
-			result = cache.Cache.instance().cacheMedium(Networker().requestJson, link = link)
-			result = result['items']
-			for i in result:
-				for j in range(len(items)):
-					if i['id'] == items[j]['id']['videoId']:
-						try:
-							if not 'contentDetails' in items[j]: items[j]['contentDetails'] = {}
-							items[j]['contentDetails'].update(i['contentDetails'])
-						except: pass
-						try:
-							if not 'localizations' in items[j]: items[j]['localizations'] = {}
-							items[j]['localizations'].update(i['localizations'])
-						except: pass
-						try:
-							if not 'status' in items[j]: items[j]['status'] = {}
-							items[j]['status'].update(i['status'])
-						except: pass
-						try:
-							if not 'statistics' in items[j]: items[j]['statistics'] = {}
-							items[j]['statistics'].update(i['statistics'])
-						except: pass
-						try:
-							if not 'snippet' in items[j]: items[j]['snippet'] = {}
-							items[j]['snippet'].update(i['snippet'])
-						except: pass
+			# YouTube returns an error if there are more than 50 IDs: The request specifies an invalid filter parameter.
+			link = Video.LinkDetails % (key, ','.join([i['id']['videoId'] for i in items[:50]]))
+			result = cache.cacheMedium(Networker().requestJson, link = link)
+			result = result.get('items')
 
-						duration = re.search('^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$', items[j]['contentDetails']['duration'])
-						try: duration = (int(duration.group(1) if duration.group(1) else 0) * 3600) + (int(duration.group(2) if duration.group(2) else 0) * 60) + (int(duration.group(3) if duration.group(3) else 0))
-						except: duration = 0
-						items[j]['contentDetails']['duration'] = duration
+			if result:
+				for i in result:
+					for j in range(len(items)):
+						if i['id'] == items[j]['id']['videoId']:
+							try:
+								if not 'contentDetails' in items[j]: items[j]['contentDetails'] = {}
+								items[j]['contentDetails'].update(i['contentDetails'])
+							except: pass
+							try:
+								if not 'localizations' in items[j]: items[j]['localizations'] = {}
+								items[j]['localizations'].update(i['localizations'])
+							except: pass
+							try:
+								if not 'status' in items[j]: items[j]['status'] = {}
+								items[j]['status'].update(i['status'])
+							except: pass
+							try:
+								if not 'statistics' in items[j]: items[j]['statistics'] = {}
+								items[j]['statistics'].update(i['statistics'])
+							except: pass
+							try:
+								if not 'snippet' in items[j]: items[j]['snippet'] = {}
+								items[j]['snippet'].update(i['snippet'])
+							except: pass
 
-						try: status = items[j]['status']['privacyStatus']
-						except: status = None
-						if not status: status = 'public'
-						items[j]['status']['privacyStatus'] = status
+							duration = re.search('^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$', items[j]['contentDetails']['duration'])
+							try: duration = (int(duration.group(1) if duration.group(1) else 0) * 3600) + (int(duration.group(2) if duration.group(2) else 0) * 60) + (int(duration.group(3) if duration.group(3) else 0))
+							except: duration = 0
+							items[j]['contentDetails']['duration'] = duration
 
-						break
+							try: status = items[j]['status']['privacyStatus']
+							except: status = None
+							if not status: status = 'public'
+							items[j]['status']['privacyStatus'] = status
+
+							break
 
 			# Details not found.
 			for i in range(len(items)):
@@ -336,6 +393,7 @@ class Video(object):
 				except: pass
 				split = [j for j in re.split('[-!$%^&*()_+|~=`{}\[\]:";\'<>?,.\/\s]', name.lower()) if j]
 				split = [i for i in split if i]
+				joined = ' '.join(split)
 
 				hasPrefer = True
 				if prefer:
@@ -382,7 +440,16 @@ class Video(object):
 							break
 
 				hasExclude = True
-				if exclude and any(j in split for j in exclude): hasExclude = False
+				if exclude and any((j in joined) if ' ' in j else (j in split ) for j in exclude): hasExclude = False
+
+				# Move videos with a different season number to the end of the list from _sort().
+				hasSeason = None
+				if serie:
+					seasonExtract = Regex.extract(data = name, expression = '(?:season[\s\-\_\+]*|s|part)([0]*\d+)')
+					if seasonExtract:
+						seasonExtract = int(seasonExtract)
+						seasonSearch = 1 if season is None else season
+						hasSeason = seasonExtract == seasonSearch
 
 				hasOfficial = 'official' in split
 
@@ -472,6 +539,13 @@ class Video(object):
 				except: pass
 				popularity = Math.round(popularity, places = 2)
 
+				# JaroWinkler provides a better measurement than Levenshtein.
+				# Eg: Tom Green Country (2025)
+				names = [name]
+				if serie: names.append(name + ' Season %d' % (1 if season is None else season))
+				if year: names.extend([j.replace(name, name + ' ' + str(year)) for j in names])
+				similarity = max([Matcher.jaroWinkler(j, title, ignoreNumeric = False, ignoreCase = True, ignoreSpace = True, ignoreSymbol = True) for j in names])
+
 				cleaned = self._cleaned(data = split, title = title)
 				countOverlap = len(set(title) & set(cleaned))
 				if countTitle > 2: hasTitle = (countOverlap / float(countTitle)) >= 0.6
@@ -488,7 +562,9 @@ class Video(object):
 						'name' : name,
 						'channel' : channel,
 						'time' : time,
+
 						'popularity' : popularity,
+						'similarity' : similarity,
 
 						'quality' : videoQuality,
 						'3d' : video3d,
@@ -510,10 +586,12 @@ class Video(object):
 							'prefer' : hasPrefer,
 							'include' : hasInclude,
 							'exclude' : hasExclude,
+							'season' : hasSeason,
 						},
 					}
 
 			items = [i for i in items if i]
+			items = self._sort(items)
 
 			if selection == Video.ModeDirect or selection == Video.ModeAutomatic:
 				link = self._filter(items, ['title', 'include', 'exclude', 'prefer', 'official', 'hd'], single = single)
@@ -614,7 +692,7 @@ class Video(object):
 			Logger.error()
 			return None
 
-	def _resolve(self, query, title = None, link = None, selection = None, prefer = None, include = None, exclude = None):
+	def _resolve(self, query, title = None, year = None, season = None, link = None, selection = None, prefer = None, include = None, exclude = None):
 		try:
 			if link.startswith(Video.LinkBase):
 				link = self._extract(link)
@@ -631,7 +709,7 @@ class Video(object):
 			# This returns too many fan-created videos. Eg: Game of Thrones Season 2 Recap.
 			# If this is ever added back, remember that query can also be a list instead of a string.
 			#if exclude: query += ' -' + (' -'.join(exclude))
-			return self._search(query, title = title, selection = selection, prefer = prefer, include = include, exclude = exclude)
+			return self._search(query, title = title, year = year, season = season, selection = selection, prefer = prefer, include = include, exclude = exclude)
 
 	def _name(self, title, season = None, episode = None):
 		if title:
@@ -736,7 +814,7 @@ class Video(object):
 			if resolve:
 				for i in range(len(items)):
 					if not Networker.linkIs(items[i]['link']) or not self.domainIs(items[i]['link']):
-						linkResolved = self._resolve(query = items[i]['query'], title = items[i]['title'], link = items[i]['link'], selection = selection, prefer = prefer, include = include, exclude = exclude)
+						linkResolved = self._resolve(query = items[i]['query'], title = items[i]['title'], year = year, season = season, link = items[i]['link'], selection = selection, prefer = prefer, include = include, exclude = exclude)
 						if linkResolved: items[i].update(linkResolved)
 
 			items = [item for item in items if not item['play'] is None]
@@ -768,7 +846,7 @@ class Trailer(Video, Database):
 
 	Name = 'trailers'
 	Id = 'trailer'
-	Label = 35536
+	Label = 33409
 	Description = 35656
 	Duration = 300 # 5 minutes.
 
@@ -801,10 +879,18 @@ class Trailer(Video, Database):
 	def _query(self, title = None, year = None, season = None):
 		query = []
 		if Media.isSerie(self.mMedia):
-			if season is None:
+			# Query first, since it is more accurate.
+			if season: query.insert(0, '"%s" "season %s"|s%s trailer' % (title, str(season), str(season)))
+
+			# Also do this for S00/S01.
+			# Many miniseries only have trailers without a "season" keyword.
+			# And even normal shows often only have trailers without a "season" keyword when S01 is released.
+			if season is None or season == 0 or season == 1:
 				season = 1
 				query.append('"%s" trailer -season %s' % (title, ' '.join(['-s%d' % i for i in range(2, 20)])))
-			query.append('"%s" "season %s"|s%s trailer' % (title, str(season), str(season)))
+
+			# The query above, which excludes season numbers, often does not return trailers that are only "Some show title Trailer".
+			query.append('"%s" trailer' % title)
 		else:
 			query.append('"%s" %s trailer' % (title, str(year)))
 		return query
@@ -815,12 +901,12 @@ class Trailer(Video, Database):
 		return result
 
 	def _include(self, season = None):
-		result = [['trailer', 'trailers']]
+		result = [['trailer', 'trailers', 'teaser', 'teasers']]
 		if Media.isSerie(self.mMedia) and not season is None: result.append(['season+%d' % season, 's+%d' % season, 's%d' % season, 'part+%d' % season])
 		return result
 
 	def _exclude(self, season = None):
-		return ['recap', 'recaps', 'summary', 'episode', 'react', 'reacts', 'reaction', 'reactions', 'reacting', 'response', 'respond', 'responding', 'review', 'reviews']
+		return ['recap', 'recaps', 'summary', 'episode', 'react', 'reacts', 'reaction', 'reactions', 'reacting', 'response', 'respond', 'responding', 'review', 'reviews', 'music video']
 
 	def play(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, link = None, items = None, resolve = True, loader = True, selection = None):
 		if not season is None: season = int(season)
@@ -828,7 +914,11 @@ class Trailer(Video, Database):
 		# Use the "official" trailer from the metadata if available.
 		if not link and not items and (imdb or tmdb or tvdb or trakt or title):
 			metadata = self._metadata(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, title = title, year = year)
-			if metadata: link = metadata.get('trailer')
+			if metadata:
+				link = metadata.get('trailer')
+				if not link and (season == 0 or season == 1):
+					metadata = self._metadata(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year)
+					if metadata: link = metadata.get('trailer')
 
 		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
 
@@ -1132,26 +1222,26 @@ class Review(Video):
 		if not season is None: season = int(season)
 		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
 
-class Extra(Video):
+class Bonus(Video):
 
-	Id = 'extra'
-	Label = 35653
+	Id = 'bonus'
+	Label = 33408
 	Description = 35659
-	Duration = 1800 # 30 minutes.
+	Duration = 1200 # 20 minutes.
 
 	def __init__(self, media = Media.Movie):
-		Video.__init__(self, media = media, durationMaximum = Extra.Duration)
+		Video.__init__(self, media = media, durationMaximum = Bonus.Duration)
 
 	def _query(self, title = None, year = None, season = None):
-		# Do not search for "easter eggs", since this returns no results (eg: Gaame of Thrones).
-		if season is None: return '"%s" "extra"|"extras"' % (title)
-		else: return '"%s" "season %s"|s%s "extra"|"extras"' % (title, str(season), str(season))
+		# Do not search for "easter eggs", since this returns no results (eg: Game of Thrones).
+		if season is None: return '"%s" "extra"|"extras"|"bonus"' % (title)
+		else: return '"%s" "season %s"|s%s "extra"|"extras"|"bonus"' % (title, str(season), str(season))
 
 	def _prefer(self, season = None):
 		return []
 
 	def _include(self, season = None):
-		result = [['extra', 'extras', 'easter+egg', 'easter+eggs']]
+		result = [['extra', 'extras', 'bonus', 'easter+egg', 'easter+eggs']]
 		if not season is None: result.append(['season+%d' % season, 's+%d' % season, 's%d' % season])
 		return result
 
@@ -1205,15 +1295,15 @@ class Deleted(Video):
 		if not season is None: season = int(season)
 		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
 
-class Making(Video):
+class Production(Video):
 
-	Id = 'making'
+	Id = 'production'
 	Label = 35650
 	Description = 35661
 	Duration = 2400 # 40 minutes.
 
 	def __init__(self, media = Media.Movie):
-		Video.__init__(self, media = media, durationMaximum = Making.Duration)
+		Video.__init__(self, media = media, durationMaximum = Production.Duration)
 
 	def _query(self, title = None, year = None, season = None):
 		if season is None: return '"%s" "making of"|"behind the scenes"|"inside"|"backstage"' % (title)
@@ -1241,15 +1331,15 @@ class Making(Video):
 		if not season is None: season = int(season)
 		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
 
-class Director(Video):
+class Direction(Video):
 
-	Id = 'director'
-	Label = 35377
+	Id = 'direction'
+	Label = 33407
 	Description = 35662
 	Duration = 2400 # 40 minutes.
 
 	def __init__(self, media = Media.Movie):
-		Video.__init__(self, media = media, durationMaximum = Director.Duration)
+		Video.__init__(self, media = media, durationMaximum = Direction.Duration)
 
 	def _query(self, title = None, year = None, season = None):
 		if season is None: return '"%s" "director"' % (title)
@@ -1318,7 +1408,7 @@ class Explanation(Video):
 	Id = 'explanation'
 	Label = 35652
 	Description = 35664
-	Duration = 2400 # 40 minutes.
+	Duration = 1200 # 20 minutes.
 
 	def __init__(self, media = Media.Movie):
 		Video.__init__(self, media = media, durationMaximum = Explanation.Duration)
@@ -1349,12 +1439,48 @@ class Explanation(Video):
 		if not season is None: season = int(season)
 		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
 
+class Alternation(Video):
+
+	Id = 'alternation'
+	Label = 33401
+	Description = 33402
+	Duration = 1200 # 20 minutes.
+
+	def __init__(self, media = Media.Movie):
+		Video.__init__(self, media = media, durationMaximum = Alternation.Duration)
+
+	def _query(self, title = None, year = None, season = None):
+		if season is None: return '"%s" "alternate"|"alternative"|"different"|"ending"' % (title)
+		else: return '"%s" "season %s"|s%s "alternate"|"alternative"|"different"|"ending"' % (title, str(season), str(season))
+
+	def _prefer(self, season = None):
+		return []
+
+	def _include(self, season = None):
+		result = [['alternate', 'alternative', 'different', 'ending']]
+		if not season is None: result.append(['season+%d' % season, 's+%d' % season, 's%d' % season])
+		return result
+
+	def _exclude(self, season = None):
+		result = ['trailer', 'episode', 'promo', 'promos', 'recap', 'recaps', 'summary', 'react', 'reacts', 'reaction', 'reactions', 'reacting', 'response', 'respond', 'responding']
+		if not season is None:
+			for episode in range(1, 101):
+				result.append('s%02de%02d' % (season, episode))
+				result.append('s%de%d' % (season, episode))
+				result.append('e%02d' % (episode))
+				result.append('e%d' % (episode))
+		return result
+
+	def play(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, season = None, link = None, items = None, resolve = True, loader = True, selection = None):
+		if not season is None: season = int(season)
+		return Video.play(self, query = self._query(title = title, year = year, season = season), imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, title = title, year = year, season = season, link = link, items = items, resolve = resolve, loader = loader, selection = selection, prefer = self._prefer(season = season), include = self._include(season = season), exclude = self._exclude(season = season))
+
 class Reaction(Video):
 
 	Id = 'reaction'
 	Label = 33990
 	Description = 33991
-	Duration = 2400 # 40 minutes.
+	Duration = 1800 # 30 minutes.
 
 	def __init__(self, media = Media.Movie):
 		Video.__init__(self, media = media, durationMaximum = Reaction.Duration)

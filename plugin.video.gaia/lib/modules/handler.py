@@ -45,6 +45,7 @@ class Handler(object):
 	ReturnCancel = 'cancel'
 	ReturnSelection = 'selection' # No file selected from list of items.
 	ReturnPack = 'pack' # No file can be found in the pack that matches the title and year/season/episode.
+	ReturnFormat = 'format' # Unsupported file format.
 
 	TypeAll = 'all'
 	TypeDirect = 'direct'
@@ -212,9 +213,9 @@ class Handler(object):
 			},
 			4 : {
 				'id' : 'orion',
-				Handler.TypeAll : {3 : 'premiumize', 4 : 'offcloud', 5 : 'torbox', 6 : 'easydebrid', 7 : 'realdebrid', 8 : 'debridlink', 9 : 'alldebrid'},
-				Handler.TypeTorrent : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'easydebrid', 6 : 'realdebrid', 7 : 'debridlink', 8 : 'alldebrid'},
-				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox'},
+				Handler.TypeAll : {3 : 'premiumize', 4 : 'offcloud', 5 : 'torbox', 6 : 'debrider', 7 : 'easydebrid', 8 : 'realdebrid', 9 : 'debridlink', 10 : 'alldebrid'},
+				Handler.TypeTorrent : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'debrider', 6 : 'easydebrid', 7 : 'realdebrid', 8 : 'debridlink', 9 : 'alldebrid'},
+				Handler.TypeUsenet : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'debrider'},
 				Handler.TypeHoster : {2 : 'premiumize', 3 : 'offcloud', 4 : 'torbox', 5 : 'realdebrid', 6 : 'debridlink', 7 : 'alldebrid'},
 			},
 		}
@@ -649,7 +650,7 @@ class Handler(object):
 		except: result['service'] = service.name()
 
 		if not result['success']:
-			if not result['error'] in [Handler.ReturnUnavailable, Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnPack]:
+			if not result['error'] in [Handler.ReturnUnavailable, Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnPack, Handler.ReturnFormat]:
 				if notification and (not 'notification' in result or not result['notification']):
 					try: tools.Logger.log('Resolving or playback failure: ' + tools.Converter.jsonTo(result), type = tools.Logger.TypeError)
 					except:
@@ -1209,7 +1210,7 @@ class HandleGaia(Handle):
 						if not handle: handle = service['handle'].id()
 						result['handle'] = handle
 
-						if result['success'] or result['error'] in [Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnSelection, Handler.ReturnPack]: return result
+						if result['success'] or result['error'] in [Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnSelection, Handler.ReturnPack, Handler.ReturnFormat]: return result
 
 		# Do not try uncached services during automatic selection if the file is cached at at least one service.
 		# Otherwise if the file is cached with only one service, and the user clicks play, and that one service fails, it will start the download process with the next available debrid service.
@@ -1230,7 +1231,7 @@ class HandleGaia(Handle):
 					if not handle: handle = service['handle'].id()
 					result['handle'] = handle
 
-					if result['success'] or result['error'] in [Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnSelection, Handler.ReturnPack]: return result
+					if result['success'] or result['error'] in [Handler.ReturnExternal, Handler.ReturnCancel, Handler.ReturnSelection, Handler.ReturnPack, Handler.ReturnFormat]: return result
 
 		return result if (result and result['success']) else core.Core.addResult(error = Handler.ReturnUnavailable)
 
@@ -1287,11 +1288,11 @@ class HandleGaia(Handle):
 			]
 			for debrid in debrids:
 				if debrid[0].accountValid():
-					torrent = debrid[0].streamingTorrent()
-					usenet = debrid[0].streamingUsenet()
-					hoster = debrid[0].streamingHoster()
+					torrent = debrid[0].streamingTorrent(support = True)
+					usenet = debrid[0].streamingUsenet(support = True)
+					hoster = debrid[0].streamingHoster(support = True)
 
-					services = debrid[1].services()
+					services = tools.Tools.copy(debrid[1].services()) # Copy, since it is edited below.
 					if usenet: services.insert(0, Handler.TypeUsenet)
 					if torrent: services.insert(0, Handler.TypeTorrent)
 

@@ -874,12 +874,20 @@ class Core(base.Core):
 			return Core.ErrorRealDebrid
 
 	##############################################################################
+	# SUPPORT
+	##############################################################################
+
+	@classmethod
+	def supportedModes(self):
+		return {Core.ModeTorrent : True, Core.ModeHoster : True}
+
+	##############################################################################
 	# CACHED
 	##############################################################################
 
 	@classmethod
 	def cachedModes(self):
-		return {Core.ModeTorrent}
+		return {Core.ModeTorrent : True}
 
 	# id: single hash or list of hashes.
 	def cachedIs(self, id, timeout = None):

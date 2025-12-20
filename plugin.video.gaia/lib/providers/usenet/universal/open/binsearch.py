@@ -19,15 +19,26 @@
 '''
 
 from lib.providers.core.usenet import ProviderUsenetHtml
-from lib.providers.core.html import Html, HtmlResults, HtmlResult, HtmlForm, HtmlInput, HtmlLink
+from lib.providers.core.html import Html, HtmlResults, HtmlResult, HtmlForm, HtmlInput, HtmlLink, HtmlDiv, HtmlSpan, HtmlListItem
 from lib.modules.tools import Regex
 
 class Provider(ProviderUsenetHtml):
 
 	_Link					= ['https://binsearch.info']
-	_PathDownload			= '/?action=nzb&%s=on'
 
-	_LimitOffset			= 250
+	_PathSearch				= {
+								ProviderUsenetHtml.Version1 : 'search',
+								ProviderUsenetHtml.Version2 : None,
+							}
+	_PathDownload			= {
+								ProviderUsenetHtml.Version1 : '/nzb?%s=on',
+								ProviderUsenetHtml.Version2 : '/?action=nzb&%s=on',
+							}
+
+	_LimitOffset			= {
+								ProviderUsenetHtml.Version1 : 100,
+								ProviderUsenetHtml.Version2 : 250,
+							}
 
 	_ParameterQuery			= 'q'
 	_ParameterOffset		= 'min'
@@ -38,10 +49,15 @@ class Provider(ProviderUsenetHtml):
 	_ParameterFormat		= 'postdate'
 	_ParameterSort			= 'adv_sort'
 
-	_AttributeResults		= 'r2'
+	_AttributeContainer		= 'items-stretch'
+	_AttributeResults1		= 'result-table'
+	_AttributeResults2		= 'r2'
 	_AttributeSubject		= 's'
 	_AttributeDescription	= 'd'
 	_AttributeMenu			= 'xMenuT'
+	_AttributeIncomplete	= 'incomplete'
+	_AttributePages			= 'navigation'
+	_AttributeDisabled		= 'disabled'
 
 	_ExpressionNext			= '(>|&gt;)'
 	_ExpressionSize			= 'size\s*:\s*(.+?)(?:$|,)'
@@ -52,10 +68,18 @@ class Provider(ProviderUsenetHtml):
 	##############################################################################
 
 	def initialize(self):
+		version = self.customVersion()
+
+		name			= 'Binsearch'
+		description		= '{name} is one of the oldest open usenet indexers. {name} has mostly incomplete {containers}, duplicate results, missing metadata, and incorrect file sizes, and should therefore be avoided if possible.'
+		rank			= 1
+		performance		= ProviderUsenetHtml.PerformanceMedium - ProviderUsenetHtml.PerformanceStep
+		customVersion	= 2
+
 		query = {
 			Provider._ParameterQuery	: ProviderUsenetHtml.TermQuery,
 			Provider._ParameterOffset	: ProviderUsenetHtml.TermOffset,
-			Provider._ParameterLimit	: Provider._LimitOffset,
+			Provider._ParameterLimit	: Provider._LimitOffset[version],
 			Provider._ParameterSort		: Provider._ParameterDate,
 			Provider._ParameterFormat	: Provider._ParameterDate,
 		}
@@ -65,40 +89,81 @@ class Provider(ProviderUsenetHtml):
 		size = self.customSize()
 		if size: query[Provider._ParameterLimitSize] = size
 
-		ProviderUsenetHtml.initialize(self,
-			name						= 'Binsearch',
-			description					= '{name} is one of the oldest open usenet indexers. {name} has mostly incomplete {containers}, duplicate results, missing metadata, and incorrect file sizes, and should therefore be avoided if possible.',
-			rank						= 1,
-			performance					= ProviderUsenetHtml.PerformanceMedium - ProviderUsenetHtml.PerformanceStep,
+		# New API (post 2025-12).
+		if version == ProviderUsenetHtml.Version1:
+			ProviderUsenetHtml.initialize(self,
+				name						= name,
+				description					= description,
+				rank						= rank,
+				performance					= performance,
 
-			link						= Provider._Link,
+				link						= Provider._Link,
 
-			customIncomplete			= True,
+				customVersion				= customVersion,
+				customIncomplete			= True,
 
-			supportMovie				= True,
-			supportShow					= True,
-			supportPack					= True,
+				supportMovie				= True,
+				supportShow					= True,
+				supportPack					= True,
 
-			offsetStart					= 0,
-			offsetIncrease				= Provider._LimitOffset,
+				offsetStart					= 0,
+				offsetIncrease				= 1,
 
-			formatEncode				= ProviderUsenetHtml.FormatEncodePlus,
+				formatEncode				= ProviderUsenetHtml.FormatEncodePlus,
 
-			searchQuery					= {
-											ProviderUsenetHtml.RequestMethod : ProviderUsenetHtml.RequestMethodGet,
-											ProviderUsenetHtml.RequestData : query,
-										},
+				searchQuery					= {
+												ProviderUsenetHtml.RequestMethod : ProviderUsenetHtml.RequestMethodGet,
+												ProviderUsenetHtml.RequestPath : Provider._PathSearch[version],
+												ProviderUsenetHtml.RequestData : query,
+											},
 
-			extractParser				= ProviderUsenetHtml.ParserHtml5, # Contains many unclosed tags. Use lenient parsing.
-			extractOptimizeData			= HtmlForm(), # To detect the last page in processOffset().
-			extractList					= [HtmlResults(id_ = Provider._AttributeResults, start = 1)],
-			extractLink					= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
-			extractIdLocal				= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
-			extractFileName				= [HtmlResult(index = 2), Html(class_ = Provider._AttributeSubject)],
-			extractFileSize				= [HtmlResult(index = 2), Html(class_ = Provider._AttributeDescription, extract = Provider._ExpressionSize)],
-			extractReleaseUploader		= [HtmlResult(index = 3)],
-			extractSourceTime			= [HtmlResult(index = 5)],
-		)
+				extractParser				= ProviderUsenetHtml.ParserHtml5, # Contains many unclosed tags. Use lenient parsing.
+				extractOptimizeData			= HtmlForm(class_ = Provider._AttributeContainer), # To detect the last page in processOffset().
+				extractList					= [HtmlResults(class_ = Provider._AttributeResults1, start = 1)],
+				extractLink					= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
+				extractIdLocal				= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
+				extractFileName				= [HtmlResult(index = 2), HtmlLink()],
+				extractFileSize				= [HtmlResult(index = 2), HtmlDiv(), HtmlDiv(), HtmlSpan(index = 0)],
+				extractReleaseUploader		= [HtmlResult(index = 2), HtmlDiv(), HtmlDiv(), HtmlSpan(index = 2), HtmlLink()],
+				extractSourceTime			= [HtmlResult(index = 3)],
+			)
+
+		elif version == ProviderUsenetHtml.Version2:
+			ProviderUsenetHtml.initialize(self,
+				name						= name,
+				description					= description,
+				rank						= rank,
+				performance					= performance,
+
+				link						= Provider._Link,
+
+				customVersion				= customVersion,
+				customIncomplete			= True,
+
+				supportMovie				= True,
+				supportShow					= True,
+				supportPack					= True,
+
+				offsetStart					= 0,
+				offsetIncrease				= Provider._LimitOffset[version],
+
+				formatEncode				= ProviderUsenetHtml.FormatEncodePlus,
+
+				searchQuery					= {
+												ProviderUsenetHtml.RequestMethod : ProviderUsenetHtml.RequestMethodGet,
+												ProviderUsenetHtml.RequestData : query,
+											},
+
+				extractParser				= ProviderUsenetHtml.ParserHtml5, # Contains many unclosed tags. Use lenient parsing.
+				extractOptimizeData			= HtmlForm(), # To detect the last page in processOffset().
+				extractList					= [HtmlResults(id_ = Provider._AttributeResults2, start = 1)],
+				extractLink					= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
+				extractIdLocal				= [HtmlResult(index = 1), HtmlInput(extract = Html.AttributeName)],
+				extractFileName				= [HtmlResult(index = 2), Html(class_ = Provider._AttributeSubject)],
+				extractFileSize				= [HtmlResult(index = 2), Html(class_ = Provider._AttributeDescription, extract = Provider._ExpressionSize)],
+				extractReleaseUploader		= [HtmlResult(index = 3)],
+				extractSourceTime			= [HtmlResult(index = 5)],
+			)
 
 	##############################################################################
 	# PROCESS
@@ -106,24 +171,34 @@ class Provider(ProviderUsenetHtml):
 
 	def processOffset(self, data, items):
 		try:
-			pages = self.extractHtml(data, [Html(class_ = Provider._AttributeMenu, index = -1), HtmlLink(index = -1, extract = Html.ParseText)])
-			if pages:
-				next = False
-				for page in pages:
-					if page == Provider._ExpressionNext:
-						next = True
-						break
-				if not next: return ProviderUsenetHtml.Skip
+			version = self.customVersion()
+			if version == ProviderUsenetHtml.Version1:
+				last = self.extractHtml(data, [Html(role_ = Provider._AttributePages, index = -1), HtmlListItem(index = -1, extract = Html.AttributeClass)])
+				if last and Provider._AttributeDisable in last: return ProviderUsenetHtml.Skip
+			elif version == ProviderUsenetHtml.Version2:
+				pages = self.extractHtml(data, [Html(class_ = Provider._AttributeMenu, index = -1), HtmlLink(index = -1, extract = Html.ParseText)])
+				if pages:
+					next = False
+					for page in pages:
+						if page == Provider._ExpressionNext:
+							next = True
+							break
+					if not next: return ProviderUsenetHtml.Skip
 		except: pass
 
 	def processBefore(self, item):
 		if self.customIncomplete():
-			try:
-				parts = self.extractHtml(item, [HtmlResult(index = 2), Html(class_ = Provider._AttributeDescription, extract = Html.ParseText)])
-				parts = Regex.extract(data = parts, expression = Provider._ExpressionParts, group = None, all = True)[0]
-				if int(parts[0]) < int(parts[1]): return ProviderUsenetHtml.Skip
-			except: pass
+			version = self.customVersion()
+			if version == ProviderUsenetHtml.Version1:
+				parts = self.extractHtml(item, [HtmlResult(index = 2), HtmlDiv(), HtmlDiv(), HtmlSpan(index = 1, extract = Html.AttributeClass)])
+				if parts and Provider._AttributeIncomplete in parts: return ProviderUsenetHtml.Skip
+			elif version == ProviderUsenetHtml.Version2:
+				try:
+					parts = self.extractHtml(item, [HtmlResult(index = 2), Html(class_ = Provider._AttributeDescription, extract = Html.ParseText)])
+					parts = Regex.extract(data = parts, expression = Provider._ExpressionParts, group = None, all = True)[0]
+					if int(parts[0]) < int(parts[1]): return ProviderUsenetHtml.Skip
+				except: pass
 
 	def processLink(self, value, item, details = None, entry = None):
 		if not value: return ProviderUsenetHtml.Skip
-		return self.linkCurrent(path = Provider._PathDownload % value)
+		return self.linkCurrent(path = Provider._PathDownload[self.customVersion()] % value)

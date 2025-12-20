@@ -33,7 +33,10 @@ class Provider(ProviderSpotJson):
 			name					= 'SpotNZB',
 			description				= '{name} is a usenet indexer based on {fork}. The API contains many English titles, but is also a great source for other European languages.',
 			rank					= 4,
-			status					= ProviderSpotJson.StatusDead, # Domain is unresponsive.
+
+			# Domain is unresponsive.
+			# Update (2025-12): Domain still down.
+			status					= ProviderSpotJson.StatusDead,
 
 			link					= Provider._Link,
 

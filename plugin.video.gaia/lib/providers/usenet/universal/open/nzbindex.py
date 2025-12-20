@@ -24,13 +24,23 @@ class Provider(ProviderUsenetJson):
 
 	_Link				= ['https://nzbindex.com', 'https://nzbindex.nl']
 
-	_PathSearch			= 'search/json'
-	_PathDownload		= 'download/%s'
+	_PathSearch			= {
+							ProviderUsenetJson.Version1 : 'api/search',
+							ProviderUsenetJson.Version2 : 'search/json',
+						}
+	_PathDownload		= {
+							ProviderUsenetJson.Version1 : 'download/%s.nzb',
+							ProviderUsenetJson.Version2 : 'download/%s',
+						}
 
-	_LimitOffset		= 250
+	_LimitOffset		= {
+							ProviderUsenetJson.Version1 : 100,
+							ProviderUsenetJson.Version2 : 250,
+						}
 
 	_ParameterQuery		= 'q'
-	_ParameterPage		= 'p'
+	_ParameterPage1		= 'page'
+	_ParameterPage2		= 'p'
 	_ParameterLimit		= 'max'
 	_ParameterSort		= 'sort'
 	_ParameterSortAge	= 'agedesc'
@@ -41,6 +51,8 @@ class Provider(ProviderUsenetJson):
 	_ParameterPassword	= 'hidepassword'
 
 	_AttributeResults	= 'results'
+	_AttributeData		= 'data'
+	_AttributeContent	= 'content'
 	_AttributeId		= 'id'
 	_AttributeName		= 'name'
 	_AttributeSize		= 'size'
@@ -48,18 +60,27 @@ class Provider(ProviderUsenetJson):
 	_AttributeUploader	= 'poster'
 
 	_ParameterStats		= 'stats'
-	_ParameterPage		= 'current_page'
-	_ParameterPages		= 'max_page'
+	_ParameterCurrent1	= 'number'
+	_ParameterCurrent2	= 'current_page'
+	_ParameterPages1	= 'number'
+	_ParameterPages2	= 'max_page'
 
 	##############################################################################
 	# INITIALIZE
 	##############################################################################
 
 	def initialize(self):
+		version = self.customVersion()
+
+		name			= 'NZBIndex'
+		description		= '{name} is one of the most well-known and oldest open usenet indexers. The site contains many English titles, but is also a great source for other European languages. {name} has several {containers} containing executables or other unplaybale files.'
+		rank			= 4
+		performance		= ProviderUsenetJson.PerformanceGood # Do not make Excellent, since it reurns many invalid links (eg PC games) that are only removed during full title validation.
+		customVersion	= 2
+
 		query = {
 			Provider._ParameterQuery	: ProviderUsenetJson.TermQuery,
-			Provider._ParameterPage		: ProviderUsenetJson.TermOffset,
-			Provider._ParameterLimit	: Provider._LimitOffset,
+			Provider._ParameterLimit	: Provider._LimitOffset[version],
 			Provider._ParameterSort		: Provider._ParameterSortAge,
 		}
 
@@ -68,53 +89,104 @@ class Provider(ProviderUsenetJson):
 		size = self.customSize()
 		if size: query[Provider._ParameterSize] = size
 		spam = self.customSpam()
-		if spam: query[Provider._ParameterSpam] = int(spam)
+		if spam: query[Provider._ParameterSpam] = int(spam) # Not in new API anymore, or at least not listed on the website.
 		password = self.customPassword()
-		if password: query[Provider._ParameterPassword] = int(password)
+		if password: query[Provider._ParameterPassword] = int(password) # Not in new API anymore, or at least not listed on the website.
 		if self.customIncomplete(): query[Provider._ParameterComplete] = 1
 
-		ProviderUsenetJson.initialize(self,
-			name					= 'NZBIndex',
-			description				= '{name} is one of the most well-known and oldest open usenet indexers. The site contains many English titles, but is also a great source for other European languages. {name} has several {containers} containing executables or other unplaybale files.',
-			rank					= 4,
-			performance				= ProviderUsenetJson.PerformanceGood, # Do not make Excellent, since it reurns many invalid links (eg PC games) that are only removed during full title validation.
+		# New API (post 2025-12).
+		if version == ProviderUsenetJson.Version1:
+			query[Provider._ParameterPage1] = ProviderUsenetJson.TermOffset
 
-			link					= Provider._Link,
+			ProviderUsenetJson.initialize(self,
+				name					= name,
+				description				= description,
+				rank					= rank,
+				performance				= performance,
 
-			customSpam				= True,
-			customPassword			= True,
-			customIncomplete		= True,
+				link					= Provider._Link,
 
-			supportMovie			= True,
-			supportShow				= True,
-			supportPack				= True,
+				customVersion			= customVersion,
+				customSpam				= True,
+				customPassword			= True,
+				customIncomplete		= True,
 
-			offsetStart				= 0,
-			offsetIncrease			= 1,
+				supportMovie			= True,
+				supportShow				= True,
+				supportPack				= True,
 
-			searchQuery				= {
-										ProviderUsenetJson.RequestMethod : ProviderUsenetJson.RequestMethodGet,
-										ProviderUsenetJson.RequestPath : Provider._PathSearch,
-										ProviderUsenetJson.RequestData : query,
-									},
+				offsetStart				= 0,
+				offsetIncrease			= 1,
 
-			extractList				= Provider._AttributeResults,
-			extractLink				= Provider._AttributeId,
-			extractIdLocal			= Provider._AttributeId,
-			extractFileName			= Provider._AttributeName,
-			extractFileSize			= Provider._AttributeSize,
-			extractSourceTime		= Provider._AttributeTime,
-			extractReleaseUploader	= Provider._AttributeUploader,
-		)
+				searchQuery				= {
+											ProviderUsenetJson.RequestMethod : ProviderUsenetJson.RequestMethodGet,
+											ProviderUsenetJson.RequestPath : Provider._PathSearch[version],
+											ProviderUsenetJson.RequestData : query,
+										},
+
+				extractList				= [Provider._AttributeData, Provider._AttributeContent],
+				extractLink				= Provider._AttributeId,
+				extractIdLocal			= Provider._AttributeId,
+				extractFileName			= Provider._AttributeName,
+				extractFileSize			= Provider._AttributeSize,
+				extractSourceTime		= Provider._AttributeTime,
+				extractReleaseUploader	= Provider._AttributeUploader,
+			)
+
+		# Old API (pre 2025).
+		elif version == ProviderUsenetJson.Version2:
+			query[Provider._ParameterPage2] = ProviderUsenetJson.TermOffset
+
+			ProviderUsenetJson.initialize(self,
+				name					= name,
+				description				= description,
+				rank					= rank,
+				performance				= performance,
+
+				link					= Provider._Link,
+
+				customVersion			= customVersion,
+				customSpam				= True,
+				customPassword			= True,
+				customIncomplete		= True,
+
+				supportMovie			= True,
+				supportShow				= True,
+				supportPack				= True,
+
+				offsetStart				= 0,
+				offsetIncrease			= 1,
+
+				searchQuery				= {
+											ProviderUsenetJson.RequestMethod : ProviderUsenetJson.RequestMethodGet,
+											ProviderUsenetJson.RequestPath : Provider._PathSearch[version],
+											ProviderUsenetJson.RequestData : query,
+										},
+
+				extractList				= Provider._AttributeResults,
+				extractLink				= Provider._AttributeId,
+				extractIdLocal			= Provider._AttributeId,
+				extractFileName			= Provider._AttributeName,
+				extractFileSize			= Provider._AttributeSize,
+				extractSourceTime		= Provider._AttributeTime,
+				extractReleaseUploader	= Provider._AttributeUploader,
+			)
 
 	##############################################################################
 	# PROCESS
 	##############################################################################
 
 	def processOffset(self, data, items):
-		stats = data[Provider._ParameterStats]
-		if int(stats[Provider._ParameterPage]) >= int(stats[Provider._ParameterPages]): return ProviderUsenetJson.Skip
+		try:
+			version = self.customVersion()
+			if version == ProviderUsenetJson.Version1:
+				stats = data[Provider._AttributeData][Provider._ParameterPage1]
+				if int(stats[Provider._ParameterCurrent1]) >= (int(stats[Provider._ParameterPages1]) - 1): return ProviderUsenetJson.Skip # Current page starts at 0.
+			elif version == ProviderUsenetJson.Version2:
+				stats = data[Provider._ParameterStats]
+				if int(stats[Provider._ParameterCurrent2]) >= int(stats[Provider._ParameterPages2]): return ProviderUsenetJson.Skip
+		except: pass
 
 	def processLink(self, value, item, details = None, entry = None):
-		if not value: return ProviderUsenetHtml.Skip
-		return self.linkCurrent(path = Provider._PathDownload % value)
+		if not value: return ProviderUsenetJson.Skip
+		return self.linkCurrent(path = Provider._PathDownload[self.customVersion()] % value)
