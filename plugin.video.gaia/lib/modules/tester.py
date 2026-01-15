@@ -46942,6 +46942,10 @@ class Tester(object):
 			{'result' : {'audio' : ['hi'], 'subtitle' : ['ar', 'en']},						'data' : 'Avatar 2009 1080p Skyler HD Hindi Dubbed Arabic+English Sub'},
 			{'result' : {'audio' : ['es'], 'subtitle' : []},								'data' : 'Avatar.extended.cut.2009.1080.BRrip.audio.latino.mkv'},
 			{'result' : {'audio' : ['es', 'en'], 'subtitle' : []},							'data' : 'Avatar.2009.1080p-dual-lat.mkv'},
+
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Tron Ares (2025) [1080p] [WEBRip] [x265] [10bit] [5.1] [YTS.LT]'},
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Tron Ares (2025) [1080p] [WEBRip] [x265] [10bit] [5.1] [YTS.MX]'},
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : '20251201_152616_Tron.Ares.2025.1080p.AMZN.WEB-DL.10bit.DDP5.1.x265-FaS.mkv'},
 		)
 		timer = tools.Time(start = True)
 		fails = [[], []]

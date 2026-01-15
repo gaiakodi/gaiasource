@@ -1055,6 +1055,31 @@ class Stream(Serializer):
 	# LANGUAGE
 	##############################################################################
 
+	# Exclude certain keywords from matching language, since they are too common.
+	# Use a dictionary for faster lookups.
+	# Eg: Icelandic's code/country is "is", but that is a very common English word that might appear in decsriptions, episode titles, etc.
+	LanguageExcluded		= {
+							# Common English words.
+							'is' : True, 'ice' : True,
+							'in' : True,
+							'it' : True,
+							'us' : True,
+							'no' : True,
+
+							# Used in German file names, eg: "German.ML"
+							'ml' : True,
+						}
+
+	# Domains to exclude during language detection if the TLD is also a language/country.
+	# Eg: [YTS.LT]
+	LanguageDomain			= ('yts', )
+
+	# Languages that should be placed after another language.
+	LanguagePriority		= {
+								'ru' : 'uk',
+								'zh' : 'zt',
+							}
+
 	LabelLanguage = {
 		LabelDefault : {
 			LabelList1		: LabelShort,
@@ -2464,21 +2489,6 @@ class Stream(Serializer):
 		AudioTypeLine : True,
 		AudioTypeMic : True,
 	}
-
-	# Exclude certain keywords from matching language, since they are too common.
-	# Use a dictionary for faster lookups.
-	# Eg: Icelandic's code/country is "is", but that is a very common English word that might appear in decsriptions, episode titles, etc.
-	AudioExcluded		= {
-							# Common English words.
-							'is' : True, 'ice' : True,
-							'in' : True,
-							'it' : True,
-							'us' : True,
-							'no' : True,
-
-							# Used in German file names, eg: "German.ML"
-							'ml' : True,
-						}
 
 	# https://translate.google.com/translate?hl=en&sl=fr&u=https://astuto.fr/definitions-vfq-vf-vost-truefrench-subforced-vostfr/&prev=search&pto=aue
 	# https://translate.google.com/translate?hl=en&sl=fr&u=https://fr.wikipedia.org/wiki/Doublage&prev=search&pto=aue
@@ -24508,10 +24518,11 @@ class Stream(Serializer):
 			default (various): The default value to return if the attribute is not set.
 			universal (boolean): Whether or not to include the universal language.
 			sort (boolean): Whether or not to sort the languages according to the user's preferences.
+			priority (boolean): Whether or not to move certain unwated languages before certain wanted languages.
 		RETURNS:
 			The languages (list).
 	'''
-	def language(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = False):
+	def language(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = False, priority = False):
 		value = []
 		audio = self.mData['audio']['language']
 		if audio: value += audio
@@ -24524,7 +24535,10 @@ class Stream(Serializer):
 
 		multiple = label == Stream.LabelSettings
 		label = self.settingsLayout(label, 'audio', 'language')
+
 		if sort: value = self.languageSort(value = value, default = self.metaLanguage(single = True), label = True, copy = True)
+		if priority: value = self.languagePrioritize(value = value, priority = priority, copy = True)
+
 		return self.languageConvert(value = value, format = format, label = label, multiple = multiple, default = self.audioDefault())
 
 	@classmethod
@@ -24575,6 +24589,20 @@ class Stream(Serializer):
 		# NB: Copy the value in some cases, otherwise if the returned list is edited, the cached version (which might be used later) is also changed.
 		# This can cause default languages (with a semi-transparent flag) to not show in the stream window right after a new scrape (not the case if the window is reloaded).
 		if copy: result = tools.Tools.copy(result)
+
+		return result
+
+	@classmethod
+	def languagePrioritize(self, value, priority = None, copy = False):
+		result = value
+		if copy: result = tools.Tools.copy(result)
+
+		if priority is None or not tools.Tools.isDictionary(priority): priority = Stream.LanguagePriority
+
+		for k, v in priority.items():
+			if k in result and v in result:
+				result.remove(k)
+				result.insert(result.index(v) + 1, k)
 
 		return result
 
@@ -25836,6 +25864,9 @@ class Stream(Serializer):
 					# "per" is detected as Persian, while "per la" means "for the" in Italian.
 					# Eg: Foundation.2021.S03E01.Una.canzone.per.la.fine.di.tutto.ITA.ENG.2160p.ATVP.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-MeM.GP.mkv
 					keyword = __languageKeywordReplace(keyword = keyword, value = 'per', replacement = 'per(?![\s\.\-\_]la[\s\.\-\_])')
+					# Release group "FaS".
+					# Eg: 20251201_152616_Tron.Ares.2025.1080p.AMZN.WEB-DL.10bit.DDP5.1.x265-FaS.mkv
+					keyword = __languageKeywordReplace(keyword = keyword, value = 'fas', replacement = 'fas' + endingExclude)
 				elif codePrimary == 'sq':
 					# SHQ = Super High Quality
 					# Eg: Avatar(2009)TS SHQ 720p-[Spanish+Sub)-[ESPADESCARGAS]
@@ -25883,7 +25914,7 @@ class Stream(Serializer):
 				exclude = []
 				temp = []
 				for i in keyword:
-					if i in Stream.AudioExcluded: exclude.append(i)
+					if i in Stream.LanguageExcluded: exclude.append(i)
 					else: temp.append(i)
 				keyword = temp
 
@@ -25896,6 +25927,14 @@ class Stream(Serializer):
 					except:
 						try: keyword[i] = keyword[i].decode('latin-1')
 						except: pass
+
+					# Exclude common domains.
+					# Eg: [YTS.LT]
+					length = len(keyword[i])
+					if length == 2 or length == 3:
+						domain = ''
+						for j in Stream.LanguageDomain: domain += '(?<!' + j + '[\s\.\-\_\+])'
+						keyword[i] = domain + keyword[i]
 
 				expression = '(?:' + ('|'.join(keyword)) + ')'
 				result.append({'code' : codePrimary, 'country' : country, 'keyword' : keyword, 'expression' : expression, 'exclude' : exclude})
@@ -27682,17 +27721,21 @@ class Stream(Serializer):
 			default (various): The default value to return if the attribute is not set.
 			universal (boolean): Whether or not to include the universal language.
 			sort (boolean): Whether or not to sort the languages according to the user's preferences.
+			priority (boolean): Whether or not to move certain unwated languages before certain wanted languages.
 		RETURNS:
 			The audio languages (list).
 	'''
-	def audioLanguage(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = True):
+	def audioLanguage(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = True, priority = False):
 		value = self.mData['audio']['language']
 		if not value: return default
 		if not universal: value = [i for i in value if not i == tools.Language.UniversalCode]
 
 		multiple = label == Stream.LabelSettings
 		label = self.settingsLayout(label, 'audio', 'language')
+
 		if sort: value = self.languageSort(value = value, default = self.metaLanguage(single = True), label = True, copy = True)
+		if priority: value = self.languagePrioritize(value = value, priority = priority, copy = True)
+
 		return self.languageConvert(value = value, format = format, label = label, multiple = multiple, default = self.audioDefault())
 
 	'''
@@ -27914,10 +27957,11 @@ class Stream(Serializer):
 			default (various): The default value to return if the attribute is not set.
 			universal (boolean): Whether or not to include the universal language.
 			sort (boolean): Whether or not to sort the languages according to the user's preferences.
+			priority (boolean): Whether or not to move certain unwated languages before certain wanted languages.
 		RETURNS:
 			The subtitle languages (list).
 	'''
-	def subtitleLanguage(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = False):
+	def subtitleLanguage(self, format = FormatNone, label = LabelNone, default = None, universal = False, sort = False, priority = False):
 		value = self.mData['subtitle']['language']
 		if not value: return default
 		if not universal:
@@ -27926,7 +27970,10 @@ class Stream(Serializer):
 
 		multiple = label == Stream.LabelSettings
 		label = self.settingsLayout(label, 'subtitle', 'language')
+
 		if sort: value = self.languageSort(value = value, default = self.metaLanguage(single = True), label = True, copy = True)
+		if priority: value = self.languagePrioritize(value = value, priority = priority, copy = True)
+
 		return self.languageConvert(value = value, format = format, label = label, multiple = multiple)
 
 	'''

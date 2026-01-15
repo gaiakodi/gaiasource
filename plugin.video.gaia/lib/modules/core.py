@@ -2771,6 +2771,8 @@ class Core(object):
 			else:
 				titleProcess(title, tvshowtitle, yearReal)
 
+			self.streamsFound1 = {}
+			self.streamsFound2 = {}
 			self.streamsTotal = 0
 			self.streamsHdUltra = 0
 			self.streamsHd1080 = 0
@@ -4236,9 +4238,9 @@ class Core(object):
 					elif stream.accessTypeDirect(): highlight = colorHighlightDirect
 					elif stream.accessDebridAny(account = True): highlight = colorHighlightDebrid
 
-					languages = stream.language(sort = True) or []
-					audioLanguages = stream.audioLanguage(sort = True) or []
-					subtitleLanguages = stream.subtitleLanguage(sort = True) or []
+					languages = stream.language(sort = True, priority = True) or []
+					audioLanguages = stream.audioLanguage(sort = True, priority = True) or []
+					subtitleLanguages = stream.subtitleLanguage(sort = True, priority = True) or []
 					defaultLanguages = stream.audioDefault() or []
 
 					language = stream.labelLanguage(format = format) if flagLabel or not decorationsIcons or not languages else '' # Check "not languages" for exact seaches.
@@ -4952,9 +4954,13 @@ class Core(object):
 
 				for source in sources:
 					try:
-						source['stream'] = Stream.load(data = source['stream'])
+						stream = source['stream'] = Stream.load(data = source['stream'])
 
-						lookups = [source['stream'].sourceHoster(), source['stream'].sourceProvider(), source['stream'].sourcePublisher()]
+						id = stream.hash() or stream.idGaia()
+						new = not id in self.streamsFound1
+						if new: self.streamsFound1[id] = True
+
+						lookups = [stream.sourceHoster(), stream.sourceProvider(), stream.sourcePublisher()]
 						lookups = [lookup.lower() for lookup in lookups if lookup]
 
 						# External providers do not always set the full hoster domain (eg: vidoza instead of vidoza.net).
@@ -4962,7 +4968,7 @@ class Core(object):
 						# Instead check if the domain starts with the hoster and followed by a ".".
 						lookups2 = [lookup + '.' for lookup in lookups if not '.' in lookup]
 
-						lookups.insert(0, source['stream'].sourceType())
+						lookups.insert(0, stream.sourceType())
 
 						# Add debrid.
 						debrid = False
@@ -4970,65 +4976,63 @@ class Core(object):
 							if value: # In case the service list request failed, returning None.
 								for val in value:
 									if any(k == val for k in lookups) or ('.' in val and any(val.startswith(k) for k in lookups2)) or key in lookups:
-										source['stream'].accessDebridSet(id = key)
+										stream.accessDebridSet(id = key)
 										debrid = True
 										break
 
 						# Clear the termination status, since it could change after various parameters were set after the scraper returned it (debrid, provider, etc).
-						source['stream'].infoTerminationClear()
+						stream.infoTerminationClear()
 
 						# Ignore duplicates if retrieving cached streams, otherwise the stats in the scraping window are incomplete when reloading cached streams.
 						# The duplication is checked and set again in adjustSourceAppend() below.
-						if not check: source['stream'].exclusionDuplicateSet(value = False)
+						if not check: stream.exclusionDuplicateSet(value = False)
 
 						source['time'] = tools.Time.timestamp() # Used for cache lookup.
 						self.adjustSourceAppend(source)
 
 						priority = False
 						if(
-							not(self.excludeDuplicate and source['stream'].exclusionDuplicate())
-							and not(self.excludeKeyword and source['stream'].exclusionKeyword())
-							and not(self.excludeMetadata and source['stream'].exclusionMetadata())
-							and not(self.excludeFormat and source['stream'].exclusionFormat())
-							and not(self.excludeFake and source['stream'].exclusionFake())
-							and not(self.excludeSupport and source['stream'].exclusionSupport())
-							and not(self.excludePrecheck and source['stream'].exclusionPrecheck())
-							and not(self.excludeCaptcha and source['stream'].exclusionCaptcha())
-							and not(self.excludeBlocked and source['stream'].exclusionBlocked())
+							not(self.excludeDuplicate and stream.exclusionDuplicate())
+							and not(self.excludeKeyword and stream.exclusionKeyword())
+							and not(self.excludeMetadata and stream.exclusionMetadata())
+							and not(self.excludeFormat and stream.exclusionFormat())
+							and not(self.excludeFake and stream.exclusionFake())
+							and not(self.excludeSupport and stream.exclusionSupport())
+							and not(self.excludePrecheck and stream.exclusionPrecheck())
+							and not(self.excludeCaptcha and stream.exclusionCaptcha())
+							and not(self.excludeBlocked and stream.exclusionBlocked())
 						):
-							if debrid: self.streamsDebrid += 1
+							quality = stream.videoQualityCategory()
+							quality2 = stream.videoQuality()
 
-							# When loading from cache.
-							if source['stream'].accessCacheAny(account = True): self.streamsCached += 1
+							if quality == Stream.VideoQualityHdUltra: priority = True
+							elif not quality == Stream.VideoQualitySd and not quality == Stream.VideoQualityScr or not quality == Stream.VideoQualityCam:
+								if quality2 == Stream.VideoQualityHd1080 or quality2 == Stream.VideoQualityHd720: priority = True
 
-							quality = source['stream'].videoQualityCategory()
-							if quality == Stream.VideoQualityHdUltra:
-								priority = True
-								self.streamsHdUltra += 1 # 4K or higher
-							elif quality == Stream.VideoQualitySd:
-								self.streamsSd += 1
-							elif quality == Stream.VideoQualityScr or quality == Stream.VideoQualityCam:
-								self.streamsLd += 1
-							else:
-								quality = source['stream'].videoQuality()
-								if quality == Stream.VideoQualityHd1080:
-									priority = True
-									self.streamsHd1080 += 1
-								elif quality == Stream.VideoQualityHd720:
-									priority = True
-									self.streamsHd720 += 1
+							if new:
+								if quality == Stream.VideoQualityHdUltra: self.streamsHdUltra += 1 # 4K or higher
+								elif quality == Stream.VideoQualitySd: self.streamsSd += 1
+								elif quality == Stream.VideoQualityScr or quality == Stream.VideoQualityCam: self.streamsLd += 1
+								else:
+									if quality2 == Stream.VideoQualityHd1080: self.streamsHd1080 += 1
+									elif quality2 == Stream.VideoQualityHd720: self.streamsHd720 += 1
 
-							if source['stream'].sourceTypeTorrent(): self.streamsTorrent += 1
-							elif source['stream'].sourceTypeUsenet(): self.streamsUsenet += 1
-							elif source['stream'].sourceTypeHoster(): self.streamsHoster += 1
-							elif source['stream'].sourceTypePremium(): self.streamsPremium += 1
-							elif source['stream'].sourceTypeLocal(): self.streamsLocal += 1
+								if stream.sourceTypeTorrent(): self.streamsTorrent += 1
+								elif stream.sourceTypeUsenet(): self.streamsUsenet += 1
+								elif stream.sourceTypeHoster(): self.streamsHoster += 1
+								elif stream.sourceTypePremium(): self.streamsPremium += 1
+								elif stream.sourceTypeLocal(): self.streamsLocal += 1
 
-							if source['stream'].accessTypeDirect() and not source['stream'].sourceTypePremium(): self.streamsDirect += 1
+								if stream.accessCacheAny(account = True): # When loading from cache.
+									if not id in self.streamsFound2:
+										self.streamsCached += 1
+										self.streamsFound2[id] = True
+								if debrid: self.streamsDebrid += 1
+								if stream.accessTypeDirect() and not stream.sourceTypePremium(): self.streamsDirect += 1
 
-							self.streamsTotal += 1
+								self.streamsTotal += 1
 
-						if check and self.enabledExtra and not source['stream'].exclusionDuplicate():
+						if check and self.enabledExtra and not stream.exclusionDuplicate():
 							# Do not create a thread here. Only create it if we execute it.
 							index = len(self.tasksAdjusted)
 							self.tasksAdjusted.append({'target' : self.adjustSource, 'args' : (source, index), 'priority' : priority, 'status' : 'queued'}) # Give priority to HD links
@@ -5241,7 +5245,12 @@ class Core(object):
 									self.sourcesAdjusted[i]['stream'].accessCacheSet(id = id, value = cached, time = time, exact = Stream.ExactYes)
 									self.sourcesAdjusted[i]['stream'].infoTerminationClear() # Clear the termination status, since it could change after the cache changed.
 									if cached and self.sourcesAdjusted[i]['stream'].accessCacheCount(account = True) == 1: # Only count one of the debird service caches.
-										self.streamsCached += 1
+										if not hashLower in self.streamsFound2:
+											id = self.sourcesAdjusted[i]['stream'].hash() or self.sourcesAdjusted[i]['stream'].idGaia()
+											if not id in self.streamsFound2:
+												self.streamsFound2[hashLower] = True
+												self.streamsFound2[id] = True
+												self.streamsCached += 1
 								break
 						except: tools.Logger.error()
 					self.adjustUnlock()

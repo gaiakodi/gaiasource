@@ -5316,7 +5316,7 @@ class Context(object):
 			items.insert(0, {'label' : label, 'command' : 'commandInformation', 'loader' : True})
 		else:
 			if self.mMedia == tools.Media.Person: items.insert(0, {'label' : 35819, 'command' : 'commandInformationPerson', 'loader' : True})
-			if tools.Media.isSerie(self.mMedia):
+			if tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia):
 				if not self.mEpisode is None: items.insert(0, {'label' : 35509, 'command' : 'commandInformationEpisode', 'loader' : True})
 				if not self.mSeason is None: items.insert(0, {'label' : 35508, 'command' : 'commandInformationSeason', 'loader' : True})
 				if self.mImdb or self.mTmdb or self.mTvdb or self.mTrakt: items.insert(0, {'label' : 35507, 'command' : 'commandInformationShow', 'loader' : True})
@@ -5434,7 +5434,7 @@ class Context(object):
 			items.append({'label' : 36773, 'command' : 'commandRefreshSet', 'parameters' : 0, 'loader' : True})
 			items.append({'label' : 33522, 'command' : 'commandRefreshSet', 'parameters' : 1, 'loader' : True})
 			items.append({'label' : 36771, 'command' : 'commandRefreshSet', 'parameters' : 2, 'loader' : True})
-		elif tools.Media.isSerie(self.mMedia):
+		elif tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia):
 			items.append({'label' : 33523, 'command' : 'commandRefreshShow', 'loader' : True})
 			items.append({'label' : 33524, 'command' : 'commandRefreshSeason', 'loader' : True})
 			if not self.mSeason is None: items.append({'label' : 33525, 'command' : 'commandRefreshEpisode', 'loader' : True})
@@ -5445,7 +5445,7 @@ class Context(object):
 		self.add(label = 32072, icon = Font.IconRefresh, items = items, loader = True)
 
 	def addBrowse(self):
-		if tools.Media.isSerie(self.mMedia):
+		if tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia):
 			if self.mSeason is None:
 				self.add(label = 32071, icon = Font.IconBrowse, command = 'commandBrowse')
 			else:
@@ -5490,7 +5490,7 @@ class Context(object):
 			{'label' : 35688, 'command' : 'commandFileLink', 'parameters' : 'resolved', 'loader' : True},
 			{'label' : 35460, 'command' : 'commandFileLink', 'parameters' : 'stream', 'loader' : True},
 		]
-		if tools.Media.isSerie(self.mMedia) and not self.mSeason is None:
+		if (tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia)) and not self.mSeason is None:
 			sublinks = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.Show, 'loader' : True}]
 			if not self.mSeason is None: sublinks.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.Season, 'loader' : True})
 			if not self.mEpisode is None: sublinks.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.Episode, 'loader' : True})
@@ -5513,7 +5513,7 @@ class Context(object):
 		])
 
 	def addLink(self):
-		if tools.Media.isSerie(self.mMedia) and not self.mSeason is None:
+		if (tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia)) and not self.mSeason is None:
 			links = [{'label' : 36482, 'command' : 'commandLink', 'parameters' : tools.Media.Show, 'loader' : True}]
 			if not self.mSeason is None: links.append({'label' : 36483, 'command' : 'commandLink', 'parameters' : tools.Media.Season, 'loader' : True})
 			if not self.mEpisode is None: links.append({'label' : 36484, 'command' : 'commandLink', 'parameters' : tools.Media.Episode, 'loader' : True})
@@ -5562,7 +5562,7 @@ class Context(object):
 			items.append({'label' : self._translate(35495, 33071), 'command' : 'commandLibraryAddStream', 'condition' : 'Context.EnabledLibrary'})
 		if tools.Media.isFilm(self.mMedia) and (not self.mImdb == None or not self.mTmdb is None):
 			items.append({'label' : self._translate(35495, 35496), 'command' : 'commandLibraryAddMovie', 'condition' : 'Context.EnabledLibrary'})
-		if tools.Media.isSerie(self.mMedia) and (not self.mImdb is None or not self.mTvdb is None):
+		if (tools.Media.isSerie(self.mMedia) or tools.Media.isBonus(self.mMedia)) and (not self.mImdb is None or not self.mTvdb is None):
 			if not self.mSeason is None and not self.mEpisode is None:
 				items.append({'label' : self._translate(35495, 33028), 'command' : 'commandLibraryAddEpisode', 'condition' : 'Context.EnabledLibrary'})
 			if not self.mSeason is None:

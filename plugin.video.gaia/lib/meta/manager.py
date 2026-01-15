@@ -1621,8 +1621,10 @@ class MetaManager(object):
 				'initial' : 1,
 				'extended' : 4 if performanceGood else 3 if performanceMedium else 2,
 				'final' : {
-					'skip' : 4 if performanceGood else 3 if performanceMedium else 2,
-					'unskip' : 7 if performanceGood else 5 if performanceMedium else 3,
+					# These later reloads on low-end devices only take 2-15secs.
+					# And note that a lot of items which were already preloaded in "extended" are reset again with _metadataSmartRenew(). A few more iterations might therefore not hurt.
+					'skip' : 7 if performanceGood else 5 if performanceMedium else 3,
+					'unskip' : 10 if performanceGood else 7 if performanceMedium else 5,
 					'quick' : 1,
 				},
 				'reload' : {

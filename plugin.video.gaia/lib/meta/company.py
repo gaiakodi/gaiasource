@@ -13332,6 +13332,12 @@ class MetaCompany(object):
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM'},
 			},
 
+			# Example: Apple TV
+			'^apple[\s\-]*(?:tv|plus|\+)' : {
+				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple TV+'},
+				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple TV+'},
+			},
+
 			# Example: Apple Original Films
 			# Example: Apple Studios
 			'^apple[\s\-]*(?:original|studio)' : {

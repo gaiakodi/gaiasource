@@ -17578,6 +17578,8 @@ class Link(object):
 		from lib.modules.window import WindowQr
 		if loader: Loader.show()
 
+		if Media.isBonus(media): media = Media.Season # When links are copied from the context menu on recaps/extras.
+
 		data = self._extract(media = media, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, slug = slug, title = title, year = year, season = season, episode = episode, metadata = metadata)
 		metadata = data.get('metadata')
 

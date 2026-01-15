@@ -2838,7 +2838,7 @@ elif action.startswith('developer'):
 
 		# TESTER
 
-		#Tester.test()
+		Tester.test()
 
 		# STREAM
 

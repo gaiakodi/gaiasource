@@ -6403,7 +6403,7 @@ class MetaTools(object):
 								value = v
 								break
 
-						# Replace BEFORE looking up the includes, since it will cahnge the lookup value.
+						# Replace BEFORE looking up the includes, since it will change the lookup value.
 						for k, v in replacement.items():
 							if Regex.match(data = value, expression = k, cache = True):
 								if v: value = v # Value can be None. Stop scanning and keep current value.
