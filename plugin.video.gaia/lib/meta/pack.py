@@ -1615,6 +1615,26 @@ class MetaPack(object):
 			# STEP 1 - Calculate the show, season, and episode counts.
 			################################################################################################################
 
+			# Sometimes IMDb temporarily adds a 2nd season to an absolute show.
+			# Eg: One Piece - IMDb has a single absolute season.
+			# But when S23 was added as a future season (S23 added to TVDb, but not to Trakt/TMDb yet), IMDb now has S02 with a single future episode S02E01.
+			# This episode is probably only temporarily in S02 and might be moved to S01 once released.
+			# Remove these S02 from IMDb, since they otherwise create confusion, since IMDb now is multi-seasoned instead of single-seasoned.
+			if imdb:
+				count = {}
+				for season in self._extractSeasons(imdb):
+					if season:
+						numberSeason = self._extractNumber(season, MetaPack.NumberStandard)
+						if numberSeason:
+							episodes = self._extractEpisodes(season)
+							count[numberSeason] = len(episodes)
+				if len(count.keys()) == 2 and count.get(1, 0) > 500 and count.get(2, 0) <= 5:
+					seasons = self._extractSeasons(imdb)
+					for i in range(len(seasons)):
+						if self._extractNumber(seasons[i], MetaPack.NumberStandard) == 2:
+							del seasons[i]
+							break
+
 			# Calculate the show/season/episode counts.
 			# Note that sometimes seasons are missing, so do not just count upwards.
 			for provider, item in base:
@@ -2925,6 +2945,13 @@ class MetaPack(object):
 										for episode2 in ((mapEpisodes.get(numberSeason) or []) + (unided or [])):
 											if not episode is episode2:
 												checker += 1
+
+												# If mutiple episodes have thew same title, but are different episodes (eg they have a different Trakt ID).
+												# Eg: Money Heist S00E01 and S00E14 are both titled "Episode 1" on TMDb, althougfh they are different episodes.
+												if checkTrakt:
+													idTrakt = self._extractId(episode2, MetaPack.ProviderTrakt)
+													if idTrakt and not checkTrakt == idTrakt: continue
+
 												title2 = self._extractTitle(episode2)
 												# Do not use "exact = True" for match() here, since it actually increases time.
 												if title2 and self.match(data = title2, title = title, combined = True, quick = True):
@@ -4615,6 +4642,8 @@ class MetaPack(object):
 				indexSeason += 1
 
 			lookupNumber = {}
+			lookupStandard = {}
+			lookupAbsolute = {}
 			automatics = []
 			counter = 0
 			indexSeason = 0
@@ -4921,6 +4950,22 @@ class MetaPack(object):
 							except: lookupEpisode[number][nativeSeason] = lookupList = {}
 							lookupList[nativeEpisode] = item
 
+							# Used to fix the index for absolute lookups. More info below outside the loop.
+							if number == MetaPack.NumberStandard:
+								try: lookupList = lookupStandard[nativeSeason]
+								except: lookupStandard[nativeSeason] = lookupList = {}
+								lookupList[nativeEpisode] = item[MetaPack.ValueIndex]
+							elif number == MetaPack.NumberAbsolute and numberSeason > 0:
+								support = self._extract(episode, 'support', default = [])
+								if len(support) == 1:
+									numberCurrent = self._extractNumber(episode, MetaPack.NumberStandard, provider = support[0])
+									if numberCurrent:
+										seasonCurrent = numberCurrent[MetaPack.PartSeason]
+										seasonEpisode = numberCurrent[MetaPack.PartEpisode]
+										try: lookupList = lookupAbsolute[seasonCurrent]
+										except: lookupAbsolute[seasonCurrent] = lookupList = {}
+										lookupList[seasonEpisode] = item
+
 					# Eg: GoT S01E00.
 					# Eg: Hereos S01E00.
 					if numberSeason > 0 and numberEpisode == 0:
@@ -4938,6 +4983,17 @@ class MetaPack(object):
 				# Remove automatically added absolute episodes to reduce size.
 				# The lookup table now has these episodes, so we can still retrieve them.
 				season['episodes'] = [i for i in episodes if not self._extractType(i, MetaPack.NumberAutomatic)]
+
+			# For future episodes that are already on TVDb, but not on Trakt/TMDb/IMDb.
+			# The absolute lookups do not have the correct lookup index for these episodes.
+			# This causes a lookup error in _initialize().
+			# Replace the index in the absolute lookups with the index added to the standard lookup.
+			# Eg: One Piece S23E01+ already on TVDb, but not on Trakt/TMDb/IMDb.
+			for season, items in lookupAbsolute.items():
+				for episode, item in items.items():
+					try: lookuped = lookupStandard[season][episode]
+					except: lookuped = None
+					if lookuped: item[MetaPack.ValueIndex] = lookuped
 
 			# Get the correct numbers for automatically added episodes.
 			# The indexes for automatic sequential/absolute episodes are also incorrect (incremented in S01 after the last standard S01 episode).

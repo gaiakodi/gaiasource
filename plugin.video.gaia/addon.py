@@ -2865,23 +2865,24 @@ elif action.startswith('developer'):
 
 		# PACK
 
-		packTrakt = None
+		'''packTrakt = None
 		packTmdb = None
 		packTvdb = None
 		packImdb = None
 
 		# One Piece
-		'''packTrakt = MetaTrakt.instance().metadataPack(imdb = 'tt0388629', cache = True)
+		packTrakt = MetaTrakt.instance().metadataPack(imdb = 'tt0388629', cache = True)
 		packTmdb = MetaTmdb.instance().metadataPack(id = '37854', cache = True)
 		packTvdb = MetaTvdb.instance().metadataPack(id ='81797', cache = True)
-		packImdb = MetaImdb.instance().metadataPack(id = 'tt0388629')'''
+		packImdb = MetaImdb.instance().metadataPack(id = 'tt0388629')
 
-		'''pack = MetaPack()
+		pack = MetaPack()
 		data = pack.generateShow(trakt = packTrakt, tmdb = packTmdb, tvdb = packTvdb, imdb = packImdb, check = MetaPack.CheckForeground)
 		#Clipboard.copy(tools.Converter.jsonTo(data))
 
 		#tools.Logger.log("Episode Info: "+str(pack.episode(season = 1, episode = 2, number = MetaPack.NumberSequential)))
 		'''
+
 
 ####################################################
 # EXECUTION

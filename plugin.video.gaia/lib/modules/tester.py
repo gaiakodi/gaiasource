@@ -31342,7 +31342,7 @@ class Tester(object):
 					# Starts at S0.
 					'status' : {
 						'show' : 'returning',
-						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'upcoming'],
+						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing'],
 					},
 
 					# Starts at S0.
@@ -31750,8 +31750,11 @@ class Tester(object):
 					'count' : {
 						'official' : 42,
 						'sequential' : 42,
+
 						#'special' : 6, # 3 episodes in TVDb S02 are considered specials.
-						'special' : 3, # Episodes are now removed from TVDb.
+						#'special' : 3, # Episodes are now removed from TVDb.
+						'special' : 17, # Update (2026-01): Bunch of new specials added to TVDb.
+
 						'seasons' : [10, 10, 10, 12],
 					},
 
@@ -33070,31 +33073,31 @@ class Tester(object):
 				# This has to be updated if new episodes are added.
 				'summary' : {
 					'count' : {
-						'official' : 1155,
-						'sequential' : 1155,
+						'official' : 1156,
+						'sequential' : 1156,
 
 						# UPDATE (2025-10): Duplicate specials are not counted anymore.
 						#'special' : 64, # 63 = 62 matched episodes + 1 unmatched episodes. One new episode was added.
-						'special' : 65,
+						'special' : 64,
 
-						'seasons' : [61, 16, 14, 39, 13, 52, 33, 35, 73, 45, 26, 14, 101, 58, 62, 50, 56, 55, 74, 14, 197, 67],
+						'seasons' : [61, 16, 14, 39, 13, 52, 33, 35, 73, 45, 26, 14, 101, 58, 62, 50, 56, 55, 74, 14, 197, 68, 0],
 					},
 
 					# The statuses will change.
 					# Starts at S0.
 					'status' : {
 						'show' : 'returning',
-						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing'],
+						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing', 'upcoming'],
 					},
 
 					# Starts at S0.
 					'interval' : {
 						'show' : 'weekly',
-						'season' : ['otherly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly'],
+						'season' : ['otherly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly', 'weekly'],
 					},
 
 					# Starts at S0.
-					'type' : [typeSpecial, typePremiereOuter, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard],
+					'type' : [typeSpecial, typePremiereOuter, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard],
 				},
 
 				'episode' : [
@@ -34948,8 +34951,8 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 2322,
-						'sequential' : 2322,
+						'official' : 2331,
+						'sequential' : 2331,
 
 						# Update (2025-10): This will probably change soon. IMDb has added all episodes of the new season to "Unknown". These are now seen as specials, but will probably be moved by IMDb to a new season soon.
 						# This also applies to the data without IMDb.
@@ -34963,23 +34966,23 @@ class Tester(object):
 						# There are 14 official Trakt specials. The other ones are from IMDb "Unknown".
 						'special' : 15 if extended else 15,
 
-						'seasons' : [191, 223, 203, 208, 190, 195, 201, 197, 194, 132, 181, 162, 45],
+						'seasons' : [191, 223, 203, 208, 190, 195, 201, 197, 194, 132, 181, 162, 46, 8],
 					},
 
 					# Starts at S0.
 					'status' : {
 						'show' : 'returning',
-						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing'],
+						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing'],
 					},
 
 					# Starts at S0.
 					'interval' : {
 						'show' : 'daily',
-						'season' : ['otherly', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily'],
+						'season' : ['otherly', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily', 'daily'],
 					},
 
 					# Starts at S0.
-					'type' : [typeSpecial, typePremiereOuter, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard],
+					'type' : [typeSpecial, typePremiereOuter, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard, typeStandard],
 				},
 
 				'episode' : [
@@ -35705,7 +35708,7 @@ class Tester(object):
 						'time'			: 1761795000, # Update (2025-11): Changed from 1761881400 to 1761795000
 
 						'number'		: {								'standard' : [13, 19],	'sequential' : [1, 2296],	'absolute' : None,		'date' : [2025, 20251029]},
-						'imdb'			: {'id' : ['tt38597808', None],	'standard' : [13, 19],	'sequential' : [1, 2219],	'absolute' : None,		'date' : None},
+						'imdb'			: {'id' : ['tt38901366', None],	'standard' : [13, 19],	'sequential' : [1, 2219],	'absolute' : None,		'date' : None},
 						'tmdb'			: {'id' : '6649392',			'standard' : [13, 19],	'sequential' : [1, 2296],	'absolute' : None,		'date' : [2025, 20251029]},
 						'tvdb'			: {'id' : '11418715',			'standard' : [13, 19],	'sequential' : [1, 2209],	'absolute' : None,		'date' : [2025, 20251029]},
 						'trakt'			: {'id' : '13684788',			'standard' : [13, 19],	'sequential' : [1, 2296],	'absolute' : None,		'date' : [2025, 20251029]},
@@ -35724,7 +35727,7 @@ class Tester(object):
 						'time'			: 1762230600, # Update (2025-11): Changed from 1762128000 to 1762230600
 
 						'number'		: {								'standard' : [13, 20],	'sequential' : [1, 2297],	'absolute' : None,		'date' : [2025, 20251103]},
-						'imdb'			: {'id' : ['tt38597809', None],	'standard' : [13, 20],	'sequential' : [1, 2220],	'absolute' : None,		'date' : None},
+						'imdb'			: {'id' : ['tt38901724', None],	'standard' : [13, 20],	'sequential' : [1, 2220],	'absolute' : None,		'date' : None},
 						'tmdb'			: {'id' : '6676714',			'standard' : [13, 20],	'sequential' : [1, 2297],	'absolute' : None,		'date' : [2025, 20251103]},
 						'tvdb'			: {'id' : '11427022',			'standard' : [13, 20],	'sequential' : [1, 2210],	'absolute' : None,		'date' : [2025, 20251103]},
 						'trakt'			: {'id' : '13715533',			'standard' : [13, 20],	'sequential' : [1, 2297],	'absolute' : None,		'date' : [2025, 20251103]},
@@ -35950,10 +35953,10 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 1751,
-						'sequential' : 1751,
+						'official' : 1759,
+						'sequential' : 1759,
 						'special' : 14,
-						'seasons' : [202, 206, 194, 195, 173, 168, 170, 107, 130, 153, 53],
+						'seasons' : [202, 206, 194, 195, 173, 168, 170, 107, 130, 153, 61],
 					},
 
 					# Starts at S0.
@@ -36207,14 +36210,14 @@ class Tester(object):
 					'count' : {
 						'official' : 42,
 						'sequential' : 42,
-						'special' : 8,
+						'special' : 27,
 						'seasons' : [8, 9, 8, 9, 8],
 					},
 
 					# Starts at S0.
 					'status' : {
-						'show' : 'returning',
-						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'continuing'],
+						'show' : 'ended',
+						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended'],
 					},
 
 					# Starts at S0.
@@ -36293,10 +36296,10 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 16,
-						'sequential' : 16,
+						'official' : 24,
+						'sequential' : 24,
 						'special' : 37, # 36 matched episodes + 1 unmatched episodes.
-						'seasons' : [8, 8, 0],
+						'seasons' : [8, 8, 8],
 					},
 
 					# Starts at S0.
@@ -36352,7 +36355,11 @@ class Tester(object):
 						'absolute'		: [1, 0],
 
 						'title'			: ['Episode 1'],
-						'support'		: ['trakt', 'tmdb'],
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'support'		: ['trakt', 'tmdb'],
+						'support'		: ['trakt', 'tmdb', 'tvdb'],
+
 						'type'			: {'official' : True, 'unofficial' : None, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : True, 'premiere' : True, 'finale' : None, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : None, 'season' : True},
 						'status'		: 'ended',
 						'date'			: '2017-12-20',
@@ -36361,7 +36368,11 @@ class Tester(object):
 						'number'		: {						'standard' : [0, 1],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 						'imdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
 						'tmdb'			: {'id' : '2264480',	'standard' : [0, 1],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
-						'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+						'tvdb'			: {'id' : '7453598',	'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
 						'trakt'			: {'id' : '5945863',	'standard' : [0, 1],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 					},
 					{
@@ -36370,7 +36381,11 @@ class Tester(object):
 						'absolute'		: [1, 0],
 
 						'title'			: ['Episode 2'],
-						'support'		: ['trakt', 'tmdb'],
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'support'		: ['trakt', 'tmdb'],
+						'support'		: ['trakt', 'tmdb', 'tvdb'],
+
 						'type'			: {'official' : True, 'unofficial' : None, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : True, 'premiere' : None, 'finale' : None, 'outer' : None, 'inner' : None, 'middle' : None, 'alternate' : None, 'season' : True},
 						'status'		: 'ended',
 						'date'			: '2017-12-20',
@@ -36379,7 +36394,11 @@ class Tester(object):
 						'number'		: {						'standard' : [0, 2],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 						'imdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
 						'tmdb'			: {'id' : '2264481',	'standard' : [0, 2],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
-						'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+						'tvdb'			: {'id' : '7453599',	'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
 						'trakt'			: {'id' : '5945864',	'standard' : [0, 2],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 					},
 					{
@@ -36388,7 +36407,11 @@ class Tester(object):
 						'absolute'		: [1, 0],
 
 						'title'			: ['Episode 13'],
-						'support'		: ['trakt', 'tmdb'],
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'support'		: ['trakt', 'tmdb'],
+						'support'		: ['trakt', 'tmdb', 'tvdb'],
+
 						'type'			: {'official' : True, 'unofficial' : None, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : True, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : None, 'middle' : True, 'alternate' : None, 'season' : True},
 						'status'		: 'ended',
 						'date'			: '2017-12-20',
@@ -36397,7 +36420,11 @@ class Tester(object):
 						'number'		: {						'standard' : [0, 13],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 						'imdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
 						'tmdb'			: {'id' : '2264492',	'standard' : [0, 13],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
-						'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
+						# Update (2026-01): Trakt now has the TVDb episode IDs pointing to the "Nextflix Order" on TVDb.
+						#'tvdb'			: {'id' : None,			'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+						'tvdb'			: {'id' : '7453631',	'standard' : None,		'sequential' : None,	'absolute' : None,		'date' : None},
+
 						'trakt'			: {'id' : '5945875',	'standard' : [0, 13],	'sequential' : [1, 0],	'absolute' : [1, 0],	'date' : [2017, 20171220]},
 					},
 					{
@@ -36672,7 +36699,10 @@ class Tester(object):
 					'count' : {
 						'official' : 69, # Will change if new episodes are added.
 						'sequential' : 69,
-						'special' : 2 if extended else 1, # S03E00 on IMDb.
+
+						#'special' : 2 if extended else 1,
+						'special' : 3 if extended else 2, # S03E00 on IMDb cannot be matched to S00E02, since IMDb does not have titles.
+
 						'seasons' : [10, 12, 16, 13, 4, 14],
 					},
 
@@ -37037,8 +37067,8 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 8439, # Will change if new episodes are added.
-						'sequential' : 8439,
+						'official' : 8460, # Will change if new episodes are added.
+						'sequential' : 8460,
 						'special' : 11,
 						'seasons' : [160, 242, 245, 241, 249, 245, 253, 253, 250, 244, 250, 249, 253, 255, 257, 249, 252, 252, 248, 254, 251, 250, 250, 252, 256, 254, 252, 251, 248, 252, 256, 254, 253, 250],
 					},
@@ -37046,7 +37076,7 @@ class Tester(object):
 					# Starts at S0.
 					'status' : {
 						'show' : 'returning',
-						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'continuing'],
+						'season' : ['continuing', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended', 'ended'],
 					},
 
 					# Starts at S0.
@@ -39105,6 +39135,27 @@ class Tester(object):
 						'trakt'			: {'id' : '342268',			'standard' : [1, 24],	'sequential' : [1, 24],		'absolute' : None,		'date' : [2005, 20050525]},
 					},
 
+					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
+					#{
+					#	'standard'		: [1, 25],
+					#	'sequential'	: [1, 25],
+					#	'absolute'		: None,
+					#	'input'			: 'imdb',
+					#	'ignore'		: not extended,
+					#
+					#	'title'			: None,
+					#	'support'		: ['imdb'],
+					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+					#	'status'		: None,
+					#	'date'			: None,
+					#	'time'			: None,
+					#
+					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#},
 					{
 						'standard'		: [1, 25],
 						'sequential'	: [1, 25],
@@ -39112,9 +39163,9 @@ class Tester(object):
 						'input'			: 'imdb',
 						'ignore'		: not extended,
 
-						'title'			: None,
-						'support'		: ['imdb'],
-						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+						'title'			: ['Exodus (3)'],
+						'support'		: ['tvdb', 'imdb'],
+						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
 						'status'		: None,
 						'date'			: None,
 						'time'			: None,
@@ -39122,7 +39173,7 @@ class Tester(object):
 						'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-						'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+						'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
 						'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 					},
 
@@ -39143,18 +39194,42 @@ class Tester(object):
 						'number'		: {							'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 						'imdb'			: {'id' : 'tt0636285',		'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : '333948',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
-						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+
+						# Update (2026-01): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
+						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
+
 						'trakt'			: {'id' : '342270',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 					},
+					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
+					#{
+					#	'standard'		: [1, 25],
+					#	'sequential'	: [1, 25],
+					#	'absolute'		: None,
+					#	'ignore'		: not extended,
+					#
+					#	'title'			: [],
+					#	'support'		: ['imdb'],
+					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+					#	'status'		: None,
+					#	'date'			: None,
+					#	'time'			: None,
+					#
+					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#},
 					{
 						'standard'		: [1, 25],
 						'sequential'	: [1, 25],
 						'absolute'		: None,
 						'ignore'		: not extended,
 
-						'title'			: [],
-						'support'		: ['imdb'],
-						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+						'title'			: ['Exodus (3)'],
+						'support'		: ['tvdb', 'imdb'],
+						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
 						'status'		: None,
 						'date'			: None,
 						'time'			: None,
@@ -39162,7 +39237,7 @@ class Tester(object):
 						'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-						'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+						'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
 						'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 					},
 
@@ -39181,7 +39256,11 @@ class Tester(object):
 						'number'		: {							'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 						'imdb'			: {'id' : 'tt0636285',		'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : '333948',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
-						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+
+						# Update (2026-01): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
+						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
+
 						'trakt'			: {'id' : '342270',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 					},
 				],
@@ -39379,15 +39458,15 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 363,
-						'sequential' : 363,
+						'official' : 366,
+						'sequential' : 366,
 
 						# UPDATE (2025-10): Duplicate specials are not counted anymore.
 						# 62 Trakt specials + 8 standard episodes that are specials on TVDb (S19E15-16, S20E15-16, S24E16-17, S22E15-16) + 1 IMDb special (S20E00).
 						#'special' : 75 if extended else 71,
-						'special' : 72 if extended else 70,
+						'special' : 73 if extended else 70,
 
-						'seasons' : [12, 12, 12, 13, 13, 12, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 16, 16, 16, 17, 16, 10],
+						'seasons' : [12, 12, 12, 13, 13, 12, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 16, 16, 16, 17, 16, 13],
 					},
 
 					# Starts at S0.
@@ -39719,6 +39798,75 @@ class Tester(object):
 						'tmdb'			: {'id' : '6388599',				'standard' : [1, 1],	'sequential' : [1, 1],	'absolute' : None,		'date' : [2025, 20251031]},
 						'tvdb'			: {'id' : '11399332',				'standard' : [1, 1],	'sequential' : [1, 1],	'absolute' : None,		'date' : [2025, 20251031]},
 						'trakt'			: {'id' : '13331413',				'standard' : [1, 1],	'sequential' : [1, 1],	'absolute' : None,		'date' : [2025, 20251031]},
+					},
+				],
+			},
+
+			{
+				'title' : 'Wednesday',
+				'id' : {'imdb' : 'tt13443470', 'tmdb' : '119051', 'tvdb' : '397060', 'trakt' : '173996'},
+
+				'summary' : {
+					'count' : {
+						'official' : 24,
+						'sequential' : 24,
+						'special' : 7,
+						'seasons' : [8, 8, 8],
+					},
+
+					# Starts at S0.
+					'status' : {
+						'show' : 'returning',
+						'season' : ['continuing', 'ended', 'ended', 'upcoming'],
+					},
+
+					# Starts at S0.
+					'interval' : {
+						'show' : 'batchly',
+						'season' : ['otherly', 'instantly', 'batchly', 'otherly'],
+					},
+
+					# Starts at S0.
+					'type' : [typeSpecial, typePremiereOuter, typeStandard, typeStandard],
+				},
+
+				'episode' : [
+					{
+						'standard'		: [2, 1],
+						'sequential'	: [1, 9],
+						'absolute'		: None,
+
+						'title'			: ['Here We Woe Again'],
+						'support'		: ['trakt', 'tvdb', 'tmdb', 'imdb'],
+						'type'			: {'official' : True, 'unofficial' : None, 'universal' : True, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : True, 'finale' : None, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : None},
+						'status'		: 'ended',
+						'date'			: '2025-08-06',
+						'time'			: 1754463600,
+
+						'number'		: {							'standard' : [2, 1],	'sequential' : [1, 9],	'absolute' : None,		'date' : [2025, 20250806]},
+						'imdb'			: {'id' : 'tt25754350',		'standard' : [2, 1],	'sequential' : [1, 9],	'absolute' : None,		'date' : None},
+						'tmdb'			: {'id' : '6165591',		'standard' : [2, 1],	'sequential' : [1, 9],	'absolute' : None,		'date' : [2025, 20250806]},
+						'tvdb'			: {'id' : '10486526',		'standard' : [2, 1],	'sequential' : [1, 9],	'absolute' : None,		'date' : [2025, 20250806]},
+						'trakt'			: {'id' : '13033535',		'standard' : [2, 1],	'sequential' : [1, 9],	'absolute' : None,		'date' : [2025, 20250806]},
+					},
+
+					{
+						'standard'		: [2, 8],
+						'sequential'	: [1, 16],
+						'absolute'		: None,
+
+						'title'			: ['This Means Woe'],
+						'support'		: ['trakt', 'tvdb', 'tmdb', 'imdb'],
+						'type'			: {'official' : True, 'unofficial' : None, 'universal' : True, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : None},
+						'status'		: 'ended',
+						'date'			: '2025-09-03',
+						'time'			: 1756882800,
+
+						'number'		: {							'standard' : [2, 8],	'sequential' : [1, 16],	'absolute' : None,		'date' : [2025, 20250903]},
+						'imdb'			: {'id' : 'tt33310268',		'standard' : [2, 8],	'sequential' : [1, 16],	'absolute' : None,		'date' : None},
+						'tmdb'			: {'id' : '6165599',		'standard' : [2, 8],	'sequential' : [1, 16],	'absolute' : None,		'date' : [2025, 20250903]},
+						'tvdb'			: {'id' : '11100621',		'standard' : [2, 8],	'sequential' : [1, 16],	'absolute' : None,		'date' : [2025, 20250903]},
+						'trakt'			: {'id' : '13033563',		'standard' : [2, 8],	'sequential' : [1, 16],	'absolute' : None,		'date' : [2025, 20250903]},
 					},
 				],
 			},
@@ -40381,7 +40529,10 @@ class Tester(object):
 					{'season' : 1, 'episode' : 24, 'number' : MetaPack.NumberSequential,	'next' : {'season' : 1, 'episode' : 25}},
 					{'season' : 1, 'episode' : 24, 'number' : MetaPack.ProviderImdb,		'next' : {'season' : 1, 'episode' : 25} if extended else None},
 
-					{'season' : 1, 'episode' : 25, 'number' : None,							'next' : {'season' : 2, 'episode' : 1} if extended else {'season' : 1, 'episode' : 26}},
+					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
+					#{'season' : 1, 'episode' : 25, 'number' : None,						'next' : {'season' : 2, 'episode' : 1} if extended else {'season' : 1, 'episode' : 26}},
+					{'season' : 1, 'episode' : 25, 'number' : None,							'next' : {'season' : 2, 'episode' : 1}},
+
 					{'season' : 1, 'episode' : 25, 'number' : MetaPack.NumberStandard,		'next' : {'season' : 2, 'episode' : 1}},
 					{'season' : 1, 'episode' : 25, 'number' : MetaPack.NumberSequential,	'next' : {'season' : 1, 'episode' : 26}},
 					{'season' : 1, 'episode' : 25, 'number' : MetaPack.ProviderImdb,		'next' : {'season' : 2, 'episode' : 1} if extended else None},
@@ -40520,7 +40671,7 @@ class Tester(object):
 				'title' : 'Star Wars: Young Jedi Adventures',
 				'id' : {'imdb' : 'tt20674124', 'tmdb' : '202998', 'tvdb' : '420658', 'trakt' : '195744'},
 				'niche' : ['instantly'], # Changed from S03 "batchly" to S04 "instantly".
-				'status' : 'returning',
+				'status' : 'ended',
 				'interval' : 'instantly', # Changed from S03 "batchly" to S04 "instantly".
 				'date' : '2023-05-04',
 				'time' : 1683205200,
@@ -40796,8 +40947,10 @@ class Tester(object):
 					{'season' : 21,	'niche' : ['weekly'],	'type' : ['standard', 'inner', 'official', 'universal'],			'status' : 'ended',			'interval' : 'weekly',		'date' : '2019-07-07',	'time' : 1562508900,	'number' : {'date' : 2019}},
 
 					# Show did not end yet, so the last season is not a finale (yet). Status will change in the future.
-					 # TVDb S22 starts in 2023 (date-number).
-					{'season' : 22,	'niche' : ['weekly'],	'type' : ['standard', 'inner', 'official', 'universal'],			'status' : 'continuing',	'interval' : 'weekly',		'date' : '2024-01-07',	'time' : 1704636900,	'number' : {'date' : 2024}},
+					# TVDb S22 starts in 2023 (date-number).
+					# Update (2026-01): S22 now has a finale on Trakt, but there is still a future episode S22E1156 after the finale on Trakt. TVDb has the future episode(s) listed under S23. So S22 has probably ended.
+					#{'season' : 22,	'niche' : ['weekly'],	'type' : ['standard', 'inner', 'official', 'universal'],		'status' : 'continuing',	'interval' : 'weekly',		'date' : '2024-01-07',	'time' : 1704636900,	'number' : {'date' : 2024}},
+					{'season' : 22,	'niche' : ['weekly'],	'type' : ['standard', 'inner', 'official', 'universal'],			'status' : 'ended',	'interval' : 'weekly',		'date' : '2024-01-07',	'time' : 1704636900,	'number' : {'date' : 2024}},
 				],
 			},
 
@@ -41197,7 +41350,7 @@ class Tester(object):
 			{
 				'title' : 'One Piece',
 				'id' : {'imdb' : 'tt0388629', 'tmdb' : '37854', 'tvdb' : '81797', 'trakt' : '37696'},
-				'count' : [62, 61, 22, 17, 39, 13, 52, 39, 35, 73, 45, 99, 56, 101, 58, 62, 50, 118, 55, 98, 14, 197, 69], # Starting at S0.
+				'count' : [62, 61, 22, 17, 39, 13, 52, 39, 35, 73, 45, 99, 56, 101, 58, 62, 50, 118, 55, 98, 14, 197, 70], # Starting at S0.
 				'episode' : [
 					{'season' : 1, 'episode' : 1,		'niche' : ['weekly'], 'type' : ['premiere', 'outer'], 'status' : 'ended'},
 					{'season' : 1, 'episode' : 8,		'niche' : ['weekly'], 'type' : ['finale', 'inner', 'alternate'], 'status' : 'ended'},
@@ -41361,7 +41514,7 @@ class Tester(object):
 			{
 				'title' : 'Lost',
 				'id' : {'imdb' : 'tt0411008', 'tmdb' : '4607', 'tvdb' : '73739', 'trakt' : '4583'},
-				'count' : [147, 25, 24, 23, 14, 17, 18] if extended else [147, 24, 24, 23, 14, 17, 18], # Starting at S0.
+				'count' : [147, 25, 24, 23, 14, 17, 18], # Starting at S0.
 				'episode' : [
 					{'season' : 1, 'episode' : 24,												'niche' : ['weekly'],		'type' : ['finale', 'inner'],					'status' : 'ended',		'interval' : 'weekly'},
 
@@ -41616,6 +41769,19 @@ class Tester(object):
 
 					# Marked as season finale on TVDb.
 					{'season' : 0, 'episode' : 23,		'niche' : ['batchly'],		'type' : ['special', 'exclusive', 'finale', 'inner'],				'status' : 'ended',		'interval' : 'batchly',		'date' : '2020-04-03',	'time' : 1585872000},
+				],
+			},
+
+			{
+				'title' : 'Wednesday',
+				'id' : {'imdb' : 'tt13443470', 'tmdb' : '119051', 'tvdb' : '397060', 'trakt' : '173996'},
+				'count' : [7, 8, 8, 8], # Starting at S0.
+				'episode' : [
+					{'season' : 1, 'episode' : 1,		'niche' : ['instantly'],		'type' : ['premiere', 'outer'],									'status' : 'ended',		'interval' : 'instantly',		'date' : '2022-11-23',	'time' : 1669190400},
+					{'season' : 1, 'episode' : 8,		'niche' : ['instantly'],		'type' : ['finale', 'inner'],									'status' : 'ended',		'interval' : 'instantly',		'date' : '2022-11-23',	'time' : 1669190400},
+
+					{'season' : 2, 'episode' : 1,		'niche' : ['batchly'],		'type' : ['premiere', 'inner'],										'status' : 'ended',		'interval' : 'batchly',		'date' : '2025-08-06',	'time' : 1754463600},
+					{'season' : 2, 'episode' : 8,		'niche' : ['batchly'],		'type' : ['finale', 'inner'],										'status' : 'ended',		'interval' : 'batchly',		'date' : '2025-09-03',	'time' : 1756882800},
 				],
 			},
 		)
