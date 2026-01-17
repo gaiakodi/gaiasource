@@ -1429,8 +1429,6 @@ class Player(xbmc.Player):
 				self.core.progressPlaybackUpdate(progress = 100, message = '', status = None, force = True) # Must be set to 100 for background dialog, otherwise it shows up in a later dialog.
 				return False
 
-			if self.resumeTime: self.resume(self.resumeTime, offset = True)
-
 			self.core.progressPlaybackUpdate(progress = 100, title = title, message = message, status = status, substatus1 = substatus1, substatus2 = substatus2)
 
 			# Important to close here, otherwise the playback window stays open (although invisible), causing a dangling Python process.
@@ -1557,6 +1555,28 @@ class Player(xbmc.Player):
 				if self.progressThread:
 					self.join(self.progressThread)
 					self.progressThread = None
+
+				# Moved this from keepPlaybackAlive().
+				# Occasionally resuming the progress does not work, and Kodi starts playing from the start, even though the playback progress is known.
+				# Maybe this happens because Kodi restarts the playback, or the TV/Kodi enters into HDR mode, and then Kodi restarts the playback, and then the resuming point is lost.
+				# Try to do this here, once (hopefully) everything in Kodi's playback is initialized.
+				try:
+					if self.resumeTime:
+						tools.Time.sleep(0.05)
+						self.playbackLock.acquire()
+						locked = True
+						self.resume(self.resumeTime, offset = True)
+						self.playbackLock.release()
+						locked = False
+						tools.Time.sleep(0.05)
+				except: pass
+				finally:
+					tools.Logger.error()
+					try:
+						if locked:
+							self.playbackLock.release()
+							locked = False
+					except: pass
 
 				if not self.resumeTime and self.progress > 0:
 					if self.timeTotal > 0:
@@ -1839,6 +1859,10 @@ class Player(xbmc.Player):
 	def playbackInitialize(self):
 		if not self.playbackInitialized:
 			self.playbackInitialized = True
+
+			# Wait for other code to execute first.
+			tools.Time.sleep(0.01)
+
 			for i in range(0, 1200):
 				# Check "started" as well, otherwise the playback window is closed too quickly and the background menus are visible for a second.
 				# It seems that Kodi fixed the issue that onAvStarted() was not called, should now be correctly executed.
@@ -1990,7 +2014,7 @@ class Player(xbmc.Player):
 		Pool.thread(target = self._onAVStarted, start = True)
 
 	def _onAVStarted(self):
-		# Do this here and not in onPlayBackStarted(), since onPlayBackStarted() is called even if the video doess not play (eg: link times out).
+		# Do this here and not in onPlayBackStarted(), since onPlayBackStarted() is called even if the video does not play (eg: link times out).
 		self.playbackInitialize()
 
 	def onAVChange(self):
@@ -3049,7 +3073,7 @@ class Chapter(Streamer):
 
 					# Only use the resume time once.
 					# Yesterday the user fell asleep, woke up in the middle of the episode progress and stopped playback.
-					# Next day the user starts playback again, it gets auto-resumed to th emiddle, but the user manually changes progress to 0% to start the episode from the beginning.
+					# Next day the user starts playback again, it gets auto-resumed to the middle, but the user manually changes progress to 0% to start the episode from the beginning.
 					# In this case "resume" will be higher that the actual getTime(). But we still want the Skip button to show.
 					if resume:
 						timeCurrent = max(resume, player.getTime())

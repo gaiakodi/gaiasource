@@ -9400,6 +9400,7 @@ class MetaTools(object):
 				media = metadata.get('media')
 				movie = Media.isMovie(media)
 				serie = Media.isSerie(media)
+				mixed = Media.isMixed(summary['media'])
 				rating = self._sortRating(metadata = metadata)
 				votes = self._sortVotes(metadata = metadata)
 				smart = (metadata.get('smart') or {})
@@ -9682,10 +9683,15 @@ class MetaTools(object):
 						# The releases only contain new episodes of shows from the user's progress, not any other arrivals the user is not watching.
 						# Still increase the rank, to push the user-watched titles up in the Arrivals menu, since those are the ones the user might be more interested in.
 						# But do not add too much, since the user will rather use the Progress menu for shows being watched, and probably use the Arrivals menu to discover new unwatched shows.
-						if smartOriginRelease and MetaTools.ProviderTrakt in smartOriginRelease: special += 0.15
+						if smartOriginRelease and MetaTools.ProviderTrakt in smartOriginRelease: special += 0.50 if mixed else 0.15 # Add more for the main/mixed Arrivals menu, otherwise only movies are listed there on the first page.
 
 						# Not too much, since the show calendars form Trakt/TMDb/IMDb are all based on the premiere date, and the Trakt origin does not mean much.
 						elif smartOriginArrival and MetaTools.ProviderTrakt in smartOriginArrival: special += 0.05
+
+				# In the main/mixed Arrivals menu, there are way more movies than shows listed.
+				# Increase the weight for shows in mixed menus, so that about the same number of movies and shows are listed.
+				# This value might have to be adjusted in the future if code in this function changes, to make sure the movie-show-ratio stays at +- 50%/50%.
+				if mixed and serie: special += 0.35
 
 				# Reduce the votes requirement if there is no IMDb rating.
 				# NB: Items not smart-loaded yet, do not have a "voting" dict.
@@ -9751,12 +9757,18 @@ class MetaTools(object):
 
 				rating = self._sortWeighted(metadatas = metadatas)
 
+				countMovie = 0
+				countShow = 0
 				current = Time.timestamp()
 				time = []
 				for metadata in metadatas:
 					# Deprecated - TimeSerie can be removed after 2025-09.
-					if Media.isSerie(metadata.get('media')): time.append(self._sortTime(metadata = metadata, type = [MetaTools.TimeCustom, MetaTools.TimeSerie, MetaTools.TimePremiere])[0]) # Use the season date, instead of the show date, if available.
-					else: time.append(self._sortHome(metadata = metadata)[0])
+					if Media.isSerie(metadata.get('media')):
+						countShow += 1
+						time.append(self._sortTime(metadata = metadata, type = [MetaTools.TimeCustom, MetaTools.TimeSerie, MetaTools.TimePremiere])[0]) # Use the season date, instead of the show date, if available.
+					else:
+						countMovie += 1
+						time.append(self._sortHome(metadata = metadata)[0])
 				time = [i for i in time if i]
 
 				# Remove outliers from the list, since large outliers cause the deviation other titles' ages to be very small.
@@ -9821,6 +9833,7 @@ class MetaTools(object):
 				]
 
 				return {
+					'media' : Media.Mixed if (countMovie and countShow) else Media.Movie if countMovie else Media.Show,
 					'language' : languages,
 					'rating' : rating,
 					'time' : {
