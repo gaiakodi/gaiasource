@@ -6191,7 +6191,7 @@ class System(object):
 			from lib.providers.core.manager import Manager
 			Manager.check(progress = False, load = True, wait = True) # load = True: Load them here already. Should decrease the provider initializtion time on first scrape.
 			if self.tInitial: Manager.optimizeInternal()
-		_launchAdd(15, 'Initializing Provider Structure', _launchProviders) # 71%
+		_launchAdd(15, 'Initializing Scrape Providers', _launchProviders) # 71%
 
 		# Trakt
 		def _launchTrakt():

@@ -2524,10 +2524,21 @@ class Stream(Serializer):
 	ExpressionAudioNordic 		= [[u'nordic', u'scandinavian?'], u'nor swe fin dan']
 	ExpressionAudioOther		= [u'vo', u'vost', u'vostfr', u'vostf', u'vos', u'vose']
 
+	ExpressionAudioDubbed = {
+		'pt'				: u'(dublad[ao])',
+		'es'				: u'(doblado)',
+		'it'				: u'(doppiato)',
+		'de'				: u'(synchron(?:isiert|isation)?)',
+		'nl'				: u'((?:nage{separator}*)?synchroniseerde?)',
+		'fr'				: u'(vfstfr?|vff?|true{separator}*french|pfd|vf?q|vfb|vfi|vf)',
+		'pl'				: u'(?:lektor(?:{separator}*pl)?|lek{separator}*pl)',
+		'ru'				: u'(Дублированный)',
+	}
+
 	ExpressionAudioType = {
 		'keyword' : {
 			'codec'			: u'(?:(?:e{separator}*)?[aа][cс]{separator}*\d|dd(?:plus|p|\+)|true{separator}*hd|atmos|dts(?:{separator}*x)?|dca|hd{separator}*(?:ma|hra?)|aac)', # Eg: AC3D means AC3 Dubbed.
-			'dubbed'		: u'(?:dub(?:s|bs?|bed|bings?)?|d[ou]bla(?:d(?:[ao]|je)|gem)|synchron(?:isiert)|doubl(?:é|e)e|vf|Дублированный|{french}|{polish})',
+			'dubbed'		: u'(?:dub(?:s|bs?|bed|bings?)?|d[ou]bla(?:d(?:[ao]|je)|gem)|doppiato|synchron(?:isiert|isation)?|(?:nage{separator}*)?synchroniseerde?|doubl(?:é|e)e|vf|Дублированный|{french}|{polish})',
 			'dubbedline'	: u'(?:(?<!trek.)ld|Профессиональный{separator}*(?:одноголосый|многоголосый))', # Exclude "Star Trek LD" (Lower Decks).
 			'dubbedmic'		: u'md',
 			'dubbedfan'		: u'Любительский{separator}*(?:одноголосый|многоголосый)',
@@ -24931,9 +24942,24 @@ class Stream(Serializer):
 				# If another language is present (eg: "Swedish, Nordic+Eng subs"), it typically means the language is audio, and "NORDiC" are the subtitles.
 				data = self._cacheId('languageExtract39', re.compile, Stream.ExpressionSymbolStart + '(' + ('|'.join(Stream.ExpressionAudioNordic[0])) + ')' + Stream.ExpressionSymbolEnd, flags = Stream.ExpressionFlags).sub(' subtitle ' + Stream.ExpressionAudioNordic[1] + ' subtitle ', data)
 
+				# Remove sizes, since "GB" can be confused with a country (English).
+				# Eg: www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - 2.2GB - Kor Sub - HQ Line Audios].mkv
+				data = self._cacheId('languageExtract40', re.compile, lambda : u'\d{1,4}(?:\.\d{1,2})?' + Stream.ExpressionSeparator + '*(?:gb|mb)', flags = Stream.ExpressionFlags).sub(' other ', data)
+
 				# Replace Hz and kpbs keywords.
 				# Eg: AVATAR (2009) Extended Collector\'s Cut 1080p BluRay x264 AVC [Org Hindi BD 5 1 448Kbps + English DD 5.1] ESubs ~ Tiberiumsun69 ...
-				data = self._cacheId('languageExtract40', re.compile, '(\d+(?:\.\d+)?(?:hz|kbps))', flags = Stream.ExpressionFlags).sub(' audio ', data)
+				data = self._cacheId('languageExtract41', re.compile, '(\d+(?:\.\d+)?(?:hz|kbps))', flags = Stream.ExpressionFlags).sub(' audio ', data)
+
+				# Replace dual-separators consisting of 2 or more unique separators (eg: " - "), since they typically indicate a separation between concepts, such as audio vs subtitles.
+				# Eg: www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - 2.2GB - Kor Sub - HQ Line Audios].mkv
+				match = self._cacheId('languageExtract42', re.compile, '((?:' + Stream.ExpressionSeparatorPlain + '|' + Stream.ExpressionBracketsEnd + '){2,})', flags = Stream.ExpressionFlags).findall(data)
+				if match:
+					for i in match:
+						# If there is more than 1 unique separator character.
+						# Eg: do not count "  " or "--".
+						if len(set(i)) > 1: data = data.replace(i, ' separatorx ')
+				data = data.replace(' separatorx separator ', ' separator ')
+				data = data.replace('  ', ' ')
 
 				# Replace audio keywords.
 				# Repalce with "a-u-d-i-o" and not "audio", since that is a keyword that will be replaced itself.
@@ -24945,7 +24971,7 @@ class Stream(Serializer):
 				expression.extend(self._audioChannelsKeyword())
 				expression.append(Stream.ExpressionAudio)
 				expression = '(?=' + Stream.ExpressionSymbolStart + '(' + ('|'.join([i for i in expression])) + ')' + Stream.ExpressionSymbolEnd + ')'
-				matches = self._cacheId('languageExtract41', re.compile, expression, flags = Stream.ExpressionFlags).finditer(data)
+				matches = self._cacheId('languageExtract43', re.compile, expression, flags = Stream.ExpressionFlags).finditer(data)
 				if matches:
 					for match in matches:
 						for group in match.groups():
@@ -24954,7 +24980,7 @@ class Stream(Serializer):
 				# Replace subtitle keywords.
 				expressionSubtitle = self._expressionFormatCommon(Stream.ExpressionSubtitleExtended)
 				expression = Stream.ExpressionSymbolStart + '(' + expressionSubtitle + ')' + Stream.ExpressionSymbolEnd
-				data = self._cacheId('languageExtract42', re.compile, expression, flags = Stream.ExpressionFlags).sub(' s-u-b-t-i-t-l-e ', data)
+				data = self._cacheId('languageExtract44', re.compile, expression, flags = Stream.ExpressionFlags).sub(' s-u-b-t-i-t-l-e ', data)
 
 				data = data.replace('a-u-d-i-o', 'audio').replace('s-u-b-t-i-t-l-e', 'subtitle')
 				parts = self.cleanSplit(data = data, single = ['i', 'v', 'x'], number = True) # Allow single characters that are roman numbers, to not mark "I - VI" as Vietnamese.
@@ -24967,7 +24993,7 @@ class Stream(Serializer):
 					other.extend(Stream.ExpressionSubtitleFrench)
 					other.extend(Stream.ExpressionSubtitleSpanish)
 					for j in other:
-						match = self._cacheId('languageExtract43', re.compile, lambda : self._expressionFormatCommon(j), flags = Stream.ExpressionFlags).search(parts[i])
+						match = self._cacheId('languageExtract45', re.compile, lambda : self._expressionFormatCommon(j), flags = Stream.ExpressionFlags).search(parts[i])
 						if match:
 							separators.append(i)
 							break
@@ -24995,10 +25021,12 @@ class Stream(Serializer):
 				# Find multi subtitle keywords (eg msubs or multi-sub).
 				# Allow both audio and subtitles to be multi.
 				# Eg: [A&C] One Piece - [0131-0206] [R2J DVDrip] [Multi-Audio-Subs] [VFR] [Batch 02]
-				expressionMulti1 = self._cacheId('languageExtract44', re.compile, '^' + Stream.ExpressionSubtitleMulti + expressionSubtitle + '$', flags = Stream.ExpressionFlags)
-				expressionMulti2 = self._cacheId('languageExtract45', re.compile, '^' + Stream.ExpressionSubtitleMulti + '$', flags = Stream.ExpressionFlags)
+				expressionMulti1 = self._cacheId('languageExtract46', re.compile, '^' + Stream.ExpressionSubtitleMulti + expressionSubtitle + '$', flags = Stream.ExpressionFlags)
+				expressionMulti2 = self._cacheId('languageExtract47', re.compile, '^' + Stream.ExpressionSubtitleMulti + '$', flags = Stream.ExpressionFlags)
 				for i in range(count):
-					if expressionMulti1.search(parts[i]):
+					if parts[i] == 'separatorx': # Do not handle this as a normal separator, since a dual-separator typically indicates separation between audio and subtitle keywords.
+						labels[i] = {'type' : 'other', 'language' : None}
+					elif expressionMulti1.search(parts[i]):
 						labels[i] = {'type' : 'subtitle', 'language' : tools.Language.UniversalCode}
 					elif i < (count - 1) and expressionMulti2.search(parts[i]):
 						if parts[i + 1] == 'subtitle':
@@ -25037,7 +25065,7 @@ class Stream(Serializer):
 							languagesExpressions.append((language['code'], ex))
 
 				languagesString = ' '.join([i[1] for i in languagesParts])
-				match = self._expressionMatchMultiple(id = 'languageExtract46', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionSubtitle + '*', end = expressionSubtitle + '*(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract48', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionSubtitle + '*', end = expressionSubtitle + '*(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -25062,7 +25090,7 @@ class Stream(Serializer):
 				for language in languagesCommon:
 					languagesExpressions.append((language['code'], language['expression']))
 				languagesString = ' '.join([i[1] for i in languagesParts])
-				match = self._expressionMatchMultiple(id = 'languageExtract47', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionDubbed + '*', end = expressionDubbed + '*(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract49', data = languagesString, expression = languagesExpressions, count = len(languagesParts), start = '(?:\s|^)' + expressionDubbed + '*', end = expressionDubbed + '*(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -25088,7 +25116,7 @@ class Stream(Serializer):
 				try: del native[tools.Language.UniversalCode] # Universal providers do not add any extra language-specific keywords and we do not want to include it in the ID.
 				except: pass
 				expressionId = str(native)
-				match = self._expressionMatchMultiple(id = 'languageExtract48_' + expressionId, data = languagesString, expression = languagesExpression, count = len(languagesParts), start = '(?:\s|^)', end = '(?:\s|$)', full = True)
+				match = self._expressionMatchMultiple(id = 'languageExtract50_' + expressionId, data = languagesString, expression = languagesExpression, count = len(languagesParts), start = '(?:\s|^)', end = '(?:\s|$)', full = True)
 				if match:
 					for i in match:
 						index = languagesString[:i[2] + 1].count(' ')
@@ -25243,6 +25271,8 @@ class Stream(Serializer):
 							temp.append(labels[i])
 						elif labels[i + 1]['type'] in ['subtitle', 'other']:
 							temp.append(labels[i])
+						elif i < (count - 2) and labels[i + 1]['type'] in ['audio', 'subtitle', 'other'] and labels[i + 2]['type'] in ['audio', 'subtitle']:
+							temp.append(labels[i])
 					elif i == 0 or labels[i - 1]['language']:
 						temp.append(labels[i])
 				labels = temp
@@ -25263,6 +25293,23 @@ class Stream(Serializer):
 							if i['type'] == 'subtitle': temp2.append(i)
 							else: temp1.append(i)
 						labels = temp1 + temp2
+
+				# Remove "audio" keywords at the end if there is a subtitle keyword before them.
+				# Otherwise certain earlier parts will be assumed to be audio and the subtitle keywords will not be assigned to the language.
+				# Eg: Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - Kor Sub - HQ Line Audios].mkv
+				last = None
+				other = None
+				for i in range(len(labels) - 1, 0, -1):
+					if labels[i]['type'] == 'subtitle':
+						last = i
+						break
+					elif labels[i]['language']:
+						break
+					elif labels[i]['type'] == 'other':
+						other = True
+				if last and other:
+					for i in range(last + 1, len(labels)):
+						labels[i]['type'] = 'other'
 
 				if len(labels) > 0 and labels[0]['type'] == 'other': del labels[0]
 				if len(labels) > 0 and labels[-1]['type'] == 'other': del labels[-1]
@@ -25467,6 +25514,21 @@ class Stream(Serializer):
 				else:
 					labels = [{'type' : 'audio', 'language' : i['language']} for i in labels if i['language']]
 
+				# For filenames with: "language audio language sub", make sure the last language is assigned to the subtitles and not the audio.
+				# Eg: Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - Kor Sub - HQ Line Audios].mkv
+				for i in range(len(labels)):
+					if labels[i]['type'] == 'other':
+						try: previous = labels[i - 1]
+						except: previous = None
+						try: next1 = labels[i + 1]
+						except: next1 = None
+						try: next2 = labels[i + 2]
+						except: next2 = None
+						if previous and next1 and next2:
+							if previous['type'] == 'audio' and next2['type'] == 'subtitle':
+								if not next1['type'] and next1['language']:
+									labels[i]['type'] = 'subtitle'
+
 				labels = [i for i in labels if not i['type'] == 'other']
 
 				# Mark the rest with the previous type.
@@ -25483,8 +25545,8 @@ class Stream(Serializer):
 
 				if exclude:
 					languagesCode = {i['code'] : i for i in languages}
-					expression1 = self._cacheId('languageExtract47', re.compile, '\.')
-					expression2 = self._cacheId('languageExtract48', re.compile, '\s+')
+					expression1 = self._cacheId('languageExtract51', re.compile, '\.')
+					expression2 = self._cacheId('languageExtract52', re.compile, '\s+')
 
 					for ex in exclude:
 						# Abbriviations (eg M.S. -> MS)
@@ -25522,7 +25584,7 @@ class Stream(Serializer):
 									#	Eg: [ OxTorrent sh ] The French Dispatch 2021 720p FRENCH HDTS MD x264-CZ530
 									# Once where are here, the "data" variable should already have stripped the title:
 									#	Eg: [ OxTorrent sh ]  2021 720p FRENCH HDTS MD x264-CZ530
-									expressioned = self._cacheId('languageExtract49_' + languagesCode[language]['code'], re.compile, expression, flags = Stream.ExpressionFlags)
+									expressioned = self._cacheId('languageExtract53_' + languagesCode[language]['code'], re.compile, expression, flags = Stream.ExpressionFlags)
 									if not expressioned.search(data):
 										for j in range(len(excludes)):
 											groups = expressioned.search(excludes[j])
@@ -25601,6 +25663,14 @@ class Stream(Serializer):
 					expression = self._expressionFormatExpression(id = 'languageExtract_specific1', type = Stream.ExpressionSequential, expression = Stream.ExpressionSubtitleLanguage)
 					extract = self._expressionMatchType(id = 'languageExtract_specific2', data = dataOriginal, expression = expression, exclude = exclude)
 					if extract: result['subtitle'] = [extract]
+
+				# Dubbed keywords without specifying the dubbed language.
+				# Eg: Zootopia.2.2025.1080p.WEBRip.Dublado.mkv
+				if not result['audio']:
+					for k, v in Stream.ExpressionAudioDubbed.items():
+						if self._cacheId('languageExtract_dubbed_' + v, re.compile, lambda : self._expressionFormatCommon(v), flags = Stream.ExpressionFlags).search(dataOriginal):
+							result['audio'].append(k)
+							break
 
 				for type in ['audio', 'subtitle', 'default']:
 					seen = set()
@@ -25822,7 +25892,8 @@ class Stream(Serializer):
 				elif codePrimary == 'bg':
 					# "BG" is also a release group.
 					# Eg: Avatar.2009.iTALiAN.Extended.Collectors.Edition.AC3.Sub-Ita.BDRip.Hx264-BG.mkv
-					keyword = __languageKeywordReplace(keyword = keyword, value = 'bg', replacement = 'bg' + endingGroup)
+					# Eg: [ New Year Chibi-BG ] Zootopia.2.2025.1440p.DCP.WEBRIP.AC3.SDR.mp4
+					keyword = __languageKeywordReplace(keyword = keyword, value = 'bg', replacement = '(?<!chibi.)bg' + endingGroup)
 				elif codePrimary == 'bs':
 					# "BS" is also a release group.
 					# Eg: Nineteen.Eighty-Four.1984.720p.WEB-DL.AAC2.0.H.264-BS [PublicHD]

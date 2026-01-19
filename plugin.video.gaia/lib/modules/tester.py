@@ -31021,7 +31021,7 @@ class Tester(object):
 		self.metadataNext()
 		self.metadataShow()
 		self.metadataSeason()
-		self.metadataEpisode()
+		self.metadataEpisode()'''
 
 		self.containerMagnet()
 
@@ -31075,7 +31075,7 @@ class Tester(object):
 		self.streamYearValid()
 
 		# Make sure that the tester call "Stream(...).valid()" and the scraper call "Stream.load(...)" return the same results.
-		self.streamValid(direct = True)'''
+		self.streamValid(direct = True)
 		'''self.streamValid(direct = False)'''
 
 		'''self.streamTimeExtract(titles = titles)
@@ -47112,6 +47112,25 @@ class Tester(object):
 			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Tron Ares (2025) [1080p] [WEBRip] [x265] [10bit] [5.1] [YTS.LT]'},
 			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Tron Ares (2025) [1080p] [WEBRip] [x265] [10bit] [5.1] [YTS.MX]'},
 			{'result' : {'audio' : [], 'subtitle' : []},									'data' : '20251201_152616_Tron.Ares.2025.1080p.AMZN.WEB-DL.10bit.DDP5.1.x265-FaS.mkv'},
+
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : '[ New Year Chibi-BG ] Zootopia.2.2025.1440p.DCP.WEBRIP.AC3.SDR.mp4'},
+			{'result' : {'audio' : ['ta', 'te', 'hi', 'en'], 'subtitle' : ['ko']},			'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - 2.2GB - Kor Sub - HQ Line Audios].mkv'},
+			{'result' : {'audio' : ['ta', 'te', 'hi', 'en'], 'subtitle' : ['ko']},			'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - Kor Sub - HQ Line Audios].mkv'},
+			{'result' : {'audio' : ['ta', 'te', 'hi', 'en'], 'subtitle' : ['ko']},			'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - KorSub - HQ Line Audios].mkv'},
+			{'result' : {'audio' : ['ta', 'te', 'hi', 'en'], 'subtitle' : ['ko']},			'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - Kor Sub - HQ Line Audios].mkv'},
+			{'result' : {'audio' : ['ta', 'te', 'hi', 'en'], 'subtitle' : ['ko']},			'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [1080p HDRip - [Tam Tel Hin Eng] - x264 - AAC - 2.2GB - Kor Sub].mkv'},
+			{'result' : {'audio' : ['ta'], 'subtitle' : []},								'data' : 'www.1TamilMV.pink - Zootopia 2 (2025) Tamil HQ PreDVD - 1080p - x264 - HQ Clean - AAC - 1.7GB.mkv'},
+			{'result' : {'audio' : ['es', 'en'], 'subtitle' : []},							'data' : 'zootopia-2-2025-1080p-web-dl-latino-ingles'},
+			{'result' : {'audio' : ['de', 'en'], 'subtitle' : []},							'data' : 'Zootopia.2.2025.1080p.DE_ENG.Multi.V2.x265.mp4'},
+			{'result' : {'audio' : [], 'subtitle' : ['nl']},								'data' : 'Zootopia.2.2025.1080p..x265-GP-M-NLsubs.mkv'},
+			{'result' : {'audio' : ['ta', 'te', 'hi'], 'subtitle' : ['ko']},				'data' : 'www.1TamilBlasters.rocks - Zootopia 2 (2025) [HDRip - [Tam Tel Hin] - x264 - AAC - 450MB - Kor Sub - HQ Line Audios].mkv'},
+			{'result' : {'audio' : ['bn'], 'subtitle' : []},								'data' : 'Zootopia.2.2025.V.2.CAMRip.BEN.DUB.1XBET'},
+			{'result' : {'audio' : ['en', 'zh'], 'subtitle' : []},							'data' : '疯狂动物城2.Zootopia.2.2025.HTC1080P.H265.AC3.English.CHS.52ZYGX'},
+			{'result' : {'audio' : ['ru', 'en'], 'subtitle' : []},							'data' : 'Zootopia 2 (2025) DUB RU MVO RU DUB UA ENG_clean.mkv'},
+			{'result' : {'audio' : ['pt'], 'subtitle' : []},								'data' : 'Zootopia.2.2025.1080p.WEBRip.Dublado.mkv'},
+			{'result' : {'audio' : ['pt'], 'subtitle' : ['en']},							'data' : 'Zootopia.2.2025.1080p.WEBRip.Dublado.Eng.Subs.mkv'},
+			{'result' : {'audio' : ['es'], 'subtitle' : []},								'data' : 'Zootopia.2.2025.1080p.WEBRip.Doblado.mkv'},
+			{'result' : {'audio' : [], 'subtitle' : []},									'data' : 'Zootopia 2 [2025, DCPRip 1080p] Dub (MovieDalen)'},
 		)
 		timer = tools.Time(start = True)
 		fails = [[], []]

@@ -1560,6 +1560,8 @@ class Player(xbmc.Player):
 				# Occasionally resuming the progress does not work, and Kodi starts playing from the start, even though the playback progress is known.
 				# Maybe this happens because Kodi restarts the playback, or the TV/Kodi enters into HDR mode, and then Kodi restarts the playback, and then the resuming point is lost.
 				# Try to do this here, once (hopefully) everything in Kodi's playback is initialized.
+				#gaiaremove - Fix this: this does not fix the problem. Maybe start a thread to sleep for a few secs and then check if resumed - and if not, try to resume again.
+				#gaiaremove - is this problem (and the retry connection issue) caused by the TV switching into HDR mode? If so, any way to detect this and do all the playbackInitialize() only once the TV iks in HDR mode.
 				try:
 					if self.resumeTime:
 						tools.Time.sleep(0.05)

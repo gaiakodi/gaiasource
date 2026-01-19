@@ -36,6 +36,7 @@ class Provider(ProviderJson, ProviderHtml):
 
 	# Update (2025-01): .net domain is completely down. .eu domain loads a semi-broken website.
 	# Update (2025-12): .to domain does not load, but the .eu domain seems fine (although it constantly gives Cloudflare 1016 server misconfiguration errors).
+	# Update (2026-01): .to domain now redirects to bitsearch.to but has a Cloudflare host error.
 	# https://solidtorrents.net
 	_Link					= ['https://solidtorrents.eu', 'https://solidtorrents.to']
 	_Path					= {
