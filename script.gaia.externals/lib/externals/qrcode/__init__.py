@@ -1,7 +1,11 @@
 from externals.qrcode.main import QRCode
 from externals.qrcode.main import make  # noqa
 from externals.qrcode.constants import (  # noqa
-    ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H)
+    ERROR_CORRECT_L,
+    ERROR_CORRECT_M,
+    ERROR_CORRECT_Q,
+    ERROR_CORRECT_H,
+)
 
 from externals.qrcode import image  # noqa
 
@@ -20,6 +24,7 @@ def run_example(data="http://www.lincolnloop.com", *args, **kwargs):
     im.show()
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     import sys
+
     run_example(*sys.argv[1:])

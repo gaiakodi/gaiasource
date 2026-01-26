@@ -53,12 +53,12 @@ class Provider(ProviderHtml):
 	_AttributeName			= 'detName'
 	_AttributeDescription	= 'detDesc'
 
-	_ExpressionVerified		= '(vip|trusted)'
-	_ExpressionSize			= 'size\s*(.*?)[,$]'
-	_ExpressionTime			= 'uploaded\s*(.*?)[,$]'
-	_ExpressionNext			= 'alt\s*=\s*"next"'
-	_ExpressionVip 			= 'vip'
-	_ExpressionTrusted		= 'trust'
+	_ExpressionVerified		= r'(vip|trusted)'
+	_ExpressionSize			= r'size\s*(.*?)[,$]'
+	_ExpressionTime			= r'uploaded\s*(.*?)[,$]'
+	_ExpressionNext			= r'alt\s*=\s*"next"'
+	_ExpressionVip 			= r'vip'
+	_ExpressionTrusted		= r'trust'
 
 	##############################################################################
 	# INITIALIZE
@@ -147,23 +147,23 @@ class Provider(ProviderHtml):
 		#	Some values on version 3: YYYY-MM-DD HH:MM
 		if value:
 			result = ''
-			if Regex.match(data = value, expression = '\d{4}-\d{2}-\d{2}'):
+			if Regex.match(data = value, expression = r'\d{4}-\d{2}-\d{2}'):
 				return value
-			elif Regex.match(data = value, expression = 'ago'):
+			elif Regex.match(data = value, expression = r'ago'):
 				return value
-			elif Regex.match(data = value, expression = 'today'):
+			elif Regex.match(data = value, expression = r'today'):
 				result += Time.format(format = Time.FormatDate)
-			elif Regex.match(data = value, expression = 'y[\-\s]*day'):
+			elif Regex.match(data = value, expression = r'y[\-\s]*day'):
 				result += Time.past(days = 1, format = Time.FormatDate)
 			else:
-				year = Regex.extract(data = value, expression = '(\d{4})')
+				year = Regex.extract(data = value, expression = r'(\d{4})')
 				if not year: year = Time.year()
-				month = Regex.extract(data = value, expression = '(\d{2})-')
-				day = Regex.extract(data = value, expression = '-(\d{2})')
+				month = Regex.extract(data = value, expression = r'(\d{2})-')
+				day = Regex.extract(data = value, expression = r'-(\d{2})')
 				if year and month and day: result += '%s-%s-%s' % (year, month, day)
 
-			hour = Regex.extract(data = value, expression = '(\d{2}):')
-			minute = Regex.extract(data = value, expression = ':(\d{2})')
+			hour = Regex.extract(data = value, expression = r'(\d{2}):')
+			minute = Regex.extract(data = value, expression = r':(\d{2})')
 			if hour and minute: result += ' %s:%s:%s' % (hour, minute, '00')
 
 			return result

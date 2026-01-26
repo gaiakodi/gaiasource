@@ -1051,8 +1051,8 @@ class MetaTools(object):
 			except: pass
 			if slug:
 				if year: slug += separator + str(year)
-				if separator: slug = Regex.replace(data = slug, expression = '(\%s{2,})' % separator, replacement = separator, group = None, all = True).strip(separator)
-				if symbol and not symbol == separator: slug = Regex.replace(data = slug, expression = '(\%s{2,})' % symbol, replacement = symbol, group = None, all = True).strip(symbol)
+				if separator: slug = Regex.replace(data = slug, expression = r'(\%s{2,})' % separator, replacement = separator, group = None, all = True).strip(separator)
+				if symbol and not symbol == separator: slug = Regex.replace(data = slug, expression = r'(\%s{2,})' % symbol, replacement = symbol, group = None, all = True).strip(symbol)
 			if slug: return slug
 		except: Logger.error()
 		return None
@@ -1319,7 +1319,7 @@ class MetaTools(object):
 			if Media.isSeason(media) or Media.isEpisode(media): # Do not use the show's year for seasons and episodes.
 				date = metadata.get('aired') or metadata.get('premiered')
 				if date:
-					try: year = int(Regex.extract(data = date, expression = '(\d{4})', cache = True))
+					try: year = int(Regex.extract(data = date, expression = r'(\d{4})', cache = True))
 					except: pass
 			if not year: year = metadata.get('year') or metadata.get('tvshowyear')
 			if year: extra.append(str(year))
@@ -2341,7 +2341,7 @@ class MetaTools(object):
 			MetaTools.Pleasures = {
 				Media.Drug : {
 					'label'						: 36646,
-					'expression'				: '(drugs?|weed|cannabis|mari[jh]uana|ganja|mary[\s\-]*jane|stone(?:rs?|d)|spliff|pot|psychedelics?|lsd|acid|shrooms?|magic[\s\-]*mushrooms?|psilocybin|psychoactives?|hallucinogens?|tripping|cocaine|coke)',
+					'expression'				: r'(drugs?|weed|cannabis|mari[jh]uana|ganja|mary[\s\-]*jane|stone(?:rs?|d)|spliff|pot|psychedelics?|lsd|acid|shrooms?|magic[\s\-]*mushrooms?|psilocybin|psychoactives?|hallucinogens?|tripping|cocaine|coke)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'drugs',
 						MetaTools.ProviderTrakt	: '("drugs" OR "weed")',
@@ -2349,7 +2349,7 @@ class MetaTools(object):
 				},
 				Media.Cannabis : {
 					'label'						: 36647,
-					'expression'				: '(weed|cannabis|mari[jh]uana|ganja|mary[\s\-]*jane|stone(?:rs?|d)|spliff|pot)',
+					'expression'				: r'(weed|cannabis|mari[jh]uana|ganja|mary[\s\-]*jane|stone(?:rs?|d)|spliff|pot)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'marijuana',
 						MetaTools.ProviderTrakt	: '("weed" || "cannabis" || "marijuana" || "ganja" || "mary jane" || "stoner" || "stoned" || "spliff")',
@@ -2357,7 +2357,7 @@ class MetaTools(object):
 				},
 				Media.Psychedelic : {
 					'label'						: 36648,
-					'expression'				: '(psychedelics?|lsd|acid|shrooms?|magic[\s\-]*mushrooms?|psilocybin|psychoactives?|hallucinogens?|tripping)',
+					'expression'				: r'(psychedelics?|lsd|acid|shrooms?|magic[\s\-]*mushrooms?|psilocybin|psychoactives?|hallucinogens?|tripping)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'psychedelic',
 						MetaTools.ProviderTrakt	: '("psychedelic" || "lsd" || "shrooms" || "magic mushrooms" || "psilocybin" || "psychoactive" || "hallucinogen")',
@@ -2365,7 +2365,7 @@ class MetaTools(object):
 				},
 				Media.Cocaine : {
 					'label'						: 36649,
-					'expression'				: '(cocaine|coke)',
+					'expression'				: r'(cocaine|coke)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'cocaine',
 						MetaTools.ProviderTrakt	: '("cocaine" || "coke")',
@@ -2373,7 +2373,7 @@ class MetaTools(object):
 				},
 				Media.Alcohol : {
 					'label'						: 36650,
-					'expression'				: '(alcohol(?:ics?)?|drunk|beers?|wine|vodka|whiskey)',
+					'expression'				: r'(alcohol(?:ics?)?|drunk|beers?|wine|vodka|whiskey)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'alcohol',
 						MetaTools.ProviderTrakt	: '("alcohol" || "drunk" || "beer" || "wine" || "vodka" || "whiskey")',
@@ -2381,7 +2381,7 @@ class MetaTools(object):
 				},
 				Media.Pill : {
 					'label'						: 36651,
-					'expression'				: '(pills?|prescription[\s\-]*drugs?|pharmaceuticals?)',
+					'expression'				: r'(pills?|prescription[\s\-]*drugs?|pharmaceuticals?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'pill',
 						MetaTools.ProviderTrakt	: '("pill" || "prescription drug" || "pharmaceutical")',
@@ -2390,7 +2390,7 @@ class MetaTools(object):
 
 				Media.Love : {
 					'label'						: 36652,
-					'expression'				: '(lov(?:e|ed|ing))',
+					'expression'				: r'(lov(?:e|ed|ing))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'love',
 						MetaTools.ProviderTrakt	: '("love" || "loving")',
@@ -2398,7 +2398,7 @@ class MetaTools(object):
 				},
 				Media.Romance : {
 					'label'						: 36653,
-					'expression'				: '(roman(?:ce|tic(?:ally)?))',
+					'expression'				: r'(roman(?:ce|tic(?:ally)?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'romantic relationship',
 						MetaTools.ProviderTrakt	: '("romance" || "romantic")',
@@ -2406,7 +2406,7 @@ class MetaTools(object):
 				},
 				Media.Kiss : {
 					'label'						: 36654,
-					'expression'				: '(kiss(?:es|ed|ing)?|frenching|smooch(?:es|ed|ing)?)',
+					'expression'				: r'(kiss(?:es|ed|ing)?|frenching|smooch(?:es|ed|ing)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'kiss',
 						MetaTools.ProviderTrakt	: '("kiss" || "kissing" || "frenching" || "smooch")',
@@ -2414,7 +2414,7 @@ class MetaTools(object):
 				},
 				Media.Lgbtq : {
 					'label'						: 36655,
-					'expression'				: '(lgbtq?\+?|gays?|homosexual(?:s|ity)?|lesbi(?:ans?|c)|queers?|transgender|tranny)',
+					'expression'				: r'(lgbtq?\+?|gays?|homosexual(?:s|ity)?|lesbi(?:ans?|c)|queers?|transgender|tranny)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'lgbt',
 						MetaTools.ProviderTrakt	: '("lgbt" || "lgbtq" || "queer" || "transgender")',
@@ -2422,7 +2422,7 @@ class MetaTools(object):
 				},
 				Media.Gay : {
 					'label'						: 36656,
-					'expression'				: '(gays?|homosexual(?:s|ity)?)',
+					'expression'				: r'(gays?|homosexual(?:s|ity)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'gay',
 						MetaTools.ProviderTrakt	: '("gay" || "homosexual")',
@@ -2430,7 +2430,7 @@ class MetaTools(object):
 				},
 				Media.Lesbian : {
 					'label'						: 36657,
-					'expression'				: '(lesbi(?:ans?|c))',
+					'expression'				: r'(lesbi(?:ans?|c))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'lesbian',
 						MetaTools.ProviderTrakt	: '("lesbian" || "lesbic")',
@@ -2439,7 +2439,7 @@ class MetaTools(object):
 
 				Media.Sex : {
 					'label'						: 36658,
-					'expression'				: '(sex|fucking|intercourse|coitus|fornication|lovemaking|making[\s\-]*love)',
+					'expression'				: r'(sex|fucking|intercourse|coitus|fornication|lovemaking|making[\s\-]*love)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'sex',
 						MetaTools.ProviderTrakt	: '("sex" || "fucking" || "intercourse" || "coitus" || "fornication")',
@@ -2447,7 +2447,7 @@ class MetaTools(object):
 				},
 				Media.Nudity : {
 					'label'						: 36659,
-					'expression'				: '(nud(?:es?|ity)|naked(?:ness)?|undress(?:ing|ed)?)',
+					'expression'				: r'(nud(?:es?|ity)|naked(?:ness)?|undress(?:ing|ed)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'nudity',
 						MetaTools.ProviderTrakt	: '("nude" || "nudity" || "naked" || "undress")',
@@ -2455,7 +2455,7 @@ class MetaTools(object):
 				},
 				Media.Erotica : {
 					'label'						: 36660,
-					'expression'				: '(erotic(?:a|ism)?)',
+					'expression'				: r'(erotic(?:a|ism)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'erotica',
 						MetaTools.ProviderTrakt	: '("erotic" || "erotica" || "eroticism")',
@@ -2463,7 +2463,7 @@ class MetaTools(object):
 				},
 				Media.Pornography : {
 					'label'						: 36661,
-					'expression'				: '(porn(?:os?|ography)?)',
+					'expression'				: r'(porn(?:os?|ography)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'pornography',
 						MetaTools.ProviderTrakt	: '("porn" || "pornography")',
@@ -2471,7 +2471,7 @@ class MetaTools(object):
 				},
 				Media.Prostitution : {
 					'label'						: 36662,
-					'expression'				: '(prostitut(?:es?|ion|ing)|hookers?|whores?|call[\s\-]*girls?)',
+					'expression'				: r'(prostitut(?:es?|ion|ing)|hookers?|whores?|call[\s\-]*girls?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'prostitute',
 						MetaTools.ProviderTrakt	: '("prostitute" || "prostitution" || "hooker" || "whore" || "call girl")',
@@ -2479,7 +2479,7 @@ class MetaTools(object):
 				},
 				Media.Orgy : {
 					'label'						: 36663,
-					'expression'				: '(org(?:y|ies)|swingers?|group[\s\-]*sex|gang[\s\-]*bangs?)',
+					'expression'				: r'(org(?:y|ies)|swingers?|group[\s\-]*sex|gang[\s\-]*bangs?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'orgy',
 						MetaTools.ProviderTrakt	: '("orgy" || "orgies" || "swinger" || "group sex" || "gang bang")',
@@ -2488,7 +2488,7 @@ class MetaTools(object):
 
 				Media.Violence : {
 					'label'						: 36664,
-					'expression'				: '(violen(?:t|ce)|fight(?:ing)?|agressi(?:ons?|ve)|brutalit(?:y|ies))',
+					'expression'				: r'(violen(?:t|ce)|fight(?:ing)?|agressi(?:ons?|ve)|brutalit(?:y|ies))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'violence',
 						MetaTools.ProviderTrakt	: '("violent" || "violence" || "brutality")',
@@ -2496,7 +2496,7 @@ class MetaTools(object):
 				},
 				Media.Robbery : {
 					'label'						: 36665,
-					'expression'				: '(robber(?:s|y|ies)?|theft|thieves?|(?:bank[\s\-]*)?heists?)',
+					'expression'				: r'(robber(?:s|y|ies)?|theft|thieves?|(?:bank[\s\-]*)?heists?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'robbery',
 						MetaTools.ProviderTrakt	: '("robber" || "robbery" || "heist")',
@@ -2504,7 +2504,7 @@ class MetaTools(object):
 				},
 				Media.Smuggle : {
 					'label'						: 36666,
-					'expression'				: '(smuggl(?:er?s?|ing))',
+					'expression'				: r'(smuggl(?:er?s?|ing))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'smuggling',
 						MetaTools.ProviderTrakt	: '("smuggle" || "smuggling")',
@@ -2512,7 +2512,7 @@ class MetaTools(object):
 				},
 				Media.Hostage : {
 					'label'						: 36668,
-					'expression'				: '(hostages?|kidnap(?:ers?|pp?ing)?|abduct(?:ions?|ings?|ors?))',
+					'expression'				: r'(hostages?|kidnap(?:ers?|pp?ing)?|abduct(?:ions?|ings?|ors?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'hostage',
 						MetaTools.ProviderTrakt	: '("hostage" || "kidnap" || "abduction" || "abducting")',
@@ -2520,7 +2520,7 @@ class MetaTools(object):
 				},
 				Media.Torture : {
 					'label'						: 36674,
-					'expression'				: '(tortur(?:e[sd]?|ing))',
+					'expression'				: r'(tortur(?:e[sd]?|ing))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'torture',
 						MetaTools.ProviderTrakt	: '("torture" || "torturing")',
@@ -2528,7 +2528,7 @@ class MetaTools(object):
 				},
 				Media.Murder : {
 					'label'						: 36669,
-					'expression'				: '(murder(?:s|ers?|ings?|ed)?|kill(?:ers?|ings?|ed)?)',
+					'expression'				: r'(murder(?:s|ers?|ings?|ed)?|kill(?:ers?|ings?|ed)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'murder',
 						MetaTools.ProviderTrakt	: '("murder" || "kill")',
@@ -2537,7 +2537,7 @@ class MetaTools(object):
 
 				Media.Religion : {
 					'label'						: 36670,
-					'expression'				: '(religio(?:ns?|ious(?:ly)?)|church|synagogue|mosque|temple|god)', # "god" also matches Dragon Ball Super (from the plot: "Beerus, the God of Destruction")
+					'expression'				: r'(religio(?:ns?|ious(?:ly)?)|church|synagogue|mosque|temple|god)', # "god" also matches Dragon Ball Super (from the plot: "Beerus, the God of Destruction")
 					'provider' : {
 						MetaTools.ProviderImdb	: 'religion',
 						MetaTools.ProviderTrakt	: '("religion" || "religious")',
@@ -2545,7 +2545,7 @@ class MetaTools(object):
 				},
 				Media.Cult : {
 					'label'						: 36671,
-					'expression'				: '(cults?|sects?)',
+					'expression'				: r'(cults?|sects?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'cult',
 						MetaTools.ProviderTrakt	: '("cult"  || "sect")',
@@ -2553,7 +2553,7 @@ class MetaTools(object):
 				},
 				Media.Secret : {
 					'label'						: 36672,
-					'expression'				: '((?:secret|hidden)[\s\-]*societ(?:y|ies)|illuminati|free[\s\-]*mason(?:s|ry)?)',
+					'expression'				: r'((?:secret|hidden)[\s\-]*societ(?:y|ies)|illuminati|free[\s\-]*mason(?:s|ry)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'secret society',
 						MetaTools.ProviderTrakt	: '("secret society" || "secret societies" || "hidden society" || "illuminati" || "freemasonry" || "free mason")',
@@ -2561,7 +2561,7 @@ class MetaTools(object):
 				},
 				Media.Terrorism : {
 					'label'						: 36673,
-					'expression'				: '(terroris(?:m|ts?))',
+					'expression'				: r'(terroris(?:m|ts?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'terrorism',
 						MetaTools.ProviderTrakt	: '("terrorism" || "terrorist")',
@@ -2569,7 +2569,7 @@ class MetaTools(object):
 				},
 				Media.Psycho : {
 					'label'						: 36675,
-					'expression'				: '((?:psycho|socio)(?:s|paths?)?)',
+					'expression'				: r'((?:psycho|socio)(?:s|paths?)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'psychopath',
 						MetaTools.ProviderTrakt	: '("psycho" || "psychopath" || "sociopath" || "sociopaths")',
@@ -2577,7 +2577,7 @@ class MetaTools(object):
 				},
 				Media.Sadism : {
 					'label'						: 36667,
-					'expression'				: '(sadis(?:ts?|m|tic(?:al(?:lt)?)?))',
+					'expression'				: r'(sadis(?:ts?|m|tic(?:al(?:lt)?)?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'torture',
 						MetaTools.ProviderTrakt	: '("sadism" || "sadist" || "sadistic")',
@@ -2586,7 +2586,7 @@ class MetaTools(object):
 
 				Media.Profanity : {
 					'label'						: 36640,
-					'expression'				: '(f[\s\-]words?|profan(?:e|ity|ities)|swearing|cursing|cuss(?:ing)?|(?:swear|curse|cuss)[\s\-]*words?|(?:bad|foul)[\s\-]*languages?|obscen(?:e|ity))',
+					'expression'				: r'(f[\s\-]words?|profan(?:e|ity|ities)|swearing|cursing|cuss(?:ing)?|(?:swear|curse|cuss)[\s\-]*words?|(?:bad|foul)[\s\-]*languages?|obscen(?:e|ity))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'f word',
 						MetaTools.ProviderTrakt	: '("f word" || "fuck" || "profanity" || "profane" || "swearing" || "swear word" || "cursing" || "curse word" || "cussing" || "cuss word")',
@@ -2594,7 +2594,7 @@ class MetaTools(object):
 				},
 				Media.Blasphemy : {
 					'label'						: 36641,
-					'expression'				: '(blasphem(?:y|ous|ers?))',
+					'expression'				: r'(blasphem(?:y|ous|ers?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'blasphemy',
 						MetaTools.ProviderTrakt	: '("blasphemy" || "blasphemous" || "blasphemer")',
@@ -2602,7 +2602,7 @@ class MetaTools(object):
 				},
 				Media.Sarcasm : {
 					'label'						: 36642,
-					'expression'				: '(sarcas(?:m|tic))',
+					'expression'				: r'(sarcas(?:m|tic))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'sarcasm',
 						MetaTools.ProviderTrakt	: '("sarcasm" || "sarcastic")',
@@ -2610,7 +2610,7 @@ class MetaTools(object):
 				},
 				Media.Parody : {
 					'label'						: 36644,
-					'expression'				: '(parod(?:y|ies)|mock(?:umentar(?:y|ies)|er(?:y|ies)|ings?)?)',
+					'expression'				: r'(parod(?:y|ies)|mock(?:umentar(?:y|ies)|er(?:y|ies)|ings?)?)',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'parody',
 						MetaTools.ProviderTrakt	: '("parody" || "parodies" || "mockumentary" || "mockumentaries" || "mockery" || "mocking")',
@@ -2618,7 +2618,7 @@ class MetaTools(object):
 				},
 				Media.Satire : {
 					'label'						: 36643,
-					'expression'				: '(satir(?:e|ical(?:ly)?))',
+					'expression'				: r'(satir(?:e|ical(?:ly)?))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'satire',
 						MetaTools.ProviderTrakt	: '("satire" || "satirical")',
@@ -2626,7 +2626,7 @@ class MetaTools(object):
 				},
 				Media.Humor : {
 					'label'						: 36645,
-					'expression'				: '(humor(?:ous)?|funny|laugh(?:s|ing|able)?|hilarious|amus(?:ed?|ing))',
+					'expression'				: r'(humor(?:ous)?|funny|laugh(?:s|ing|able)?|hilarious|amus(?:ed?|ing))',
 					'provider' : {
 						MetaTools.ProviderImdb	: 'humor',
 						MetaTools.ProviderTrakt	: '("humor" || "humorous" || "funny" || "laugh" || "hilarious" || "amused" || "amusing")',
@@ -2637,7 +2637,7 @@ class MetaTools(object):
 			# Only check full words. Do not match substrings within other words.
 			# Eg: when matching "sex", it should not match "sexy".
 			for i in MetaTools.Pleasures.values():
-				i['expression'] = '(?:^|[\s\-\,\.\!\?\(\[])' + i['expression'] + '(?:$|[\s\-\,\.\!\?\)\]])'
+				i['expression'] = r'(?:^|[\s\-\,\.\!\?\(\[])' + i['expression'] + r'(?:$|[\s\-\,\.\!\?\)\]])'
 
 		return MetaTools.Pleasures if pleasure is None else MetaTools.Pleasures.get(pleasure)
 
@@ -4277,6 +4277,10 @@ class MetaTools(object):
 						detail = Detail.MenuProgress
 				detail = self.mLabelActivityMenu[detail].get(Media.Mixed if mixed else Media.Extra if Media.isBonus(media) else media) or {}
 
+				if self.mLabelRatingEnabled and self.mLabelRatingMedia.get(detailMedia) == Detail.ModeEnabled and not metadata.get('userrating') is None:
+					format = '%d' if self.mLabelRatingFormat == 0 else '%.1f'
+					activity.append({'label' : 35187, 'value' : format % metadata['userrating'], 'icon' : Font.IconRating, 'color' : Format.colorMedium()})
+
 				if detail:
 					if self.mLabelPlayEnabled and self.mLabelPlayMedia.get(detailMedia) == Detail.ModeEnabled:
 						playcount = metadata.get('playcount') or 0
@@ -4347,10 +4351,6 @@ class MetaTools(object):
 
 									format = '%.0f%%' if self.mLabelProgressFormat == 0 else '%d'
 									activity.append({'label' : 32037, 'value' : format % (progression * 100.0), 'icon' : Font.IconProgress, 'color' : Format.colorPoor()})
-
-					if self.mLabelRatingEnabled and self.mLabelRatingMedia.get(detailMedia) == Detail.ModeEnabled and not metadata.get('userrating') is None:
-						format = '%d' if self.mLabelRatingFormat == 0 else '%.1f'
-						activity.append({'label' : 35187, 'value' : format % metadata['userrating'], 'icon' : Font.IconRating, 'color' : Format.colorMedium()})
 
 					if serie and self.mLabelAirEnabled and self.mLabelAirMedia.get(detailMedia) == Detail.ModeEnabled and 'airs' in metadata:
 						try: airTime = metadata['airs']['time']
@@ -4439,7 +4439,7 @@ class MetaTools(object):
 					if self.menuSeason(menu = menu) == 0: # S0 menu.
 						special = metadata.get('special')
 						try:
-							specialType = special['type'] or []
+							specialType = special.get('type') or []
 							try: specialFirst = specialType[0]
 							except: specialFirst = None
 							specialInclude = any(x in specialIncludes for x in specialType)
@@ -4466,7 +4466,7 @@ class MetaTools(object):
 								label.append(33111)
 								description.append(36011)
 							else:
-								labeled = Translation.string(35149) if specialFirst == MetaData.SpecialUnimportant else specialFirst.capitalize()
+								labeled = Translation.string(35149) if (not specialFirst or specialFirst == MetaData.SpecialUnimportant) else specialFirst.capitalize()
 								label.append(labeled)
 								description.append(labeled + ' ' + Translation.string(33105))
 						except: Logger.error()
@@ -4512,7 +4512,7 @@ class MetaTools(object):
 							elif alternate: description.append(36009)
 						elif Media.Special in type or Media.Exclusive in type:
 							special = metadata.get('special') or {}
-							specialType = special['type'] or []
+							specialType = special.get('type') or []
 							specialInclude = any(x in specialIncludes for x in specialType)
 							specialExclude = any(x in specialExcludes for x in specialType)
 							specialEpisode = any(x in specialEpisodes for x in specialType)
@@ -4830,7 +4830,7 @@ class MetaTools(object):
 				metadata['dateadded'] = dated.string(format = '%Y-%m-%d %H:%M:%S')
 
 				if media == Media.Season or media == Media.Episode:
-					year = Regex.extract(data = date, expression = '(\d{4})', cache = True)
+					year = Regex.extract(data = date, expression = r'(\d{4})', cache = True)
 					if year: metadata['year'] = int(year)
 
 	def itemTagline(self, media, metadata, item, extend = True):
@@ -4873,10 +4873,10 @@ class MetaTools(object):
 						description = Format.newline().join(description)
 						plot = metadata.get('plot')
 						if plot:
-							plot = Regex.remove(data = plot, expression = '(?:updated|modified|created|added)\s*(?:at|on)?[\s\:\-]*[\d\-\:\s\/]+', cache = True)
-							plot = Regex.remove(data = plot, expression = 'create\s*your\s*own\s*[\:\.\,]?\s*', cache = True)
-							plot = Regex.replace(data = plot, expression = '\n+', replacement = '\n', cache = True).strip()
-							plot = Regex.replace(data = plot, expression = '\s+', replacement = ' ', cache = True).strip()
+							plot = Regex.remove(data = plot, expression = r'(?:updated|modified|created|added)\s*(?:at|on)?[\s\:\-]*[\d\-\:\s\/]+', cache = True)
+							plot = Regex.remove(data = plot, expression = r'create\s*your\s*own\s*[\:\.\,]?\s*', cache = True)
+							plot = Regex.replace(data = plot, expression = r'\n+', replacement = '\n', cache = True).strip()
+							plot = Regex.replace(data = plot, expression = r'\s+', replacement = ' ', cache = True).strip()
 							if plot: description = description + (Format.newline() * 2) + plot
 						metadata['plot'] = description
 			elif media == Media.Person:
@@ -5696,7 +5696,7 @@ class MetaTools(object):
 						if metadataNext and MetaImage.Attribute in metadataNext: MetaImage.update(media = MetaImage.MediaSeason, images = metadataNext[MetaImage.Attribute], data = metadata, category = MetaImage.IndexNext, copy = True)
 
 						title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
-						label2 = Regex.replace(data = Translation.string(35362) % '', expression = '\s+', replacement = ' ', all = True)
+						label2 = Regex.replace(data = Translation.string(35362) % '', expression = r'\s+', replacement = ' ', all = True)
 						if submenu: label = Translation.string(35362) % str(metadata['season'])
 						else: label = label2
 
@@ -5812,7 +5812,7 @@ class MetaTools(object):
 
 							title = metadata['tvshowtitle'] if 'tvshowtitle' in metadata else metadata['title']
 
-							label2 = Regex.replace(data = Translation.string(35791) % '', expression = '\s+', replacement = ' ', all = True)
+							label2 = Regex.replace(data = Translation.string(35791) % '', expression = r'\s+', replacement = ' ', all = True)
 							if submenu: label = Translation.string(35791) % str(metadata['season'])
 							else: label = label2
 
@@ -6137,7 +6137,7 @@ class MetaTools(object):
 		# Maybe some APIs have mistakes in their IDs.
 		# Eg: ttt4154796
 		# Update: this was caused by:
-		#	'tt' + Regex.remove(data = str(imdb), expression = '[^0-9]', all = True)
+		#	'tt' + Regex.remove(data = str(imdb), expression = r'[^0-9]', all = True)
 		# That was called without "all = True", therefore only replacing the first t.
 		# This has been fixed now.
 		if metadata:
@@ -6176,7 +6176,7 @@ class MetaTools(object):
 			#	The Amazing Spider-Man Collection (125574)
 
 			# Remove the trailing keyword.
-			title = Regex.remove(data = title, expression = '(?:\s*-\s*)?(?:\s*movie\s*)?(?:\s*[\[\(\{])?\s*((?:d(?:i|uo|ou)|tr[iy]|(?:quadr[iao]|tetr[ao])|penta|hex[ao]|hept[ao]|oct[ao]|enn?e[ao]|dec[ao]|antho)log(?:(?:i|í)[ae]?|y)s?|coll?ecti(?:on|e)s?|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|kolekcja|kolekce|koleksiyonu|sagas?|set|seri|sammlung|(?:film)?reihe|komplett|verzameling|samling|filmene|трилогия|коллекция|полный)(?:\s*[\]\)\}])?$', all = True, cache = True)
+			title = Regex.remove(data = title, expression = r'(?:\s*-\s*)?(?:\s*movie\s*)?(?:\s*[\[\(\{])?\s*((?:d(?:i|uo|ou)|tr[iy]|(?:quadr[iao]|tetr[ao])|penta|hex[ao]|hept[ao]|oct[ao]|enn?e[ao]|dec[ao]|antho)log(?:(?:i|í)[ae]?|y)s?|coll?ecti(?:on|e)s?|colecci(?:o|ó)n|cole(?:c|ç)(?:a|ã)o|collezione|kollektion(?:en)?|kolekcja|kolekce|koleksiyonu|sagas?|set|seri|sammlung|(?:film)?reihe|komplett|verzameling|samling|filmene|трилогия|коллекция|полный)(?:\s*[\]\)\}])?$', all = True, cache = True)
 
 			# Determine if the leading "The" should be removed.
 			if title.startswith('The ') and not title.startswith('The Making'):
@@ -6188,7 +6188,7 @@ class MetaTools(object):
 
 				if parts:
 					total = len(parts)
-					expression = '^' + Regex.escape(title) + '\s*[\:\-]\s+'
+					expression = r'^' + Regex.escape(title) + r'\s*[\:\-]\s+'
 					for i in parts:
 						i = i.get('title')
 						if i:
@@ -6205,13 +6205,13 @@ class MetaTools(object):
 				#	Eg (exclude): The Bourne Collection (assuming the last movie was never there and all movies start with "The Bourne ...").
 				if total and (exact or prefix or (starts and (title.count(' ') + title.count('-')) > 1)): the = False
 
-				if the: title = Regex.remove(data = title, expression = '^the\s+', cache = True)
+				if the: title = Regex.remove(data = title, expression = r'^the\s+', cache = True)
 		else:
 			title = title.lower()
-			title = Regex.remove(data = title, expression = '&#(\d+);', cache = True)
-			title = Regex.replace(data = title, expression = '(&#\d+)([^;\d]+)', replacement = r'\1;\2', cache = True)
+			title = Regex.remove(data = title, expression = r'&#(\d+);', cache = True)
+			title = Regex.replace(data = title, expression = r'(&#\d+)([^;\d]+)', replacement = r'\1;\2', cache = True)
 			title = title.replace('&quot;', '\"').replace('&amp;', '&')
-			title = Regex.remove(data = title, expression = '\n|(\[.+?\])|(\(.+?\))|\s(vs|v\.)\s|[\.,_\-\?\!:;"\']', cache = True)
+			title = Regex.remove(data = title, expression = r'\n|(\[.+?\])|(\(.+?\))|\s(vs|v\.)\s|[\.,_\-\?\!:;"\']', cache = True)
 		return title.strip()
 
 	def cleanDescription(self, metadata):
@@ -6220,23 +6220,23 @@ class MetaTools(object):
 				description = metadata.get(i)
 				if description:
 					# Some have no plot, just showing "Add a Plot<a ...".
-					if Regex.match(data = description, expression = '(add\s*a\s*(?:plot|tag))'): description = None
+					if Regex.match(data = description, expression = r'(add\s*a\s*(?:plot|tag))'): description = None
 
 					if description:
 						# Some plots end with a URL.
-						description = Regex.remove(data = description, expression = '.{10,}\.(\s*(?:[a-z\d\s\-\,\;\:\\\']*)(?:https?:\/\/|www\.).*?$)', group = 1)
+						description = Regex.remove(data = description, expression = r'.{10,}\.(\s*(?:[a-z\d\s\-\,\;\:\\\']*)(?:https?:\/\/|www\.).*?$)', group = 1)
 
 						# Some plots end with "see full summary".
-						description = Regex.remove(data = description, expression = '.{10,}(see\s*full\s*summary.*$)', group = 1).strip()
+						description = Regex.remove(data = description, expression = r'.{10,}(see\s*full\s*summary.*$)', group = 1).strip()
 
 						# Some plots start with "Short synopsis (50 words)".
 						# https://www.imdb.com/title/tt20158938/
-						description = Regex.remove(data = description, expression = '(short\s*synopsis\s*(?:[\[\(]\d+\s*words?[\]\)]\s*)?(?:docu(?:mentary)?|short|movie|film|(?:tv\s*)?show|series?)?,?\s*)', group = 1)
+						description = Regex.remove(data = description, expression = r'(short\s*synopsis\s*(?:[\[\(]\d+\s*words?[\]\)]\s*)?(?:docu(?:mentary)?|short|movie|film|(?:tv\s*)?show|series?)?,?\s*)', group = 1)
 
 						# Symbols without spacing, which prevents line breaks.
 						# Eg (Mad Max 2 tagline): When all that's left is one last chance, pray that he's still out there...somewhere!
 						try:
-							symbols = Regex.extract(data = description, expression = '(?:[a-z\d\s]([\.\,\-\+]{2,})[a-z\d]|[a-z\d]([\.\,\-\+]{2,})[a-z\d\s])', group = None, all = True)
+							symbols = Regex.extract(data = description, expression = r'(?:[a-z\d\s]([\.\,\-\+]{2,})[a-z\d]|[a-z\d]([\.\,\-\+]{2,})[a-z\d\s])', group = None, all = True)
 							if symbols:
 								for s1 in symbols:
 									if s1 and Tools.isArray(s1):
@@ -6245,7 +6245,7 @@ class MetaTools(object):
 						except: Logger.error()
 
 						# Some plots are cut off and do not end with a full stop.
-						if Regex.match(data = description, expression = '[a-z\d]$'): description += ' ...'
+						if Regex.match(data = description, expression = r'[a-z\d]$'): description += ' ...'
 
 						# Remove duplicate spaces.
 						description = Tools.stringRemoveSpace(description).strip()
@@ -6634,26 +6634,26 @@ class MetaTools(object):
 				# For Anime, certain companies have the same abbreviation as US companies.
 				if 'jp' in country:
 					replacements.extend([
-						{'expression' : '^(tbs)', 'replacement' : 'Tokyo Broadcasting System', 'group' : 1},
-						{'expression' : '^(cbc)', 'replacement' : 'Chubu-Nippon Broadcasting Company', 'group' : 1},
+						{'expression' : r'^(tbs)', 'replacement' : 'Tokyo Broadcasting System', 'group' : 1},
+						{'expression' : r'^(cbc)', 'replacement' : 'Chubu-Nippon Broadcasting Company', 'group' : 1},
 					])
 
 				# Different TV2 stations across the world.
 				if 'hu' in country:
 					replacements.extend([
-						{'expression' : '^(tv2)(?:.*?hungary)?', 'replacement' : 'TV2 (HU)'},
+						{'expression' : r'^(tv2)(?:.*?hungary)?', 'replacement' : 'TV2 (HU)'},
 					])
 
 				if 'ru' in country:
 					replacements.extend([
-						{'expression' : '^(premier)(?:$|\s)(?:.*?russia)?', 'replacement' : 'Premier (RU)'},
+						{'expression' : r'^(premier)(?:$|\s)(?:.*?russia)?', 'replacement' : 'Premier (RU)'},
 					])
 
 			replacements.extend([
 				# TMDb sometimes returns "5" for "Channel 5".
 				# Eg: The Madame Blanc Mysteries
-				{'expression' : '^4$', 'replacement' : 'Channel 4'},
-				{'expression' : '^5$', 'replacement' : 'Channel 5'},
+				{'expression' : r'^4$', 'replacement' : 'Channel 4'},
+				{'expression' : r'^5$', 'replacement' : 'Channel 5'},
 			])
 
 			if replacements:
@@ -6670,7 +6670,7 @@ class MetaTools(object):
 
 				# Remove alternative names with numbers, typically coming from IMDb.
 				# Eg: "Liberty Films" vs "Liberty Films (II)"
-				if '(' in value: value = Regex.remove(data = value, expression = '(\s*\([iv]+\))', group = 1, cache = True)
+				if '(' in value: value = Regex.remove(data = value, expression = r'(\s*\([iv]+\))', group = 1, cache = True)
 
 				values[i] = value
 
@@ -6680,7 +6680,7 @@ class MetaTools(object):
 			for value in values:
 				# Probably not a studio/network, but indicates the original creators.
 				# Eg: Anime OAV
-				if Regex.match(data = value, expression = '[\s\-]oav($|[\s\-])', cache = True): temp2.append(value)
+				if Regex.match(data = value, expression = r'[\s\-]oav($|[\s\-])', cache = True): temp2.append(value)
 				else: temp1.append(value)
 			values = temp1 + temp2
 
@@ -6693,14 +6693,14 @@ class MetaTools(object):
 			numbers = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen']
 
 			for i in values:
-				value = Regex.remove(data = i.lower(), expression = '[\.\,\-\_\+\!\?\(\)\[\]\&]', all = True, cache = True)
+				value = Regex.remove(data = i.lower(), expression = r'[\.\,\-\_\+\!\?\(\)\[\]\&]', all = True, cache = True)
 
 				# Remove common words. Full words only.
-				for j in ignore: value = Regex.remove(data = value, expression = '(?:^|\s)(' + j + ')(?:$|\s)', group = 1, cache = True)
+				for j in ignore: value = Regex.remove(data = value, expression = r'(?:^|\s)(' + j + r')(?:$|\s)', group = 1, cache = True)
 
 				# Replace number words. Full words or ending words only.
 				# Eg: Film4 vs Film 4 vs FilmFour vs Film Four
-				for j, k in enumerate(numbers): value = Regex.replace(data = value, expression = '(' + k + ')(?:$|[\s\-])', replacement = str(j + 1), group = 1, cache = True)
+				for j, k in enumerate(numbers): value = Regex.replace(data = value, expression = r'(' + k + r')(?:$|[\s\-])', replacement = str(j + 1), group = 1, cache = True)
 
 				base[i] = value
 
@@ -8863,7 +8863,7 @@ class MetaTools(object):
 	def filterEdition(self, items, include = None, exclude = None, unknown = None, full = True, condition = None):
 		# Hide extended editions, since otherwise some users might scrape that one instead of the normal edition and then find fewer/no links.
 		try:
-			if condition is None or not Regex.match(data = condition, expression = '(extend|special|edition|version)'):
+			if condition is None or not Regex.match(data = condition, expression = r'(extend|special|edition|version)'):
 				if unknown is None: unknown = True
 				if include is None and exclude is None: exclude = True
 				result = []
@@ -8871,7 +8871,7 @@ class MetaTools(object):
 					title = item.get('title')
 					if title:
 						normal = False
-						if not Regex.match(data = title, expression = '[\(\[].*?edition.*[\)\]]$', cache = True):
+						if not Regex.match(data = title, expression = r'[\(\[].*?edition.*[\)\]]$', cache = True):
 							if full:
 								if item.get('year') or item.get('tvshowyear') or item.get('premiered') or (item.get('time') or {}).get(MetaTools.TimePremiere) or item.get('duration'):
 									normal = True
@@ -10055,13 +10055,13 @@ class MetaTools(object):
 			return MetaTools.DummyString
 		else:
 			try:
-				if self.mSettingsLanguage == 'de': return '^((?:de[nmrs]|die|das|ein(?:e[nmrs])?|dies(?:e[nmrs])?)\s)'
-				elif self.mSettingsLanguage == 'fr': return '^((?:l[ae]|les|une?|d[eu](?:\sl[ae])?|des|)\s|(?:l[\'\’\‘]|d[eu](?:\sl[\'\’\‘])))'
-				elif self.mSettingsLanguage == 'nl': return '^((?:de|het|een)\s)'
-				elif self.mSettingsLanguage == 'es': return '^((?:l[ao]s?|el|un[ao]?s?)\s)'
-				elif self.mSettingsLanguage == 'pt': return '^((?:[ao]s?|uma?s?|uns)\s)'
-				elif self.mSettingsLanguage == 'it': return '^((?:il?|gil|l[aeo]|un[ao]?)\s|l[\'\’\‘])'
-				else: return '^((?:the|an?)\s)'
+				if self.mSettingsLanguage == 'de': return r'^((?:de[nmrs]|die|das|ein(?:e[nmrs])?|dies(?:e[nmrs])?)\s)'
+				elif self.mSettingsLanguage == 'fr': return r'^((?:l[ae]|les|une?|d[eu](?:\sl[ae])?|des|)\s|(?:l[\'\’\‘]|d[eu](?:\sl[\'\’\‘])))'
+				elif self.mSettingsLanguage == 'nl': return r'^((?:de|het|een)\s)'
+				elif self.mSettingsLanguage == 'es': return r'^((?:l[ao]s?|el|un[ao]?s?)\s)'
+				elif self.mSettingsLanguage == 'pt': return r'^((?:[ao]s?|uma?s?|uns)\s)'
+				elif self.mSettingsLanguage == 'it': return r'^((?:il?|gil|l[aeo]|un[ao]?)\s|l[\'\’\‘])'
+				else: return r'^((?:the|an?)\s)'
 			except: Logger.error()
 			return None
 
@@ -10391,7 +10391,7 @@ class MetaTools(object):
 										data2 = data['movie_results'][0]
 										release = None
 										if 'release_date' in data2:
-											release = Regex.extract(data = data2['release_date'], expression = '(\d{4})-', group = 1)
+											release = Regex.extract(data = data2['release_date'], expression = r'(\d{4})-', group = 1)
 											release = int(release) if release else None
 										Tools.update(result, {'title' : data2.get('title'), 'year' : release, 'score' : data2.get('popularity'), 'rating' : data2.get('vote_average'), 'votes' : data2.get('vote_count')}, none = False)
 		except: Logger.error()
@@ -10440,7 +10440,7 @@ class MetaTools(object):
 								if (query == self.cleanTitle(i['title']) or query == self.cleanTitle(i['original_title'])):
 									release = None
 									if 'release_date' in i:
-										release = Regex.extract(data = i['release_date'], expression = '(\d{4})-', group = 1)
+										release = Regex.extract(data = i['release_date'], expression = r'(\d{4})-', group = 1)
 										release = int(release) if release else None
 									if not year or yearDeviated == release:
 										link = 'https://api.themoviedb.org/3/movie/%s/external_ids' % str(i['id'])

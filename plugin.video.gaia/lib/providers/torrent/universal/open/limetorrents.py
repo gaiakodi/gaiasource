@@ -42,14 +42,14 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'search_stat'
 	_AttributeNext			= 'next'
 
-	_ExpressionHash			= '\/torrent\/([a-z0-9]{16,})(?:[\/\?]|\.torrent)'
-	_ExpressionTime			= '(.*?)(?:\-|\s+in|$)'
-	_ExpressionVerified		= '(verified)'
+	_ExpressionHash			= r'\/torrent\/([a-z0-9]{16,})(?:[\/\?]|\.torrent)'
+	_ExpressionTime			= r'(.*?)(?:\-|\s+in|$)'
+	_ExpressionVerified		= r'(verified)'
 
-	_ExpressionRightNow		= '(right\s*now)'
-	_ExpressionYesterday	= '(yesterday)'
-	_ExpressionLastMonth	= '(last\s*month)'
-	_ExpressionYears		= '(year\s*\+)'
+	_ExpressionRightNow		= r'(right\s*now)'
+	_ExpressionYesterday	= r'(yesterday)'
+	_ExpressionLastMonth	= r'(last\s*month)'
+	_ExpressionYears		= r'(year\s*\+)'
 
 	##############################################################################
 	# INITIALIZE

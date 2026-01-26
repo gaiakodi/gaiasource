@@ -55,8 +55,8 @@ class Provider(ProviderHtml):
 	_AttributeTime			= 'fromnow'
 	_AttributePages			= 'bottom-pager'
 
-	_ExpressionSize			= 'file\s*size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
-	_ExpressionNext			= '(next)'
+	_ExpressionSize			= r'file\s*size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
+	_ExpressionNext			= r'(next)'
 
 	##############################################################################
 	# INITIALIZE
@@ -113,8 +113,8 @@ class Provider(ProviderHtml):
 
 			extractOptimizeData			= HtmlDiv(id_ = Provider._AttributeWall),
 			extractList					= HtmlDiv(class_ = Provider._AttributeItem),
-			extractLink					= [HtmlLink(href_ = '^' + ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)], # ^: must start with magnet:....
-			extractFileName				= [HtmlDiv(class_ = Provider._AttributeTitle), HtmlScript(extract = [Html.ParseCode, 'decodeURIComponent\([\'"](.*?)[\'"]\)', Html.ParseDecode])],
+			extractLink					= [HtmlLink(href_ = r'^' + ProviderHtml.ExpressionMagnet, extract = Html.AttributeHref)], # ^: must start with magnet:....
+			extractFileName				= [HtmlDiv(class_ = Provider._AttributeTitle), HtmlScript(extract = [Html.ParseCode, r'decodeURIComponent\([\'"](.*?)[\'"]\)', Html.ParseDecode])],
 			extractFileSize				= [HtmlDiv(class_ = Provider._AttributeBar, extract = [Html.ParseTextNested, Provider._ExpressionSize])],
 			extractSourceTimeInexact	= [HtmlDiv(class_ = Provider._AttributeBar), HtmlBold(class_ = Provider._AttributeTime, extract = 't')],
 		)

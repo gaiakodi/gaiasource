@@ -5382,11 +5382,11 @@ class Tester(object):
 				'pokemon-s01-odc-8-droga-do-ligi-pokemon',
 				'pokemon-the-movie-i-choose-you-napisy-pl',
 				'policjanci-z-miami1986-s02e22-lektor-pl',
-				'\	posted by juggs in  Movies - Animation',
-				'\	posted by LifeLongg in  Movies - Animation',
-				'\	posted by moviefreak in  Movies - Animation',
-				'\	posted by Pirates82 in  Movies - Animation',
-				'\	posted by Tamilgun in  Movies - Animation',
+				'\\	posted by juggs in  Movies - Animation',
+				'\\	posted by LifeLongg in  Movies - Animation',
+				'\\	posted by moviefreak in  Movies - Animation',
+				'\\	posted by Pirates82 in  Movies - Animation',
+				'\\	posted by Tamilgun in  Movies - Animation',
 				'poszukiwana-sarah-pender-online-2013-lektor-pl',
 				'powroacutet-do-edenu-s01e01-lektor-pl',
 				'prawda-czy-kaamstwo-truth-ampamp-lies-2015360p-lek',
@@ -31021,7 +31021,7 @@ class Tester(object):
 		self.metadataNext()
 		self.metadataShow()
 		self.metadataSeason()
-		self.metadataEpisode()'''
+		self.metadataEpisode()
 
 		self.containerMagnet()
 
@@ -31075,7 +31075,7 @@ class Tester(object):
 		self.streamYearValid()
 
 		# Make sure that the tester call "Stream(...).valid()" and the scraper call "Stream.load(...)" return the same results.
-		self.streamValid(direct = True)
+		self.streamValid(direct = True)'''
 		'''self.streamValid(direct = False)'''
 
 		'''self.streamTimeExtract(titles = titles)
@@ -31086,11 +31086,14 @@ class Tester(object):
 		#extended=True
 		#extended=False
 		#extended=MetaTools.DetailEssential
-		#self.metadataPack()
+		#self.metadataPack(extended=True)
 		#self.metadataNext()
 		#self.metadataShow()
 		#self.metadataSeason()
 		#self.metadataEpisode()
+
+		self.streamLanguage()
+
 
 		# Always reset the metadata detail after testing.
 		self._metadataDetail(extended = True)
@@ -31144,7 +31147,7 @@ class Tester(object):
 			else: tools.Logger.log('Failed to wait for previous refreshes to finish: %d secs' % timer.elapsed())
 
 	@classmethod
-	def _metadataUsage(self):
+	def _metadataUsage(self, many = False):
 		instance = MetaTrakt.instance()
 		while True:
 			wait = instance.wait()
@@ -31153,7 +31156,9 @@ class Tester(object):
 			usageAuthenticated = instance.usage(authenticated = True)
 			usageUnauthenticated = instance.usage(authenticated = False)
 
-			if usageAuthenticated < 0.75 and usageUnauthenticated < 0.75 and not wait: break
+			# Sometimes when downloading episode metadata, Trakt already returns 429 errors after 50%+.
+			limit = 0.55 if many else 0.75
+			if usageAuthenticated < limit and usageUnauthenticated < limit and not wait: break
 
 			tools.Logger.log('Waiting for API usage to go down: %d%% Auth, %d%% Unauth, %s' % (usageAuthenticated * 100, usageUnauthenticated * 100, 'Wait' if wait else 'No Wait'))
 			tools.Time.sleep(30)
@@ -31164,27 +31169,35 @@ class Tester(object):
 			# Refresh both the pack and epsiode metadata.
 			# Otherwise if changes were made to MetaPack or MetaManager, the cached metadata is still based on the old code.
 			Tester.Refresh += 1
-			self._metadataManager(extended = extended).metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = True)
+			self._metadataManager(extended = extended).metadataPack(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = None if self._automatic else True)
 			Tester.Refresh -= 1
 			return True # Do not return None, otherwise the cache will think the function failed and reevaluate/reexecute it.
 
 		def _metadataRefreshShow(imdb, tmdb, tvdb, trakt, extended):
 			Tester.Refresh += 1
-			self._metadataManager(extended = extended).metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, refresh = True)
+			self._metadataManager(extended = extended).metadataShow(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, pack = False, refresh = None if self._automatic else True)
 			Tester.Refresh -= 1
 			return True # Do not return None, otherwise the cache will think the function failed and reevaluate/reexecute it.
 
 		def _metadataRefreshSeason(imdb, tmdb, tvdb, trakt, extended):
 			Tester.Refresh += 1
-			self._metadataManager(extended = extended).metadataSeason(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = True)
+			self._metadataManager(extended = extended).metadataSeason(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, refresh = None if self._automatic else True)
 			Tester.Refresh -= 1
 			return True # Do not return None, otherwise the cache will think the function failed and reevaluate/reexecute it.
 
 		def _metadataRefreshEpisode(imdb, tmdb, tvdb, trakt, season, extended):
 			Tester.Refresh += 1
-			self._metadataManager(extended = extended).metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, refresh = True)
+			self._metadataManager(extended = extended).metadataEpisode(imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, refresh = None if self._automatic else True)
 			Tester.Refresh -= 1
 			return True # Do not return None, otherwise the cache will think the function failed and reevaluate/reexecute it.
+
+		many = tools.Tools.isNumber(season)
+		self._metadataUsage(many = many)
+
+		self._automatic = False
+		if refresh is None:
+			self._automatic = True
+			refresh = True
 
 		cache = Cache.instance()
 		if refresh: cacher = cache.cacheClear
@@ -31197,7 +31210,7 @@ class Tester(object):
 		elif season is True: cacher(_metadataRefreshSeason, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, extended = extended)
 		elif not season is None: cacher(_metadataRefreshEpisode, imdb = imdb, tmdb = tmdb, tvdb = tvdb, trakt = trakt, season = season, extended = extended)
 
-		self._metadataUsage()
+		self._metadataUsage(many = many)
 
 		# There might be 100s of threads refreshing the metadata in the background.
 		# Wait for some threads to finish before continuing.
@@ -31333,10 +31346,10 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 253,
-						'sequential' : 253,
-						'special' : 280 if extended else 272,
-						'seasons' : [9, 12, 16, 14, 14, 14, 14, 10, 14, 14, 14, 14, 16, 16, 16, 16, 16, 14],
+						'official' : 255,
+						'sequential' : 255,
+						'special' : 275 if extended else 267,
+						'seasons' : [9, 12, 16, 14, 14, 14, 14, 10, 14, 14, 14, 14, 16, 16, 16, 16, 16, 16],
 					},
 
 					# Starts at S0.
@@ -35953,10 +35966,10 @@ class Tester(object):
 
 				'summary' : {
 					'count' : {
-						'official' : 1759,
-						'sequential' : 1759,
+						'official' : 1762,
+						'sequential' : 1762,
 						'special' : 14,
-						'seasons' : [202, 206, 194, 195, 173, 168, 170, 107, 130, 153, 61],
+						'seasons' : [202, 206, 194, 195, 173, 168, 170, 107, 130, 153, 64],
 					},
 
 					# Starts at S0.
@@ -39135,27 +39148,8 @@ class Tester(object):
 						'trakt'			: {'id' : '342268',			'standard' : [1, 24],	'sequential' : [1, 24],		'absolute' : None,		'date' : [2005, 20050525]},
 					},
 
-					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
-					#{
-					#	'standard'		: [1, 25],
-					#	'sequential'	: [1, 25],
-					#	'absolute'		: None,
-					#	'input'			: 'imdb',
-					#	'ignore'		: not extended,
-					#
-					#	'title'			: None,
-					#	'support'		: ['imdb'],
-					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
-					#	'status'		: None,
-					#	'date'			: None,
-					#	'time'			: None,
-					#
-					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
-					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
-					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#	'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#},
+					# Update (2026-01-15): TVDb now also has added the final as a 3-part episode.
+					# Update (2026-01-21): TVDb has now removed the 3rd-part finale and went back to the old (24 episodes in S01).
 					{
 						'standard'		: [1, 25],
 						'sequential'	: [1, 25],
@@ -39163,9 +39157,9 @@ class Tester(object):
 						'input'			: 'imdb',
 						'ignore'		: not extended,
 
-						'title'			: ['Exodus (3)'],
-						'support'		: ['tvdb', 'imdb'],
-						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+						'title'			: None,
+						'support'		: ['imdb'],
+						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
 						'status'		: None,
 						'date'			: None,
 						'time'			: None,
@@ -39173,9 +39167,29 @@ class Tester(object):
 						'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-						'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
+						'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 						'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 					},
+					#{
+					#	'standard'		: [1, 25],
+					#	'sequential'	: [1, 25],
+					#	'absolute'		: None,
+					#	'input'			: 'imdb',
+					#	'ignore'		: not extended,
+					#
+					#	'title'			: ['Exodus (3)'],
+					#	'support'		: ['tvdb', 'imdb'],
+					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+					#	'status'		: None,
+					#	'date'			: None,
+					#	'time'			: None,
+					#
+					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
+					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#},
 
 					# MetaPack.lookup() was changed to allow for IMDb special lookups, even if they clash with a sequential number.
 					{
@@ -39195,41 +39209,24 @@ class Tester(object):
 						'imdb'			: {'id' : 'tt0636285',		'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : '333948',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 
-						# Update (2026-01): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
-						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
-						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
+						# Update (2026-01-15): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
+						# Update (2026-01-21): TVDb has now removed the 3rd-part finale and went back to the old (24 episodes in S01).
+						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
 
 						'trakt'			: {'id' : '342270',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 					},
-					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
-					#{
-					#	'standard'		: [1, 25],
-					#	'sequential'	: [1, 25],
-					#	'absolute'		: None,
-					#	'ignore'		: not extended,
-					#
-					#	'title'			: [],
-					#	'support'		: ['imdb'],
-					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
-					#	'status'		: None,
-					#	'date'			: None,
-					#	'time'			: None,
-					#
-					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
-					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
-					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#	'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-					#},
+					# Update (2026-01-15): TVDb now also has added the final as a 3-part episode.
+					# Update (2026-01-21): TVDb has now removed the 3rd-part finale and went back to the old (24 episodes in S01).
 					{
 						'standard'		: [1, 25],
 						'sequential'	: [1, 25],
 						'absolute'		: None,
 						'ignore'		: not extended,
 
-						'title'			: ['Exodus (3)'],
-						'support'		: ['tvdb', 'imdb'],
-						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+						'title'			: [],
+						'support'		: ['imdb'],
+						'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : None, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
 						'status'		: None,
 						'date'			: None,
 						'time'			: None,
@@ -39237,9 +39234,28 @@ class Tester(object):
 						'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
-						'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
+						'tvdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 						'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
 					},
+					#{
+					#	'standard'		: [1, 25],
+					#	'sequential'	: [1, 25],
+					#	'absolute'		: None,
+					#	'ignore'		: not extended,
+					#
+					#	'title'			: ['Exodus (3)'],
+					#	'support'		: ['tvdb', 'imdb'],
+					#	'type'			: {'official' : None, 'unofficial' : True, 'universal' : None, 'standard' : True, 'sequential' : True, 'absolute' : None, 'special' : None, 'premiere' : None, 'finale' : True, 'outer' : None, 'inner' : True, 'middle' : None, 'alternate' : True},
+					#	'status'		: None,
+					#	'date'			: None,
+					#	'time'			: None,
+					#
+					#	'number'		: {							'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'imdb'			: {'id' : 'tt6222548',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : None},
+					#	'tmdb'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#	'tvdb'			: {'id' : '7515913',		'standard' : [1, 25],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050525]},
+					#	'trakt'			: {'id' : None,				'standard' : None,		'sequential' : None,		'absolute' : None,	'date' : None},
+					#},
 
 					{
 						'standard'		: [2, 1],
@@ -39257,9 +39273,10 @@ class Tester(object):
 						'imdb'			: {'id' : 'tt0636285',		'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : None},
 						'tmdb'			: {'id' : '333948',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 
-						# Update (2026-01): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
-						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
-						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
+						# Update (2026-01-15): The TVDb sequential number increased, since TVDb has now added S01E25 (3rd part finale).
+						# Update (2026-01-21): TVDb has now removed the 3rd-part finale and went back to the old (24 episodes in S01).
+						'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
+						#'tvdb'			: {'id' : '302656',			'standard' : [2, 1],	'sequential' : [1, 26],		'absolute' : None,	'date' : [2005, 20050921]},
 
 						'trakt'			: {'id' : '342270',			'standard' : [2, 1],	'sequential' : [1, 25],		'absolute' : None,	'date' : [2005, 20050921]},
 					},
@@ -40529,9 +40546,10 @@ class Tester(object):
 					{'season' : 1, 'episode' : 24, 'number' : MetaPack.NumberSequential,	'next' : {'season' : 1, 'episode' : 25}},
 					{'season' : 1, 'episode' : 24, 'number' : MetaPack.ProviderImdb,		'next' : {'season' : 1, 'episode' : 25} if extended else None},
 
-					# Update (2026-01): TVDb now also has added the final as a 3-part episode.
-					#{'season' : 1, 'episode' : 25, 'number' : None,						'next' : {'season' : 2, 'episode' : 1} if extended else {'season' : 1, 'episode' : 26}},
-					{'season' : 1, 'episode' : 25, 'number' : None,							'next' : {'season' : 2, 'episode' : 1}},
+					# Update (2026-01-15): TVDb now also has added the final as a 3-part episode.
+					# Update (2026-01-21): TVDb has now removed the 3rd-part finale and went back to the old (24 episodes in S01).
+					{'season' : 1, 'episode' : 25, 'number' : None,							'next' : {'season' : 2, 'episode' : 1} if extended else {'season' : 1, 'episode' : 26}},
+					#{'season' : 1, 'episode' : 25, 'number' : None,						'next' : {'season' : 2, 'episode' : 1}},
 
 					{'season' : 1, 'episode' : 25, 'number' : MetaPack.NumberStandard,		'next' : {'season' : 2, 'episode' : 1}},
 					{'season' : 1, 'episode' : 25, 'number' : MetaPack.NumberSequential,	'next' : {'season' : 1, 'episode' : 26}},
@@ -41514,7 +41532,7 @@ class Tester(object):
 			{
 				'title' : 'Lost',
 				'id' : {'imdb' : 'tt0411008', 'tmdb' : '4607', 'tvdb' : '73739', 'trakt' : '4583'},
-				'count' : [147, 25, 24, 23, 14, 17, 18], # Starting at S0.
+				'count' : [147, 25 if extended else 24, 24, 23, 14, 17, 18], # Starting at S0.
 				'episode' : [
 					{'season' : 1, 'episode' : 24,												'niche' : ['weekly'],		'type' : ['finale', 'inner'],					'status' : 'ended',		'interval' : 'weekly'},
 
@@ -41796,7 +41814,7 @@ class Tester(object):
 		# Refresh pack data, since the data on Trakt/TVDb/TMDb often changes..# Refreshing in the background never finishes, because there are too many threads for all the episodes below.
 		# Never refresh this test function in the background.
 		# "refresh=True" has to be called manually.
-		if refresh:
+		if refresh or refresh is None:
 			refreshed = {}
 			for test in tests:
 				for i in test.get('episode'):
@@ -42096,8 +42114,8 @@ class Tester(object):
 		timer = tools.Time(start = True)
 
 		clean = Stream.cleanKeyword(clean)
-		clean = re.sub('[^\w\d]', ' ', clean) # Remove special characters.
-		clean = re.sub('\s+', ' ', clean).strip() # Remove duplicate spaces.
+		clean = re.sub(r'[^\w\d]', ' ', clean) # Remove special characters.
+		clean = re.sub(r'\s+', ' ', clean).strip() # Remove duplicate spaces.
 
 		fails = [[], []]
 		total = 0
@@ -42142,8 +42160,8 @@ class Tester(object):
 				'group' : ['mircrew', 'publichd'],
 			},
 		})
-		clean = re.sub('[^\w\d]', ' ', clean) # Remove special characters.
-		clean = re.sub('\s+', ' ', clean).strip() # Remove duplicate spaces.
+		clean = re.sub(r'[^\w\d]', ' ', clean) # Remove special characters.
+		clean = re.sub(r'\s+', ' ', clean).strip() # Remove duplicate spaces.
 
 		fails = [[], []]
 		total = 0
@@ -46671,7 +46689,7 @@ class Tester(object):
 			{'result' : {'audio' : [], 'subtitle' : ['es']},								'data' : 'Obi.Wan.Kenobi.S01E01.720p.HDTV.Subtitulado.Esp.SC.mp4'},
 			{'result' : {'audio' : [], 'subtitle' : ['pl']},								'data' : 'A Complete Unknown (2024) [x265.1080p] Mapisy PL AI [AAC 5.1] M80'},
 			{'result' : {'audio' : [], 'subtitle' : ['it', 'en']},							'data' : 'A.Complete.Unknown.2024.1080p.HEVC.AC3.ITA.ENG.SUBS.mkv'},
-			{'result' : {'audio' : ['en', 'pl'], 'subtitle' : ['en', 'pl']},				'data' : 'A Complete Unknown (2024) [BDRemux 1080p by alE13][AC3\TrueHD][Audio & Sub Eng\PL][Eng]'},
+			{'result' : {'audio' : ['en', 'pl'], 'subtitle' : ['en', 'pl']},				'data' : r'A Complete Unknown (2024) [BDRemux 1080p by alE13][AC3\TrueHD][Audio & Sub Eng\PL][Eng]'},
 			{'result' : {'audio' : ['en'], 'subtitle' : ['ru', 'en']},						'data' : 'A Complete Unknown [2024, BDRemux 1080p] Dub (Bravo Records) + 4x MVO (TVShows, Red Head Sound, HDRezka, 1win) + AVO + Sub Rus, Eng + Original Eng'}, # Probably RU dubbed.
 			{'result' : {'audio' : [], 'subtitle' : ['es']},								'data' : 'A Complete Unknown (2024) [1080p][Subtitulada][Ver-Peliculas-Online.org].mp4'},
 			{'result' : {'audio' : ['es', 'en'], 'subtitle' : []},							'data' : 'A.complete.unknown.2024.1080p-dual-lat-cinecalidad.rs.mp4'},

@@ -826,7 +826,7 @@ class Interface(base.Interface):
 				if item['directory']:
 					info.append(interface.Translation.string(35258))
 				else:
-					extension = re.search('\.([a-zA-Z0-9]{3,4})$', item['name'], re.IGNORECASE).group(1).upper()
+					extension = re.search(r'\.([a-zA-Z0-9]{3,4})$', item['name'], re.IGNORECASE).group(1).upper()
 					info.append(extension)
 					name = name[:-(len(extension) + 1)]
 			except: pass

@@ -3784,7 +3784,7 @@ class MetaManager(object):
 				if arrival: # Allow for the Progress menu.
 					for item in items:
 						title = item.get('title')
-						if title and Regex.match(data = title, expression = '(?:^|[\s\-\:])(WWE|AEW|UFC|NXT|TNA|[eE]lite\s*[wW]restling|[wW]restle\s*[mM]ania)(?:$|[\s\-\:])', flags = Regex.FlagNone, cache = True):
+						if title and Regex.match(data = title, expression = r'(?:^|[\s\-\:])(WWE|AEW|UFC|NXT|TNA|[eE]lite\s*[wW]restling|[wW]restle\s*[mM]ania)(?:$|[\s\-\:])', flags = Regex.FlagNone, cache = True):
 							item[MetaManager.Smart]['removed'] = current
 
 				if Tools.isInteger(remove):
@@ -8484,7 +8484,7 @@ class MetaManager(object):
 					if numberSeason > 0 and numberEpisode == 0:
 						titleLower = episode['title'].lower()
 						if ('pilot' in titleLower or 'premiere' in titleLower or 'unaired' in titleLower) and title and titleLower.startswith(title.lower()):
-							titleCleaned = Regex.remove(data = episode['title'], expression = '^(%s\s*(?:[\:\-]\s*)?)' % title)
+							titleCleaned = Regex.remove(data = episode['title'], expression = r'^(%s\s*(?:[\:\-]\s*)?)' % title)
 							if titleCleaned: episode['title'] = MetaImdb.cleanTitle(titleCleaned)
 
 				# If the original title is a generic title (eg: Episode 3), replace it with an alias titles that is not the main title.
@@ -10040,7 +10040,7 @@ class MetaManager(object):
 					partRequests = []
 					for i in requests:
 						partData = partOld.get(i['id'])
-						if partData and partData.get('complete'): partDatas[i['id']] = partData
+						if partData and partData.get('complete'): partDatas[i['id']] = MetaPack.fix(provider = i['id'], data = partData)
 						else: partRequests.append(i)
 					requests = partRequests
 					partDatas = Tools.copy(partDatas) # Copy inner dicts that can be carried over with the update() below.
@@ -12691,10 +12691,10 @@ class MetaManager(object):
 	def _releaseExternalProcess(self, result, media, name, time, type = None):
 		if name and time:
 			if (
-				Regex.match(data = name, expression = '[\s\.\-\_\[\(]((?:1080|2160|3160|4096|4320)[ip]?|[468]k|uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must be HD releases.
-				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(]((?:(?:hd|dvd|bd).?)?(?:cam|scr|tc|tele.?cine|ts|tele.?sync)(?:.?rip)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be CAM/SCR/TS/TC releases.
-				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(](hc|dub(?:bed|bing)?|pcm|theater|theatre|record(?:ing|ed)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be HC/dubbed/PCM/theater releases. Eg: Nuremberg 2025 1080p Theater HEVC PCM 5.1-NaNi
-				and not Regex.match(data = name, expression = '[\s\.\-\_\[\(](s\d+(?:e\d+))(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be shows (present in the x264 category of corrupt-net.org). Most of then are in any case old or German/Dutch releases.
+				Regex.match(data = name, expression = r'[\s\.\-\_\[\(]((?:1080|2160|3160|4096|4320)[ip]?|[468]k|uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must be HD releases.
+				and not Regex.match(data = name, expression = r'[\s\.\-\_\[\(]((?:(?:hd|dvd|bd).?)?(?:cam|scr|tc|tele.?cine|ts|tele.?sync)(?:.?rip)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be CAM/SCR/TS/TC releases.
+				and not Regex.match(data = name, expression = r'[\s\.\-\_\[\(](hc|dub(?:bed|bing)?|pcm|theater|theatre|record(?:ing|ed)?)(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be HC/dubbed/PCM/theater releases. Eg: Nuremberg 2025 1080p Theater HEVC PCM 5.1-NaNi
+				and not Regex.match(data = name, expression = r'[\s\.\-\_\[\(](s\d+(?:e\d+))(?:$|[\s\.\-\_\]\)])', cache = True) # Must not be shows (present in the x264 category of corrupt-net.org). Most of then are in any case old or German/Dutch releases.
 			):
 				# Update: Now do very strict matching of movie scene releases.
 				# If there is an improper scene release that is detected as a proper HD release, but contains some keyword that is not in the regex above, the scene date is added as a digital release date and can mess things up.
@@ -12714,10 +12714,10 @@ class MetaManager(object):
 					allow = False
 					count = 0
 					expressions = [
-						'[\s\.\-\_\[\(](?:hdr(?:[\s\.\-\_]?\d+(?:\+|plus)?)?|dv|dolby.?vision)(?:$|[\s\.\-\_\]\)])', # HDR/DV.
-						'[\s\.\-\_\[\(](?:(?:2160|3160|4096|4320)[ip]?|[468]k)(?:$|[\s\.\-\_\]\)])', # 4K+ and not 1080p.
-						'[\s\.\-\_\[\(](?:uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', # Disk/web rip.
-						'[\s\.\-\_\[\(](?:atmos|7\.1)(?:$|[\s\.\-\_\]\)])', # HQ audio.
+						r'[\s\.\-\_\[\(](?:hdr(?:[\s\.\-\_]?\d+(?:\+|plus)?)?|dv|dolby.?vision)(?:$|[\s\.\-\_\]\)])', # HDR/DV.
+						r'[\s\.\-\_\[\(](?:(?:2160|3160|4096|4320)[ip]?|[468]k)(?:$|[\s\.\-\_\]\)])', # 4K+ and not 1080p.
+						r'[\s\.\-\_\[\(](?:uhd|blu.?ray|(?:bd|dvd)(?:r|.?rip)|web(?:.?(?:rip|dl))?)(?:$|[\s\.\-\_\]\)])', # Disk/web rip.
+						r'[\s\.\-\_\[\(](?:atmos|7\.1)(?:$|[\s\.\-\_\]\)])', # HQ audio.
 					]
 					for expression in expressions:
 						if Regex.match(data = name, expression = expression, cache = True):
@@ -12727,7 +12727,7 @@ class MetaManager(object):
 								break
 
 				if allow:
-					match = Regex.extract(data = name, expression = '\s*(.*?)[\s\.\-\_\[\(]*((?:19|2[01])\d{2})(?:$|[\s\.\-\_\]\)])', group = None, all = True, cache = True) # Year.
+					match = Regex.extract(data = name, expression = r'\s*(.*?)[\s\.\-\_\[\(]*((?:19|2[01])\d{2})(?:$|[\s\.\-\_\]\)])', group = None, all = True, cache = True) # Year.
 					if match:
 						match = match[0]
 						title = match[0].replace('.', ' ')
@@ -12735,7 +12735,7 @@ class MetaManager(object):
 						# Bleach Thousand Year Blood War Vol 01 D01
 						# Im Quitting Heroing Vol 02
 						# The Dreaming Boy Is a Realist D01
-						new = Regex.extract(data = title, expression = '(.*?)\s*((?:vol(?:ume|\.)?)\s*\d+|d(?:is[ck])?\s*\d+)', cache = True)
+						new = Regex.extract(data = title, expression = r'(.*?)\s*((?:vol(?:ume|\.)?)\s*\d+|d(?:is[ck])?\s*\d+)', cache = True)
 						if new: title = new
 
 						year = int(match[1])
@@ -12771,17 +12771,17 @@ class MetaManager(object):
 				# Doctor Who: Sylvester McCoy: Complete Season Two
 				# Tales of Wedding Rings: Season 1
 				# Many more formats.
-				if Regex.match(data = title, expression = '(seasons?|series?)', cache = True):
+				if Regex.match(data = title, expression = r'(seasons?|series?)', cache = True):
 					media = Media.Show
 
 					# Sometimes the season is only given in the extended/extra attributes.
 					for i in [title, extra]:
 						if i:
 							if not season:
-								extract = Regex.extract(data = title, expression = '(?:seasons?|series?)\s*(\d+)(?![a-z])', cache = True)
+								extract = Regex.extract(data = title, expression = r'(?:seasons?|series?)\s*(\d+)(?![a-z])', cache = True)
 								if extract: season = int(extract)
 							if not season:
-								extract = Regex.extract(data = title, expression = '(?:(?:seasons?|series?)\s*(one|two|three|four|five|six|seven|eight|nine|ten)|(one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*(?:seasons?|series?))', cache = True)
+								extract = Regex.extract(data = title, expression = r'(?:(?:seasons?|series?)\s*(one|two|three|four|five|six|seven|eight|nine|ten)|(one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*(?:seasons?|series?))', cache = True)
 								if extract:
 									if extract == 'one' or extract == 'first' or extract == '1st': season = 1
 									elif extract == 'two' or extract == 'second' or extract == '2nd': season = 2
@@ -12797,7 +12797,7 @@ class MetaManager(object):
 
 					# Remove trailing descriptions.
 					# Star Trek: Section 31 [DVD]
-					title = Regex.remove(data = title, expression = '(\s*(?:[\:\-]\s*(?:(?:the)?\s*(?:final|last|full|complete|one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*)*(?:seasons?|series?)|\s+(?:seasons?|series?)\s*\d+).*)$', cache = True)
+					title = Regex.remove(data = title, expression = r'(\s*(?:[\:\-]\s*(?:(?:the)?\s*(?:final|last|full|complete|one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|[1-9]+(?:st|nd|rd|th))\s*)*(?:seasons?|series?)|\s+(?:seasons?|series?)\s*\d+).*)$', cache = True)
 				else:
 					media = Media.Movie
 
@@ -12815,7 +12815,7 @@ class MetaManager(object):
 				# Morning Show Mysteries: Complete Movie Collection
 				# Hallmark Dayspring 2-Movie Collection
 				# Star Trek: Section 31 [DVD]
-				title = Regex.remove(data = title, expression = '([\s\-\_\:]+(?:\s*(?:[\:\-]|\d+\-)\s*(?:4k|\([a-z\d\s\-]+\)|(?:the\s*)?(?:(?:\d+|one|two|three|four|five)[\-\s])?(?:(?:final|last|first|second|third|fourth|fifth|complete|movie|film|collection|series?|seasons?)\s)+)|4k|\([a-z\d\s\-]+\)|(?:series?|seasons?)\s\d|[\[\(]?(?:dvd|blur.?ray)[\]\)]?).*)$', cache = True)
+				title = Regex.remove(data = title, expression = r'([\s\-\_\:]+(?:\s*(?:[\:\-]|\d+\-)\s*(?:4k|\([a-z\d\s\-]+\)|(?:the\s*)?(?:(?:\d+|one|two|three|four|five)[\-\s])?(?:(?:final|last|first|second|third|fourth|fifth|complete|movie|film|collection|series?|seasons?)\s)+)|4k|\([a-z\d\s\-]+\)|(?:series?|seasons?)\s\d|[\[\(]?(?:dvd|blur.?ray)[\]\)]?).*)$', cache = True)
 
 			if Media.isSerie(media) or not year or year >= (Time.year() - 3): # Do not add old titles for movies.
 				item = {'origin' : origin or MetaManager.OriginOfficial, 'time' : time, 'type' : type}
@@ -12911,12 +12911,12 @@ class MetaManager(object):
 					for values in data:
 						try:
 							time = values.find(class_ = 'reldate').find(text = True) # Not nested text.
-							time = Regex.extract(data = time, expression = '(\w+\s+\d.*?\d{4})', cache = True) # Remove weekday.
+							time = Regex.extract(data = time, expression = r'(\w+\s+\d.*?\d{4})', cache = True) # Remove weekday.
 							time = time = ConverterTime(time, format = ConverterTime.FormatDateAmerican, utc = True).timestamp()
 							for value in values.find_all(class_ = 'dvdcell'):
 								try:
 									imdb = value.find(class_ = 'imdblink').find('a')['href']
-									imdb = Regex.extract(data = imdb, expression = '\/(tt\d+)')
+									imdb = Regex.extract(data = imdb, expression = r'\/(tt\d+)')
 									try: title = value.find_all('a')[1].text
 									except: title = None
 									self._releaseExternalAdd(result = result, imdb = imdb, title = title, time = time, type = type)
@@ -12967,26 +12967,26 @@ class MetaManager(object):
 					data = str(data)
 
 					# Even if there is no titles listes (eg next month's future releases), still check if the page is correct.
-					valid = Regex.match(data = data, expression = '<a\s.*?title\s*=\s*[\'\"]blu\-ray\.com', cache = True)
+					valid = Regex.match(data = data, expression = r'<a\s.*?title\s*=\s*[\'\"]blu\-ray\.com', cache = True)
 
-					values = Regex.extract(data = data, expression = 'movies\[\d.*?(\{.*?\})\s*;', group = None, all = True, cache = True)
+					values = Regex.extract(data = data, expression = r'movies\[\d.*?(\{.*?\})\s*;', group = None, all = True, cache = True)
 					if values:
 						for value in values:
 							try:
 								if value:
 									# Double quotes inside a string.
 									# Eg: 'Limited Box Set, 2 180g LP Gatefold, 3 exclusive 10" Vinyl records, XL T-Shirt, Exclusive Plectrums, Lanyard, Art Print'
-									value = Regex.replace(data = value, expression = '"', replacement = '\\\\\\"', all = True, cache = True)
+									value = Regex.replace(data = value, expression = r'"', replacement = '\\\\\\"', all = True, cache = True)
 
 									# Strings are in escaped single quotes.
-									value = Regex.replace(data = value, expression = '(:\s*)\\\\\'(.*?)\\\\\'([\,\]\}])', replacement = r'\1"\2"\3', all = True, cache = True)
+									value = Regex.replace(data = value, expression = r'(:\s*)\\\\\'(.*?)\\\\\'([\,\]\}])', replacement = r'\1"\2"\3', all = True, cache = True)
 
 									# Replace escaped quotes internal to string.
-									for i in range(3): value = Regex.replace(data = value, expression = '(\\\\\')', replacement = '\'', all = True, cache = True)
+									for i in range(3): value = Regex.replace(data = value, expression = r'(\\\\\')', replacement = '\'', all = True, cache = True)
 
 									# The keys do not have quotes.
 									# Do multiple times, otherwise not all keys are quoted.
-									for i in range(3): value = Regex.replace(data = value, expression = '([\[\{]\s*|(?:\"|:\s*\d+)\s*,\s*)((?=\D)\w+):', replacement = r'\1"\2":', all = True, cache = True)
+									for i in range(3): value = Regex.replace(data = value, expression = r'([\[\{]\s*|(?:\"|:\s*\d+)\s*,\s*)((?=\D)\w+):', replacement = r'\1"\2":', all = True, cache = True)
 
 									# Unescape hex-escaped characters in the string.
 									# Eg: Arz\xe9 -> Arzé
@@ -14769,7 +14769,7 @@ class MetaManager(object):
 					#	https://trakt.tv/search/lists?query=call%20girls
 					#	Eg: Dubailand Call Girls +971505700000 Indian Call Girls ...
 					if discover:
-						items = [item for item in items if not Regex.match(data = item.get('title'), expression = 'call.?girl.*\d', cache = True)]
+						items = [item for item in items if not Regex.match(data = item.get('title'), expression = r'call.?girl.*\d', cache = True)]
 						more = True # Else the next page does not show if we filter out some itmes.
 
 				# Also return if there are no items. To return the MetaImdb.Privacy error.

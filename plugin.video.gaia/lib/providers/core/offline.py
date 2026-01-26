@@ -38,8 +38,8 @@ class ProviderOffline(ProviderBase):
 	AttributeDownloads	= 'downloads'
 	AttributeUploader	= 'uploader'
 
-	FilterMagnet		= '&dn=(.*?)(?:&[a-z\d]+=|$)'	# Extracts file name from magnet link.
-	FilterQuote			= '"(.*)"'						# Extracts file name from between quotes.
+	FilterMagnet		= r'&dn=(.*?)(?:&[a-z\d]+=|$)'	# Extracts file name from magnet link.
+	FilterQuote			= r'"(.*)"'						# Extracts file name from between quotes.
 
 	_CustomLocation		= 'location'
 
@@ -256,61 +256,61 @@ class ProviderOffline(ProviderBase):
 			if File.exists(path):
 				titles = titles['search']['main']
 				queries = Tools.listUnique(['%' + Tools.replaceNotAlphaNumeric(i, replace = '%') + '%' for i in titles])
-				matcher = '(?:^|[^a-z\d]+)(%s)(?:$|[^a-z\d]+)' % ('|'.join(Tools.listUnique([Tools.replaceNotAlphaNumeric(i, replace = '[^a-z\d]+') for i in titles])))
+				matcher = r'(?:^|[^a-z\d]+)(%s)(?:$|[^a-z\d]+)' % (r'|'.join(Tools.listUnique([Tools.replaceNotAlphaNumeric(i, replace = r'[^a-z\d]+') for i in titles])))
 				if queries:
 					database = Database(path = path, label = True)
 					if database:
 						query = ' OR '.join(['name LIKE ?'] * len(queries))
 						tables = database._tables()
 						if tables:
-							mixed = '(?:data|mixed|generic|all|full|torrents?|magnets?|links?|urls?|streams?)'
-							if Media.isFilm(media): expression = '(movie|film|set|collection|%s)' % mixed
-							elif Media.isSerie(media): expression = '(tv|television|serie|show|episode|%s)' % mixed
+							mixed = r'(?:data|mixed|generic|all|full|torrents?|magnets?|links?|urls?|streams?)'
+							if Media.isFilm(media): expression = r'(movie|film|set|collection|%s)' % mixed
+							elif Media.isSerie(media): expression = r'(tv|television|serie|show|episode|%s)' % mixed
 							if expression: tables = [i for i in tables if Regex.match(data = i, expression = expression)]
 							if not tables: tables = database._tables()
 						for i in tables:
 							values = database._select('SELECT * FROM %s WHERE %s;' % (i, query), (queries))
 							if values:
 								parameters = {
-									Stream.ParameterLink : '(?:link|url|urn|magnet|torrent)',
-									Stream.ParameterHash : '(?:(?:info.*)?hash|md5|sha1|sha256|sha512)',
+									Stream.ParameterLink : r'(?:link|url|urn|magnet|torrent)',
+									Stream.ParameterHash : r'(?:(?:info.*)?hash|md5|sha1|sha256|sha512)',
 
-									Stream.ParameterVideoQuality : '(?:video.*)?quality',
-									Stream.ParameterVideoCodec : '(?:video.*)?codec',
-									Stream.ParameterVideoDepth : '(?:video.*)?(?:depth|bit)',
-									Stream.ParameterVideoRange : '(?:video.*)?(?:range|sdr|hdr)',
-									Stream.ParameterVideo3d : '(?:video.*)?(?:3d|sbs)',
+									Stream.ParameterVideoQuality : r'(?:video.*)?quality',
+									Stream.ParameterVideoCodec : r'(?:video.*)?codec',
+									Stream.ParameterVideoDepth : r'(?:video.*)?(?:depth|bit)',
+									Stream.ParameterVideoRange : r'(?:video.*)?(?:range|sdr|hdr)',
+									Stream.ParameterVideo3d : r'(?:video.*)?(?:3d|sbs)',
 
-									Stream.ParameterAudioType : '(?:audio.*)type',
-									Stream.ParameterAudioChannels : '(?:audio.*)?(?:channel|surround)',
-									Stream.ParameterAudioSystem : '(?:audio.*)system',
-									Stream.ParameterAudioCodec : '(?:audio.*)codec',
-									Stream.ParameterAudioLanguage : '(?:audio.*)?language',
+									Stream.ParameterAudioType : r'(?:audio.*)type',
+									Stream.ParameterAudioChannels : r'(?:audio.*)?(?:channel|surround)',
+									Stream.ParameterAudioSystem : r'(?:audio.*)system',
+									Stream.ParameterAudioCodec : r'(?:audio.*)codec',
+									Stream.ParameterAudioLanguage : r'(?:audio.*)?language',
 
-									Stream.ParameterSubtitleType : '(?:subtitle.*)type',
-									Stream.ParameterSubtitleLanguage : '(?:subtitle.*)language',
+									Stream.ParameterSubtitleType : r'(?:subtitle.*)type',
+									Stream.ParameterSubtitleLanguage : r'(?:subtitle.*)language',
 
-									Stream.ParameterReleaseType : '(?:release.*)type',
-									Stream.ParameterReleaseFormat : '(?:release.*)?format',
-									Stream.ParameterReleaseEdition : '(?:release.*)?edition',
-									Stream.ParameterReleaseNetwork : '(?:release.*)?network',
-									Stream.ParameterReleaseGroup : '(?:release.*)?group',
-									Stream.ParameterReleaseUploader : '(?:release.*)?(?:uploader|user)',
+									Stream.ParameterReleaseType : r'(?:release.*)type',
+									Stream.ParameterReleaseFormat : r'(?:release.*)?format',
+									Stream.ParameterReleaseEdition : r'(?:release.*)?edition',
+									Stream.ParameterReleaseNetwork : r'(?:release.*)?network',
+									Stream.ParameterReleaseGroup : r'(?:release.*)?group',
+									Stream.ParameterReleaseUploader : r'(?:release.*)?(?:uploader|user)',
 
-									Stream.ParameterFileName : '(?:file.*)?name',
-									Stream.ParameterFileExtra : '(?:file.*)?extra',
-									Stream.ParameterFileSize : '(?:file.*)?(?:size|byte)',
-									Stream.ParameterFileContainer : '(?:file.*)?container',
-									Stream.ParameterFilePack : '(?:(?:file|show|season|episode|set|collection).*)?(?:pack|set|collection)',
+									Stream.ParameterFileName : r'(?:file.*)?name',
+									Stream.ParameterFileExtra : r'(?:file.*)?extra',
+									Stream.ParameterFileSize : r'(?:file.*)?(?:size|byte)',
+									Stream.ParameterFileContainer : r'(?:file.*)?container',
+									Stream.ParameterFilePack : r'(?:(?:file|show|season|episode|set|collection).*)?(?:pack|set|collection)',
 
-									Stream.ParameterSourceType : '(?:source.*)?type',
-									Stream.ParameterSourceSeeds : '(?:source.*)?seed',
-									Stream.ParameterSourceLeeches : '(?:source.*)?leech',
-									Stream.ParameterSourcePeers : '(?:source.*)?peers',
-									Stream.ParameterSourceTime : '(?:source.*)?(?:time(?:.*stamp)?|date)',
-									Stream.ParameterSourcePopularity : '(?:source.*)?(?:popularity|rating|rank(?:ing)?)',
-									Stream.ParameterSourcePublisher : '(?:source.*)?publisher',
-									Stream.ParameterSourceHoster : '(?:source.*)?host',
+									Stream.ParameterSourceType : r'(?:source.*)?type',
+									Stream.ParameterSourceSeeds : r'(?:source.*)?seed',
+									Stream.ParameterSourceLeeches : r'(?:source.*)?leech',
+									Stream.ParameterSourcePeers : r'(?:source.*)?peers',
+									Stream.ParameterSourceTime : r'(?:source.*)?(?:time(?:.*stamp)?|date)',
+									Stream.ParameterSourcePopularity : r'(?:source.*)?(?:popularity|rating|rank(?:ing)?)',
+									Stream.ParameterSourcePublisher : r'(?:source.*)?publisher',
+									Stream.ParameterSourceHoster : r'(?:source.*)?host',
 								}
 
 								attributes = {}
@@ -377,7 +377,7 @@ class ProviderOffline(ProviderBase):
 		link = Tools.copy(self.dumpLinkOrignal())
 		if not Tools.isDictionary(link): link = {Media.Mixed : link}
 		for k, v in link.items():
-			if Tools.isArray(v) and Regex.match(data = v[0], expression = '\.[a-z]?0*(?:0|1)$'): # Multi-part archive.
+			if Tools.isArray(v) and Regex.match(data = v[0], expression = r'\.[a-z]?0*(?:0|1)$'): # Multi-part archive.
 				data[k] = [{'id' : Hash.sha1(v[0]), 'name' : v[0], 'link' : v, 'path' : None}]
 			else:
 				if not Tools.isArray(v): v = [v]
@@ -393,7 +393,7 @@ class ProviderOffline(ProviderBase):
 				else:
 					if Tools.isArray(i['link']):
 						for j in i['link']:
-							pathSplit = i['path'] + Regex.extract(data = j, expression = '.*(\.\d+)$')
+							pathSplit = i['path'] + Regex.extract(data = j, expression = r'.*(\.\d+)$')
 							if File.exists(pathSplit):
 								self.log('   Already downloaded: %s' % pathSplit)
 							else:
@@ -402,7 +402,7 @@ class ProviderOffline(ProviderBase):
 								if not success:
 									self.log('Failed to download %s datasets: %s' % (k, j))
 									return False
-						i['path'] += Regex.extract(data = i['link'][0], expression = '.*(\.\d+)$')
+						i['path'] += Regex.extract(data = i['link'][0], expression = r'.*(\.\d+)$')
 					else:
 						self.log('   Downloading: %s' % i['link'])
 						success = Networker().download(link = i['link'], path = i['path'])
@@ -613,8 +613,8 @@ class ProviderOffline(ProviderBase):
 		name = data['name']
 		if not name: return False
 
-		expressionSeparator = u'[\s\-\–\_\+\.\,\\\/\|\:\&]'
-		expressionSeparatorExtra = u'[\s\-\–\_\+\.\,\\\/\|\:\&\(\[\{\)\]\}]'
+		expressionSeparator = r'[\s\-\–\_\+\.\,\\\/\|\:\&]'
+		expressionSeparatorExtra = r'[\s\-\–\_\+\.\,\\\/\|\:\&\(\[\{\)\]\}]'
 
 		# Prohibited
 		if Stream.titleProhibited(data = name, special = True, exception = True): return False
@@ -629,7 +629,7 @@ class ProviderOffline(ProviderBase):
 				if len(parts) > 1 and Stream.titleProhibited(data = ' '.join(parts), special = True, exception = True): return False
 
 		# Music/Albums
-		if Regex.match(data = name, expression = 'kbps', cache = True):
+		if Regex.match(data = name, expression = r'kbps', cache = True):
 			# Some DD/DTS also have a kbps label.
 			system = Stream.audioSystemExtract(data = name)
 			if not system or not system in [Stream.AudioSystemDolby, Stream.AudioSystemDts]: return False
@@ -640,7 +640,7 @@ class ProviderOffline(ProviderBase):
 			if Stream.audioSystemExtract(data = name): return True
 
 		# Generic
-		if Regex.match(data = name, expression = '((?:^|%s)(?:movies?|films?|tv|series?|episodes?)(?:$|%s))' % (expressionSeparatorExtra, expressionSeparatorExtra), cache = True): return True
+		if Regex.match(data = name, expression = r'((?:^|%s)(?:movies?|films?|tv|series?|episodes?)(?:$|%s))' % (expressionSeparatorExtra, expressionSeparatorExtra), cache = True): return True
 
 		# Number
 		number = Stream.numberShowExtract(data = name)
@@ -663,7 +663,7 @@ class ProviderOffline(ProviderBase):
 		audio = Stream.audioTypeExtract(data = name)
 		if audio and not audio == Stream.AudioTypeOriginal: return True
 
-		music = Regex.match(data = name, expression = '(?:^|%s)(\d+%s*cds?|va|top%s\d+|music%s(?:compilation|collection|set)s?|vol(?:umes?)?%s*\d+|megamix|remixland|discography|@?\d+%s*kbps?|best%sof)(?:$|%s)' % (expressionSeparatorExtra, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparatorExtra), cache = True)
+		music = Regex.match(data = name, expression = r'(?:^|%s)(\d+%s*cds?|va|top%s\d+|music%s(?:compilation|collection|set)s?|vol(?:umes?)?%s*\d+|megamix|remixland|discography|@?\d+%s*kbps?|best%sof)(?:$|%s)' % (expressionSeparatorExtra, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparator, expressionSeparatorExtra), cache = True)
 
 		# Year
 		if not album and not music and Stream.yearExtract(data = name): return True
@@ -683,43 +683,43 @@ class ProviderOffline(ProviderBase):
 			data = File.readNow(path)
 			result = data.split('\n')
 		else:
-			expressionSymbol			= u'[\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
-			expressionSymbolAlternative	= u'[\s\-\–\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
-			expressionSymbolStart		= u'(?:^|' + expressionSymbol + '+)'
-			expressionSymbolEnd			= u'(?:$|' + expressionSymbol + '+)'
-			expressionSeparator			= u'[\s\-\–\_\+\.\,\\\/\|\:\&]'
-			expressionSeparatorExtra	= u'[\s\-\–\_\+\.\,\\\/\|\:\&\(\[\{\)\]\}]'
+			expressionSymbol			= r'[\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
+			expressionSymbolAlternative	= r'[\s\-\–\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]'
+			expressionSymbolStart		= r'(?:^|' + expressionSymbol + r'+)'
+			expressionSymbolEnd			= r'(?:$|' + expressionSymbol + r'+)'
+			expressionSeparator			= r'[\s\-\–\_\+\.\,\\\/\|\:\&]'
+			expressionSeparatorExtra	= r'[\s\-\–\_\+\.\,\\\/\|\:\&\(\[\{\)\]\}]'
 
 			# Porn
-			result.append('(?:horny|penetration|facials?|shemale|nude.+photos?|fc2.?ppv|MyDaughtersHotFriend|SisLoveMe)')
+			result.append(r'(?:horny|penetration|facials?|shemale|nude.+photos?|fc2.?ppv|MyDaughtersHotFriend|SisLoveMe)')
 
 			# JAV Porn
 			#	 [HD] FCH-037
 			#	[HD] SIRO-3911
 			#	[HD] 200GANA-2119
 			#	[HD] 300MIUM-472
-			result.append('(?:\s*\[hd\]\s*[a-z\d]+\-\d+\s*$)')
+			result.append(r'(?:\s*\[hd\]\s*[a-z\d]+\-\d+\s*$)')
 
 			# Some daytime shows have a date, but most dates are porn.
-			result.append('(?:[0123]\d[\.\-\s]?[0123]\d[\.\-\s]?(?:19|2[01])?\d{2}|(?:19|2[01])?\d{2}[\.\-\s]?[0123]\d[\.\-\s]?[0123]\d)')
+			result.append(r'(?:[0123]\d[\.\-\s]?[0123]\d[\.\-\s]?(?:19|2[01])?\d{2}|(?:19|2[01])?\d{2}[\.\-\s]?[0123]\d[\.\-\s]?[0123]\d)')
 
 			# Music
-			result.append('(?:^%s?VA%s+|(?:mp3|aac|flac)%s+@)' % (expressionSeparatorExtra, expressionSeparatorExtra, expressionSeparator))
-			result.append('(?:^|%s)(ost)(?:$|%s)' % (expressionSeparatorExtra, expressionSeparator))
+			result.append(r'(?:^%s?VA%s+|(?:mp3|aac|flac)%s+@)' % (expressionSeparatorExtra, expressionSeparatorExtra, expressionSeparator))
+			result.append(r'(?:^|%s)(ost)(?:$|%s)' % (expressionSeparatorExtra, expressionSeparator))
 
 			# Books
-			result.append('(?:(?:^|%s)(epubs?|ebooks?)(?:$|%s))' % (expressionSeparatorExtra, expressionSeparatorExtra))
-			result.append('(?:^ttc[\.\-\s]|books?.?(?:collections?|packs?))')
-			result.append('(?:\d+[\s\-\–\_\+\.]?(?:ed(?:ition)?|(?:st|nd|rd|th)[\s\-\–\_\+\.]?ed(?:ition)?))')
+			result.append(r'(?:(?:^|%s)(epubs?|ebooks?)(?:$|%s))' % (expressionSeparatorExtra, expressionSeparatorExtra))
+			result.append(r'(?:^ttc[\.\-\s]|books?.?(?:collections?|packs?))')
+			result.append(r'(?:\d+[\s\-\–\_\+\.]?(?:ed(?:ition)?|(?:st|nd|rd|th)[\s\-\–\_\+\.]?ed(?:ition)?))')
 
 			# Software
-			result.append('(?:v(?:ersion)?[\.\-\s]*\d+\.\d+|v(?:ersion)?[\.\-\s]*\d+[\.\-\s]\d+[\.\-\s]\d+|(?:with|including|includes)[\.\-\s]*crack(?:s|ed)?|crackingpatching|keygen|build[\.\-\s]*\d+|free4pc|babupc|x86|x64|[^a-z\d]oem[^a-z\d]|mac.*os)')
+			result.append(r'(?:v(?:ersion)?[\.\-\s]*\d+\.\d+|v(?:ersion)?[\.\-\s]*\d+[\.\-\s]\d+[\.\-\s]\d+|(?:with|including|includes)[\.\-\s]*crack(?:s|ed)?|crackingpatching|keygen|build[\.\-\s]*\d+|free4pc|babupc|x86|x64|[^a-z\d]oem[^a-z\d]|mac.*os)')
 
 			# Games
-			result.append('(?:skidrow|fitgirl|codex)')
+			result.append(r'(?:skidrow|fitgirl|codex)')
 
 			# Other
-			result.append('(?:Tour[\.\-\s]de[\.\-\s]France)')
+			result.append(r'(?:Tour[\.\-\s]de[\.\-\s]France)')
 
 			# Dictionary
 
@@ -804,7 +804,7 @@ class ProviderOffline(ProviderBase):
 										if domain == domainStripped: domainStripped = None
 										if not any(j == domain for j in words) and (not domainStripped or not any(j == domainStripped for j in words)):
 											if not any(j == domain for j in names) and (not domainStripped or not any(j == domainStripped for j in names)):
-												result.append(Tools.replaceNotAlphaNumeric(data = domain, replace = '[\s\.\-\_]?'))
+												result.append(Tools.replaceNotAlphaNumeric(data = domain, replace = r'[\s\.\-\_]?'))
 
 				self.log('      Progress: 100%')
 

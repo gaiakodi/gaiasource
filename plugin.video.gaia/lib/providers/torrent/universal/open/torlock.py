@@ -44,10 +44,10 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 
 
-	_ExpressionHash			= '(?:info\s*)?hash\s*' + ProviderHtml.ExpressionSha
-	_ExpressionVerified		= '(verified)'
-	_ExpressionNext			= '(next)'
-	_ExpressionApproval		= '(\-?\d+)\s*(?:good|bad)?\s*vote'
+	_ExpressionHash			= r'(?:info\s*)?hash\s*' + ProviderHtml.ExpressionSha
+	_ExpressionVerified		= r'(verified)'
+	_ExpressionNext			= r'(next)'
+	_ExpressionApproval		= r'(\-?\d+)\s*(?:good|bad)?\s*vote'
 
 	##############################################################################
 	# INITIALIZE

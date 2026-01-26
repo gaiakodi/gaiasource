@@ -157,10 +157,10 @@ class Provider(ProviderJson):
 										ProviderJson.ProcessExtract : {
 											ProviderJson.RequestCookies : ProviderJson.RequestCookiePhp,
 											ProviderJson.RequestHeaders : {
-												ProviderJson.RequestHeaderRequestToken : ['token\s*:\s*(.*?)(?:$|\s|,)', '%s\s*\+?=\s*[\'"](.*?)[\'";]'],
+												ProviderJson.RequestHeaderRequestToken : [r'token\s*:\s*(.*?)(?:$|\s|,)', r'%s\s*\+?=\s*[\'"](.*?)[\'";]'],
 											},
 										},
-										ProviderJson.ProcessValidate : {ProviderJson.RequestHeaders : {ProviderJson.RequestHeaderRequestToken : '.{1,}'}},
+										ProviderJson.ProcessValidate : {ProviderJson.RequestHeaders : {ProviderJson.RequestHeaderRequestToken : r'.{1,}'}},
 									}
 
 			formatEncode			= ProviderJson.FormatEncodeNone

@@ -25,7 +25,6 @@ import hashlib
 import xbmc
 import xbmcvfs
 import xbmcgui
-import xbmcaddon
 from threading import Lock
 
 try: import sqlite3 as database
@@ -65,6 +64,7 @@ class Database(object):
 	LimitFree = 0.8
 	Timeout = 20
 	Compression = None
+	Addon = {}
 
 	# 2024-12
 	# Use the "new" Write-Ahead-Logging (WAL), instead of the old Journaling (DELETE) mode.
@@ -126,7 +126,7 @@ class Database(object):
 	def path(self, name, id = None, info = 'profile', path = []):
 		try:
 			if not name.endswith(Database.Extension): name += Database.Extension
-			return os.path.join(xbmcvfs.translatePath((xbmcaddon.Addon(id) if id else xbmcaddon.Addon()).getAddonInfo(info)), *path, name)
+			return os.path.join(xbmcvfs.translatePath(self.addon(id = id).getAddonInfo(info)), *path, name)
 		except:
 			return None
 
@@ -193,9 +193,17 @@ class Database(object):
 		finally:
 			self.__unlock()
 
+	@classmethod
+	def addon(self, id = None):
+		addon = Database.Addon.get(id)
+		if addon is None:
+			from lib.modules.tools import System
+			addon = System.addon(id = id or System.GaiaAddon)
+			Database.Addon[id] = addon
+		return addon
+
 	def _addon(self):
-		if self._mAddon: return xbmcaddon.Addon(self._mAddon)
-		else: return xbmcaddon.Addon()
+		return self.addon(id = self._mAddon)
 
 	def _initialize(self):
 		pass
@@ -411,19 +419,10 @@ class Database(object):
 	# tables can be None, table name, or list of tables names.
 	# If tables is provided, only clears the specific table(s), otherwise clears all tables.
 	def clear(self, tables = None, confirm = False):
-		title = self._addon().getAddonInfo('name') + ' - ' + self._addon().getLocalizedString(33013)
-		message = self._addon().getLocalizedString(33042)
-		if not confirm or xbmcgui.Dialog().yesno(title, message):
+		from lib.modules.interface import Dialog
+		if not confirm or Dialog.option(title = 33013, message = 33042):
 			self._deleteAll(tables = tables)
-			if confirm:
-				message = self._addon().getLocalizedString(33043)
-
-				icon = xbmcaddon.Addon('script.gaia.resources').getAddonInfo('path')
-				icon = self._addon().getAddonInfo('profile')
-				icon = xbmcvfs.translatePath(self._mPath)
-
-				icon = os.path.join(icon, 'resources', 'media', 'notifications', 'information.png')
-				xbmcgui.Dialog().notification(title, message, icon = icon)
+			if confirm: Dialog.notification(title = 33013, message = 33043, icon = Dialog.IconInformation)
 
 	##############################################################################
 	# COMPRESSION

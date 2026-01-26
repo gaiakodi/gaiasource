@@ -53,10 +53,10 @@ class ProviderNzbreader(ProviderUsenetHtml):
 	_AttributeTable			= 'results'
 	_AttributeNext			= 'paging_next'
 
-	_ExpressionCollection	= 'collection\/(.*?)(?:$|\/)'
-	_ExpressionUuid			= 'nzbreader\/(.*?)(?:$|\/)'
-	_ExpressionGet			= '(\/get\/collection\/)'
-	_ExpressionUploader		= '(?:&|&amp;)q=(.*?)(?:$|&)'
+	_ExpressionCollection	= r'collection\/(.*?)(?:$|\/)'
+	_ExpressionUuid			= r'nzbreader\/(.*?)(?:$|\/)'
+	_ExpressionGet			= r'(\/get\/collection\/)'
+	_ExpressionUploader		= r'(?:&|&amp;)q=(.*?)(?:$|&)'
 
 	##############################################################################
 	# INITIALIZE

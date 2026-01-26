@@ -1,12 +1,44 @@
 #########################################################################################################################
 
-Download:			https://pypi.org/project/pytz/#files
-Current Version:	2021.1 (2021-02-23)
-Used By:			TzLocal, Gaia
+Download:		https://pypi.org/project/pytz/#files
+Current Version:	2025.2 (2026-01-23)
+Used By:		TzLocal, Gaia
 
 #########################################################################################################################
 
 find ./ -type f -exec sed -i -e 's/from pytz/from externals.pytz/g' {} \;
 find ./ -type f -exec sed -i -e 's/import pytz/from externals import pytz/g' {} \;
+
+#########################################################################################################################
+
+Update (2026-01):
+pkg_resources is deprecated in Python 3.12.
+
+Change from this:
+
+            try:
+                from pkg_resources import resource_stream
+            except ImportError:
+                resource_stream = None
+
+            if resource_stream is not None:
+                return resource_stream(__name__, 'zoneinfo/' + name)
+                
+to this (make sure the indentation is correct - spaces):
+
+            # GAIACODE
+            stream = None
+            try:
+                from importlib import resources
+                stream = resources.open_binary(__name__ + '.zoneinfo' + (('.' + '.'.join(name_parts[:-1])) if len(name_parts) > 1 else ''), name_parts[-1])
+            except: pass
+            if stream: return stream
+            else:
+                try:
+                    from pkg_resources import resource_stream
+                except ImportError:
+                    resource_stream = None
+                if resource_stream is not None:
+                    return resource_stream(__name__, 'zoneinfo/' + name)
 
 #########################################################################################################################

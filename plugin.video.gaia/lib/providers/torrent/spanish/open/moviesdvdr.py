@@ -37,13 +37,13 @@ class Provider(ProviderHtml):
 	_AttributePages				= 'wp-pagenavi'
 	_AttributeNext				= 'nextpostslink'
 
-	_ExpressionSize				= u'tamaño\s*:*\s*(.*)'
-	_ExpressionTime				= u'fecha\s*:*\s*(.*)'
-	_ExpressionFormat			= u'formato\s*:*\s*(.*)'
-	_ExpressionAudioLanguage	= u'idiomas\s*:*\s*(.*)'
-	_ExpressionSubtitleLanguage	= u'subtitulos\s*:*\s*(.*)'
-	_ExpressionSubtitle			= u'(subtitulos)'
-	_ExpressionLanguage			= u'(idioma\s*)'
+	_ExpressionSize				= r'tamaño\s*:*\s*(.*)'
+	_ExpressionTime				= r'fecha\s*:*\s*(.*)'
+	_ExpressionFormat			= r'formato\s*:*\s*(.*)'
+	_ExpressionAudioLanguage	= r'idiomas\s*:*\s*(.*)'
+	_ExpressionSubtitleLanguage	= r'subtitulos\s*:*\s*(.*)'
+	_ExpressionSubtitle			= r'(subtitulos)'
+	_ExpressionLanguage			= r'(idioma\s*)'
 
 	##############################################################################
 	# INITIALIZE

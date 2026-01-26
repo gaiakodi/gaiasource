@@ -134,10 +134,10 @@ class Environment(object):
 
 	@classmethod
 	def enabled(self):
-		# Do not use Gaia's Setting class here, since it is called from script.modules.externals.
 		if Environment.Enabled is None:
-			import xbmcaddon
-			addon = xbmcaddon.Addon()
+			# Do not use Gaia's Setting class here, since it is called from script.modules.externals.
+			from lib.modules.tools import System
+			addon = System.addon()
 
 			mode = addon.getSettingInt(Environment.SettingMode)
 			if mode == 1: Environment.Enabled = True

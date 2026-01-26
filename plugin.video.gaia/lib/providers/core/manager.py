@@ -130,7 +130,7 @@ class Manager(object):
 				def _success():
 					label = Settings.getDataLabel(id = id)
 					if label:
-						label = Regex.extract(data = label, expression = '(\d+)')
+						label = Regex.extract(data = label, expression = r'(\d+)')
 						if label and int(label) > 0: return True
 					return False
 

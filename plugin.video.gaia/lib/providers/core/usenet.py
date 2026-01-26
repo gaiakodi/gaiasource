@@ -21,7 +21,6 @@
 from lib.providers.core.base import ProviderBase
 from lib.providers.core.json import ProviderJson
 from lib.providers.core.html import ProviderHtml
-from lib.modules.tools import Regex
 
 class ProviderUsenet(object):
 

@@ -814,7 +814,7 @@ class ProviderHtml(ProviderWeb):
 		return item
 
 	def extractHtmlExpression(self, data, multi = False):
-		if multi: return Regex.match(data = data, expression = '(\([^\?].*?\).*?){2,}')
+		if multi: return Regex.match(data = data, expression = r'(\([^\?].*?\).*?){2,}')
 		else: return data and '(' in data and ')' in data
 
 	def extractHtmlParameters(self, keys, extract = None):

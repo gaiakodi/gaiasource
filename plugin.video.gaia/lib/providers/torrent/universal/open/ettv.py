@@ -37,13 +37,13 @@ class Provider(ProviderHtml):
 	_AttributeDownload		= 'downloadbox'
 	_AttributeDetails		= 'download'
 
-	_ExpressionName			= '(.*?)\s*torrent$'
-	_ExpressionTime			= 'date\s*added\s*:\s*(.*)'
-	_ExpressionLanguage		= 'lang\s*:\s*(.*)'
-	_ExpressionCategory		= 'category\s*:\s*(.*)'
-	_ExpressionMovie		= '(movie)'
-	_ExpressionShow			= '(tv)'
-	_ExpressionNext			= '(next)'
+	_ExpressionName			= r'(.*?)\s*torrent$'
+	_ExpressionTime			= r'date\s*added\s*:\s*(.*)'
+	_ExpressionLanguage		= r'lang\s*:\s*(.*)'
+	_ExpressionCategory		= r'category\s*:\s*(.*)'
+	_ExpressionMovie		= r'(movie)'
+	_ExpressionShow			= r'(tv)'
+	_ExpressionNext			= r'(next)'
 
 	##############################################################################
 	# INITIALIZE

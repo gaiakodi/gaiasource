@@ -83,12 +83,12 @@ class View(object):
 
 			xml = File.joinPath(skinPath, 'addon.xml')
 			data = File.readNow(xml).replace('\n', '')
-			source = Regex.extract(data = data, expression = 'defaultresolution\s*=\s*[\\\'\\"](.+?)[\\\'\\"]')
-			if not source: source = Regex.extract(data = data, expression = '<\s*res.+?folder\s*=\s*[\\\'\\"](.+?)[\\\'\\"]')
+			source = Regex.extract(data = data, expression = r'defaultresolution\s*=\s*[\\\'\\"](.+?)[\\\'\\"]')
+			if not source: source = Regex.extract(data = data, expression = r'<\s*res.+?folder\s*=\s*[\\\'\\"](.+?)[\\\'\\"]')
 			source = File.joinPath(skinPath, source, 'MyVideoNav.xml')
 
 			data = File.readNow(source).replace('\n', '')
-			views = Regex.extract(data = data, expression = '<views>(.+?)</views>')
+			views = Regex.extract(data = data, expression = r'<views>(.+?)</views>')
 			views = [int(x) for x in views.split(',')]
 
 			Loader.hide() # NB: Loader must be hidden, otherwise the info label below will not work.

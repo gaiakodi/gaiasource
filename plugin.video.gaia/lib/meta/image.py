@@ -1874,7 +1874,7 @@ class MetaImage(object):
 				'''
 				for type, link in images.items():
 					if 'fanart.tv/' in link:
-						path = Regex.extract(data = link, expression = '.*\/(.*?)$')
+						path = Regex.extract(data = link, expression = r'.*\/(.*?)$')
 						images[type] = 'https://images.fanart.tv/fanart/' + path
 				'''
 

@@ -28,7 +28,7 @@ class Provider(ProviderHtml):
 
 	_ParameterQuery			= 'search'
 
-	_ExpressionItem			= '(odd\d?)'
+	_ExpressionItem			= r'(odd\d?)'
 
 	##############################################################################
 	# INITIALIZE

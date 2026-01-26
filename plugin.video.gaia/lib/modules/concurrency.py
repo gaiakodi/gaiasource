@@ -272,7 +272,7 @@ class Concurrency(object):
 		if not exception: return Concurrency.ErrorNone
 		exception = str(exception)
 		if not exception: return Concurrency.ErrorNone
-		elif Regex.match(data = exception, expression = 'can\'t\s*start\s*new\s*thread'): return Concurrency.ErrorStart
+		elif Regex.match(data = exception, expression = r'can\'t\s*start\s*new\s*thread'): return Concurrency.ErrorStart
 		else: return Concurrency.ErrorUnknown
 
 	def _errorNotification(self, error):
@@ -1050,6 +1050,10 @@ class Pool(object):
 			for id, instance in self.threads().items():
 				self._log('   THREAD: %s [%s]' % (id, instance.label()), prefix = False)
 
+			# Exclude certain processes.
+			exclusions = [
+			]
+
 			# Add custom timeouts for processes that are known to take longer.
 			exceptions = [
 				{'instance' : 'System._launch', 'timeout' : 180}, # System._launch.<locals>._launchObserve -> Settings.saveWait() will wait 60+ seconds.
@@ -1059,15 +1063,32 @@ class Pool(object):
 			# Do multiple loops, so that we can wait on instances that might have started during the first iteration.
 			recheck = True
 			while recheck:
+				if System.aborted(): break
+
 				running = False
 				nonrunning = False
 
 				for instance in list(Pool.Instances.values()): # Use a list, since instances can be removed while iterating. Otherwise throws: dictionary changed size during iteration.
 					try:
+						if System.aborted(): break
+
 						if instance and not instance.isDaemon():
+							label = instance.label()
+
+							# Ignore certain threads.
+							try:
+								excluded = False
+								for i in exclusions:
+									if i['instance'] in label:
+										excluded = True
+										break
+								if excluded: continue
+							except:
+								from lib.modules.tools import Logger
+								Logger.error()
+
 							# Get a custom timeout for exceptions.
 							try:
-								label = instance.label()
 								timeoutException = timeouts.get(label)
 								if not timeoutException:
 									for i in exceptions:
@@ -1084,16 +1105,16 @@ class Pool(object):
 							if busy:
 								if timeoutCustom:
 									timer = Time(start = True)
-									while instance.alive():
+									while instance.alive() and not System.aborted():
 										self.sleep(busy)
 										if timer.elapsed() > timeoutCustom:
 											if instance.alive(): self._logDangling(instance = instance)
 											break
 									if timeoutDefault:
-										while instance.alive():
+										while instance.alive() and not System.aborted():
 											self.sleep(busy)
 								else:
-									while instance.alive():
+									while instance.alive() and not System.aborted():
 										self.sleep(busy)
 							else:
 								instance.join(timeout = timeoutCustom)
@@ -1142,17 +1163,20 @@ class Pool(object):
 				if timeout:
 					timer = Time(start = True)
 					for i in instance:
-						while i.alive():
+						if System.aborted(): break
+						while i.alive() and not System.aborted():
 							self.sleep(busy)
 							if timer.elapsed() > timeout:
 								if i.alive(): self._logDangling(instance = i)
 								break
 				else:
 					for i in instance:
-						while i.alive():
+						if System.aborted(): break
+						while i.alive() and not System.aborted():
 							self.sleep(busy)
 			else:
 				for i in instance:
+					if System.aborted(): break
 					i.join(timeout = timeout)
 					if i.alive(): self._logDangling(instance = i)
 
@@ -1177,7 +1201,9 @@ class Pool(object):
 			if delay <= interval:
 				self.sleep(delay)
 			else:
+				from lib.modules.tools import System
 				for i in range(int(delay / float(interval))):
+					if System.aborted(): break
 					if Pool.Joining and (not minimum or (i * interval) > minimum): break
 					self.sleep(interval)
 
@@ -1457,6 +1483,15 @@ class Pool(object):
 			Kodi allows a single process to execute at any given time per addon ID.
 			If an addon has multiple processes running, Kodi will interleave them sequentially, similar to how the GIL works for threads.
 			So if one process is executing, other processes of the addon are waiting until the first process finishes or sleeps.
+		UPDATE (2026-01):
+			After testing, it turns out that Kodi executes individual Python processes/invokers on separate CPU cores.
+			Even if a process is launched with the SAME addon ID, Kodi still executes them on their own core.
+			Hence, Kodi/Python does not interleave separate invokers, but instead executes them fully in parallel.
+			Eg: These will all run on their one core and utilize 100% of that core (eg: heavy-duty-task does a 1 min compression task):
+				tools.System.executePlugin(id = 'plugin.video.gaia', action = 'heavy-duty-task')
+				tools.System.executePlugin(id = 'plugin.video.gaia', action = 'heavy-duty-task')
+				tools.System.executePlugin(id = 'plugin.video.gaia', action = 'heavy-duty-task')
+			These tasks use the same total time (plus about 5-10% overhead) compared to the time it takes if only a single process is executed.
 
 		To solve the problem of a process for menu-loading having to wait a long time until it gets CPU time, add sleeps in between computationally-expensive code, so that Python switches to the execution of another process.
 		There are two main places that has computationally-expensive code:
@@ -1497,18 +1532,6 @@ class Pool(object):
 			Kodi will try to kill the processes/threads, but this seems to not really work and the code keeps executing.
 			The user might then kill Kodi because it froze and does not exit (at least not for a while), and this might cause various other issues, like certain Gaia settings losing their value when Kodi is restarted.
 			Hence, during these sleeps, also check if Kodi was aborted, and if so, cancel the current code execution.
-
-		#gaiafuture
-		The solution of sleeping and locking seems to work pretty well.
-		However, we might be able to improve this even further in the future.
-		If Kodi allows only a single process per addon ID to execute at the same time, would it help to add another dummy/reloading addon to Gaia (eg: script.gaia.reload)?
-		This addon will handle:
-			1. Smart-reloading from Playback.reload() through a the dummy addon during boot and after playback is done.
-			2. Instead of doing individual metadata background refreshing at the end of a process, simply pass the media + IDs to the dummy addon, and then start the dummy addon at the end of the current execution to do the refreshing in a separate process.
-		Before doing this, make sure of the following:
-			1. That Kodi allows the concurrent execution of two processes from two different addon IDs. Not that all addons share the same CPU time.
-			2. The dummy addon should import the code from plugin.video.gaia, instead of calling one of its endpoint. This could cause various problems in the dummy addon, such as the wrong addon settings being used. Eg: script.gaia.reload should still use the settings from plugin.video.gaia.
-			3. If plugin.video.gaia makes a system call to script.gaia.reload, does Kodi see this as a new separate process under script.gaia.reload, or will it add the process as a child under plugin.video.gaia?
 	'''
 
 	@classmethod

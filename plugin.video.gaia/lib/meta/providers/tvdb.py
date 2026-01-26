@@ -154,7 +154,7 @@ class MetaTvdb(MetaProvider):
 
 					premiered = data.releaseDateFirst(zone = MetaData.ZoneOriginal, format = MetaData.FormatDate)
 					if premiered:
-						premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+						premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 						if premiered:
 							result['premiered'] = premiered
 							result['aired'] = premiered
@@ -343,7 +343,7 @@ class MetaTvdb(MetaProvider):
 								if episodeFirst: premiered = episodeFirst.releaseDateFirst(zone = MetaData.ZoneOriginal, format = MetaData.FormatDate)
 								if not premiered and resultSeason['season'] <= 1: premiered = showPremiered # Do not do this for later seasons, since they might be new/unaired seasons and we do not want to use the years-earlier show premier date.
 							if premiered:
-								premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+								premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 								if premiered:
 									resultSeason['premiered'] = premiered
 									resultSeason['aired'] = premiered
@@ -612,7 +612,7 @@ class MetaTvdb(MetaProvider):
 								seasonTime = season.releaseDateFirst(zone = MetaData.ZoneUtc, format = MetaData.FormatTimestamp) # Return the timestamp in UTC, not the original timezone.
 								seasonPremiered = season.releaseDateFirst(zone = MetaData.ZoneOriginal, format = MetaData.FormatDate)
 								if not seasonPremiered and season.numberSeason() == 1: seasonPremiered = showPremiered # Do not do this for later seasons. Otherwise new unaired season/episodes without a release date yet, will get the 1st season's date.
-								if seasonPremiered: seasonPremiered = Regex.extract(data = seasonPremiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+								if seasonPremiered: seasonPremiered = Regex.extract(data = seasonPremiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 
 								seasonAirs = {}
 								seasonAirTime = season.releaseTime(zone = MetaData.ZoneOriginal)
@@ -725,7 +725,7 @@ class MetaTvdb(MetaProvider):
 											# Aka the season premiere date might be EARLIER than the airing date of some later episodes.
 											if not premiered and not previousPremiered: premiered = seasonPremiered
 											if premiered:
-												premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+												premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 												if premiered:
 													resultEpisode['premiered'] = premiered
 													resultEpisode['aired'] = premiered
@@ -1134,7 +1134,7 @@ class MetaTvdb(MetaProvider):
 					return Networker.linkName(image.get('link'), extension = False)
 
 				def _id(name):
-					return Regex.replace(data = name, expression = '\-(\d+)(?:$|\-)', replacement = 'x', group = 1)
+					return Regex.replace(data = name, expression = r'\-(\d+)(?:$|\-)', replacement = 'x', group = 1)
 
 				def _add(id, vote, index, quality):
 					try:

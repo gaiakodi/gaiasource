@@ -394,7 +394,7 @@ class Playback(Database):
 		choice = Dialog.input(title = title, type = Dialog.InputDate)
 		if choice:
 			try:
-				choice = Regex.extract(data = choice, expression = '(\d{1,2})\/(\d{1,2})\/(\d{4})', all = True, group = None)[0]
+				choice = Regex.extract(data = choice, expression = r'(\d{1,2})\/(\d{1,2})\/(\d{4})', all = True, group = None)[0]
 				result = self.timestamp(date = '%02d-%02d-%02d' % (int(choice[2]), int(choice[1]), int(choice[0])), time = time)
 			except:
 				result = None
@@ -1170,7 +1170,7 @@ class Playback(Database):
 						break
 
 				duration = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordShort)
-				duration = Regex.replace(data = duration, expression = '(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
+				duration = Regex.replace(data = duration, expression = r'(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
 
 				message += ' ' + Translation.string(36523) % (Format.fontBold(label), duration)
 
@@ -1222,7 +1222,7 @@ class Playback(Database):
 			return True
 		return False
 
-	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, bulk = False, accelerate = False, launch = False, force = False, wait = False):
+	def reload(self, media = None, history = False, progress = False, rating = False, arrival = False, bulk = False, accelerate = False, launch = False, force = False, wait = False):		
 		# The menu reloading could take place in a thread, but this could hold up other important code, since some menus can take a long time to refresh.
 		# Even if we add a delay/sleep to the reload thread, allowing other code to execute first, eventually the reloading execution will catch up.
 		# Smart-reloading will also background retrieve metadata and has to do a lot of processing to smart-assemble the menus, which is all too much for a "quick" reload.

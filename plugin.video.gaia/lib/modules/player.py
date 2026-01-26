@@ -18,6 +18,70 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+#gaiaremove
+#gaiaremove
+#gaiaremove
+# There are two issues when playback starts, probably both resulting from the same root cause:
+#	1. Occasionally when the video starts playing, Kodi fails to play the video after 1-2 seconds and the stream is reconnected (aka connection retry).
+#	   Sometimes playback fails right at the start, but sometimes the video plays for a second before failing.
+#	   Reconnecting typically works, but the Kodi Kore app does not show the movie/episode metadata in the app anymore once reconnected.
+#	2. Occasionally when playback starts with a resume point (aka previous known playback progress), the playback does not resume at the given point.
+#	   Kodi then starts playing the video from the start.
+#	   The playback progress % is available from both Trakt and the local playback database. Hence, this is most likely not caused because the resume point is unknown.
+# Both problems are rare and very sporadic. They also seem to happen on a TV+AVreceiver+KodiBox, but not really on the dev machine.
+# This is what typically happens:
+#	1. When the video starts playing, the TV screen turns black for 1-2 seconds.
+#	2. After this delay, the TV screen turns back on and plays the video, but then fails and starts the reconnection.
+#	3. Sometimes the TV screen does not turn back to the video before failure, but instead, when the TV screen turns back on, the video playback was already stopped and now shows the Gaia reconnection window or the stream reload dialog.
+#	4. Sometimes the TV screen turns back on and plays the video without failure, but then the playback resume point might get ignored.
+#	5. Kodi then starts the playback from the beginning, instead of continuing from the 1-2 seconds it already played.
+# These were considered as the possible causes:
+#	1. When the video starts playing, the TV switches from SDR to HDR mode, causing the 1-2 seconds TV blackout.
+#	   The solution is to wait for the TV to switch into HDR before doing the audio/subtitle stream selection and playback resuming.
+#	   This is probably not the reason - check the next point below.
+#	2. The problem is caused by Gaia changing the audio stream when the playback starts.
+#	   Right before the screen turns black, the audio selection code executes and the last line in the log shows:
+#			GAIA DEV: Playback AV Changed
+#			GAIA DEV: Playback AV Started
+#			GAIA DEV: [AUDIO] Language preferences: French | Spanish
+#			GAIA DEV: [AUDIO] Available streams: English (BTM DDP5.1 Atmos - DD+ 5.1(side)) | French (BTM DDP5.1 - DD+ 5.1(side))
+#			GAIA DEV: [AUDIO] Original audio language: English | Spanish | French
+#			GAIA DEV: [AUDIO] Using preferred stream: French (BTM DDP5.1 - DD+ 5.1(side))
+#			Closing stream player 1
+#			Waiting for audio thread to exit
+#			thread end: CVideoPlayerAudio::OnExit()
+#			Closing audio device
+#			Deleting audio codec
+#			Opening stream: 7 source: 256
+#			Finding audio codec for: 86056
+#			CDVDAudioCodecFFmpeg::Open() Successful opened audio decoder eac3
+#			OpenStream: Allowing max Out-Of-Sync Value of 10 ms
+#			Creating audio thread
+#			running thread: CVideoPlayerAudio::Process()
+#			CActiveAESink::OpenSink - initialize sink
+#			GAIA DEV: Playback AV Changed
+#			PulseAudio: Opened device Default in pcm mode with Buffersize 150 ms Periodsize 50 ms
+#	   Then the screen turns black for a few seconds before playback resumes, with this log showing during this time:
+#			Creating audio stream (codec id: 86056, channels: 6, sample rate: 48000, no pass-through)
+#			CActiveAESink::OpenSink - initialize sink
+#			PulseAudio: Opened device Default in pcm mode with Buffersize 150 ms Periodsize 50 ms
+#			GAIA DEV: Playback AV Changed
+#			CVideoPlayerAudio::Process - stream stalled
+#	   It is Kodi's interface turning black, not the entire screen.
+#	   Kodi might only loaded a single audio stream during playback.
+#	   Hence, when changing the audio stream, Kodi has to retrieve it at that point.
+#	   Then the audio buffer is empty and needs to be loaded with new data.
+#	   Kodi then probably restarts the video playback as well, since it will have to restart the audio buffer, since it was empty.
+#	   This is a just guess, but according to the log, the root cause might very well be changing the audio stream.
+#			When audio buffers are reset, something might fail in Kodi, causing the playback to fail, and then Gaia reconnecting the stream.
+#			Even if the playback does not fail, when Kodi restarts the playback after changing the audio track, any previous resume point is now also reset.
+# These were the solutions that were tried:
+#	1. [NOT THE SOLUTION] Moving the resume call from keepPlaybackAlive() to progressInitialize().
+#	2. [NOT THE SOLUTION] Adding a small sleep time in playbackInitialize() to progressInitialize() to allow Kodi some time to initialize everything before Gaia initializes its stuff.
+#	3. [CURRENT SOLUTION BEING TESTED] Wait in streamSelect() for the audio stream to get selected before continuing with the rest of the initialization code.
+#		If the audio stream is changed, wait for onAVChange() to fire, before continuing with the other initialization code (eg: playback resume).
+#		playbackInitialize() was also changed to adjust when progressInitialize() is started.
+
 import xbmc
 import xbmcvfs
 
@@ -142,6 +206,7 @@ class Player(xbmc.Player):
 			try: self.idSet = metadata['collection']['id']
 			except: self.idSet = None
 
+			self.changed = None
 			self.autoplay = autoplay
 			self.reload = reload
 			self.handle = handle
@@ -1274,7 +1339,7 @@ class Player(xbmc.Player):
 
 		self._errorLast = None
 		self._errorSeparator = end
-		self._errorExpression = '%s(.*?)(?:$|%s)' % (start.replace('[', '\[').replace(']', '\]').replace(' ', '\s').replace('/', '\/'), end.replace('[', '\[').replace(']', '\]').replace(' ', '\s').replace('/', '\/'))
+		self._errorExpression = r'%s(.*?)(?:$|%s)' % (start.replace('[', r'\[').replace(']', r'\]').replace(' ', r'\s').replace('/', r'\/'), end.replace('[', r'\[').replace(']', r'\]').replace(' ', r'\s').replace('/', r'\/'))
 
 		tools.Logger.log(start)
 
@@ -1313,7 +1378,7 @@ class Player(xbmc.Player):
 				data = tools.Logger.data()
 				if data:
 					data = tools.Regex.extract(data = data, expression = self._errorExpression, flags = tools.Regex.FlagAllLines)
-					if data: return tools.Regex.match(data = data, expression = 'VideoPlayer::OnExit')
+					if data: return tools.Regex.match(data = data, expression = r'VideoPlayer::OnExit')
 
 		except: tools.Logger.error()
 		return False
@@ -1556,12 +1621,6 @@ class Player(xbmc.Player):
 					self.join(self.progressThread)
 					self.progressThread = None
 
-				# Moved this from keepPlaybackAlive().
-				# Occasionally resuming the progress does not work, and Kodi starts playing from the start, even though the playback progress is known.
-				# Maybe this happens because Kodi restarts the playback, or the TV/Kodi enters into HDR mode, and then Kodi restarts the playback, and then the resuming point is lost.
-				# Try to do this here, once (hopefully) everything in Kodi's playback is initialized.
-				#gaiaremove - Fix this: this does not fix the problem. Maybe start a thread to sleep for a few secs and then check if resumed - and if not, try to resume again.
-				#gaiaremove - is this problem (and the retry connection issue) caused by the TV switching into HDR mode? If so, any way to detect this and do all the playbackInitialize() only once the TV iks in HDR mode.
 				try:
 					if self.resumeTime:
 						tools.Time.sleep(0.05)
@@ -1571,9 +1630,8 @@ class Player(xbmc.Player):
 						self.playbackLock.release()
 						locked = False
 						tools.Time.sleep(0.05)
-				except: pass
+				except: tools.Logger.error()
 				finally:
-					tools.Logger.error()
 					try:
 						if locked:
 							self.playbackLock.release()
@@ -1828,21 +1886,83 @@ class Player(xbmc.Player):
 			except:
 				tools.Logger.error()
 
-	def streamSelect(self):
+	def streamSelect(self, wait = None, threads = None):
 		locked = False
+		started = False
 		try:
+			# The audio stream does not have any popup dialogs.
+			# Auto-select the audio, while the progress resume dialog might be showing.
 			enabled = tools.Settings.getBoolean('playback.general.pause')
 			if enabled:
 				self.playbackLock.acquire()
 				locked = True
 				Streamer.playerPause()
+				self.playbackLock.release()
+				locked = False
+
+			#gaiaremove - new code - check comment at the start of the file.
+			# When changing the audio stream, Kodi sometimes sporadically fails playback requiring reconnection, or Kodi restarts the playback once the audio stream changed.
+			# Wait for the audio stream to change before continuing with the initialization, such as resuming playback at a specific point.
+			# Hopefully this solves the issues of failing/retrying the connection, and losing the resume point.
+			# Detecting when the audio stream has changed is a bit difficult:
+			#	1. When changing the audio stream, Kodi immediately has the new stream ID in Audio.streamCurrent(), although the stream has not actually changed yet. Only a few seconds later when onAVChange() is fired, is the audio actually changed.
+			#	2. onAVChange() also fires when the video or subtitle changes. And there is no way in onAVChange() to determine if the change is due to audio or subtitles. Hence, wait for the audio stream to change before changing the subtitles, to avoid onAVChange() firing twice.
+			changed = self.changed
+			def _wait():
+				try:
+					audio = Audio.changed()
+					if not audio is None:
+						# Wait up to 3 seconds for the stream to change before continuing.
+						# In case the stream changing does not work or takes too long, or if onAVChange() does not fire or fires too late.
+						duration = 3
+						interval = 0.05
+						for i in range(int(duration / interval)):
+							current = Audio.streamCurrent()
+							if current and current.get('id') == audio and not changed == self.changed: break
+							tools.Time.sleep(interval)
+						tools.Time.sleep(interval * 2) # Wait a bit longer.
+				except: tools.Logger.error()
 
 			Audio.select(metadata = self.metadata) # Must be before subtitles, since the subtitles might need the current audio stream/language.
-			thread = Subtitle.select(name = self.name, imdb = self.idImdb, tmdb = self.idTmdb, title = self.title, year = self.year, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
+			if wait is True or wait == 1: _wait()
+
+			subtitle = Subtitle.select(name = self.name, imdb = self.idImdb, tmdb = self.idTmdb, title = self.title, year = self.year, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = self.playbackLock)
+			if wait == 2: _wait()
+
+			# Start the progress resume thread, while the subtitles load and only AFTER the audio stream has changed above.
+			if threads:
+				started = True
+				[thread.start() for thread in threads]
+			if wait == 3: _wait()
 
 			if enabled:
-				if thread: thread.join()
+				if subtitle: subtitle.join()
 				Streamer.playerUnpause()
+			if wait == 4: _wait()
+		except: tools.Logger.error()
+		finally:
+			try:
+				if locked: self.playbackLock.release()
+			except: pass
+		if not started and threads: [thread.start() for thread in threads] # In case the code above throws an exception.
+
+	#gaiaremove - the old streamSelect() function. Can be removed once the issues in the comments at the start of the file are resolved.
+	def streamSelectOld(self, wait = None, threads = None):
+		locked = False
+		try:
+			self.playbackLock.acquire()
+			locked = True
+
+			enabled = tools.Settings.getBoolean('playback.general.pause')
+			if enabled: Streamer.playerPause()
+
+			Audio.select(metadata = self.metadata)
+			subtitle = Subtitle.select(name = self.name, imdb = self.idImdb, tmdb = self.idTmdb, title = self.title, year = self.year, season = self.seasonString, episode = self.episodeString, source = self.source['stream'], lock = None if locked else self.playbackLock)
+
+			if enabled:
+				if subtitle: subtitle.join()
+				Streamer.playerUnpause()
+		except: tools.Logger.error()
 		finally:
 			try:
 				if locked: self.playbackLock.release()
@@ -1863,7 +1983,8 @@ class Player(xbmc.Player):
 			self.playbackInitialized = True
 
 			# Wait for other code to execute first.
-			tools.Time.sleep(0.01)
+			# Update: Do not do this, otherwise other code is executed first, making the threads below start to late.
+			#tools.Time.sleep(0.01)
 
 			for i in range(0, 1200):
 				# Check "started" as well, otherwise the playback window is closed too quickly and the background menus are visible for a second.
@@ -1880,14 +2001,27 @@ class Player(xbmc.Player):
 			# This is important for anime, where the dialog often starts in the 1st second of the video.
 			# If selecting the subtitles takes too long (when executing sequentially), the first few sentences might be missed.
 			# streamSelect() does pause playback until the subtitles were selected, but it might take too long before it is paused while the dialog already started.
-			threads = [
+			#gaiaremove - check comment at the start of the file.
+			'''threads = [
 				Pool.thread(target = self.streamSelect, start = True),
 				Pool.thread(target = self.progressInitialize, start = True),
+			]
+			[thread.join() for thread in threads]'''
+			#gaiaremove - try the approach below first.
+			'''thread = Pool.thread(target = self.progressInitialize)
+			threads = [
+				Pool.thread(target = self.streamSelect, kwargs = {'threads' : [thread]}, start = True),
+				thread,
+			]
+			[thread.join() for thread in threads]'''
+			threads = [
+				Pool.thread(target = self.progressInitialize, start = True),
+				Pool.thread(target = self.streamSelect, kwargs = {'wait' : 4}, start = True),
 			]
 			[thread.join() for thread in threads]
 
 			# Only do this after the streamSelect() and progressInitialize().
-			# Otherwise the Skip button might show over the resume/subtitle dialogs making them unclickable until the Skip button ius canceled.
+			# Otherwise the Skip button might show over the resume/subtitle dialogs making them unclickable until the Skip button is cancelled.
 			if self.mediaSerie: Chapter.select(resume = self.resumedTime)
 
 			# Only start this AFTER the resume feature and subtitle dialogs, since they pause playback which is incorrectly detected as buffering.
@@ -2020,6 +2154,7 @@ class Player(xbmc.Player):
 		self.playbackInitialize()
 
 	def onAVChange(self):
+		self.changed = tools.Time.timestamp(milliseconds = True)
 		tools.Logger.log('Playback AV Changed')
 		#Pool.thread(target = self._onAVChange, start = True)
 
@@ -2047,6 +2182,7 @@ class Streamer(object):
 	Player = None
 	Status = None
 	Language = None
+	Changed = None
 
 	# Must correspond with settings.xml.
 	LanguageAutomatic = 0
@@ -2073,6 +2209,36 @@ class Streamer(object):
 	@classmethod
 	def name(self):
 		return self.__name__
+
+	@classmethod
+	def log(self, message, stream = None):
+		message = '[%s] %s' % (self.name().upper(), message)
+		if stream:
+			if tools.Tools.isArray(stream):
+				if tools.Tools.isString(stream[0]): tools.Logger.log('%s: %s' % (message, ' | '.join([str(tools.Language.name(i)) for i in stream])))
+				elif not 'language' in stream[0]: tools.Logger.log('%s: %s' % (message, ' | '.join([str(i[tools.Language.Name][tools.Language.NameDefault]) for i in stream])))
+				else: tools.Logger.log('%s: %s' % (message, ' | '.join(['%s%s' % (str(i['language'][tools.Language.Name][tools.Language.NameDefault] if i['language'] else None), (' [%s]' % i['name']) if i['name'] else '') for i in stream])))
+			else:
+				tools.Logger.log('%s: %s%s' % (message, str(stream['language'][tools.Language.Name][tools.Language.NameDefault] if stream['language'] else None), (' [%s]' % stream['name']) if stream['name'] else ''))
+		else:
+			if not stream is None: message + ': None'
+			tools.Logger.log(message)
+
+	##############################################################################
+	# CHANGE
+	##############################################################################
+
+	@classmethod
+	def changed(self):
+		return self.Changed # Use "self." so that Audio and Subtitle each use their own variable.
+
+	@classmethod
+	def change(self, change = True):
+		self.Changed = change
+
+	##############################################################################
+	# PLAYER
+	##############################################################################
 
 	@classmethod
 	def player(self):
@@ -2128,6 +2294,10 @@ class Streamer(object):
 			if player.status == status: break
 			tools.Time.sleep(0.01)
 
+	##############################################################################
+	# STREAM
+	##############################################################################
+
 	@classmethod
 	def streams(self, unknown = False):
 		return self._streamRetrieve(retrieve = interface.Player.RetrieveAll, unknown = unknown)
@@ -2165,19 +2335,9 @@ class Streamer(object):
 	def _streamRetrieve(self, retrieve, unknown = False):
 		return self._stream(player = self.player(), retrieve = retrieve, process = True, unknown = self.language() if unknown is True else unknown if unknown else None)
 
-	@classmethod
-	def log(self, message, stream = None):
-		message = '[%s] %s' % (self.name().upper(), message)
-		if stream:
-			if tools.Tools.isArray(stream):
-				if tools.Tools.isString(stream[0]): tools.Logger.log('%s: %s' % (message, ' | '.join([str(tools.Language.name(i)) for i in stream])))
-				elif not 'language' in stream[0]: tools.Logger.log('%s: %s' % (message, ' | '.join([str(i[tools.Language.Name][tools.Language.NameDefault]) for i in stream])))
-				else: tools.Logger.log('%s: %s' % (message, ' | '.join(['%s (%s)' % (str(i['language'][tools.Language.Name][tools.Language.NameDefault] if i['language'] else None), str(i['name'] if i['name'] else None)) for i in stream])))
-			else:
-				tools.Logger.log('%s: %s (%s)' % (message, str(stream['language'][tools.Language.Name][tools.Language.NameDefault] if stream['language'] else None), str(stream['name'] if stream['name'] else None)))
-		else:
-			if not stream is None: message + ': None'
-			tools.Logger.log(message)
+	##############################################################################
+	# LANGUAGE
+	##############################################################################
 
 	@classmethod
 	def language(self):
@@ -2226,6 +2386,74 @@ class Audio(Streamer):
 		return player.audioStream(retrieve = retrieve, process = process, unknown = unknown)
 
 	@classmethod
+	def _rank(self, streams, languages = None):
+		# Example of the audio streams of a file:
+		#	{'bitrate': 768000, 'channels': 6, 'codec': 'eac3', 'index': 0, 'isdefault': True, 'isimpaired': False, 'isoriginal': True, 'language': 'eng', 'name': 'BTM DDP5.1 Atmos - DD+ 5.1(side)', 'samplerate': 0}
+		#	{'bitrate': 960000, 'channels': 6, 'codec': 'eac3', 'index': 1, 'isdefault': False, 'isimpaired': False, 'isoriginal': False, 'language': 'eng', 'name': 'BTM DDP5.1 - DD+ 5.1(side)', 'samplerate': 0}
+		#	{'bitrate': 960000, 'channels': 2, 'codec': 'eac3', 'index': 2, 'isdefault': False, 'isimpaired': False, 'isoriginal': False, 'language': 'spa', 'name': 'BTM DDP5.1 - DD+ stereo', 'samplerate': 0}
+
+		ids = max([stream.get('id') or 0 for stream in streams])
+		bitrates = max([stream.get('bitrate') or 1024000.0 for stream in streams]) # Maximum bitrate among all streams.
+
+		for stream in streams:
+			rank = 0
+
+			try:
+				if stream:
+					stream['intelligible'] = False
+					name = (stream.get('codec') or '') + ' ' + (stream.get('name') or '')
+
+					# Prefer languages understood by the user.
+					if languages:
+						for i in range(len(languages)):
+							if languages[i] == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
+								stream['intelligible'] = True
+								rank += (len(languages) - i) * 2.0
+								break
+
+					# If two streams have the exact same rank, prefer the first one.
+					# Use a very small weight, especially if there are 10+ streams. The largest one should be < 0.001.
+					id = stream.get('id')
+					if not id is None: rank += (ids - id) * 0.0001
+
+					# Prefer default and original tracks.
+					# These are flags that are not always set, even if it is the original track.
+					default = stream.get('default')
+					if default: rank += 0.15
+					original = stream.get('original')
+					if original: rank += 0.15
+
+					# Prefer more channels.
+					# Use 8 channels as the base with a 0.5 weight.
+					channels = stream.get('channels') or 0
+					rank += (channels / 8.0) * 0.5
+
+					# Prefer higher bitrates.
+					# Use 1024 kbps as the base with a 0.1 weight.
+					# Lossless codecs (eg TrueHD) do not have a bitrate. Use the maximum instead.
+					# Keep the weight lower than the Atmos/DTSX, due to the example given above.
+					bitrate = stream.get('bitrate') or bitrates
+					rank += (channels / 1024000.0) * 0.1
+
+					# Ignore commentary audio.
+					if tools.Regex.match(data = name, expression = r'(comment|director)'): rank -= 3.0
+
+					# Prefer Atmos and DTS:X.
+					# Make this weight higher than the bitrate.
+					if tools.Regex.match(data = name, expression = r'(atmos)'): rank += 0.60
+					elif tools.Regex.match(data = name, expression = r'((?:dts|(?:hd\.?)?hra?|(?:hd\.?)?ma)\.{0,3}x)'): rank += 0.55
+					elif tools.Regex.match(data = name, expression = r'(true\.?hd|thd(?:$|[^a-z]))'): rank += 0.50
+					elif tools.Regex.match(data = name, expression = r'(dd(?:\.{0,3}plus|p|\+))'): rank += 0.45
+					elif tools.Regex.match(data = name, expression = r'(e?ac\.?4)'): rank += 0.40
+					elif tools.Regex.match(data = name, expression = r'(e?ac\.?3)'): rank += 0.35
+					elif tools.Regex.match(data = name, expression = r'((?:(?:hd\.?)?hra?|(?:hd\.?)?ma)(?:$|[^a-z]))'): rank += 0.30
+			except: tools.Logger.error()
+
+			stream['rank'] = rank
+
+		return tools.Tools.listSort(streams, key = lambda i : i['rank'], reverse = True)
+
+	@classmethod
 	def select(self, metadata = None, unknown = False):
 		try:
 			# In sporadic cases, the streams returned might be None.
@@ -2272,6 +2500,7 @@ class Audio(Streamer):
 
 				best = None
 				bestOriginal = False
+				ranked = self._rank(streams = streams)
 
 				# First try to use the language the title was originally released in.
 				# Pick any language that is in the user's settings, even if it is the secondary/tertiary language.
@@ -2280,51 +2509,23 @@ class Audio(Streamer):
 				if best is None and original:
 					for code in original:
 						if originaled == Audio.OriginalLenient or (originaled == Audio.OriginalStrict and code in settings):
-							for stream in streams:
+							for stream in ranked:
 								if stream and code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
-									if best is None:
-										if stream['name']: # Ingore commentary audio.
-											lower = stream['name'].lower()
-											if not 'comment' in lower  and not 'director' in lower:
-												best = stream
-										else:
-											best = stream
-									else:
-										better = False
-										if stream['channels'] and best['channels']:
-											if stream['channels'] > best['channels']: better = True
-											elif stream['bitrate'] and best['bitrate'] and stream['channels'] == best['channels'] and stream['bitrate'] > best['bitrate']: better = True
-											if better and stream['name']: # Ingore commentary audio.
-												lower = stream['name'].lower()
-												if 'comment' in lower or 'director' in lower: better = False
-										if better: best = stream
-							if best:
-								bestOriginal = True
-								break
+									best = stream
+									bestOriginal = True
+									break
+							if best: break
 
 				if best is None:
 					for code in settings:
-						for stream in streams:
+						for stream in ranked:
 							if stream and code == stream['language'][tools.Language.Code][tools.Language.CodeStream]:
-								if best is None:
-									if stream['name']: # Ingore commentary audio.
-										lower = stream['name'].lower()
-										if not 'comment' in lower  and not 'director' in lower:
-											best = stream
-									else:
-										best = stream
-								else:
-									better = False
-									if stream['channels'] and best['channels']:
-										if stream['channels'] > best['channels']: better = True
-										elif stream['bitrate'] and best['bitrate'] and stream['channels'] == best['channels'] and stream['bitrate'] > best['bitrate']: better = True
-										if better and stream['name']: # Ingore commentary audio.
-											lower = stream['name'].lower()
-											if 'comment' in lower or 'director' in lower: better = False
-									if better: best = stream
+								best = stream
+								break
 						if best: break
 
 				if best:
+					if not current.get('id') == best.get('id'): self.change(best.get('id'))
 					self.log('Using %s stream' % ('original' if bestOriginal else 'unknown' if unknown else 'preferred'), best)
 					self.player().audioSelect(best)
 				else:
@@ -2420,23 +2621,28 @@ class Subtitle(Streamer):
 			interface.Dialog.notification(title = title, message = message, icon = icon)
 
 	@classmethod
-	def _load(self, subtitle):
+	def _load(self, subtitle, lock = None, loader = None):
 		success = False
 
 		if subtitle:
 			if (subtitle.get('type') or {}).get('integrated'):
 				self.player().subtitleSelect(id = subtitle.get('id'))
 				success = True
-				self.log('Integrated subtitles loaded: ' + subtitle.get('name'))
+				self.log('Integrated subtitles loaded: %s (%s)' % (subtitle['language'][tools.Language.Name][tools.Language.CodeEnglish], subtitle.get('name')))
 			else:
 				# Issues with decoding the subtitles.
 				# This means that the subtitles will not show at all, or show, but with a weird/incorrect encoding.
 				decoded = 'decoded' in subtitle and subtitle['decoded'] is False
 
 				if not 'path' in subtitle:
+					if loader is None: loader = bool((not lock or not lock.locked()) and self.playerStatus() == Player.StatusPaused)
+					if loader: interface.Loader.show()
+
 					from lib.modules.subtitle import Subtitle as Subtitler
 					self.log('Downloading external subtitles.')
 					subtitle = Subtitler.download(subtitle = subtitle)
+
+					if loader: interface.Loader.hide()
 
 				if subtitle:
 					# Do not load if there were decoding problems.
@@ -2447,7 +2653,7 @@ class Subtitle(Streamer):
 					elif 'path' in subtitle:
 						self.player().subtitleSelect(path = subtitle['path'])
 						success = True
-						self.log('External subtitles loaded: ' + subtitle['name'])
+						self.log('External subtitles loaded: %s (%s)' % (subtitle['language'][tools.Language.Name][tools.Language.CodeEnglish], subtitle.get('name')))
 
 		return success, subtitle
 
@@ -2481,7 +2687,7 @@ class Subtitle(Streamer):
 		return thread
 
 	@classmethod
-	def _select(self, name, imdb, tmdb, title, year, season, episode, source, internal = False, lock = None):
+	def _select(self, name, imdb, tmdb, title, year, season, episode, source, internal = False, lock = None, loader = None):
 		unpause = False
 		try:
 			if Subtitle.Lock.locked(): return None
@@ -2514,6 +2720,7 @@ class Subtitle(Streamer):
 
 			player = self.player()
 			current = self.streamCurrent()
+			currentHas = bool(current and current.get('id'))
 			self.log('Available streams', streams if streams else [])
 
 			pathDisable = tools.File.joinPath(tools.System.pathResources(), 'resources', 'media', 'subtitle', Subtitle.InternalDisable + '.srt')
@@ -2551,6 +2758,7 @@ class Subtitle(Streamer):
 
 			if not internal:
 				if settingsStream == Subtitle.StreamDisabled:
+					if currentHas: self.change(-1)
 					player.subtitleDisable()
 					self.log('Disabling subtitles.')
 					return self._finish(status = Subtitle.StatusDisabled)
@@ -2562,6 +2770,7 @@ class Subtitle(Streamer):
 						self.log('Leaving forced subtitles.')
 						return self._finish(status = Subtitle.StatusForced, subtitle = current)
 					else:
+						if currentHas: self.change(-1)
 						player.subtitleDisable()
 						self.log('Disabling subtitles.')
 						return self._finish(status = Subtitle.StatusDisabled)
@@ -2583,6 +2792,7 @@ class Subtitle(Streamer):
 							# If the language of the forced subtitles is unknown, leave them on.
 							# Eg: Constellation (2024) series: The audio is 99% English, but there are occasional Swedish/Russian conversations. Leave the forced English subtitles on for that 1%.
 							if code and not code == tools.Language.UniversalCode and settingsLanguage and not code in settingsLanguage:
+								if currentHas: self.change(-1)
 								self.log('Audio stream known. Disabling forced subtitles.')
 								player.subtitleDisable()
 								return self._finish(status = Subtitle.StatusDisabled)
@@ -2590,6 +2800,7 @@ class Subtitle(Streamer):
 								self.log('Audio stream known. Leaving forced subtitles.')
 								return self._finish(status = Subtitle.StatusForced, subtitle = current)
 						else:
+							if currentHas: self.change(-1)
 							self.log('Audio stream known. Disabling subtitles.')
 							player.subtitleDisable()
 							return self._finish(status = Subtitle.StatusDisabled)
@@ -2620,8 +2831,8 @@ class Subtitle(Streamer):
 										else: sort -= 0.1
 									else:
 										if stream['name']:
-											if tools.Regex.match(data = stream['name'], expression = '(full|complete)'): sort += 0.1
-											elif tools.Regex.match(data = stream['name'], expression = '(force|foreign)'): sort -= 0.1
+											if tools.Regex.match(data = stream['name'], expression = r'(full|complete)'): sort += 0.1
+											elif tools.Regex.match(data = stream['name'], expression = r'(force|foreign)'): sort -= 0.1
 
 									stream['sort'] = sort
 									integrated.append(stream)
@@ -2629,12 +2840,19 @@ class Subtitle(Streamer):
 						integrated = tools.Tools.listSort(integrated, key = lambda i : i['sort'], reverse = True)
 						for stream in integrated:
 							success, _ = self._load(subtitle = stream)
-							if success: return self._finish(status = Subtitle.StatusIntegrated, subtitle = stream)
+							if success:
+								if currentHas and not current.get('id') == stream.get('id'): self.change(stream.get('id'))
+								return self._finish(status = Subtitle.StatusIntegrated, subtitle = stream)
 
 			subtitles = []
 			failure = False
 			if Subtitle.InternalIntegrated: subtitles.extend(Subtitle.InternalIntegrated)
 			if settingsDownload:
+				# Only show the loader if the subtitles are loaded in the foreground.
+				# Do not show if the subtitles are searched in the background, or if playback is playing (instead of paused).
+				# This loader will probably never show, since the playback is resumed at this point, and the external subtitle search is done in the background while the playback continues.
+				if loader is None: loader = bool((not lock or not lock.locked()) and self.playerStatus() == Player.StatusPaused)
+
 				# If external subtitles are loaded on the initial run, and reopened with InternalSelect, the dialog shows quickly, since the search results are cached.
 				# However, if during the initital run integrated subtitles are selected and the user later selects InternalSelect, a new search is done which can take time.
 				# Notify the user.
@@ -2647,8 +2865,11 @@ class Subtitle(Streamer):
 					self._notification(title = 36127, message = 36128, icon = interface.Dialog.IconInformation)
 				Subtitle.InternalExternal = True
 
+				if loader: interface.Loader.show()
 				self.log('Searching external subtitles.')
 				subsubtitles = Subtitler.search(language = settingsLanguage, imdb = imdb, tmdb = tmdb, title = title, year = year, season = season, episode = episode)
+				if loader: interface.Loader.hide()
+
 				if subsubtitles: subtitles.extend(subsubtitles)
 				elif subsubtitles is None: failure = True
 			if len(subtitles) == 0: return self._finish(status = Subtitle.StatusUnavailable, notification = not failure, unpause = unpause) # OpenSubntitles error already showing if there were server issues.
@@ -2751,7 +2972,7 @@ class Subtitle(Streamer):
 				for i in range(len(subtitles)):
 					subtitle = subtitles[i]
 					if subtitle['match'] >= 1 and subtitle['language'][tools.Language.Code][tools.Language.CodeStream] in settingsLanguage:
-						success, subtitle = self._load(subtitle = subtitle)
+						success, subtitle = self._load(subtitle = subtitle, lock = lock)
 						if success:
 							subtitles[i] = subtitle
 							break
@@ -2760,13 +2981,13 @@ class Subtitle(Streamer):
 			if settingsSelection == Subtitle.SelectionAutomatic:
 				success = False
 				for subtitle in subtitles:
-					success = self._load(subtitle = subtitle)
+					success = self._load(subtitle = subtitle, lock = lock)
 					if success: break
 				if not success: # Try again with decode-failed subtitles.
 					for i in range(len(subtitles)):
 						subtitle = subtitles[i]
 						if subtitle and 'decoded' in subtitle and subtitle['decoded'] is False:
-							success, subtitle = self._load(subtitle = subtitle)
+							success, subtitle = self._load(subtitle = subtitle, lock = lock)
 							if success:
 								subtitles[i] = subtitle
 								break
@@ -2782,11 +3003,12 @@ class Subtitle(Streamer):
 					choice = interface.Dialog.select(title = 32353, items = self._items(subtitles = subtitles, details = details), details = details)
 					if choice < 0: return self._finish(status = Subtitle.StatusCanceled, unpause = True)
 					subtitle = subtitles[choice]
-					success, subtitle = self._load(subtitle = subtitle)
+					success, subtitle = self._load(subtitle = subtitle, lock = lock)
 					if subtitle: subtitles[choice] = subtitle
 					if success: break
 					elif subtitle and 'decoded' in subtitle and subtitle['decoded'] is False: self._notification(title = 35860, message = 35861, icon = interface.Dialog.IconWarning)
 
+			if success: self.change()
 			return self._finish(status = Subtitle.StatusLoaded if success else Subtitle.StatusFailed, subtitle = subtitle, unpause = True)
 		except:
 			tools.Logger.error()
@@ -2900,10 +3122,10 @@ class Chapter(Streamer):
 	TypeDefault = TypeStory
 	TypesSkip = [TypePromo, TypeIntro, TypeRecap]
 	TypesExpression = {
-		TypePromo : '(promo)',
-		TypeIntro : '(intro|start|theme|trailer)',
-		TypeOutro : '(outro|credit|finish)',
-		TypeRecap : '(recap|refresh)',
+		TypePromo : r'(promo)',
+		TypeIntro : r'(intro|start|theme|trailer)',
+		TypeOutro : r'(outro|credit|finish)',
+		TypeRecap : r'(recap|refresh)',
 	}
 
 	Chapters = []

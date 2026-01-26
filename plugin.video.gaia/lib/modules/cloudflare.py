@@ -373,11 +373,11 @@ class Cloudflare(object):
 
 			if data:
 				if default or custom:
-					if Regex.match(data = data, expression = '(cloudflare|_cf_chl_opt|cf-error-details)'):
+					if Regex.match(data = data, expression = r'(cloudflare|_cf_chl_opt|cf-error-details)'):
 						if default:
 							# Do not just check the headers (eg: server: cloudflare), since some sites (eg: ApiBay when not sending GET parameters) return the same headers and 403, but it does not show the Cloudflare.
 							# https://support.cloudflare.com/hc/en-us/articles/360029779472-Troubleshooting-Cloudflare-1XXX-errors
-							if Regex.match(data = data, expression = '(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3}|enable\s*javascript\s*and\s*cookies)'): return True
+							if Regex.match(data = data, expression = r'(error(?:\s*<\/?(?:div|span)>\s*)*1\d{3}|please\s*wait\s*\.{3}|enable\s*javascript\s*and\s*cookies)'): return True
 						elif custom:
 							return True
 			else:

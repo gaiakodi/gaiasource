@@ -277,12 +277,17 @@ class Subtitle(object):
 					# NB: Do not append the language to the end (eg: filename.eng.srt).
 					# In most cases it works, but if the filename contains certain keywords, they will be used as language instead of the last keyword.
 					# Eg: "No Time To Die ...srt" will be detected as Norwegian (first word "No").
+					# Eg: "HDR10P.DV ...srt" will be detected as Maldivian ("DV").
 					# Use the fallback code if available. Kodi cannot detect some variation codes (eg: ZHT). Use the main language code instead.
-					# It seems that Kodi can also not detect any other language/country variatios (eg: zh-TW, zh-Hant, zh_TW, zhtw)
+					# It seems that Kodi can also not detect any other language/country variations (eg: zh-TW, zh-Hant, zh_TW, zhtw)
 					# https://github.com/xbmc/xbmc/issues/15308
+					# Update (2026-01): It seems that Kodi matches the filename from back-to-front in detecting language keywords.
+					# This might cause the wrong language to be detected from other metadata keywords.
+					# Eg ("DV" detected as Maldivian): JPN.One.Battle.After.Another.2025.2160p.iT.WEB-DL.DDPA5.1.HDR10P.DV.HEVC-BTBN.srt
+					# Add the language to the end as well, which seems to solve the problem.
 					try: language = subtitle['language'][Language.Fallback]
 					except: language = subtitle['language'][Language.Code][Language.CodeStream]
-					path = '%s.%s.srt' % (language.upper(), subtitle['name'])
+					path = '%s.%s.%s.srt' % (language.upper(), subtitle['name'], language.upper())
 
 					path = System.temporary(directory = 'subtitles', file = path)
 					if not File.exists(path): Networker().request(link = link, path = path, cloudflare = False)

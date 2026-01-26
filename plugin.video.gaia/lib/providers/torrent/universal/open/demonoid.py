@@ -43,9 +43,9 @@ class Provider(ProviderHtml):
 	_AttributeContainer		= 'ctable_content_no_pad'
 	_AttributeTime			= 'added_today'
 
-	_ExpressionTime			= 'added\s*on.*?,\s*(.*)'
-	_ExpressionMagnet		= '(downloadmagnet)'
-	_ExpressionNext			= '(next)'
+	_ExpressionTime			= r'added\s*on.*?,\s*(.*)'
+	_ExpressionMagnet		= r'(downloadmagnet)'
+	_ExpressionNext			= r'(next)'
 
 	_Lock1					= Semaphore(5)
 	_Lock2					= Lock()

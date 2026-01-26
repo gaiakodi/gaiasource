@@ -280,7 +280,7 @@ def _cacheAdd(url, post = None, timestamp = None, retry = None):
 	# Make sure to exclude the GET syn requests. Eg: sync/ratings/<type>
 	try:
 		if retry: # Only add to the cache if this requests is not a retry itself.
-			if tools.Regex.match(data = url, expression = '\/sync\/(?:(?:history|ratings|watchlist|favorites|collection)(?:$|\/?\?|\/(?:remove|reorder))|playback\/\d)'):
+			if tools.Regex.match(data = url, expression = r'\/sync\/(?:(?:history|ratings|watchlist|favorites|collection)(?:$|\/?\?|\/(?:remove|reorder))|playback\/\d)'):
 				global TraktCache
 				TraktCache = True
 				return Cache.instance().traktCache(link = url, data = post, timestamp = timestamp)
@@ -591,8 +591,8 @@ def list(id):
 def slug(name):
 	name = name.strip()
 	name = name.lower()
-	name = re.sub('[^a-z0-9_]', '-', name)
-	name = re.sub('--+', '-', name)
+	name = re.sub(r'[^a-z0-9_]', '-', name)
+	name = re.sub(r'--+', '-', name)
 	return name
 
 def verify(authentication = None):
@@ -908,13 +908,13 @@ def sortTitle(data):
 		else: title = title.lower().strip()
 
 		articles = {
-			'en' : '^((?:the|an?)\s)',
-			'de' : '^((?:de[nmrs]|die|das|ein(?:e[nmrs])?|dies(?:e[nmrs])?)\s)',
-			'fr' : '^((?:l[ae]|les|une?|d[eu](?:\sl[ae])?|des|)\s|(?:l[\'\’\‘]|d[eu](?:\sl[\'\’\‘])))',
-			'nl' : '^((?:de|het|een)\s)',
-			'es' : '^((?:l[ao]s?|el|un[ao]?s?)\s)',
-			'pt' : '^((?:[ao]s?|uma?s?|uns)\s)',
-			'it' : '^((?:il?|gil|l[aeo]|un[ao]?)\s|l[\'\’\‘])',
+			'en' : r'^((?:the|an?)\s)',
+			'de' : r'^((?:de[nmrs]|die|das|ein(?:e[nmrs])?|dies(?:e[nmrs])?)\s)',
+			'fr' : r'^((?:l[ae]|les|une?|d[eu](?:\sl[ae])?|des|)\s|(?:l[\'\’\‘]|d[eu](?:\sl[\'\’\‘])))',
+			'nl' : r'^((?:de|het|een)\s)',
+			'es' : r'^((?:l[ao]s?|el|un[ao]?s?)\s)',
+			'pt' : r'^((?:[ao]s?|uma?s?|uns)\s)',
+			'it' : r'^((?:il?|gil|l[aeo]|un[ao]?)\s|l[\'\’\‘])',
 		}
 		for expression in articles.values():
 			titleNew = tools.Regex.remove(data = title, expression = expression, group = 1, cache = True)

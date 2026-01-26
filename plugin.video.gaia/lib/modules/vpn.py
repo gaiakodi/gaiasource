@@ -479,8 +479,8 @@ class Vpn(object):
 		return {
 			'connected' : status == Vpn.StatusConnected,
 			'status' : status,
-			'service' : tools.Regex.extract(data = connection, expression = '.*\/(.*?)\/.*\.ovpn'),
-			'profile' : tools.Regex.extract(data = connection, expression = '.*\/(.*?)\.ovpn'),
+			'service' : tools.Regex.extract(data = connection, expression = r'.*\/(.*?)\/.*\.ovpn'),
+			'profile' : tools.Regex.extract(data = connection, expression = r'.*\/(.*?)\.ovpn'),
 		}
 
 	@classmethod

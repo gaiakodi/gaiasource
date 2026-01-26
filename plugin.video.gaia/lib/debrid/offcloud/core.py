@@ -563,9 +563,9 @@ class Core(base.Core):
 		else:
 			return Core.ServicesUpdate
 
-	def servicesList(self, onlyEnabled = False):
+	def servicesList(self, cached = True, onlyEnabled = False):
 		if Core.ServicesList is None:
-			services = self.services(onlyEnabled = onlyEnabled)
+			services = self.services(cached = cached, onlyEnabled = onlyEnabled)
 			if services:
 				special = [service['id'] for service in services if not service['hoster']]
 				result = []
@@ -596,7 +596,7 @@ class Core(base.Core):
 				result = result['list']
 				for proxy in result:
 					try:
-						location = re.search('\\(([^(0-9)]*)', proxy['name']).group(1).strip()
+						location = re.search(r'\(([^(0-9)]*)', proxy['name']).group(1).strip()
 						location = location.replace('US', 'United States')
 						location = location.replace(',', ' -')
 					except:
@@ -604,7 +604,7 @@ class Core(base.Core):
 						location = None
 
 					try:
-						type = re.search('(.*)\\(', proxy['name']).group(1).strip().lower()
+						type = re.search(r'(.*)\(', proxy['name']).group(1).strip().lower()
 						if Core.ServerMain in type: type = Core.ServerMain
 						elif Core.ServerProxy in type: type = Core.ServerProxy
 						else: type = Core.ServerUnknown
@@ -1016,7 +1016,7 @@ class Core(base.Core):
 
 				speed = 0
 				try:
-					speed = float(re.sub('[^0123456789\.]', '', self.tResulTransfer['downloadingSpeed']))
+					speed = float(re.sub(r'[^0123456789\.]', '', self.tResulTransfer['downloadingSpeed']))
 					speedObject = convert.ConverterSpeed(speed, unit = convert.ConverterSpeed.Byte)
 				except:
 					# Hoster links downloaded through the cloud.
@@ -1284,7 +1284,7 @@ class Core(base.Core):
 		if network.Networker.linkIs(idOrLink):
 			# Matches LAST occurance of a hash.
 			# Instant links have both the user account hash and file hash in the link.
-			id = re.search('[a-zA-Z0-9]{24}(?!.*[a-zA-Z0-9]{24})', idOrLink, re.IGNORECASE).group(0)
+			id = re.search(r'[a-zA-Z0-9]{24}(?!.*[a-zA-Z0-9]{24})', idOrLink, re.IGNORECASE).group(0)
 		else:
 			return idOrLink
 

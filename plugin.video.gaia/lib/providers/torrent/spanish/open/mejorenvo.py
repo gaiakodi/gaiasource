@@ -31,13 +31,13 @@ class Provider(ProviderHtml):
 	_ParameterSection		= 'sec'
 	_ParameterSearch		= 'buscador'
 
-	_ExpressionMovie		= u'(pel[ií]cula)'
-	_ExpressionShow			= u'(series?)'
-	_ExpressionTime			= u'fecha\s*:*\s*(.*)'
-	_ExpressionFormat		= u'formato\s*:*\s*(.*)'
-	_ExpressionEntry		= u'(a\d+)'
-	_ExpressionTorrent		= u'(torrent=1)'
-	_ExpressionSeason		= u'(temporada)'
+	_ExpressionMovie		= r'(pel[ií]cula)'
+	_ExpressionShow			= r'(series?)'
+	_ExpressionTime			= r'fecha\s*:*\s*(.*)'
+	_ExpressionFormat		= r'formato\s*:*\s*(.*)'
+	_ExpressionEntry		= r'(a\d+)'
+	_ExpressionTorrent		= r'(torrent=1)'
+	_ExpressionSeason		= r'(temporada)'
 
 	##############################################################################
 	# INITIALIZE

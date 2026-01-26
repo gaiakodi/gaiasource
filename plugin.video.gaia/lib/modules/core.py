@@ -1448,31 +1448,31 @@ class Core(object):
 				# Remove years in brackets from titles.
 				# Do not remove years that are not between brackets, since it might be part of the title. Eg: 2001 A Space Oddesy
 				# Eg: Heartland (CA) (2007) -> Heartland (CA)
-				temp = re.sub('[\(\{\[](?:19|2[01])\d{2}[\)\}\]]', '', value)
+				temp = re.sub(r'[\(\{\[](?:19|2[01])\d{2}[\)\}\]]', '', value)
 				if temp: value = temp
 
 				# Remove the exact year if it is part of the title.
 				# Eg: For "Eternals 2021" there exists an alias "Eternos 2021" -> "Eternos" (otherwise the search query will be "Eternos 2021 2021").
 				if year:
-					temp = re.sub('\s*[\(\{\[]?\s*' + str(year) + '\s*[\)\}\]]?\s*$', '', value)
+					temp = re.sub(r'\s*[\(\{\[]?\s*' + str(year) + r'\s*[\)\}\]]?\s*$', '', value)
 					if temp: value = temp
 
 				# Replace country codes. Otherwise "U.S." will end up as "U S".
-				value = re.sub('u\.s\.', 'us', value, flags = re.IGNORECASE)
-				value = re.sub('u\.k\.', 'uk', value, flags = re.IGNORECASE)
+				value = re.sub(r'u\.s\.', 'us', value, flags = re.IGNORECASE)
+				value = re.sub(r'u\.k\.', 'uk', value, flags = re.IGNORECASE)
 
 				# Remove apostrophes.
 				# Create two different versions of apostrophes (one with "'s" -> "s", and the other one "'s" -> ""), since some sites can only use one of them.
 
-				valueNew = re.sub('([\'\`])([a-zA-Z](?:$|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]))', '\g<2>', value) # Replace apostrophes at the end of the word with an empty string (eg: Peter's -> Peters).
+				valueNew = re.sub(r'([\'\`])([a-zA-Z](?:$|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\`\<\>\?\,\.\\\/]))', r'\g<2>', value) # Replace apostrophes at the end of the word with an empty string (eg: Peter's -> Peters).
 				if value == valueNew: values1 = [valueNew]
-				else: values1 = [valueNew, re.sub('([\'\`][a-zA-Z])($|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/])', '\g<2>', value)]
+				else: values1 = [valueNew, re.sub(r'([\'\`][a-zA-Z])($|[\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\`\<\>\?\,\.\\\/])', r'\g<2>', value)]
 
 				values2 = []
 				for val in values1:
 					# Replace apostrophes at the start of the word with a space (eg: "L'Ascension de Skywalker" -> "L Ascension de Skywalker" and "LAscension de Skywalker").
-					values2.append(re.sub('([\'\`])', ' ', val)) # Place this before the one below, since the one below might exceed the maximum number of search titles. YggTorrent can only find with the "'" or " ", but not with "".
-					values2.append(re.sub('([\'\`])', '', val))
+					values2.append(re.sub(r'([\'\`])', ' ', val)) # Place this before the one below, since the one below might exceed the maximum number of search titles. YggTorrent can only find with the "'" or " ", but not with "".
+					values2.append(re.sub(r'([\'\`])', '', val))
 
 				seen = set()
 				values2 = [i for i in values2 if not (i in seen or seen.add(i))]
@@ -1481,18 +1481,18 @@ class Core(object):
 					# Remove symbols.
 					# Eg: Heartland (CA) -> Heartland CA
 					# Replace with space: Brooklyn Nine-Nine -> Brooklyn Nine Nine
-					val = re.sub('[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]', ' ', val)
+					val = re.sub(r'[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\`\<\>\?\,\.\\\/]', ' ', val)
 
 					# Replace extra spaces.
-					val = re.sub('\s+', ' ', val).strip()
+					val = re.sub(r'\s+', ' ', val).strip()
 
 					values.append(val)
 
 				# Censored words which are mostly given in full in the filename.
 				# Eg: The Pimp No F**ing Fairytale
 				if not internal == 2:
-					censored = {'(s\*x)' : 'sex', '(p\*+r?n)[a-z]*' : 'porn', '(f\*+(?:c?k|ck)?)(?:ed|ing)?' : 'fuck'}
-					expression = '(?:^|[\.\,\:\-\–\s])%s(?:$|[\.\,\:\-\–\s])'
+					censored = {r'(s\*x)' : 'sex', r'(p\*+r?n)[a-z]*' : 'porn', r'(f\*+(?:c?k|ck)?)(?:ed|ing)?' : 'fuck'}
+					expression = r'(?:^|[\.\,\:\-\–\s])%s(?:$|[\.\,\:\-\–\s])'
 					for valFrom, valTo in censored.items():
 						if tools.Regex.match(data = value, expression = expression % valFrom):
 							# Add the unccensored title in FRONT, ssince it is more likley to find values.
@@ -1512,7 +1512,7 @@ class Core(object):
 				if not title: return False
 
 				year = str(year)
-				temp = re.sub('\s*[\(\{\[]?\s*' + year + '\s*[\)\}\]]?', '', title)
+				temp = re.sub(r'\s*[\(\{\[]?\s*' + year + r'\s*[\)\}\]]?', '', title)
 				if temp: title = temp
 				lower = titleStrip(title).lower()
 
@@ -1567,7 +1567,7 @@ class Core(object):
 				titleAbbreviation = self.titles['main']
 				if 'original' in self.titles and self.titles['original']: titleAbbreviation = self.titles['original']
 				if titleAbbreviation:
-					abbreviations = re.findall('[A-Z]{2,}', titleAbbreviation)
+					abbreviations = re.findall(r'[A-Z]{2,}', titleAbbreviation)
 					for abbreviation in abbreviations:
 						titleAbbreviation = titleAbbreviation.replace(abbreviation, ' '.join(list(abbreviation)))
 				if titleAbbreviation:
@@ -1683,8 +1683,8 @@ class Core(object):
 					temp2 = []
 					temp3 = []
 					for i in temp:
-						if tools.Regex.match(data = i, expression = '(d[iy]s[ck]|dvd|edition.*(?:part|teil))[^a-z\d]*\d', cache = True): temp3.append(i)
-						elif tools.Regex.match(data = i, expression = '((?:extended|special|theatrical).*edition|see(?:$|[^a-z])|versi.n.*(?:longue|extend))', cache = True): temp2.append(i)
+						if tools.Regex.match(data = i, expression = r'(d[iy]s[ck]|dvd|edition.*(?:part|teil))[^a-z\d]*\d', cache = True): temp3.append(i)
+						elif tools.Regex.match(data = i, expression = r'((?:extended|special|theatrical).*edition|see(?:$|[^a-z])|versi.n.*(?:longue|extend))', cache = True): temp2.append(i)
 						else: temp1.append(i)
 					processedAlias.extend(temp1)
 					processedAlias.extend(temp2)
@@ -1697,8 +1697,8 @@ class Core(object):
 				main = self.titles.get('main')
 				original = self.titles.get('original')
 				if main and original and not main == original:
-					if tools.Regex.match(data = main, expression = '[a-z]\d[a-z]'):
-						if not tools.Regex.match(data = original, expression = '[a-z]\d[a-z]'):
+					if tools.Regex.match(data = main, expression = r'[a-z]\d[a-z]'):
+						if not tools.Regex.match(data = original, expression = r'[a-z]\d[a-z]'):
 							titles.insert(0, original)
 							processedMain.insert(0, original)
 							processedBasic.insert(0, original)
@@ -1712,7 +1712,7 @@ class Core(object):
 					if 'main' in self.titles and self.titles['main']:
 						# Ignore apostrophes.
 						# Eg: "Manitou's Canoe" => "Canoe" (and not "'s Canoe").
-						titleReduced = re.sub(self.titles['collection'] + '(?:\'s)?', '', self.titles['main'], re.IGNORECASE)
+						titleReduced = re.sub(self.titles['collection'] + r'(?:\'s)?', '', self.titles['main'], re.IGNORECASE)
 						if not titleReduced == self.titles['main']:
 							titleReduced = titleStrip(titleReduced)
 							# Avoid: "Hotel Transylvania 3 Summer Vacation" -> "3 Summer Vacation"
@@ -1726,13 +1726,13 @@ class Core(object):
 				# If there is an abbreviation in the title, remove it.
 				# Eg: "XMA: Xtreme Martial Arts" -> "Xtreme Martial Arts"
 				if processedMain:
-					abbreviation = tools.Regex.extract(data = processedMain[0], expression = '^([A-Z]{3,})', flags = tools.Regex.FlagNone)
+					abbreviation = tools.Regex.extract(data = processedMain[0], expression = r'^([A-Z]{3,})', flags = tools.Regex.FlagNone)
 					if abbreviation:
-						capital = tools.Regex.extract(data = processedMain[0], expression = '\s([A-Z])[a-z\d]', group = None, all = True, flags = tools.Regex.FlagNone)
+						capital = tools.Regex.extract(data = processedMain[0], expression = r'\s([A-Z])[a-z\d]', group = None, all = True, flags = tools.Regex.FlagNone)
 						if capital:
 							capital = ''.join(capital)
 							if abbreviation.startswith(capital):
-								capital = tools.Regex.remove(data = processedMain[0], expression = '^(%s.*?\s)' % abbreviation, all = True)
+								capital = tools.Regex.remove(data = processedMain[0], expression = r'^(%s.*?\s)' % abbreviation, all = True)
 								if capital:
 									titles.append(capital)
 									processedMain.insert(1, capital)
@@ -1778,21 +1778,21 @@ class Core(object):
 										# Eg: Gran Turismo - De Jogador a Corredor
 										# Eg: Gran Turismo: D'après une histoire vraie
 										# Set a global var, so we also ignore other languages once we detected this for the English title.
-										if tools.Regex.match(data = titleStripped, expression = '($based\s+on|true\s*story)'): ignore = True
+										if tools.Regex.match(data = titleStripped, expression = r'($based\s+on|true\s*story)'): ignore = True
 										if not ignore:
 											# Do not strip the main title to only end up with eg "Extended Version".
 											# Avatar Extended Version
 											# Avatar - Collector's Edition
 											# Avatar - Extended Collector's Edition
 											# Avatar - Collector's Extended Edition
-											if not tools.Regex.match(data = titleStripped, expression = '(?:edition|version|cut|release|extended|collector|director|ece|special|ultimate|limited|theatrical|retail|imax|colecionador|estendida|colecionador|3d|edição|edicion|coleccionista|edi\u00e7\u00e3o|edicao|edio|wersja|specjalna|rozszerzona|ungeschnittene|fassung|unrated|uncensored|remastered|the\smovie|dvd|bluray|4k|2160p|1080p|disc)(?:\s|$)'):
+											if not tools.Regex.match(data = titleStripped, expression = r'(?:edition|version|cut|release|extended|collector|director|ece|special|ultimate|limited|theatrical|retail|imax|colecionador|estendida|colecionador|3d|edição|edicion|coleccionista|edi\u00e7\u00e3o|edicao|edio|wersja|specjalna|rozszerzona|ungeschnittene|fassung|unrated|uncensored|remastered|the\smovie|dvd|bluray|4k|2160p|1080p|disc)(?:\s|$)'):
 												# Do not include short titles.
 												# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
 												#	Westworld: The Maze
 												#	Westworld: The Door
 												#	Westworld: The New World
 												# We do not want to search eg "The Door S01E01", since it might actually be a different show.
-												if not tools.Regex.match(data = val, expression = '([a-z\d\s\-\–\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
+												if not tools.Regex.match(data = val, expression = r'([a-z\d\s\-\–\\\']+){1,2}\s*:\s*(the|an?)(\s*[a-z]+){1,2}'):
 													self.titles[type][key].append(titleStripped)
 													if (type == 'native' and settingNative) or (type == 'alias' and settingAlias):
 														if not type == 'native': titles.append(titleStripped) # Do not include the native titles, otherwise universal providers also scrape these titles.
@@ -1801,16 +1801,16 @@ class Core(object):
 
 				# Regex check what remains after unicode decoding, otherwise titles like "Harry Potter 1" might degress into "1:" or "1".
 				main = []
-				expression = '^%s*$' % tools.Regex.Nonalpha
+				expression = r'^%s*$' % tools.Regex.Nonalpha
 				for title in titles:
 					# For titles with subscripts/superscripts.
 					# Eg: "The Accountant²" -> "The Accountant 2"
-					script = tools.Regex.extract(data = title, expression = '([\u00B0\u00B2\u00B3\u00B9\u02AF\u0670\u0711\u2121\u213B\u2207\u29B5\uFC5B-\uFC5D\uFC63\uFC90\uFCD9\u2070\u2071\u2074-\u208E\u2090-\u209C\u0345\u0656\u17D2\u1D62-\u1D6A\u2A27\u2C7C]+)', flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagUnicode)
+					script = tools.Regex.extract(data = title, expression = r'([\u00B0\u00B2\u00B3\u00B9\u02AF\u0670\u0711\u2121\u213B\u2207\u29B5\uFC5B-\uFC5D\uFC63\uFC90\uFCD9\u2070\u2071\u2074-\u208E\u2090-\u209C\u0345\u0656\u17D2\u1D62-\u1D6A\u2A27\u2C7C]+)', flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagUnicode)
 					unscripted = None
 					if script:
 						unscripted = title.replace(script, '')
 						script = title.replace(script, ' ' + tools.Converter.unicodeNormalize(script) + ' ')
-						script = tools.Regex.replace(data = script, expression = '\s+', replacement = ' ').strip()
+						script = tools.Regex.replace(data = script, expression = r'\s+', replacement = ' ').strip()
 						main.append(script)
 
 					nonalpha = tools.Regex.match(data = title, expression = expression)
@@ -1907,9 +1907,9 @@ class Core(object):
 				#	Avatar Extended Collectors Edition
 				#	Taken 1 (Unrated)
 				temp = []
-				removes = ['edition', 'version', 'extended', 'ece', 'collector', 'collector\'?s', 'extended', 'director', 'director\'?s', 'special', 'ultimate', 'limited', 'theatrical', 'retail', 'imax', 'estendida\sde\scolecionador', 'estendida', 'colecionador', '3d\sexperience', '3d', 'edicion', 'coleccionista', 'edi\u00e7\u00e3o', 'edicao', 'edio', 'wersja', 'specjalna', 'rozszerzona', 'ungeschnittene', 'fassung', 'unrated', 'uncensored', 'remastered', 'dvd', 'bluray', '4k', '2160p', '1080p', 'disc']
+				removes = [r'edition', r'version', r'extended', r'ece', r'collector', r'collector\'?s', r'extended', r'director', r'director\'?s', r'special', r'ultimate', r'limited', r'theatrical', r'retail', r'imax', r'estendida\sde\scolecionador', r'estendida', r'colecionador', r'3d\sexperience', r'3d', r'edicion', r'coleccionista', r'edi\u00e7\u00e3o', r'edicao', r'edio', r'wersja', r'specjalna', r'rozszerzona', r'ungeschnittene', r'fassung', r'unrated', r'uncensored', r'remastered', r'dvd', r'bluray', r'4k', r'2160p', r'1080p', r'disc']
 				for i in removes: # Do not exclude keywords that appear in the main title.
-					i = '((?:\s|^)%s)(?:\s|$)' % i
+					i = r'((?:\s|^)%s)(?:\s|$)' % i
 					found = False
 					for j in processedBasic:
 						if tools.Regex.match(data = j, expression = i):
@@ -1919,9 +1919,9 @@ class Core(object):
 				removes = temp
 
 				temp = []
-				excludes = ['the\smovie', str(year), 'james\scameron(?:\'?s)?', '(?<!\s[a-z\d]\s)an?(?!\s[a-z\d]\s)'] # The the lookahead/lookbehind for "an?", otherwise "S.W.A.T." -> "S W A T" will match the "A".
+				excludes = [r'the\smovie', str(year), r'james\scameron(?:\'?s)?', r'(?<!\s[a-z\d]\s)an?(?!\s[a-z\d]\s)'] # The the lookahead/lookbehind for "an?", otherwise "S.W.A.T." -> "S W A T" will match the "A".
 				for i in excludes: # Do not exclude keywords that appear in the main title.
-					i = '(?:^|\s)\s*%s\s*(?:$|\s)' % i
+					i = r'(?:^|\s)\s*%s\s*(?:$|\s)' % i
 					found = False
 					for j in processedBasic:
 						if tools.Regex.match(data = j, expression = i):
@@ -1963,11 +1963,11 @@ class Core(object):
 								duplicates = True
 								break
 						if not duplicates:
-							if collection and tools.Regex.match(data = i, expression = '^\s*\d+\s*$'): continue # Number only. "Taken 1" -> "1".
+							if collection and tools.Regex.match(data = i, expression = r'^\s*\d+\s*$'): continue # Number only. "Taken 1" -> "1".
 							searchMain.append(i)
 
 					temp = tools.Tools.copy(searchMain)
-					searchBasic = tools.Regex.remove(data = searchMain[0], expression = '^((?:the|an?)\s)', all = True)
+					searchBasic = tools.Regex.remove(data = searchMain[0], expression = r'^((?:the|an?)\s)', all = True)
 					for i in search:
 						searchBase = i
 						searchReplace = None
@@ -1977,14 +1977,14 @@ class Core(object):
 							i = tools.Tools.replaceInsensitive(data = i, value = j, replacement = '')
 
 							# Eg: "The Terminator": replace "Terminator" and not just the full "The Terminator".
-							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = '((?:the|an?)\s)'), replacement = '', all = True)
+							#i = tools.Tools.replaceInsensitive(data = i, value = tools.Regex.remove(data = j, expression = r'((?:the|an?)\s)'), replacement = '', all = True)
 
 						# Do not include if the 2nd part is just a description that is too vague to scrape.
 						# Eg: Gran Turismo: Based on a True Story
 						# Eg: Gran Turismo. No spēles līdz trasei
 						# Eg: Gran Turismo - De Jogador a Corredor
 						# Eg: Gran Turismo: D'après une histoire vraie
-						if i and not tools.Regex.match(data = i, expression = '($based\s+on|true\s*story)'):
+						if i and not tools.Regex.match(data = i, expression = r'($based\s+on|true\s*story)'):
 							i = ' '.join([j for j in i.split(' ') if j])
 							if i:
 								# Very short titles, which will probably not return good search results.
@@ -1992,21 +1992,21 @@ class Core(object):
 
 								# Number only.
 								# Eg: "Taken 1" -> "1".
-								if collection and tools.Regex.match(data = i, expression = '^\s*\d+\s*$'): continue
+								if collection and tools.Regex.match(data = i, expression = r'^\s*\d+\s*$'): continue
 
 								# If the main keyword appears multiple times.
 								# Eg: Terminator the 01 Terminator The
 								if searchBasic and len(searchBasic) > 5:
-									matches = tools.Regex.extract(data = i, expression = '(%s)' % searchBasic, group = None, all = True)
+									matches = tools.Regex.extract(data = i, expression = r'(%s)' % searchBasic, group = None, all = True)
 									if matches and len(matches) > 1: continue
 
 								# Ignore numbers.
 								# Eg: If "Terminator" is already in the list, do not use "Terminator 1".
-								if tools.Regex.remove(data = i, expression = '(\s\d)$', all = True).strip() in temp: continue
+								if tools.Regex.remove(data = i, expression = r'(\s\d)$', all = True).strip() in temp: continue
 
 								# Ignore only symbols or single digit.
 								# Eg: "#9" -> "9".
-								if tools.Regex.match(data = i, expression = '^[\d\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\\\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
+								if tools.Regex.match(data = i, expression = r'^[\d\s\-\–\!\?\$\%%\^\&\*\(\)\_\+\|\~\=\#\`\{\}\[\]\:\"\;\'\<\>\,\.\\\/]$'): continue
 
 								# Do not include short titles.
 								# Eg: Trakt returns aliases titles for Westworld that are actually the title of the seasons.
@@ -2014,7 +2014,7 @@ class Core(object):
 								#	Westworld: The Door
 								#	Westworld: The New World
 								# We do not want to search eg "The Door S01E01", since it might actually be a different show.
-								if searchReplace and tools.Regex.match(data = searchBase, expression = '^%s (the|an?)(\s*[a-z]+){1,2}$' % searchReplace): continue
+								if searchReplace and tools.Regex.match(data = searchBase, expression = r'^%s (the|an?)(\s*[a-z]+){1,2}$' % searchReplace): continue
 
 								if not i.lower() in people: temp.append(i)
 
@@ -2042,7 +2042,7 @@ class Core(object):
 				# However, another movie was released that year called "Pinocchio (2022)", and we want to exclude those results.
 				# These are special cases that cannot be eliminated with any of the code above, and needs to be hard-coded on a per-movie basis.
 				removals = [
-					('del\s+toro', '^pinocchio$'),
+					(r'del\s+toro', r'^pinocchio$'),
 				]
 				exclusions = []
 				temp = []
@@ -2088,7 +2088,7 @@ class Core(object):
 					# Eg: "Predator: Pogromca zabójców" -> "Predator Pogromca zabojcow".
 					processedCustom = processed
 					processedExtra = []
-					expression = re.compile('^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
+					expression = re.compile(r'^\s*[\s\d\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\`\<\>\?\,\.\\\/]*\s*$') # Ignore titles with single symbol (when unicode fails leaving only spaces/symbols/digits behind).
 					seen = set()
 					processedCustom = [i for i in processedCustom if i and not(i.lower() in seen or seen.add(i.lower()))] # Reduce computation.
 					for title in processedCustom:
@@ -2107,16 +2107,16 @@ class Core(object):
 					# Sometimes there are weird aliases, which hinders metadata extraction (eg keywords like "1080p", "BluRay", etc).
 					#	The Terminator BluRay 1080p REMASTERED
 					#	The Terminator (1984) [BluRay] [1080p] REMASTERED
-					for i in ['2160p?', '1080p?', '720p?', '4k', '(?:hd.*?)?dvd', 'bluray', 'vhs']:
-						expression = '(?:^|\s)(%s?%s%s?)(?:$|\s)' % (tools.Regex.Symbol, i, tools.Regex.Symbol)
+					for i in [r'2160p?', r'1080p?', r'720p?', r'4k', r'(?:hd.*?)?dvd', r'bluray', r'vhs']:
+						expression = r'(?:^|\s)(%s?%s%s?)(?:$|\s)' % (tools.Regex.Symbol, i, tools.Regex.Symbol)
 						if not tools.Regex.match(data = self.titles['main'], expression = expression):
 							for j in range(len(processedCustom)):
 								processedNew = tools.Regex.remove(data = processedCustom[j], expression = expression, group = 1, all = True)
-								if not processedNew == processedCustom[j]: processedCustom[j] = tools.Regex.replace(data = processedNew, expression = '\s{2,}', replacement = ' ', all = True)
+								if not processedNew == processedCustom[j]: processedCustom[j] = tools.Regex.replace(data = processedNew, expression = r'\s{2,}', replacement = ' ', all = True)
 
 					# Exclude network/studio prefixes.
 					# Eg: "FX's 将軍" -> "FX's"
-					processedCustom = [i for i in processedCustom if not tools.Regex.match(data = i, expression = '^[A-Z0-9]+\\\'s$', flags = tools.Regex.FlagNone)]
+					processedCustom = [i for i in processedCustom if not tools.Regex.match(data = i, expression = r'^[A-Z0-9]+\'s$', flags = tools.Regex.FlagNone)]
 
 					processed.extend(processedCustom)
 
@@ -2129,7 +2129,7 @@ class Core(object):
 							if not tools.Tools.isArray(titlesGerman): titlesGerman = [titlesGerman]
 							for j in titlesGerman:
 								if j and j.count(' ') >= 2: # Only do this if there are at least 3 words.
-									j = tools.Regex.remove(data = j, expression = '^\s*(?:der|die|das|dem|den|der|des)\s+')
+									j = tools.Regex.remove(data = j, expression = r'^\s*(?:der|die|das|dem|den|der|des)\s+')
 									if j: processed.append(j)
 				except: tools.Logger.error()
 
@@ -2163,7 +2163,7 @@ class Core(object):
 
 					titles = [original]
 					titles.extend([i for i in self.titles['processed']['main'] if tools.Matcher.levenshtein(original, i) > 0.75])
-					titles = [tools.Regex.extract(data = i, expression = '^\s*[\-\_\:\+]*\s*(.*?)\s*[\-\_\:\+]*\s*$', cache = True) for i in titles] # Remove leading/trailing symbols (except a dot), Eg: ["S.W.A.T.", "S.W.A.T. -", "S.W.A.T.:"]
+					titles = [tools.Regex.extract(data = i, expression = r'^\s*[\-\_\:\+]*\s*(.*?)\s*[\-\_\:\+]*\s*$', cache = True) for i in titles] # Remove leading/trailing symbols (except a dot), Eg: ["S.W.A.T.", "S.W.A.T. -", "S.W.A.T.:"]
 					seen = set()
 					titles = [i for i in titles if i and not(i.lower() in seen or seen.add(i.lower()))]
 					self.titles['processed']['original'] = titles
@@ -2187,7 +2187,7 @@ class Core(object):
 			def titleFinish(title):
 				try: title = title.decode('utf-8')
 				except: pass
-				title = tools.Regex.replace(data = title, expression = '\s{2,}', replacement = ' ', all = True)
+				title = tools.Regex.replace(data = title, expression = r'\s{2,}', replacement = ' ', all = True)
 				return title
 
 			def additional(title, titleShow, year, imdb, tmdb, tvdb, trakt, season, episode, metadata):
@@ -2260,7 +2260,7 @@ class Core(object):
 					for i in self.originalNetwork:
 						try:
 							# Eg: British Broadcasting Corporation (BBC)
-							abbrivation = tools.Regex.extract(data = i, expression = '(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
+							abbrivation = tools.Regex.extract(data = i, expression = r'(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
 							if abbrivation:
 								self.originalNetwork.append(abbrivation[0][0])
 								self.originalNetwork.append(abbrivation[0][1])
@@ -2270,7 +2270,7 @@ class Core(object):
 					for i in self.originalStudio:
 						try:
 							# Eg: British Broadcasting Corporation (BBC)
-							abbrivation = tools.Regex.extract(data = i, expression = '(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
+							abbrivation = tools.Regex.extract(data = i, expression = r'(.*?)\s*[\(\[]([A-Z0-9\-\s]{3,6}\+?)[\)\]]\s*$', flags = tools.Regex.FlagNone, group = None, all = True, cache = True)
 							if abbrivation:
 								self.originalStudio.append(abbrivation[0][0])
 								self.originalStudio.append(abbrivation[0][1])
@@ -2409,7 +2409,7 @@ class Core(object):
 						if result:
 							result = result[0]
 							if result:
-								year = int(tools.Regex.extract(data = result['release_date'], expression = '((?:1[89]|2[01])\d{2})'))
+								year = int(tools.Regex.extract(data = result['release_date'], expression = r'((?:1[89]|2[01])\d{2})'))
 								if year: self.years['tmdb'] = year
 				except: tools.Logger.error()
 				self.progressYearTmdb = 90
@@ -2634,7 +2634,7 @@ class Core(object):
 							return self.tmdbDetails[id]
 						result = tmdbDetails(id = imdb, key = key)
 						self.progressTitleCollection = 50
-						try: self.titles['collection'] = tools.Regex.remove(data = result['belongs_to_collection']['name'], expression = '\s*[\-\:]?\s*(?:a|the)?\s*collection\s*$').strip()
+						try: self.titles['collection'] = tools.Regex.remove(data = result['belongs_to_collection']['name'], expression = r'\s*[\-\:]?\s*(?:a|the)?\s*collection\s*$').strip()
 						except: self.titles['collection'] = None
 						try: id = result['belongs_to_collection']['id']
 						except: id = None
@@ -2673,7 +2673,7 @@ class Core(object):
 									except: time = None
 									if time:
 										time = tools.Time.timestamp(fixedTime = time, format = tools.Time.FormatDate)
-									try: year = int(tools.Regex.extract(data = movie['release_date'], expression = '((?:1[89]|2[01])\d{2})'))
+									try: year = int(tools.Regex.extract(data = movie['release_date'], expression = r'((?:1[89]|2[01])\d{2})'))
 									except: year = None
 									try: duration = self.tmdbDetails[movie['id']]['runtime'] * 60 # Runtime is in minutes.
 									except: duration = None
@@ -3825,7 +3825,7 @@ class Core(object):
 			container = network.Container(link)
 			if container.torrentIs(): sourceType = Stream.SourceTypeTorrent
 			elif container.usenetIs(): sourceType = Stream.SourceTypeUsenet
-			elif network.Networker.linkIsLocal(link) or re.search('^(\/|file|[a-z]:)', link, re.IGNORECASE) or tools.File.samba(link) or tools.File.exists(link): sourceType = Stream.SourceTypeLocal
+			elif network.Networker.linkIsLocal(link) or re.search(r'^(\/|file|[a-z]:)', link, re.IGNORECASE) or tools.File.samba(link) or tools.File.exists(link): sourceType = Stream.SourceTypeLocal
 			else: sourceType = Stream.SourceTypeHoster
 
 			stream = Stream(
@@ -5551,8 +5551,8 @@ class Core(object):
 							spaceBottom = 0
 							if not labelTop: labelTop = ''
 							if not labelBottom: labelBottom = ''
-							lengthTop = len(re.sub('\\[(.*?)\\]', '', labelTop))
-							lengthBottom = len(re.sub('\\[(.*?)\\]', '', labelBottom))
+							lengthTop = len(re.sub(r'\[(.*?)\]', '', labelTop))
+							lengthBottom = len(re.sub(r'\[(.*?)\]', '', labelBottom))
 							if lengthBottom > lengthTop: spaceTop = int((lengthBottom - lengthTop) * padding)
 							else: spaceBottom = int((lengthBottom - lengthTop) * padding)
 							spaceTop = ' ' * max(8, spaceTop)

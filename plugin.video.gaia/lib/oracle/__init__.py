@@ -100,7 +100,7 @@ class Oracle(object):
 	ExpressionYearSequence		= r'\"?%s\"?,\s*\"?%s\"?' % (ExpressionYear, ExpressionYear)
 
 	InlineMedia					= '-GAIAMEDIA-%s-GAIAMEDIA-'
-	Inline						= '(\s*%s.*?%s)'
+	Inline						= r'(\s*%s.*?%s)'
 
 	InterfaceSpecial			= 0
 	InterfaceAutomatic			= 1
@@ -1426,9 +1426,9 @@ class Oracle(object):
 		# Determine the media type.
 		media = None
 		medias = {
-			Media.Set : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : '(?:^|[\s\.\,\-\–])(%s)' % Oracle.ExpressionSet},
-			Media.Movie : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(movies?|films?|(?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))'},
-			Media.Show : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % '(tv|television|shows?|(?<!book[\s\-\–])(?<!novel[\s\-\–])series?|seasons?|episodes?)'},
+			Media.Set : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : r'(?:^|[\s\.\,\-\–])(%s)' % Oracle.ExpressionSet},
+			Media.Movie : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % r'(movies?|films?|(?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))'},
+			Media.Show : {'rank' : 0, 'percent' : 0, 'extracted' : {}, 'match' : Oracle.ExpressionItem % r'(tv|television|shows?|(?<!book[\s\-\–])(?<!novel[\s\-\–])series?|seasons?|episodes?)'},
 		}
 		for key, value in medias.items():
 			for data in [(request, False, 1.5), (response, True, 1.0)]:
@@ -1477,7 +1477,7 @@ class Oracle(object):
 		# Sometimes the chatbot returns individual movies, even though sets were requested, especially if the query addresses a release date.
 		# If the list does not contain any set keywords, IDs, or year ranges, assume they are movies.
 		if media == Media.Set:
-			subresponse = Regex.extract(data = response, expression = '.*?((?:[\{\[]|\n\s*[-\d]).*(?:[\}\]]|\n))', flags = Regex.FlagAllLines)
+			subresponse = Regex.extract(data = response, expression = r'.*?((?:[\{\[]|\n\s*[-\d]).*(?:[\}\]]|\n))', flags = Regex.FlagAllLines)
 			if subresponse:
 				if not Regex.match(data = subresponse, expression = medias[Media.Set]['match']):
 					ids = Regex.extract(data = subresponse, expression = Oracle.ExpressionIdGeneric, group = None, all = True)
@@ -1489,10 +1489,10 @@ class Oracle(object):
 		# Determine if IDs were requested.
 		id = None
 		ids = {
-			MetaTools.ProviderImdb : {'match' : 'imdb|internet\s*movie\s*db|internet\s*movie\s*database', 'extract' : 'tt\d{5,10}'},
-			MetaTools.ProviderTmdb : {'match' : 'tmdb|the\s*mdb|the\s*movie\s*db|the\s*movie\s*database', 'extract' : '\d{1,10}'},
-			MetaTools.ProviderTvdb : {'match' : 'tvdb|the\s*tvdb|the\s*tv\s*database', 'extract' : '\d{1,10}'},
-			MetaTools.ProviderTrakt : {'match' : 'trakt', 'extract' : '\d{1,10}'},
+			MetaTools.ProviderImdb : {'match' : r'imdb|internet\s*movie\s*db|internet\s*movie\s*database', 'extract' : r'tt\d{5,10}'},
+			MetaTools.ProviderTmdb : {'match' : r'tmdb|the\s*mdb|the\s*movie\s*db|the\s*movie\s*database', 'extract' : r'\d{1,10}'},
+			MetaTools.ProviderTvdb : {'match' : r'tvdb|the\s*tvdb|the\s*tv\s*database', 'extract' : r'\d{1,10}'},
+			MetaTools.ProviderTrakt : {'match' : r'trakt', 'extract' : r'\d{1,10}'},
 		}
 		for key, value in ids.items():
 			if Regex.match(data = request, expression = Oracle.ExpressionItem % value['match']):
@@ -1514,7 +1514,7 @@ class Oracle(object):
 
 			# Replace newlines, since sometimes ChatGPT adds a newline in the middle of a JSON attribute.
 			# Eg:   {"title": "The \nLord of the Rings: The Fellowship of the Ring", "year": 2001},
-			data = Regex.remove(data = response, expression = '"[^\"\/\}\]]+(\n+)[^\/\"\}\]]+"', group = 1, all = True)
+			data = Regex.remove(data = response, expression = r'"[^\"\/\}\]]+(\n+)[^\/\"\}\]]+"', group = 1, all = True)
 
 			# Remove comments.
 			# Eg: [
@@ -1565,13 +1565,13 @@ class Oracle(object):
 
 						# Do these after IDs,  otherwise some TMD IDs might be  detected as year.
 						'title' : {'attributes' : ['title', 'titles', 'original_title', 'originaltitle', 'original_titles', 'originaltitles', 'name', 'names',  '.*?title.*?'], 'parse' : str},
-						'year' : {'attributes' : ['year', 'years', 'date', 'dates', 'release', 'releases', 'released', 'premier', 'premiered', 'releasedate', 'release-date', 'release_date', 'releaseddate', 'released-date', 'released_date', 'releasedates', 'release-dates', 'release_dates', 'releaseddates', 'released-dates', 'released_dates', 'premierdate', 'premier-date', 'premier_date', 'premiereddate', 'premiered-date', 'premiered_date', 'premierdates', 'premier-dates', 'premier_dates', 'premiereddates', 'premiered-dates', 'premiered_dates', '.*?year.*?', '.*?date.*?', '.*?release.*?', '.*?premier.*?'], 'expression' : '(%s)' % Oracle.ExpressionYear, 'parse' : int},
+						'year' : {'attributes' : ['year', 'years', 'date', 'dates', 'release', 'releases', 'released', 'premier', 'premiered', 'releasedate', 'release-date', 'release_date', 'releaseddate', 'released-date', 'released_date', 'releasedates', 'release-dates', 'release_dates', 'releaseddates', 'released-dates', 'released_dates', 'premierdate', 'premier-date', 'premier_date', 'premiereddate', 'premiered-date', 'premiered_date', 'premierdates', 'premier-dates', 'premier_dates', 'premiereddates', 'premiered-dates', 'premiered_dates', '.*?year.*?', '.*?date.*?', '.*?release.*?', '.*?premier.*?'], 'expression' : r'(%s)' % Oracle.ExpressionYear, 'parse' : int},
 					}
 					keys2 = {
 						MetaTools.ProviderImdb : {'expression' : Oracle.ExpressionIdImdb, 'parse' : str},
 					}
 					if id and not id == MetaTools.ProviderImdb: keys2[id] = {'expression' : Oracle.ExpressionIdPlain, 'parse' : str}
-					keys2['year'] = {'expression' : '(%s)' % Oracle.ExpressionYear, 'parse' : int} # Do these after IDs, otherwise some TMDb IDs might be detected as year.
+					keys2['year'] = {'expression' : r'(%s)' % Oracle.ExpressionYear, 'parse' : int} # Do these after IDs, otherwise some TMDb IDs might be detected as year.
 
 					list = []
 					for item in items:
@@ -1673,7 +1673,7 @@ class Oracle(object):
 				for key, value in data.items():
 					# In rare cases, ChatGPT returns the direct output of TMDb API.
 					# Ignore arrays with certain IDs, eg: genre_ids.
-					if not Regex.match(data = key, expression = '([a-z]?%s[\s\-\_]ids?)' % ''.join(['(?<!%s)' % i for i in Oracle.Ids])):
+					if not Regex.match(data = key, expression = r'([a-z]?%s[\s\-\_]ids?)' % r''.join([r'(?<!%s)' % i for i in Oracle.Ids])):
 						if Tools.isDictionary(value) or (Tools.isList(value) and not all((Tools.isInteger(i) or Tools.isString(i)) and Regex.match(data = str(i), expression = Oracle.ExpressionYear) for i in value)):
 							nested = True
 							result.extend(self._extractJsonItem(data = value))
@@ -1696,7 +1696,7 @@ class Oracle(object):
 		# Remove those new lines, since the image tag can help identify the media.
 		# Eg: * **The Princess Bride:** This classic comedy-fantasy film is sure to put a smile on your face. It follows the story of Westley, a farmhand who sets out to rescue his true love, Princess Buttercup, from the evil Prince Humperdinck.
 		#     [Image of The Princess Bride movie poster]
-		response = Regex.replace(data = response, expression = '(\n)\[image\s', replacement = ' ', group = 1, all = True)
+		response = Regex.replace(data = response, expression = r'(\n)\[image\s', replacement = ' ', group = 1, all = True)
 
 		lines = response.split('\n')
 		lines = [line.strip() for line in lines]
@@ -1716,13 +1716,13 @@ class Oracle(object):
 				# Older ChatGPT models sometimes list movies in a single sentence, comma-separated.
 				# Eg: Matrix, Mission Impossible, Rambo, Die Hard, and Bourne.
 				if not Regex.match(data = line, expression = Oracle.ExpressionTitleQuote):
-					extract = Regex.remove(data = line, expression = '([\(\[]?(?:the\s)?(?:imdb|tmdb|tvdb)(?:.?id)[\s\:\-\–]*(?:is[\s\:\-\–]*)?(?:[\'\"]?(?:tt)?\d{2,15})?[\'\"]?[\)\]]?)')
+					extract = Regex.remove(data = line, expression = r'([\(\[]?(?:the\s)?(?:imdb|tmdb|tvdb)(?:.?id)[\s\:\-\–]*(?:is[\s\:\-\–]*)?(?:[\'\"]?(?:tt)?\d{2,15})?[\'\"]?[\)\]]?)')
 					extract = Regex.extract(data = extract, expression = Oracle.ExpressionListInline, group = None, all = True, flags = Regex.FlagMultiLines)
 					if extract and len(extract) >= 3:
 						# Ignore people.
 						# Eg: the movie Avatar (2009), directed by James Cameron.
 						for e in extract:
-							if not Regex.match(data = line, expression = '(\s*(?:directed|written|produced|released)\sby\s%s)' % e):
+							if not Regex.match(data = line, expression = r'(\s*(?:directed|written|produced|released)\sby\s%s)' % e):
 								list.append(e)
 
 		# Invalid "I'm sorry ..." messages with multiple sentences that were not detected above.
@@ -1731,8 +1731,8 @@ class Oracle(object):
 			capital = []
 			for line in list:
 				value  = line
-				value = Regex.remove(data = value, expression = '^([A-Z][a-z]{0,7})\s', group = 1, flags = Regex.FlagAllLines)
-				value = Regex.remove(data = value, expression = '[^a-zA-Z](AI|TV|JSON|I)[^a-zA-Z]', group = 1, all = True, flags = Regex.FlagAllLines)
+				value = Regex.remove(data = value, expression = r'^([A-Z][a-z]{0,7})\s', group = 1, flags = Regex.FlagAllLines)
+				value = Regex.remove(data = value, expression = r'[^a-zA-Z](AI|TV|JSON|I)[^a-zA-Z]', group = 1, all = True, flags = Regex.FlagAllLines)
 				value = value.split()
 				countWords = len(value)
 				countCapital = sum([1 if i and i[0].isupper() else 0 for i in value])
@@ -1744,7 +1744,7 @@ class Oracle(object):
 		# Sometimes a list is returned without a newline before the first item.
 		# Add the first item manually.
 		if len(list) > 2 and not lines[0] in list:
-			extract = Regex.extract(data = lines[0], expression = '\s\d+\.\s(.*)')
+			extract = Regex.extract(data = lines[0], expression = r'\s\d+\.\s(.*)')
 			if extract: list.insert(0, extract)
 
 		items = []
@@ -1761,8 +1761,8 @@ class Oracle(object):
 			#	1. The Silence of the Lambs (1991) - won Best Picture, Best Director, Best Actor, Best Actress, and Best Adapted Screenplay
 			#	2. The Exorcist (1973) - nominated for Best Picture, Best Director, Best Actress, Best Supporting Actor, Best Adapted Screenplay, and won Best Sound Mixing
 			#	3. Jaws (1975) - nominated for Best Picture, Best Director, Best Film Editing, Best Original Score, and won Best Sound Mixing
-			expression1 = '^[a-z0-9\s\-\–\(\)]+(?<!\(%s\)\s)(?<!\(%s\))(?<!%s\s)(?<!%s)(?<!\(%s-%s\)\s)(?<!\(%s-%s\))(?<!%s-%s\s)(?<!%s-%s)(?<!\(%s\s-\s%s\)\s)(?<!\(%s\s-\s%s\))(?<!%s\s-\s%s\s)(?<!%s\s-\s%s)[\:\-\–]\s*((?:.*?,){2,}.*?)$' % tuple([Oracle.ExpressionYear] * 20)
-			expression2 = '.*?[\-\:]\s.*?([A-Z][a-z]{1,})'
+			expression1 = r'^[a-z0-9\s\-\–\(\)]+(?<!\(%s\)\s)(?<!\(%s\))(?<!%s\s)(?<!%s)(?<!\(%s-%s\)\s)(?<!\(%s-%s\))(?<!%s-%s\s)(?<!%s-%s)(?<!\(%s\s-\s%s\)\s)(?<!\(%s\s-\s%s\))(?<!%s\s-\s%s\s)(?<!%s\s-\s%s)[\:\-\–]\s*((?:.*?,){2,}.*?)$' % tuple([Oracle.ExpressionYear] * 20)
+			expression2 = r'.*?[\-\:]\s.*?([A-Z][a-z]{1,})'
 			sublist = []
 			for line in list:
 				if Regex.match(data = line, expression = expression1):
@@ -1778,8 +1778,8 @@ class Oracle(object):
 				for line in list:
 					# Eg: Cozy Movies: Choose heartwarming films like "The Shawshank Redemption," "Forrest Gump," or "The Princess Bride" to lift your spirits.
 					if line.count('"') >= 4:
-						extract = Regex.remove(data = line, expression = '^([a-z0-9\s\-\–\(\)]+[\:\-\–]\s*)')
-						extract = Regex.extract(data = extract, expression = '"(.*?)[\,\.]?"', group = None, all = True)
+						extract = Regex.remove(data = line, expression = r'^([a-z0-9\s\-\–\(\)]+[\:\-\–]\s*)')
+						extract = Regex.extract(data = extract, expression = r'"(.*?)[\,\.]?"', group = None, all = True)
 						if extract:
 							if media is None:
 								mediaSub = self._extractMedia(line, extendedSet = False, extendedDocu = False)
@@ -1788,7 +1788,7 @@ class Oracle(object):
 					else:
 						# Limit subitems in a sublist to no more than 50 characters, in order to distiguish between comma-separated titles vs a very long comma-separated description.
 						# 25 characters is too short for titles like: Avatar: The Last Airbender
-						extract = Regex.extract(data = line, expression = '^[a-z0-9\s\-\–\(\)]+[\:\-\–]\s*((?:.{2,50},){2,}.*?)$')
+						extract = Regex.extract(data = line, expression = r'^[a-z0-9\s\-\–\(\)]+[\:\-\–]\s*((?:.{2,50},){2,}.*?)$')
 						# Exclude descriptions mentioning directors, producers, and actors.
 						if extract and not Regex.match(data = extract, expression = Oracle.ExpressionExplanation):
 							extract = [i.strip() for i in extract.split(',')]
@@ -1798,12 +1798,12 @@ class Oracle(object):
 			elif sublist == 0:
 				temp = []
 				expresssion1 = Oracle.ExpressionListInline.replace(Oracle.ExpressionIgnore, '')
-				expresssion2 = Oracle.ExpressionIgnore.replace('(?!', '(')
+				expresssion2 = Oracle.ExpressionIgnore.replace(r'(?!', r'(')
 				for line in list:
 					# Eg: **The Princess Bride:** This classic comedy-fantasy film is sure to put a smile on your face. It follows the story of Westley, a farmhand who sets out to rescue his true love, Princess Buttercup, from the evil Prince Humperdinck.
-					if not Regex.match(data = line, expression = '^\s*[\"\*]'):
+					if not Regex.match(data = line, expression = r'^\s*[\"\*]'):
 						# Eg: * 2001: A Space Odyssey is a science fiction film that follows a team of astronauts on a mission to Jupiter. The film is known for its groundbreaking special effects and its exploration of philosophical themes. [Image of 2001: A Space Odyssey (1968) movie poster]
-						if descriptionHas or not Regex.match(data = line, expression = '\[image\s.*?\]\s*$'):
+						if descriptionHas or not Regex.match(data = line, expression = r'\[image\s.*?\]\s*$'):
 							temp2 = []
 							sublist = Regex.extract(data = line, expression = expresssion1, group = None, all = True, flags = Regex.FlagMultiLines)
 							if sublist:
@@ -1834,10 +1834,10 @@ class Oracle(object):
 			if not descriptionHas:
 				# Make sure that all of them use the same separator.
 				# Eg: As an AI language model, I do not have personal preferences, but here are two popular action movies:\n\n1. John Wick: Chapter 3 - Parabellum \n2. Mission Impossible: Fallout
-				#description = (sum([1 if Regex.match(data = line, expression = '.*%s' % Oracle.ExpressionDescription) else 0 for line in list]) / float(len(list))) > 0.5
+				#description = (sum([1 if Regex.match(data = line, expression = r'.*%s' % Oracle.ExpressionDescription) else 0 for line in list]) / float(len(list))) > 0.5
 				separators = {}
 				for line in list:
-					separator = Regex.extract(data = line, expression = '.*(%s)' % Oracle.ExpressionDescription)
+					separator = Regex.extract(data = line, expression = r'.*(%s)' % Oracle.ExpressionDescription)
 					if separator:
 						separator = separator.strip()
 						if not separator in separators: separators[separator] = 0
@@ -1852,7 +1852,7 @@ class Oracle(object):
 			# 3. Yellowstone: Season 4
 			# 4. The Morning Show: Season 2
 			if not descriptionHas and description:
-				if (sum([1 if Regex.match(data = line, expression = '.*%sseason\s\d+(?:$|\.)' % Oracle.ExpressionDescription) else 0 for line in list]) / float(len(list))) > 0.5:
+				if (sum([1 if Regex.match(data = line, expression = r'.*%sseason\s\d+(?:$|\.)' % Oracle.ExpressionDescription) else 0 for line in list]) / float(len(list))) > 0.5:
 					description = False
 		else: # Single title.
 			if not descriptionHas: description = False
@@ -1928,38 +1928,38 @@ class Oracle(object):
 			# Eg: I'm sorry, I don't understand the prompt for this request. Could you please provide more information or a clarification?
 			# Eg: As an AI language model, I don\'t have knowledge of the current date. However, I\'m always up-to-date on movies and TV shows and can answer any related questions you may have.
 			# Eg: As an AI language model, I don't experience time or have access to real-time information. As a result, I cannot tell you what is currently playing on TV or predict what movies are being released shortly. However, I can help you find information about movies and TV shows from the past. Feel free to ask me any related questions!
-			if Regex.match(data = response, expression = '(?:^|.)(.*?\s*(?:ai\s*language\s*model|language\s*model\s*ai|text.?based\s*chatbot|i(?:\'m|\sam)?\s*(?:sorry|apologize)\,?\s*(?:but|that|as|i\'m\snot|i\s*can|it\sseems|i\s*do\s*n[o\']t))[^\.\!\?]*?(?:$|[\.\!\?](?!\s*how\s[^\.\!\?]*?\?)|[\.\!\?](?:\s*how\s[^\.\!\?]*?\?|.*?i\s*can\s*(?:assist|help)\s*you\s*with\?|.*?can\s*i\s*(?:assist|help)\s*you.*?\?|\s*if\syou\shave\s[^\.\!\?]*?|\s*(?:could|can|would)\syou\splease[^\.\!\?]*?|.*?please\s*provide\s*(?:more|me|clear)\s.*?|.*?against\s*openai\'?s?\s*policy.*?|i\s*cannot\s*perform\s*this|\s*however[^\.\!\?\:]*)))(?:$|[\.\!\?]$)'): response =  ''
+			if Regex.match(data = response, expression = r'(?:^|.)(.*?\s*(?:ai\s*language\s*model|language\s*model\s*ai|text.?based\s*chatbot|i(?:\'m|\sam)?\s*(?:sorry|apologize)\,?\s*(?:but|that|as|i\'m\snot|i\s*can|it\sseems|i\s*do\s*n[o\']t))[^\.\!\?]*?(?:$|[\.\!\?](?!\s*how\s[^\.\!\?]*?\?)|[\.\!\?](?:\s*how\s[^\.\!\?]*?\?|.*?i\s*can\s*(?:assist|help)\s*you\s*with\?|.*?can\s*i\s*(?:assist|help)\s*you.*?\?|\s*if\syou\shave\s[^\.\!\?]*?|\s*(?:could|can|would)\syou\splease[^\.\!\?]*?|.*?please\s*provide\s*(?:more|me|clear)\s.*?|.*?against\s*openai\'?s?\s*policy.*?|i\s*cannot\s*perform\s*this|\s*however[^\.\!\?\:]*)))(?:$|[\.\!\?]$)'): response =  ''
 
 			# YouChat quite often returns SQL, jS, and other code.
 			# Eg: ... Here is a sample SQL query that could be used if we had access to a database of sci-fi movies:\n\n```\nSELECT title, year\nFROM movies\nWHERE genre = 'sci-fi' AND rating &gt; ...
-			if Regex.match(data = response, expression = '(sql|select.{,20}from.{,20}where)'): response =  ''
+			if Regex.match(data = response, expression = r'(sql|select.{,20}from.{,20}where)'): response =  ''
 
 			# Some playgrounds return custom errors, if for instance the acount tokens were used up.
 			# Eg: 请求失败啦，您的使用积分已用完，可前往登录体验完整功能！
 			# Eg: List in JSON format 20 titles and years of movies for: romantic movies.  You exceeded your current quota, please check your plan and billing details.
-			if Regex.match(data = response, expression = '(请求失败啦|您的使用积分已用完|可前往登录体验完整功能|you\sexceeded\syour\scurrent\squota|check\syour\splan\sand\sbilling\sdetails)'): response =  ''
+			if Regex.match(data = response, expression = r'(请求失败啦|您的使用积分已用完|可前往登录体验完整功能|you\sexceeded\syour\scurrent\squota|check\syour\splan\sand\sbilling\sdetails)'): response =  ''
 
 			# Some playgrounds when the context is confused with the prompt message.
 			# Eg: That's correct! I am an AI-powered chatbot programmed to provide information and insights about everything related to movies. From classic films to the latest blockbusters, I've got it covered! Whether you're looking for movie recommendations, trivia, or analysis, I'm here to help. Let me know if you have any questions or requests!
-			if Regex.match(data = response, expression = '(?:ai\s*language\s*model|ai.*powered).*(?:i.m\s*here\s*to\s*help|let\s*me\s*know\s*if\s*you\s*(?:have|need))'): response =  ''
+			if Regex.match(data = response, expression = r'(?:ai\s*language\s*model|ai.*powered).*(?:i.m\s*here\s*to\s*help|let\s*me\s*know\s*if\s*you\s*(?:have|need))'): response =  ''
 
 			# Some playgrounds think the request is piracy.
 			# Eg: No, I cannot provide you with pirated software as it is illegal and violates ethical principles. As an AI language model, I am programmed to operate within the ethical and legal boundaries and cannot engage in illegal activities. Please obtain licensed and authorized software from official sources or legitimate retailers.
-			if Regex.match(data = response, expression = '(?:violates\s*ethic|illegal\sactivities|pirated\ssoftware)'): response =  ''
+			if Regex.match(data = response, expression = r'(?:violates\s*ethic|illegal\sactivities|pirated\ssoftware)'): response =  ''
 
 			# If torrents are mentioned multiple times.
-			if len(Regex.extract(data = response, expression = '((?:bit.?)?torrents?|magnets?)', group = None, all = True) or []) > 3: response =  ''
+			if len(Regex.extract(data = response, expression = r'((?:bit.?)?torrents?|magnets?)', group = None, all = True) or []) > 3: response =  ''
 
 			# Bard
 			# Eg: I need more information on what you want me to list. Here are some examples of things I can list: ...
-			if Regex.match(data = response, expression = '(i\s*need\s*more\s*information)'): response =  ''
+			if Regex.match(data = response, expression = r'(i\s*need\s*more\s*information)'): response =  ''
 
 		return response
 
 	def _extractMedia(self, data, media = None, single = None, item = None, extendedSet = False, extendedDocu = True):
 		result = media
 
-		fixed = Regex.extract(data = data, expression = Oracle.InlineMedia % '(.*?)')
+		fixed = Regex.extract(data = data, expression = Oracle.InlineMedia % r'(.*?)')
 		if fixed:
 			result = fixed
 		else:
@@ -1967,23 +1967,23 @@ class Oracle(object):
 			# In other rare cases, ChatgPT might return a show when requesting a movie.
 			expressions = (
 				(Media.Set, Oracle.ExpressionSetExtended, None), # Before checking multiple years.
-				(Media.Set, '(?:(films?|movies?).*?(series?)|(series?).*?(films?|movies?))', None),
-				(Media.Set, '(?:films|movies)\s*(?:$|[\(\[\{\:\.\!\?\-])', '(tv|television|shows?)') if extendedSet else (None, None, None),
-				(Media.Show, '((?:tv|television)(?:[\s\-\–]*(?:shows?%s))?)' % ('' if media == Media.Set else '|series?'), None),
-				(Media.Movie, '(movies?|films?)', None),
-				(Media.Movie, '((?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))', None) if extendedDocu else (None, None, None),
-				(Media.Movie, '(oscars?|academy\s*awards?)', None),
-				(Media.Show, '(emm(?:ys?|ies))', None),
-				(Media.Show, '(shows%s)' % ('' if media == Media.Set else '(?<!book[\s\-\–])(?<!novel[\s\-\–])series?'), None),
-				(Media.Set if result == Media.Movie or result == Media.Set else Media.Show, '(%s)' % Oracle.ExpressionYearMultiple, None),
-				(Media.Show, '(seasons?|episodes?)(?!\s[ivx]+)', None), # Ignore 'Star Wars: Episode IV'.
+				(Media.Set, r'(?:(films?|movies?).*?(series?)|(series?).*?(films?|movies?))', None),
+				(Media.Set, r'(?:films|movies)\s*(?:$|[\(\[\{\:\.\!\?\-])', '(tv|television|shows?)') if extendedSet else (None, None, None),
+				(Media.Show, r'((?:tv|television)(?:[\s\-\–]*(?:shows?%s))?)' % (r'' if media == Media.Set else r'|series?'), None),
+				(Media.Movie, r'(movies?|films?)', None),
+				(Media.Movie, r'((?<!tv\s)(?<!television\s)docu(?:mentar(?:y|ie))s?(?![\s\-\–](?:tv|television|shows?|series?)))', None) if extendedDocu else (None, None, None),
+				(Media.Movie, r'(oscars?|academy\s*awards?)', None),
+				(Media.Show, r'(emm(?:ys?|ies))', None),
+				(Media.Show, r'(shows%s)' % ('' if media == Media.Set else r'(?<!book[\s\-\–])(?<!novel[\s\-\–])series?'), None),
+				(Media.Set if result == Media.Movie or result == Media.Set else Media.Show, r'(%s)' % Oracle.ExpressionYearMultiple, None),
+				(Media.Show, r'(seasons?|episodes?)(?!\s[ivx]+)', None), # Ignore 'Star Wars: Episode IV'.
 			)
 
 			label = None
 			if expressions:
 				for media, expression, exception in expressions:
 					if media:
-						try: expression = '%s.*?%s' % (expression, Oracle.ExpressionDescription)
+						try: expression = r'%s.*?%s' % (expression, Oracle.ExpressionDescription)
 						except: pass
 						extract = Regex.extract(data = data, expression = expression, group = None, all = True)
 						if extract:
@@ -2021,22 +2021,22 @@ class Oracle(object):
 		result = None
 		extract = None
 
-		requestStripped = (Regex.extract(data = request, expression = '.*\:(.*)') or request) if request else None
+		requestStripped = (Regex.extract(data = request, expression = r'.*\:(.*)') or request) if request else None
 
 		data = data.strip('\n').strip('\r').strip(' ')
 
 		# Remove IDs first.
 		# Eg: The IMDb ID for the movie Avatar 2 (2022) is tt9253866
 		# Eg: Frozen (IMDb ID: tt2294629)
-		data = Regex.remove(data = data, expression = '([\(\[]?(?:the\s)?(?:imdb|tmdb|tvdb)(?:.?id)[\s\:\-\–]*(?:is[\s\:\-\–]*)?(?:[\'\"]?(?:tt)?\d{2,15})?[\'\"]?[\)\]]?|tt\d{2,15})', all = True, group = 1) or data
+		data = Regex.remove(data = data, expression = r'([\(\[]?(?:the\s)?(?:imdb|tmdb|tvdb)(?:.?id)[\s\:\-\–]*(?:is[\s\:\-\–]*)?(?:[\'\"]?(?:tt)?\d{2,15})?[\'\"]?[\)\]]?|tt\d{2,15})', all = True, group = 1) or data
 
 		# Remove leading chat.
 		# Eg: The movie is Avatar 2 (2022).
-		data = Regex.remove(data = data, expression = '^(th(?:e|is|ese)\s(?:movies?|films?|series?|(?:tv[\-\–\s]?)?shows?)\s(?:is|are))', all = True, group = 1) or data
+		data = Regex.remove(data = data, expression = r'^(th(?:e|is|ese)\s(?:movies?|films?|series?|(?:tv[\-\–\s]?)?shows?)\s(?:is|are))', all = True, group = 1) or data
 
 		# Remove explanations.
 		# Eg: The IMDb ID of the movie with the blue people is "tt0499549", which corresponds to the movie "Avatar" directed by James Cameron.
-		data = Regex.remove(data = data, expression = '(\s*(?:directed|written|produced|released)\sby\s.*)', all = True, group = 1) or data
+		data = Regex.remove(data = data, expression = r'(\s*(?:directed|written|produced|released)\sby\s.*)', all = True, group = 1) or data
 
 		# NB: Sometimes single quotes are used.
 		# Make sure that apostrophes are not detected, eg: don't.
@@ -2044,7 +2044,7 @@ class Oracle(object):
 			# Extract title-case before a year.
 			# Do this before extracting from quotes, since the quotes might actually contain a requote from the chatbot.
 			# Eg: Unfortunately, I'm not authorized to provide information in JSON format as I'm a text-based chatbot. However, I can tell you that the movie quote \"The first rule of Fight Club is: You do not talk about Fight Club\" is from the movie Fight Club (1999). Its IMDb ID is tt0137523.
-			if not extract: extract = Regex.extract(data = data, expression = '.*?([A-Z].{1,30})+\s\(%s[\)\-\–\s]' % Oracle.ExpressionYear, flags = Regex.FlagMultiLines)
+			if not extract: extract = Regex.extract(data = data, expression = r'.*?([A-Z].{1,30})+\s\(%s[\)\-\–\s]' % Oracle.ExpressionYear, flags = Regex.FlagMultiLines)
 
 			# Accomodate multiple quotes:
 			# Eg: 1990 was the year of "The Best Picture" Oscar went to "The Artist".
@@ -2059,41 +2059,41 @@ class Oracle(object):
 			# Sometimes no quotes are used.
 			# Try to find title-case letters.
 			# Eg: The 1990 best picture Oscar was given to Forrest Gump
-			if not extract: extract = Regex.extract(data = data, expression = '^..*?((?:^|[\s\-\–\,\.\!\?\:\"\'])%s[A-Z].*?)(?:$|%s[\.])' % (Oracle.ExpressionIgnore, Oracle.ExpressionAbbreviation), flags = Regex.FlagMultiLines)
+			if not extract: extract = Regex.extract(data = data, expression = r'^..*?((?:^|[\s\-\–\,\.\!\?\:\"\'])%s[A-Z].*?)(?:$|%s[\.])' % (Oracle.ExpressionIgnore, Oracle.ExpressionAbbreviation), flags = Regex.FlagMultiLines)
 
 			# Ignore the year.
 			# Eg: Avatar 2 (2022)
-			if extract: extract = Regex.remove(data = extract, expression = '(\s+\((?:%s|%s)\).*)' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+			if extract: extract = Regex.remove(data = extract, expression = r'(\s+\((?:%s|%s)\).*)' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
 
 		# Titles surounded by quotes or *.
 		# Eg: **The Princess Bride:** This classic ...
 		if not extract:
-			extract = Regex.extract(data = data, expression = '^\s*\"(.*?)\"')
-			if not extract: extract = Regex.extract(data = data, expression = '^\s*\*+(.*?)\*+')
+			extract = Regex.extract(data = data, expression = r'^\s*\"(.*?)\"')
+			if not extract: extract = Regex.extract(data = data, expression = r'^\s*\*+(.*?)\*+')
 
 			# Bard: try to use image tags.
 			# Eg: * 2001: A Space Odyssey is a science fiction film that follows a team of astronauts on a mission to Jupiter. The film is known for its groundbreaking special effects and its exploration of philosophical themes. [Image of 2001: A Space Odyssey (1968) movie poster]
-			if not extract: extract = Regex.extract(data = data, expression = '\[image\sof\s(.*?)(?:\(%s\)|[a-z]{3,10}\s(?:poster|image))' % Oracle.ExpressionYearSingle)
+			if not extract: extract = Regex.extract(data = data, expression = r'\[image\sof\s(.*?)(?:\(%s\)|[a-z]{3,10}\s(?:poster|image))' % Oracle.ExpressionYearSingle)
 
 			if extract:
 				extract = extract.strip(':').strip()
 				if extract:
 					# Add the country if it is outrside the quotes.
 					# Eg: 5. "The Office" (US) - tt0386676
-					country = Regex.extract(data = data, expression = extract + '.{,4}\s*\(([a-z]\.?[a-z]\.?)\)')
+					country = Regex.extract(data = data, expression = extract + r'.{,4}\s*\(([a-z]\.?[a-z]\.?)\)')
 					if country: extract += ' ' + country
 
 		if not extract:
 			# Do this is multiple steps, otherwise there is a problem when the title contains a colon :.
-			extract = Regex.extract(data = data, expression = '(.+)(?:\s+[\(\[\{\|\-]\s*(?:%s|%s)\s*[\)\]\}\|\-])' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
-			if not extract: extract = Regex.extract(data = data, expression = '(.+)(?:\s*[\-\–\:]\s+(?:%s|%s))' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+			extract = Regex.extract(data = data, expression = r'(.+)(?:\s+[\(\[\{\|\-]\s*(?:%s|%s)\s*[\)\]\}\|\-])' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+			if not extract: extract = Regex.extract(data = data, expression = r'(.+)(?:\s*[\-\–\:]\s+(?:%s|%s))' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
 			if not extract:
-				extract = Regex.extract(data = data, expression = '(.+)%s' % (Oracle.ExpressionDescription if description else ''))
+				extract = Regex.extract(data = data, expression = r'(.+)%s' % (Oracle.ExpressionDescription if description else ''))
 				if extract:
 					# Eg: Yellowstone: Season 4
 					# Eg: The Circle (Season 3)
-					extract = Regex.extract(data = extract, expression = '(.+?)(?:$|\s*[\:\-\–]\s*season\s+\d+|\s*[\(\[]s*season\s+\d+[\)\]])')
-			if not extract: extract = Regex.extract(data = data, expression = '^[^A-Z]*?%s([A-Z].*?)(?:$|%s[\.])' % (Oracle.ExpressionIgnore, Oracle.ExpressionAbbreviation), flags = Regex.FlagMultiLines)
+					extract = Regex.extract(data = extract, expression = r'(.+?)(?:$|\s*[\:\-\–]\s*season\s+\d+|\s*[\(\[]s*season\s+\d+[\)\]])')
+			if not extract: extract = Regex.extract(data = data, expression = r'^[^A-Z]*?%s([A-Z].*?)(?:$|%s[\.])' % (Oracle.ExpressionIgnore, Oracle.ExpressionAbbreviation), flags = Regex.FlagMultiLines)
 
 		# Assume the entire data is the title.
 		#if not extract and not single: extract = data
@@ -2107,29 +2107,29 @@ class Oracle(object):
 				if labels:
 					if not Tools.isArray(labels): labels = [labels]
 					for label in labels:
-						extract = Regex.remove(data = extract, expression = '[\s\-\–]' + label)
+						extract = Regex.remove(data = extract, expression = r'[\s\-\–]' + label)
 
 			# Ignore the year.
 			# Eg: Avatar 2 (2022)
-			extract = Regex.remove(data = extract, expression = '(\s+\((?:%s|%s)\).*)' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+			extract = Regex.remove(data = extract, expression = r'(\s+\((?:%s|%s)\).*)' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
 
 			# Strip bracket descriptions.
 			# Eg: Friends (TV Show)
-			extract = Regex.remove(data = extract, expression = '(\s*[\(\[](?:tv|television)(?:[\s\-\–]*(?:shows?|series?))?[\)\]])', group = 1)
+			extract = Regex.remove(data = extract, expression = r'(\s*[\(\[](?:tv|television)(?:[\s\-\–]*(?:shows?|series?))?[\)\]])', group = 1)
 
 			# Remove irregular quotes.
 			# Eg: "The Office" US
-			extract2 = Regex.extract(data = extract, expression = '^\"(.*)\"(.*)', group = None, all = True)
+			extract2 = Regex.extract(data = extract, expression = r'^\"(.*)\"(.*)', group = None, all = True)
 			if extract2 and extract2[0]: extract = ' '.join(extract2[0])
 
 			# Strip bracket versions.
 			# Eg: The Office (US version)
-			for x, y in {'u\.?s\.?' : 'US', 'u\.?k\.?' : 'UK'}.items():
-				extract = Regex.replace(data = extract, expression = '(\s*[\(\[]%s(?:[\s\-\–]*(?:versions?|editions?|releases?))?[\)\]])' % x, replacement = ' ' + y, group = 1)
+			for x, y in {r'u\.?s\.?' : 'US', r'u\.?k\.?' : 'UK'}.items():
+				extract = Regex.replace(data = extract, expression = r'(\s*[\(\[]%s(?:[\s\-\–]*(?:versions?|editions?|releases?))?[\)\]])' % x, replacement = ' ' + y, group = 1)
 
 			# Ignore random templates.
 			# Eg: Replace "k_1234567890" with your own...
-			if Regex.match(data = extract, expression = '[a-z\d]_\d{3,}'): extract = ''
+			if Regex.match(data = extract, expression = r'[a-z\d]_\d{3,}'): extract = ''
 
 			# Ignore sentences that contain an IMDb ID.
 			# Eg: The IMDb ID for the movie with blue people is tt0499549
@@ -2145,7 +2145,7 @@ class Oracle(object):
 			extract = extract.strip(' ').strip('"').strip('\'').strip('-').strip('–').strip(':')
 
 			# Remove duplicate spaces.
-			extract = Regex.remove(data = extract, expression = '\s(\s+)', group = 1, all = True)
+			extract = Regex.remove(data = extract, expression = r'\s(\s+)', group = 1, all = True)
 
 			# Ignore long extractions, which most likley means it is not a title.
 			# This could be that the chatbot error message makes it down to here.
@@ -2162,7 +2162,7 @@ class Oracle(object):
 				if extract in requestStripped:
 					extract = ''
 				else:
-					plural = Regex.replace(data = extract, expression = 's(?:$|[\s\.\,\!\?\:])', replacement = 'XGAIAREPLACEX', all = True).replace('XGAIAREPLACEX', 's?(?:$|[\s\.\,\!\?\:])')
+					plural = Regex.replace(data = extract, expression = r's(?:$|[\s\.\,\!\?\:])', replacement = 'XGAIAREPLACEX', all = True).replace('XGAIAREPLACEX', r's?(?:$|[\s\.\,\!\?\:])')
 					if Regex.match(data = requestStripped, expression = plural): extract = ''
 
 			result = extract.strip(' ')
@@ -2178,22 +2178,22 @@ class Oracle(object):
 		if item and 'media' in item['extract']['metadata'] and item['extract']['metadata']['media'] == Media.Set:
 			if description is None: description = guidance == Media.Set
 
-			suffix1 = Regex.match(data = result, expression = '[\s\-\–](series?|extended\s*editions?|%s)' % Oracle.ExpressionSet)
-			suffix2 = Regex.match(data = result, expression = '[\s\-\–](movies|films)\s*(?:$|[\(\[\{\:\.\!\?\-])')
+			suffix1 = Regex.match(data = result, expression = r'[\s\-\–](series?|extended\s*editions?|%s)' % Oracle.ExpressionSet)
+			suffix2 = Regex.match(data = result, expression = r'[\s\-\–](movies|films)\s*(?:$|[\(\[\{\:\.\!\?\-])')
 
 			result = Regex.remove(data = result, expression = Oracle.ExpressionSetExtended, group = 1)
 
 			if suffix1 or suffix2:
-				if suffix1: result = Regex.remove(data = result, expression = '[\s\-\–](series?|extended\s*editions?|%s)' % Oracle.ExpressionSet, group = 1)
-				elif suffix2: result = Regex.remove(data = result, expression = '[\s\-\–](movies|films)\s*(?:$|[\(\[\{\:\.\!\?\-])', group = 1)
+				if suffix1: result = Regex.remove(data = result, expression = r'[\s\-\–](series?|extended\s*editions?|%s)' % Oracle.ExpressionSet, group = 1)
+				elif suffix2: result = Regex.remove(data = result, expression = r'[\s\-\–](movies|films)\s*(?:$|[\(\[\{\:\.\!\?\-])', group = 1)
 
 				# Only strip the leading "the" if there are at least 2 words that follow.
 				# Otherwise searching TMDb sometimes returns the wrong set.
 				# Eg: The Mummy -> Mummy -> TMDb: The Mummy (Hammer) Collection.
 				# Update: This is probably not needed.
 				# Update: Only do this if it is followed by a set keyword and it has a desciption.
-				#result = Regex.remove(data = result.strip(), expression = '^(the\s).*\s.*', group = 1)
-				if description: result = Regex.remove(data = result.strip(), expression = '^(the\s)', group = 1)
+				#result = Regex.remove(data = result.strip(), expression = r'^(the\s).*\s.*', group = 1)
+				if description: result = Regex.remove(data = result.strip(), expression = r'^(the\s)', group = 1)
 
 		return result
 
@@ -2207,14 +2207,14 @@ class Oracle(object):
 		# Sometimes ChatGPT gives a year range for shows.
 		# Eg: CSI: Crime Scene Investigation (2000-2015)
 		stripped = data.replace(title, '', 1) if title else data
-		extract = Regex.extract(data = stripped, expression = '[\(\[\{\|\-]\s*((?:%s|%s))\s*[\)\]\}\|\-]' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
-		if not extract: extract = Regex.extract(data = stripped, expression = '%s(%s|%s)' % (Oracle.ExpressionDescription, Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+		extract = Regex.extract(data = stripped, expression = r'[\(\[\{\|\-]\s*((?:%s|%s))\s*[\)\]\}\|\-]' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+		if not extract: extract = Regex.extract(data = stripped, expression = r'%s(%s|%s)' % (Oracle.ExpressionDescription, Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
 
 		# Pick last year from string.
-		if not extract and single: extract = Regex.extract(data = stripped, expression = '((?:%s|%s))' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
+		if not extract and single: extract = Regex.extract(data = stripped, expression = r'((?:%s|%s))' % (Oracle.ExpressionYearSingle, Oracle.ExpressionYearMultiple))
 
 		if extract:
-			extract = Regex.extract(data = extract, expression = '(%s)' % Oracle.ExpressionYear)
+			extract = Regex.extract(data = extract, expression = r'(%s)' % Oracle.ExpressionYear)
 			if extract: result = int(extract)
 
 		if not item is None and not result is None: item['extract']['metadata']['year'] = result
@@ -2284,7 +2284,7 @@ class Oracle(object):
 		# Instead format each individual word.
 
 		if replacement:
-			joiner = '(%s+?)' % (Oracle.ExpressionSeparator if sequential else '.')
+			joiner = r'(%s+?)' % (Oracle.ExpressionSeparator if sequential else '.')
 
 			if Tools.isArray(replacement):replacement = [str(i) for i in replacement if i]
 			elif replacement: replacement = [str(replacement)]
@@ -2296,13 +2296,13 @@ class Oracle(object):
 				count = i.count('\'')
 				if count >= 2 and count % 2 == 0: extra = '\''
 
-				extract = Regex.extract(data = i, expression = '(?:([^\s\(\)\[\]\{\}\"%s]+))+' % extra, group = None, all = True)
-				expression = joiner.join(['(?<![a-z\d])(%s)(?![a-z\d])' % Regex.escape(j) for j in extract]) # NB: make sure we do not extract subtrings. Otherwise short TMDb IDs (eg: 12) might replace years or other numbers.
+				extract = Regex.extract(data = i, expression = r'(?:([^\s\(\)\[\]\{\}\"%s]+))+' % extra, group = None, all = True)
+				expression = joiner.join([r'(?<![a-z\d])(%s)(?![a-z\d])' % Regex.escape(j) for j in extract]) # NB: make sure we do not extract subtrings. Otherwise short TMDb IDs (eg: 12) might replace years or other numbers.
 				count = (len(extract) * 2) - 1
 
-				if color.startswith('\033'): i = (color + '\%d' + '\033[0m')
-				else: i = Format.font('\%d', color = color)
-				i = r''.join([(i % j) if j % 2 else ('\%d' % j) for j in range(1, count + 1)])
+				if color.startswith(r'\033'): i = (color + r'\%d' + r'\033[0m')
+				else: i = Format.font(r'\%d', color = color)
+				i = r''.join([(i % j) if j % 2 else (r'\%d' % j) for j in range(1, count + 1)])
 
 				# Only replace 1st occurance.
 				# Otherwise it might be highlighted again if it appears in the description-part.
@@ -2707,7 +2707,7 @@ class Oracle(object):
 			if label == Oracle.LabelBold: replacement = Format.fontBold('%s')
 			elif label == Oracle.LabelColor: replacement = Format.fontColor('%s', color = Format.colorPrimary())
 			else: replacement = None
-			if replacement: duration = Regex.replace(data = duration, expression = '(\d+(?:\.\d+)?)', replacement = replacement % r'\1')
+			if replacement: duration = Regex.replace(data = duration, expression = r'(\d+(?:\.\d+)?)', replacement = replacement % r'\1')
 		return duration
 
 	@classmethod
@@ -2899,13 +2899,13 @@ class Oracle(object):
 
 								# This is if the chat output is in JSON.
 								# The messageFrom might have removed unnecessary spaces during JSON encoded that are present in the chatbot output.
-								messageFrom = Regex.replace(data = messageFrom, expression = '([\{\}\[\]\,\:\s])', replacement = r'XGAIAREPLACEX\1XGAIAREPLACEX', all = True)
-								messageFrom = Regex.replace(data = messageFrom, expression = '(?:^XGAIAREPLACEX|XGAIAREPLACEX$)', replacement = '', all = True) # Do not remove newlines before/after.
+								messageFrom = Regex.replace(data = messageFrom, expression = r'([\{\}\[\]\,\:\s])', replacement = r'XGAIAREPLACEX\1XGAIAREPLACEX', all = True)
+								messageFrom = Regex.replace(data = messageFrom, expression = r'(?:^XGAIAREPLACEX|XGAIAREPLACEX$)', replacement = '', all = True) # Do not remove newlines before/after.
 								messageFrom = Regex.escape(messageFrom)
-								messageFrom = messageFrom.replace('XGAIAREPLACEX', '\s*')
-								messageFrom = messageFrom.replace('\ \s*', '\s*').replace('\s*\ ', '\s*')
+								messageFrom = messageFrom.replace(r'XGAIAREPLACEX', r'\s*')
+								messageFrom = messageFrom.replace(r'\ \s*', r'\s*').replace(r'\s*\ ', r'\s*')
 
-								message = Regex.replace(data = message, expression = '(?<![a-z\d])(%s)(?![a-z\d])' % messageFrom, replacement = messageTo, group = 1, all = True) # NB: make sure we do not extract subtrings. Otherwise short TMDb IDs (eg: 12) might replace years or other numbers.
+								message = Regex.replace(data = message, expression = r'(?<![a-z\d])(%s)(?![a-z\d])' % messageFrom, replacement = messageTo, group = 1, all = True) # NB: make sure we do not extract subtrings. Otherwise short TMDb IDs (eg: 12) might replace years or other numbers.
 		else: message = ''
 		if Tools.isArray(message): message = ' | '.join(message)
 
@@ -2916,7 +2916,7 @@ class Oracle(object):
 			integers = {}
 			extract = message
 			original = message
-			values = Regex.extract(data = extract, expression = ':\s*(\[color\s[a-f\d]{8}\](?:\d+|null|true|false)\[\/color\])', group = None, all = True) # Year or ID integers that are formatted will cause the json decoding to fail.
+			values = Regex.extract(data = extract, expression = r':\s*(\[color\s[a-f\d]{8}\](?:\d+|null|true|false)\[\/color\])', group = None, all = True) # Year or ID integers that are formatted will cause the json decoding to fail.
 			if values:
 				for i in values:
 					id = str(Hash.hash(i)) # Produces an int.
@@ -2937,7 +2937,7 @@ class Oracle(object):
 						for k, v in integers.items():
 							message = message.replace(k, v)
 						if reduce:
-							extracted = Regex.extract(data = message, expression = '\{([^\{]*?)\}', group = None, all = True, flags = Regex.FlagAllLines) # [^\{] = only inner most objects, not outer nested objects.
+							extracted = Regex.extract(data = message, expression = r'\{([^\{]*?)\}', group = None, all = True, flags = Regex.FlagAllLines) # [^\{] = only inner most objects, not outer nested objects.
 							if extracted and len(extracted) > 1:
 								# Only place all JSON attributes on a single line, if the JSON data is not too long.
 								# KeyTalk returns additional JSON attributes, and if all are placed on a single line, it actually makes it harder, instead of easier, to read.
@@ -2947,13 +2947,13 @@ class Oracle(object):
 										short = False
 										break
 									else:
-										i = Regex.remove(data = i, expression = '(\[color\s[a-f\d]{8}\]|\[\/color\]|\s{2,})', group = None, all = True)
+										i = Regex.remove(data = i, expression = r'(\[color\s[a-f\d]{8}\]|\[\/color\]|\s{2,})', group = None, all = True)
 										if len(i) > 200:
 											short = False
 											break
 								if short:
 									for i in extracted:
-										message = message.replace(i, Regex.replace(data = i.replace('\n', ' '), expression = '\s{2,}', replacement = ' ', group = None, all = True).strip())
+										message = message.replace(i, Regex.replace(data = i.replace('\n', ' '), expression = r'\s{2,}', replacement = ' ', group = None, all = True).strip())
 
 						# Readd the part of the chabot response before/after the JSON data.
 						# Eg: Sure, here is one more action movie title and year in JSON format:\n\n```json ...

@@ -44,7 +44,7 @@ class Provider(ProviderNewznab):
 			# Retry and there is a good chance of the results being retruned.
 			# Might be a temporary issue.
 			retryCount				= 2,
-			retryExpression			= '(^<\?xml\s|504\*gateway)',
+			retryExpression			= r'(^<\?xml\s|504\*gateway)',
 
 			# Does not support IMDb for shows, specials, and packs.
 			supportShowImdb			= False,

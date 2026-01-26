@@ -494,7 +494,7 @@ class MetaMenu(object):
 		return self.commandCreate(command = command, parameters = parameters, clean = clean, **{
 			MetaMenu.ParameterAction	: MetaMenu.Action,
 			MetaMenu.ParameterMenu		: MetaMenu.MenuMedia,
-			MetaMenu.ParameterContent	: MetaMenu.ContentEpisode if Media.isEpisode(media) else MetaMenu.ContentSeason if Media.isSeason(media) else None,
+			MetaMenu.ParameterContent	: MetaMenu.ContentSet if Media.isSet(media) else MetaMenu.ContentEpisode if Media.isEpisode(media) else MetaMenu.ContentSeason if Media.isSeason(media) else None,
 			MetaMenu.ParameterMedia		: media,
 			MetaMenu.ParameterImdb		: imdb,
 			MetaMenu.ParameterTmdb		: tmdb,
@@ -1810,7 +1810,7 @@ class MetaMenu(object):
 						[36536, Audience.AgeAdult],
 					])
 					for i in certificate: i[1] = Audience.certificate(age = i[1], media = self.mMedia, unrated = False, select = Audience.SelectSingle)
-					items = [self._menuItem(label = Regex.replace(data = Translation.string(i[0]), expression = '(\d+)', replacement = r'\1+'), image = 'audience', certificate = i[1]) for i in certificate]
+					items = [self._menuItem(label = Regex.replace(data = Translation.string(i[0]), expression = r'(\d+)', replacement = r'\1+'), image = 'audience', certificate = i[1]) for i in certificate]
 
 				# Certificate menu.
 				elif MetaMenu.AudienceCertificate in category:

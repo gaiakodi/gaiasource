@@ -28,19 +28,19 @@ class Debrid(object):
 	TypeHandle		= 'handle'
 
 	Meta			= {
-						'premiumize'	: {'id' : 'premiumize',		'name' : 'Premiumize',		'abbreviation' : 'P',	'acronym' : 'PM',	'expression' : '(premiumize|energycdn)'},
-						'offcloud'		: {'id' : 'offcloud',		'name' : 'OffCloud',		'abbreviation' : 'O',	'acronym' : 'OC',	'expression' : '(off[\-\s]?cloud)'},
-						'torbox'		: {'id' : 'torbox',			'name' : 'TorBox',			'abbreviation' : 'T',	'acronym' : 'TB',	'expression' : '(tor[\-\s]?box)'},
-						'debrider'		: {'id' : 'debrider',		'name' : 'Debrider',		'abbreviation' : 'D',	'acronym' : 'DB',	'expression' : '(debrider)'},
-						'easydebrid'	: {'id' : 'easydebrid',		'name' : 'EasyDebrid',		'abbreviation' : 'E',	'acronym' : 'ED',	'expression' : '(easy[\-\s]?debrid)'},
-						'realdebrid'	: {'id' : 'realdebrid',		'name' : 'RealDebrid',		'abbreviation' : 'R',	'acronym' : 'RD',	'expression' : '(real[\-\s]?debrid)'},
-						'debridlink'	: {'id' : 'debridlink',		'name' : 'DebridLink',		'abbreviation' : 'D',	'acronym' : 'DL',	'expression' : '(debrid[\-\s\.]?link)'}, # Streaming domain: debrid.link.
-						'alldebrid'		: {'id' : 'alldebrid',		'name' : 'AllDebrid',		'abbreviation' : 'A',	'acronym' : 'AD',	'expression' : '(all[\-\s]?debrid)'},
-						'linksnappy'	: {'id' : 'linksnappy',		'name' : 'LinkSnappy',		'abbreviation' : 'L',	'acronym' : 'LS',	'expression' : '(link[\-\s]?snappy)'},
-						'megadebrid'	: {'id' : 'megadebrid',		'name' : 'MegaDebrid',		'abbreviation' : 'M',	'acronym' : 'MD',	'expression' : '(mega[\-\s]?debrid)'},
-						'rapidpremium'	: {'id' : 'rapidpremium',	'name' : 'RapidPremium',	'abbreviation' : 'R',	'acronym' : 'RP',	'expression' : '(rapid[\-\s]?premium)'},
-						'simplydebrid'	: {'id' : 'simplydebrid',	'name' : 'SimplyDebrid',	'abbreviation' : 'S',	'acronym' : 'SD',	'expression' : '(simply[\-\s]?debrid)'},
-						'smoozed'		: {'id' : 'smoozed',		'name' : 'Smoozed',			'abbreviation' : 'S',	'acronym' : 'SM',	'expression' : '(smoozed)'},
+						'premiumize'	: {'id' : 'premiumize',		'name' : 'Premiumize',		'abbreviation' : 'P',	'acronym' : 'PM',	'expression' : r'(premiumize|energycdn)'},
+						'offcloud'		: {'id' : 'offcloud',		'name' : 'OffCloud',		'abbreviation' : 'O',	'acronym' : 'OC',	'expression' : r'(off[\-\s]?cloud)'},
+						'torbox'		: {'id' : 'torbox',			'name' : 'TorBox',			'abbreviation' : 'T',	'acronym' : 'TB',	'expression' : r'(tor[\-\s]?box)'},
+						'debrider'		: {'id' : 'debrider',		'name' : 'Debrider',		'abbreviation' : 'D',	'acronym' : 'DB',	'expression' : r'(debrider)'},
+						'easydebrid'	: {'id' : 'easydebrid',		'name' : 'EasyDebrid',		'abbreviation' : 'E',	'acronym' : 'ED',	'expression' : r'(easy[\-\s]?debrid)'},
+						'realdebrid'	: {'id' : 'realdebrid',		'name' : 'RealDebrid',		'abbreviation' : 'R',	'acronym' : 'RD',	'expression' : r'(real[\-\s]?debrid)'},
+						'debridlink'	: {'id' : 'debridlink',		'name' : 'DebridLink',		'abbreviation' : 'D',	'acronym' : 'DL',	'expression' : r'(debrid[\-\s\.]?link)'}, # Streaming domain: debrid.link.
+						'alldebrid'		: {'id' : 'alldebrid',		'name' : 'AllDebrid',		'abbreviation' : 'A',	'acronym' : 'AD',	'expression' : r'(all[\-\s]?debrid)'},
+						'linksnappy'	: {'id' : 'linksnappy',		'name' : 'LinkSnappy',		'abbreviation' : 'L',	'acronym' : 'LS',	'expression' : r'(link[\-\s]?snappy)'},
+						'megadebrid'	: {'id' : 'megadebrid',		'name' : 'MegaDebrid',		'abbreviation' : 'M',	'acronym' : 'MD',	'expression' : r'(mega[\-\s]?debrid)'},
+						'rapidpremium'	: {'id' : 'rapidpremium',	'name' : 'RapidPremium',	'abbreviation' : 'R',	'acronym' : 'RP',	'expression' : r'(rapid[\-\s]?premium)'},
+						'simplydebrid'	: {'id' : 'simplydebrid',	'name' : 'SimplyDebrid',	'abbreviation' : 'S',	'acronym' : 'SD',	'expression' : r'(simply[\-\s]?debrid)'},
+						'smoozed'		: {'id' : 'smoozed',		'name' : 'Smoozed',			'abbreviation' : 'S',	'acronym' : 'SM',	'expression' : r'(smoozed)'},
 					}
 
 	Lock			= Lock()
@@ -75,7 +75,7 @@ class Debrid(object):
 
 	@classmethod
 	def _import(self):
-		import importlib
+		import sys, importlib
 		directories, files = File.listDirectory(self._path(), absolute = False)
 		for directory in directories:
 			if not directory.startswith('_'):
@@ -83,7 +83,14 @@ class Debrid(object):
 				# Otherwise import_module(...) can end up in deadlock if this functions is called in parallel.
 				# Eg: _frozen_importlib._DeadlockError: deadlock detected by _ModuleLock('lib.debrid.easynews')
 				module = 'lib.debrid.' + directory
-				if not importlib.find_loader(module): importlib.import_module(module)
+
+				# Deprecated since Python 3.4, and removed since Python 3.12.
+				#imported = importlib.find_loader(module)
+				# The alternative is: importlib.util.find_spec(module)
+				# However, this seems not work like find_loader(). The specs are always returned, even if not imported yet.
+				imported = module in sys.modules
+
+				if not imported: importlib.import_module(module)
 
 	@classmethod
 	def _instances(self, type = TypeCore):

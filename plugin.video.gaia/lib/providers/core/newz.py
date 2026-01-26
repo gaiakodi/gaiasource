@@ -193,13 +193,13 @@ class ProviderNewz(ProviderUsenetJson):
 
 	_AttributeExtensions		= [_AttributeId, _AttributeGuid, _AttributeSize, _AttributePassword, _AttributeDownloads, _AttributeVotesUp, _AttributeVotesDown, _AttributeMd5, _AttributeSha1, _AttributeSha256] + _AttributeTime
 
-	_RequestSuccess				= '^((?!code\s*=\s*"10[02]"|incorrect\s*user\s*credentials|wrong\s*(?:api\s*)?key).)*$'
+	_RequestSuccess				= r'^((?!code\s*=\s*"10[02]"|incorrect\s*user\s*credentials|wrong\s*(?:api\s*)?key).)*$'
 	_RequestErrors				= [
-									{'message' : 35792, 'expression' : '(code\s*=\s*"(?:429|500|501)"|limit\s*reached)'}, # Limit reached
-									{'message' : 35793, 'expression' : '(upgrade\s*to)'}, # Premium required. Also has error code 100, like the incorrect credentials ereror, so check message instead.
-									{'message' : 35794, 'expression' : '(code\s*=\s*"100"|incorrect\s*user\s*credentials|wrong\s*(?:api\s*)?key)'}, # Incorrect credentials
-									{'message' : 35795, 'expression' : '(code\s*=\s*"(?:101)")'}, # Suspended
-									{'message' : 35796, 'expression' : '(code\s*=\s*"(?:102)")'}, # Insufficient privileges
+									{'message' : 35792, 'expression' : r'(code\s*=\s*"(?:429|500|501)"|limit\s*reached)'}, # Limit reached
+									{'message' : 35793, 'expression' : r'(upgrade\s*to)'}, # Premium required. Also has error code 100, like the incorrect credentials ereror, so check message instead.
+									{'message' : 35794, 'expression' : r'(code\s*=\s*"100"|incorrect\s*user\s*credentials|wrong\s*(?:api\s*)?key)'}, # Incorrect credentials
+									{'message' : 35795, 'expression' : r'(code\s*=\s*"(?:101)")'}, # Suspended
+									{'message' : 35796, 'expression' : r'(code\s*=\s*"(?:102)")'}, # Insufficient privileges
 								]
 
 	# Links can contain both the GUID and the API key.
@@ -209,7 +209,7 @@ class ProviderNewz(ProviderUsenetJson):
 	_IdLengths					= [44, 40, 36, 32]
 	_IdPrefixes					= ['\/', _AttributeGuid, _AttributeId, '=', '']
 	_IdExtras					= ['\-', ''] # First try with dashes "-" in the GUID. This seems to have been added in the new NewzNab API. API keys do not seem to have dashes.
-	_IdExpression				= '^.*%s([a-z0-9%s]{%d,})(?:&|\/|\.|$)'
+	_IdExpression				= r'^.*%s([a-z0-9%s]{%d,})(?:&|\/|\.|$)'
 
 	_LimitOffset				= 100	# Maximum number of links returned per request. Technically every site can provide a custom value for this, but it seems to be 100 in most cases.
 	_LimitDownloads				= 500	# How many grabs/downloads count towards the approval.

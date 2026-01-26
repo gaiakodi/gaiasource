@@ -70,11 +70,11 @@ class Bluetooth(object):
 
 	@classmethod
 	def _extractDevice(self, data):
-		return Regex.extract(data = data, expression = '^\s*device\s+((?:[a-f\d]{2}[:-]){5}[a-f\d]{2})\s+(.*?)$', all = True, group = None, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
+		return Regex.extract(data = data, expression = r'^\s*device\s+((?:[a-f\d]{2}[:-]){5}[a-f\d]{2})\s+(.*?)$', all = True, group = None, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
 	@classmethod
 	def _extractInfo(self, data, attribute):
-		data = Regex.extract(data = data, expression = '^\s*%s\s*:?\s*(.*?)$' % attribute, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
+		data = Regex.extract(data = data, expression = r'^\s*%s\s*:?\s*(.*?)$' % attribute, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 		return bool(data and data.lower().strip() == 'yes')
 
 	@classmethod
@@ -113,7 +113,7 @@ class Bluetooth(object):
 		if not enabled or self.enabled():
 			#data = self._execute(action = 'version') # This calls hangs if there is no Bluetooth dongle: Waiting to connect to bluetoothd...
 			data = Subprocess.output(command = 'bluetoothctl --version')
-			return bool(data and Regex.extract(data = data, expression = '^\s*bluetoothctl.*?(\d+\.)', flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines))
+			return bool(data and Regex.extract(data = data, expression = r'^\s*bluetoothctl.*?(\d+\.)', flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines))
 		return False
 
 	@classmethod

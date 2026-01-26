@@ -421,17 +421,17 @@ class MetaPack(object):
 			return MetaPack.Expressions[index]
 		except:
 			if MetaPack.Expressions is None:
-				generic = '^\s*(?:tba|(?:(?:e|é|e\?)pis(?:o|ó|o\?)(?:des?|d?ios?)|part|folge|teil|aflevering|deel)[\s\-\_\.]*(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}|(?:\#\s?)?\d+(?:\.\d+)?(?:$|[^\d])|[ivxlcd]+(?:$|[^\da-z]))|(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}))[\s\:\-]*'
+				generic = r'^\s*(?:tba|(?:(?:e|é|e\?)pis(?:o|ó|o\?)(?:des?|d?ios?)|part|folge|teil|aflevering|deel)[\s\-\_\.]*(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}|(?:\#\s?)?\d+(?:\.\d+)?(?:$|[^\d])|[ivxlcd]+(?:$|[^\da-z]))|(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}))[\s\:\-]*'
 				MetaPack.Expressions = [
-					Regex.expression(expression = '(\s{2,})', cache = False),
-					Regex.expression(expression = '(' + generic + ')', cache = False),
+					Regex.expression(expression = r'(\s{2,})', cache = False),
+					Regex.expression(expression = r'(' + generic + ')', cache = False),
 					Regex.expression(expression = generic, cache = False),
-					Regex.expression(expression = '(.{2,})[\(\[\s\-\_\.]*(?:\d+|[ivxlcd]+|one|two|three|four|five)[\)\]\s\-\_\.]*$', cache = False),
-					Regex.expression(expression = '(prequel|sequel)', cache = False),
-					Regex.expression(expression = '(\d+)', cache = False),
-					Regex.expression(expression = '([\(\[]\d+[\)\]]$|(?:part|pt\.?|teil|deel)\d+[\)\]]?$)', cache = False),
-					Regex.expression(expression = '(.*?)(?:$|\s*[\(\[])', cache = False),
-					Regex.expression(expression = '(?:^|\s)(IX|IV|V?I{0,3})(?:$|[\s\)\]])', cache = False),
+					Regex.expression(expression = r'(.{2,})[\(\[\s\-\_\.]*(?:\d+|[ivxlcd]+|one|two|three|four|five)[\)\]\s\-\_\.]*$', cache = False),
+					Regex.expression(expression = r'(prequel|sequel)', cache = False),
+					Regex.expression(expression = r'(\d+)', cache = False),
+					Regex.expression(expression = r'([\(\[]\d+[\)\]]$|(?:part|pt\.?|teil|deel)\d+[\)\]]?$)', cache = False),
+					Regex.expression(expression = r'(.*?)(?:$|\s*[\(\[])', cache = False),
+					Regex.expression(expression = r'(?:^|\s)(IX|IV|V?I{0,3})(?:$|[\s\)\]])', cache = False),
 				]
 			return MetaPack.Expressions[index]
 
@@ -575,38 +575,48 @@ class MetaPack(object):
 	# minimum/maximum/first(evaluated 3rd): pick the minimum/maximum/first value.
 	@classmethod
 	def _extractCombined(self, data, key, preference = None, common = None, minimum = None, maximum = None, first = None):
-		results = self._extract(data = data, key = key)
+		try:
+			results = self._extract(data = data, key = key)
 
-		if results:
-			result = None
-			commoned = None
-			if Tools.isTuple(results): results = [results]
-			provider = Tools.isArray(results) and Tools.isTuple(results[0])
+			if results:
+				result = None
+				commoned = None
+				if Tools.isTuple(results): results = [results]
+				provider = Tools.isArray(results) and Tools.isTuple(results[0])
 
-			if not result and preference and provider:
-				for i in results:
-					if Tools.isArray(i):
-						if i[0] == preference:
+				if not result and preference and provider:
+					for i in results:
+						if Tools.isArray(i):
+							if i[0] == preference:
+								result = i
+								if result[1]: break
+						else:
 							result = i
-							if result[1]: break
-					else:
-						result = i
-						if result: break
+							if result: break
 
-			if not result and common:
-				results = Tools.listUnique(results)
-				base = [i[1] if Tools.isArray(i) else i for i in results] if provider else results
-				commoned = Tools.listCommon(base)
-				if commoned and base.count(commoned) > 1: result = commoned
+				if not result and common:
+					results = Tools.listUnique(results)
+					base = [i[1] if Tools.isArray(i) else i for i in results] if provider else results
+					commoned = Tools.listCommon(base)
+					if commoned and base.count(commoned) > 1: result = commoned
 
-			if not result:
-				if minimum: result = min(results, key = lambda i : i[1] if Tools.isArray(i) else i) if provider else min(results)
-				elif maximum: result = max(results, key = lambda i : i[1] if Tools.isArray(i) else i) if provider else max(results)
-				elif first: result = results[0]
-				elif commoned: result = commoned
-				else: result = results[0]
+				if not result:
+					if minimum: result = min(results, key = lambda i : i[1] if Tools.isArray(i) else i) if provider else min(results)
+					elif maximum: result = max(results, key = lambda i : i[1] if Tools.isArray(i) else i) if provider else max(results)
+					elif first: result = results[0]
+					elif commoned: result = commoned
+					else: result = results[0]
 
-			if result: return result[1] if provider and Tools.isTuple(result) else result
+				if result: return result[1] if provider and Tools.isTuple(result) else result
+		except:
+			# More info under fix().
+			# There can be exceptions with Tools.listUnique() and Tools.listCommon(), if the internal items are not tuples (hashable), but lists (non-hashable).
+			# This can happen if the pack metadata is partial and gets a partial refresh, where the old partial data that is being reused for pack generation comes from MetaCache and was internally edited (during the last refresh) before being written to the database as "part" data.
+			# Without a try-except, the pack generation fails, due to an exception being thrown here. This in turn makes the (partial) pack metadata not ever being refreshed, and MetaCache continues to use the very old partial data, since it can never be refreshed.
+			# This is now fixed with fix() called from MetaManager._metadataPackUpdate(). But keep the try-except here, so that if this function fails due to other reasons, it still can generate the pack (even if some values are now None because of the default returned value here).
+			# But at least the pack generation refresh works, so that the partial data is removed from MetaCache. On the next pack refresh the metadata will be correctly generated (and all the None values here will be fixed).
+			Logger.error()
+
 		return None
 
 	@classmethod
@@ -1269,6 +1279,39 @@ class MetaPack(object):
 						if season == 0 and (result == MetaPack.IntervalWeekly or result == MetaPack.IntervalDaily): result = MetaPack.IntervalOtherly
 		except: Logger.error()
 		return result
+
+	##############################################################################
+	# GENERATE
+	##############################################################################
+
+	# More info under _extractCombined().
+	# The partial data from MetaCache can contain attributes (status, serie, time, date, year, etc) in the format: ["provider-id", value] or [["provider-id", value]].
+	#	Eg: "status": ["tvdb", "continuing"]
+	#	Eg: "year": [["tvdb", 2020]]
+	# This format still comes from the old Gaia v7.
+	# But can also be caused in Gaia v8+ if the pack metadata is partial (eg provider API rate limits reached) and the dict's internal values are changed to those values in this format during generateShow() and then later saved as partial metadata in MetaCache.
+	# When the pack is then partial refreshed, that old part data is used to generate the pack again, instead of retrieving the metadata again.
+	# This then causes the pack generation to fail, since the partial data causes exceptions in _extractCombined().
+	# This is now patchy-fixed in _extractCombined(), so the pack generation will at least not fail anymore. But the pack metadata can still have missing attributes (status, time, year, etc) until the next full pack refresh.
+	# Call this function from MetaManager on partial data to fix these list-values. Then on partial refresh, the new pack metadata will have all attributes without having to wait for a full refresh later on.
+	# To fix this in the long-run, the providers' dicts passed into generateShow() could be copied before being internally edited.
+	# However, the copying can take 5-50ms for smaller packs, and 100-500ms for larger packs. This will have to be done EVERY time for ALL pack generations.
+	# In contrast, this function takes about 1-5ms for smaller packs, and 50-300ms for larger packs. This will have to be done only occasionally and only for partial refreshes.
+	# Hence, for performance reasons it is better to call fix() occasionally instead of copying the dicts every time.
+	@classmethod
+	def fix(self, provider, data):
+		if Tools.isDictionary(data):
+			for k, v in data.items():
+				if Tools.isDictionary(v):
+					self.fix(provider = provider, data = v)
+				elif Tools.isArray(v):
+					if len(v) == 2 and v[0] == provider:
+						data[k] = v[1]
+					elif len(v) == 1 and Tools.isArray(v[0]) and len(v[0]) == 2 and v[0][0] == provider:
+						data[k] = v[0][1]
+					else:
+						for i in v: self.fix(provider = provider, data = i)
+		return data
 
 	##############################################################################
 	# GENERATE

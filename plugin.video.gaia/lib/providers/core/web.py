@@ -1168,7 +1168,7 @@ class ProviderWeb(ProviderBase):
 			replacements = self.mData['replacements']
 			if replacements:
 				for key, value in replacements.items():
-					custom = Regex.extract(data = key, expression = 'custom_(.*?)_(.*)', group = None)
+					custom = Regex.extract(data = key, expression = r'custom_(.*?)_(.*)', group = None)
 					if custom:
 						customId = custom[0]
 						customLabel = custom[1]
@@ -1267,7 +1267,7 @@ class ProviderWeb(ProviderBase):
 		# Some values are only replaced later on (like authentication).
 		if Tools.isString(search):
 			path = search
-			matches = Regex.extract(data = path, expression = '(\{.*?\})', group = None, all = True)
+			matches = Regex.extract(data = path, expression = r'(\{.*?\})', group = None, all = True)
 		else:
 			try: link = search['link']
 			except: pass
@@ -1288,13 +1288,13 @@ class ProviderWeb(ProviderBase):
 
 			matches = []
 			if path:
-				matches = Regex.extract(data = path, expression = '(\{.*?\})', group = None, all = True)
+				matches = Regex.extract(data = path, expression = r'(\{.*?\})', group = None, all = True)
 				if not matches: matches = []
 
 			for item in [headers, cookies, data]:
 				if item:
 					for key, value in item.items():
-						sub = Regex.extract(data = value, expression = '(\{.*?\})', group = None, all = True)
+						sub = Regex.extract(data = value, expression = r'(\{.*?\})', group = None, all = True)
 						if sub: matches.extend(sub)
 
 		for match in matches:
@@ -1624,7 +1624,7 @@ class ProviderWeb(ProviderBase):
 					if originalIndex > 1: priority *= 1.3 + (0.1 * originalIndex * max(1, originalIndex - 1))
 
 					# Movie queries with universal numbering (S01 or S01E01) before local-language numbering (season 1 or saison 1").
-					if not orignalSame and not language == Language.EnglishCode and Regex.match(data = search, expression = '\s\d+(?:e\d+|$|\s)'):
+					if not orignalSame and not language == Language.EnglishCode and Regex.match(data = search, expression = r'\s\d+(?:e\d+|$|\s)'):
 						if universal is True: multiplier = 0.4 if originalIndex >= 0 else 0.5
 						elif universal is False: multiplier = (3.0 if pack else 1.6) if originalIndex >= 0 else (2.5 if pack else 1.5)
 						else: multiplier = 1.0
@@ -1644,7 +1644,7 @@ class ProviderWeb(ProviderBase):
 
 						# Move cut-off titles lower.
 						# Eg: and the Philosophers Stone 2001
-						expression = '^[a-z]{2,}\s'
+						expression = r'^[a-z]{2,}\s'
 						if Regex.match(data = search, expression = expression, flags = Regex.FlagNone) and (not originalSearch or not Regex.match(data = originalSearch[0], expression = expression, flags = Regex.FlagNone)):
 							priority += (priorities[1] * 7.0)
 
@@ -1920,14 +1920,14 @@ class ProviderWeb(ProviderBase):
 				formatTitles = [self._queryClean(i).lower() for i in queryTitles if i]
 				formatTitles = [i for i in formatTitles if i]
 
-				formatExpression = ''
+				formatExpression = r''
 				if includeEncode:
-					if encodeQuote: formatExpression = '%'
-					elif encodePlus: formatExpression = '\+'
-					elif encodeMinus: formatExpression = '\-'
-					elif encodeDot: formatExpression = '\.'
-				formatExpression1 = '[^a-z\d]'
-				formatExpression2 = '[^a-z\d\s%s]' % formatExpression
+					if encodeQuote: formatExpression = r'%'
+					elif encodePlus: formatExpression = r'\+'
+					elif encodeMinus: formatExpression = r'\-'
+					elif encodeDot: formatExpression = r'\.'
+				formatExpression1 = r'[^a-z\d]'
+				formatExpression2 = r'[^a-z\d\s%s]' % formatExpression
 
 			queries = Tools.listSort(data = queries, key = lambda x : x['priority'])
 			result = []
@@ -2011,9 +2011,9 @@ class ProviderWeb(ProviderBase):
 		return replacements
 
 	def _queryClean(self, query):
-		query = Regex.remove(data = query, expression = '[\'\`]', all = True)
-		query = Regex.replace(data = query, expression = '[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]', replacement = ' ', all = True)
-		query = Regex.replace(data = query, expression = '\s{2,}', replacement = ' ', all = True).strip()
+		query = Regex.remove(data = query, expression = r'[\'\`]', all = True)
+		query = Regex.replace(data = query, expression = r'[\-\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]', replacement = ' ', all = True)
+		query = Regex.replace(data = query, expression = r'\s{2,}', replacement = ' ', all = True).strip()
 		return query
 
 	##############################################################################

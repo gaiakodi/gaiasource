@@ -57,14 +57,14 @@ class Provider(ProviderHtml):
 	_AttributeAuthorized	= 'auth_ok'
 	_AttributeUnauthorized	= 'auth_bad'
 
-	_ExpressionCategory		= 'cat=(\d+)'
-	_ExpressionSize			= 'size\s*:\s*([a-z\d\.]+)\s*(?:$|\|)'
-	_ExpressionDate			= 'date\s*:\s*([\d\-\:\s]+)\s*[a-z]*\s*(?:$|\|)'
-	_ExpressionUploader		= 'submitter\s*:\s*(.*?)\s*(?:$|\|)'
-	_ExpressionSeeds		= 's\s*:\s*(\d+)(?:$|\s)'
-	_ExpressionLeeches		= 'l\s*:\s*(\d+)(?:$|\s)'
-	_ExpressionDownloads	= 'c\s*:\s*(\d+)(?:$|\s)'
-	_ExpressionOffset		= 'showing\s*results.*?(\d+)\s*of\s*.*?(\d+)'
+	_ExpressionCategory		= r'cat=(\d+)'
+	_ExpressionSize			= r'size\s*:\s*([a-z\d\.]+)\s*(?:$|\|)'
+	_ExpressionDate			= r'date\s*:\s*([\d\-\:\s]+)\s*[a-z]*\s*(?:$|\|)'
+	_ExpressionUploader		= r'submitter\s*:\s*(.*?)\s*(?:$|\|)'
+	_ExpressionSeeds		= r's\s*:\s*(\d+)(?:$|\s)'
+	_ExpressionLeeches		= r'l\s*:\s*(\d+)(?:$|\s)'
+	_ExpressionDownloads	= r'c\s*:\s*(\d+)(?:$|\s)'
+	_ExpressionOffset		= r'showing\s*results.*?(\d+)\s*of\s*.*?(\d+)'
 
 	##############################################################################
 	# INITIALIZE
@@ -133,7 +133,7 @@ class Provider(ProviderHtml):
 			values = []
 			for i in range(0, len(items), 2):
 				value = str(items[i]) + str(items[i + 1])
-				value = Regex.remove(data = value, expression = '<\/tr>\s*<tr.*?>')
+				value = Regex.remove(data = value, expression = r'<\/tr>\s*<tr.*?>')
 				value = self.parseHtml(value)
 				if value:
 					value = self.extractHtml(value, HtmlTableRow())

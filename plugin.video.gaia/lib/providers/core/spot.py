@@ -127,7 +127,7 @@ class ProviderSpotHtml(ProviderUsenetHtml):
 	_AttributeUploader	= 'poster'
 	_AttributeLink		= 'nzb'
 
-	_ExpressionId		= 'messageid=(.*?)(?:$|&)'
+	_ExpressionId		= r'messageid=(.*?)(?:$|&)'
 
 	##############################################################################
 	# INITIALIZE

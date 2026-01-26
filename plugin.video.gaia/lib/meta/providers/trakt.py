@@ -1551,7 +1551,7 @@ class MetaTrakt(MetaProvider):
 			# Trakt uses Solr for the query. Escape special characters.
 			# https://trakt.docs.apiary.io/#reference/search/text-query/get-text-query-results
 			# https://solr.apache.org/guide/6_6/the-standard-query-parser.html
-			if query: query = Regex.replace(data = query, expression = '([\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\/]|[\&\|]{2})', replacement = r'\\\1', group = None, all = True)
+			if query: query = Regex.replace(data = query, expression = r'([\+\-\!\(\)\{\}\[\]\^\"\~\*\?\:\/]|[\&\|]{2})', replacement = r'\\\1', group = None, all = True)
 
 			# Although Trakt states in the docs that && and || are reserved Solr characters, often using them does not work and returns few results.
 			# Use the Solr AND and OR instead, which seems to work better.
@@ -2243,7 +2243,7 @@ class MetaTrakt(MetaProvider):
 			if not result.get('tmdb'):
 				description = (data.get(data.get('type')) or data).get('description')
 				if description:
-					id = Regex.extract(data = description, expression = 'themoviedb\.org\/collection\/(\d+)')
+					id = Regex.extract(data = description, expression = r'themoviedb\.org\/collection\/(\d+)')
 					if id: result['tmdb'] = str(id)
 
 		# If IDs are missing, add them from the request parameters.
@@ -2262,7 +2262,7 @@ class MetaTrakt(MetaProvider):
 
 			# Sets (official Trakt lists) often contain the TMDb collection link in the description. Remove it.
 			# Eg: The Transformers series follows the continuing battle between the Autobots and the Decepticons and ultimately, the triumph of good over evil. This collection includes theatrically released films of the Transformers saga only.https://themoviedb.org/collection/8650
-			data = Regex.remove(data = data, expression = 'http\S+', all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
+			data = Regex.remove(data = data, expression = r'http\S+', all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
 
 			data = data.strip()
 		return data
@@ -2608,7 +2608,7 @@ class MetaTrakt(MetaProvider):
 				# This can cause the date to be off by 1 day, if the episode was released close to UTC midnight, and it is closer than the local timezone offset which seems to be used in Time.timestamp().
 				# Eg: One Piece: 2001-03-21T00:30:00Z (check that the date is the same in the Series menu between S01E61 and "Reason Extras").
 				# Movies have a normal date without a timezone.
-				#	premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+				#	premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 				#	time = Time.timestamp(fixedTime = premiered, format = Time.FormatDate)
 				# All dates from Trakt are returned as GMT/UTC.
 				#	https://trakt.docs.apiary.io/#introduction/dates
@@ -2620,7 +2620,7 @@ class MetaTrakt(MetaProvider):
 					if time:
 						premiered = Time.format(time, format = Time.FormatDate)
 					else:
-						premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
+						premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
 						time = Time.timestamp(fixedTime = premiered, format = Time.FormatDate, utc = True)
 					if premiered:
 						result['premiered'] = premiered
@@ -2634,7 +2634,7 @@ class MetaTrakt(MetaProvider):
 					if time:
 						aired = Time.format(time, format = Time.FormatDate)
 					else:
-						aired = Regex.extract(data = aired, expression = '(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
+						aired = Regex.extract(data = aired, expression = r'(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
 						time = Time.timestamp(fixedTime = aired, format = Time.FormatDate, utc = True)
 					if aired:
 						result['premiered'] = result['aired'] = aired
@@ -2649,7 +2649,7 @@ class MetaTrakt(MetaProvider):
 						time = None
 						if 'T' in released: time = Time.timestamp(fixedTime = released, iso = True)
 						if not time:
-							released = Regex.extract(data = released, expression = '(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
+							released = Regex.extract(data = released, expression = r'(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
 							time = Time.timestamp(fixedTime = released, format = Time.FormatDate, utc = True)
 						if time: self._dataSet(item = result, key = ['time', MetaTools.ReleaseDigital if calendar == MetaTrakt.CalendarStreaming else MetaTools.ReleasePhysical], value = time)
 
@@ -3146,7 +3146,7 @@ class MetaTrakt(MetaProvider):
 				#	https://trakt.tv/lists/25075602
 				#	https://trakt.tv/lists/25629401
 				#	https://trakt.tv/lists/26068972
-				if Regex.match(data = result['title'], expression = 'collection(\s*[\:\-]+\s*)*\s*copy$'): return None
+				if Regex.match(data = result['title'], expression = r'collection(\s*[\:\-]+\s*)*\s*copy$'): return None
 
 			if result:
 				self._tempSet(item = result, value = resultTrakt)

@@ -39,9 +39,9 @@ class Provider(ProviderHtml):
 	_AttributeNext			= 'next'
 	_AttributeDisabled		= 'disabled'
 
-	_ExpressionDownloads	= '(downloads)'
-	_ExpressionVoteUp		= '(up\s*votes)'
-	_ExpressionVoteDown		= '(down\s*votes)'
+	_ExpressionDownloads	= r'(downloads)'
+	_ExpressionVoteUp		= r'(up\s*votes)'
+	_ExpressionVoteDown		= r'(down\s*votes)'
 
 	##############################################################################
 	# INITIALIZE

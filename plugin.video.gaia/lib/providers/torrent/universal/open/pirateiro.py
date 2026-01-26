@@ -44,8 +44,8 @@ class Provider(ProviderHtml):
 	_AttributePage			= 'pagi-link'
 	_AttributeDisabled		= 'disabled'
 
-	_ExpressionMovie		= '(movie|anime)'
-	_ExpressionShow			= '(tv|anime)'
+	_ExpressionMovie		= r'(movie|anime)'
+	_ExpressionShow			= r'(tv|anime)'
 
 	##############################################################################
 	# INITIALIZE

@@ -34,8 +34,8 @@ class Provider(ProviderUsenetHtml):
 	_AttributePoster		= 'poster'
 	_AttributeNext			= 'paging_next'
 
-	_ExpressionGet			= '\/get\/(.*?)(?:$|&|\/)'
-	_ExpressionUploader		= 'posted\s*by:\s*(.*?)(?:$|[\r\n]+)'
+	_ExpressionGet			= r'\/get\/(.*?)(?:$|&|\/)'
+	_ExpressionUploader		= r'posted\s*by:\s*(.*?)(?:$|[\r\n]+)'
 
 	##############################################################################
 	# INITIALIZE

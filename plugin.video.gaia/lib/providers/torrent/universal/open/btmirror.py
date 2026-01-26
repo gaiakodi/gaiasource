@@ -46,9 +46,9 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributePage			= 'flag_pg'
 
-	_ExpressionSize			= 'file\s*size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
-	_ExpressionDownloads	= 'download\s*times\s*[:：]\s*(\d+)'
-	_ExpressionNext			= '(next)'
+	_ExpressionSize			= r'file\s*size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
+	_ExpressionDownloads	= r'download\s*times\s*[:：]\s*(\d+)'
+	_ExpressionNext			= r'(next)'
 
 	##############################################################################
 	# INITIALIZE

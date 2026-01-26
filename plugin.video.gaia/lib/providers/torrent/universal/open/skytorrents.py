@@ -36,11 +36,11 @@ class Provider(ProviderHtml):
 	_AttributeTable			= 'table'
 	_AttributeLabel			= 'label'
 
-	_ExpressionMovie		= '(movie|video)'
-	_ExpressionShow			= '(show|video)'
-	_ExpressionVerified		= '(verified)'
-	_ExpressionVoteUp		= '.*>\s*([\-\d]+)\s*<.+?thumb_upm'
-	_ExpressionVoteDown		= '.*>\s*([\-\d]+)\s*<.+?thumb_downm'
+	_ExpressionMovie		= r'(movie|video)'
+	_ExpressionShow			= r'(show|video)'
+	_ExpressionVerified		= r'(verified)'
+	_ExpressionVoteUp		= r'.*>\s*([\-\d]+)\s*<.+?thumb_upm'
+	_ExpressionVoteDown		= r'.*>\s*([\-\d]+)\s*<.+?thumb_downm'
 
 	##############################################################################
 	# INITIALIZE

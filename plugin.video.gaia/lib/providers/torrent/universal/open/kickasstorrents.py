@@ -53,8 +53,8 @@ class Provider(ProviderHtml):
 	_AttributePage		= 'siteButton'
 	_AttributeActive	= 'active'
 
-	_ExpressionMagnet	= '(.*magnet.*)'
-	_ExpressionUploader	= 'posted\s*by\s*(.*?)\s*in\s*'
+	_ExpressionMagnet	= r'(.*magnet.*)'
+	_ExpressionUploader	= r'posted\s*by\s*(.*?)\s*in\s*'
 
 	##############################################################################
 	# INITIALIZE

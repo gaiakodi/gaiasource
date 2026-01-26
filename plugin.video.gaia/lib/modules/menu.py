@@ -381,32 +381,6 @@ class Menu(object):
 							self._item(label = 33013,	image = 'downloadsclean',		action = 'offcloudClear',		category = download),
 							self._item(label = 33344,	image = 'downloadsinformation',	action = 'offcloudInformation',	category = download),
 						])
-
-
-			elif Menu.ServiceRealdebrid in category:
-				from lib.debrid.realdebrid import Core
-				valid = Core().accountValid()
-				if Menu.CategoryDownloads in category:
-					if valid:
-						items.extend([
-							self._item(label = 33297,	image = 'downloadslist',		action = 'realdebridList',			folder = True),
-							self._item(label = 35069,	image = 'downloadsadd',			action = 'realdebridAdd'),
-							self._item(label = 33013,	image = 'downloadsclean',		action = 'realdebridClear'),
-							self._item(label = 33344,	image = 'downloadsinformation',	action = 'realdebridInformation'),
-						])
-					items.append(self._item(label = 33011,	image = 'downloadssettings',	action = 'realdebridSettings'))
-				else:
-					if valid:
-						items.extend([
-							self._item(label = 32009,	image = 'realdebriddownloads',	content = Menu.ContentService,	category = [Menu.ServiceRealdebrid, Menu.CategoryDownloads]),
-							self._item(label = 33339,	image = 'realdebridaccount',	action = 'realdebridAccount'),
-							self._item(label = 33030,	image = 'realdebridspeed',		action = 'speedtestRealDebrid'),
-						])
-					items.extend([
-						self._item(label = 33011,	image = 'realdebridsettings',	action = 'realdebridSettings'),
-						self._item(label = 33354,	image = 'realdebridweb',		action = 'realdebridWebsite'),
-					])
-
 			else:
 				if valid:
 					items.extend([
@@ -417,6 +391,30 @@ class Menu(object):
 				items.extend([
 					self._item(label = 33011,	image = 'offcloudsettings',	action = 'offcloudSettings'),
 					self._item(label = 33354,	image = 'offcloudweb',		action = 'offcloudWebsite'),
+				])
+
+		elif Menu.ServiceRealdebrid in category:
+			from lib.debrid.realdebrid import Core
+			valid = Core().accountValid()
+			if Menu.CategoryDownloads in category:
+				if valid:
+					items.extend([
+						self._item(label = 33297,	image = 'downloadslist',		action = 'realdebridList',			folder = True),
+						self._item(label = 35069,	image = 'downloadsadd',			action = 'realdebridAdd'),
+						self._item(label = 33013,	image = 'downloadsclean',		action = 'realdebridClear'),
+						self._item(label = 33344,	image = 'downloadsinformation',	action = 'realdebridInformation'),
+					])
+				items.append(self._item(label = 33011,	image = 'downloadssettings',	action = 'realdebridSettings'))
+			else:
+				if valid:
+					items.extend([
+						self._item(label = 32009,	image = 'realdebriddownloads',	content = Menu.ContentService,	category = [Menu.ServiceRealdebrid, Menu.CategoryDownloads]),
+						self._item(label = 33339,	image = 'realdebridaccount',	action = 'realdebridAccount'),
+						self._item(label = 33030,	image = 'realdebridspeed',		action = 'speedtestRealDebrid'),
+					])
+				items.extend([
+					self._item(label = 33011,	image = 'realdebridsettings',	action = 'realdebridSettings'),
+					self._item(label = 33354,	image = 'realdebridweb',		action = 'realdebridWebsite'),
 				])
 
 		elif Menu.ServiceEasynews in category:

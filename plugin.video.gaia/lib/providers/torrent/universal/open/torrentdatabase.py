@@ -38,7 +38,7 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributePage			= 'current-page'
 
-	_ExpressionUploader		= 'developify'
+	_ExpressionUploader		= r'developify'
 
 	##############################################################################
 	# INITIALIZE
@@ -103,5 +103,5 @@ class Provider(ProviderHtml):
 	def processSourceTime(self, value, item, details = None, entry = None):
 		# %:z is only supported in Python 3.12 and later.
 		# Eg: 2025-04-19 21:43:11+02:00
-		if value: return Regex.extract(data = value, expression = '(\d{4}\-\d{2}\-\d{2}\s*\d{2}\:\d{2}\:\d{2})', cache = True)
+		if value: return Regex.extract(data = value, expression = r'(\d{4}\-\d{2}\-\d{2}\s*\d{2}\:\d{2}\:\d{2})', cache = True)
 		return value

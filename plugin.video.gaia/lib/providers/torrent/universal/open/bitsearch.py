@@ -212,7 +212,7 @@ class Provider(ProviderJson, ProviderHtml):
 													ProviderJson.RequestHeaders : True,
 												},
 												ProviderJson.ProcessValidate : {
-													ProviderJson.RequestHeaders : {Provider._HeaderLimit : '\d{4,}'}, # "x-ratelimit-tier: free" is only added if there is no API key. Check that the total limit is 1000 or greater.
+													ProviderJson.RequestHeaders : {Provider._HeaderLimit : r'\d{4,}'}, # "x-ratelimit-tier: free" is only added if there is no API key. Check that the total limit is 1000 or greater.
 												},
 											},
 
@@ -415,7 +415,7 @@ class Provider(ProviderJson, ProviderHtml):
 					if 'b' in value: multiplier = 1000000000
 					elif 'm' in value: multiplier = 1000000
 					elif 'k' in value: multiplier = 1000
-					value = Regex.extract(data = value, expression = '(\d+(?:\.\d+)?)')
+					value = Regex.extract(data = value, expression = r'(\d+(?:\.\d+)?)')
 					value = float(value) * multiplier
 
 					result += (1 - result) * max(0, min(1, (float(value) / Provider._LimitApproval[version])))

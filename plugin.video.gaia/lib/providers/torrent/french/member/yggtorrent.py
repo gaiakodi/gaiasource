@@ -55,7 +55,7 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributeNext			= 'next'
 
-	_ExpressionId			= '.+\/(.*?)-'
+	_ExpressionId			= r'.+\/(.*?)-'
 
 	##############################################################################
 	# INITIALIZE

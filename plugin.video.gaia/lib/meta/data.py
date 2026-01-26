@@ -646,10 +646,10 @@ class MetaData(Serializer):
 		else:
 			# Use faster Python replacements.
 			'''if newline:
-				data = Regex.remove(data = data, expression = '[\r\n]', all = True, cache = True)
+				data = Regex.remove(data = data, expression = r'[\r\n]', all = True, cache = True)
 			if space:
-				data = Regex.remove(data = data, expression = '\t', all = True, cache = True)
-				data = Regex.replace(data = data, expression = '\s{2,}', replacement = ' ', all = True, cache = True)'''
+				data = Regex.remove(data = data, expression = r'\t', all = True, cache = True)
+				data = Regex.replace(data = data, expression = r'\s{2,}', replacement = ' ', all = True, cache = True)'''
 			if newline: data = data.replace('\r', '').replace('\n', '')
 			if space: data = ' '.join(data.split())
 		return data
@@ -758,11 +758,11 @@ class MetaData(Serializer):
 		except: pass
 
 		provider = MetaData.ProviderDefault
-		if Regex.match(data = data, expression = '(?:the[\s\-\_\.]*)?i(?:nternet[\s\-\_\.]*)?m(?:ovie[\s\-\_\.]*)?d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderImdb
-		elif Regex.match(data = data, expression = '(?:the[\s\-\_\.]*)?m(?:ovie[\s\-\_\.]*)?d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderTmdb
-		elif Regex.match(data = data, expression = '(?:the[\s\-\_\.]*)?tv[\s\-\_\.]*d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderTvdb
-		elif Regex.match(data = data, expression = 'trakt', cache = True): provider = MetaData.ProviderTrakt
-		elif Regex.match(data = data, expression = 'orion(?:[\s\-\_\.]*oid)?', cache = True): provider = MetaData.ProviderOrion
+		if Regex.match(data = data, expression = r'(?:the[\s\-\_\.]*)?i(?:nternet[\s\-\_\.]*)?m(?:ovie[\s\-\_\.]*)?d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderImdb
+		elif Regex.match(data = data, expression = r'(?:the[\s\-\_\.]*)?m(?:ovie[\s\-\_\.]*)?d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderTmdb
+		elif Regex.match(data = data, expression = r'(?:the[\s\-\_\.]*)?tv[\s\-\_\.]*d(?:ata[\s\-\_\.]*)?b(?:ase)?', cache = True): provider = MetaData.ProviderTvdb
+		elif Regex.match(data = data, expression = r'trakt', cache = True): provider = MetaData.ProviderTrakt
+		elif Regex.match(data = data, expression = r'orion(?:[\s\-\_\.]*oid)?', cache = True): provider = MetaData.ProviderOrion
 
 		MetaData.DataProvider[data] = provider
 		return provider
@@ -1109,15 +1109,15 @@ class MetaData(Serializer):
 		except: pass
 
 		character = MetaData.CharacterTypeDefault
-		if Regex.match(data = data, expression = '(?:actor)', cache = True): character = MetaData.CharacterTypeActor
-		elif Regex.match(data = data, expression = '(?:director)', cache = True): character = MetaData.CharacterTypeDirector
-		elif Regex.match(data = data, expression = '(?:writer)', cache = True): character = MetaData.CharacterTypeWriter
-		elif Regex.match(data = data, expression = '(?:editor)', cache = True): character = MetaData.CharacterTypeEditor
-		elif Regex.match(data = data, expression = '(?:creator)', cache = True): character = MetaData.CharacterTypeCreator
-		elif Regex.match(data = data, expression = '(?:host)', cache = True): character = MetaData.CharacterTypeHost
-		elif Regex.match(data = data, expression = '(?:crew)', cache = True): character = MetaData.CharacterTypeCrew
-		elif Regex.match(data = data, expression = '(?:producer|show.*runner)', cache = True): character = MetaData.CharacterTypeProducer
-		elif Regex.match(data = data, expression = '(?:guest)', cache = True): character = MetaData.CharacterTypeGuest
+		if Regex.match(data = data, expression = r'(?:actor)', cache = True): character = MetaData.CharacterTypeActor
+		elif Regex.match(data = data, expression = r'(?:director)', cache = True): character = MetaData.CharacterTypeDirector
+		elif Regex.match(data = data, expression = r'(?:writer)', cache = True): character = MetaData.CharacterTypeWriter
+		elif Regex.match(data = data, expression = r'(?:editor)', cache = True): character = MetaData.CharacterTypeEditor
+		elif Regex.match(data = data, expression = r'(?:creator)', cache = True): character = MetaData.CharacterTypeCreator
+		elif Regex.match(data = data, expression = r'(?:host)', cache = True): character = MetaData.CharacterTypeHost
+		elif Regex.match(data = data, expression = r'(?:crew)', cache = True): character = MetaData.CharacterTypeCrew
+		elif Regex.match(data = data, expression = r'(?:producer|show.*runner)', cache = True): character = MetaData.CharacterTypeProducer
+		elif Regex.match(data = data, expression = r'(?:guest)', cache = True): character = MetaData.CharacterTypeGuest
 
 		MetaData.DataCharacterType[data] = character
 		return character
@@ -1128,18 +1128,18 @@ class MetaData(Serializer):
 		except: pass
 
 		character = MetaData.CharacterTypeDefault
-		if Regex.match(data = data, expression = '(?:show.*runner)', cache = True): character = MetaData.CharacterRoleRunner
-		elif Regex.match(data = data, expression = '(?:executive)', cache = True): character = MetaData.CharacterRoleExecutive
-		elif Regex.match(data = data, expression = '(?:associat(?:e|ive))', cache = True): character = MetaData.CharacterRoleAssociate
-		elif Regex.match(data = data, expression = '(?:co[\s\-]*producer)', cache = True): character = MetaData.CharacterRoleCo
-		elif Regex.match(data = data, expression = '(?:line)', cache = True): character = MetaData.CharacterRoleLine
-		elif Regex.match(data = data, expression = '(?:coordinate)', cache = True): character = MetaData.CharacterRoleCoordinate
-		elif Regex.match(data = data, expression = '(?:supervise)', cache = True): character = MetaData.CharacterRoleSupervise
-		elif Regex.match(data = data, expression = '(?:consult)', cache = True): character = MetaData.CharacterRoleConsult
-		elif Regex.match(data = data, expression = '(?:segment)', cache = True): character = MetaData.CharacterRoleSegment
-		elif Regex.match(data = data, expression = '(?:field)', cache = True): character = MetaData.CharacterRoleField
-		elif Regex.match(data = data, expression = '(?:star)', cache = True): character = MetaData.CharacterRoleStar
-		elif Regex.match(data = data, expression = '(?:music)', cache = True): character = MetaData.CharacterRoleMusical
+		if Regex.match(data = data, expression = r'(?:show.*runner)', cache = True): character = MetaData.CharacterRoleRunner
+		elif Regex.match(data = data, expression = r'(?:executive)', cache = True): character = MetaData.CharacterRoleExecutive
+		elif Regex.match(data = data, expression = r'(?:associat(?:e|ive))', cache = True): character = MetaData.CharacterRoleAssociate
+		elif Regex.match(data = data, expression = r'(?:co[\s\-]*producer)', cache = True): character = MetaData.CharacterRoleCo
+		elif Regex.match(data = data, expression = r'(?:line)', cache = True): character = MetaData.CharacterRoleLine
+		elif Regex.match(data = data, expression = r'(?:coordinate)', cache = True): character = MetaData.CharacterRoleCoordinate
+		elif Regex.match(data = data, expression = r'(?:supervise)', cache = True): character = MetaData.CharacterRoleSupervise
+		elif Regex.match(data = data, expression = r'(?:consult)', cache = True): character = MetaData.CharacterRoleConsult
+		elif Regex.match(data = data, expression = r'(?:segment)', cache = True): character = MetaData.CharacterRoleSegment
+		elif Regex.match(data = data, expression = r'(?:field)', cache = True): character = MetaData.CharacterRoleField
+		elif Regex.match(data = data, expression = r'(?:star)', cache = True): character = MetaData.CharacterRoleStar
+		elif Regex.match(data = data, expression = r'(?:music)', cache = True): character = MetaData.CharacterRoleMusical
 
 		MetaData.DataCharacterRole[data] = character
 		return character
@@ -1203,11 +1203,11 @@ class MetaData(Serializer):
 		except: pass
 
 		company = MetaData.CompanyTypeDefault
-		if Regex.match(data = data, expression = '(?:network)', cache = True): company = MetaData.CompanyTypeNetwork
-		elif Regex.match(data = data, expression = '(?:studio)', cache = True): company = MetaData.CompanyTypeStudio
-		elif Regex.match(data = data, expression = '(?:produc(?:tion|er))', cache = True): company = MetaData.CompanyTypeProducer
-		elif Regex.match(data = data, expression = '(?:distribut(?:tion|or))', cache = True): company = MetaData.CompanyTypeDistributor
-		elif Regex.match(data = data, expression = '(?:effect)', cache = True): company = MetaData.CompanyTypeEffects
+		if Regex.match(data = data, expression = r'(?:network)', cache = True): company = MetaData.CompanyTypeNetwork
+		elif Regex.match(data = data, expression = r'(?:studio)', cache = True): company = MetaData.CompanyTypeStudio
+		elif Regex.match(data = data, expression = r'(?:produc(?:tion|er))', cache = True): company = MetaData.CompanyTypeProducer
+		elif Regex.match(data = data, expression = r'(?:distribut(?:tion|or))', cache = True): company = MetaData.CompanyTypeDistributor
+		elif Regex.match(data = data, expression = r'(?:effect)', cache = True): company = MetaData.CompanyTypeEffects
 
 		MetaData.DataCompany[data] = company
 		return company
@@ -1391,14 +1391,14 @@ class MetaData(Serializer):
 		except: pass
 
 		media = MetaData.MediaDefault
-		if Regex.match(data = data, expression = '(?:movie|film)', cache = True): media = MetaData.MediaMovie
-		elif Regex.match(data = data, expression = '(?:season)', cache = True): media = MetaData.MediaSeason
-		elif Regex.match(data = data, expression = '(?:ep(?:isode)?|part)', cache = True): media = MetaData.MediaEpisode
-		elif Regex.match(data = data, expression = '(?:show|serie)', cache = True): media = MetaData.MediaShow
-		elif Regex.match(data = data, expression = '(?:collection|box|set)', cache = True): media = MetaData.MediaCollection
-		elif Regex.match(data = data, expression = '(?:person|people)', cache = True): media = MetaData.MediaPerson
-		elif Regex.match(data = data, expression = '(?:character|actor|director|writer|producer|creator|crew|star|host|guest|showrunner)', cache = True): media = MetaData.MediaCharacter
-		elif Regex.match(data = data, expression = '(?:company|network|studio|distribut(?:or|ion)|production|special.*effects)', cache = True): media = MetaData.MediaCompany
+		if Regex.match(data = data, expression = r'(?:movie|film)', cache = True): media = MetaData.MediaMovie
+		elif Regex.match(data = data, expression = r'(?:season)', cache = True): media = MetaData.MediaSeason
+		elif Regex.match(data = data, expression = r'(?:ep(?:isode)?|part)', cache = True): media = MetaData.MediaEpisode
+		elif Regex.match(data = data, expression = r'(?:show|serie)', cache = True): media = MetaData.MediaShow
+		elif Regex.match(data = data, expression = r'(?:collection|box|set)', cache = True): media = MetaData.MediaCollection
+		elif Regex.match(data = data, expression = r'(?:person|people)', cache = True): media = MetaData.MediaPerson
+		elif Regex.match(data = data, expression = r'(?:character|actor|director|writer|producer|creator|crew|star|host|guest|showrunner)', cache = True): media = MetaData.MediaCharacter
+		elif Regex.match(data = data, expression = r'(?:company|network|studio|distribut(?:or|ion)|production|special.*effects)', cache = True): media = MetaData.MediaCompany
 
 		MetaData.DataMedia[data] = media
 		return media
@@ -2369,7 +2369,7 @@ class MetaData(Serializer):
 			# Also remove this, since the user will be able to identify the correct show based on the poster/fanart.
 			# And even without that, the release country is still available in the info dialog.
 			for k, v in value.items():
-				value[k] = Tools.listUnique([Regex.remove(data = i, expression = '\s+[\(\[](?:(?:19|2[01])\d{2}|[A-Z]{2})[\)\]]$', all = True, flags = Regex.FlagNone) for i in v] if v else v)
+				value[k] = Tools.listUnique([Regex.remove(data = i, expression = r'\s+[\(\[](?:(?:19|2[01])\d{2}|[A-Z]{2})[\)\]]$', all = True, flags = Regex.FlagNone) for i in v] if v else v)
 
 			value = self.dataClean(data = value, newline = True, space = True)
 			self.dataUpdate(data = {'title' : value}, media = media)
@@ -2725,7 +2725,7 @@ class MetaData(Serializer):
 	@classmethod
 	def yearExtract(self, data):
 		if data:
-			year = Regex.extract(data = data, expression = '((?:19|2\d)\d{2})', cache = True)
+			year = Regex.extract(data = data, expression = r'((?:19|2\d)\d{2})', cache = True)
 			if year: return int(year)
 		return None
 
@@ -3099,16 +3099,16 @@ class MetaData(Serializer):
 		except: pass
 
 		image = MetaData.ImageTypeDefault
-		if Regex.match(data = data, expression = '(?:icon|logo)', cache = True): image = MetaData.ImageTypeIcon
-		elif Regex.match(data = data, expression = 'poster', cache = True): image = MetaData.ImageTypePoster
-		elif Regex.match(data = data, expression = '(?:dis[ck]|dvd|blu.?ray|box|cover)', cache = True): image = MetaData.ImageTypeDisc
-		elif Regex.match(data = data, expression = '(?:ph|f)oto', cache = True): image = MetaData.ImageTypePhoto
-		elif Regex.match(data = data, expression = 'banner', cache = True): image = MetaData.ImageTypeBanner
-		elif Regex.match(data = data, expression = '(?:background|landscape)', cache = True): image = MetaData.ImageTypeBackground
-		elif Regex.match(data = data, expression = '(?:fan[\s\-\_\.]*)?art(?:[\s\-\_\.]*work)?', cache = True): image = MetaData.ImageTypeArtwork
-		elif Regex.match(data = data, expression = '(?:thumb(?:[\s\-\_\.]*nail)?|screens?(?:[\s\-\_\.]*caps?)?)', cache = True): image = MetaData.ImageTypeThumbnail
-		elif Regex.match(data = data, expression = 'cinema(?:[\s\-\_\.]*graph)?', cache = True): image = MetaData.ImageTypeCinemagraph
-		elif Regex.match(data = data, expression = '(?:person|people|character|actor|director|producer)', cache = True): image = MetaData.ImageTypePhoto # Eg: https://artworks.thetvdb.com/banners/person/xxx/primary.jpg
+		if Regex.match(data = data, expression = r'(?:icon|logo)', cache = True): image = MetaData.ImageTypeIcon
+		elif Regex.match(data = data, expression = r'poster', cache = True): image = MetaData.ImageTypePoster
+		elif Regex.match(data = data, expression = r'(?:dis[ck]|dvd|blu.?ray|box|cover)', cache = True): image = MetaData.ImageTypeDisc
+		elif Regex.match(data = data, expression = r'(?:ph|f)oto', cache = True): image = MetaData.ImageTypePhoto
+		elif Regex.match(data = data, expression = r'banner', cache = True): image = MetaData.ImageTypeBanner
+		elif Regex.match(data = data, expression = r'(?:background|landscape)', cache = True): image = MetaData.ImageTypeBackground
+		elif Regex.match(data = data, expression = r'(?:fan[\s\-\_\.]*)?art(?:[\s\-\_\.]*work)?', cache = True): image = MetaData.ImageTypeArtwork
+		elif Regex.match(data = data, expression = r'(?:thumb(?:[\s\-\_\.]*nail)?|screens?(?:[\s\-\_\.]*caps?)?)', cache = True): image = MetaData.ImageTypeThumbnail
+		elif Regex.match(data = data, expression = r'cinema(?:[\s\-\_\.]*graph)?', cache = True): image = MetaData.ImageTypeCinemagraph
+		elif Regex.match(data = data, expression = r'(?:person|people|character|actor|director|producer)', cache = True): image = MetaData.ImageTypePhoto # Eg: https://artworks.thetvdb.com/banners/person/xxx/primary.jpg
 
 		MetaData.DataImageType[data] = image
 		return image
@@ -3128,8 +3128,8 @@ class MetaData(Serializer):
 		quality = MetaData.ImageQualityDefault
 		if width: quality = MetaData.ImageQualityLow if width < 500 else MetaData.ImageQualityHigh # Eg: https://thetvdb.com/artwork/60802233
 		elif height: quality = MetaData.ImageQualityLow if height < 600 else MetaData.ImageQualityHigh
-		elif Regex.match(data = data, expression = '(?:high|[^a-z0-9]*h[qd][^a-z0-9]*|16\s*:\s*\d)', cache = True): quality = MetaData.ImageQualityHigh
-		elif Regex.match(data = data, expression = '(?:low|[^a-z0-9]*[sl][qd][^a-z0-9]*|4\s*:\s*3)', cache = True): quality = MetaData.ImageQualityLow
+		elif Regex.match(data = data, expression = r'(?:high|[^a-z0-9]*h[qd][^a-z0-9]*|16\s*:\s*\d)', cache = True): quality = MetaData.ImageQualityHigh
+		elif Regex.match(data = data, expression = r'(?:low|[^a-z0-9]*[sl][qd][^a-z0-9]*|4\s*:\s*3)', cache = True): quality = MetaData.ImageQualityLow
 
 		MetaData.DataImageQuality[id] = quality
 		return quality
@@ -3150,8 +3150,8 @@ class MetaData(Serializer):
 		except: pass
 
 		opacity = MetaData.ImageOpacityDefault
-		if Regex.match(data = data, expression = '(?:clear|transparent)', cache = True): opacity = MetaData.ImageOpacityClear
-		elif Regex.match(data = data, expression = '(?:opaque|solid)', cache = True): opacity = MetaData.ImageOpacitySolid
+		if Regex.match(data = data, expression = r'(?:clear|transparent)', cache = True): opacity = MetaData.ImageOpacityClear
+		elif Regex.match(data = data, expression = r'(?:opaque|solid)', cache = True): opacity = MetaData.ImageOpacitySolid
 
 		MetaData.DataImageOpacity[data] = opacity
 		return opacity
@@ -3170,8 +3170,8 @@ class MetaData(Serializer):
 		decor = MetaData.ImageDecorDefault
 		if text: decor = MetaData.ImageDecorEmbell
 		elif language and not language == MetaData.LanguageUnknown: decor = MetaData.ImageDecorEmbell
-		elif data and Regex.match(data = data, expression = '(?:landscape|logo|icon|clear[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorEmbell
-		elif data and Regex.match(data = data, expression = '(?:actor|character|photo|thumb|(?:fan|key)[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorPlain
+		elif data and Regex.match(data = data, expression = r'(?:landscape|logo|icon|clear[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorEmbell
+		elif data and Regex.match(data = data, expression = r'(?:actor|character|photo|thumb|(?:fan|key)[\s\-\_\.]?art)', cache = True): decor = MetaData.ImageDecorPlain
 		else:
 			try: decor = MetaData.ImageDecorTypes[type if type else self.imageTypeExtract(data = data)]
 			except: pass
@@ -3201,53 +3201,53 @@ class MetaData(Serializer):
 		except: pass
 
 		provider = MetaData.GenreDefault
-		if Regex.match(data = data, expression = '(?:action)', cache = True): genre = MetaData.GenreAction
-		elif Regex.match(data = data, expression = '(?:sci(?:ence)?[\s\-]*fi(?:ction)?)', cache = True): genre = MetaData.GenreScifi
-		elif Regex.match(data = data, expression = '(?:fantasy)', cache = True): genre = MetaData.GenreFantasy
-		elif Regex.match(data = data, expression = '(?:adventure)', cache = True): genre = MetaData.GenreAdventure
-		elif Regex.match(data = data, expression = '(?:horror)', cache = True): genre = MetaData.GenreHorror
-		elif Regex.match(data = data, expression = '(?:mystery)', cache = True): genre = MetaData.GenreMystery
-		elif Regex.match(data = data, expression = '(?:suspense)', cache = True): genre = MetaData.GenreSuspense
-		elif Regex.match(data = data, expression = '(?:thriller)', cache = True): genre = MetaData.GenreThriller
-		elif Regex.match(data = data, expression = '(?:crime)'): genre = MetaData.GenreCrime
-		elif Regex.match(data = data, expression = '(?:martial|karate|kong[\s\-]*fu)', cache = True): genre = MetaData.GenreMartial
-		elif Regex.match(data = data, expression = '(?:west)', cache = True): genre = MetaData.GenreWestern
-		elif Regex.match(data = data, expression = '(?:war)', cache = True): genre = MetaData.GenreWar
-		elif Regex.match(data = data, expression = '(?:politics)', cache = True): genre = MetaData.GenrePolitics
-		elif Regex.match(data = data, expression = '(?:histor(?:y|ical))', cache = True): genre = MetaData.GenreHistory
-		elif Regex.match(data = data, expression = '(?:comedy)', cache = True): genre = MetaData.GenreComedy
-		elif Regex.match(data = data, expression = '(?:romance|love)', cache = True): genre = MetaData.GenreRomance
-		elif Regex.match(data = data, expression = '(?:drama)', cache = True): genre = MetaData.GenreDrama
+		if Regex.match(data = data, expression = r'(?:action)', cache = True): genre = MetaData.GenreAction
+		elif Regex.match(data = data, expression = r'(?:sci(?:ence)?[\s\-]*fi(?:ction)?)', cache = True): genre = MetaData.GenreScifi
+		elif Regex.match(data = data, expression = r'(?:fantasy)', cache = True): genre = MetaData.GenreFantasy
+		elif Regex.match(data = data, expression = r'(?:adventure)', cache = True): genre = MetaData.GenreAdventure
+		elif Regex.match(data = data, expression = r'(?:horror)', cache = True): genre = MetaData.GenreHorror
+		elif Regex.match(data = data, expression = r'(?:mystery)', cache = True): genre = MetaData.GenreMystery
+		elif Regex.match(data = data, expression = r'(?:suspense)', cache = True): genre = MetaData.GenreSuspense
+		elif Regex.match(data = data, expression = r'(?:thriller)', cache = True): genre = MetaData.GenreThriller
+		elif Regex.match(data = data, expression = r'(?:crime)'): genre = MetaData.GenreCrime
+		elif Regex.match(data = data, expression = r'(?:martial|karate|kong[\s\-]*fu)', cache = True): genre = MetaData.GenreMartial
+		elif Regex.match(data = data, expression = r'(?:west)', cache = True): genre = MetaData.GenreWestern
+		elif Regex.match(data = data, expression = r'(?:war)', cache = True): genre = MetaData.GenreWar
+		elif Regex.match(data = data, expression = r'(?:politics)', cache = True): genre = MetaData.GenrePolitics
+		elif Regex.match(data = data, expression = r'(?:histor(?:y|ical))', cache = True): genre = MetaData.GenreHistory
+		elif Regex.match(data = data, expression = r'(?:comedy)', cache = True): genre = MetaData.GenreComedy
+		elif Regex.match(data = data, expression = r'(?:romance|love)', cache = True): genre = MetaData.GenreRomance
+		elif Regex.match(data = data, expression = r'(?:drama)', cache = True): genre = MetaData.GenreDrama
 
-		elif Regex.match(data = data, expression = '(?:family)', cache = True): genre = MetaData.GenreFamily
-		elif Regex.match(data = data, expression = '(?:child)', cache = True): genre = MetaData.GenreChildren
-		elif Regex.match(data = data, expression = '(?:animat(?:ion|ed))', cache = True): genre = MetaData.GenreAnimation
-		elif Regex.match(data = data, expression = '(?:anime)', cache = True): genre = MetaData.GenreAnime
-		elif Regex.match(data = data, expression = '(?:musical)', cache = True): genre = MetaData.GenreMusical
-		elif Regex.match(data = data, expression = '(?:music)', cache = True): genre = MetaData.GenreMusic
+		elif Regex.match(data = data, expression = r'(?:family)', cache = True): genre = MetaData.GenreFamily
+		elif Regex.match(data = data, expression = r'(?:child)', cache = True): genre = MetaData.GenreChildren
+		elif Regex.match(data = data, expression = r'(?:animat(?:ion|ed))', cache = True): genre = MetaData.GenreAnimation
+		elif Regex.match(data = data, expression = r'(?:anime)', cache = True): genre = MetaData.GenreAnime
+		elif Regex.match(data = data, expression = r'(?:musical)', cache = True): genre = MetaData.GenreMusical
+		elif Regex.match(data = data, expression = r'(?:music)', cache = True): genre = MetaData.GenreMusic
 
-		elif Regex.match(data = data, expression = '(?:docu)', cache = True): genre = MetaData.GenreDocumentary
-		elif Regex.match(data = data, expression = '(?:bio)', cache = True): genre = MetaData.GenreBiography
-		elif Regex.match(data = data, expression = '(?:sporting)', cache = True): genre = MetaData.GenreSporting
-		elif Regex.match(data = data, expression = '(?:sport)', cache = True): genre = MetaData.GenreSport
-		elif Regex.match(data = data, expression = '(?:travel|road|trip)', cache = True): genre = MetaData.GenreTravel
-		elif Regex.match(data = data, expression = '(?:holiday|vacation)', cache = True): genre = MetaData.GenreHoliday
-		elif Regex.match(data = data, expression = '(?:home|garde|living)', cache = True): genre = MetaData.GenreHome
-		elif Regex.match(data = data, expression = '(?:food|cook)', cache = True): genre = MetaData.GenreFood
+		elif Regex.match(data = data, expression = r'(?:docu)', cache = True): genre = MetaData.GenreDocumentary
+		elif Regex.match(data = data, expression = r'(?:bio)', cache = True): genre = MetaData.GenreBiography
+		elif Regex.match(data = data, expression = r'(?:sporting)', cache = True): genre = MetaData.GenreSporting
+		elif Regex.match(data = data, expression = r'(?:sport)', cache = True): genre = MetaData.GenreSport
+		elif Regex.match(data = data, expression = r'(?:travel|road|trip)', cache = True): genre = MetaData.GenreTravel
+		elif Regex.match(data = data, expression = r'(?:holiday|vacation)', cache = True): genre = MetaData.GenreHoliday
+		elif Regex.match(data = data, expression = r'(?:home|garde|living)', cache = True): genre = MetaData.GenreHome
+		elif Regex.match(data = data, expression = r'(?:food|cook)', cache = True): genre = MetaData.GenreFood
 
-		elif Regex.match(data = data, expression = '(?:soap)', cache = True): genre = MetaData.GenreSoap
-		elif Regex.match(data = data, expression = '(?:reality)', cache = True): genre = MetaData.GenreReality
-		elif Regex.match(data = data, expression = '(?:news)', cache = True): genre = MetaData.GenreNews
-		elif Regex.match(data = data, expression = '(?:talk)', cache = True): genre = MetaData.GenreTalk
-		elif Regex.match(data = data, expression = '(?:game)', cache = True): genre = MetaData.GenreGame
-		elif Regex.match(data = data, expression = '(?:award)', cache = True): genre = MetaData.GenreAward
-		elif Regex.match(data = data, expression = '(?:mini)', cache = True): genre = MetaData.GenreMini
-		elif Regex.match(data = data, expression = '(?:pod[\s\-]*cast)', cache = True): genre = MetaData.GenrePodcast
-		elif Regex.match(data = data, expression = '(?:tv|television)', cache = True): genre = MetaData.GenreTelevision
+		elif Regex.match(data = data, expression = r'(?:soap)', cache = True): genre = MetaData.GenreSoap
+		elif Regex.match(data = data, expression = r'(?:reality)', cache = True): genre = MetaData.GenreReality
+		elif Regex.match(data = data, expression = r'(?:news)', cache = True): genre = MetaData.GenreNews
+		elif Regex.match(data = data, expression = r'(?:talk)', cache = True): genre = MetaData.GenreTalk
+		elif Regex.match(data = data, expression = r'(?:game)', cache = True): genre = MetaData.GenreGame
+		elif Regex.match(data = data, expression = r'(?:award)', cache = True): genre = MetaData.GenreAward
+		elif Regex.match(data = data, expression = r'(?:mini)', cache = True): genre = MetaData.GenreMini
+		elif Regex.match(data = data, expression = r'(?:pod[\s\-]*cast)', cache = True): genre = MetaData.GenrePodcast
+		elif Regex.match(data = data, expression = r'(?:tv|television)', cache = True): genre = MetaData.GenreTelevision
 
-		elif Regex.match(data = data, expression = '(?:short)', cache = True): genre = MetaData.GenreShort
-		elif Regex.match(data = data, expression = '(?:ind(?:ie|ependent))', cache = True): genre = MetaData.GenreIndie
-		elif Regex.match(data = data, expression = '(?:noir)', cache = True): genre = MetaData.GenreNoir
+		elif Regex.match(data = data, expression = r'(?:short)', cache = True): genre = MetaData.GenreShort
+		elif Regex.match(data = data, expression = r'(?:ind(?:ie|ependent))', cache = True): genre = MetaData.GenreIndie
+		elif Regex.match(data = data, expression = r'(?:noir)', cache = True): genre = MetaData.GenreNoir
 
 		MetaData.DataGenre[data] = genre
 		return genre
@@ -3358,19 +3358,19 @@ class MetaData(Serializer):
 		#	Shows: returning series, in production, planned, canceled, ended
 
 		status = MetaData.StatusDefault
-		if Regex.match(data = data, expression = '(?:rumou?r)', cache = True): status = MetaData.StatusRumored
-		elif Regex.match(data = data, expression = '(?:plan)', cache = True): status = MetaData.StatusPlanned
-		elif Regex.match(data = data, expression = '(?:pre.?product)', cache = True): status = MetaData.StatusPreproduction
-		elif Regex.match(data = data, expression = '(?:post.?product)', cache = True): status = MetaData.StatusPostproduction
-		elif Regex.match(data = data, expression = '(?:product|film)', cache = True): status = MetaData.StatusProduction
-		elif Regex.match(data = data, expression = '(?:complet)', cache = True): status = MetaData.StatusCompleted
-		elif Regex.match(data = data, expression = '(?:release)', cache = True): status = MetaData.StatusReleased
-		elif Regex.match(data = data, expression = '(?:pilot|test)', cache = True): status = MetaData.StatusPiloted
-		elif Regex.match(data = data, expression = '(?:upcoming)', cache = True): status = MetaData.StatusUpcoming
-		elif Regex.match(data = data, expression = '(?:contin|busy|running)', cache = True): status = MetaData.StatusContinuing
-		elif Regex.match(data = data, expression = '(?:return)', cache = True): status = MetaData.StatusReturning
-		elif Regex.match(data = data, expression = '(?:end|finish)', cache = True): status = MetaData.StatusEnded
-		elif Regex.match(data = data, expression = '(?:cancel)', cache = True): status = MetaData.StatusCanceled
+		if Regex.match(data = data, expression = r'(?:rumou?r)', cache = True): status = MetaData.StatusRumored
+		elif Regex.match(data = data, expression = r'(?:plan)', cache = True): status = MetaData.StatusPlanned
+		elif Regex.match(data = data, expression = r'(?:pre.?product)', cache = True): status = MetaData.StatusPreproduction
+		elif Regex.match(data = data, expression = r'(?:post.?product)', cache = True): status = MetaData.StatusPostproduction
+		elif Regex.match(data = data, expression = r'(?:product|film)', cache = True): status = MetaData.StatusProduction
+		elif Regex.match(data = data, expression = r'(?:complet)', cache = True): status = MetaData.StatusCompleted
+		elif Regex.match(data = data, expression = r'(?:release)', cache = True): status = MetaData.StatusReleased
+		elif Regex.match(data = data, expression = r'(?:pilot|test)', cache = True): status = MetaData.StatusPiloted
+		elif Regex.match(data = data, expression = r'(?:upcoming)', cache = True): status = MetaData.StatusUpcoming
+		elif Regex.match(data = data, expression = r'(?:contin|busy|running)', cache = True): status = MetaData.StatusContinuing
+		elif Regex.match(data = data, expression = r'(?:return)', cache = True): status = MetaData.StatusReturning
+		elif Regex.match(data = data, expression = r'(?:end|finish)', cache = True): status = MetaData.StatusEnded
+		elif Regex.match(data = data, expression = r'(?:cancel)', cache = True): status = MetaData.StatusCanceled
 
 		MetaData.DataStatus[data] = status
 		return status
@@ -3424,37 +3424,37 @@ class MetaData(Serializer):
 
 			# Eg: The Cost of Genius: Inside The Queen's Gambit
 			# Eg: Creating the Queen's Gambit
-			if exclude: title = '(?:%s)' % '|'.join([Regex.escape(i) for i in exclude])
+			if exclude: title = r'(?:%s)' % r'|'.join([Regex.escape(i) for i in exclude])
 			else: title = 'xxxxxxxxxxxx'
 
 			expression = (
-				(MetaData.SpecialProduction,	('((?:inside|creat(?:e|ings?))(?:\s*(?:the|of))*\s%s)' % title, False)),									# Eg: The Queen's Gambit S00E01, S00E02.
+				(MetaData.SpecialProduction,	(r'((?:inside|creat(?:e|ings?))(?:\s*(?:the|of))*\s%s)' % title, False)),									# Eg: The Queen's Gambit S00E01, S00E02.
 
-				(MetaData.SpecialProduction,	'(behind[\s\-]*the[\s\-]*(?:scenes?|casts?|shows?|series?|seasons?|drama)|^(?:inside|creat(?:e|ings?)))'),	# Eg: Downton Abbey S00E01. The Queen's Gambit S00E02.
-				(MetaData.SpecialBlooper,		'(bloopers?)'),
-				(MetaData.SpecialInterview,		'(interview(?:s|ed|ing)?|conversation|up[\s\-]close[\s\-]with)'),											# Eg: True Detective S00E03.
-				(MetaData.SpecialCrossover,		'(cross-?over(?:s|ed|ing)?)'),
-				(MetaData.SpecialDeleted,		'(deleted[\s\-]*scenes?)'),
-				(MetaData.SpecialMovie,			'((?:tv[\s\-]*)?movie)'),
-				(MetaData.SpecialExtended,		'(extended[\s\-]*scenes?)'),
+				(MetaData.SpecialProduction,	r'(behind[\s\-]*the[\s\-]*(?:scenes?|casts?|shows?|series?|seasons?|drama)|^(?:inside|creat(?:e|ings?)))'),	# Eg: Downton Abbey S00E01. The Queen's Gambit S00E02.
+				(MetaData.SpecialBlooper,		r'(bloopers?)'),
+				(MetaData.SpecialInterview,		r'(interview(?:s|ed|ing)?|conversation|up[\s\-]close[\s\-]with)'),											# Eg: True Detective S00E03.
+				(MetaData.SpecialCrossover,		r'(cross-?over(?:s|ed|ing)?)'),
+				(MetaData.SpecialDeleted,		r'(deleted[\s\-]*scenes?)'),
+				(MetaData.SpecialMovie,			r'((?:tv[\s\-]*)?movie)'),
+				(MetaData.SpecialExtended,		r'(extended[\s\-]*scenes?)'),
 
 				# Update (2025-07): This category has been removed by TVDb and merged with 4447 into "Behind the Scenes/ Makings Of".
 				# Use SpecialProduction instead, to ensure consistency with specials marked with the taxonomy ID, which are not extracted by title.
 				# Eg: The Witcher S00E01 (Behind ID) vs S00E02-09 (No ID, but titles include "a look inside").
-				#(MetaData.SpecialMaking,		'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: True Detective S00E01, S00E04, S00E05.
-				(MetaData.SpecialProduction,	'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: The Witcher S00E01 vs S00E02-09.
+				#(MetaData.SpecialMaking,		r'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: True Detective S00E01, S00E04, S00E05.
+				(MetaData.SpecialProduction,	r'(making[\s\-](?:of|the|an?)|^making|look[\s\-]inside)'),													# Eg: The Witcher S00E01 vs S00E02-09.
 
-				(MetaData.SpecialOriginal,		'(ova|original[\s\-]*video[\s\-]*animations?)'),
-				(MetaData.SpecialPilot,			'((?:un)?(?:aired|released)[\s\-]*pilot|pilot(?:[\s\-]*episode)?)'),										# Eg: Sherlock S00E01.
-				(MetaData.SpecialRecap,			'((?:(?:show|series|season)[\s\-]*)?recap|story[\s\-]so[\s\-]far|^(?:a|the)?\s*count\-?down)'),				# Eg: Heroes S00E56.
-				(MetaData.SpecialShort,			'(short(?:[\s\-]*episode)?|webisode|webinar)'),
-				(MetaData.SpecialPodcast,		'((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)'), 															# Eg: Last of Us S00E02, S00E06, S00E07, etc.
-				(MetaData.SpecialUnimportant,	'(best[\s\-]*of|rewind|concert|pre[\s\-]*show|comic[\s\-]*relief|awards?|celebrates?|batfa)'),				# Eg: Doctor Who S00E37, S00E40, S00E41, S00E50, S00E76, S00E128. Downton Abbey S00E16, S00E17.
+				(MetaData.SpecialOriginal,		r'(ova|original[\s\-]*video[\s\-]*animations?)'),
+				(MetaData.SpecialPilot,			r'((?:un)?(?:aired|released)[\s\-]*pilot|pilot(?:[\s\-]*episode)?)'),										# Eg: Sherlock S00E01.
+				(MetaData.SpecialRecap,			r'((?:(?:show|series|season)[\s\-]*)?recap|story[\s\-]so[\s\-]far|^(?:a|the)?\s*count\-?down)'),				# Eg: Heroes S00E56.
+				(MetaData.SpecialShort,			r'(short(?:[\s\-]*episode)?|webisode|webinar)'),
+				(MetaData.SpecialPodcast,		r'((?:pod|vod|mob|god|web)cast(?:ed|ing)?|vlog)'), 															# Eg: Last of Us S00E02, S00E06, S00E07, etc.
+				(MetaData.SpecialUnimportant,	r'(best[\s\-]*of|rewind|concert|pre[\s\-]*show|comic[\s\-]*relief|awards?|celebrates?|batfa)'),				# Eg: Doctor Who S00E37, S00E40, S00E41, S00E50, S00E76, S00E128. Downton Abbey S00E16, S00E17.
 
 				# Do this after Unimportant. Eg: "Best of the Christmas Specials"
-				(MetaData.SpecialEpisode,		'((?:christmas|holiday)[\s\-]*specials?|episode)'),															# Eg: The Office UK S00E01, S00E02.
+				(MetaData.SpecialEpisode,		r'((?:christmas|holiday)[\s\-]*specials?|episode)'),															# Eg: The Office UK S00E01, S00E02.
 
-				(MetaData.SpecialEpisode,		'^\s*(?:(?:(?:e|é|e\?)pis(?:o|ó|o\?)(?:des?|d?ios?)|part|folge|teil|aflevering|deel)[\s\-\_\.]*(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}|(?:\#\s?)?\d+(?:\.\d+)?(?:$|[^\d])|[ivxlcd]+(?:$|[^\da-z]))|(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}))[\s\:\-]*'),																						# Eg: Money Heist (entire S00 is a season with full episodes).
+				(MetaData.SpecialEpisode,		r'^\s*(?:(?:(?:e|é|e\?)pis(?:o|ó|o\?)(?:des?|d?ios?)|part|folge|teil|aflevering|deel)[\s\-\_\.]*(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}|(?:\#\s?)?\d+(?:\.\d+)?(?:$|[^\d])|[ivxlcd]+(?:$|[^\da-z]))|(?:(?:\d{2}[\-\_\.]){2}\d{4}|\d{4}(?:[\-\_\.]\d{2}){2}))[\s\:\-]*'),																						# Eg: Money Heist (entire S00 is a season with full episodes).
 			)
 
 			for key, value in expression:
@@ -3463,7 +3463,7 @@ class MetaData(Serializer):
 					excluded = value[1]
 					value = value[0]
 
-				value += '(?:$|[\s\,\.\!\?\:\-])'
+				value += r'(?:$|[\s\,\.\!\?\:\-])'
 				if Regex.match(data = data, expression = value):
 					ignore = False
 					if excluded and exclude:
@@ -3606,13 +3606,13 @@ class MetaData(Serializer):
 		except: pass
 
 		day = MetaData.DayDefault
-		if Regex.match(data = data, expression = 'mon', cache = True): day = MetaData.DayMonday
-		elif Regex.match(data = data, expression = 'tue', cache = True): day = MetaData.DayTuesday
-		elif Regex.match(data = data, expression = 'wed', cache = True): day = MetaData.DayWednesday
-		elif Regex.match(data = data, expression = 'thu', cache = True): day = MetaData.DayThursday
-		elif Regex.match(data = data, expression = 'fri', cache = True): day = MetaData.DayFriday
-		elif Regex.match(data = data, expression = 'sat', cache = True): day = MetaData.DaySaturday
-		elif Regex.match(data = data, expression = 'sun', cache = True): day = MetaData.DaySunday
+		if Regex.match(data = data, expression = r'mon', cache = True): day = MetaData.DayMonday
+		elif Regex.match(data = data, expression = r'tue', cache = True): day = MetaData.DayTuesday
+		elif Regex.match(data = data, expression = r'wed', cache = True): day = MetaData.DayWednesday
+		elif Regex.match(data = data, expression = r'thu', cache = True): day = MetaData.DayThursday
+		elif Regex.match(data = data, expression = r'fri', cache = True): day = MetaData.DayFriday
+		elif Regex.match(data = data, expression = r'sat', cache = True): day = MetaData.DaySaturday
+		elif Regex.match(data = data, expression = r'sun', cache = True): day = MetaData.DaySunday
 
 		MetaData.DataDay[data] = day
 		return day

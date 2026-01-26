@@ -380,9 +380,9 @@ class MetaTmdb(MetaProvider):
 		premiered = item.get('release_date')
 		if not premiered: premiered = item.get('first_air_date')
 		if premiered:
-			premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+			premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 			if premiered:
-				year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
+				year = Regex.extract(data = premiered, expression = r'(\d{4})-', group = 1)
 				if year: result['year'] = int(year)
 
 				result['premiered'] = premiered
@@ -802,10 +802,10 @@ class MetaTmdb(MetaProvider):
 
 							premiered = dataMovie.get('release_date')
 							if premiered:
-								premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+								premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 								if premiered:
 									result['premiered'] = premiered
-									year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
+									year = Regex.extract(data = premiered, expression = r'(\d{4})-', group = 1)
 									if year: result['year'] = int(year)
 
 							genre = dataMovie.get('genres')
@@ -866,7 +866,7 @@ class MetaTmdb(MetaProvider):
 									collection['tmdb'] = collectionId
 									collection['id'] = {'tmdb' : collectionId}
 								collectionTitle = dataCollection.get('name')
-								if collectionTitle: collection['title'] = Regex.replace(data = Networker.htmlDecode(collectionTitle), expression = '\s+', replacement = ' ', all = True) # Sometimes TMDb has 2 spaces between the title and the "Collection" part.
+								if collectionTitle: collection['title'] = Regex.replace(data = Networker.htmlDecode(collectionTitle), expression = r'\s+', replacement = ' ', all = True) # Sometimes TMDb has 2 spaces between the title and the "Collection" part.
 
 								if collection:
 									collectionImage = {}
@@ -1100,9 +1100,9 @@ class MetaTmdb(MetaProvider):
 
 								premiered = part.get('release_date')
 								if premiered:
-									premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
+									premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1, cache = True)
 									if premiered:
-										year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1, cache = True)
+										year = Regex.extract(data = premiered, expression = r'(\d{4})-', group = 1, cache = True)
 										if year: resultPart['year'] = int(year)
 										resultPart['premiered'] = premiered
 										resultPart['time'] = {MetaTools.TimePremiere : Time.timestamp(premiered, format = Time.FormatDate, utc = True)}
@@ -1324,14 +1324,14 @@ class MetaTmdb(MetaProvider):
 
 							mini = False
 							type = dataShow.get('type')
-							if type and Tools.isString(type) and Regex.match(data = type, expression = 'mini\-?serie'):
+							if type and Tools.isString(type) and Regex.match(data = type, expression = r'mini\-?serie'):
 								mini = True
 							else:
 								try:
 									season = dataShow.get('seasons')
 									if season:
 										season = season[0].get('name')
-										if season and Regex.match(data = season, expression = 'mini\-?serie'): mini = True
+										if season and Regex.match(data = season, expression = r'mini\-?serie'): mini = True
 								except: Logger.error()
 							if mini: result['niche'] = [Media.Mini]
 
@@ -1364,11 +1364,11 @@ class MetaTmdb(MetaProvider):
 
 							premiered = dataShow.get('first_air_date')
 							if premiered:
-								premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+								premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 								if premiered:
 									result['premiered'] = premiered
 									result['aired'] = premiered
-									year = Regex.extract(data = premiered, expression = '(\d{4})-', group = 1)
+									year = Regex.extract(data = premiered, expression = r'(\d{4})-', group = 1)
 									if year: result['year'] = int(year)
 
 							genre = dataShow.get('genres')
@@ -1668,7 +1668,7 @@ class MetaTmdb(MetaProvider):
 
 									premiered = dataSeason.get('air_date')
 									if premiered:
-										premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+										premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 										if premiered:
 											resultSeason['premiered'] = premiered
 											resultSeason['aired'] = premiered
@@ -1867,7 +1867,7 @@ class MetaTmdb(MetaProvider):
 
 							premiered = episode.get('air_date')
 							if premiered:
-								premiered = Regex.extract(data = premiered, expression = '(\d{4}-\d{2}-\d{2})', group = 1)
+								premiered = Regex.extract(data = premiered, expression = r'(\d{4}-\d{2}-\d{2})', group = 1)
 								if premiered:
 									resultEpisode['premiered'] = premiered
 									resultEpisode['aired'] = premiered
@@ -2013,7 +2013,7 @@ class MetaTmdb(MetaProvider):
 								# If such default titles are used, add the original language of the show to the parameters, so that episode titles for that language are returned.
 								language = None
 								last = data.get('last_episode_to_air')
-								if last and (not last.get('name') or Regex.match(data = last.get('name'), expression = '^episode\s*\d+')): language = data.get('original_language')
+								if last and (not last.get('name') or Regex.match(data = last.get('name'), expression = r'^episode\s*\d+')): language = data.get('original_language')
 
 								seasons = [i.get('season_number') for i in dataSeasons]
 								seasons = ['season/%d' % i for i in seasons if not i is None]

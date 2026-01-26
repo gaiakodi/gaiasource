@@ -49,10 +49,17 @@ class FormatRegistry(object):
         if self.loaded:
             return
         with self.write_lock:
-            import pkg_resources
-            for entry_point in pkg_resources.iter_entry_points('pymaging.formats'):
-                format = entry_point.load()
-                self.register(format)
+            # GAIACODE
+            try:
+                from importlib.metadata import entry_points
+                for entry_point in entry_points(group='pymaging.formats'):
+                    format = entry_point.load()
+                    self.register(format)
+            except:
+                import pkg_resources
+                for entry_point in pkg_resources.iter_entry_points('pymaging.formats'):
+                    format = entry_point.load()
+                    self.register(format)
             self.loaded = True
     
     def register(self, format):

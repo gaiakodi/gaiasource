@@ -66,11 +66,11 @@ class Provider(ProviderHtml):
 	_AttributeDetails		= 'gluewrapper'
 	_AttributeDetail		= 'torrentpagetable'
 
-	_ExpressionHash			= '(?:info\s*)?hash\s*\:\s*' + ProviderHtml.ExpressionSha
-	_ExpressionTime			= '(?:added|date)\s*\:\s*(.*?)\.\s'
-	_ExpressionActive		= '(active)'
-	_ExpressionDisabled		= '(disabled)'
-	_ExpressionVerified		= '(verified\s*by)'
+	_ExpressionHash			= r'(?:info\s*)?hash\s*\:\s*' + ProviderHtml.ExpressionSha
+	_ExpressionTime			= r'(?:added|date)\s*\:\s*(.*?)\.\s'
+	_ExpressionActive		= r'(active)'
+	_ExpressionDisabled		= r'(disabled)'
+	_ExpressionVerified		= r'(verified\s*by)'
 
 	##############################################################################
 	# INITIALIZE

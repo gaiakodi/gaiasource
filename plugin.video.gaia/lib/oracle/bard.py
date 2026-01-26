@@ -40,13 +40,13 @@ class Bard(Oracle):
 	Errors = {
 		# Throws a Python excecption: raise Exception(\n', 'Exception: SNlM0e value not found in response. Check __Secure-1PSID value.
 		# Or: __Secure-1PSID value must end with a single dot. Enter correct __Secure-1PSID value.
-		ErrorAccountInvalid	: {'expression' : '(value\s*not\s*found\s*in\s*response|__Secure-1PSID)', 'name' : 'Account Invalid', 'message' : 'The authentication cookie is invalid or has expired.'},
+		ErrorAccountInvalid	: {'expression' : r'(value\s*not\s*found\s*in\s*response|__Secure-1PSID)', 'name' : 'Account Invalid', 'message' : 'The authentication cookie is invalid or has expired.'},
 
 		# Bard is not available in many EU countries.
 		# The API returns the following error:
 		#	{'content': 'Response Error: b\')]}\\\'\\n\\n38\\n[["wrb.fr",null,null,null,null,[9]]]\\n56\\n[["di",115],["af.httprm",115,"-509415844058109364",7]]\\n25\\n[["e",4,null,null,131]]\\n\'.'}
 		# But when going onto the website, the following error is shown: Bard is not available in your country.
-		ErrorAccountAccess	: {'expression' : 'response\s*error\s*:', 'name' : 'Account Access', 'message' : 'Bard is not available in your country or inaccessible due to other reasons.'},
+		ErrorAccountAccess	: {'expression' : r'response\s*error\s*:', 'name' : 'Account Access', 'message' : 'Bard is not available in your country or inaccessible due to other reasons.'},
 
 		# Throws a Python excecption.
 		# Eg: Response code not 200. Response Status is ...

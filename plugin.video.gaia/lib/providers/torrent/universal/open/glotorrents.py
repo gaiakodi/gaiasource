@@ -45,12 +45,12 @@ class Provider(ProviderHtml):
 	_AttributeTable			= 'ttable_headinner'
 	_AttributePages			= 'pagination'
 
-	_ExpressionNext			= '(next)'
-	_ExpressionVerified		= '(verified)'
-	_ExpressionVip			= '(vip)'
-	_ExpressionAdmin		= '(admin)'
-	_ExpressionUploader		= '^(uploader)'		# Match start, since it can also be "Verified Uploader".
-	_ExpressionAnonymous	= '^(anonymous)$'	# Match start/end, to exclude usernames with "anonymous" in them.
+	_ExpressionNext			= r'(next)'
+	_ExpressionVerified		= r'(verified)'
+	_ExpressionVip			= r'(vip)'
+	_ExpressionAdmin		= r'(admin)'
+	_ExpressionUploader		= r'^(uploader)'		# Match start, since it can also be "Verified Uploader".
+	_ExpressionAnonymous	= r'^(anonymous)$'	# Match start/end, to exclude usernames with "anonymous" in them.
 
 	##############################################################################
 	# INITIALIZE

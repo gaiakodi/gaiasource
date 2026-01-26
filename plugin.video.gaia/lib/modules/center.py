@@ -190,7 +190,7 @@ class Center(object):
 		sever = self.mServers[index]
 		if sever['server']['encryption']: link += 'https://'
 		else: link += 'http://'
-		try: host = Regex.extract(data = sever['server']['host'], expression = '(^.*?\:\/\/)?([^\/:?#]+)(?:[\/:?#]|$)', group = 2)
+		try: host = Regex.extract(data = sever['server']['host'], expression = r'(^.*?\:\/\/)?([^\/:?#]+)(?:[\/:?#]|$)', group = 2)
 		except: host = sever['server']['host']
 		link += host + ':' + str(sever['server']['port'])
 		if category:
@@ -1151,12 +1151,12 @@ class Center(object):
 										copy['video']['range'] = None
 										copy['video']['depth'] = None
 
-										value = Regex.extract(data = link, expression = 'VideoCodec=([a-z\d](?:$|[&,])')
+										value = Regex.extract(data = link, expression = r'VideoCodec=([a-z\d](?:$|[&,])')
 										copy['video']['codec'] = value if value else Center.VideoCodecType[videoCodec]
 
 										if audioChannels: copy['audio']['channels'] = audioChannels
 
-										value = Regex.extract(data = link, expression = 'AudioCodec=([a-z\d](?:$|[&,])')
+										value = Regex.extract(data = link, expression = r'AudioCodec=([a-z\d](?:$|[&,])')
 										copy['audio']['codec'] = value if value else Center.AudioCodecType[audioCodec]
 
 										copy['audio']['language'] = [audioDefault['language']] if audioDefault else None

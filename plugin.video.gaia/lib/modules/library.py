@@ -97,7 +97,7 @@ class Library(object):
 		try:
 			if path.startswith('ftp://') or path.startswith('ftps://'):
 				from ftplib import FTP
-				arguments = re.compile('ftp://(.+?):(.+?)@(.+?):?(\d+)?/(.+/?)').findall(path)
+				arguments = re.compile(r'ftp://(.+?):(.+?)@(.+?):?(\d+)?/(.+/?)').findall(path)
 				ftp = FTP(arguments[0][2], arguments[0][0], arguments[0][1])
 				try: ftp.cwd(arguments[0][4])
 				except: ftp.mkd(arguments[0][4])
@@ -173,8 +173,8 @@ class Library(object):
 		try:
 			path = path.strip()
 			path = re.sub(r'(?!%s)[^\w\-_\.]', '.', path)
-			path = re.sub('\.+', '.', path)
-			path = re.sub(re.compile('(CON|PRN|AUX|NUL|COM\d|LPT\d)\.', re.I), '\\1_', path)
+			path = re.sub(r'\.+', '.', path)
+			path = re.sub(re.compile(r'(CON|PRN|AUX|NUL|COM\d|LPT\d)\.', re.I), '\\1_', path)
 			path = path.strip('.')
 		except:
 			pass
@@ -314,7 +314,7 @@ class Library(object):
 
 	def _movieResolve(self, title, year):
 		try:
-			name = re.sub('\s\s+', ' ', re.sub('([^\s\w]|_)+', ' ', title))
+			name = re.sub(r'\s\s+', ' ', re.sub(r'([^\s\w]|_)+', ' ', title))
 			nameLegal = self._legalPath('%s (%s) %s' % (name, year, System.name())) + Library.ExtensionMeta
 			path = File.joinPath(self._path(self.mLocation, name, year), nameLegal)
 			if not File.exists(path): # To accomodate the old file name format that did not contain the year and Gaia.
@@ -325,7 +325,7 @@ class Library(object):
 
 	def _movieFiles(self, imdb = None, tmdb = None, tvdb = None, trakt = None, title = None, year = None, metadata = None, link = None):
 		try:
-			name = re.sub('\s\s+', ' ', re.sub('([^\s\w]|_)+', ' ', title))
+			name = re.sub(r'\s\s+', ' ', re.sub(r'([^\s\w]|_)+', ' ', title))
 			nameLegal = self._legalPath('%s (%s) %s' % (name, year, System.name()))
 			generic = link is None
 			data = None
@@ -419,6 +419,7 @@ class Library(object):
 
 		return count
 
+	#gaiaremove
 	#gaiafuture - Adding an entire page of shows to the library is extremely expensive.
 	#gaiafuture - Each episode for each of the shows is added. This requires the full metadata (show + pack + season + episode metadata).
 	#gaiafuture - If the metadata is cached, it should not be a huge issue.
@@ -508,7 +509,7 @@ class Library(object):
 
 	def _televisionResolve(self, title, year, season, episode):
 		try:
-			name = re.sub('\s\s+', ' ', re.sub('([^\s\w]|_)+', ' ', title))
+			name = re.sub(r'\s\s+', ' ', re.sub(r'([^\s\w]|_)+', ' ', title))
 			nameLegal = self._legalPath('%s S%02dE%02d %s' % (name, int(season), int(episode), System.name())) + Library.ExtensionMeta
 			path = File.joinPath(self._path(self.mLocation, name, year, season), nameLegal)
 			if not File.exists(path): # To accomodate the old file name format that did not contain Gaia.
@@ -553,7 +554,7 @@ class Library(object):
 			episode = int(episode)
 
 			generic = link is None
-			name = re.sub('\s\s+', ' ', re.sub('([^\s\w]|_)+', ' ', tvshowtitle))
+			name = re.sub(r'\s\s+', ' ', re.sub(r'([^\s\w]|_)+', ' ', tvshowtitle))
 			nameLegal = self._legalPath('%s S%02dE%02d %s' % (name, season, episode, System.name()))
 
 			if generic:
@@ -663,7 +664,7 @@ class Library(object):
 					try: year = int(params.get('tvshowyear') or params.get('year'))
 					except: year = None
 
-					imdb = 'tt' + re.sub('[^0-9]', '', str(imdb))
+					imdb = 'tt' + re.sub(r'[^0-9]', '', str(imdb))
 
 					items.append({'imdb' : imdb, 'tmdb' : tmdb, 'tvdb' : tvdb, 'trakt' : trakt, 'tvshowtitle' : tvshowtitle, 'year' : year})
 				except: Logger.error()

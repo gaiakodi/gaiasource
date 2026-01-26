@@ -256,11 +256,11 @@ class MetaFanart(MetaProvider):
 
 				def _name(image):
 					name = Networker.linkName(image.get('link'), extension = False)
-					if name: name = Regex.extract(data = name, expression = '.*\-+(.*)')
+					if name: name = Regex.extract(data = name, expression = r'.*\-+(.*)')
 					return name
 
 				def _id(name):
-					return Regex.replace(data = name, expression = '\-(\d+)(?:$|\-)', replacement = 'x', group = 1)
+					return Regex.replace(data = name, expression = r'\-(\d+)(?:$|\-)', replacement = 'x', group = 1)
 
 				def _add(id, vote, language):
 					try:

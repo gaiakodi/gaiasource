@@ -324,7 +324,7 @@ class Downloader(Database):
 	@classmethod
 	def _loaderType(self):
 		try:
-			if float(re.search('^\d+\.?\d+', xbmc.getInfoLabel('System.BuildVersion')).group(0)) >= 18:
+			if float(re.search(r'^\d+\.?\d+', xbmc.getInfoLabel('System.BuildVersion')).group(0)) >= 18:
 				return 'busydialognocancel'
 		except: pass
 		return 'busydialog'
@@ -602,11 +602,11 @@ class Downloader(Database):
 		map = str.maketrans('', '', '\/:*?"<>|')
 
 		title = str(title) # For some reason the parameters sometimes comes in as non-strung. Maybe utf8-string?
-		content = re.compile('(.+?)\sS(\d*)E\d*.*').findall(title)
+		content = re.compile(r'(.+?)\sS(\d*)E\d*.*').findall(title)
 		title = title.translate(map).strip('.')
 
 		# Remove old [x] version in title.
-		title = re.sub('\[\d*\]', '', title).strip()
+		title = re.sub(r'\[\d*\]', '', title).strip()
 		path = self._location()
 		if len(content) == 0:
 			try: directoryName = os.path.splitext(title)[0] # Remove file extension.
@@ -1255,8 +1255,8 @@ class Downloader(Database):
 			labelBottom = Downloader.FontSeparator.join(info)
 
 			# Esnures that the top part is always longer. Otherwise the speed & ETA will not be visible if the top label is very short.
-			lengthTop = len(re.sub('\\[(.*?)\\]', '', labelTop))
-			lengthBottom = len(re.sub('\\[(.*?)\\]', '', labelBottom))
+			lengthTop = len(re.sub(r'\[(.*?)\]', '', labelTop))
+			lengthBottom = len(re.sub(r'\[(.*?)\]', '', labelBottom))
 			labelDifference = lengthBottom - lengthTop
 
 			if labelDifference > 0:

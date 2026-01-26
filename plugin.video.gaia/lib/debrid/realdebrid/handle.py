@@ -48,10 +48,10 @@ class Handle(HandleBase):
 			return Interface().add(link = link, name = name, title = title, year = year, season = season, episode = episode, pack = pack, strict = strict, close = close, type = type, cached = cached, select = select, cloud = cloud)
 		return None
 
-	def services(self):
+	def services(self, cached = True):
 		try:
 			if self.mServices is None and self.mService.accountValid():
-				self.mServices = self.mService.servicesList(onlyEnabled = True)
+				self.mServices = self.mService.servicesList(cached = cached, onlyEnabled = True)
 		except: pass
 		return self.mServices
 

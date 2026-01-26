@@ -44,8 +44,8 @@ class Provider(ProviderHtml):
 	_AttributeLeeches		= 'leechs'
 	_AttributeMagnet		= 'btn-magnet'
 
-	_ExpressionDetails		= '(torrent_details)'
-	_ExpressionMagnet		= '(?:url|link|magnet)=(magnet.*?)(?:$|&)'
+	_ExpressionDetails		= r'(torrent_details)'
+	_ExpressionMagnet		= r'(?:url|link|magnet)=(magnet.*?)(?:$|&)'
 
 	##############################################################################
 	# INITIALIZE

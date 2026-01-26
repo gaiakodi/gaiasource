@@ -187,7 +187,7 @@ class Provider(ProviderJson):
 		return Networker.linkJoin(self.linkCurrent(), Provider._PathDownload % value)
 
 	def processSourceTime(self, value, item, details = None, entry = None):
-		if value: return Regex.extract(data = value, expression = '(\d{4}\-\d{2}\-\d{2}T\d{2}\:\d{2}\:\d{2})', cache = True)
+		if value: return Regex.extract(data = value, expression = r'(\d{4}\-\d{2}\-\d{2}T\d{2}\:\d{2}\:\d{2})', cache = True)
 		return value
 
 	def processSourceApproval(self, value, item, details = None, entry = None):

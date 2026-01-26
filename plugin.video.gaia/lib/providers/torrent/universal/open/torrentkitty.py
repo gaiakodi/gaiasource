@@ -38,7 +38,7 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributeDisabled		= 'disabled'
 
-	_ExpressionSize			= '(?:content\s*)?size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
+	_ExpressionSize			= r'(?:content\s*)?size\s*:\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
 
 	##############################################################################
 	# INITIALIZE

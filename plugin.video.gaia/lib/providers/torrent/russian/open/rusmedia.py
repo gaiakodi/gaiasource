@@ -50,8 +50,8 @@ class Provider(ProviderHtml):
 	_AttributeLeeches		= 'leech'
 	_AttributePages			= 'nav'
 
-	_ExpressionVerified		= u'(√)'
-	_ExpressionNext			= u'(След)'
+	_ExpressionVerified		= r'(√)'
+	_ExpressionNext			= r'(След)'
 
 	##############################################################################
 	# INITIALIZE

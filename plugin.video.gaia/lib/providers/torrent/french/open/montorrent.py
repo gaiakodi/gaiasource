@@ -51,13 +51,13 @@ class Provider(ProviderHtml):
 	_AttributeDownloads		= 'telecharges'
 	_AttributePages			= 'pagination'
 
-	_ExpressionNext			= '(suiv|→)'
-	_ExpressionNumber		= '(\d+)'
-	_ExpressionTime			= '(d.?ajout)'
-	_ExpressionYear			= '(\s*an)'
-	_ExpressionMonth		= '(\s*mois)'
-	_ExpressionWeek			= '(\s*semain)'
-	_ExpressionDay			= '(\s*jour)'
+	_ExpressionNext			= r'(suiv|→)'
+	_ExpressionNumber		= r'(\d+)'
+	_ExpressionTime			= r'(d.?ajout)'
+	_ExpressionYear			= r'(\s*an)'
+	_ExpressionMonth		= r'(\s*mois)'
+	_ExpressionWeek			= r'(\s*semain)'
+	_ExpressionDay			= r'(\s*jour)'
 
 	##############################################################################
 	# INITIALIZE

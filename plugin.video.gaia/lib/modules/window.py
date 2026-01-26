@@ -484,36 +484,36 @@ class Window(object):
 		if allow:
 			for type in allow:
 				type = category % type.upper()
-				expression = '(<!-- \[%s/\] -->(.*?)<!-- \[/%s\] -->)' % (type, type)
+				expression = r'(<!-- \[%s/\] -->(.*?)<!-- \[/%s\] -->)' % (type, type)
 				matches = tools.Regex.extract(data = data, expression = expression, group = None, all = True, flags = flags)
 				if matches:
 					for match in matches:
-						if not tools.Regex.match(data = match[0], expression = '\[/%s/\]' % type, flags = flags): # Ignore if-else.
+						if not tools.Regex.match(data = match[0], expression = r'\[/%s/\]' % type, flags = flags): # Ignore if-else.
 							data = data.replace(match[0], match[1])
 
 		# IF (OTHER TYPES)
 		if forbid:
 			for type in forbid:
 				type = category % type.upper()
-				expression = '<!-- \[%s/\] -->.*?<!-- \[/%s\] -->' % (type, type)
+				expression = r'<!-- \[%s/\] -->.*?<!-- \[/%s\] -->' % (type, type)
 				matches = tools.Regex.extract(data = data, expression = expression, group = None, all = True, flags = flags)
 				if matches:
 					for match in matches:
-						if not tools.Regex.match(data = match, expression = '\[/%s/\]' % type, flags = flags): # Ignore if-else.
+						if not tools.Regex.match(data = match, expression = r'\[/%s/\]' % type, flags = flags): # Ignore if-else.
 							data = data.replace(match, '')
 
 		# IF-ELSE (CURRENT TYPES)
 		if allow:
 			for type in allow:
 				type = category % type.upper()
-				expression = '<!-- \[%s/\] -->(.*?)<!-- \[/%s/\] -->.*?<!-- \[/%s\] -->' % (type, type, type)
+				expression = r'<!-- \[%s/\] -->(.*?)<!-- \[/%s/\] -->.*?<!-- \[/%s\] -->' % (type, type, type)
 				data = tools.Regex.replace(data = data, expression = expression, replacement = r'\1', group = None, all = True, flags = flags)
 
 		# IF-ELSE (OTHER TYPES)
 		if forbid:
 			for type in forbid:
 				type = category % type.upper()
-				expression = '<!-- \[%s/\] -->.*?<!-- \[/%s/\] -->(.*?)<!-- \[/%s\] -->' % (type, type, type)
+				expression = r'<!-- \[%s/\] -->.*?<!-- \[/%s/\] -->(.*?)<!-- \[/%s\] -->' % (type, type, type)
 				data = tools.Regex.replace(data = data, expression = expression, replacement = r'\1', group = None, all = True, flags = flags)
 
 		# SINGLE REPLACEMENTS
@@ -522,7 +522,7 @@ class Window(object):
 			for type, replacement in single.items():
 				if tools.Tools.isFunction(replacement): replacement = replacement()
 				type = category % type.upper()
-				data = tools.Regex.replace(data = data, expression = '\[%s\]' % type, replacement = str(replacement), group = None, all = True, flags = flags)
+				data = tools.Regex.replace(data = data, expression = r'\[%s\]' % type, replacement = str(replacement), group = None, all = True, flags = flags)
 
 		return data
 
@@ -4115,7 +4115,7 @@ class WindowButton(Window):
 					animation = self.mButton[4]['progressanimation']
 					for i in range(len(animation)):
 						if 'progress=true' in animation[i][1]:
-							animation[i] = (animation[i][0], tools.Regex.replace(data = animation[i][1], expression = 'time=(\d+)', replacement = duration, group = 1))
+							animation[i] = (animation[i][0], tools.Regex.replace(data = animation[i][1], expression = r'time=(\d+)', replacement = duration, group = 1))
 					self.mButton[4]['progress'].setAnimations(animation)
 
 				if not self.mInteracted: self._actionToggle()
@@ -6989,7 +6989,7 @@ class WindowMetaPreload(WindowStep):
 
 						from lib.modules.convert import ConverterDuration, ConverterSize
 						limit = ConverterDuration(bracket[0] or limit, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordMinimal, places = False)
-						limit = tools.Regex.replace(data = limit, expression = '(\d+(?:\.\d+)?)(.*?)', replacement = r'\1+\2') # Add a plus after the number.
+						limit = tools.Regex.replace(data = limit, expression = r'(\d+(?:\.\d+)?)(.*?)', replacement = r'\1+\2') # Add a plus after the number.
 						label = (
 							ConverterSize(cache._size()).stringOptimal(places = 1),
 							ConverterDuration(age, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordMinimal, places = False),
@@ -7121,7 +7121,7 @@ class WindowWizardIntro(WindowStep):
 			# Get the major + minor version, in case the version wizard is sometimes shown on a minor version upgrade.
 			try:
 				version = tools.System.version()
-				version = tools.Regex.extract(data = version, expression = '(\d+(?:\.\d+)?)') # Remove patch version. Eg: 8.0.3 -> 8.0
+				version = tools.Regex.extract(data = version, expression = r'(\d+(?:\.\d+)?)') # Remove patch version. Eg: 8.0.3 -> 8.0
 				if version: version = tools.Tools.stringRemoveSuffix(data = version, remove = '.0') # Remove the minor version if it is 0. Eg: 8.0 -> 8
 				label += ' ' + version
 			except: tools.Logger.error()

@@ -1,9 +1,9 @@
 #########################################################################################################################
 
-Download:			https://pypi.org/project/ujson/#files
-					https://www.piwheels.org/project/ujson/
-Current Version:	5.5.0 (2022-11-16) and older versions for older Pythons
-Used By:			Gaia
+Download:		https://pypi.org/project/ujson/#files
+			https://www.piwheels.org/project/ujson/
+Current Version:	5.11.0 (2026-01-23) and older versions for older Pythons
+Used By:		Gaia
 
 #########################################################################################################################
 
@@ -19,9 +19,9 @@ libraries must first be extracted from the Python wheels on the websites before 
 all libraries might be from the latests version. Older versions can be found on pypi.org under the "Release history" tab.
 
 The following operating systems and architectures should be supported:
-1. Linux						x86 [32bit + 64bit]		Tested
-2. Windows						x86 [32bit + 64bit]		Tested
-3. Mac							x86 [64bit] and ARM		Untested
+1. Linux				x86 [32bit + 64bit]	Tested
+2. Windows				x86 [32bit + 64bit]	Tested
+3. Mac					x86 [64bit] and ARM	Untested
 4. ARM [Linux + Android]		Various architectures	Partially tested (at least newer Raspberry and Odroid should work)
 
 #########################################################################################################################

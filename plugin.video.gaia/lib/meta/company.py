@@ -493,7 +493,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : '20th Century'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '((?:20th|twentieth)[\s\-\_\.\+]*(?:century|fox|tv|television|digital)|fox[\s\-\_\.\+]*2000)',
+					'expression'	: r'((?:20th|twentieth)[\s\-\_\.\+]*(?:century|fox|tv|television|digital)|fox[\s\-\_\.\+]*2000)',
 				},
 
 				#################################################################################################################################
@@ -789,7 +789,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'ABC'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'ABC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'ABC Originals'},
-					'expression'	: '([kw]?abc[d\d]?|american[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation)|freeform)',
+					'expression'	: r'([kw]?abc[d\d]?|american[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation)|freeform)',
 				},
 
 				#################################################################################################################################
@@ -908,7 +908,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'A&E'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'A&E'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'A&E Originals'},
-					'expression'	: '(a\s*(?:[\+\&]|and)\s*e|^aen$|arts?\s*(?:[\+\&]|and)?\s*enter?tainmn?en?t\s*network)',
+					'expression'	: r'(a\s*(?:[\+\&]|and)\s*e|^aen$|arts?\s*(?:[\+\&]|and)?\s*enter?tainmn?en?t\s*network)',
 				},
 
 				#################################################################################################################################
@@ -1009,7 +1009,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Acorn TV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Acorn'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Acorn Originals'},
-					'expression'	: '(acorn[\s\-\_\.\+]*(?:$|tv|media|dvd))',
+					'expression'	: r'(acorn[\s\-\_\.\+]*(?:$|tv|media|dvd))',
 				},
 
 				#################################################################################################################################
@@ -1075,7 +1075,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Adult Swim'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Adult Swim'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Adult Swim Originals'},
-					'expression'	: '(adult[\s\-\_\.\+]*swim|william\'?s[\s\-\_\.\+]*street)',
+					'expression'	: r'(adult[\s\-\_\.\+]*swim|william\'?s[\s\-\_\.\+]*street)',
 				},
 
 				#################################################################################################################################
@@ -1181,7 +1181,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Amazon Prime'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Amazon'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Amazon Originals'},
-					'expression'	: '(amazon|prime[\s\-\_\.\+]*video)',
+					'expression'	: r'(amazon|prime[\s\-\_\.\+]*video)',
 				},
 
 				#################################################################################################################################
@@ -1337,7 +1337,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'AMC+'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'AMC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'AMC Originals'},
-					'expression'	: '(^(?:.*?(?:cbs|\&[\s\-\_\.\+]*)[\s\-\_\.\+]*)?amc[\s\-\_\.\+]*(?:$|\+|plus|\.com|studio|network|production|film|entertainment|independent|theat(?:er|re)|foundation|espa[nñ]a|magyarorsz[aá]g)|american?[\s\-\_\.\+]*movie[\s\-\_\.\+]*classics?|shudder|ifc[\s\-\_\.\+]*(?:$|studio|film|production|midnight|first|tv|releas|in[\s\-\_\.\+]*theat(?:er|re)|festival[\s\-\_\.\+]*direct)|independent[\s\-\_\.\+]*film[\s\-\_\.\+]*channel|sundance[\s\-\_\.\+]*(?:tv|now|channel)|bbc[\s\-\_\.\+]*america|we[\s\-\_\.\+]*tv|allblk)',
+					'expression'	: r'(^(?:.*?(?:cbs|\&[\s\-\_\.\+]*)[\s\-\_\.\+]*)?amc[\s\-\_\.\+]*(?:$|\+|plus|\.com|studio|network|production|film|entertainment|independent|theat(?:er|re)|foundation|espa[nñ]a|magyarorsz[aá]g)|american?[\s\-\_\.\+]*movie[\s\-\_\.\+]*classics?|shudder|ifc[\s\-\_\.\+]*(?:$|studio|film|production|midnight|first|tv|releas|in[\s\-\_\.\+]*theat(?:er|re)|festival[\s\-\_\.\+]*direct)|independent[\s\-\_\.\+]*film[\s\-\_\.\+]*channel|sundance[\s\-\_\.\+]*(?:tv|now|channel)|bbc[\s\-\_\.\+]*america|we[\s\-\_\.\+]*tv|allblk)',
 				},
 
 				#################################################################################################################################
@@ -1415,7 +1415,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Apple TV+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Apple'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Apple Originals'},
-					'expression'	: '(^apple(?:[\s\-\_\.\+]*(?:studios?|tv[\s\-\_\.\+]*|original[\s\-\_\.\+]*films?|music|podcasts?|inc))?$|i[\s\-\_\.\+]*tunes)',
+					'expression'	: r'(^apple(?:[\s\-\_\.\+]*(?:studios?|tv[\s\-\_\.\+]*|original[\s\-\_\.\+]*films?|music|podcasts?|inc))?$|i[\s\-\_\.\+]*tunes)',
 				},
 
 				#################################################################################################################################
@@ -1672,7 +1672,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ARD'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ARD'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ARD Originals'},
-					'expression'	: '((?:^|[\s\-\/])(?:ard|ndr|wdre?|hr|swf|sdrw?|sfb|swr|rbb|br|rb|sr|mdr|orb|nwdr|dw|dff|funk|kika|ddr(?:[\s\-\_\.\+]*f)?)\d?(?:$|[\s\-\/])|das[\s\-\_\.\+]*erste|arbeitsgemeinschaft.*?rundfunkanstalten|degeto|(?:norddeutscher|süddeutscher|(?:nord)?westdeutscher|ostdeutscher|hessischer|mitteldeutscher|saarländischer)[\s\-\_\.\+]*rundfunk|südwest(?:deutscher)?[\s\-\_\.\+]*(?:rund)?funk|deutsche[\s\-\_\.\+]*welle|deutscher[\s\-\_\.\+]*fernsehfunk|fernsehen[\s\-\_\.\+]*der[\s\-\_\.\+]*ddr|sender[\s\-\_\.\+]*freies[\s\-\_\.\+]*berlin|rundfunk[\s\-\_\.\+]*berlin[\s\-\_\.\+]*brandenburg|bayerischer[\s\-\_\.\+]*rundfunk|radio[\s\-\_\.\+]*bremen|deutsches[\s\-\_\.\+]*rundfunk|german[\s\-\_\.\+]*broadcasting|kinder[\s\-\_\.\+]*kanal|^(?:one|phoenix)$)',
+					'expression'	: r'((?:^|[\s\-\/])(?:ard|ndr|wdre?|hr|swf|sdrw?|sfb|swr|rbb|br|rb|sr|mdr|orb|nwdr|dw|dff|funk|kika|ddr(?:[\s\-\_\.\+]*f)?)\d?(?:$|[\s\-\/])|das[\s\-\_\.\+]*erste|arbeitsgemeinschaft.*?rundfunkanstalten|degeto|(?:norddeutscher|süddeutscher|(?:nord)?westdeutscher|ostdeutscher|hessischer|mitteldeutscher|saarländischer)[\s\-\_\.\+]*rundfunk|südwest(?:deutscher)?[\s\-\_\.\+]*(?:rund)?funk|deutsche[\s\-\_\.\+]*welle|deutscher[\s\-\_\.\+]*fernsehfunk|fernsehen[\s\-\_\.\+]*der[\s\-\_\.\+]*ddr|sender[\s\-\_\.\+]*freies[\s\-\_\.\+]*berlin|rundfunk[\s\-\_\.\+]*berlin[\s\-\_\.\+]*brandenburg|bayerischer[\s\-\_\.\+]*rundfunk|radio[\s\-\_\.\+]*bremen|deutsches[\s\-\_\.\+]*rundfunk|german[\s\-\_\.\+]*broadcasting|kinder[\s\-\_\.\+]*kanal|^(?:one|phoenix)$)',
 				},
 
 				#################################################################################################################################
@@ -1812,7 +1812,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'AUBC'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'AUBC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'AUBC Originals'},
-					'expression'	: '(abc\d?|australian?[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation))',
+					'expression'	: r'(abc\d?|australian?[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation))',
 				},
 
 				#################################################################################################################################
@@ -2241,7 +2241,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'BBC'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'BBC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'BBC Originals'},
-					'expression'	: '(c?bbc[i\d]?|british[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*corporation)',
+					'expression'	: r'(c?bbc[i\d]?|british[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*corporation)',
 				},
 
 				#################################################################################################################################
@@ -2341,7 +2341,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Boomerang'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Boomerang'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Boomerang Originals'},
-					'expression'	: '(boomerang)',
+					'expression'	: r'(boomerang)',
 				},
 
 				#################################################################################################################################
@@ -2463,7 +2463,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Bravo TV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Bravo'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Bravo Originals'},
-					'expression'	: '(^[7]?bravo(?:$|\!|[\s\-\_\.\+]*(?:tv|cable|networks?|studios?|originals?|arts?)))',
+					'expression'	: r'(^[7]?bravo(?:$|\!|[\s\-\_\.\+]*(?:tv|cable|networks?|studios?|originals?|arts?)))',
 				},
 
 				#################################################################################################################################
@@ -2520,7 +2520,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'BritBox'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'BritBox'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'BritBox Originals'},
-					'expression'	: '(brit[\s\-\_\.\+]*box)',
+					'expression'	: r'(brit[\s\-\_\.\+]*box)',
 				},
 
 				#################################################################################################################################
@@ -2641,7 +2641,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Cartoon Network'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Cartoon Network'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Cartoon Network Originals'},
-					'expression'	: '(cartoon[\s\-\_\.\+]*net?work|cartoonito|toonami|checkered[\s\-\_\.\+]*past)',
+					'expression'	: r'(cartoon[\s\-\_\.\+]*net?work|cartoonito|toonami|checkered[\s\-\_\.\+]*past)',
 				},
 
 				#################################################################################################################################
@@ -2788,7 +2788,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'CBC'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'CBC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'CBC Originals'},
-					'expression'	: '(cbc|canadian[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:corporation|company))',
+					'expression'	: r'(cbc|canadian[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:corporation|company))',
 				},
 
 				#################################################################################################################################
@@ -3129,7 +3129,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'CBS'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'CBS'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'CBS Originals'},
-					'expression'	: '(cbsn?|columbia[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*system|viacom[\s\-\_\.\+]*cbs)',
+					'expression'	: r'(cbsn?|columbia[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*system|viacom[\s\-\_\.\+]*cbs)',
 				},
 
 				#################################################################################################################################
@@ -3230,7 +3230,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Channel 4'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Channel 4'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Channel 4 Originals'},
-					'expression'	: '((?:channel|film)[\s\-\_\.\+]*(?:4[^\d]|four)|^e4(?:$|[\s\-\_\.\+]*)|more4[^\d]|kerrang|^the[\s\-\_\.\+]*box[\s\-\_\.\+]*(?:$|plus))',
+					'expression'	: r'((?:channel|film)[\s\-\_\.\+]*(?:4[^\d]|four)|^e4(?:$|[\s\-\_\.\+]*)|more4[^\d]|kerrang|^the[\s\-\_\.\+]*box[\s\-\_\.\+]*(?:$|plus))',
 				},
 
 				#################################################################################################################################
@@ -3327,7 +3327,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Channel 5'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Channel 5'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Channel 5 Originals'},
-					'expression'	: '(channel[\s\-\_\.\+]*(?:5|five)|(?:five|5)[\s\-\_\.\+]*(?:\+[\s\-\_\.\+]*one|\*|star|usa?|select|action|spike|life|tv)|my[\s\-\_\.\+]*(?:five|5)|fiver?|spike)',
+					'expression'	: r'(channel[\s\-\_\.\+]*(?:5|five)|(?:five|5)[\s\-\_\.\+]*(?:\+[\s\-\_\.\+]*one|\*|star|usa?|select|action|spike|life|tv)|my[\s\-\_\.\+]*(?:five|5)|fiver?|spike)',
 				},
 
 				#################################################################################################################################
@@ -3395,7 +3395,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Cineflix'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(cineflix)',
+					'expression'	: r'(cineflix)',
 				},
 
 				#################################################################################################################################
@@ -3468,7 +3468,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'Cinemax'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Cinemax'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'Cinemax Originals'},
-					'expression'	: '(cinem[aá]x)',
+					'expression'	: r'(cinem[aá]x)',
 				},
 
 				#################################################################################################################################
@@ -3832,7 +3832,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Columbia'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(columbia[\s\-\_\.\+]*(?:tr[is][\s\-\_\.\+]*star|picture|fil?m|studio|television|tv|animation|home|video|entertainment|network|distribut|production|global|interna[ct]ional|domestic|house|classic|record|[ck]amera|c\.?e\.?i\.?a\.?d|bavaria|rca|warner|fox|emi|cannon|delphi|hoyts|british|$))',
+					'expression'	: r'(columbia[\s\-\_\.\+]*(?:tr[is][\s\-\_\.\+]*star|picture|fil?m|studio|television|tv|animation|home|video|entertainment|network|distribut|production|global|interna[ct]ional|domestic|house|classic|record|[ck]amera|c\.?e\.?i\.?a\.?d|bavaria|rca|warner|fox|emi|cannon|delphi|hoyts|british|$))',
 				},
 
 				#################################################################################################################################
@@ -3919,7 +3919,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Comedy Central'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Comedy Central'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Comedy Central Originals'},
-					'expression'	: '(comedy[\s\-\_\.\+]*(?:central|channel|network)|ha!)',
+					'expression'	: r'(comedy[\s\-\_\.\+]*(?:central|channel|network)|ha!)',
 				},
 
 				#################################################################################################################################
@@ -4005,7 +4005,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Constantin'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(constantin)',
+					'expression'	: r'(constantin)',
 				},
 
 				#################################################################################################################################
@@ -4089,7 +4089,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crave'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crave'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crave Originals'},
-					'expression'	: '(crave|tmn|the[\s\-\_\.\+]*(?:cult[\s\-\_\.\+]*)?movie[\s\-\_\.\+]*network)',
+					'expression'	: r'(crave|tmn|the[\s\-\_\.\+]*(?:cult[\s\-\_\.\+]*)?movie[\s\-\_\.\+]*network)',
 				},
 
 				#################################################################################################################################
@@ -4132,7 +4132,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crunchyroll'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crunchyroll'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Crunchyroll Originals'},
-					'expression'	: '(crunchy[\s\-\_\.\+]*roll|ellation|right[\s\-\_\.\+]*stuf)',
+					'expression'	: r'(crunchy[\s\-\_\.\+]*roll|ellation|right[\s\-\_\.\+]*stuf)',
 				},
 
 				#################################################################################################################################
@@ -4232,7 +4232,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'The CW'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'The CW'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'The CW Originals'},
-					'expression'	: '((?:the)?[\s\-\_\.\+]*cw(?:tv|\d+)?|wpix|pix[\s\-\_\.\+]*11|ktla|kvcw|wcwg)',
+					'expression'	: r'((?:the)?[\s\-\_\.\+]*cw(?:tv|\d+)?|wpix|pix[\s\-\_\.\+]*11|ktla|kvcw|wcwg)',
 				},
 
 				#################################################################################################################################
@@ -4353,7 +4353,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Dark Horse'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Dark Horse Originals'},
-					'expression'	: '(dark[\s\-\_\.\+]*horse[\s\-\_\.\+]*(?:entertainment|indie|comics?|books?))',
+					'expression'	: r'(dark[\s\-\_\.\+]*horse[\s\-\_\.\+]*(?:entertainment|indie|comics?|books?))',
 				},
 
 				#################################################################################################################################
@@ -4414,7 +4414,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'DC Comics'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'DC Originals'},
-					'expression'	: '(detective[\s\-\_\.\+]*comics?|(?:^|(?:vertigo|cinema).*)?dc[\s\-\_\.\+]*(?:$|comic|studio|film|entertainment|universe|helden|kid|vertigo))',
+					'expression'	: r'(detective[\s\-\_\.\+]*comics?|(?:^|(?:vertigo|cinema).*)?dc[\s\-\_\.\+]*(?:$|comic|studio|film|entertainment|universe|helden|kid|vertigo))',
 				},
 
 				#################################################################################################################################
@@ -4475,7 +4475,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Dimension'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(dimension[\s\-\_\.\+]*(?:films?|television|extreme))',
+					'expression'	: r'(dimension[\s\-\_\.\+]*(?:films?|television|extreme))',
 				},
 
 				#################################################################################################################################
@@ -4804,7 +4804,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Discovery+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Discovery'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Discovery Originals'},
-					'expression'	: '((?:^|the|investiga(?:tion|ção)|warner\s*(?:bros\.?|home)?|canal\+|sbs|animal\s*planet.*|tvn[\s\-\_\.\+]*|tlc[\s\-\_\.\+]*)\s*(?:discovery|dmax)|^(?:the[\s\-\_\.\+]*)?science[\s\-\_\.\+]*channel)',
+					'expression'	: r'((?:^|the|investiga(?:tion|ção)|warner\s*(?:bros\.?|home)?|canal\+|sbs|animal\s*planet.*|tvn[\s\-\_\.\+]*|tlc[\s\-\_\.\+]*)\s*(?:discovery|dmax)|^(?:the[\s\-\_\.\+]*)?science[\s\-\_\.\+]*channel)',
 				},
 
 				#################################################################################################################################
@@ -5362,7 +5362,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Disney+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Disney'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Disney Originals'},
-					'expression'	: '(disney|buena[\s\-\_\.\+]*vista)',
+					'expression'	: r'(disney|buena[\s\-\_\.\+]*vista)',
 				},
 
 				#################################################################################################################################
@@ -5462,7 +5462,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'DreamWorks'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'DreamWorks Originals'},
-					'expression'	: '(dreamworks)',
+					'expression'	: r'(dreamworks)',
 				},
 
 				#################################################################################################################################
@@ -5515,7 +5515,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Facebook Watch'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Facebook'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Facebook Originals'},
-					'expression'	: '(facebook)',
+					'expression'	: r'(facebook)',
 				},
 
 				#################################################################################################################################
@@ -6055,7 +6055,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Fox'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Fox'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Fox Originals'},
-					'expression'	: '(^fox[\s\-\_\.\+]*(?:$|\d+|kid|family|sport|soccer|national|life|crime|premium|movie|film|action|reality|nation|international|world|home|footy|doco|box|business|classic|now|play|one|connect|digital|news|broadcast|network|cable|showcase|latin|vid[eé]o|channel|tv|television|faith|soul|star|travel|guild|interactive|entertainment|history|\/|\.com)|canal[\s\-\_\.\+]*fox|foxtel|(?:20th|twentieth|21st|twenty[\s\-\_\.\+]*first |cbs|warner|paramount|columbia|path[eé]).*?fox|fox.*?(?:warner|paramount|columbia|path[eé]))',
+					'expression'	: r'(^fox[\s\-\_\.\+]*(?:$|\d+|kid|family|sport|soccer|national|life|crime|premium|movie|film|action|reality|nation|international|world|home|footy|doco|box|business|classic|now|play|one|connect|digital|news|broadcast|network|cable|showcase|latin|vid[eé]o|channel|tv|television|faith|soul|star|travel|guild|interactive|entertainment|history|\/|\.com)|canal[\s\-\_\.\+]*fox|foxtel|(?:20th|twentieth|21st|twenty[\s\-\_\.\+]*first |cbs|warner|paramount|columbia|path[eé]).*?fox|fox.*?(?:warner|paramount|columbia|path[eé]))',
 				},
 
 				#################################################################################################################################
@@ -6108,7 +6108,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Freevee'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Freevee'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Freevee Originals'},
-					'expression'	: '(free(?:vee|dive)|imdb)',
+					'expression'	: r'(free(?:vee|dive)|imdb)',
 				},
 
 				#################################################################################################################################
@@ -6176,7 +6176,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'FX'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'FX'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'FX Originals'},
-					'expression'	: '(^fx[xm]?(?:$|[\s\-\_\.\+]*(?:network|channel|movie|production|studio|canada|brasil|argentina|italia))|canal[\s\-\_\.\+]*fx)',
+					'expression'	: r'(^fx[xm]?(?:$|[\s\-\_\.\+]*(?:network|channel|movie|production|studio|canada|brasil|argentina|italia))|canal[\s\-\_\.\+]*fx)',
 				},
 
 				#################################################################################################################################
@@ -6345,7 +6345,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Gaumont'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Gaumont Originals'}, # Not really originals, since they are produced for other networks (eg Netflix), but still add here for the Frenchies.
-					'expression'	: '(gaumont)',
+					'expression'	: r'(gaumont)',
 				},
 
 				#################################################################################################################################
@@ -6444,7 +6444,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Google Play'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Google'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(google)',
+					'expression'	: r'(google)',
 				},
 
 				#################################################################################################################################
@@ -6484,7 +6484,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Hayu'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Hayu'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(hayu)',
+					'expression'	: r'(hayu)',
 				},
 
 				#################################################################################################################################
@@ -6692,7 +6692,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'HBO Max'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'HBO'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'HBO Originals'},
-					'expression'	: '(hbo|home[\s\-\_\.\+]*box[\s\-\_\.\+]*office|^max(?:[\s\-\_\.\+]*international)?$|warner[\s\-\_\.\+]*max)',
+					'expression'	: r'(hbo|home[\s\-\_\.\+]*box[\s\-\_\.\+]*office|^max(?:[\s\-\_\.\+]*international)?$|warner[\s\-\_\.\+]*max)',
 				},
 
 				#################################################################################################################################
@@ -6821,7 +6821,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'History Channel'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'History'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'History Originals'},
-					'expression'	: '((?:^|the[\s\-\_\.\+]*)histor(?:y|ia)(?:$|[\s\-\_\.\+]*(?:channel|television|tv|play|hd|latin)))',
+					'expression'	: r'((?:^|the[\s\-\_\.\+]*)histor(?:y|ia)(?:$|[\s\-\_\.\+]*(?:channel|television|tv|play|hd|latin)))',
 				},
 
 				#################################################################################################################################
@@ -6887,7 +6887,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Hulu'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Hulu'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Hulu Originals'},
-					'expression'	: '(hulu)',
+					'expression'	: r'(hulu)',
 				},
 
 				#################################################################################################################################
@@ -7099,7 +7099,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'ITV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ITV'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ITV Originals'},
-					'expression'	: '(c?itv(?:\d|x|be)?|^(?:(?:children(?:\'?s)?|central|northern|southern)[\s\-\_\.\+]*)?independent[\s\-\_\.\+]*(?:television|tv)(?:$|[\s\-\_\.\+]*(?:news))|stv\d?|scottish[\s\-\_\.\+]*(?:television|tv)|smg|utv\d?|scottish[\s\-\_\.\+]*media[\s\-\_\.\+]*group|ulster[\s\-\_\.\+]*(?:television|tv)|granada[\s\-\_\.\+]*sky)',
+					'expression'	: r'(c?itv(?:\d|x|be)?|^(?:(?:children(?:\'?s)?|central|northern|southern)[\s\-\_\.\+]*)?independent[\s\-\_\.\+]*(?:television|tv)(?:$|[\s\-\_\.\+]*(?:news))|stv\d?|scottish[\s\-\_\.\+]*(?:television|tv)|smg|utv\d?|scottish[\s\-\_\.\+]*media[\s\-\_\.\+]*group|ulster[\s\-\_\.\+]*(?:television|tv)|granada[\s\-\_\.\+]*sky)',
 				},
 
 				#################################################################################################################################
@@ -7217,7 +7217,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Lionsgate+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Lionsgate'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(lion\'?s[\s\-\_\.\+]*gate)',
+					'expression'	: r'(lion\'?s[\s\-\_\.\+]*gate)',
 				},
 
 				#################################################################################################################################
@@ -7281,7 +7281,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Lucasfilm'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Lucasfilm Originals'},
-					'expression'	: '(lucasfilm)',
+					'expression'	: r'(lucasfilm)',
 				},
 
 				#################################################################################################################################
@@ -7357,7 +7357,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Marvel'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Marvel Originals'},
-					'expression'	: '((?:marvel|mvl)(?:$|[\s\-\_\.\+\/]))',
+					'expression'	: r'((?:marvel|mvl)(?:$|[\s\-\_\.\+\/]))',
 				},
 
 				#################################################################################################################################
@@ -7583,7 +7583,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'MGM+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'MGM'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'MGM Originals'},
-					'expression'	: '(?:(?:^|[^a-z])mgm(?:$|[^a-z])|metro[\s\-\_\.\+]*goldwyn[\s\-\_\.\+]*mayer|^(?:epix(?:[\s\-\_\.\+]*hd)?|screen[\s\-\_\.\+]*pix))',
+					'expression'	: r'(?:(?:^|[^a-z])mgm(?:$|[^a-z])|metro[\s\-\_\.\+]*goldwyn[\s\-\_\.\+]*mayer|^(?:epix(?:[\s\-\_\.\+]*hd)?|screen[\s\-\_\.\+]*pix))',
 				},
 
 				#################################################################################################################################
@@ -7640,7 +7640,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Miramax'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(miramax)',
+					'expression'	: r'(miramax)',
 				},
 
 				#################################################################################################################################
@@ -7882,7 +7882,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'MTV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'MTV'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'MTV Originals'},
-					'expression'	: '(mtv[u\d]?|music[\s\-\_\.\+]*television)',
+					'expression'	: r'(mtv[u\d]?|music[\s\-\_\.\+]*television)',
 				},
 
 				#################################################################################################################################
@@ -8073,7 +8073,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'National Geographic'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'National Geographic'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'National Geographic Originals'},
-					'expression'	: '(nat(?:ional)?[\s\-\_\.\+]*geo(?:graphics?)?)',
+					'expression'	: r'(nat(?:ional)?[\s\-\_\.\+]*geo(?:graphics?)?)',
 				},
 
 				#################################################################################################################################
@@ -8309,7 +8309,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'NBC'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'NBC'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'NBC Originals'},
-					'expression'	: '((?:[ck]|ms)?nbc|national[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation))',
+					'expression'	: r'((?:[ck]|ms)?nbc|national[\s\-\_\.\+]*broadcast(?:ing)?[\s\-\_\.\+]*(?:company|corporation))',
 				},
 
 				#################################################################################################################################
@@ -8373,7 +8373,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Netflix'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Netflix'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Netflix Originals'},
-					'expression'	: '(netflix)',
+					'expression'	: r'(netflix)',
 				},
 
 				#################################################################################################################################
@@ -8462,7 +8462,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'New Line'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(new[\s\-\_\.\+]*line[\s\-\_\.\+]*(?:cinema|production|television|home|international)|fine[\s\-\_\.\+]*line[\s\-\_\.\+]*features?)',
+					'expression'	: r'(new[\s\-\_\.\+]*line[\s\-\_\.\+]*(?:cinema|production|television|home|international)|fine[\s\-\_\.\+]*line[\s\-\_\.\+]*features?)',
 				},
 
 				#################################################################################################################################
@@ -8650,7 +8650,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Nickelodeon'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Nickelodeon'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Nickelodeon Originals'},
-					'expression'	: '(nickelodeon|nick(?:toons?|troops?)|^nick$|nick[\s\-\_\.\+]*(?:jr|junior|(?:(?:at|@)[\s\-\_\.\+]*(?:nite|night))|india|pakistan|polska|gas|mom|splat|recors?|digital)|teen[\s\-\_\.\+]*nick|noggin|the[\s\-\_\.\+]*n(?:$|[\s\-\_\.\+])|^snick$)',
+					'expression'	: r'(nickelodeon|nick(?:toons?|troops?)|^nick$|nick[\s\-\_\.\+]*(?:jr|junior|(?:(?:at|@)[\s\-\_\.\+]*(?:nite|night))|india|pakistan|polska|gas|mom|splat|recors?|digital)|teen[\s\-\_\.\+]*nick|noggin|the[\s\-\_\.\+]*n(?:$|[\s\-\_\.\+])|^snick$)',
 				},
 
 				#################################################################################################################################
@@ -9036,7 +9036,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Paramount+'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Paramount'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Paramount Originals'},
-					'expression'	: '(paramount|viacom[\s\-\_\.\+]*cbs)',
+					'expression'	: r'(paramount|viacom[\s\-\_\.\+]*cbs)',
 				},
 
 				#################################################################################################################################
@@ -9098,7 +9098,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Peacock'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Peacock'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Peacock Originals'},
-					'expression'	: '(^(?:(?:nbc|universal).*)?peacock(?:.*(?:nbc|universal|kid|junior|jr|production)|$))',
+					'expression'	: r'(^(?:(?:nbc|universal).*)?peacock(?:.*(?:nbc|universal|kid|junior|jr|production)|$))',
 				},
 
 				#################################################################################################################################
@@ -9148,7 +9148,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Philo'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Philo'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(philo)',
+					'expression'	: r'(philo)',
 				},
 
 				#################################################################################################################################
@@ -9205,7 +9205,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Pixar'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Pixar Originals'},
-					'expression'	: '(pixar(?:[\s\-\_\.\+]*vision)?)',
+					'expression'	: r'(pixar(?:[\s\-\_\.\+]*vision)?)',
 				},
 
 				#################################################################################################################################
@@ -9256,7 +9256,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Pluto TV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Pluto'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(pluto[\s\-\_\.\+]*tv)',
+					'expression'	: r'(pluto[\s\-\_\.\+]*tv)',
 				},
 
 				#################################################################################################################################
@@ -9344,7 +9344,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Regency'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(new[\s\-\_\.\+]*regency|regency[\s\-\_\.\+]*(?:enterpri[sZ]es?|television|entertainment|international)|embassy[\s\-\_\.\+]*international[\s\-\_\.\+]*pictures)',
+					'expression'	: r'(new[\s\-\_\.\+]*regency|regency[\s\-\_\.\+]*(?:enterpri[sZ]es?|television|entertainment|international)|embassy[\s\-\_\.\+]*international[\s\-\_\.\+]*pictures)',
 				},
 
 				#################################################################################################################################
@@ -9511,7 +9511,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'RKO'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '((?:^|[\s\-\_\.\+])r[\s.]*k[\s.]*o(?:$|[\s\-\_\.\+\/])|radio[\s\-\_\.\+]*keith[\s\-\_\.\+]*orpheum)',
+					'expression'	: r'((?:^|[\s\-\_\.\+])r[\s.]*k[\s.]*o(?:$|[\s\-\_\.\+\/])|radio[\s\-\_\.\+]*keith[\s\-\_\.\+]*orpheum)',
 				},
 
 				#################################################################################################################################
@@ -9574,7 +9574,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Roku Channel'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Roku'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Roku Originals'},
-					'expression'	: '((?:$^|[^a-z\d])roku(?:$|[^a-z\d]))',
+					'expression'	: r'((?:$^|[^a-z\d])roku(?:$|[^a-z\d]))',
 				},
 
 				#################################################################################################################################
@@ -9643,7 +9643,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Screen Gems'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(screen[\s\-\_\.\+]*gems?)',
+					'expression'	: r'(screen[\s\-\_\.\+]*gems?)',
 				},
 
 				#################################################################################################################################
@@ -9761,7 +9761,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Showtime'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Showtime'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'Showtime Originals'},
-					'expression'	: '(showtime|^(?:showcase|xtrm)$|^sho(?:$|\.com|[\s\-\_\.\+]*(?:film|entertainment)))',
+					'expression'	: r'(showtime|^(?:showcase|xtrm)$|^sho(?:$|\.com|[\s\-\_\.\+]*(?:film|entertainment)))',
 				},
 
 				#################################################################################################################################
@@ -10267,7 +10267,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Sky'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Sky'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Sky Originals'},
-					'expression'	: '((?:^|(?:british|tv|showcase|granada)[\s\-\_\.\+]*)sky(?:\d|tv|\d?hd|vision|go|showtime|media)?(?:$|\s)|sky\s(?:tv|channel)|getty.*?sky|b\s*sky\s*b|acetrax|^(?:now|wow)(?:[\s\-\_\.\+]*tv)?$)',
+					'expression'	: r'((?:^|(?:british|tv|showcase|granada)[\s\-\_\.\+]*)sky(?:\d|tv|\d?hd|vision|go|showtime|media)?(?:$|\s)|sky\s(?:tv|channel)|getty.*?sky|b\s*sky\s*b|acetrax|^(?:now|wow)(?:[\s\-\_\.\+]*tv)?$)',
 				},
 
 				#################################################################################################################################
@@ -10619,7 +10619,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Sony Channel'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Sony'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Sony Originals'},
-					'expression'	: '((?:^|[^a-z])sony(?:[\s\-\_\.\+]*liv)?(?:$|[^a-z]))',
+					'expression'	: r'((?:^|[^a-z])sony(?:[\s\-\_\.\+]*liv)?(?:$|[^a-z]))',
 				},
 
 				#################################################################################################################################
@@ -10703,7 +10703,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Starz'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Starz'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'Starz Originals'},
-					'expression'	: '(starz[\s\-\_\.\+]*(?:play|encore|edge|\!)?|(?:movie|indie|retro)[\s\-\_\.\+]*plex)',
+					'expression'	: r'(starz[\s\-\_\.\+]*(?:play|encore|edge|\!)?|(?:movie|indie|retro)[\s\-\_\.\+]*plex)',
 				},
 
 				#################################################################################################################################
@@ -10836,7 +10836,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Syfy'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Syfy'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'Syfy Originals'},
-					'expression'	: '(syfy|(?:^|(?:the|ctv)\s)sci[\s\-]fi(?:$|\s(?:channel|picture|film|universal|pulse))|sf[\s\-\_\.\+]*channel)',
+					'expression'	: r'(syfy|(?:^|(?:the|ctv)\s)sci[\s\-]fi(?:$|\s(?:channel|picture|film|universal|pulse))|sf[\s\-\_\.\+]*channel)',
 				},
 
 				#################################################################################################################################
@@ -10936,7 +10936,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'TBS'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'TBS'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'TBS Originals'},
-					'expression'	: '(tbs|turner[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*system)',
+					'expression'	: r'(tbs|turner[\s\-\_\.\+]*broadcasting[\s\-\_\.\+]*system)',
 				},
 
 				#################################################################################################################################
@@ -11090,7 +11090,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'TNT'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'TNT'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'TNT Originals'},
-					'expression'	: '(tnt|tcm|turner[\s\-\_\.\+]*network[\s\-\_\.\+]*(?:television|tv)|turner[\s\-\_\.\+]*originals?|turner[\s\-\_\.\+]*classics?[\s\-\_\.\+]*movies?)',
+					'expression'	: r'(tnt|tcm|turner[\s\-\_\.\+]*network[\s\-\_\.\+]*(?:television|tv)|turner[\s\-\_\.\+]*originals?|turner[\s\-\_\.\+]*classics?[\s\-\_\.\+]*movies?)',
 				},
 
 				#################################################################################################################################
@@ -11172,7 +11172,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Touchstone'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(touchstone)',
+					'expression'	: r'(touchstone)',
 				},
 
 				#################################################################################################################################
@@ -11381,7 +11381,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'TriStar'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(tr[is][\s\-\_\.\+]*star)',
+					'expression'	: r'(tr[is][\s\-\_\.\+]*star)',
 				},
 
 				#################################################################################################################################
@@ -11438,7 +11438,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'TruTV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'TruTV'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'TruTV Originals'},
-					'expression'	: '((?:tru|court)[\s\-\_\.\+]*tv)',
+					'expression'	: r'((?:tru|court)[\s\-\_\.\+]*tv)',
 				},
 
 				#################################################################################################################################
@@ -11489,7 +11489,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Tubi TV'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Tubi'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Tubi Originals'},
-					'expression'	: '(^tubi(?:$|[\s\-\_\.\+]*(?:tv|television|movie|film)))',
+					'expression'	: r'(^tubi(?:$|[\s\-\_\.\+]*(?:tv|television|movie|film)))',
 				},
 
 				#################################################################################################################################
@@ -11649,7 +11649,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Turner'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(turner)',
+					'expression'	: r'(turner)',
 				},
 
 				#################################################################################################################################
@@ -12088,7 +12088,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Universal TV'}, # Not much content, since most is on Peacock.
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Universal'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None}, # These are rather NBC Originals, or originals for other platforms.
-					'expression'	: '((?:(?:nbc)[\s\-\_\.\+]*)?(?:universal)[\s\-\_\.\+]*(?:media|cable|content|picture|film|studio|television|tv|channel|animation|home|video|entertainment|network|production|global|interna[tc]ional|worldwide|domestic|music|classic|toon|kid|family|sport|premier|cinema|connect|all|hd|digital|news|pay|cgi|j|remote|spectrum|park|vision|stage|creative|culture|brand|1440|italia|sony|walt|.?(?:cic|public|tri)|$)|(?:studio|vista)[\s\-\_\.\+]*universal)',
+					'expression'	: r'((?:(?:nbc)[\s\-\_\.\+]*)?(?:universal)[\s\-\_\.\+]*(?:media|cable|content|picture|film|studio|television|tv|channel|animation|home|video|entertainment|network|production|global|interna[tc]ional|worldwide|domestic|music|classic|toon|kid|family|sport|premier|cinema|connect|all|hd|digital|news|pay|cgi|j|remote|spectrum|park|vision|stage|creative|culture|brand|1440|italia|sony|walt|.?(?:cic|public|tri)|$)|(?:studio|vista)[\s\-\_\.\+]*universal)',
 				},
 
 				#################################################################################################################################
@@ -12195,7 +12195,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'USA'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'USA'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1,		'label' : 'USA Originals'},
-					'expression'	: '((?:^|(?:studios?|\/)[\s\-\_\.\+]*)?usa[\s\-\_\.\+]*(?:$|network|picture|film|cable|broadcast|television|entertainment|video|home))',
+					'expression'	: r'((?:^|(?:studios?|\/)[\s\-\_\.\+]*)?usa[\s\-\_\.\+]*(?:$|network|picture|film|cable|broadcast|television|entertainment|video|home))',
 				},
 
 				#################################################################################################################################
@@ -12691,7 +12691,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'The WB'},
 					'vendor'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'Warner Bros'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'The WB Originals'},
-					'expression'	: '(warner(?:[\s\-\_\.\+]*(?:media|max))?|(?:^|the[\s\-\_\.\+]*|kids.?[\s\-\_\.\+]*)wb)',
+					'expression'	: r'(warner(?:[\s\-\_\.\+]*(?:media|max))?|(?:^|the[\s\-\_\.\+]*|kids.?[\s\-\_\.\+]*)wb)',
 				},
 
 				#################################################################################################################################
@@ -12746,7 +12746,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'Weinstein'},
 					'original'		: {Media.Movie : False,	Media.Show : False,	'label' : None},
-					'expression'	: '(weinstein[\s\-\_\.\+]*company|(?:^|[\s\-])twc(?:$|[\s\-]))',
+					'expression'	: r'(weinstein[\s\-\_\.\+]*company|(?:^|[\s\-])twc(?:$|[\s\-]))',
 				},
 
 				#################################################################################################################################
@@ -12830,7 +12830,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'YouTube'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'YouTube'},
 					'original'		: {Media.Movie : 1,		Media.Show : 1,		'label' : 'YouTube Originals'},
-					'expression'	: '(you[\s\-\_\.\+]*tube[\s\-\_\.\+]*(?:red|premium|originals?|kids?|space)?|^yt$)',
+					'expression'	: r'(you[\s\-\_\.\+]*tube[\s\-\_\.\+]*(?:red|premium|originals?|kids?|space)?|^yt$)',
 				},
 
 				#################################################################################################################################
@@ -12932,7 +12932,7 @@ class MetaCompany(object):
 					'network'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ZDF'},
 					'vendor'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ZDF'},
 					'original'		: {Media.Movie : 1000,	Media.Show : 1000,	'label' : 'ZDF Originals'},
-					'expression'	: '([z2]df|zweites[\s\-\_\.\+]*deutsches[\s\-\_\.\+]*fernsehen|ki\.?ka|kinder[\s\-\_\.\+]*kanal|^phoenix$)',
+					'expression'	: r'([z2]df|zweites[\s\-\_\.\+]*deutsches[\s\-\_\.\+]*fernsehen|ki\.?ka|kinder[\s\-\_\.\+]*kanal|^phoenix$)',
 				},
 			}
 
@@ -13038,8 +13038,8 @@ class MetaCompany(object):
 
 					'partial' : {
 						# A lot more icons for "Twentieth" than for "20th".
-						'(20th[\s\-]*century)(?![\s\-]fox)' : 'Twentieth Century Fox',
-						'(20th[\s\-]*century)' : 'Twentieth Century',
+						r'(20th[\s\-]*century)(?![\s\-]fox)' : 'Twentieth Century Fox',
+						r'(20th[\s\-]*century)' : 'Twentieth Century',
 					},
 
 					# Prefer these over other names.
@@ -13163,1114 +13163,1114 @@ class MetaCompany(object):
 	def _helperReplacement(self, type, release):
 		base = {
 			# Example: A Netflix Original Documentary
-			'^(?:(?:a|the)\s)?netflix' : {
+			r'^(?:(?:a|the)\s)?netflix' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Netflix',							MetaCompany.ReleaseNew : 'Netflix'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Netflix',							MetaCompany.ReleaseNew : 'Netflix'},
 			},
 
 			# Example: Amazon Video
-			'^amazon[\s\-]*video' : {
+			r'^amazon[\s\-]*video' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Amazon',							MetaCompany.ReleaseNew : 'Amazon Prime Video'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Amazon Video',						MetaCompany.ReleaseNew : 'Amazon Video'},
 			},
 			# Example: Amazon Prime Video
 			# Example: Prime Video
-			'^(?:amazon[\s\-]*prime|prime[\s\-]*video)' : {
+			r'^(?:amazon[\s\-]*prime|prime[\s\-]*video)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Amazon',							MetaCompany.ReleaseNew : 'Amazon Prime Video'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Amazon Prime Video',				MetaCompany.ReleaseNew : 'Amazon Prime Video'},
 			},
 			# Example: Amazon Freevee
-			'^amazon[\s\-]*freevee' : {
+			r'^amazon[\s\-]*freevee' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Amazon',							MetaCompany.ReleaseNew : 'Amazon'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Freevee',							MetaCompany.ReleaseNew : 'Amazon Freevee'},
 			},
 
 			# Example: Peacock
-			'^peacock$' : {
+			r'^peacock$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NBC Universal Television',			MetaCompany.ReleaseNew : None}, # No icon in the old pack, use a different icon to "NBC".
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 			# Example: Comcast
-			'^comcast' : {
+			r'^comcast' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NBC Universal Global Networks',	MetaCompany.ReleaseNew : 'NBC Universal Global Networks'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'NBC Universal Global Networks',	MetaCompany.ReleaseNew : 'NBC Universal Global Networks'},
 			},
 
 			# Example: discovery+
-			'^discovery[\s\-]*(?:\+|plus)$' : {
+			r'^discovery[\s\-]*(?:\+|plus)$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Discovery',						MetaCompany.ReleaseNew : 'Discovery+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Discovery+',						MetaCompany.ReleaseNew : 'Discovery+'},
 			},
 			# Example: Discovery+1
-			'^discovery[\s\-]*(?:\+|plus).+' : {
+			r'^discovery[\s\-]*(?:\+|plus).+' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Discovery',						MetaCompany.ReleaseNew : 'Discovery+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None}, # Has various other Discovery+X icons.
 			},
 			# Example: Discovery Family
-			'^discovery[\s\-]*(?:family|kids?)' : {
+			r'^discovery[\s\-]*(?:family|kids?)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Discovery',						MetaCompany.ReleaseNew : 'Discovery'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Discovery Kids',					MetaCompany.ReleaseNew : 'Discovery Kids'},
 			},
 
-			'^national[\s\-]*geographic[\s\-]*hd' : {
+			r'^national[\s\-]*geographic[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'National Geographic',				MetaCompany.ReleaseNew : 'National Geographic'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'National Geographic HD',			MetaCompany.ReleaseNew : 'National Geographic HD'},
 			},
-			'^national[\s\-]*geographic[\s\-]*channel' : {
+			r'^national[\s\-]*geographic[\s\-]*channel' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'National Geographic',				MetaCompany.ReleaseNew : 'National Geographic'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'National Geographic Channel',		MetaCompany.ReleaseNew : 'National Geographic Channel'},
 			},
 			# Example: National Geographic Documentary Films
-			'^national[\s\-]*geographic' : {
+			r'^national[\s\-]*geographic' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'National Geographic',				MetaCompany.ReleaseNew : 'National Geographic'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'National Geographic',				MetaCompany.ReleaseNew : 'National Geographic'},
 			},
 
 			# This is rather Showtime, even if Paramount is listed first.
 			# Example: Paramount+ with Showtime
-			'^paramount[\s\-]*(?:\+|plus)[\s\-]*with' : {
+			r'^paramount[\s\-]*(?:\+|plus)[\s\-]*with' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Showtime',							MetaCompany.ReleaseNew : 'Showtime'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Showtime',							MetaCompany.ReleaseNew : 'Showtime'},
 			},
 
 			# Example: Disney Jr.
-			'^disney[\s\-]*(?:jr|junior)' : {
+			r'^disney[\s\-]*(?:jr|junior)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Disney Junior',					MetaCompany.ReleaseNew : 'Disney Junior'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Disney Channel',					MetaCompany.ReleaseNew : 'Disney Channel'},
 			},
 			# Example: Toon Disney
-			'^toon[\s\-]*disney' : {
+			r'^toon[\s\-]*disney' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'DisneyToon Studios',				MetaCompany.ReleaseNew : 'DisneyToon Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Toon Disney',						MetaCompany.ReleaseNew : 'Toon Disney'},
 			},
 			# Example: Disney Toon
-			'^disney[\s\-]*toon' : {
+			r'^disney[\s\-]*toon' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'DisneyToon Studios',				MetaCompany.ReleaseNew : 'DisneyToon Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Disney Toon',						MetaCompany.ReleaseNew : 'Disney Toon'},
 			},
 			# Example: Disney Channels Worldwide
-			'^disney[\s\-]*channels?[\s\-]*(?:world|international)' : {
+			r'^disney[\s\-]*channels?[\s\-]*(?:world|international)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Disney Channel',					MetaCompany.ReleaseNew : 'Disney Channel'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Disney Channel',					MetaCompany.ReleaseNew : 'Disney Channel'},
 			},
 			# Example: Disney Enterprises
-			'^disney[\s\-]*enterprises?' : {
+			r'^disney[\s\-]*enterprises?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Disney',							MetaCompany.ReleaseNew : 'Disney'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Disney',							MetaCompany.ReleaseNew : 'Disney'},
 			},
 
 			# Example: Sky HD
 			# Example: Sky+
-			'^sky[\s\-]*(?:hd|\+|plus)' : {
+			r'^sky[\s\-]*(?:hd|\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 			},
 			# Example: Sky Max
-			'^sky[\s\-]*max' : {
+			r'^sky[\s\-]*max' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Max',							MetaCompany.ReleaseNew : 'Sky Max'},
 			},
 			# Example: Sky Showcase
-			'^sky[\s\-]*showcase' : {
+			r'^sky[\s\-]*showcase' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Showcase',						MetaCompany.ReleaseNew : 'Sky Showcase'},
 			},
 			# Example: SkyShowtime
-			'^sky[\s\-]*showtime' : {
+			r'^sky[\s\-]*showtime' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 			},
 			# Example: Sky Deutschland
-			'^sky[\s\-]*[\s\(\[](?:germany|deutschland|de)(?:[\s\)\]]|$)' : {
+			r'^sky[\s\-]*[\s\(\[](?:germany|deutschland|de)(?:[\s\)\]]|$)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky Deutschland'},
 			},
 			# Example: Sky Italia
-			'^sky[\s\-]*[\s\(\[](?:italia|italy|it)(?:[\s\)\]]|$)' : {
+			r'^sky[\s\-]*[\s\(\[](?:italia|italy|it)(?:[\s\)\]]|$)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 			},
 			# Example: Sky Atlantic (UK)
-			'^sky[\s\-]*atlantic[\s\-]*[\s\(\[](?:uk|gb)(?:[\s\)\]]|$)' : {
+			r'^sky[\s\-]*atlantic[\s\-]*[\s\(\[](?:uk|gb)(?:[\s\)\]]|$)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky Atlantic (UK)',				MetaCompany.ReleaseNew : 'Sky Atlantic (UK)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Atlantic',						MetaCompany.ReleaseNew : 'Sky Atlantic (UK)'},
 			},
 			# Example: Sky Atlantic (DE)
-			'^sky[\s\-]*atlantic[\s\-]*[\s\(\[](?:germany|deutschland|de)(?:[\s\)\]]|$)' : {
+			r'^sky[\s\-]*atlantic[\s\-]*[\s\(\[](?:germany|deutschland|de)(?:[\s\)\]]|$)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky Atlantic',						MetaCompany.ReleaseNew : 'Sky Atlantic (DE)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Atlantic',						MetaCompany.ReleaseNew : 'Sky Atlantic (DE)'},
 			},
 			# Example: Sky Documentaries
-			'^sky[\s\-]*documentar' : {
+			r'^sky[\s\-]*documentar' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Documentaries',				MetaCompany.ReleaseNew : 'Sky Documentaries'},
 			},
 			# Example: Sky Studios
-			'^sky[\s\-]*studios?' : {
+			r'^sky[\s\-]*studios?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sky',								MetaCompany.ReleaseNew : 'Sky'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sky Cinema',						MetaCompany.ReleaseNew : 'Sky Cinema'},
 			},
 			# Example: BSkyB
-			'^bskyb' : {
+			r'^bskyb' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BSkyB',							MetaCompany.ReleaseNew : 'BSkyB'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'British Sky Broadcasting (BSkyB)',	MetaCompany.ReleaseNew : 'British Sky Broadcasting (BSkyB)'},
 			},
 
 			# Example: MGM+
-			'^mgm[\s\-]*(?:\+|plus)' : {
+			r'^mgm[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM+'},
 			},
 			# Example: MGM HD
-			'^mgm[\s\-]*hd' : {
+			r'^mgm[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MGM HD',							MetaCompany.ReleaseNew : 'MGM HD'},
 			},
 			# Example: Amazon MGM Studios
-			'^amazon.*(?:mgm|metro.*goldwyn.*mayer)' : {
+			r'^amazon.*(?:mgm|metro.*goldwyn.*mayer)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MGM',								MetaCompany.ReleaseNew : 'MGM'},
 			},
 
 			# Example: Apple TV
-			'^apple[\s\-]*(?:tv|plus|\+)' : {
+			r'^apple[\s\-]*(?:tv|plus|\+)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple TV+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple TV+'},
 			},
 
 			# Example: Apple Original Films
 			# Example: Apple Studios
-			'^apple[\s\-]*(?:original|studio)' : {
+			r'^apple[\s\-]*(?:original|studio)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple TV+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Apple TV+',						MetaCompany.ReleaseNew : 'Apple Studios'},
 			},
 
 			# Example: HBO Latino
-			'^hbo[\s\-]*latin[oa]' : {
+			r'^hbo[\s\-]*latin[oa]' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'HBO',								MetaCompany.ReleaseNew : 'HBO'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'HBO',								MetaCompany.ReleaseNew : 'HBO'},
 			},
 			# In the new color icons there is a "Max" from a different studio.
 			# But assume this is HBO.
 			# Example: Max
-			'^max$' : {
+			r'^max$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'HBO Max',							MetaCompany.ReleaseNew : 'HBO Max'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'HBO Max',							MetaCompany.ReleaseNew : 'HBO Max'},
 			},
 
 			# Example: AMC+
-			'^amc[\s\-]*(?:\+|plus)' : {
+			r'^amc[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'AMC',								MetaCompany.ReleaseNew : 'AMC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'AMC+',								MetaCompany.ReleaseNew : 'AMC+'},
 
 			},
 			# Example: AMC HD
-			'^amc[\s\-]*hd' : {
+			r'^amc[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'AMC',								MetaCompany.ReleaseNew : 'AMC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'AMC HD',							MetaCompany.ReleaseNew : 'AMC HD'},
 			},
 			# Example: Shudder
-			'^shudder$' : {
+			r'^shudder$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'AMC',								MetaCompany.ReleaseNew : None}, # No icon the the old pack.
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: CBS Studios
-			'^cbs[\s\-]*studios?' : {
+			r'^cbs[\s\-]*studios?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CBS Productions',					MetaCompany.ReleaseNew : 'CBS Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'CBS Productions',					MetaCompany.ReleaseNew : 'CBS Productions'},
 			},
 
 			# Example: STARZ+
-			'^starz[\s\-]*(?:\+|plus)' : {
+			r'^starz[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'STARZ',							MetaCompany.ReleaseNew : 'STARZ'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'STARZ',							MetaCompany.ReleaseNew : 'STARZ'},
 			},
 
 			# Example: BBC Scotland
-			'^bbc[\s\-]*scotland' : {
+			r'^bbc[\s\-]*scotland' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC 1 Scotland',					MetaCompany.ReleaseNew : 'BBC 1 Scotland'},
 			},
 			# Example: BBC Wales
-			'^bbc[\s\-]*scotland' : {
+			r'^bbc[\s\-]*scotland' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC 1 Wales',						MetaCompany.ReleaseNew : 'BBC 1 Wales'},
 			},
 			# Example: BBC One Northern Island
-			'^bbc[\s\-]*one[\s\-\(\[]*[a-z]' : {
+			r'^bbc[\s\-]*one[\s\-\(\[]*[a-z]' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC One',							MetaCompany.ReleaseNew : 'BBC One'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC One',							MetaCompany.ReleaseNew : 'BBC One'},
 			},
 			# Example: BBC Film
-			'^bbc[\s\-]*film' : {
+			r'^bbc[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC Films',						MetaCompany.ReleaseNew : 'BBC Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC Films',						MetaCompany.ReleaseNew : 'BBC Films'},
 			},
 			# Used by shows, so replacing with "BBC" instead of "BBC Films" is probably better.
 			# Example: BBC Studios
-			'^bbc[\s\-]*studio' : {
+			r'^bbc[\s\-]*studio' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 			},
 			# Example: BBC Worldwide
-			'^bbc[\s\-]*(?:worldwide|international)' : {
+			r'^bbc[\s\-]*(?:worldwide|international)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BBC',								MetaCompany.ReleaseNew : 'BBC'},
 			},
 
 			# Sometimes returned by TMDb and should already be replaced in _mergeMetaCompany().
 			# Example: 5
-			'^5$' : {
+			r'^5$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Channel 5',						MetaCompany.ReleaseNew : 'Channel 5'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Channel 5',						MetaCompany.ReleaseNew : 'Channel 5'},
 			},
 
 			# Not sure if this happens, but do the same as for Channel 5.
 			# Example: 4
-			'^4$' : {
+			r'^4$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Channel 4',						MetaCompany.ReleaseNew : 'Channel 4'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Channel 4',						MetaCompany.ReleaseNew : 'Channel 4'},
 			},
 			# Example: More4
-			'^more[\s\-]*(?:4|four)$' : {
+			r'^more[\s\-]*(?:4|four)$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Channel 4',						MetaCompany.ReleaseNew : 'Channel 4'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'More4',							MetaCompany.ReleaseNew : 'More4'},
 			},
 			# Example: Film4 Productions
-			'^film[\s\-]*(?:4|four)[\s\-]*productions?$' : {
+			r'^film[\s\-]*(?:4|four)[\s\-]*productions?$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Film4',							MetaCompany.ReleaseNew : 'Film4 Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Film4 Productions',				MetaCompany.ReleaseNew : 'Film4 Productions'},
 			},
 
 			# Example: ITVX
-			'^itv[\s\-]*x' : {
+			r'^itv[\s\-]*x' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ITV',								MetaCompany.ReleaseNew : 'ITV'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ITVX',								MetaCompany.ReleaseNew : 'ITVX'},
 			},
 
 			# Example: History Canada
-			'^history[\s\-]*(?:[\s\(\[]canada|ca(?:[\s\)\]]|$))' : {
+			r'^history[\s\-]*(?:[\s\(\[]canada|ca(?:[\s\)\]]|$))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'History (CA)',						MetaCompany.ReleaseNew : 'History (CA)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'History',							MetaCompany.ReleaseNew : 'History'},
 			},
 
 			# Example: Spike
-			'^spike$' : {
+			r'^spike$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Spike TV',							MetaCompany.ReleaseNew : 'Spike TV'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Spike TV',							MetaCompany.ReleaseNew : 'Spike TV'},
 			},
 
 			# Example: Fox Sports 1
-			'^fox[\s\-]*sport' : {
+			r'^fox[\s\-]*sport' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Fox Sports (AU)',					MetaCompany.ReleaseNew : 'Fox Sports (AU)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Fox',								MetaCompany.ReleaseNew : 'Fox'},
 			},
 			# Example: Fox Nation
-			'^fox[\s\-]*nation' : {
+			r'^fox[\s\-]*nation' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Fox',								MetaCompany.ReleaseNew : 'Fox'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Fox',								MetaCompany.ReleaseNew : 'Fox'},
 			},
 			# Example: Fox Kids
-			'^fox[\s\-]*(?:kids|children|family)' : {
+			r'^fox[\s\-]*(?:kids|children|family)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Fox',								MetaCompany.ReleaseNew : 'Fox'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Fox Family',						MetaCompany.ReleaseNew : 'Fox Family'},
 			},
 
 			# Example: Nickelodeon (US)
-			'^nickelodeon[\s\-]*[\(\[]' : {
+			r'^nickelodeon[\s\-]*[\(\[]' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nickelodeon',						MetaCompany.ReleaseNew : 'Nickelodeon'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nickelodeon',						MetaCompany.ReleaseNew : 'Nickelodeon'},
 			},
 
 			# Example: Cartoon Network (UK)
-			'^cartoon[\s\-]*network[\s\-]*[\s\(\[]' : {
+			r'^cartoon[\s\-]*network[\s\-]*[\s\(\[]' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Cartoon Network',					MetaCompany.ReleaseNew : 'Cartoon Network'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Cartoon Network',					MetaCompany.ReleaseNew : 'Cartoon Network'},
 			},
 
 			# Example: BET+
-			'^bet[\s\-]*(?:\+|plus)' : {
+			r'^bet[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BET',								MetaCompany.ReleaseNew : 'BET'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BET',								MetaCompany.ReleaseNew : 'BET'},
 			},
 
 			# Example: Vice TV (US)
-			'^vice(?:$|[\s\-]*tv)' : {
+			r'^vice(?:$|[\s\-]*tv)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Viceland',							MetaCompany.ReleaseNew : 'Viceland'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Vice',								MetaCompany.ReleaseNew : 'Vice'},
 			},
 
 			# Example: MTV Studios
-			'^mtv[\s\-]*studio' : {
+			r'^mtv[\s\-]*studio' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MTV Films',						MetaCompany.ReleaseNew : 'MTV Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MTV Films',						MetaCompany.ReleaseNew : 'MTV Entertainment Studios'},
 			},
 
 			# Example: CBC Television
 			# Example: CBC Gem
-			'^cbc[\s\-]*(?:television|gem)' : {
+			r'^cbc[\s\-]*(?:television|gem)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CBC',								MetaCompany.ReleaseNew : 'CBC'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'CBC',								MetaCompany.ReleaseNew : 'CBC'},
 			},
 
 			# Example: ABC 1
-			'^abc[\s\-]*(?:1|one)' : {
+			r'^abc[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ABC1',								MetaCompany.ReleaseNew : 'ABC1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ABC1',								MetaCompany.ReleaseNew : 'ABC1'},
 			},
 			# Example: ABC 2
-			'^abc[\s\-]*(?:2|two)' : {
+			r'^abc[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ABC2',								MetaCompany.ReleaseNew : 'ABC2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ABC2',								MetaCompany.ReleaseNew : 'ABC2'},
 			},
 			# Example: ABC 3
-			'^abc[\s\-]*(?:3|three)' : {
+			r'^abc[\s\-]*(?:3|three)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ABC (AU)',							MetaCompany.ReleaseNew : 'ABC (AU)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ABC3',								MetaCompany.ReleaseNew : 'ABC3'},
 			},
 			# Example: ABC Kids
 			# Example: ABC for Kids
-			'^abc.*?kids' : {
+			r'^abc.*?kids' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ABC (AU)',							MetaCompany.ReleaseNew : 'ABC (AU)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ABC (AU)',							MetaCompany.ReleaseNew : 'ABC Kids'},
 			},
 
 			# Example: Global TV
-			'^global[\s\-]*tv' : {
+			r'^global[\s\-]*tv' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Global',							MetaCompany.ReleaseNew : 'Global'}, # "Global-TV" exists, but the logo is skewed.
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Global TV',						MetaCompany.ReleaseNew : 'Global TV'},
 			},
 
 			# Example: Science
-			'^science$' : {
+			r'^science$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Science Channel',					MetaCompany.ReleaseNew : 'Science Channel'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: TNT Sports
-			'^tnt.*?sport' : {
+			r'^tnt.*?sport' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TNT',								MetaCompany.ReleaseNew : 'TNT'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TNT',								MetaCompany.ReleaseNew : 'TNT'},
 			},
 
 			# Example: Hallmark+
-			'^hallmark[\s\-]*(?:\+|plus)' : {
+			r'^hallmark[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Hallmark Channel',					MetaCompany.ReleaseNew : 'Hallmark Channel'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Hallmark Channel',					MetaCompany.ReleaseNew : 'Hallmark Channel'},
 			},
 			# Example: Hallmark ...
-			'^hallmark' : {
+			r'^hallmark' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Hallmark Channel',					MetaCompany.ReleaseNew : 'Hallmark Channel'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None}, # Has other icons starting with "Hallmark".
 			},
 
 			# Example: Magnolia Network
-			'^magnolia[\s\-]*network' : {
+			r'^magnolia[\s\-]*network' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Magnolia',							MetaCompany.ReleaseNew : 'Magnolia'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Magnolia',							MetaCompany.ReleaseNew : 'Magnolia'},
 			},
 
 			# Example: Virgin TV
-			'^virgin[\s\-]*(?:tv|media|1|one)' : {
+			r'^virgin[\s\-]*(?:tv|media|1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Virgin Media One',					MetaCompany.ReleaseNew : 'Virgin Media One'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None}, # Has a few other icons.
 			},
 
 			# Example: Twin Cities PBS
-			'^twin[\s\-]*cities.*pbs' : {
+			r'^twin[\s\-]*cities.*pbs' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'PBS Television',					MetaCompany.ReleaseNew : 'PBS Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'PBS Television',					MetaCompany.ReleaseNew : 'PBS Television'},
 			},
 
 			# Example: Stan.
 			# Example: Stan Australia
-			'^stan\.?(?:$|.*?(?:au(?:$|[^a-z])|australia))' : {
+			r'^stan\.?(?:$|.*?(?:au(?:$|[^a-z])|australia))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Stan',								MetaCompany.ReleaseNew : 'Stan'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Stan',								MetaCompany.ReleaseNew : 'Stan'},
 			},
 
 			# Example: RTL+
-			'^rtl[\s\-]*(?:\+|plus)' : {
+			r'^rtl[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RTL Television',					MetaCompany.ReleaseNew : 'RTL Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTL Television',					MetaCompany.ReleaseNew : 'RTL Television'},
 			},
 
 			# Example: VRT 1
-			'^vrt[\s\-]*(?:[12]|one|two)' : {
+			r'^vrt[\s\-]*(?:[12]|one|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'VRT',								MetaCompany.ReleaseNew : 'VRT'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'VRT',								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Canal+ Family
-			'^canal[\s\-]*(?:\+|plus)[\s\-]*family' : {
+			r'^canal[\s\-]*(?:\+|plus)[\s\-]*family' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Canal+',							MetaCompany.ReleaseNew : 'Canal+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Canal+ Family',					MetaCompany.ReleaseNew : 'Canal+ Family'},
 			},
 			# Example: Canal+ HD
-			'^canal[\s\-]*(?:\+|plus)[\s\-]*hd' : {
+			r'^canal[\s\-]*(?:\+|plus)[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Canal+',							MetaCompany.ReleaseNew : 'Canal+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Canal+ HD',						MetaCompany.ReleaseNew : 'Canal+ HD'},
 			},
 			# Example: Canal+ Polska
-			'^canal[\s\-]*(?:\+|plus).*(?:[^a-z]pl[^a-z]|polska)' : {
+			r'^canal[\s\-]*(?:\+|plus).*(?:[^a-z]pl[^a-z]|polska)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Canal+',							MetaCompany.ReleaseNew : 'Canal+'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Canal+',							MetaCompany.ReleaseNew : 'Canal+'},
 			},
 
 			# Example: RTÉ
-			'^rt(?:É|é|e|É)$' : {
+			r'^rt(?:É|é|e|É)$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RTÉ',								MetaCompany.ReleaseNew : 'RTÉ'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTE',								MetaCompany.ReleaseNew : 'RTE'}, # RTÉ has white logo.
 			},
 			# Example: RTÉ One
 			# Example: RTE One
-			'^rt(?:É|é|e|É)[\s\-]*(?:1|one)' : {
+			r'^rt(?:É|é|e|É)[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RTÉ',								MetaCompany.ReleaseNew : 'RTÉ One'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTE One',							MetaCompany.ReleaseNew : 'RTÉ One'},
 			},
 			# Example: RTÉ Two
 			# Example: RTE Two
-			'^rt(?:É|é|e)[\s\-]*(?:2|two)' : {
+			r'^rt(?:É|é|e)[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RTÉ',								MetaCompany.ReleaseNew : 'RTÉ'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTE Two',							MetaCompany.ReleaseNew : 'RTÉ Two'},
 			},
 			# Example: RTÉjr
-			'^rt(?:É|é|e)(?:$|[\s\-]*.+)' : {
+			r'^rt(?:É|é|e)(?:$|[\s\-]*.+)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RTÉ',								MetaCompany.ReleaseNew : 'RTÉ'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTE',								MetaCompany.ReleaseNew : 'RTE'},
 			},
 
 			# Example: TVNZ 1
-			'^tv[\s\-]*nz[\s\-]*(?:1|one)' : {
+			r'^tv[\s\-]*nz[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TVNZ1',							MetaCompany.ReleaseNew : 'TVNZ1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ 1',							MetaCompany.ReleaseNew : 'TVNZ 1'},
 			},
 			# Example: TVNZ 2
-			'^tv[\s\-]*nz[\s\-]*(?:2|two)' : {
+			r'^tv[\s\-]*nz[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TVNZ2',							MetaCompany.ReleaseNew : 'TVNZ2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ 2',							MetaCompany.ReleaseNew : 'TVNZ 2'},
 			},
 			# Example: TVNZ 3
-			'^tv[\s\-]*nz[\s\-]*(?:3|three)' : {
+			r'^tv[\s\-]*nz[\s\-]*(?:3|three)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV3 (NZ)',							MetaCompany.ReleaseNew : 'TV3 (NZ)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ',								MetaCompany.ReleaseNew : 'TV3 (NZ) Three'},
 			},
 			# Example: TVNZ+
-			'^tv[\s\-]*nz[\s\-]*(?:\+|plus)' : {
+			r'^tv[\s\-]*nz[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TVNZ',								MetaCompany.ReleaseNew : 'TVNZ'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ+',							MetaCompany.ReleaseNew : 'TVNZ+'},
 			},
 
 			# Same as TVNZ1. Seems to use the old logo.
 			# Example: TV1 (NZ) One
-			'^tv[\s\-]*(?:1|one).*(?:nz|new[\s\-]*zealand)' : {
+			r'^tv[\s\-]*(?:1|one).*(?:nz|new[\s\-]*zealand)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV One (NZ)',						MetaCompany.ReleaseNew : 'TV One (NZ)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ 1',							MetaCompany.ReleaseNew : 'TVNZ 1'},
 			},
 			# Same as TVNZ2. Seems to use the old logo.
 			# Example: TV2 (NZ) Two
-			'^tv[\s\-]*(?:2|two).*(?:nz|new[\s\-]*zealand)' : {
+			r'^tv[\s\-]*(?:2|two).*(?:nz|new[\s\-]*zealand)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV2 (NZ)',							MetaCompany.ReleaseNew : 'TV2 (NZ)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ 2',							MetaCompany.ReleaseNew : 'TVNZ 2'},
 			},
 			# Same as TVNZ3. Seems to use the old logo.
 			# Example: TV3 (NZ) Three
-			'^tv[\s\-]*(?:3|three).*(?:nz|new[\s\-]*zealand)' : {
+			r'^tv[\s\-]*(?:3|three).*(?:nz|new[\s\-]*zealand)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV3 (NZ)',							MetaCompany.ReleaseNew : 'TV3 (NZ)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TVNZ',								MetaCompany.ReleaseNew : 'TV3 (NZ) Three'},
 			},
 
 			# Example: BNNVARA
-			'^bnn[\s\-]*vara' : {
+			r'^bnn[\s\-]*vara' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BNN',								MetaCompany.ReleaseNew : 'BNN'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BNN',								MetaCompany.ReleaseNew : 'BNNVARA'},
 			},
 
 			# Example: KBS2
-			'^kbs[\s\-]*\d' : {
+			r'^kbs[\s\-]*\d' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'KBS',								MetaCompany.ReleaseNew : 'KBS'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'KBS',								MetaCompany.ReleaseNew : 'KBS'},
 			},
 
 			# Example: TV4 Plus
-			'^tv[\s\-]*4[\s\-]*(?:\+|plus)' : {
+			r'^tv[\s\-]*4[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV4',								MetaCompany.ReleaseNew : 'TV4'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TV4 Plus',							MetaCompany.ReleaseNew : 'TV4 Plus'},
 			},
 
 			# Example: La 1
-			'^la[\s\-]*(?:1|one)' : {
+			r'^la[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TVE1, La 1',						MetaCompany.ReleaseNew : 'TVE1, La 1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'La 1',								MetaCompany.ReleaseNew : 'La 1'},
 			},
 			# Example: La 2
-			'^la[\s\-]*(?:2|two)' : {
+			r'^la[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TVE2, La 2',						MetaCompany.ReleaseNew : 'TVE2, La 2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'La 2',								MetaCompany.ReleaseNew : 'La 2'},
 			},
 
 			# Example: S4C
-			'^s4c$' : {
+			r'^s4c$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'S4C2',								MetaCompany.ReleaseNew : 'S4C2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'S4C',								MetaCompany.ReleaseNew : 'S4C'},
 			},
 
 			# Owned by A&E
 			# Example: Crime + Investigation
-			'^crime[\s\-]*(?:and|\+|\&)[\s\-]*investigation' : {
+			r'^crime[\s\-]*(?:and|\+|\&)[\s\-]*investigation' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'A&E',								MetaCompany.ReleaseNew : 'A&E'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Crime And Investigation',			MetaCompany.ReleaseNew : 'Crime And Investigation'},
 			},
 
 			# Example: Tubi
-			'^tubi$' : {
+			r'^tubi$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Tubi TV'},
 			},
 
 			# Example: Videoland (NL)
-			'^video[\s\-]*land$' : {
+			r'^video[\s\-]*land$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Videoland'},
 			},
 
 			# Example: TV2 (HU)
-			'^tv[\s\-]*(?:2|two).*(?:[^a-z]hu(?:$|[^a-z])|hungary)' : {
+			r'^tv[\s\-]*(?:2|two).*(?:[^a-z]hu(?:$|[^a-z])|hungary)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TV2',								MetaCompany.ReleaseNew : 'TV2'},
 			},
 
 			# Example: TV3 (ES)
-			'^tv[\s\-]*(?:3|three).*(?:[^a-z]es(?:$|[^a-z])|spain|espa.ol)' : {
+			r'^tv[\s\-]*(?:3|three).*(?:[^a-z]es(?:$|[^a-z])|spain|espa.ol)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TV3',								MetaCompany.ReleaseNew : 'TV3'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TV3',								MetaCompany.ReleaseNew : 'TV3'},
 			},
 
 			# Example: Premier (RU)
 			# Example: TNT-Premier
-			'^(?:premier(?:$|\s+)(?:ru(?:$|[^a-z])|russia)|tnt.?premier)' : {
+			r'^(?:premier(?:$|\s+)(?:ru(?:$|[^a-z])|russia)|tnt.?premier)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Premier (Russia)'},
 			},
 
 			# Example: Star+
-			'^star[\s\-]*(?:\+|plus)' : {
+			r'^star[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Star Plus',						MetaCompany.ReleaseNew : 'Star Plus'},
 			},
 
 			# Example: Drama
-			'^drama$' : {
+			r'^drama$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'U&Drama'},
 			},
 
 			# Example: iQiyi
-			'^iqiyi' : {
+			r'^iqiyi' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'IQIYI Pictures'},
 			},
 
 			# Example: SVT1
-			'^svt[\s\-]*(?:1|one)' : {
+			r'^svt[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'SVT 1',							MetaCompany.ReleaseNew : 'SVT 1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SVT1',								MetaCompany.ReleaseNew : 'SVT1'},
 			},
 			# Example: SVT2
-			'^svt[\s\-]*(?:2|two)' : {
+			r'^svt[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'SVT 2',							MetaCompany.ReleaseNew : 'SVT 2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SVT2',								MetaCompany.ReleaseNew : 'SVT2'},
 			},
 
 			# Example: RTP1
-			'^rtp[\s\-]*(?:1|one)' : {
+			r'^rtp[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTP',								MetaCompany.ReleaseNew : 'RTP1'},
 			},
 			# Example: RTP2
-			'^rtp[\s\-]*(?:2|3|two|three)' : {
+			r'^rtp[\s\-]*(?:2|3|two|three)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RTP',								MetaCompany.ReleaseNew : 'RTP'},
 			},
 
 			# Example: Network 10
-			'^network[\s\-]*10$' : {
+			r'^network[\s\-]*10$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Network Ten',						MetaCompany.ReleaseNew : 'Network Ten'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Network Ten',						MetaCompany.ReleaseNew : 'Network Ten'},
 			},
 
 			# Example: ESPN+
-			'^espn[\s\-]*(?:\+|plus)' : {
+			r'^espn[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ESPN',								MetaCompany.ReleaseNew : 'ESPN'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ESPN',								MetaCompany.ReleaseNew : 'ESPN'},
 			},
 
 			# Example: Atresplayer
-			'^atres[\s\-]*player$' : {
+			r'^atres[\s\-]*player$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ATRESplayer Premium',				MetaCompany.ReleaseNew : 'ATRESplayer'},
 			},
 
 			# Example: Norsk Rikskringkasting (NRK)
-			'^(?:norsk[\s\-]*rikskringkasting[\s\-]*[^\d]|nrk$)' : {
+			r'^(?:norsk[\s\-]*rikskringkasting[\s\-]*[^\d]|nrk$)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NRK1',								MetaCompany.ReleaseNew : 'NRK1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'NRK HD',							MetaCompany.ReleaseNew : 'NRK HD'},
 			},
 
 			# Example: kykNet
-			'^kyk[\s\-]*net' : {
+			r'^kyk[\s\-]*net' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'M-Net',							MetaCompany.ReleaseNew : 'M-Net'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: E.R.T.
-			'^e\.r\.t\.' : {
+			r'^e\.r\.t\.' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ERT',								MetaCompany.ReleaseNew : 'ERT'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ERT Sat',							MetaCompany.ReleaseNew : 'ERT Sat'},
 			},
 
 			# Example: Prima+
-			'^prima[\s\-]*(?:\+|plus|tv)' : {
+			r'^prima[\s\-]*(?:\+|plus|tv)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Prima TV',							MetaCompany.ReleaseNew : 'Prima TV'},
 			},
 
 			# Example: IRIB
-			'^irib$' : {
+			r'^irib$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'IRIB TV 1',						MetaCompany.ReleaseNew : 'IRIB TV 1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Ciné+
-			'^cin(?:e|é)[\s\-]*(?:\+|plus)' : {
+			r'^cin(?:e|é)[\s\-]*(?:\+|plus)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Cine+',							MetaCompany.ReleaseNew : 'Cine+'},
 			},
 			# Example: CinéCinéma
-			'^cin(?:e|é)[\s\-]*cin(?:e|é)ma' : {
+			r'^cin(?:e|é)[\s\-]*cin(?:e|é)ma' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Cinecinema Club',					MetaCompany.ReleaseNew : 'Cinecinema Club'},
 			},
 
 			# Example: U&Dave
-			'^u\s*(?:\&|\+|and)\s*dave' : {
+			r'^u\s*(?:\&|\+|and)\s*dave' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Dave',								MetaCompany.ReleaseNew : 'Dave'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Dave',								MetaCompany.ReleaseNew : 'Dave'},
 			},
 
 			# Example: Audience
-			'^audience$' : {
+			r'^audience$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Audience Network',					MetaCompany.ReleaseNew : 'Audience Network'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Audience',							MetaCompany.ReleaseNew : 'Audience'},
 			},
 
 			# Example: Turner Network Television
-			'^turner[\s\-]*network' : {
+			r'^turner[\s\-]*network' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Turner Network Television (TNT)',	MetaCompany.ReleaseNew : 'Turner Network Television (TNT)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Turner Network Television (TNT)',	MetaCompany.ReleaseNew : 'Turner Network Television (TNT)'},
 			},
 
 			# Example: NPO 1 HD
-			'^(?:npo|nederland)[\s\-]*(?:1|one)[\s\-]*hd' : {
+			r'^(?:npo|nederland)[\s\-]*(?:1|one)[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 1',						MetaCompany.ReleaseNew : 'Nederland 1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 1 HD',					MetaCompany.ReleaseNew : 'Nederland 1 HD'},
 			},
 			# Example: NPO 1
-			'^(?:npo|nederland)[\s\-]*(?:1|one)' : {
+			r'^(?:npo|nederland)[\s\-]*(?:1|one)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 1',						MetaCompany.ReleaseNew : 'Nederland 1'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 1',						MetaCompany.ReleaseNew : 'Nederland 1'},
 			},
 			# Example: NPO 2 HD
-			'^(?:npo|nederland)[\s\-]*(?:2|two)[\s\-]*hd' : {
+			r'^(?:npo|nederland)[\s\-]*(?:2|two)[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 2',						MetaCompany.ReleaseNew : 'Nederland 2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 2 HD',					MetaCompany.ReleaseNew : 'Nederland 2 HD'},
 			},
 			# Example: NPO 2
-			'^(?:npo|nederland)[\s\-]*(?:2|two)' : {
+			r'^(?:npo|nederland)[\s\-]*(?:2|two)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 2',						MetaCompany.ReleaseNew : 'Nederland 2'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 2',						MetaCompany.ReleaseNew : 'Nederland 2'},
 			},
 			# Example: NPO 3 HD
-			'^(?:npo|nederland)[\s\-]*(?:3|three)[\s\-]*hd' : {
+			r'^(?:npo|nederland)[\s\-]*(?:3|three)[\s\-]*hd' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 3',						MetaCompany.ReleaseNew : 'Nederland 3'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 3 HD',					MetaCompany.ReleaseNew : 'Nederland 3 HD'},
 			},
 			# Example: NPO 3
-			'^(?:npo|nederland)[\s\-]*(?:3|three)' : {
+			r'^(?:npo|nederland)[\s\-]*(?:3|three)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nederland 3',						MetaCompany.ReleaseNew : 'Nederland 3'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nederland 3',						MetaCompany.ReleaseNew : 'Nederland 3'},
 			},
 
 			# Example: CCTV
-			'^cctv$' : {
+			r'^cctv$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CCTV',								MetaCompany.ReleaseNew : 'CCTV'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'CCTV',								MetaCompany.ReleaseNew : 'CCTV'},
 			},
 			# Example: CCTV 4
 			# Example: CCTV 9
-			'^cctv[\s\-]*[49]' : {
+			r'^cctv[\s\-]*[49]' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CCTV',								MetaCompany.ReleaseNew : 'CCTV'}, # Not available.
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None}, # Has multiple icons.
 			},
 			# Example: CCTV 8
-			'^cctv[\s\-]*\d' : {
+			r'^cctv[\s\-]*\d' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CCTV',								MetaCompany.ReleaseNew : 'CCTV'}, # Not available.
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'CCTV F',							MetaCompany.ReleaseNew : 'CCTV F'},
 			},
 
 			# Example: RaiPlay
-			'^rai[\s\-]*play' : {
+			r'^rai[\s\-]*play' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RAI',								MetaCompany.ReleaseNew : 'RAI'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RAI',								MetaCompany.ReleaseNew : 'RAI'},
 			},
 
 			# Example: YTV (JP)
-			'^ytv.*?(?:j[pa][^a-z]|japan)' : {
+			r'^ytv.*?(?:j[pa][^a-z]|japan)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'YTV',								MetaCompany.ReleaseNew : 'YTV (JP)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'YTV',								MetaCompany.ReleaseNew : 'YTV'},
 			},
 
 			# Added in mergeMetaCompany() for CBC (JP).
 			# Example: Chubu-Nippon Broadcasting MetaCompany
-			'^(?:cbc.*?(?:j[pa][^a-z]|japan)|chubu[\s\-]*nippon[\s\-]*broadcast)' : {
+			r'^(?:cbc.*?(?:j[pa][^a-z]|japan)|chubu[\s\-]*nippon[\s\-]*broadcast)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CBC (JP)',							MetaCompany.ReleaseNew : 'CBC (JP)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Chubu-Nippon Broadcasting MetaCompany'},
 			},
 
 			# Example: Chiba TV
-			'^(?:chiba[\s\-]*tv|ctc(?:$|.*?(?:j[pa][^a-z]|japan)))' : {
+			r'^(?:chiba[\s\-]*tv|ctc(?:$|.*?(?:j[pa][^a-z]|japan)))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'CTC (JA)',							MetaCompany.ReleaseNew : 'CTC (JA)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'CTC',								MetaCompany.ReleaseNew : 'CTC'},
 			},
 
 			# The US also has an unrelated TBS channel.
 			# Example: TBS (JP)
-			'^(?:tbs|tokyo[\s\-]*broadcasting[\s\-]*system).*?(?:j[pa][^a-z]|japan)' : {
+			r'^(?:tbs|tokyo[\s\-]*broadcasting[\s\-]*system).*?(?:j[pa][^a-z]|japan)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Tokyo Broadcasting System',		MetaCompany.ReleaseNew : 'Tokyo Broadcasting System'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Tokyo Broadcasting System',		MetaCompany.ReleaseNew : 'Tokyo Broadcasting System'},
 			},
 
 			# Example: NHK WORLD-JAPAN
-			'^nhk.*?world.*?(?:j[pa][^a-z]|japan)' : {
+			r'^nhk.*?world.*?(?:j[pa][^a-z]|japan)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NHK World',						MetaCompany.ReleaseNew : 'NHK World'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'NHK World',						MetaCompany.ReleaseNew : 'NHK World'},
 			},
 			# Example: NHK BS Premium
-			'^nhk.*(?:bs|premium)' : {
+			r'^nhk.*(?:bs|premium)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NHK',								MetaCompany.ReleaseNew : 'NHK'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'NHK',								MetaCompany.ReleaseNew : 'NHK'},
 			},
 
 			# Example: BS4
-			'^bs[\s\-]*4$' : {
+			r'^bs[\s\-]*4$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Nippon TV',									MetaCompany.ReleaseNew : 'Nippon TV'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Nippon Television Network Corporation (NTV)',	MetaCompany.ReleaseNew : 'Nippon Television Network Corporation (NTV)'},
 			},
 
 			# Example: 20th Century
-			'^(?:20th|twentieth)[\s\-]*century$' : {
+			r'^(?:20th|twentieth)[\s\-]*century$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '20th Century Fox',					MetaCompany.ReleaseNew : '20th Century Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '20th Century Fox',					MetaCompany.ReleaseNew : '20th Century Fox'},
 			},
 			# Example: Twentieth Television
-			'^(?:20th|twentieth)[\s\-]*television$' : {
+			r'^(?:20th|twentieth)[\s\-]*television$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Twentieth Television',				MetaCompany.ReleaseNew : 'Twentieth Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Twentieth Television',				MetaCompany.ReleaseNew : 'Twentieth Television'},
 			},
 			# Example: 20th Century Studios
-			'^(?:20th|twentieth)[\s\-]*century[\s\-]*studio' : {
+			r'^(?:20th|twentieth)[\s\-]*century[\s\-]*studio' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '20th Century Fox Studios',			MetaCompany.ReleaseNew : '20th Century Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '20th Century Fox Studios',			MetaCompany.ReleaseNew : '20th Century Fox Studios'},
 			},
 			# Example: 20th Century Fox Studios
-			'^(?:20th|twentieth)[\s\-]*century[\s\-]*fox[\s\-]*studio' : {
+			r'^(?:20th|twentieth)[\s\-]*century[\s\-]*fox[\s\-]*studio' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '20th Century Fox Studios',			MetaCompany.ReleaseNew : '20th Century Fox Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '20th Century Fox Studios',			MetaCompany.ReleaseNew : '20th Century Fox Studios'},
 			},
 			# Example: Twentieth Century Fox Film
-			'^(?:20th|twentieth)[\s\-]*century[\s\-]*fox[\s\-]*films?$' : {
+			r'^(?:20th|twentieth)[\s\-]*century[\s\-]*fox[\s\-]*films?$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Twentieth Century Fox Film',		MetaCompany.ReleaseNew : 'Twentieth Century Fox Film'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Twentieth Century Fox Film',		MetaCompany.ReleaseNew : 'Twentieth Century Fox Film'},
 			},
 			# Example: 20th Century Fox Television
-			'^(?:20th|twentieth)[\s\-]*fox[\s\-]*television$' : {
+			r'^(?:20th|twentieth)[\s\-]*fox[\s\-]*television$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '20th Century Fox Television',		MetaCompany.ReleaseNew : '20th Century Fox Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '20th Century Fox Television',		MetaCompany.ReleaseNew : '20th Century Fox Television'},
 			},
 
 			# Example: Sony Entertainment Television
-			'^sony[\s\-]*entertainment[\s\-]*(?:tv|television)' : {
+			r'^sony[\s\-]*entertainment[\s\-]*(?:tv|television)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sony Pictures Television',			MetaCompany.ReleaseNew : 'Sony Pictures Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sony Pictures Television',			MetaCompany.ReleaseNew : 'Sony Pictures Television'},
 			},
 			# Example: SonyLIV
-			'^sony[\s\-]*liv' : {
+			r'^sony[\s\-]*liv' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sony Pictures Television International',	MetaCompany.ReleaseNew : 'Sony Pictures Television International'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sony TV Asia',								MetaCompany.ReleaseNew : 'Sony TV Asia'},
 			},
 			# Example: Sony Music
-			'^sony[\s\-]*music' : {
+			r'^sony[\s\-]*music' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sony',								MetaCompany.ReleaseNew : 'Sony'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sony',								MetaCompany.ReleaseNew : 'Sony'},
 			},
 			# Example: Sony Pictures International
-			'^sony[\s\-]*pictures?[\s\-]*int' : {
+			r'^sony[\s\-]*pictures?[\s\-]*int' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sony Pictures Studios',			MetaCompany.ReleaseNew : 'Sony Pictures Studios'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sony Pictures Studios',			MetaCompany.ReleaseNew : 'Sony Pictures Studios'},
 			},
 
 			# Example: Warner Bros. Feature Animation
-			'^warner[\s\-]*bros\.?[\s\-]*feature.*animation$' : {
+			r'^warner[\s\-]*bros\.?[\s\-]*feature.*animation$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros. Animation',			MetaCompany.ReleaseNew : 'Warner Bros. Animation'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros. Animation',			MetaCompany.ReleaseNew : 'Warner Bros. Animation'},
 			},
 			# Example: Warner Bros. International Television Production Germany
 			# Example: Warner Bros. ITVP Deutschland
-			'^warner[\s\-]*bros\.?.*?(?:television|tv|itvp)' : {
+			r'^warner[\s\-]*bros\.?.*?(?:television|tv|itvp)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros. Television',			MetaCompany.ReleaseNew : 'Warner Bros. Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros. Television',			MetaCompany.ReleaseNew : 'Warner Bros. Television'},
 			},
 			# Example: Warner Horizon Unscripted Television
-			'^warner.*?(?:horizon|television)' : {
+			r'^warner.*?(?:horizon|television)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros. Television',			MetaCompany.ReleaseNew : 'Warner Bros. Television'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros. Television',			MetaCompany.ReleaseNew : 'Warner Bros. Television'},
 			},
 			# Example: Warner Bros.-Seven Arts
-			'^warner[\s\-]*bros\.?.*?seven' : {
+			r'^warner[\s\-]*bros\.?.*?seven' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros.',						MetaCompany.ReleaseNew : 'Warner Bros.'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros.',						MetaCompany.ReleaseNew : 'Warner Bros.'},
 			},
 			# Example: Warner Bros. Family Entertainment.png
-			'^warner[\s\-]*bros\.?[\s\-]*(?:family|entertainment)' : {
+			r'^warner[\s\-]*bros\.?[\s\-]*(?:family|entertainment)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros. Entertainment',		MetaCompany.ReleaseNew : 'Warner Bros. Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros. Entertainment',		MetaCompany.ReleaseNew : 'Warner Bros. Entertainment'},
 			},
 			# Example: Warner Bros. Japan
-			'^warner[\s\-]*bros?\.?.*?(?:j[pa][^a-z]|japan)' : {
+			r'^warner[\s\-]*bros?\.?.*?(?:j[pa][^a-z]|japan)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bro. Japan',				MetaCompany.ReleaseNew : 'Warner Bro. Japan'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros.',						MetaCompany.ReleaseNew : 'Warner Bros.'},
 			},
 			# Example: Warner Bros. Korea
-			'^warner[\s\-]*bros?\.?.*?(?:[^a-z]kr[^a-z]|Korea)' : {
+			r'^warner[\s\-]*bros?\.?.*?(?:[^a-z]kr[^a-z]|Korea)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Warner Bros.',						MetaCompany.ReleaseNew : 'Warner Bros.'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Warner Bros.',						MetaCompany.ReleaseNew : 'Warner Bros.'},
 			},
 
 			# Example: Searchlight Pictures
-			'^searchlight[\s\-]*pictures?$' : {
+			r'^searchlight[\s\-]*pictures?$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Searchlight',						MetaCompany.ReleaseNew : 'Searchlight'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Fox Searchlight Pictures',			MetaCompany.ReleaseNew : 'Searchlight Pictures'},
 			},
 
 			# Example: New Regency Productions
-			'^new[\s\-]*regency[\s\-]*production' : {
+			r'^new[\s\-]*regency[\s\-]*production' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'New Regency Pictures',				MetaCompany.ReleaseNew : 'New Regency Pictures'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'New Regency Productions',			MetaCompany.ReleaseNew : 'New Regency Productions'},
 			},
 
 			# Example: Paramount Famous Productions
-			'^paramount[\s\-]*famous' : {
+			r'^paramount[\s\-]*famous' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Paramount Pictures',				MetaCompany.ReleaseNew : 'Paramount Pictures'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Paramount Pictures',				MetaCompany.ReleaseNew : 'Paramount Pictures'},
 			},
 
 			# Example: DC Films
-			'^dc[\s\-]*(?:film|studio|production)' : {
+			r'^dc[\s\-]*(?:film|studio|production)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'DC Entertainment',					MetaCompany.ReleaseNew : 'DC Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'DC Entertainment',					MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Spyglass Media Group
-			'^spyglass[\s\-]*media' : {
+			r'^spyglass[\s\-]*media' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Spyglass Entertainment',			MetaCompany.ReleaseNew : 'Spyglass Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Spyglass Media Group',				MetaCompany.ReleaseNew : 'Spyglass Media Group'},
 			},
 
 			# Example: Big Beach
-			'^big[\s\-]*beach$' : {
+			r'^big[\s\-]*beach$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Big Beach Films',					MetaCompany.ReleaseNew : 'Big Beach Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Big Beach Productions',			MetaCompany.ReleaseNew : 'Big Beach Productions'},
 			},
 
 			# Example: TF1 Films Production
 			# Example: TF1 International
-			'^tf1[\s\-]*(?:film|studio|production|international)' : {
+			r'^tf1[\s\-]*(?:film|studio|production|international)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'TF1 Films Productions',			MetaCompany.ReleaseNew : 'TF1 Films Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'TF1 Films Production',				MetaCompany.ReleaseNew : 'TF1 Films Production'},
 			},
 
 			# Example: Marv
-			'^marv$' : {
+			r'^marv$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Marv Films',						MetaCompany.ReleaseNew : 'Marv Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Marv Films',						MetaCompany.ReleaseNew : 'Marv Films'},
 			},
 
 			# Example: Maverick Film
-			'^maverick[\s\-]*films?$' : {
+			r'^maverick[\s\-]*films?$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Maverick Films',					MetaCompany.ReleaseNew : 'Maverick Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Maverick Films',					MetaCompany.ReleaseNew : 'Maverick Films'},
 			},
 
 			# Example: Black Bear
-			'^black[\s\-]*bear$' : {
+			r'^black[\s\-]*bear$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Black Bear Pictures',				MetaCompany.ReleaseNew : 'Black Bear Pictures'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Black Bear Pictures',				MetaCompany.ReleaseNew : 'Black Bear Pictures'},
 			},
 
 			# Example: Illumination
-			'^illumination$' : {
+			r'^illumination$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Illumination Entertainment',		MetaCompany.ReleaseNew : 'Illumination Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Illumination Entertainment',		MetaCompany.ReleaseNew : 'Illumination Entertainment'},
 			},
 
 			# Example: Media Rights Capital (MRC)
-			'^media[\s\-]*rights[\s\-]*capital' : {
+			r'^media[\s\-]*rights[\s\-]*capital' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Media Rights Capital',				MetaCompany.ReleaseNew : 'Media Rights Capital'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Media Rights Capital',				MetaCompany.ReleaseNew : 'Media Rights Capital'},
 			},
 
 			# Example: El Dorado Pictures
-			'^el[\s\-]*dorado$' : {
+			r'^el[\s\-]*dorado$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'El Dorado Films',					MetaCompany.ReleaseNew : 'El Dorado Films'},
 			},
 
 			# "Pandora Films" (ending in an s) seems like a different studio.
 			# Example: Pandora Film
-			'^pandora[\s\-]*film$' : {
+			r'^pandora[\s\-]*film$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Pandora Filmproduktion',			MetaCompany.ReleaseNew : 'Pandora Filmproduktion'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Pandora Film',						MetaCompany.ReleaseNew : 'Pandora Film'},
 			},
 
 			# Example: Python (Monty) Pictures Limited
-			'^python.*?monty' : {
+			r'^python.*?monty' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Python (Monty) Pictures Ltd',		MetaCompany.ReleaseNew : 'Python (Monty) Pictures Ltd'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Python (Monty) Pictures Limited',	MetaCompany.ReleaseNew : 'Python (Monty) Pictures Limited'},
 			},
 
 			# Example: Blumhouse Television
-			'^blumhouse' : {
+			r'^blumhouse' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Blumhouse Productions',			MetaCompany.ReleaseNew : 'Blumhouse Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Blumhouse Productions',			MetaCompany.ReleaseNew : 'Blumhouse Television'},
 			},
 
 			# Example: Big Talk Studios
-			'^big[\s\-]*talk' : {
+			r'^big[\s\-]*talk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Big Talk Productions',				MetaCompany.ReleaseNew : 'Big Talk Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Big Talk Productions',				MetaCompany.ReleaseNew : 'Big Talk Productions'},
 			},
 
 			# Example: Pacific Data Images
-			'^pacific[\s\-]*data[\s\-]*image' : {
+			r'^pacific[\s\-]*data[\s\-]*image' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Pacific Data Images (PDI)',		MetaCompany.ReleaseNew : 'Pacific Data Images (PDI)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Pacific Data Images (PDI)',		MetaCompany.ReleaseNew : 'Pacific Data Images (PDI)'}, # Not available.
 			},
 
 			# Example: Double Dare You (DDY)
-			'^(?:ddy$|double[\s\-]*dare[\s\-]*you)' : {
+			r'^(?:ddy$|double[\s\-]*dare[\s\-]*you)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Double Dare You Productions',		MetaCompany.ReleaseNew : 'Double Dare You Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Double Dare You Productions',		MetaCompany.ReleaseNew : 'Double Dare You Productions'},
 			},
 
 			# Example: The Kennedy/Marshall MetaCompany
-			'^(?:the[\s\-]*)?kennedy.*?marshall' : {
+			r'^(?:the[\s\-]*)?kennedy.*?marshall' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'The KennedyMarshall MetaCompany',		MetaCompany.ReleaseNew : 'The KennedyMarshall MetaCompany'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'The KennedyMarshall MetaCompany',		MetaCompany.ReleaseNew : 'The KennedyMarshall MetaCompany'},
 			},
 
 			# Example: Madhouse Entertainmet
-			'^madhouse' : {
+			r'^madhouse' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MadHouse',							MetaCompany.ReleaseNew : 'MadHouse'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MadHouse',							MetaCompany.ReleaseNew : 'MadHouse'},
 			},
 
 			# Example: 87North
-			'^87\s*north' : {
+			r'^87\s*north' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '87Eleven',							MetaCompany.ReleaseNew : '87Eleven'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '87Eleven',							MetaCompany.ReleaseNew : '87 North Productions'},
 			},
 
 			# Example: Sierra / Affinity
-			'^sierra[\s\-]*(?:\/|affinity|entertainment|picture)' : {
+			r'^sierra[\s\-]*(?:\/|affinity|entertainment|picture)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Sierra Pictures',					MetaCompany.ReleaseNew : 'Sierra Pictures'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Sierra Entertainment‚ Inc.',		MetaCompany.ReleaseNew : 'Sierra Entertainment‚ Inc.'},
 			},
 
 			# Example: Legendary East
-			'^legendary[\s\-]*east' : {
+			r'^legendary[\s\-]*east' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Legendary',						MetaCompany.ReleaseNew : 'Legendary'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Legendary',						MetaCompany.ReleaseNew : 'Legendary East'},
 			},
 
 			# Example: Univision Studios
-			'^univision[\s\-]*studios?' : {
+			r'^univision[\s\-]*studios?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Univision',						MetaCompany.ReleaseNew : 'Univision'},
 			},
 
 			# Example: Brooksfilms Ltd.
-			'^brooks[\s\-]*films?' : {
+			r'^brooks[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Brooksfilms',						MetaCompany.ReleaseNew : 'Brooksfilms'},
 			},
 
 			# Not sure if "Grand Illusion Films" and "Grand Illusions Entertainment" is the same company.
 			# Example: Grand Illusion Films
-			'^grand[\s\-]*illusion[\s\-]*films?' : {
+			r'^grand[\s\-]*illusion[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Grand Illusions Entertainment',	MetaCompany.ReleaseNew : 'Grand Illusions Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Signature Films
-			'^signature[\s\-]*films?' : {
+			r'^signature[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Signature Entertainment',			MetaCompany.ReleaseNew : 'Signature Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Signature Entertainment',			MetaCompany.ReleaseNew : 'Signature Films'},
 			},
 
 			# Example: LuckyChap
-			'^lucky[\s\-]*chap' : {
+			r'^lucky[\s\-]*chap' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'LuckyChap Entertainment',			MetaCompany.ReleaseNew : 'LuckyChap Entertainment'},
 			},
 
 			# Example: Sega Sammy Group
-			'^sega(?:$|\s)' : {
+			r'^sega(?:$|\s)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SEGA Studios',						MetaCompany.ReleaseNew : 'SEGA Studios'},
 			},
 
 			# Example: 2AM
-			'^2am' : {
+			r'^2am' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : '2AM Films',						MetaCompany.ReleaseNew : '2AM Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : '2AM Films',						MetaCompany.ReleaseNew : '2AM Films'},
 			},
 
 			# Example: Beta Cinema
-			'^beta[\s\-]*cinema' : {
+			r'^beta[\s\-]*cinema' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Beta Film',						MetaCompany.ReleaseNew : 'Beta Film'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Beta Film GmbH',					MetaCompany.ReleaseNew : 'Beta Film GmbH'},
 			},
 
 			# Example: Tea Shop Productions
-			'^tea[\s\-]*shop' : {
+			r'^tea[\s\-]*shop' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Tea Shop & Film MetaCompany',		MetaCompany.ReleaseNew : 'Tea Shop & Film MetaCompany'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: BFI Doc Society Fund
-			'^(?:bfi|british[\s\-]*film[\s\-]*institute).*?fund' : {
+			r'^(?:bfi|british[\s\-]*film[\s\-]*institute).*?fund' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'British Film Institute (BFI)',		MetaCompany.ReleaseNew : 'British Film Institute (BFI)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BFI Film Fund',					MetaCompany.ReleaseNew : 'BFI Film Fund'},
 			},
 			# Example: BFI
-			'^(?:bfi(?:$|\s)|british[\s\-]*film[\s\-]*institute)' : {
+			r'^(?:bfi(?:$|\s)|british[\s\-]*film[\s\-]*institute)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'British Film Institute (BFI)',		MetaCompany.ReleaseNew : 'British Film Institute (BFI)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BFI Film Fund',					MetaCompany.ReleaseNew : 'British Film Institute (BFI)'},
 			},
 
 			# Example: Wildside
-			'^wildside$' : {
+			r'^wildside$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Wild Side'},
 			},
@@ -14283,19 +14283,19 @@ class MetaCompany(object):
 			},
 
 			# Example: Shochiku
-			'^shochiku' : {
+			r'^shochiku' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Shochiku MetaCompany',				MetaCompany.ReleaseNew : 'Shochiku MetaCompany'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Shochiku',							MetaCompany.ReleaseNew : 'Shochiku'},
 			},
 
 			# Example: Egg Film
-			'^egg[\s\-]*films?' : {
+			r'^egg[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Egg Films',						MetaCompany.ReleaseNew : 'Egg Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Egg Films',						MetaCompany.ReleaseNew : 'Egg Films'},
 			},
 
 			# Example: Memento Films Production
-			'^memento[\s\-]*films?' : {
+			r'^memento[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Memento Films',					MetaCompany.ReleaseNew : 'Memento Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Memento Films Production',			MetaCompany.ReleaseNew : 'Memento Films Production'},
 			},
@@ -14303,294 +14303,294 @@ class MetaCompany(object):
 			# Example: Daiei
 			# Example: Daiei Film
 			# Example: Daiei Motion Picture Co., Ltd.
-			'^daiei(?:$|[\s\-])' : {
+			r'^daiei(?:$|[\s\-])' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Daiei Film'},
 			},
 
 			# Example: Hemdale
-			'^hemdale(?:$|[\s\-])' : {
+			r'^hemdale(?:$|[\s\-])' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Hemdale Film',						MetaCompany.ReleaseNew : 'Hemdale Film'},
 			},
 
 			# Example: Pacific Western
-			'^pacific[\s\-]*western' : {
+			r'^pacific[\s\-]*western' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Pacific Western Productions'},
 			},
 
 			# Example: Euro Film Funding
-			'^euro[\s\-]*film' : {
+			r'^euro[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Eurofilm Stúdió',					MetaCompany.ReleaseNew : 'Eurofilm Stúdió'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Euro Film Funding'},
 			},
 
 			# "Svenska Filminstitutet" is a different studio.
 			# Example: Svensk Filmindustri
-			'^svensk[\s\-]*filmindu' : {
+			r'^svensk[\s\-]*filmindu' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Svensk Filmindustri (SF)',			MetaCompany.ReleaseNew : 'Svensk Filmindustri (SF)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Svensk Filmindustri (SF)',			MetaCompany.ReleaseNew : 'Svensk Filmindustri (SF)'},
 			},
 			# Example: SF Studios
-			'^svensk[\s\-]*filmindu' : {
+			r'^svensk[\s\-]*filmindu' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Svensk Filmindustri (SF)',			MetaCompany.ReleaseNew : 'Svensk Filmindustri (SF)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SF Studios',						MetaCompany.ReleaseNew : 'SF Studios'},
 			},
 
 			# Example: Samuel Goldwyn MetaCompany
-			'^samuel[\s\-]*goldwyn' : {
+			r'^samuel[\s\-]*goldwyn' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Samuel Goldwyn',					MetaCompany.ReleaseNew : 'Samuel Goldwyn'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Samuel Goldwyn',					MetaCompany.ReleaseNew : 'Samuel Goldwyn'},
 			},
 
 			# Example: Falcon International Productions
-			'^falcon' : {
+			r'^falcon' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Falcon Studios',					MetaCompany.ReleaseNew : 'Falcon Studios'},
 			},
 
 			# Example: Next Entertainment World (NEW)
-			'^(?:new$|next[\s\-]*entertainment[\s\-]*world)' : {
+			r'^(?:new$|next[\s\-]*entertainment[\s\-]*world)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Next Entertainment World',			MetaCompany.ReleaseNew : 'Next Entertainment World'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Next Entertainment World',			MetaCompany.ReleaseNew : 'Next Entertainment World'},
 			},
 
 			# Example: Act III Productions
-			'^act[\s\-]*(?:iii|3|three)' : {
+			r'^act[\s\-]*(?:iii|3|three)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Act III Communications',			MetaCompany.ReleaseNew : 'Act III Communications'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Act III Communications',			MetaCompany.ReleaseNew : 'Act III Communications'},
 			},
 
 			# Example: Limelight
-			'^lime[\s\-]*light' : {
+			r'^lime[\s\-]*light' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Limelight International Media Entertainment',	MetaCompany.ReleaseNew : 'Limelight International Media Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Limelight International Media Entertainment',	MetaCompany.ReleaseNew : 'Limelight International Media Entertainment'},
 			},
 
 			# Example: Wolper Pictures
-			'^wolper' : {
+			r'^wolper' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Wolper Pictures Ltd.',				MetaCompany.ReleaseNew : 'Wolper Pictures Ltd.'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'David L. Wolper Productions',		MetaCompany.ReleaseNew : 'David L. Wolper Productions'},
 			},
 
 			# Example: IFC Productions
-			'^ifc(?:$|[\s\-]*(?:film|studio|production))' : {
+			r'^ifc(?:$|[\s\-]*(?:film|studio|production))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'IFC Films',						MetaCompany.ReleaseNew : 'IFC Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'IFC Films',						MetaCompany.ReleaseNew : 'IFC Films'},
 			},
 
 			# Example: STX Films
-			'^stx[\s\-]*film' : {
+			r'^stx[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'STX Entertainment',				MetaCompany.ReleaseNew : 'STX Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'STX Films',						MetaCompany.ReleaseNew : 'STX Films'},
 			},
-			'^stx(?:$|\s)' : {
+			r'^stx(?:$|\s)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'STX Entertainment',				MetaCompany.ReleaseNew : 'STX Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'STX Entertainment',				MetaCompany.ReleaseNew : 'STX Entertainment'},
 			},
 
 			# Example: The De Laurentiis MetaCompany
-			'^(?:the[\s\-]*)?de[\s\-]*laurentiis' : {
+			r'^(?:the[\s\-]*)?de[\s\-]*laurentiis' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'De Laurentiis',					MetaCompany.ReleaseNew : 'De Laurentiis'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'De Laurentiis',					MetaCompany.ReleaseNew : 'De Laurentiis'},
 			},
 
 			# Example: ABS-CBN Film Productions
 			# Example: ABS-CBN Studios
-			'^abs[\s\-]*cbn' : {
+			r'^abs[\s\-]*cbn' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ABS-CBN Entertainment',			MetaCompany.ReleaseNew : 'ABS-CBN Entertainment'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ABS-CBN Entertainment',			MetaCompany.ReleaseNew : 'ABS-CBN Entertainment'},
 			},
 
 			# Example: Trésor Films
-			'^tr(?:é|e)sor[\s\-]*film' : {
+			r'^tr(?:é|e)sor[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Trésor Films',						MetaCompany.ReleaseNew : 'Trésor Films'},
 			},
 
 			# Example: OddLot Entertainment
-			'^odd[\s\-]*lot' : {
+			r'^odd[\s\-]*lot' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Oddlot',							MetaCompany.ReleaseNew : 'Oddlot'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Oddlot',							MetaCompany.ReleaseNew : 'Oddlot'},
 			},
 
 			# Example: Edko Films
-			'^edko[\s\-]*films?' : {
+			r'^edko[\s\-]*films?' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Edko Film',						MetaCompany.ReleaseNew : 'Edko Film'},
 			},
 
 			# Example: China Film Co-Production Corp.
-			'^china[\s\-]*film' : {
+			r'^china[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'China Film Group Corporation',		MetaCompany.ReleaseNew : 'China Film Group Corporation'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'China Film Group Corporation',		MetaCompany.ReleaseNew : 'China Film Group Corporation'},
 			},
 
 			# Example: Beijing New Picture Film Co. Ltd.
-			'^beijing[\s\-]*new[\s\-]*picture' : {
+			r'^beijing[\s\-]*new[\s\-]*picture' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Beijing New Picture Film Co.',		MetaCompany.ReleaseNew : 'Beijing New Picture Film Co.'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# "Zazen Produções" in the addon, but for some reason does not load. However, "Zazen Produçoes" does load.
 			# Example: Zazen Produções
-			'^zazen(?:$|\s)' : {
+			r'^zazen(?:$|\s)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Zazen Produçoes',					MetaCompany.ReleaseNew : 'Zazen Produçoes'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Zazen Produçoes',					MetaCompany.ReleaseNew : 'Zazen Produçoes'},
 			},
 
 			# Example: Tribeca Productions
-			'^tribeca' : {
+			r'^tribeca' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Tribeca Film',						MetaCompany.ReleaseNew : 'Tribeca Film'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Tribeca Productions',				MetaCompany.ReleaseNew : 'Tribeca Productions'},
 			},
 
 			# Example: Absolute Entertainment
-			'^absolute(?:$|[\s\-]*entertainment)' : {
+			r'^absolute(?:$|[\s\-]*entertainment)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Absolute',							MetaCompany.ReleaseNew : 'Absolute'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Absolute Entertainment‚ Inc.',		MetaCompany.ReleaseNew : 'Absolute Entertainment‚ Inc.'},
 			},
 
 			# Not sure if "Parallel Films" and "Parallel Film Productions" are the same studio.
 			# Example: Parallel Films
-			'^parallel[\s\-]*film' : {
+			r'^parallel[\s\-]*film' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Parallel Film Productions',		MetaCompany.ReleaseNew : 'Parallel Film Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Parallel Film Productions',		MetaCompany.ReleaseNew : 'Parallel Film Productions'},
 			},
 
 			# Example: Oscilloscope
-			'^oscilloscope' : {
+			r'^oscilloscope' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Oscilloscope Laboratories',		MetaCompany.ReleaseNew : 'Oscilloscope Laboratories'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Oscilloscope Laboratories',		MetaCompany.ReleaseNew : 'Oscilloscope Laboratories'},
 			},
 
 			# Example: Chiodo Bros. Production
-			'^chiodo[\s\-]*bro' : {
+			r'^chiodo[\s\-]*bro' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Chiodo Brothers Productions',		MetaCompany.ReleaseNew : 'Chiodo Brothers Productions'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Decla Film Gesellschaft Holz & Co.
-			'^decla(?:$|[\s\-])' : {
+			r'^decla(?:$|[\s\-])' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,									MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Decla-Film-Gesellschaft Holz & Co.',	MetaCompany.ReleaseNew : 'Decla-Film-Gesellschaft Holz & Co.'},
 			},
 
 			# Example: Altitude Film Entertainment
-			'^altitude(?:$|[\s\-]*film)' : {
+			r'^altitude(?:$|[\s\-]*film)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Altitude',							MetaCompany.ReleaseNew : 'Altitude'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Altitude Film Entertainment',		MetaCompany.ReleaseNew : 'Altitude Film Entertainment'},
 			},
 
 			# Example: Matchbox Pictures
-			'^matchbox(?:$|[\s\-]*(?:film|picture|studio))' : {
+			r'^matchbox(?:$|[\s\-]*(?:film|picture|studio))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : 'Matchbox Films'},
 			},
 
 			# Example: Viacom18 Studios
-			'^viacom[\s\-]*18' : {
+			r'^viacom[\s\-]*18' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Viacom18 Motion Pictures',			MetaCompany.ReleaseNew : 'Viacom18 Motion Pictures'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Viacom18 Motion Pictures',			MetaCompany.ReleaseNew : 'Viacom18 Motion Pictures'},
 			},
 
 			# Example: Huayi Tencent Entertainment
-			'^huayi(?:$|[\s\-])' : {
+			r'^huayi(?:$|[\s\-])' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Huayi Brothers',					MetaCompany.ReleaseNew : 'Huayi Brothers'},
 			},
 
 			# Example: Arcadia Motion Pictures
-			'^arcadia(?:$|[\s\-]*(?:motion|picture))' : {
+			r'^arcadia(?:$|[\s\-]*(?:motion|picture))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Arcadia',							MetaCompany.ReleaseNew : 'Arcadia'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : None,								MetaCompany.ReleaseNew : None},
 			},
 
 			# Example: Goldcrest
-			'^goldcrest' : {
+			r'^goldcrest' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Goldcrest Films',					MetaCompany.ReleaseNew : 'Goldcrest Films'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Goldcrest',						MetaCompany.ReleaseNew : 'Goldcrest'},
 			},
 
 			# Example: Instituto Nacional de Cine y Artes Audiovisuales
 			# Example: INCAA
-			'^(?:incaa$|instituto[\s\-]*nacional.*?audiovisuales)' : {
+			r'^(?:incaa$|instituto[\s\-]*nacional.*?audiovisuales)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Instituto Nacional De Cine Y Artes Audiovisuales (INCAA)',	MetaCompany.ReleaseNew : 'Instituto Nacional De Cine Y Artes Audiovisuales (INCAA)'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Instituto Nacional De Cine Y Artes Audiovisuales (INCAA)',	MetaCompany.ReleaseNew : 'Instituto Nacional De Cine Y Artes Audiovisuales (INCAA)'},
 			},
 
 			# More info below at "syndication".
 			# Example: Syndicated
-			'^syndicat(?:ion|or|ing|ed)s?$' : {
+			r'^syndicat(?:ion|or|ing|ed)s?$' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Syndicated',						MetaCompany.ReleaseNew : 'Syndicated'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'Syndicated',						MetaCompany.ReleaseNew : 'Syndicated'},
 			},
 
 			# Example: Erstes Deutsches Fernsehen
-			'^erstes?[\s\-]*deutsches[\s\-]*fernsehen' : {
+			r'^erstes?[\s\-]*deutsches[\s\-]*fernsehen' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ARD',								MetaCompany.ReleaseNew : 'ARD'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ARD',								MetaCompany.ReleaseNew : 'ARD'},
 			},
 			# Example: ARD/Degeto Film vs ARD Degeto
-			'^ard.*degeto' : {
+			r'^ard.*degeto' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ARD',								MetaCompany.ReleaseNew : 'ARD'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ARD',								MetaCompany.ReleaseNew : 'ARD'},
 			},
 			# Example: Zweites Deutsches Fernsehen
-			'^zweites?[\s\-]*deutsches[\s\-]*fernsehen' : {
+			r'^zweites?[\s\-]*deutsches[\s\-]*fernsehen' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'ZDF',								MetaCompany.ReleaseNew : 'ZDF'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'ZDF',								MetaCompany.ReleaseNew : 'ZDF'},
 			},
 			# Example: Norddeutscher Rundfunk
-			'^norddeutscher[\s\-]*rundfunk' : {
+			r'^norddeutscher[\s\-]*rundfunk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'NDR',								MetaCompany.ReleaseNew : 'NDR'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'NDR Fernsehen',					MetaCompany.ReleaseNew : 'NDR Fernsehen'},
 			},
 			# Example: Westdeutscher Rundfunk
-			'^westdeutscher[\s\-]*rundfunk' : {
+			r'^westdeutscher[\s\-]*rundfunk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'WDR',								MetaCompany.ReleaseNew : 'WDR'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'WDR',								MetaCompany.ReleaseNew : 'WDR'},
 			},
 
 			# Example: Mitteldeutscher Rundfunk
-			'^mitteldeutscher[\s\-]*rundfunk' : {
+			r'^mitteldeutscher[\s\-]*rundfunk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'MDR',								MetaCompany.ReleaseNew : 'MDR'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'MDR Fernsehen',					MetaCompany.ReleaseNew : 'MDR Fernsehen'},
 			},
 			# Example: Bayerischer Rundfunk
-			'^bayerischer[\s\-]*rundfunk' : {
+			r'^bayerischer[\s\-]*rundfunk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'BR',								MetaCompany.ReleaseNew : 'BR'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'BR',								MetaCompany.ReleaseNew : 'BR'},
 			},
 			# Example: Hessischer Rundfunk
-			'^hessischer[\s\-]*rundfunk' : {
+			r'^hessischer[\s\-]*rundfunk' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'Hessischer Rundfunk',				MetaCompany.ReleaseNew : 'Hessischer Rundfunk'}, # HDR not available.
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'HR-Fernsehen',						MetaCompany.ReleaseNew : 'HR-Fernsehen'},
 			},
 			# Example: Südwestrundfunk
 			# Example: SWR Fernsehen
-			'^(?:südwestrundfunk|swr[\s\-]*fernsehen)' : {
+			r'^(?:südwestrundfunk|swr[\s\-]*fernsehen)' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'SWR',								MetaCompany.ReleaseNew : 'SWR'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SWR Fernsehen BW',					MetaCompany.ReleaseNew : 'SWR Fernsehen BW'}, # SWR not available.
 			},
 			# Example: RBB Brandenburg
-			'^rbb(?:$|[\s\-]*(?:brandenburg|berlin))' : {
+			r'^rbb(?:$|[\s\-]*(?:brandenburg|berlin))' : {
 				MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'RBB',								MetaCompany.ReleaseNew : 'RBB'},
 				MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'RBB Brandenburg',					MetaCompany.ReleaseNew : 'RBB Brandenburg'},
 			},
 			# Example: Süddeutscher Rundfunk
-			#'^süddeutscher[\s\-]*rundfunk' : {
+			#r'^süddeutscher[\s\-]*rundfunk' : {
 			#	MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'SDR',								MetaCompany.ReleaseNew : 'SDR'}, # Not available.
 			#	MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SDR',								MetaCompany.ReleaseNew : 'SDR'}, # Not available.
 			#},
 			# Example: Nordwestdeutscher Rundfunk
-			#'^nordwestdeutscher[\s\-]*rundfunk' : {
+			#r'^nordwestdeutscher[\s\-]*rundfunk' : {
 			#	MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'WDR',								MetaCompany.ReleaseNew : 'WDR'}, # NWDR not available.
 			#	MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'WDR',								MetaCompany.ReleaseNew : 'WDR'}, # NWDR not available.
 			#},
 			# Example: Südwestfunk
-			#'^südwestfunk' : {
+			#r'^südwestfunk' : {
 			#	MetaCompany.TypeWhite	: {MetaCompany.ReleaseOld : 'SWF',								MetaCompany.ReleaseNew : 'SWF'}, # SWF not available.
 			#	MetaCompany.TypeColor	: {MetaCompany.ReleaseOld : 'SWF',								MetaCompany.ReleaseNew : 'SWF'}, # SWF not available.
 			#},

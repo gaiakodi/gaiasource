@@ -31,9 +31,9 @@ class Provider(ProviderHtml):
 	_AttributePages		= 'pagination'
 	_AttributeDisabled	= 'disabled'
 
-	_ExpressionLink		= 'hash/(%s).html' % ProviderHtml.ExpressionSha
-	_ExpressionSize		= 'size\s*[:：]\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
-	_ExpressionTime		= 'created\s*[:：]\s*(\d+-\d+-\d+(?:\s\d+:\d+:\d+)?)(?:$|\s|&nbsp;)'
+	_ExpressionLink		= r'hash/(%s).html' % ProviderHtml.ExpressionSha
+	_ExpressionSize		= r'size\s*[:：]\s*(\d+(?:\.\d+)?\s*[kmgt]?b)(?:$|\s|&nbsp;)'
+	_ExpressionTime		= r'created\s*[:：]\s*(\d+-\d+-\d+(?:\s\d+:\d+:\d+)?)(?:$|\s|&nbsp;)'
 
 	##############################################################################
 	# INITIALIZE

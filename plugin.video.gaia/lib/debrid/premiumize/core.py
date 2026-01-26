@@ -689,7 +689,7 @@ class Core(base.Core):
 						name = key.lower()
 						try: name = name[:name.find('.')]
 						except: pass
-						name = re.sub('\W+', '', name).capitalize()
+						name = re.sub(r'\W+', '', name).capitalize()
 						Core.Services.append({'name' : name, 'domain' : key, 'factor' : value})
 
 					# Cache cannot add new direct downloads, but only retrieve existing files in cache.
@@ -763,9 +763,9 @@ class Core(base.Core):
 		else:
 			return Core.ServicesUpdate
 
-	def servicesList(self, onlyEnabled = False):
+	def servicesList(self, cached = True, onlyEnabled = False):
 		if Core.ServicesList is None:
-			services = self.services(onlyEnabled = onlyEnabled)
+			services = self.services(cached = cached, onlyEnabled = onlyEnabled)
 			special = [service['id'] for service in services if not service['hoster']]
 			result = []
 			for service in services:
@@ -1157,7 +1157,7 @@ class Core(base.Core):
 	##############################################################################
 
 	def itemId(self, link):
-		try: return re.search('dl\/([^\/]*)', link, re.IGNORECASE).group(1)
+		try: return re.search(r'dl\/([^\/]*)', link, re.IGNORECASE).group(1)
 		except: return None
 
 	def _itemStatus(self, status, message = None):
@@ -1211,7 +1211,7 @@ class Core(base.Core):
 
 	def _itemSize(self, size = None, message = None):
 		if (size is None or size <= 0) and not message is None:
-			match = re.search('of\s?([0-9,.]+\s?(bytes|b|kb|mb|gb|tb))', message, re.IGNORECASE)
+			match = re.search(r'of\s?([0-9,.]+\s?(bytes|b|kb|mb|gb|tb))', message, re.IGNORECASE)
 			if match:
 				size = match.group(1)
 				if not(size is None or size == ''):
@@ -1232,7 +1232,7 @@ class Core(base.Core):
 
 	def _itemSizeCompleted(self, size = None, message = None):
 		if (size is None or size <= 0) and not message is None:
-			match = re.search('([0-9,.]+\s?(bytes|b|kb|mb|gb|tb))\s?of', message, re.IGNORECASE)
+			match = re.search(r'([0-9,.]+\s?(bytes|b|kb|mb|gb|tb))\s?of', message, re.IGNORECASE)
 			if match:
 				size = match.group(1)
 				if not(size is None or size == ''):
@@ -1242,7 +1242,7 @@ class Core(base.Core):
 	def _itemSpeed(self, message):
 		speed = None
 		if not message is None:
-			match = re.search('([0-9,.]+\s?(bytes|b|kb|mb|gb|tb)\/s)', message, re.IGNORECASE)
+			match = re.search(r'([0-9,.]+\s?(bytes|b|kb|mb|gb|tb)\/s)', message, re.IGNORECASE)
 			if match:
 				speed = match.group(1)
 				if not(speed is None or speed == ''):
@@ -1267,7 +1267,7 @@ class Core(base.Core):
 	def _itemPeers(self, message):
 		peers = 0
 		try:
-			match = re.search('(\d+)\s+peer', message, re.IGNORECASE)
+			match = re.search(r'(\d+)\s+peer', message, re.IGNORECASE)
 			if match:
 				peers = match.group(1)
 				if not(peers is None or peers == ''):
@@ -1285,7 +1285,7 @@ class Core(base.Core):
 
 	def _itemTime(self, time = None, message = None):
 		if (time is None or time <= 0) and not message is None:
-			match = re.search('((\d{1,2}:){2}\d{1,2})', message, re.IGNORECASE)
+			match = re.search(r'((\d{1,2}:){2}\d{1,2})', message, re.IGNORECASE)
 			if match:
 				try:
 					time = match.group(1)
@@ -1293,7 +1293,7 @@ class Core(base.Core):
 						time = convert.ConverterDuration(time).value(convert.ConverterDuration.UnitSecond)
 				except: time = None
 			if time is None or time <= 0:
-				match = re.search('.*,\s+(.*)\s+left', message, re.IGNORECASE)
+				match = re.search(r'.*,\s+(.*)\s+left', message, re.IGNORECASE)
 				try:
 					time = match.group(1)
 					if not(time is None or time == ''):

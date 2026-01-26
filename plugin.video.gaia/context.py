@@ -27,6 +27,8 @@ if developer:
 from lib.modules.tools import Logger
 if developer: Logger.log('EXECUTION STARTED [Action: %s]' % 'Context')
 
+System.prepare(full = False) # Prepare important things, like Ujson.
+
 try:
 	from lib.modules.interface import Context
 	Context.create()

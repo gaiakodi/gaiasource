@@ -375,7 +375,7 @@ class MetaTvdb(MetaService):
 								if provider == MetaData.ProviderTmdb:
 									try: int(id)
 									except:
-										try: id = Regex.extract(data = id, expression = '^\s*(\d+)\-')
+										try: id = Regex.extract(data = id, expression = r'^\s*(\d+)\-')
 										except: id = None
 
 								if id: result[provider] = id
@@ -509,7 +509,7 @@ class MetaTvdb(MetaService):
 					# If a season is retrieved and the season name is null, when retrieving the same season but with "extended", the name is sometimes the season type name.
 					# Eg: https://api4.thetvdb.com/v4/seasons/567215/extended returns the season name as "Aired Order".
 					# Remove these names.
-					value = [i for i in value if not Regex.match(data = i, expression = '^(?:aired|dvd|absolute|alternate(?:\s*dvd)?|regional)\s*order$', cache = True)]
+					value = [i for i in value if not Regex.match(data = i, expression = r'^(?:aired|dvd|absolute|alternate(?:\s*dvd)?|regional)\s*order$', cache = True)]
 					if value: filtered[key] = value
 			return filtered
 
@@ -803,10 +803,10 @@ class MetaTvdb(MetaService):
 			width = self._extract(data = data, type = 'width')
 			height = self._extract(data = data, type = 'height')
 
-		match = Regex.extract(data = path, expression = '\/?([a-z]+)(?<!posters)\/', cache = True)
+		match = Regex.extract(data = path, expression = r'\/?([a-z]+)(?<!posters)\/', cache = True)
 		if match: media = MetaData.mediaExtract(match)
 
-		match = Regex.extract(data = path, expression = '\/([a-z\d\-\_]+)\.[a-z]{3,4}$', cache = True)
+		match = Regex.extract(data = path, expression = r'\/([a-z\d\-\_]+)\.[a-z]{3,4}$', cache = True)
 		if match: descriptor = match
 
 		'''
@@ -890,11 +890,11 @@ class MetaTvdb(MetaService):
 		'''
 
 		# Make sure the expressions work for both show and season images.
-		extension = '\.[a-z]{3,4}$'
+		extension = r'\.[a-z]{3,4}$'
 		set = MetaTvdb.OriginNone
-		if Regex.match(data = path, expression = '(?:seasons|series)\/\d+\/posters\/\d+' + extension, cache = True): set = MetaTvdb.OriginOfficial
-		elif Regex.match(data = path, expression = '(?:seasons|posters)\/[a-z\d]+' + extension, cache = True): set = MetaTvdb.OriginUnofficial
-		elif Regex.match(data = path, expression = 'seasons\/[\d\-]+' + extension, cache = True): set = MetaTvdb.OriginFanmade
+		if Regex.match(data = path, expression = r'(?:seasons|series)\/\d+\/posters\/\d+' + extension, cache = True): set = MetaTvdb.OriginOfficial
+		elif Regex.match(data = path, expression = r'(?:seasons|posters)\/[a-z\d]+' + extension, cache = True): set = MetaTvdb.OriginUnofficial
+		elif Regex.match(data = path, expression = r'seasons\/[\d\-]+' + extension, cache = True): set = MetaTvdb.OriginFanmade
 
 		result = {
 			'id' : id,
@@ -1621,12 +1621,12 @@ class MetaTvdb(MetaService):
 					for item in data:
 						type = None
 
-						if Regex.match(data = item['type'], expression = '(?:official|air|release)', cache = True): type = MetaData.NumberStandard
-						elif Regex.match(data = item['type'], expression = '(?:absolute)', cache = True): type = MetaData.NumberAbsolute
-						elif Regex.match(data = item['type'], expression = '(?:region)', cache = True): type = MetaData.NumberRegional
-						elif Regex.match(data = item['type'], expression = '(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberDisc
-						elif Regex.match(data = item['type'], expression = '(?:alt(?:ernat(?:e|ive))?)', cache = True): type = MetaData.NumberAlternative
-						elif Regex.match(data = item['type'], expression = '(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberAlternativeDisc
+						if Regex.match(data = item['type'], expression = r'(?:official|air|release)', cache = True): type = MetaData.NumberStandard
+						elif Regex.match(data = item['type'], expression = r'(?:absolute)', cache = True): type = MetaData.NumberAbsolute
+						elif Regex.match(data = item['type'], expression = r'(?:region)', cache = True): type = MetaData.NumberRegional
+						elif Regex.match(data = item['type'], expression = r'(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberDisc
+						elif Regex.match(data = item['type'], expression = r'(?:alt(?:ernat(?:e|ive))?)', cache = True): type = MetaData.NumberAlternative
+						elif Regex.match(data = item['type'], expression = r'(?<!alt)(?<!alternate)(?<!alternative)(?:dvd|blu.?ray|dis[ck])', cache = True): type = MetaData.NumberAlternativeDisc
 
 						if type: MetaTvdb.DataSeason[type] = item['id']
 

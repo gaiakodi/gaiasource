@@ -271,14 +271,14 @@ class Chatgpt(Oracle):
 	ErrorNone				= None
 
 	Errors = {
-		ErrorAccountInvalid		: {'code' : 401, 'expression' : '(?:invalid|incorrect|wrong).*?auth', 'name' : 'Account Invalid', 'message' : 'The account is not authenticated.'},
-		ErrorAccountKey			: {'code' : 401, 'expression' : '(?:invalid|incorrect|wrong).*?key', 'name' : 'Account Key', 'message' : 'The account API key is invalid.'},
-		ErrorAccountMember		: {'code' : 401, 'expression' : '(?:member|organization)', 'name' : 'Account Member', 'message' : 'The request requires organizational membership.'},
+		ErrorAccountInvalid		: {'code' : 401, 'expression' : r'(?:invalid|incorrect|wrong).*?auth', 'name' : 'Account Invalid', 'message' : 'The account is not authenticated.'},
+		ErrorAccountKey			: {'code' : 401, 'expression' : r'(?:invalid|incorrect|wrong).*?key', 'name' : 'Account Key', 'message' : 'The account API key is invalid.'},
+		ErrorAccountMember		: {'code' : 401, 'expression' : r'(?:member|organization)', 'name' : 'Account Member', 'message' : 'The request requires organizational membership.'},
 		ErrorAccount			: {'code' : 401, 'expression' : None, 'name' : 'Account', 'message' : 'An unknown account error occurred.'},
 
-		ErrorUsageRate			: {'code' : 429, 'expression' : 'rate\s*limit', 'name' : 'Usage Rate', 'message' : 'The request rate limit was reached.'},
-		ErrorUsageQuota			: {'code' : 429, 'expression' : '(?:quota|billing)', 'name' : 'Usage Quota', 'message' : 'The account quota was exceeded.'},
-		ErrorUsageOverload		: {'code' : 429, 'expression' : 'overload', 'name' : 'Usage Overload', 'message' : 'The servers are currently overloaded.'},
+		ErrorUsageRate			: {'code' : 429, 'expression' : r'rate\s*limit', 'name' : 'Usage Rate', 'message' : 'The request rate limit was reached.'},
+		ErrorUsageQuota			: {'code' : 429, 'expression' : r'(?:quota|billing)', 'name' : 'Usage Quota', 'message' : 'The account quota was exceeded.'},
+		ErrorUsageOverload		: {'code' : 429, 'expression' : r'overload', 'name' : 'Usage Overload', 'message' : 'The servers are currently overloaded.'},
 		ErrorUsage				: {'code' : 429, 'expression' : None, 'name' : 'Usage', 'message' : 'An unknown usage error occurred.'},
 
 		ErrorClientRequest		: {'code' : 400, 'expression' : None, 'name' : 'Client Request', 'message' : 'The request is invalid.'},
@@ -287,7 +287,7 @@ class Chatgpt(Oracle):
 		ErrorClientConflict		: {'code' : 409, 'expression' : None, 'name' : 'Client Conflict', 'message' : 'The request has caused a conflict.'},
 		ErrorClientMedia		: {'code' : 415, 'expression' : None, 'name' : 'Client Media', 'message' : 'The request media is unsupported.'},
 
-		ErrorServerProcess		: {'code' : 500, 'expression' : 'server.*?(?:process|request)', 'name' : 'Server Process', 'message' : 'The server cannot process the request.'},
+		ErrorServerProcess		: {'code' : 500, 'expression' : r'server.*?(?:process|request)', 'name' : 'Server Process', 'message' : 'The server cannot process the request.'},
 		ErrorServer				: {'code' : 500, 'expression' : None, 'name' : 'Server', 'message' : 'An unknown server error occurred.'},
 
 		ErrorUnknown			: {'code' : 500, 'expression' : None, 'name' : 'Unknown', 'message' : 'An unknown error occurred.'},
@@ -789,7 +789,7 @@ class Chatgpt(Oracle):
 
 	def _translate(self, data):
 		if Tools.isString(data):
-			extract = Regex.extract(data = data, expression = '\$ADDON\[.*\s(\d+)\]')
+			extract = Regex.extract(data = data, expression = r'\$ADDON\[.*\s(\d+)\]')
 			if extract: data = Translation.string(int(extract))
 		return data
 
@@ -1033,7 +1033,7 @@ class Chatgpt(Oracle):
 			# Eg: data = "ChatGPT error 429: {"detail":"rate limited."}"
 			if data and not message:
 				try:
-					error = Regex.extract(data = str(data), expression = 'error.*?[^\da-z]([2-5]\d{2})[^\da-z]')
+					error = Regex.extract(data = str(data), expression = r'error.*?[^\da-z]([2-5]\d{2})[^\da-z]')
 					if error:
 						message = str(data)
 						code = int(error)
@@ -1837,8 +1837,8 @@ class Chatgpt(Oracle):
 				# which further indicates that the context is sent as a normal message.
 				# Update: It seems that the context is required, otherwise the chatbot just returns random answers.
 				context = context[0] if Tools.isArray(context) else context
-				#context = Regex.remove(data = context, expression = '\.([a-z\s]+\:?\s*\d{1,2}\s*[a-z]+\s*\d{4}\s*(?:$|[\.\,\!]))', group = 1)
-				#context = Regex.remove(data = context, expression = '\.(\s*\d{1,2}\s*[a-z]+\s*\d{4}\s*(?:$|[\.\,\!]))', group = 1)
+				#context = Regex.remove(data = context, expression = r'\.([a-z\s]+\:?\s*\d{1,2}\s*[a-z]+\s*\d{4}\s*(?:$|[\.\,\!]))', group = 1)
+				#context = Regex.remove(data = context, expression = r'\.(\s*\d{1,2}\s*[a-z]+\s*\d{4}\s*(?:$|[\.\,\!]))', group = 1)
 				messages.append({
 					'role' : 'assistant',
 					'isMe' : False,

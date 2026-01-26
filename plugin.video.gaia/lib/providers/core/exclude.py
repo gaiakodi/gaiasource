@@ -118,7 +118,7 @@ try:
 
 	log('Compiling ...')
 	dataExclude = [dataExclude[i::size] for i in range(size)]
-	dataExclude = ['(?:^|[^a-z\d])(%s)(?:$|[^a-z\d])' % '|'.join(i) for i in dataExclude]
+	dataExclude = [r'(?:^|[^a-z\d])(%s)(?:$|[^a-z\d])' % r'|'.join(i) for i in dataExclude]
 	dataExclude = [re.compile(i, flags = re.IGNORECASE) for i in dataExclude]
 	if filter: filter = re.compile(filter, flags = re.IGNORECASE)
 	log('  Expressions: ' + str(len(dataExclude)))

@@ -36,15 +36,15 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'search_stat'
 	_AttributeNext			= 'next'
 
-	_ExpressionHash			= '\/?(.*?)\/'
-	_ExpressionVerified		= '(verified)'
-	_ExpressionMovie		= '(movie)'
-	_ExpressionShow			= '(tv)'
+	_ExpressionHash			= r'\/?(.*?)\/'
+	_ExpressionVerified		= r'(verified)'
+	_ExpressionMovie		= r'(movie)'
+	_ExpressionShow			= r'(tv)'
 
-	_ExpressionRightNow		= '(right\s*now)'
-	_ExpressionYesterday	= '(yesterday)'
-	_ExpressionLastMonth	= '(last\s*month)'
-	_ExpressionYears		= '(year\s*\+)'
+	_ExpressionRightNow		= r'(right\s*now)'
+	_ExpressionYesterday	= r'(yesterday)'
+	_ExpressionLastMonth	= r'(last\s*month)'
+	_ExpressionYears		= r'(year\s*\+)'
 
 	##############################################################################
 	# INITIALIZE

@@ -406,15 +406,15 @@ class Networker(object):
 
 	@classmethod
 	def linkIs(self, link, magnet = False):
-		return tools.Tools.isString(link) and (tools.Regex.match(data = link, expression = '^\s*(http|ftp)s?:\/{2}', cache = True) or (magnet and self.linkIsMagnet(link)))
+		return tools.Tools.isString(link) and (tools.Regex.match(data = link, expression = r'^\s*(http|ftp)s?:\/{2}', cache = True) or (magnet and self.linkIsMagnet(link)))
 
 	@classmethod
 	def linkIsMagnet(self, link):
-		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*magnet:', cache = True)
+		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = r'^\s*magnet:', cache = True)
 
 	@classmethod
 	def linkIsIp(self, link):
-		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*((http|ftp)s?:\/{2})?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', cache = True)
+		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = r'^\s*((http|ftp)s?:\/{2})?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', cache = True)
 
 	# Checks if a link is a local domain or IP address.
 	@classmethod
@@ -423,7 +423,7 @@ class Networker(object):
 			import ipaddress
 			if ipaddress.ip_address(link.lower()).is_private: return True
 		except: pass
-		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = '^\s*((http|ftp)s?:\/{2})?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.16\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|::1|0:0:0:0:0:0:0:1|fc[0-9a-f]{0,22}::|fd[0-9a-f]{0,22}::)')
+		return tools.Tools.isString(link) and tools.Regex.match(data = link, expression = r'^\s*((http|ftp)s?:\/{2})?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.16\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|::1|0:0:0:0:0:0:0:1|fc[0-9a-f]{0,22}::|fd[0-9a-f]{0,22}::)')
 
 	# Extracts the domain from the link.
 	@classmethod
@@ -767,7 +767,7 @@ class Networker(object):
 	def _headersName(self, headers):
 		try:
 			if tools.Tools.isDictionary(headers): headers = self.moduleCaseInsensitiveDict()(headers)
-			return tools.Regex.extract(data = headers['Content-Disposition'], expression = 'filename\s*=\s*[\'"](.*)[\'"]')
+			return tools.Regex.extract(data = headers['Content-Disposition'], expression = r'filename\s*=\s*[\'"](.*)[\'"]')
 		except: pass
 		return None
 
@@ -778,7 +778,7 @@ class Networker(object):
 			if tools.Tools.isDictionary(headers): headers = self.moduleCaseInsensitiveDict()(headers)
 
 			if 'Content-Range' in headers:
-				value = tools.Regex.extract(data = headers['Content-Range'], expression = 'bytes.*\/(.*)')
+				value = tools.Regex.extract(data = headers['Content-Range'], expression = r'bytes.*\/(.*)')
 				if value and value.isdigit(): return int(value)
 
 			if 'Content-Length' in headers:
@@ -793,7 +793,7 @@ class Networker(object):
 	def _headersType(self, headers):
 		try:
 			if tools.Tools.isDictionary(headers): headers = self.moduleCaseInsensitiveDict()(headers)
-			return tools.Regex.extract(data = headers[Networker.HeaderContentType], expression = '(.*?)(?:;|$)')
+			return tools.Regex.extract(data = headers[Networker.HeaderContentType], expression = r'(.*?)(?:;|$)')
 		except: pass
 		return None
 
@@ -1296,12 +1296,12 @@ class Networker(object):
 					errorType = Networker.ErrorCertificate
 
 				try:
-					errorMessage = tools.Regex.extract(data = errorDescription, expression = '>:\s*(.*)')
+					errorMessage = tools.Regex.extract(data = errorDescription, expression = r'>:\s*(.*)')
 					if not errorMessage:
-						errorMessage = tools.Regex.extract(data = errorDescription, expression = '\]\s*(.*)')
+						errorMessage = tools.Regex.extract(data = errorDescription, expression = r'\]\s*(.*)')
 						if not errorMessage:
-							errorMessage = tools.Regex.extract(data = errorDescription, expression = 'port\s*=\s*\d{1,5}\):\s*(.*)')
-							if not errorMessage: errorMessage = tools.Regex.extract(data = errorDescription, expression = '\s*(connection\s*aborted).*?\'')
+							errorMessage = tools.Regex.extract(data = errorDescription, expression = r'port\s*=\s*\d{1,5}\):\s*(.*)')
+							if not errorMessage: errorMessage = tools.Regex.extract(data = errorDescription, expression = r'\s*(connection\s*aborted).*?\'')
 					if errorMessage: errorMessage = errorMessage.strip().strip('(').strip(')').strip(',').strip('\'').strip()
 					else: errorMessage = errorDescription
 				except: errorMessage = errorDescription
@@ -1554,7 +1554,7 @@ class Networker(object):
 		# Eg: Failed to establish a new connection: [Errno -2] Name or service not known
 		if full:
 			data = self.responseErrorMessage()
-			if data and tools.Regex.match(data = data, expression = 'failed\s*to\s*establish\s*a\s*new\s*connection.*?connection\s*refused'): return True
+			if data and tools.Regex.match(data = data, expression = r'failed\s*to\s*establish\s*a\s*new\s*connection.*?connection\s*refused'): return True
 
 		return False
 
@@ -2017,12 +2017,12 @@ class Geolocator(object):
 
 	@classmethod
 	def _dataName(self, name):
-		return tools.Regex.remove(data = name, expression = '.*(\s[\[\(\{].*$)', group = 1) or name
+		return tools.Regex.remove(data = name, expression = r'.*(\s[\[\(\{].*$)', group = 1) or name
 
 	@classmethod
 	def _dataIp(self, ip = None, ipv4 = None, ipv6 = None):
-		if not ipv4 and tools.Regex.match(data = ip, expression = '^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$'): ipv4 = ip
-		elif not ipv6 and tools.Regex.match(data = ip, expression = '(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'): ipv6 = ip
+		if not ipv4 and tools.Regex.match(data = ip, expression = r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$'): ipv4 = ip
+		elif not ipv6 and tools.Regex.match(data = ip, expression = r'(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))'): ipv6 = ip
 		return ipv4, ipv6
 
 	@classmethod
@@ -2104,7 +2104,7 @@ class Geolocator(object):
 		if not addressName: addressName = None
 		addressIpv4, addressIpv6 = self._dataIp(ip = addressIp, ipv4 = addressIpv4, ipv6 = addressIpv6)
 
-		expression = '(asn?\d+)' # ASN number (eg: AS62240)
+		expression = r'(asn?\d+)' # ASN number (eg: AS62240)
 		if networkProvider:
 			asn = tools.Regex.extract(data = networkProvider, expression = expression)
 			if asn:
@@ -2861,8 +2861,8 @@ class Container(object):
 	PrefixSha256		= 'urn:btmh:'
 
 	# Expression
-	ExpressionPrefix	= 'urn:bt[im]h:'
-	ExpressionHash		= 'xt=urn:bt[im]h:([a-z\d\/\+=]+)(?:$|&)'
+	ExpressionPrefix	= r'urn:bt[im]h:'
+	ExpressionHash		= r'xt=urn:bt[im]h:([a-z\d\/\+=]+)(?:$|&)'
 
 	##############################################################################
 	# CONSTRUCTOR
@@ -3218,7 +3218,7 @@ class Container(object):
 		if self._torrentIsMagnet(link):
 
 			# Replace &amps; with &.
-			if decode: link = tools.Regex.replace(data = link, expression = '(&amp;)([a-z]{2}=)', replacement = '&\g<2>', all = True)
+			if decode: link = tools.Regex.replace(data = link, expression = r'(&amp;)([a-z]{2}=)', replacement = r'&\g<2>', all = True)
 
 			hash = None
 			title = None
@@ -3263,7 +3263,7 @@ class Container(object):
 					name = names[i]
 					replacement = replace
 					if replacement is None:
-						expression = tools.Regex.expression(expression = '\.{2,}\s*$')
+						expression = tools.Regex.expression(expression = r'\.{2,}\s*$')
 						if title and (not name or expression.search(name)) and (title and not expression.search(title)):
 							if name:
 								current = Networker.linkUnquote(name)

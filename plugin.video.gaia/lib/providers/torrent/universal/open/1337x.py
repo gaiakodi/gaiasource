@@ -47,12 +47,12 @@ class Provider(ProviderHtml):
 	_AttributeFiles			= 'head'
 
 	# Admin = Black, Moderator = Green, VIP = Blue, Uploader = Orange, Trial Uploader = Red, Member = Grey
-	_ExpressionAdmin		= '(?:^|\s)(admin)(?:$|\s)'
-	_ExpressionModerator	= '(?:^|\s)(moderator)(?:$|\s)'
-	_ExpressionVip			= '(?:^|\s)(vip)(?:$|\s)'
-	_ExpressionUploader		= '(?:^|\s)(uploader)(?:$|\s)'
-	_ExpressionTrial		= '(?:^|\s)(trial)(?:$|\s|-|_)'
-	_ExpressionMember		= '(?:^|\s)(member)(?:$|\s)'
+	_ExpressionAdmin		= r'(?:^|\s)(admin)(?:$|\s)'
+	_ExpressionModerator	= r'(?:^|\s)(moderator)(?:$|\s)'
+	_ExpressionVip			= r'(?:^|\s)(vip)(?:$|\s)'
+	_ExpressionUploader		= r'(?:^|\s)(uploader)(?:$|\s)'
+	_ExpressionTrial		= r'(?:^|\s)(trial)(?:$|\s|-|_)'
+	_ExpressionMember		= r'(?:^|\s)(member)(?:$|\s)'
 
 	##############################################################################
 	# INITIALIZE
@@ -116,22 +116,22 @@ class Provider(ProviderHtml):
 		if value:
 			result = ''
 
-			year = Regex.extract(data = value, expression = '(\d{4})')
+			year = Regex.extract(data = value, expression = r'(\d{4})')
 			if not year:
-				year = Regex.extract(data = value, expression = '\'(\d{2})')
+				year = Regex.extract(data = value, expression = r'\'(\d{2})')
 				if year: year = int('20' + year)
 			if not year: year = Time.year()
-			month = Regex.extract(data = value, expression = '([a-z]{3})\.')
-			day = Regex.extract(data = value, expression = '\.\s(\d{1,2})[a-z]')
+			month = Regex.extract(data = value, expression = r'([a-z]{3})\.')
+			day = Regex.extract(data = value, expression = r'\.\s(\d{1,2})[a-z]')
 			if year and month and day: result += '%s %s %s' % (day, month, year)
 			else: result += Time.format(format = Time.FormatDate)
 
-			hour = Regex.extract(data = value, expression = '(\d{1,2})(?::\d{2})?am')
+			hour = Regex.extract(data = value, expression = r'(\d{1,2})(?::\d{2})?am')
 			if not hour:
-				hour = Regex.extract(data = value, expression = '(\d{1,2})(?::\d{2})?pm')
+				hour = Regex.extract(data = value, expression = r'(\d{1,2})(?::\d{2})?pm')
 				if hour: hour = str(int(hour) + 12)
 			if hour:
-				minute = Regex.extract(data = value, expression = ':(\d{2})')
+				minute = Regex.extract(data = value, expression = r':(\d{2})')
 				if not minute: minute = '00'
 				if minute: result += ' %s:%s:%s' % (hour, minute, '00')
 

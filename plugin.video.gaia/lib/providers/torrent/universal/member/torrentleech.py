@@ -63,7 +63,7 @@ class Provider(ProviderJson):
 	_AttributeNonscene		= 'nonscene'
 	_AttributeRar			= 'rar'
 
-	_ExpressionLogout		= '(logout)'
+	_ExpressionLogout		= r'(logout)'
 
 	##############################################################################
 	# INITIALIZE

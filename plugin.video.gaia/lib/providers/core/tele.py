@@ -54,8 +54,8 @@ class ProviderTele(ProviderHtml):
 	AttributeLeeches	= 'down'
 	AttributePages		= 'pagination'
 
-	ExpressionTime		= '((?:\d{1,2}[\/\-]){2}\d{4})'
-	ExpressionNext		= '(next|suivant|→|►)'
+	ExpressionTime		= r'((?:\d{1,2}[\/\-]){2}\d{4})'
+	ExpressionNext		= r'(next|suivant|→|►)'
 
 	##############################################################################
 	# INITIALIZE

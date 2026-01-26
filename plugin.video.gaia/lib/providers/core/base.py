@@ -543,12 +543,12 @@ class ProviderBase(object):
 	Details								= '[GAIADETAILS]'
 	Entries								= '[GAIAENTRIES]'
 
-	ExpressionMagnet					= '(magnet(?:\:|%3A).*)'
-	ExpressionTorrent					= '(\.torrent)'
-	ExpressionProxy						= '(proxy|unblock|bypass|immunicity|nocensor|prox\d|p4y)'
-	ExpressionSha1						= '([a-f0-9]{40})'
-	ExpressionSha256					= '([a-f0-9]{64})'
-	ExpressionSha						= '([a-f0-9]{40}|[a-f0-9]{64})'
+	ExpressionMagnet					= r'(magnet(?:\:|%3A).*)'
+	ExpressionTorrent					= r'(\.torrent)'
+	ExpressionProxy						= r'(proxy|unblock|bypass|immunicity|nocensor|prox\d|p4y)'
+	ExpressionSha1						= r'([a-f0-9]{40})'
+	ExpressionSha256					= r'([a-f0-9]{64})'
+	ExpressionSha						= r'([a-f0-9]{40}|[a-f0-9]{64})'
 
 	def __init__(self,
 		id				= None,		# The ID of the provider. If not provided, the ID is determined from the file name.

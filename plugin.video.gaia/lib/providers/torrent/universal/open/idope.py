@@ -74,9 +74,9 @@ class Provider(ProviderHtml):
 	_AttributeBar			= 'seedbar'
 	_AttributeColumn		= 'column'
 
-	_ExpressionHash			= '(%s*)' % _AttributeHash
-	_ExpressionPage			= '(/page/\d)'
-	_ExpressionNext			= '(next)'
+	_ExpressionHash			= r'(%s*)' % _AttributeHash
+	_ExpressionPage			= r'(/page/\d)'
+	_ExpressionNext			= r'(next)'
 
 	##############################################################################
 	# INITIALIZE
@@ -185,7 +185,7 @@ class Provider(ProviderHtml):
 				if items:
 					for i in range(len(items)):
 						item = items[i]
-						hash = Regex.extract(data = item[Html.AttributeHref], expression = '.+\/(.+)\/')
+						hash = Regex.extract(data = item[Html.AttributeHref], expression = r'.+\/(.+)\/')
 						file = self.extractHtml(item = item, keys = [HtmlDiv(class_ = Provider._AttributeFile)])[0]
 						element = data.new_tag(Html.TagDiv, id = Provider._AttributeHash + str(i))
 						element.string = hash

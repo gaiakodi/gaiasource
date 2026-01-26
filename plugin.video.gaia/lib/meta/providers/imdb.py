@@ -602,9 +602,9 @@ class MetaImdb(MetaProvider):
 
 	@classmethod
 	def _idExpression(self, id, group = True, suffix = True):
-		expression = id + '\d+'
-		if group: expression = '(%s)' % expression
-		if suffix: expression = '%s(?:$|[^\d])' % expression
+		expression = id + r'\d+'
+		if group: expression = r'(%s)' % expression
+		if suffix: expression = r'%s(?:$|[^\d])' % expression
 		return expression
 
 	@classmethod
@@ -630,7 +630,7 @@ class MetaImdb(MetaProvider):
 	@classmethod
 	def _idMatch(self, id, data, group = True, prefix = True, suffix = True):
 		expression = self._idExpression(id = id, group = group, suffix = suffix)
-		if prefix: expression = '\!?' + expression
+		if prefix: expression = r'\!?' + expression
 		return Regex.match(data = data, expression = expression, cache = True)
 
 	@classmethod
@@ -705,14 +705,14 @@ class MetaImdb(MetaProvider):
 	@classmethod
 	def linkImage(self, link, size = 780, crop = False):
 		if not link: return None
-		expression = '((?:_SX|_SY|_UX|_UY|_CR|_AL|_V)(?:\d+|_).+?\.)'
+		expression = r'((?:_SX|_SY|_UX|_UY|_CR|_AL|_V)(?:\d+|_).+?\.)'
 
 		# Keep the cropped coordinates for people images, otherwise there might be differently sized images in the menu.
 		# Eg: https://m.media-amazon.com/images/M/MV5BMzIzMTE4NzcyMl5BMl5BanBnXkFtZTgwODA2NTQyNTM@._V1_UY209_CR87,0,140,209_AL_.jpg
 		# Eg: https://m.media-amazon.com/images/M/MV5BYjQ5MDkyMGEtYmI0OS00MmM2LWE0MmEtZmQ2NjA5MzYyYTFjXkEyXkFqcGdeQXVyNjIwMTQzOTU@._V1_UY209_CR37,0,140,209_AL_.jpg
 		if crop:
 			try:
-				pixel = Regex.extract(data = link, expression = '_CR([\d\,]+)')
+				pixel = Regex.extract(data = link, expression = r'_CR([\d\,]+)')
 				if pixel:
 					pixel = [int(i) for i in pixel.split(',')]
 					if pixel:
@@ -724,7 +724,7 @@ class MetaImdb(MetaProvider):
 						# Otherwise some images might have top-bottom or left-right white bars.
 						width = pixel[2]
 						height = pixel[3]
-						if Regex.extract(data = link, expression = '((?:_UX)(?:\d+|_).+?\.)'):
+						if Regex.extract(data = link, expression = r'((?:_UX)(?:\d+|_).+?\.)'):
 							scaler = '_UX'
 							size = width
 						else:
@@ -7325,7 +7325,7 @@ class MetaImdb(MetaProvider):
 				#	Episode #4.1
 				# Clean it to be consistent with other providers:
 				#	Episode 1
-				temp = Regex.extract(data = data, expression = '([a-z]+\s)\s*#(?:\d+\.)?(\d+)', group = None)
+				temp = Regex.extract(data = data, expression = r'([a-z]+\s)\s*#(?:\d+\.)?(\d+)', group = None)
 				if temp: data = temp[0] + temp[1]
 
 				# Titles ending in a slash.
@@ -7494,7 +7494,7 @@ class MetaImdb(MetaProvider):
 		try:
 			if data:
 				if data.lower() == 'x': return Audience.CertificateTvma if Media.isSerie(media) else Audience.CertificateNc17 # IMDb has an old "X" rating for old movies which was replaced by NC-17.
-				elif Regex.match(data = data, expression = '(?:ur|(?:un|not)?.*?rated)', cache = True): return Audience.CertificateNr
+				elif Regex.match(data = data, expression = r'(?:ur|(?:un|not)?.*?rated)', cache = True): return Audience.CertificateNr
 				elif len(data) > 5 and not '-' in data: return None # Sometimes IMDb returns "approved" or "passed".
 				else: return self._convertCertificate(certificate = data, inverse = True, default = True)
 		except: Logger.error()
@@ -7699,16 +7699,16 @@ class MetaImdb(MetaProvider):
 		#	Add a plot
 		#	Add a plot in your language
 		if description:
-			if Regex.match(data = description, expression = 'add\s+a\s+(?:plot|bio|description)', cache = True):
+			if Regex.match(data = description, expression = r'add\s+a\s+(?:plot|bio|description)', cache = True):
 				description = None
 			else:
 				# Eg: The definitive documentary, ...  See full summary</a> »
 				# Use "?:<a[^<]*?)" instead of "?:<a.*?)", since it is a lot faster for people's bio.
-				description = Regex.remove(data = description, expression = '(\s*(?:<a[^<]*?)?\s*see\s*full\s*summary\s*(?:<\/a>)?\s*).{0,3}$', cache = True)
+				description = Regex.remove(data = description, expression = r'(\s*(?:<a[^<]*?)?\s*see\s*full\s*summary\s*(?:<\/a>)?\s*).{0,3}$', cache = True)
 
 				# Remove BBcode tags.
 				if '[' in description:
-					decoded = Regex.remove(data = description, expression = '(\[.*?])', group = 1, all = True, cache = True)
+					decoded = Regex.remove(data = description, expression = r'(\[.*?])', group = 1, all = True, cache = True)
 					if decoded: description = decoded
 
 				# Remove HTML tags.
@@ -7925,7 +7925,7 @@ class MetaImdb(MetaProvider):
 
 							try:
 								profession = item.find('p', {'class' : 'text-muted'}).text
-								profession = Regex.extract(data = profession, expression = '(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
+								profession = Regex.extract(data = profession, expression = r'(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
 								profession = [i.strip() for i in profession.split(',')]
 								if profession: result['profession'] = profession
 							except: pass
@@ -7959,8 +7959,8 @@ class MetaImdb(MetaProvider):
 							try:
 								title = item.find_all('a')[1].text.strip()
 								if title:
-									if filterMovie and Regex.match(data = title, expression = '^\s*episode:', cache = True): continue # Some movie lists contain shows.
-									elif filterShow and Regex.match(data = title, expression = '^\s*movie:', cache = True): continue # Some show lists contain movies.
+									if filterMovie and Regex.match(data = title, expression = r'^\s*episode:', cache = True): continue # Some movie lists contain shows.
+									elif filterShow and Regex.match(data = title, expression = r'^\s*movie:', cache = True): continue # Some show lists contain movies.
 
 									title = self._extractTitle(title)
 									result['title'] = title
@@ -7972,22 +7972,22 @@ class MetaImdb(MetaProvider):
 								# Years that contain extra parts, like "Video Game" or "2019-" or "2011-2018".
 								year = item.find('span', {'class' : ['lister-item-year', 'year_type']}).text
 
-								if Regex.match(data = year, expression = 'game', cache = True): # (2018 Video Game)
+								if Regex.match(data = year, expression = r'game', cache = True): # (2018 Video Game)
 									continue
-								elif filterMovie and not Regex.match(data = year, expression = '\(\d{4}[a-z\d\s]*\)', cache = True): # For movies, allow (2014 TV Movie), but disallow (2016 - 2018)
+								elif filterMovie and not Regex.match(data = year, expression = r'\(\d{4}[a-z\d\s]*\)', cache = True): # For movies, allow (2014 TV Movie), but disallow (2016 - 2018)
 									continue
-								elif Regex.match(data = year, expression = '\(\d{4}.*\d{4}\)', cache = True):
+								elif Regex.match(data = year, expression = r'\(\d{4}.*\d{4}\)', cache = True):
 									years = True
 									if filterMovie: continue
 
-								year = int(Regex.extract(data = year, expression = '(\d{4})', group = 1, cache = True))
+								year = int(Regex.extract(data = year, expression = r'(\d{4})', group = 1, cache = True))
 								if year: result['year'] = year
 							except: pass
 
 							plot = None
 							try:
 								plot = item.find_all('p', {'class' : 'text-muted'})[-1].text
-								if Regex.match(data = plot, expression = 'votes:', cache = True): plot = item.find_all('p', {'class' : ''})[-1].text # User rating lists has the votes in "text-muted".
+								if Regex.match(data = plot, expression = r'votes:', cache = True): plot = item.find_all('p', {'class' : ''})[-1].text # User rating lists has the votes in "text-muted".
 							except: pass
 							if not plot:
 								try: plot = item.find('div', {'class' : 'item_description'}).text
@@ -8024,7 +8024,7 @@ class MetaImdb(MetaProvider):
 
 							try:
 								duration = item.find('span', {'class' : 'runtime'}).text
-								if not duration: duration = Regex.extract(data = itemData, expression = '((\d+\shr?\s)?\d+\sm(?:in)?)', group = 1, cache = True)
+								if not duration: duration = Regex.extract(data = itemData, expression = r'((\d+\shr?\s)?\d+\sm(?:in)?)', group = 1, cache = True)
 								duration = ConverterDuration(value = duration.replace(',', '')).value(ConverterDuration.UnitSecond) # Eg: 5,702 min
 								if duration and (not filterShow or duration < 18000): result['duration'] = duration # The total duration of all episodes in the show.
 							except: pass
@@ -8051,7 +8051,7 @@ class MetaImdb(MetaProvider):
 							# Do not do this for other lists, since the alternative rating might be from a different user (creator of the list) and will incorrectly overwrite the current user's rating.
 							# Also ingore individual episodes, since the season and episode numbers are unknown.
 							ratingUser = None
-							if filterUser and (not filterShow or not filterRating or not Regex.match(data = title, expression = '^\s*episode:', cache = True)):
+							if filterUser and (not filterShow or not filterRating or not Regex.match(data = title, expression = r'^\s*episode:', cache = True)):
 								try: ratingUser = item.find('span', {'class' : 'userRatingValue'}).text
 								except: pass
 								if not ratingUser:
@@ -8065,7 +8065,7 @@ class MetaImdb(MetaProvider):
 										except: pass
 
 							try:
-								ratingTime = ConverterTime(Regex.extract(data = itemData, expression = 'rated\s*on\s*(.*?)<', group = 1, cache = True, utc = True), format = ConverterTime.FormatDateShort).timestamp()
+								ratingTime = ConverterTime(Regex.extract(data = itemData, expression = r'rated\s*on\s*(.*?)<', group = 1, cache = True, utc = True), format = ConverterTime.FormatDateShort).timestamp()
 								if ratingTime:
 									if not 'voting' in resultImdb: resultImdb['voting'] = {}
 									resultImdb['voting']['time'] = ratingTime
@@ -8084,7 +8084,7 @@ class MetaImdb(MetaProvider):
 							try: votes = item.find('span', {'name' : 'nv'}).text
 							except: pass
 							if not votes:
-								try: votes = Regex.extract(data = item.find('div', {'class' : 'rating-list'})['title'], expression = '\((.+?)\svotes?\)', cache = True)
+								try: votes = Regex.extract(data = item.find('div', {'class' : 'rating-list'})['title'], expression = r'\((.+?)\svotes?\)', cache = True)
 								except: pass
 							if votes:
 								votes = votes.strip()
@@ -8094,14 +8094,14 @@ class MetaImdb(MetaProvider):
 									except: pass
 
 							try:
-								director = Regex.extract(data = itemData, expression = 'directors?:(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
+								director = Regex.extract(data = itemData, expression = r'directors?:(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
 								director = self.parser(data = director).find_all('a')
 								director = [i.text for i in director]
 								if director: result['director'] = director
 							except: pass
 
 							try:
-								cast = Regex.extract(data = itemData, expression = 'stars?:(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
+								cast = Regex.extract(data = itemData, expression = r'stars?:(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
 								cast = self.parser(data = cast).find_all('a')
 								cast = [i.text for i in cast]
 								if cast: result['cast'] = cast
@@ -8369,12 +8369,12 @@ class MetaImdb(MetaProvider):
 						except: pass
 
 						try:
-							profession = Regex.extract(data = str(tag2), expression = '>(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
+							profession = Regex.extract(data = str(tag2), expression = r'>(.+?)(?:\||<\/?div|<\/?span)', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
 							if profession: result['profession'] = [i.strip() for i in profession.split(',')]
 						except: pass
 
 						try:
-							films = Regex.extract(data = str(tag2), expression = '(?:<\/div>|<\/span>)\s*(.+?)\s*<\/p', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
+							films = Regex.extract(data = str(tag2), expression = r'(?:<\/div>|<\/span>)\s*(.+?)\s*<\/p', group = 1, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines, cache = True)
 							if films:
 								films = self.parser(data = films).find_all('a')
 								if films:
@@ -8442,7 +8442,7 @@ class MetaImdb(MetaProvider):
 			# https://imdb.com/list/ls566661486
 			if not id or not self.idType(id) in [MetaImdb.IdTitle, MetaImdb.IdPerson] and more:
 				basic = True
-				id = Regex.extract(data = more, expression = '\[link.*?\/' + self._idExpressionTitle(), cache = True)
+				id = Regex.extract(data = more, expression = r'\[link.*?\/' + self._idExpressionTitle(), cache = True)
 
 			if id and self.idType(id) in [MetaImdb.IdTitle, MetaImdb.IdPerson]:
 				type = data.get('Title Type')
@@ -8564,17 +8564,17 @@ class MetaImdb(MetaProvider):
 				# https://imdb.com/list/ls566661486
 				if basic:
 					if not 'title' in result:
-						title = Regex.extract(data = more, expression = '\[link.*?\](.*?)\[\/', cache = True)
+						title = Regex.extract(data = more, expression = r'\[link.*?\](.*?)\[\/', cache = True)
 						if title: result['title'] = result['originaltitle'] = title
 
 					if not 'year' in result or not 'premiered' in result:
-						date = Regex.extract(data = more, expression = '.*?\s([a-z]{3,}\.?\s\d{1,2}(?:,?\s\d{4})?)(?!\[\/link)', cache = True)
+						date = Regex.extract(data = more, expression = r'.*?\s([a-z]{3,}\.?\s\d{1,2}(?:,?\s\d{4})?)(?!\[\/link)', cache = True)
 						if date:
-							month = Regex.extract(data = date, expression = '([a-z]{3}[a-z]*\.?)', cache = True)
+							month = Regex.extract(data = date, expression = r'([a-z]{3}[a-z]*\.?)', cache = True)
 							date = date.replace(month, month[:3])
 							if date:
 								if not 'year' in result:
-									year = Regex.extract(data = date, expression = '(\d{4})', cache = True)
+									year = Regex.extract(data = date, expression = r'(\d{4})', cache = True)
 									if year: result['year'] = int(year)
 
 								if not 'premiered' in result:
@@ -9171,13 +9171,13 @@ class MetaImdb(MetaProvider):
 					if date:
 						resultEpisode['premiered'] = date
 						resultEpisode['aired'] = date
-						resultEpisode['year'] = int(Regex.extract(data = date, expression = '(\d{4})'))
+						resultEpisode['year'] = int(Regex.extract(data = date, expression = r'(\d{4})'))
 
 				thumbnail = episode.find('div', {'class' : 'image'})
 				if thumbnail:
 					number = thumbnail.text
 					if number:
-						number = Regex.extract(data = number, expression = 's(\d+).*?ep?(\d+)', group = None, all = True)
+						number = Regex.extract(data = number, expression = r's(\d+).*?ep?(\d+)', group = None, all = True)
 						if number:
 							resultEpisode['season'] = int(number[0][0])
 							resultEpisode['episode'] = int(number[0][1])
@@ -9306,7 +9306,7 @@ class MetaImdb(MetaProvider):
 						if premiered:
 							resultEpisode['premiered'] = premiered
 							resultEpisode['aired'] = premiered
-							resultEpisode['year'] = int(Regex.extract(data = premiered, expression = '(\d{4})'))
+							resultEpisode['year'] = int(Regex.extract(data = premiered, expression = r'(\d{4})'))
 
 							# Important for episodes that are only on IMDb and will not get the time from anywhere else.
 							# Eg: GoT S01E00.
@@ -9438,32 +9438,32 @@ class MetaImdb(MetaProvider):
 				# Visual Effects Society Awards
 				# Kids' Choice Awards
 				# Grammy Awards
-				'us' : '([\s\,\.\-\(\[]+(usa?)[\s\.\)\]]?|united\s*states|america|los\s*angeles|new\s*york|carolina|florida|hawaii|dakota|denver|columbus|austin|san\s*diego|portland|chicago|seattle|houston|hollywood|allywood|academy\s*award|oscar|golden\s*globe|emm(?:y|ie)\s|national\s*board.*review|national\s*society.*critic|annie\s|raspberr|sundance|screen.*actor.*guild|tony\s*award|pulitzer|mtv|satellite\s*ward|afi\s*ward|critics\s*choice|black\s*reel|aarp|music\s*city|gafca|georgia\s*film\s*critics|motion \s*picture\s*sound\s*editors|pga\s*award|cinema\s*audio\s*society|costume\s*designers\s*guild|golden\s*derby|visual\s*effects\s*society|kid.*choice|grammy)',
+				'us' : r'([\s\,\.\-\(\[]+(usa?)[\s\.\)\]]?|united\s*states|america|los\s*angeles|new\s*york|carolina|florida|hawaii|dakota|denver|columbus|austin|san\s*diego|portland|chicago|seattle|houston|hollywood|allywood|academy\s*award|oscar|golden\s*globe|emm(?:y|ie)\s|national\s*board.*review|national\s*society.*critic|annie\s|raspberr|sundance|screen.*actor.*guild|tony\s*award|pulitzer|mtv|satellite\s*ward|afi\s*ward|critics\s*choice|black\s*reel|aarp|music\s*city|gafca|georgia\s*film\s*critics|motion \s*picture\s*sound\s*editors|pga\s*award|cinema\s*audio\s*society|costume\s*designers\s*guild|golden\s*derby|visual\s*effects\s*society|kid.*choice|grammy)',
 
 				# BAFTA Film Awards
-				'uk' : '([\s\,\.\-\(\[]+(uk|gb)[\s\.\)\]]?|great\s*britain|united\s*kingdom|london|liverpool|bafta)',
+				'uk' : r'([\s\,\.\-\(\[]+(uk|gb)[\s\.\)\]]?|great\s*britain|united\s*kingdom|london|liverpool|bafta)',
 
 				# Golden Screen Award
-				'ca' : '(canada|canadian|golden\s*screen\s*award)',
+				'ca' : r'(canada|canadian|golden\s*screen\s*award)',
 
 				# AACTA International Awards
-				'au' : '(australia|sydney|perthaacta)',
+				'au' : r'(australia|sydney|perthaacta)',
 
 				# Palme d’Or – The Cannes International Film Festival
 				# César Awards
 				# Méliès d’Or
 				# Cartoon d’Or
-				'fr' : '(france|french|paris|d(?:\'|’)or|palme.*or|cannes|c(?:é|e)sar)',
+				'fr' : r'(france|french|paris|d(?:\'|’)or|palme.*or|cannes|c(?:é|e)sar)',
 
 				# The Golden Bear – The Berlin International Film Festival
-				'de' : '(german|deutsch|golden(?:er)?\s*b(?:ea|ä)r|berlin|m(?:u|ue|ü)nchen)',
+				'de' : r'(german|deutsch|golden(?:er)?\s*b(?:ea|ä)r|berlin|m(?:u|ue|ü)nchen)',
 
 				# The Golden Leopard
-				'ch' : '(golden(?:er)?\s*leopard)',
+				'ch' : r'(golden(?:er)?\s*leopard)',
 
 				# National Film Awards
 				# FilmFare Awards
-				'in' : '(india|hindi|national\s*film\s*award|film\s*fare)',
+				'in' : r'(india|hindi|national\s*film\s*award|film\s*fare)',
 			}
 
 			result = {
@@ -9503,7 +9503,7 @@ class MetaImdb(MetaProvider):
 							entry['country'] = country
 							break
 
-					entry['name'] = Regex.remove(data = name, expression = '([\s\,\.\-\(\[]*(usa?|uk|gb|de)[\s\.\)\]]*$)')
+					entry['name'] = Regex.remove(data = name, expression = r'([\s\,\.\-\(\[]*(usa?|uk|gb|de)[\s\.\)\]]*$)')
 
 					if 'section' in item:
 						item = item['section']
@@ -9522,17 +9522,17 @@ class MetaImdb(MetaProvider):
 
 									type = self._extract(id = id, data = subitem, keys = ['rowTitle'])
 
-									year = Regex.extract(data = type, expression = '((?:19|2[01])\d{2})')
+									year = Regex.extract(data = type, expression = r'((?:19|2[01])\d{2})')
 									if year: subentry['year'] = int(year)
 
-									if Regex.match(data = type, expression = '(winner)'): subentry['type'] = 'winner'
-									elif Regex.match(data = type, expression = '(nominee)'): subentry['type'] = 'nominee'
+									if Regex.match(data = type, expression = r'(winner)'): subentry['type'] = 'winner'
+									elif Regex.match(data = type, expression = r'(nominee)'): subentry['type'] = 'nominee'
 
 									self._extract(id = id, data = subitem, keys = ['rowSubTitle'], result = subentry, attribute = 'award')
 									if 'listContent' in subitem:
 										content = subitem['listContent']
 										if content:
-											expression = '\s*(?:[\(\[]|[\,\-]\s)\s*(.*?)[\s\)\]]*$'
+											expression = r'\s*(?:[\(\[]|[\,\-]\s)\s*(.*?)[\s\)\]]*$'
 											for i in content:
 												if i and 'className' in i and i['className'] == 'awardCategoryName':
 													category = self._extract(id = id, data = i, keys = ['text'])
@@ -10252,7 +10252,7 @@ class MetaImdb(MetaProvider):
 					label = [
 						Format.fontBold('%d%%' % stepProgress),
 						Format.fontBold(ConverterDuration(self.tTime.elapsed(), unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatClockMini)),
-						Regex.replace(data = ConverterSize(self.tSize).string(unit = ConverterSize.ByteMega, places = 0), expression = '(\d+(?:\.\d+)?)(.*)', replacement = r'[B]\1[/B]\2'),
+						Regex.replace(data = ConverterSize(self.tSize).string(unit = ConverterSize.ByteMega, places = 0), expression = r'(\d+(?:\.\d+)?)(.*)', replacement = r'[B]\1[/B]\2'),
 						'%s %s' % (Format.fontBold(Math.thousand(self.tTitles)), Translation.string(33881)),
 					]
 

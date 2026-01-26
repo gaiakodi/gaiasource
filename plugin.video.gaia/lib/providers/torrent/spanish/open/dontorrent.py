@@ -36,12 +36,12 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributePage			= 'page-link'
 
-	_ExpressionName			= u'.*\/(.*?)\.torrent'
-	_ExpressionSize			= u'tamaño\s*:\s*(.*)'
-	_ExpressionMovie		= u'(pel[ií]cula|documental(?:es)?|variado)'
-	_ExpressionShow			= u'(series?|episodios?|documental(?:es)?|variado)'
-	_ExpressionBrackets		= u'^\(?(.*?)\)?$'
-	_ExpressionStrip		= u'^[\s\.\-]*(.*?)[\s\.\-]*$'
+	_ExpressionName			= r'.*\/(.*?)\.torrent'
+	_ExpressionSize			= r'tamaño\s*:\s*(.*)'
+	_ExpressionMovie		= r'(pel[ií]cula|documental(?:es)?|variado)'
+	_ExpressionShow			= r'(series?|episodios?|documental(?:es)?|variado)'
+	_ExpressionBrackets		= r'^\(?(.*?)\)?$'
+	_ExpressionStrip		= r'^[\s\.\-]*(.*?)[\s\.\-]*$'
 
 	##############################################################################
 	# INITIALIZE

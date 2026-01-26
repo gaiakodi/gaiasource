@@ -36,9 +36,9 @@ class Provider(ProviderJson, ProviderHtml):
 
 	# Update (2025-01): .net domain is completely down. .eu domain loads a semi-broken website.
 	# Update (2025-12): .to domain does not load, but the .eu domain seems fine (although it constantly gives Cloudflare 1016 server misconfiguration errors).
-	# Update (2026-01): .to domain now redirects to bitsearch.to but has a Cloudflare host error.
+	# Update (2026-01): .to domain now redirects to bitsearch.to, but sometimes has Cloudflare host errors.
 	# https://solidtorrents.net
-	_Link					= ['https://solidtorrents.eu', 'https://solidtorrents.to']
+	_Link					= ['https://solidtorrents.to', 'https://solidtorrents.eu']
 	_Path					= {
 								ProviderHtml.Version1 : 'api/v1/search', # https://solidtorrents.eu/api
 								ProviderHtml.Version2 : 'search',
@@ -123,7 +123,9 @@ class Provider(ProviderJson, ProviderHtml):
 		# Down too often.
 		#rank					= 5
 		#performance			= ProviderJson.PerformanceExcellent
-		rank					= 4
+		#rank					= 4
+		#performance			= ProviderJson.PerformanceGood
+		rank					= 2
 		performance				= ProviderJson.PerformanceGood
 
 		# Update (2024-12): Domain has been down for a few weeks, although it was working a few weeks earlier. Leave enabled, since it will probably come back online and SolidTorrents is one of the better providers.
@@ -225,7 +227,7 @@ class Provider(ProviderJson, ProviderHtml):
 													ProviderJson.RequestHeaders : True,
 												},
 												ProviderJson.ProcessValidate : {
-													ProviderJson.RequestHeaders : {Provider._HeaderLimit : '\d{4,}'}, # "x-ratelimit-tier: free" is only added if there is no API key. Check that the total limit is 1000 or greater.
+													ProviderJson.RequestHeaders : {Provider._HeaderLimit : r'\d{4,}'}, # "x-ratelimit-tier: free" is only added if there is no API key. Check that the total limit is 1000 or greater.
 												},
 											},
 
@@ -434,7 +436,7 @@ class Provider(ProviderJson, ProviderHtml):
 					if 'b' in value: multiplier = 1000000000
 					elif 'm' in value: multiplier = 1000000
 					elif 'k' in value: multiplier = 1000
-					value = Regex.extract(data = value, expression = '(\d+(?:\.\d+)?)')
+					value = Regex.extract(data = value, expression = r'(\d+(?:\.\d+)?)')
 					value = float(value) * multiplier
 
 					result += (1 - result) * max(0, min(1, (float(value) / Provider._LimitApproval[version])))

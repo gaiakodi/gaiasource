@@ -88,8 +88,8 @@ class Provider(ProviderJson, ProviderHtml):
 	_AttributePublisher		= 'cachedOrigin'
 	_AttributeDownloads		= 'grabs'
 
-	_ExpressionType			= '(?:^|\s|\-|:|>|\/)\s*(video|movie|tv|show|episode|hd|4k|3d|hdr|x264|x265|other|foreign)'
-	_ExpressionSize			= '(\d+)\s'
+	_ExpressionType			= r'(?:^|\s|\-|:|>|\/)\s*(video|movie|tv|show|episode|hd|4k|3d|hdr|x264|x265|other|foreign)'
+	_ExpressionSize			= r'(\d+)\s'
 
 	##############################################################################
 	# INITIALIZE
@@ -233,5 +233,5 @@ class Provider(ProviderJson, ProviderHtml):
 		else: return ProviderHtml.Skip
 
 	def processSourceTime(self, value, item, details = None, entry = None):
-		if self.customVersion1() and value: return Regex.extract(data = value, expression = '(\d{4}\-\d{2}\-\d{2}T\d{2}\:\d{2}\:\d{2})', cache = True)
+		if self.customVersion1() and value: return Regex.extract(data = value, expression = r'(\d{4}\-\d{2}\-\d{2}T\d{2}\:\d{2}\:\d{2})', cache = True)
 		return value

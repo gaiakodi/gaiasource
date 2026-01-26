@@ -49,8 +49,8 @@ class Youchat(Oracle):
 	ErrorNone				= None
 
 	Errors = {
-		ErrorAccountKey		: {'expression' : 'valid[\s\-\_]*api[\s\-\_]*key', 'name' : 'Account Key', 'message' : 'The account API key is invalid.'},
-		ErrorServerLoad		: {'expression' : 'reached\sthe\smaximum\snumber\sof\susers ', 'name' : 'Server Load', 'message' : 'The server is currently overloaded. Try again later.'},
+		ErrorAccountKey		: {'expression' : r'valid[\s\-\_]*api[\s\-\_]*key', 'name' : 'Account Key', 'message' : 'The account API key is invalid.'},
+		ErrorServerLoad		: {'expression' : r'reached\sthe\smaximum\snumber\sof\susers ', 'name' : 'Server Load', 'message' : 'The server is currently overloaded. Try again later.'},
 		ErrorServer			: {'expression' : None, 'name' : 'Server', 'message' : 'An unknown server error occurred.'},
 
 		ErrorUnknown		: {'expression' : None, 'name' : 'Unknown', 'message' : 'An unknown error occurred.'},

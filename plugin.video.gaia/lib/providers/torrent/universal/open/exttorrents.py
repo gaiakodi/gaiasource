@@ -70,9 +70,9 @@ class Provider(ProviderHtml):
 	_AttributeInfo2			= 'detail-torrent-poster-info'
 	_AttributePages2		= 'pagination-block'
 
-	_ExpressionAge			= '(\s*age\s*)'
-	_ExpressionDownloads	= 'downloaded\s*(\d+)\s*time'
-	_ExpressionNext			= '(>|&gt;){1,}'
+	_ExpressionAge			= r'(\s*age\s*)'
+	_ExpressionDownloads	= r'downloaded\s*(\d+)\s*time'
+	_ExpressionNext			= r'(>|&gt;){1,}'
 
 	##############################################################################
 	# INITIALIZE

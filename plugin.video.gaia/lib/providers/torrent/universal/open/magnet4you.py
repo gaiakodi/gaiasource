@@ -38,9 +38,9 @@ class Provider(ProviderHtml):
 	_AttributeItem			= 'tb4'
 	_AttributePage			= 'botton444'
 
-	_ExpressionNext			= '(next)'
-	_ExpressionThousand		= '(k)'
-	_ExpressionMillion		= '(m)'
+	_ExpressionNext			= r'(next)'
+	_ExpressionThousand		= r'(k)'
+	_ExpressionMillion		= r'(m)'
 
 	##############################################################################
 	# INITIALIZE

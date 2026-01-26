@@ -40,6 +40,16 @@ class Service(object):
 	SettingAutomatic	= 'general.launch.automatic'
 
 	##############################################################################
+	# GENERAL
+	##############################################################################
+
+	@classmethod
+	def aborted(self, log = None):
+		aborted = not Pool.check(delay = Pool.DelayMedium)
+		if aborted and log: Logger.log('SERVICE ABORTED: %s' % log)
+		return aborted
+
+	##############################################################################
 	# SETTINGS
 	##############################################################################
 
@@ -88,30 +98,47 @@ class Service(object):
 		label = Translation.string(33805 if mode == Service.ModeKodi else 33806)
 		Logger.log('SERVICE STARTED: %s' % label)
 
+		# Prepare important things.
+		# Initializes Ujson, which is used in Settings.
+		System.prepare(full = False)
+
 		kodi = mode == Service.ModeKodi
 
 		if kodi:
 			delay = Settings.getCustom('general.launch.delay')
 			if delay:
 				Logger.log('SERVICE DELAY: %d Seconds' % delay)
-				Time.sleep(delay)
+				interval = 1.0
+				for i in range(int(delay / interval)):
+					if self.aborted(log = label): return False
+					Time.sleep(interval)
 
 		# Reset possible old modules after the addon was updated.
 		# Otherwise after upgrade, Gaia throws errors about copied modules under the __gaia__ directory.
 		Importer.reset()
+		if self.aborted(log = label): return False
 		Loader.reset()
+		if self.aborted(log = label): return False
+		System.prepare(full = False) # Initialize again, since the modules were reset above.
+		if self.aborted(log = label): return False
 
 		# Reset launch data to force Gaia to fully launch after the addon was upgraded.
-		if kodi: System.launchDataClear(full = True)
+		if kodi:
+			System.launchDataClear(full = True)
+			if self.aborted(log = label): return False
 
 		# Reload here if the invoker settings changed after upgrading Gaia.
 		# This will cause Kodi to freeze for a bit.
 		# Once reloaded, Kodi will restart all services, so this script will be called again.
 		if not Settings.interpreterSelect(notification = True, silent = True):
+			if self.aborted(log = label): return False
+
 			# Remove old settings no longer in settings.xml.
 			# Do here instead of during the addon launch, since this function can fail and also takes very long.
-			# The function is also more likley to work correctly here, since there are less threads writing to settings.
+			# The function is also more likely to work correctly here, since there are less threads writing to settings.
+			# Do this before System.launch() below, to ensure the file write does not interfere with the settings being changed during launch.
 			Settings.clean()
+			if self.aborted(log = label): return False
 
 			# Initialize Gaia during Kodi boot.
 			if kodi:
@@ -127,34 +154,45 @@ class Service(object):
 						Time.sleep(1)
 						System.launchAutomatic()
 				Pool.thread(target = _launch, start = True)
+				if self.aborted(log = label): return False
 
 			# VPN Monitor
 			# NB: Utilizes an infinite busy-wait thread.
 			Vpn.monitor(delay = kodi, silent = True)
+			if self.aborted(log = label): return False
 
 			# Bluetooth Monitor
 			# NB: Utilizes an infinite busy-wait thread.
 			Bluetooth.monitor()
+			if self.aborted(log = label): return False
 
 			# Local Library Update Monitor
 			# NB: Utilizes an infinite busy-wait thread.
 			Library.monitor()
+			if self.aborted(log = label): return False
 
 			# Context Menu
 			Context.initialize(force = True, wait = False)
+			if self.aborted(log = label): return False
 
 			# Trakt Cache
 			# Retry previously failed Trakt POST requests.
 			Trakt.cacheRetry(force = True, wait = False)
+			if self.aborted(log = label): return False
 
 			# Database Cleanup
 			# This can take very long for large databases.
 			# Do here instead of during launch. Nothing important requires this to finish first.
 			Manager.streamsDatabaseClearOld(notification = True, wait = True)
+			if self.aborted(log = label): return False
 			Database.cleanAutomatic(notification = True, wait = True)
+			if self.aborted(log = label): return False
 
 			# Wait for threads.
 			# Do not timeout, since there might be various threads that should run continuously (eg: Bluetooth and Library service).
+			Logger.log('SERVICE FINISHING: %s' % label)
 			Pool.join(timeout = False)
+			if self.aborted(log = label): return False
 
 		Logger.log('SERVICE FINISHED: %s' % label)
+		return True

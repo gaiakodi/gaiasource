@@ -1091,7 +1091,7 @@ class HandleResolver(Handle):
 		return self.mServiceName
 
 	def serviceClean(self, service, lower = True):
-		service = tools.Regex.remove(data = service, expression = '.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
+		service = tools.Regex.remove(data = service, expression = r'.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
 		service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol, all = True) # Remove symbols. Eg: Real-Debrid
 		if service.lower() == 'rpnet': service = 'RapidPremium'
 		if lower: service = service.lower()
@@ -1159,7 +1159,7 @@ class HandleGaia(Handle):
 		self.mServiceId = None
 		self.mServiceName = None
 		if service:
-			service = tools.Regex.remove(data = service, expression = '.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
+			service = tools.Regex.remove(data = service, expression = r'.*?(\..*)', group = 1) # Remove TLD. Eg: Premiumize.me
 			service = tools.Regex.remove(data = service, expression = tools.Regex.Symbol, all = True) # Remove symbols. Eg: Real-Debrid
 			self.mServiceName = service
 
@@ -1293,6 +1293,11 @@ class HandleGaia(Handle):
 					hoster = debrid[0].streamingHoster(support = True)
 
 					services = tools.Tools.copy(debrid[1].services()) # Copy, since it is edited below.
+
+					#gaiaremove - check emails for OC dev reply.
+					# OffCloud's new API does not have the "sites" endpoint anymore and therefore returns None.
+					if services is None: services = []
+
 					if usenet: services.insert(0, Handler.TypeUsenet)
 					if torrent: services.insert(0, Handler.TypeTorrent)
 
@@ -1848,9 +1853,9 @@ class HandleTorrenter(Handle):
 	def logCheck(self, cancel = False):
 		data = tools.Logger.data()
 		if data:
-			expression = '\[%s\s%s\s\/\](.*)(?:$|\[\/\s%s\s%s\])' % (self.mModule.Name.upper(), self.mLog, self.mModule.Name.upper(), self.mLog)
+			expression = r'\[%s\s%s\s\/\](.*)(?:$|\[\/\s%s\s%s\])' % (self.mModule.Name.upper(), self.mLog, self.mModule.Name.upper(), self.mLog)
 			data = tools.Regex.extract(data = data, expression = expression, flags = tools.Regex.FlagAllLines)
-			if cancel: return tools.Regex.match(data = data, expression = 'user\s*cancelled\s*the\s*buffering') and not tools.Regex.match(data = data, expression = 'not\s*enough\s*space\s*on\s*download\s*destination')
+			if cancel: return tools.Regex.match(data = data, expression = r'user\s*cancelled\s*the\s*buffering') and not tools.Regex.match(data = data, expression = r'not\s*enough\s*space\s*on\s*download\s*destination')
 			else: return data
 		return None
 

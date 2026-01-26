@@ -39,11 +39,11 @@ class Provider(ProviderUsenetHtml):
 	_AttributePoster	= 'search-poster'
 	_AttributePages		= 'pagination'
 
-	_ExpressionId		= 'nzb:(.*?)(?:$|\/)'
-	_ExpressionName		= '(.+?)(?:<br\/?>|<a\s+|[\r\n]+)'
-	_ExpressionSize		= 'size:\s*(.*?)(?:$|[\r\n]+)'
-	_ExpressionPassword	= 'password\s*protected'
-	_ExpressionParts	= 'parts:\s*(\d+)\s*\/\s*(\d+)'
+	_ExpressionId		= r'nzb:(.*?)(?:$|\/)'
+	_ExpressionName		= r'(.+?)(?:<br\/?>|<a\s+|[\r\n]+)'
+	_ExpressionSize		= r'size:\s*(.*?)(?:$|[\r\n]+)'
+	_ExpressionPassword	= r'password\s*protected'
+	_ExpressionParts	= r'parts:\s*(\d+)\s*\/\s*(\d+)'
 
 	##############################################################################
 	# INITIALIZE

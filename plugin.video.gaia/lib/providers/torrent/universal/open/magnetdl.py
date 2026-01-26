@@ -62,8 +62,8 @@ class Provider(ProviderHtml):
 	_AttributeHeader		= 'header-content'
 	_AttributeFill			= 'fill-content'
 
-	_ExpressionHash			= 'hash\s*:\s*' + ProviderHtml.ExpressionSha
-	_ExpressionTime			= 'uploaded\s*:\s*([\d\-\:\.\s]+)'
+	_ExpressionHash			= r'hash\s*:\s*' + ProviderHtml.ExpressionSha
+	_ExpressionTime			= r'uploaded\s*:\s*([\d\-\:\.\s]+)'
 
 	##############################################################################
 	# INITIALIZE

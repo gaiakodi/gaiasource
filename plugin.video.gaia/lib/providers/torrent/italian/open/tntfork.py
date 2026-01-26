@@ -28,7 +28,7 @@ class Provider(ProviderHtml):
 
 	_ParameterQuery			= 'titolo'
 
-	_ExpressionLink			= 'bt[im]h:([a-z0-9]{32,})(?:$|&)'
+	_ExpressionLink			= r'bt[im]h:([a-z0-9]{32,})(?:$|&)'
 
 	##############################################################################
 	# INITIALIZE

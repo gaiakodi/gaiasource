@@ -94,8 +94,8 @@ class Provider(ProviderJson):
 	_AttributeSeason		= 'seasonnum'
 	_AttributeEpisode		= 'epnum'
 
-	_ExpressionError		= '(no\s*results?\s*found|"error_code"\s*:\s*20[,\}])' # No results are returned. This might be because there are no results, or because of a TorrentApi error that sometimes does not return results although there are some.
-	_ExpressionLimit		= '(^$)' # Empty data returned. This seems to be caused by exceeding the request limit.
+	_ExpressionError		= r'(no\s*results?\s*found|"error_code"\s*:\s*20[,\}])' # No results are returned. This might be because there are no results, or because of a TorrentApi error that sometimes does not return results although there are some.
+	_ExpressionLimit		= r'(^$)' # Empty data returned. This seems to be caused by exceeding the request limit.
 
 	##############################################################################
 	# INITIALIZE

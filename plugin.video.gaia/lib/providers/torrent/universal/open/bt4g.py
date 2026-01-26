@@ -60,8 +60,8 @@ class Provider(ProviderHtml):
 	_AttributePages			= 'pagination'
 	_AttributeActive		= 'active'
 
-	_ExpressionTime			= '(?:\:\s*(.*))'
-	_ExpressionLink			= 'magnet/' + ProviderHtml.ExpressionSha
+	_ExpressionTime			= r'(?:\:\s*(.*))'
+	_ExpressionLink			= r'magnet/' + ProviderHtml.ExpressionSha
 
 	##############################################################################
 	# INITIALIZE

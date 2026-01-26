@@ -115,7 +115,7 @@ class Time(object):
 	@classmethod
 	def integer(self, date = None):
 		if date is None: date = self.format(format = Time.FormatDate)
-		return int(Regex.remove(data = date, expression = '[^\d]', all = True))
+		return int(Regex.remove(data = date, expression = r'[^\d]', all = True))
 
 	@classmethod
 	def time(self, mode = ModeThread):
@@ -604,7 +604,7 @@ class Tools(object):
 	@classmethod
 	def replaceSymbol(self, data, replace = ''):
 		try:
-			for char in '!?,.;:@#$%^&*()[]{}<>/\|~=+-_`"\'':
+			for char in r'!?,.;:@#$%^&*()[]{}<>/\|~=+-_`"\'':
 				if char in data: data = data.replace(char, replace)
 			return data
 		except: pass
@@ -813,6 +813,7 @@ class Tools(object):
 			else: return random.choice(data)
 
 	# Pick the most frequent/common element in the list.
+	# Internal items in "data" must be hashable and can therefore not be lists (must be a tuple or other hashable type).
 	@classmethod
 	def listCommon(self, data, count = 1):
 		from collections import Counter
@@ -956,18 +957,18 @@ class Tools(object):
 	@classmethod
 	def isNumeric(self, value, full = False):
 		if full:
-			return Regex.match(data = value, expression = '^[\-\+]?\d+(?:\.\d*)?$', cache = True)
+			return Regex.match(data = value, expression = r'^[\-\+]?\d+(?:\.\d*)?$', cache = True)
 		else:
 			try: return value.isnumeric()
 			except: return False
 
 	@classmethod
 	def isNumericInteger(self, value, exact = False):
-		return Regex.match(data = value, expression = '^[\-\+]?\d+$' if exact else '^[\-\+]?\d+(?:\.\d*)?$', cache = True)
+		return Regex.match(data = value, expression = r'^[\-\+]?\d+$' if exact else r'^[\-\+]?\d+(?:\.\d*)?$', cache = True)
 
 	@classmethod
 	def isNumericFloat(self, value, exact = False):
-		return Regex.match(data = value, expression = '^[\-\+]?\d+(?:\.\d*)$' if exact else '^[\-\+]?\d+$', cache = True)
+		return Regex.match(data = value, expression = r'^[\-\+]?\d+(?:\.\d*)$' if exact else r'^[\-\+]?\d+$', cache = True)
 
 	# Check if string is alphabetic.
 	@classmethod
@@ -1012,8 +1013,8 @@ class Regex(object):
 
 	FlagsDefault 		= FlagCaseInsensitive
 
-	Symbol				= '[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
-	Nonalpha			= '[\d\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\\\[\]\:\"\;\'\<\>\?\,\.\\\/]'
+	Symbol				= r'[\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\<\>\?\,\.\\\/]'
+	Nonalpha			= r'[\d\s\-\–\!\$\%%\^\&\*\(\)\_\+\|\~\=\`\{\}\[\]\:\"\;\'\<\>\?\,\.\\\/]'
 
 	CacheData			= {}
 	CacheSize			= 2048
@@ -1506,6 +1507,9 @@ class Language(object):
 	Sets = {
 		'providers' : [CodeFrench, CodeSpanish, CodePortuguese, CodeItalian, CodeGerman, CodeDutch, CodeRussian],	# The set of languages supported by providers. Used in scrape.query.keyword.language.
 	}
+
+	SettingsAudio = 'playback.audio.language'
+	SettingsSubtitle = 'playback.subtitle.language'
 
 	Replacements = {'gr' : 'el'}
 	Settings = None
@@ -2716,7 +2720,7 @@ class Hash(object):
 
 	@classmethod
 	def valid(self, hash, length = 40):
-		return hash and len(hash) == length and bool(re.match('^[a-fA-F0-9]+', hash))
+		return hash and len(hash) == length and bool(Regex.match(data = hash, expression = r'^[a-fA-F0-9]+'))
 
 class Video(object):
 
@@ -3634,11 +3638,11 @@ class Csv(object):
 				# Eg: 1,Action,123,"He made a ""reboot""",987
 				# Ignore internal BBcode brackets followed by quotes.
 				# Eg: 2011 short film ""[link=/title/tt2049400/]Beau[/link],"" which inspi
-				data = Regex.replace(data = data, expression = '(?<![^\]],)(%s%s)(?!,)' % (delimiterQuote, delimiterQuote), replacement = replaceQuote, group = None, all = True, cache = True)
+				data = Regex.replace(data = data, expression = r'(?<![^\]],)(%s%s)(?!,)' % (delimiterQuote, delimiterQuote), replacement = replaceQuote, group = None, all = True, cache = True)
 
 				# Both FlagMultiLines and FlagAllLines
 				# Eg: https://imdb.com/list/ls566661486/export
-				entries = Regex.extract(data = data, expression = '(?:^|(?<=,))\s*(\".*?\")(?:$|(?<=\"),)' , group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines | Regex.FlagAllLines, cache = True)
+				entries = Regex.extract(data = data, expression = r'(?:^|(?<=,))\s*(\".*?\")(?:$|(?<=\"),)' , group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines | Regex.FlagAllLines, cache = True)
 				if entries:
 					for entry in entries:
 						data = data.replace(entry, entry.strip(delimiterQuote).replace(',', replaceComma).replace('\n', replaceBreak))
@@ -4806,7 +4810,7 @@ class System(object):
 			return System.KodiVersionFull
 		else:
 			if System.KodiVersion is None:
-				try: System.KodiVersion = float(re.search('^(\d+\.?\d+)', self.infoLabel('System.BuildVersion')).group(0))
+				try: System.KodiVersion = float(re.search(r'^(\d+\.?\d+)', self.infoLabel('System.BuildVersion')).group(0))
 				except: pass
 			return System.KodiVersion
 
@@ -5095,7 +5099,7 @@ class System(object):
 			thread = Pool.thread(target = _exit, kwargs = {'delayed' : delayed}, start = True)
 			if warning:
 				message = ConverterDuration(value = timeout, unit = ConverterDuration.UnitSecond).string(format = ConverterDuration.FormatWordOptimal)
-				message = Regex.replace(data = message, expression = '(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
+				message = Regex.replace(data = message, expression = r'(\d+)', replacement = r'[B]\1[/B]', group = None, all = True)
 				message = Translation.string(36457) % (Format.fontBold(label), message)
 				choice = not Dialog.option(title = 36419, message = message, labelConfirm = 33743, labelDeny = action['name'], default = Dialog.ChoiceYes, timeout = timeout * 1000)
 
@@ -5235,7 +5239,9 @@ class System(object):
 		if initialize: self.argumentsInitialize()
 
 		from lib.modules.network import Networker
-		if command is None: command = self.arguments(2)
+		if command is None:
+			try: command = self.arguments(2) # plugin.video.gaia
+			except: command = self.arguments(1) # script.gaia.service
 
 		if Tools.isDictionary(command): parameters = command
 		else: parameters = dict(Networker.linkDecode(command.replace(self.plugin() + '/', '').replace('?', '')))
@@ -5636,32 +5642,45 @@ class System(object):
 		self.windowPropertyClear(System.PropertyVersion)
 
 	@classmethod
-	def prepare(self, action = None, parameters = None):
+	def prepare(self, action = None, parameters = None, full = True):
 		# These are functions that should be called every time a new Python process/invoker is initiated, not just when the addon is launched for the first time.
 		quick = False
 
-		# Execute on first launch.
-		# Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
-		if action is None or action == 'home' or action == 'menu' or action == 'search' or action == 'scrape' or action == 'play' or action.startswith('oracle'): self.launch()
+		if full:
+			# Execute on first launch.
+			# Initiate the launch of certain submenus as well, since there might be skin shortcuts linking directly to submenus without going through the main menu (action is None).
+			if action is None or action == 'home' or action == 'menu' or action == 'search' or action == 'scrape' or action == 'play' or action.startswith('oracle'): self.launch()
 
-		# Reduce processing time for menus that are in any case loaded in a new Python process, because they were launched as an "action" instead of a "folder" and therefore do not have a Kodi handle.
-		# Importing and doing all the advanced initialization below is not needed for a "wrapper" process like this.
-		# This can save around 100ms.
-		# Use when opening show/season and other series submenus.
-		# More info in MetaTools._items().
-		if action == 'menu':
-			from lib.meta.menu import MetaMenu
-			quick = MetaMenu.menuExternal(**parameters)
+			# Reduce processing time for menus that are in any case loaded in a new Python process, because they were launched as an "action" instead of a "folder" and therefore do not have a Kodi handle.
+			# Importing and doing all the advanced initialization below is not needed for a "wrapper" process like this.
+			# This can save around 100ms.
+			# Use when opening show/season and other series submenus.
+			# More info in MetaTools._items().
+			if action == 'menu':
+				from lib.meta.menu import MetaMenu
+				quick = MetaMenu.menuExternal(**parameters)
 
 		if not quick:
+			# When launching Kodi -> Gaia -> Tools -> Utilities -> System -> Information -> this errors shows:
+			#	from .ujson import *\n', 'SystemError: initialization of ujson did not return an extension module\n']
+			# Not sure why this happens.
+			# The issue is that in the call to Hardware.data() -> Hardware.detectProcessorCount() -> Psutil is imported and called.
+			# This then causes the error above.
+			# For some reason, when importing Ujson BEFORE Psutil seems to solve the problem.
+			# Update: This error shows up in other places as well, such as in tester.py.
+			# Maaybe just import Ujson here, which should hopefully fix it for every situation.
+			#Platform.modules()
+			Platform.ujson()
+
 			# Initialize the internal regex cache.
 			Regex.initialize()
 
-			# For Gaia Eminence navigation.
-			System.navigationResolve(action = action, parameters = parameters)
+			if full:
+				# For Gaia Eminence navigation.
+				System.navigationResolve(action = action, parameters = parameters)
 
-			from lib.modules.shortcut import Shortcut
-			Shortcut.process(parameters)
+				from lib.modules.shortcut import Shortcut
+				Shortcut.process(parameters)
 
 			# Otherwise importing modules in sub-threads might cause the execution to deadlock.
 			# Check the modulePrepare() function for more info.
@@ -6483,7 +6502,11 @@ class Settings(object):
 	Database = 'settings'
 	Lock = Lock()
 	Busy = 0
-	Save = None
+
+	# Set to True to enable this feature again. Currently not needed anymore.
+	# More info under Settings.saveXYZ() and Settings._addon().
+	SaveEnabled = False
+	SaveData = None
 
 	LevelBasic = 0
 	LevelStandard = 1
@@ -7256,12 +7279,71 @@ class Settings(object):
 
 	@classmethod
 	def reset(self, settings = True):
-		Settings.Save = None
+		Settings.SaveData = None
+		self._addonReset()
 
 	@classmethod
-	def _addon(self):
-		if Settings.Addon is None: Settings.Addon = System.addon()
-		return Settings.Addon
+	def _addon(self, new = False):
+		'''
+			Update (2026-01)
+
+			This is a problem with addon settings:
+				1. Enable the "reuselanguageinvoker" setting. This does not seem to happen if it is disabled.
+				2. Close Kodi and manually set the "internal.donation" setting to 9999.
+				3. Start Kodi and wait a few seconds for Gaia to start the System._launch() code in the background.
+				4. 3-5 seconds after Kodi started, launch Gaia. Do not launch to quickly, otherwise System._launch() was not initiated yet.
+				5. The donation window will show, since "internal.donation" has a high value.
+				6. After closing the donation window, the "internal.donation" is correctly reset to its default value of 0, which can be observed in settings.xml.
+				7. However, the "playbackReload" call that was started from the System._launch() code is still running and takes a few minutes to finish.
+				8. Once the "playbackReload" code has finished and the process exits, the "internal.donation" value (which is now 0), is replaced from by process to the previous value of 9999.
+				9. Hence, when restarting Kodi and opening Gaia, the donation window will show again, since the value is still 9999. And this will continue to happen if Gaia is opened shortly after Kodi is launched.
+				10. This happens to other code as well, like the announcements. Any setting changed during System._launch() is changed for a short time, but shortly afterwards replaced by the old value when "playbackReload" finishes.
+				11. When Kodi is launched and we wait a few minutes for "playbackReload" to finish, and only then start Gaia, the problem does NOT happen.
+
+			The reason this happens is as follows:
+				1. When launching a Python process and settings are read/written by Gaia, a global System.addon() instance is created in this function.
+				2. If this addon instance is used to read/written settings, Kodi loads in the settings from file.
+				3. Any settings read/written are then done/cached in memory by Kodi.
+				4. Once the Python process exits, or rather once the addon instance runs out of scope, only then does Kodi write the settings back to file.
+				5. Hence, when "playbackReload" is started, Kodi loads in the settings and runs the reload code.
+				6. The System._launch() code then resets "internal.donation" to 0. When the startup service code finishes, Kodi writes out the value to file.
+				7. A few minutes later when "playbackReload" finishes, Kodi writes the cached settings to file. But when it read in the settings, the value was still 9999 (before being reset), and hence this value is then written t file, replacing the value of 0.
+
+			This can be illustrated by changing the code in "playbackReload" to:
+				tools.Settings.get('internal.dummy')
+				for i in range(60):
+					tools.Logger.log("Waiting: "+str(i))
+					tools.Time.sleep(1)
+				tools.Settings.set('internal.dummy', False)
+			Which will cause the same problem. Leaving "playbackReload" as is also has the same problem.
+			Note that we have to call Settings.set(...) on some setting during the process, otherwise Kodi's internally cached settings are not changed and Kodi does not write them out to file at the end.
+
+			One solution to this is using Settings.saveXYZ().
+				This solution keeps track of the settings that were updated during System._launch()
+				Then System._launch() waits for all other external Gaia processes to finish.
+				Once the other processes exited, it will write these updated settings again, replacing the replaced values again.
+				This solution works, but is not great for the following reasons:
+					1. It makes System._launch() wait up to a few minutes, instead of exiting the startup process the moment it is done. Although this is not a huge issue.
+					2. It only works for System._launch(). However, processes that are executed in parallel in other places (like reloading after playback finishes) might run into the same problem.
+					3. It does not handle a situation where the same setting is updated from both System._launch() and "playbackReload", possibly making System._launch() overwrite settings updated by "playbackReload" that we actually want to keep.
+				This solution was used for a while and does work pretty reliably.
+				But it was disabled again for this more elegant solution.
+
+			A better solution:
+				1. When writing settings, create a new System.addon() instance that is temporary and runs out of scope when the moment the setting were updated.
+				2. This makes sure the setting gets written to file immediately and do not stay in Kodi's cache until it finally gets written once the process finishes.
+				3. Do NOT create a new addon instance when reading settings. Since so many settings are read all the time, this drastically increases execution time, making a non-media menu take 5+ seconds to load, instead of the usual 0.1-0.2 seconds.
+				4. Creating a new addon instance when writing settings does not increase execution time much, since settings are updated rarely. It takes 10-50ms in some cases, but mostly 0ms, since most process do not update any setting.
+		'''
+
+		#if Settings.Addon is None: Settings.Addon = System.addon()
+		#return Settings.Addon
+
+		if new:
+			return System.addon()
+		else:
+			if Settings.Addon is None: Settings.Addon = System.addon()
+			return Settings.Addon
 
 	@classmethod
 	def _addonReset(self):
@@ -7286,7 +7368,7 @@ class Settings(object):
 		check = True
 		if full:
 			data = File.readNow(File.joinPath(System.path(), 'addon.xml'))
-			check = Regex.extract(data = data, expression = '<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', group = 1) == 'true'
+			check = Regex.extract(data = data, expression = r'<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', group = 1) == 'true'
 
 		interpreter = Settings.InterpreterStandard
 		if check:
@@ -7336,11 +7418,11 @@ class Settings(object):
 
 			path = File.joinPath(System.path(), 'addon.xml')
 			data = File.readNow(path)
-			reuse = Regex.extract(data = data, expression = '<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', group = 1) == 'true'
+			reuse = Regex.extract(data = data, expression = r'<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', group = 1) == 'true'
 
 			if not reuse == enabled:
 				result = True
-				data = Regex.replace(data = data, expression = '<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', replacement = 'true' if enabled else 'false', group = 1)
+				data = Regex.replace(data = data, expression = r'<reuselanguageinvoker>(.*?)<\/reuselanguageinvoker>', replacement = 'true' if enabled else 'false', group = 1)
 				File.writeNow(path, data)
 
 				# NB: Important to delay the reloading to allow Kodi to write the changed setting to file.
@@ -7416,7 +7498,7 @@ class Settings(object):
 		try:
 			path = File.joinPath('special://userdata', 'guisettings.xml')
 			data = File.readNow(path)
-			level = Regex.extract(data = data, expression = '<settinglevel>(.*?)<\/settinglevel>')
+			level = Regex.extract(data = data, expression = r'<settinglevel>(.*?)<\/settinglevel>')
 			level = int(level)
 		except:
 			level = default
@@ -7430,7 +7512,7 @@ class Settings(object):
 		try:
 			path = File.joinPath('special://userdata', 'guisettings.xml')
 			data = File.readNow(path)
-			data = Regex.replace(data = data, expression = '<settinglevel>(.*?)<\/settinglevel>', replacement = str(level), group = 1)
+			data = Regex.replace(data = data, expression = r'<settinglevel>(.*?)<\/settinglevel>', replacement = str(level), group = 1)
 			File.writeNow(path, data)
 			return True
 		except:
@@ -7452,13 +7534,15 @@ class Settings(object):
 	def _clean(self, reload = False, retry = True, delay = False, force = False):
 		# Do not clean on the first run after a fresh install.
 		if not force and not Settings.getBoolean('internal.initial.launch'): return False
+		self._addonReset()
 
 		# Important when called from service.py after Kodi is freshly booted.
 		# Otherwise Koldi might not have loaded the addon settings yet, causing many "Resetting to default value" calls below.
 		if delay: Time.sleep(3)
 
+		self._addonReset() # Make sure all settings are written to file by Kodi.
 		dataMain = self.cacheDataMain()
-		idsMain = Regex.extract(data = dataMain, expression = '<setting\s*id\s*=\s*"(.*?)"', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
+		idsMain = Regex.extract(data = dataMain, expression = r'<setting\s*id\s*=\s*"(.*?)"', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
 		# Reset data labels to default if they were removed from settings.db.
 		# Eg: The user deletes settings.db or the DB gets corrupted. The labels still show in the settings dialog.
@@ -7475,19 +7559,9 @@ class Settings(object):
 
 		self.cacheClear()
 
-		# Update (2025-12):
-		# Is this still needed in Kodi 21+?
-		# This manually overwrites the settings.xml file and is probably not a good idea.
-		# This might only have been needed for older Kodis, were Kodi complained in the log that some setting from the profile does not exist in the addon xml.
-		# Hopefully Kodi nowadays remove old non-existing settings automatically.
-		# This was thought to be the cause from Settings.save. However, it turns out this is not the cause. More info under Settings.save.
-		# However, we should probably still not do this anymore.
-		# If we ever enable this again, make sure Settings.save still works.
-		# And this should probably only be done once when the version changes, since that is the only time settings get removed.
-		'''
 		# Only do this here, since some values might be reset to default above.
 		dataUser = self.cacheDataUser()
-		idsUser = Regex.extract(data = dataUser, expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"(.*?)".*?(?:<\/setting>|\/>)(?:\r|\n|$))', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
+		idsUser = Regex.extract(data = dataUser, expression = r'(?:^|[\r\n]+)(.*?id\s*=\s*"(.*?)".*?(?:<\/setting>|\/>)(?:\r|\n|$))', group = None, all = True, flags = Regex.FlagCaseInsensitive | Regex.FlagMultiLines)
 
 		# Remove old settings that do not exist anymore.
 		change = False
@@ -7497,23 +7571,21 @@ class Settings(object):
 				dataUser = dataUser.replace(id[0], '')
 				change = True
 
-		def _write(data, reload):
-			path = self.pathProfile()
-			size = File.size(path)
-			for i in range(5):
-				File.writeNow(path, data)
-				Time.sleep(0.5)
-				if not File.size(path) == size: break
-			if reload: self.cacheClear()
-
 		if change:
 			# File does not change in Kodi 19 if writeNow() is used, probably due to caching.
 			# Sometimes writeNow() seems to work? But just stick with writeNative() to be sure.
+			path = self.pathProfile()
 			if retry:
-				_write(data = dataUser, reload = reload)
+				size = File.size(path)
+				for i in range(3):
+					File.writeNow(path, dataUser)
+					Time.sleep(0.05)
+					if not File.size(path) == size: break
+				if reload: self.cacheClear()
 			else:
-				File.writeNow(self.pathProfile(), dataUser)
-				if reload: self.cacheClear()'''
+				File.writeNow(path, dataUser)
+			if reload: self.cacheClear()
+			self._addonReset() # Make sure new settings are read in from the updated file.
 
 	@classmethod
 	def path(self, id):
@@ -7571,73 +7643,56 @@ class Settings(object):
 	# SAVE
 	###################################################################
 
-	#gaiaremove
-	#gaiaremove - NB: Ignore all the eliminated causes. This was tested with the Interpreter setting set at "Standard" and therefore any changes to the code during testing did not take effect and the conclusions might be incorrect.
-	# This is a weird one!!
-	# If you start Gaia shortly after Kodi is booted, this happens.
-	#	If you start Gaia 1-3 seconds after Kodi, it sometimes does not happen.
-	#	But it happens most of the time when starting Gaia 3-5 seconds after Kodi.
-	#	This also seems to happen more frequently on Windows and and on low-end devices with Linux.
-	#	If you let all background processes/addons finish and wait 5 minutes after launch, and only then open Gaia, this overwriting does not seem to happen.
-	# A lot of the settings set/updated during the Gaia-launch execution do not permanently get updated in settings.xml after calling Settings.set(...).
-	#	Sometimes you can see for a short time that the value does get updated inside settings.xml, but a few seconds later the value gets overwritten by the original value before update.
-	#	It was also observed that often the value gets replaced multiple times and not just once. And this is even without this new code below that updates the values multiple times in a loop.
-	# This makes the Donation window and Announcement dialog show up again and again after rebooting Kodi, because their counters/timestamps, although updated during launch, get reset to their previous value.
-	# These have been eliminated as possible causes:
-	#	1. The automatic settings Backup import, which might accidentally replace the setting with an old backup. This is not the case.
-	#	2. The service script is also not the cause. At least not if you remove the code inside service.py.
-	#	3. The 2 Playback.instance().launch(...) calls during launch, which load metadata in the background. If commented-out, the problem still persists.
-	#	4. It is also not Settings.clean(), although the setttings.xml file gets manually written there. Even without the write, this issues still persists. But the write in Settings.clean() was removed, since it probably isn't needed for modern Kodis anymore.
-	# The cause is unknown, but probably it is Kodi itself, that might take some time to initialize the addons or something?
-	# Or there is some Python invoker or other thing in Kodi that loads the original settings into memory, then Gaia launch updates them, and if that other invoker/script finishes, Kodi writes out its settings in memory to file (which are still the old values), replacing the updated values.
-	# Whatever the root cause is, this seems to be a hacky solution:
-	#	1. Save all the settings that were updated during the Gaia launch process to a dict.
-	#	2. Outwait the process that causes this from the launch process. How long to wait or for which process to wait is unclear. But just wait a long time.
-	#	3. Hope that the old settings that are written to file are done by now. Then update the settings from the saved dict to file.
-	# The only drawback of this approach is that if another process updates one of these settings while the launch process waits, it will get overwritten by these functions.
-	#	But there are probably not many settings updated during launch that are updated elsewhere early in the boot process.
-	# Update: What is even weirder is that it was observed that after changing the settings.xml manually (for testing purposes), minutes after boot (once all these settings are done), the manual set setting is overwritten again.
-	#	The manual setting is then overwritten with the value that was correctly fixed by these functions.
-	#	It seems to be auto-replaced exactly once a few seconds after manually editing it, so maybe Kodi checks for file changes?
-	#	So Kodi must have some internal processes which has the settings cached in memory which then gets written to file every now and then, or if that process exits.
+	# This code has the following purpose:
+	#	1. During the startup process that executes System._launch(), all settings that are updated are saved to a temp dict.
+	#	2. Once the launch code is done, the process will wait for any other Gaia processes to finish, such as "playbackReload".
+	#	3. Then all the values from the temp dict are written to the settings again, replacing the old values that the other process incorrectly wrote to the settings file.
+	# This code is currently not called anymore, since there is a more elegant solution.
+	# Check Settings._addon() for more info.
+	# If this is ever needed again int he future, reenable Settings.SaveEnabled.
 
 	@classmethod
 	def saveInitialize(self):
-		Settings.Save = {}
+		if Settings.SaveEnabled:
+			Settings.SaveData = {}
 
 	@classmethod
 	def saveFinalize(self):
-		if Settings.Save:
-			for i in range(3): # Repeat in case the dict is updated or added-to while iterating over it.
-				ids = list(Settings.Save.keys()) # In case the dict is updated or added-to while iterating over it. And we also delete below.
-				if not ids: break
-				addon = System.addon()
-				for id in ids:
-					addon.setSetting(id = id, value = Settings.Save[id])
-					del Settings.Save[id]
-			Settings.Save = None
+		if Settings.SaveEnabled:
+			if Settings.SaveData:
+				for i in range(3): # Repeat in case the dict is updated or added-to while iterating over it.
+					ids = list(Settings.SaveData.keys()) # In case the dict is updated or added-to while iterating over it. And we also delete below.
+					if not ids: break
+					addon = System.addon()
+					for id in ids:
+						addon.setSetting(id = id, value = Settings.SaveData[id])
+						del Settings.SaveData[id]
+				Settings.SaveData = None
 
 	@classmethod
 	def saveUpdate(self):
-		if Settings.Save:
-			ids = list(Settings.Save.keys()) # In case the dict is updated or added-to while iterating over it.
-			addon = System.addon()
-			for id in ids:
-				addon.setSetting(id = id, value = Settings.Save[id])
+		if Settings.SaveEnabled:
+			if Settings.SaveData:
+				ids = list(Settings.SaveData.keys()) # In case the dict is updated or added-to while iterating over it.
+				addon = System.addon()
+				for id in ids:
+					addon.setSetting(id = id, value = Settings.SaveData[id])
 
 	@classmethod
 	def saveAdd(self, id, value):
-		if not Settings.Save is None: Settings.Save[id] = value
+		if Settings.SaveEnabled:
+			if not Settings.SaveData is None: Settings.SaveData[id] = value
 
 	@classmethod
 	def saveWait(self):
-		try:
-			# How long to wait is unclear. But 1 minute seems enough.
-			for i in range(12): # 1 minute.
-				self.saveUpdate() # Save while waiting, in case the setting is used by another external process.
-				Time.sleep(5)
-			self.saveFinalize()
-		except: Logger.error()
+		if Settings.SaveEnabled:
+			try:
+				# How long to wait is unclear. But 1 minute seems enough.
+				for i in range(12): # 1 minute.
+					self.saveUpdate() # Save while waiting, in case the setting is used by another external process.
+					Time.sleep(5)
+				self.saveFinalize()
+			except: Logger.error()
 
 	###################################################################
 	# CACHE
@@ -8023,6 +8078,15 @@ class Settings(object):
 			if not category is None: parameters['category'] = category
 			System.executePlugin(action = 'settingsBackground', parameters = parameters)
 		else:
+			# These values (100 and 80) does not work for Kodi 21 (21.3) anymore.
+			# Maybe because they increased the number of settings per category from 100 to 200?
+			if System.versionKodi() >= 21:
+				offsetCategory = 200
+				offsetSettings = 180
+			else:
+				offsetCategory = 100
+				offsetSettings = 80
+
 			interface.Loader.hide()
 			System.execute('Addon.OpenSettings(%s)' % addon)
 
@@ -8043,14 +8107,14 @@ class Settings(object):
 
 					# Exclude categories that are hidden, because all their children are also hidden.
 					index = 0
-					values = Regex.extract(data = data, expression = '<category(.*?)<\/category>', group = None, all = True, flags = Regex.FlagAllLines)
+					values = Regex.extract(data = data, expression = r'<category(.*?)<\/category>', group = None, all = True, flags = Regex.FlagAllLines)
 					for value in values:
 						for i in range(Settings.LevelBasic, level + 1):
 							if value.count('<level>%d</level>' % i) > 0:
 								index += 1
 								break
 
-					System.execute('Control.SetFocus(%d)' % (index - 100))
+					System.execute('Control.SetFocus(%d)' % (index - offsetCategory))
 
 					if not type == 'category':
 						entry = '<category id="'
@@ -8065,7 +8129,7 @@ class Settings(object):
 
 						# Exclude groups that are hidden, because all their children are also hidden.
 						# Must add 2 and not just 1 to the index. Not sure why, maybe Kodi adds something internally.
-						values = Regex.extract(data = sub, expression = '<group(.*?)<\/group>', group = None, all = True, flags = Regex.FlagAllLines)
+						values = Regex.extract(data = sub, expression = r'<group(.*?)<\/group>', group = None, all = True, flags = Regex.FlagAllLines)
 						for value in values:
 							for i in range(Settings.LevelBasic, level + 1):
 								if value.count('<level>%d</level>' % i) > 0:
@@ -8079,12 +8143,12 @@ class Settings(object):
 						# For group selection, go to the first entry in the group.
 						if ('<group id="%s"' % id) in sub: index += 1
 
-						System.execute('Control.SetFocus(%d)' % (index - 80))
+						System.execute('Control.SetFocus(%d)' % (index - offsetSettings))
 				except:
 					Logger.log('Setting ID not found: ' + id)
 			elif category:
-				System.execute('Control.SetFocus(%d)' % (int(category) - 100)) # Convert to int, when passed from addon.py.
-				if not idOld is None: System.execute('Control.SetFocus(%d)' % (int(idOld) - 80))
+				System.execute('Control.SetFocus(%d)' % (int(category) - offsetCategory)) # Convert to int, when passed from addon.py.
+				if not idOld is None: System.execute('Control.SetFocus(%d)' % (int(idOld) - offsetSettings))
 
 		if wait: self.launchWait(all = not gaiaIs)
 
@@ -8158,7 +8222,7 @@ class Settings(object):
 				Settings.Lock.acquire()
 				id = Converter.unicode(id)
 				if save: self.saveAdd(id = id, value = value)
-				self._addon().setSetting(id = id, value = value)
+				self._addon(new = True).setSetting(id = id, value = value)
 				Settings.Lock.release()
 				Settings.Busy -= 1
 			if background:
@@ -8202,22 +8266,21 @@ class Settings(object):
 		try:
 			# This does not always work.
 			# Sometimes when writing the truncated data to file, Kodi later replaces the content with its in-memory version.
-			'''
+
+			#data = self.cacheDataUser()
+			#expression = r'(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
+			#if not Tools.isArray(id): id = [id]
+			#
+			#for i in id:
+			#	data = Regex.remove(data = data, expression = expression % i, group = 1)
+			#	try: del Settings.CacheValuesUser[i]
+			#	except: pass
+			#
+			#File.writeNow(self.pathProfile(), data)
+			#System.windowPropertySet(Settings.PropertyCacheDataUser, data)
+
 			data = self.cacheDataUser()
-			expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
-			if not Tools.isArray(id): id = [id]
-
-			for i in id:
-				data = Regex.remove(data = data, expression = expression % i, group = 1)
-				try: del Settings.CacheValuesUser[i]
-				except: pass
-
-			File.writeNow(self.pathProfile(), data)
-			System.windowPropertySet(Settings.PropertyCacheDataUser, data)
-			'''
-
-			data = self.cacheDataUser()
-			expression = '(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
+			expression = r'(?:^|[\r\n]+)(.*?id\s*=\s*"%s".*?(?:[\r\n]+|$))'
 			if not Tools.isArray(id): id = [id]
 
 			for i in id:
@@ -8247,8 +8310,8 @@ class Settings(object):
 		try:
 			if data is None: data = self.cacheDataMain()
 
-			if parameter == Settings.ParameterValue: expression = 'id\s*=\s*"' + id + '"[^\/]*?>(.*?)<'
-			else: expression = 'id\s*=\s*"' + id + '".*?<' + parameter + '[^\/]*?>(.*?)<'
+			if parameter == Settings.ParameterValue: expression = r'id\s*=\s*"' + id + r'"[^\/]*?>(.*?)<'
+			else: expression = r'id\s*=\s*"' + id + r'".*?<' + parameter + r'[^\/]*?>(.*?)<'
 
 			match = re.search(expression, data, re.IGNORECASE | re.DOTALL)
 			if match: return match.group(1)
@@ -10294,40 +10357,40 @@ class Audience(object):
 		if Audience.Expressions is None:
 			Audience.Expressions = {
 				# International Age Rating Coalition
-				'^3'								: Audience.CertificateG,	# 3+
-				'^7'								: Audience.CertificatePg,	# 7+
-				'^12'								: Audience.CertificatePg13,	# 12+
-				'^16'								: Audience.CertificateR,	# 16+
-				'^18'								: Audience.CertificateNc17,	# 18+
+				r'^3'								: Audience.CertificateG,	# 3+
+				r'^7'								: Audience.CertificatePg,	# 7+
+				r'^12'								: Audience.CertificatePg13,	# 12+
+				r'^16'								: Audience.CertificateR,	# 16+
+				r'^18'								: Audience.CertificateNc17,	# 18+
 
 				# United Kingdom
-				'^u$'								: Audience.CertificateG,	# U
-				'^r18'								: Audience.CertificateNc17,	# R18
+				r'^u$'								: Audience.CertificateG,	# U
+				r'^r18'								: Audience.CertificateNc17,	# R18
 
 				# Canada
-				'^e$'								: Audience.CertificateG,	# E
-				'^14a'								: Audience.CertificateR,	# 14A
-				'^18a'								: Audience.CertificateNc17,	# 18A
-				'^a$'								: Audience.CertificateNc17,	# A
+				r'^e$'								: Audience.CertificateG,	# E
+				r'^14a'								: Audience.CertificateR,	# 14A
+				r'^18a'								: Audience.CertificateNc17,	# 18A
+				r'^a$'								: Audience.CertificateNc17,	# A
 
 				# Australia
 				#'^e$'								: Audience.CertificateG,	# E - same as Canada
-				'^g[\s\-]*8'						: Audience.CertificatePg,	# G8+
-				'^m(?:$|a?[\s\-]?15)'				: Audience.CertificateR,	# M, M15+, MA15+
-				'^(?:[rx][\s\-]?18|rc)'				: Audience.CertificateNc17,	# X18+, R18+, RC
-				'^ctc$'								: Audience.CertificateNr,	# CTC
+				r'^g[\s\-]*8'						: Audience.CertificatePg,	# G8+
+				r'^m(?:$|a?[\s\-]?15)'				: Audience.CertificateR,	# M, M15+, MA15+
+				r'^(?:[rx][\s\-]?18|rc)'			: Audience.CertificateNc17,	# X18+, R18+, RC
+				r'^ctc$'							: Audience.CertificateNr,	# CTC
 
 				# Spain
-				'^al?(?:$|\/)'						: Audience.CertificateG,	# A, AL, A/fig, A/i, A/i/fig (this clashes with Canada's A)
-				'^tp$'								: Audience.CertificateG,	# TP
-				'^x$'								: Audience.CertificateNc17,	# X
+				r'^al?(?:$|\/)'						: Audience.CertificateG,	# A, AL, A/fig, A/i, A/i/fig (this clashes with Canada's A)
+				r'^tp$'								: Audience.CertificateG,	# TP
+				r'^x$'								: Audience.CertificateNc17,	# X
 
 				# Generic
-				'(?<!\d)(?:0|1|2|3|4|5|6|7)(?!\d)'	: Audience.CertificateG,
-				'(?<!\d)(?:8|9|10|11)(?!\d)'		: Audience.CertificatePg,
-				'(?<!\d)(?:12|13)(?!\d)'			: Audience.CertificatePg13,
-				'(?<!\d)(?:14|15|16)(?!\d)'			: Audience.CertificateR,
-				'(?<!\d)(?:17|18|19|20|21)(?!\d)'	: Audience.CertificateNc17,
+				r'(?<!\d)(?:0|1|2|3|4|5|6|7)(?!\d)'	: Audience.CertificateG,
+				r'(?<!\d)(?:8|9|10|11)(?!\d)'		: Audience.CertificatePg,
+				r'(?<!\d)(?:12|13)(?!\d)'			: Audience.CertificatePg13,
+				r'(?<!\d)(?:14|15|16)(?!\d)'		: Audience.CertificateR,
+				r'(?<!\d)(?:17|18|19|20|21)(?!\d)'	: Audience.CertificateNc17,
 			}
 
 		for k, v in Audience.Expressions.items():
@@ -10608,7 +10671,7 @@ class Title(object):
 		format = formats[media]
 
 		result = self._format(format = format, title = title, year = year, season = season, episode = episode, series = series, special = special)
-		if not title: result = Regex.remove(data = result, expression = '(\s*[\-\.]\s*)$') # For episode titles for the History streams window.
+		if not title: result = Regex.remove(data = result, expression = r'(\s*[\-\.]\s*)$') # For episode titles for the History streams window.
 
 		return result
 
@@ -10844,39 +10907,39 @@ class Platform(object):
 
 	Kodi				= {
 		KodiOfficial		: {'name' : 'Official',			'expression' : None},
-		KodiCoreelec		: {'name' : 'CoreELEC',			'expression' : 'core[\s\-\_\.]*elec'},
-		KodiLibreelec		: {'name' : 'LibreELEC',		'expression' : 'libre[\s\-\_\.]*elec'},
-		KodiOpenelec		: {'name' : 'OpenELEC',			'expression' : 'open[\s\-\_\.]*elec'},
-		KodiXbian			: {'name' : 'XBian',			'expression' : 'xbian'},
-		KodiRasplex			: {'name' : 'RasPlex',			'expression' : 'ras[\s\-\_\.]*plex'},
-		KodiRaspbmc			: {'name' : 'Raspbmc',			'expression' : 'raspbmc'},
-		KodiNodi			: {'name' : 'Nodi',				'expression' : 'Nodi'},
-		KodiSpmc			: {'name' : 'SPMC',				'expression' : 'spmc'},
-		KodiOsmc			: {'name' : 'OSMC',				'expression' : 'osmc'},
-		KodiCemc			: {'name' : 'CEMC',				'expression' : 'cemc'},
-		KodiFtmc			: {'name' : 'FTMC',				'expression' : 'ftmc'},
-		KodiEbmc			: {'name' : 'EBox MC',			'expression' : 'e(?:[\s\-\_\.]*box)?[\s\-\_\.]*bmc'},
-		KodiE2bmc			: {'name' : 'E2BMC',			'expression' : 'e2bmc'},
-		KodiZdmc			: {'name' : 'ZDMC',				'expression' : 'zdmc'},
-		KodiStvmc			: {'name' : 'STVMC',			'expression' : 'stvmc'},
-		KodiFiremc			: {'name' : 'FireMC',			'expression' : 'fire[\s\-\_\.]*mc'},
-		KodiVdubstylemc		: {'name' : 'Vdub Style MC',	'expression' : 'vdub[\s\-\_\.]*style[\s\-\_\.]*mc'},
-		KodiTofu			: {'name' : 'TOFU',				'expression' : 'tofu'},
-		KodiMrmc			: {'name' : 'MrMC',				'expression' : 'mr[\s\-\_\.]*mc'},
-		KodiMygica			: {'name' : 'MyGica',			'expression' : 'my[\s\-\_\.]*gica'},
-		KodiKato			: {'name' : 'Kato',				'expression' : 'kato'},
-		KodiJesusbox		: {'name' : 'Jesus Box',		'expression' : 'jesus[\s\-\_\.]*box'},
-		KodiTerrarium		: {'name' : 'Terrarium TV',		'expression' : 'terrarium[\s\-\_\.]*tv'},
-		KodiOpenpht			: {'name' : 'OpenPHT',			'expression' : 'open[\s\-\_\.]*pht'},
-		KodiWetek			: {'name' : 'WeTek',			'expression' : 'we[\s\-\_\.]*tek'},
-		KodiOpenbricks		: {'name' : 'OpenBricks',		'expression' : 'open[\s\-\_\.]*bricks'},
-		KodiCrystalbuntu	: {'name' : 'Crystalbuntu',		'expression' : 'Crystal[\s\-\_\.]*u?buntu'},
-		KodiIconsole		: {'name' : 'iConsole',			'expression' : 'i[\s\-\_\.]*console'},
-		KodiGeexbox			: {'name' : 'GeeXboX',			'expression' : 'gee[\s\-\_\.]*xbox'},
-		KodiBoxee			: {'name' : 'Boxee',			'expression' : 'box[\s\-\_\.]*ee'},
-		KodiMeego			: {'name' : 'MeeGo',			'expression' : 'mee[\s\-\_\.]*go'},
-		KodiDvdfab			: {'name' : 'DVDFab',			'expression' : 'dvd[\s\-\_\.]*fab'},
-		KodiAlienware		: {'name' : 'Alienware Alpha',	'expression' : 'alienware'},
+		KodiCoreelec		: {'name' : 'CoreELEC',			'expression' : r'core[\s\-\_\.]*elec'},
+		KodiLibreelec		: {'name' : 'LibreELEC',		'expression' : r'libre[\s\-\_\.]*elec'},
+		KodiOpenelec		: {'name' : 'OpenELEC',			'expression' : r'open[\s\-\_\.]*elec'},
+		KodiXbian			: {'name' : 'XBian',			'expression' : r'xbian'},
+		KodiRasplex			: {'name' : 'RasPlex',			'expression' : r'ras[\s\-\_\.]*plex'},
+		KodiRaspbmc			: {'name' : 'Raspbmc',			'expression' : r'raspbmc'},
+		KodiNodi			: {'name' : 'Nodi',				'expression' : r'Nodi'},
+		KodiSpmc			: {'name' : 'SPMC',				'expression' : r'spmc'},
+		KodiOsmc			: {'name' : 'OSMC',				'expression' : r'osmc'},
+		KodiCemc			: {'name' : 'CEMC',				'expression' : r'cemc'},
+		KodiFtmc			: {'name' : 'FTMC',				'expression' : r'ftmc'},
+		KodiEbmc			: {'name' : 'EBox MC',			'expression' : r'e(?:[\s\-\_\.]*box)?[\s\-\_\.]*bmc'},
+		KodiE2bmc			: {'name' : 'E2BMC',			'expression' : r'e2bmc'},
+		KodiZdmc			: {'name' : 'ZDMC',				'expression' : r'zdmc'},
+		KodiStvmc			: {'name' : 'STVMC',			'expression' : r'stvmc'},
+		KodiFiremc			: {'name' : 'FireMC',			'expression' : r'fire[\s\-\_\.]*mc'},
+		KodiVdubstylemc		: {'name' : 'Vdub Style MC',	'expression' : r'vdub[\s\-\_\.]*style[\s\-\_\.]*mc'},
+		KodiTofu			: {'name' : 'TOFU',				'expression' : r'tofu'},
+		KodiMrmc			: {'name' : 'MrMC',				'expression' : r'mr[\s\-\_\.]*mc'},
+		KodiMygica			: {'name' : 'MyGica',			'expression' : r'my[\s\-\_\.]*gica'},
+		KodiKato			: {'name' : 'Kato',				'expression' : r'kato'},
+		KodiJesusbox		: {'name' : 'Jesus Box',		'expression' : r'jesus[\s\-\_\.]*box'},
+		KodiTerrarium		: {'name' : 'Terrarium TV',		'expression' : r'terrarium[\s\-\_\.]*tv'},
+		KodiOpenpht			: {'name' : 'OpenPHT',			'expression' : r'open[\s\-\_\.]*pht'},
+		KodiWetek			: {'name' : 'WeTek',			'expression' : r'we[\s\-\_\.]*tek'},
+		KodiOpenbricks		: {'name' : 'OpenBricks',		'expression' : r'open[\s\-\_\.]*bricks'},
+		KodiCrystalbuntu	: {'name' : 'Crystalbuntu',		'expression' : r'crystal[\s\-\_\.]*u?buntu'},
+		KodiIconsole		: {'name' : 'iConsole',			'expression' : r'i[\s\-\_\.]*console'},
+		KodiGeexbox			: {'name' : 'GeeXboX',			'expression' : r'gee[\s\-\_\.]*xbox'},
+		KodiBoxee			: {'name' : 'Boxee',			'expression' : r'box[\s\-\_\.]*ee'},
+		KodiMeego			: {'name' : 'MeeGo',			'expression' : r'mee[\s\-\_\.]*go'},
+		KodiDvdfab			: {'name' : 'DVDFab',			'expression' : r'dvd[\s\-\_\.]*fab'},
+		KodiAlienware		: {'name' : 'Alienware Alpha',	'expression' : r'alienware'},
 	}
 
 	SettingIdentifier	= 'internal.identifier'
@@ -10892,7 +10955,7 @@ class Platform(object):
 	########################################
 
 	@classmethod
-	def data(self, refresh = False, full = True):
+	def data(self, refresh = False, full = True, force = False):
 		if full:
 			data = Platform.DataFull
 			property = Platform.PropertyFull
@@ -10900,7 +10963,7 @@ class Platform(object):
 			data = Platform.DataBasic
 			property = Platform.PropertyBasic
 
-		if data is None:
+		if data is None or force:
 			# Some parameters can take a while to detect. Rather try to load/save to global vars.
 			if not refresh:
 				platform = System.windowPropertyGet(property)
@@ -10911,7 +10974,7 @@ class Platform(object):
 						except: version = None
 						if version and version == System.version(): data = platform
 
-			if data is None:
+			if data is None or force:
 				data = self.detect(full = full)
 				System.windowPropertySet(property, Converter.jsonTo(data))
 
@@ -11170,8 +11233,22 @@ class Platform(object):
 		return self.data(refresh = refresh, full = full)['agent']
 
 	########################################
-	# INTERNAL
+	# MODULES
 	########################################
+
+	@classmethod
+	def modules(self):
+		# Make sure Ujson is improted BEFORE Psutil. More info under System.information().
+		from lib.modules.external import Psutil, Ujson
+		return {
+			Ujson.Id : Ujson().module(),
+			Psutil.Id : Psutil().module(),
+		}
+
+	@classmethod
+	def ujson(self):
+		from lib.modules.external import Ujson
+		return Ujson().module()
 
 	@classmethod
 	def psutil(self):
@@ -11640,7 +11717,7 @@ class Platform(object):
 
 			release = platform.release()
 			if not versionName:
-				if release: versionNumber = Regex.extract(data = release, expression = '([\d\.]+).*')
+				if release: versionNumber = Regex.extract(data = release, expression = r'([\d\.]+).*')
 				if not versionNumber: versionNumber = release
 
 			if not versionLabel:
@@ -11660,8 +11737,8 @@ class Platform(object):
 			except: pass
 			if architectureName:
 				if not architectureBits:
-					if Regex.match(data = architectureName, expression = '((?<!(?<![a-z])a)64)'): architectureBits = Platform.Bits64
-					elif Regex.match(data = architectureName, expression = '((?<!(?<![a-z])a)86|(?<![a-z])32|i\d{3}|ulv|atom)'): architectureBits = Platform.Bits32
+					if Regex.match(data = architectureName, expression = r'((?<!(?<![a-z])a)64)'): architectureBits = Platform.Bits64
+					elif Regex.match(data = architectureName, expression = r'((?<!(?<![a-z])a)86|(?<![a-z])32|i\d{3}|ulv|atom)'): architectureBits = Platform.Bits32
 
 				processor = Hardware.extractProcessor(data = architectureName)
 				if processor == Hardware.ProcessorArm: architectureType = Platform.ArchitectureArm
@@ -11870,26 +11947,26 @@ class Hardware(object):
 				# https://en.wikipedia.org/wiki/List_of_products_using_ARM_processors
 				#gaiaremove - update these every now and then, especially the ARM A/X/M models.
 
-				if Regex.match(data = data, expression = '(intel)'): type = Hardware.ProcessorIntel
-				elif Regex.match(data = data, expression = '(amd)'): type = Hardware.ProcessorAmd
+				if Regex.match(data = data, expression = r'(intel)'): type = Hardware.ProcessorIntel
+				elif Regex.match(data = data, expression = r'(amd)'): type = Hardware.ProcessorAmd
 
-				elif Regex.match(data = data, expression = '(arm|aarch|risc|acorn|cortex|neoverse|securcore)'): type = Hardware.ProcessorArm
-				elif Regex.match(data = data, expression = '(arc)'): type = Hardware.ProcessorArc
+				elif Regex.match(data = data, expression = r'(arm|aarch|risc|acorn|cortex|neoverse|securcore)'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = r'(arc)'): type = Hardware.ProcessorArc
 
 				# AppleTV
 				# Eg: AppleTV14,1
 				# AppleTV1,1 is still Intel. All higher versions, AppleTVx are ARM (eg: AppleTV14,1).
-				elif Regex.match(data = data, expression = '(appletv1,)'): type = Hardware.ProcessorIntel # AppleTV: Pentium M.
-				elif Regex.match(data = data, expression = '(apple.?(?:tv|m\d))'): type = Hardware.ProcessorArm # AppleTV: Native ARM or new Apple A ARM-based processors.
+				elif Regex.match(data = data, expression = r'(appletv1,)'): type = Hardware.ProcessorIntel # AppleTV: Pentium M.
+				elif Regex.match(data = data, expression = r'(apple.?(?:tv|m\d))'): type = Hardware.ProcessorArm # AppleTV: Native ARM or new Apple A ARM-based processors.
 
-				elif Regex.match(data = data, expression = '(am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument)'): type = Hardware.ProcessorArm
-				elif Regex.match(data = data, expression = '(a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715))'): type = Hardware.ProcessorArm
-				elif Regex.match(data = data, expression = '((?!x86|x64)x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8))'): type = Hardware.ProcessorArm
-				elif Regex.match(data = data, expression = '(nvidia|tegra)'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = r'(am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument)'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = r'(a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715))'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = r'((?!x86|x64)x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8))'): type = Hardware.ProcessorArm
+				elif Regex.match(data = data, expression = r'(nvidia|tegra)'): type = Hardware.ProcessorArm
 
-				elif Regex.match(data = data, expression = '(x86|x64|i\d{3}|ulv|atom|ia.?32)'): type = Hardware.ProcessorIntel
+				elif Regex.match(data = data, expression = r'(x86|x64|i\d{3}|ulv|atom|ia.?32)'): type = Hardware.ProcessorIntel
 
-				elif Regex.match(data = data, expression = '(apple)'): type = Hardware.ProcessorArm # Assume it is a new Apple device, which all have ARM.
+				elif Regex.match(data = data, expression = r'(apple)'): type = Hardware.ProcessorArm # Assume it is a new Apple device, which all have ARM.
 		except: Logger.error()
 		return type
 
@@ -12853,7 +12930,7 @@ class Hardware(object):
 				try:
 					data = Subprocess.fallback('system_profiler').strip()
 					if data:
-						result = Regex.extract(data = data, expression = 'processor\s*name\s*:?\s*(.*?)(?:$|\n)')
+						result = Regex.extract(data = data, expression = r'processor\s*name\s*:?\s*(.*?)(?:$|\n)')
 						if result: return result
 				except: pass
 		except: pass
@@ -12863,15 +12940,15 @@ class Hardware(object):
 			if linux or android or mac:
 				data = Converter.unicode(open('/proc/cpuinfo').read())
 				if data:
-					result = Regex.extract(data = data, expression = 'model\s*name\s*:\s*(.*?)[\n\r]')
+					result = Regex.extract(data = data, expression = r'model\s*name\s*:\s*(.*?)[\n\r]')
 					if result: return result.strip()
 
 					# There can be other "processor" entries, with simply a number.
 					# Eg: processor	: 0
-					result = Regex.extract(data = data, expression = 'processor\s*:\s*(.*?(?:intel|amd|arc|apple|arm|aarch|risc|acorn|cortex|neoverse|securcore|am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument|nvidia|tegra|x86|x64|i\d{3}|ulv|atom|ia.?32|a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715)|x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8)).*?)(?:$|\n)') # Android devices.
+					result = Regex.extract(data = data, expression = r'processor\s*:\s*(.*?(?:intel|amd|arc|apple|arm|aarch|risc|acorn|cortex|neoverse|securcore|am.?logic|aml|rockchip|qualcomm|snapdragon|mediatek|broadcom|texas.?instrument|nvidia|tegra|x86|x64|i\d{3}|ulv|atom|ia.?32|a\-?(?:5|7|8|9|12|15|17|32|35|53|55|57|72|73|75|76|77|78|710|715)|x\-?(?:1|2|3|4)|r\-?(?:4|5)|m\-?(?:0|1|2|3|4|5|6|7|8)).*?)(?:$|\n)') # Android devices.
 					if result: return result.strip()
 
-					result = Regex.extract(data = data, expression = 'cpu\s*model\s*:\s*(.*?)[\n\r]')
+					result = Regex.extract(data = data, expression = r'cpu\s*model\s*:\s*(.*?)[\n\r]')
 					if result: return result.strip()
 		except: pass
 
@@ -12978,7 +13055,7 @@ class Hardware(object):
 		# cpuset may restrict the number of *available* processors
 		try:
 			result = Converter.unicode(open('/proc/self/status').read())
-			result = Regex.extract(data = result, expression = '(?m)^Cpus_allowed:\s*(.*)$')
+			result = Regex.extract(data = result, expression = r'(?m)^Cpus_allowed:\s*(.*)$')
 			if result:
 				result = bin(int(result.replace(',', ''), 16)).count('1')
 				result = _result(result)
@@ -13004,7 +13081,7 @@ class Hardware(object):
 			devices = os.listdir('/devices/pseudo/')
 			result = 0
 			for device in devices:
-				if Regex.match(data = device, expression = '^cpuid@[0-9]+$'): result += 1
+				if Regex.match(data = device, expression = r'^cpuid@[0-9]+$'): result += 1
 			result = _result(result)
 			if result and result['core']: return result
 		except: pass
@@ -13256,11 +13333,11 @@ class Hardware(object):
 					try:
 						data = info.strip()
 						if data:
-							result = Regex.extract(data = data, expression = 'cpu\s*mhz.*?([\d\.]+)')
+							result = Regex.extract(data = data, expression = r'cpu\s*mhz.*?([\d\.]+)')
 							result = _result(result, unit = 'mhz', count = count)
 							if result and result['total']: return result
 
-							result = Regex.extract(data = data, expression = 'cpu\s*ghz.*?([\d\.]+)')
+							result = Regex.extract(data = data, expression = r'cpu\s*ghz.*?([\d\.]+)')
 							result = _result(result, unit = 'ghz', count = count)
 							if result and result['total']: return result
 					except: pass
@@ -13270,11 +13347,11 @@ class Hardware(object):
 		try:
 			data = model if model else self.detectProcessorModel()
 			if data:
-				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*mhz')
+				result = Regex.extract(data = data, expression = r'([\d\.\-]+)\s*mhz')
 				result = _result(result, unit = 'mhz', count = count)
 				if result and result['total']: return result
 
-				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*ghz')
+				result = Regex.extract(data = data, expression = r'([\d\.\-]+)\s*ghz')
 				result = _result(result, unit = 'ghz', count = count)
 				if result and result['total']: return result
 		except:	pass
@@ -13283,11 +13360,11 @@ class Hardware(object):
 		try:
 			data = System.infoLabel('System.CpuFrequency', wait = True)
 			if data:
-				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*mhz')
+				result = Regex.extract(data = data, expression = r'([\d\.\-]+)\s*mhz')
 				result = _result(result, unit = 'mhz', count = count)
 				if result and result['total']: return result
 
-				result = Regex.extract(data = data, expression = '([\d\.\-]+)\s*ghz')
+				result = Regex.extract(data = data, expression = r'([\d\.\-]+)\s*ghz')
 				result = _result(result, unit = 'ghz', count = count)
 				if result and result['total']: return result
 		except: pass
@@ -13306,7 +13383,7 @@ class Hardware(object):
 		cores = 0
 		try:
 			# NB: On Windows only one core might be detected with one reading, instead of individual cores with individual readings on Linux.
-			usage = Regex.extract(data = usage, expression = ':?\s*([\d.]+)%', group = None, all = True)
+			usage = Regex.extract(data = usage, expression = r':?\s*([\d.]+)%', group = None, all = True)
 			cores = len(usage)
 			average = sum(float(i) for i in usage) / cores
 			percentFree = int(100 - average) / 100.0
@@ -13727,7 +13804,7 @@ class Hardware(object):
 					after = Subprocess.output(command)
 					duration = timer.elapsed(milliseconds = True) / 1000.0
 
-					expression = '(\d+)\s*(\d+)'
+					expression = r'(\d+)\s*(\d+)'
 					before = Regex.extract(data = before, expression = expression, group = None, all = True)[0]
 					after = Regex.extract(data = after, expression = expression, group = None, all = True)[0]
 					sent = int(after[1]) - int(before[1])
@@ -14372,7 +14449,7 @@ class Extension(object):
 		path = File.joinPath(path, 'addon.xml')
 		data = File.readNow(path)
 		link = None
-		for match in re.findall('<info.*?>(.*?)<\/info>', data, flags = re.IGNORECASE):
+		for match in re.findall(r'<info.*?>(.*?)<\/info>', data, flags = re.IGNORECASE):
 			if not 'common' in match:
 				link = match
 				break
@@ -14380,7 +14457,7 @@ class Extension(object):
 			from lib.modules import network
 			data = network.Networker().requestText(link)
 			if data:
-				match = re.search('id\s*=\s*[\'"]' + id + '[\'"].*?version\s*=\s*[\'"](.*?)[\'"]', data, flags = re.IGNORECASE)
+				match = re.search(r'id\s*=\s*[\'"]' + id + r'[\'"].*?version\s*=\s*[\'"](.*?)[\'"]', data, flags = re.IGNORECASE)
 				if match: return match.group(1)
 		return None
 
@@ -14747,7 +14824,7 @@ class Resolver(object):
 					fileOriginal = None
 					if File.exists(path):
 						fileOriginal = file = File.readNow(path)
-						file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all\)[\'"]\)', replacement = 'pass', all = True)
+						file = Regex.replace(data = file, expression = r'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all\)[\'"]\)', replacement = 'pass', all = True)
 						File.writeNow(path, file)
 
 					if authenticate:
@@ -15729,7 +15806,7 @@ class Backup(object):
 
 			# Do not allow to import old settings backups.
 			with file.open('settings.xml') as subfile:
-				version = Regex.extract(data = Converter.unicode(subfile.read()), expression = 'id\s*=\s*"internal.version".*?>(.*?)<')
+				version = Regex.extract(data = Converter.unicode(subfile.read()), expression = r'id\s*=\s*"internal.version".*?>(.*?)<')
 				version = int(version.replace('.', ''))
 				if version < 600:
 					file.close()
@@ -15914,7 +15991,7 @@ class Backup(object):
 					if not force and restore == 0:
 						choice = 0
 					elif force or (restore == 1 and interface.Dialog.option(title = 33773, message = 35210)):
-						items = [interface.Format.fontBold(re.search('\\d*-\\d*-\\d*\\s*\\d*\\.\\d*\\.\\d*', file).group(0).replace('.', ':')) for file in files]
+						items = [interface.Format.fontBold(re.search(r'\d*-\d*-\d*\s*\d*\.\d*\.\d*', file).group(0).replace('.', ':')) for file in files]
 						choice = interface.Dialog.select(title = 33773, items = items)
 
 					if choice >= 0:
@@ -16046,12 +16123,14 @@ class Donations(object):
 		Settings.set('internal.donation', 0)
 
 	@classmethod
-	def show(self, type = None, wait = False):
+	def show(self, type = None, wait = False, retry = True):
 		from lib.modules.api import Api
+		from lib.modules.cache import Cache
 
 		# If the API request failed, do not show the donations window, otherwise the window will be empty.
 		# The data is cached with this call, and later retrieved in WindowDonation.
 		donations = Api.donation(cache = True)
+		if not donations and retry: donations = Api.donation(cache = Cache.TimeoutClear) # Retry if the previous cached request failed.
 
 		if donations:
 			if type is None:
@@ -16255,8 +16334,8 @@ class Playlist(object):
 		flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines
 		if File.exists(System.AdvancedSettings):
 			data = File.readNow(System.AdvancedSettings)
-			if Regex.match(data = data, expression = '<playlistretries>.*?<\/playlistretries>', flags = flags): found = True
-			elif Regex.match(data = data, expression = '<playlisttimeout>.*?<\/playlisttimeout>', flags = flags): found = True
+			if Regex.match(data = data, expression = r'<playlistretries>.*?<\/playlistretries>', flags = flags): found = True
+			elif Regex.match(data = data, expression = r'<playlisttimeout>.*?<\/playlisttimeout>', flags = flags): found = True
 
 		if not silent:
 			Dialog.text(title = 35532, message = 32028)
@@ -16267,8 +16346,8 @@ class Playlist(object):
 				if choice == Dialog.ChoiceYes:
 					return self._settingsResult(result = None, settings = settings)
 				elif choice == Dialog.ChoiceYes:
-					data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
-					data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+					data = Regex.remove(data = data, expression = r'(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+					data = Regex.remove(data = data, expression = r'(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					if File.writeNow(System.AdvancedSettings, data):
 						data = File.readNow(System.AdvancedSettings)
 						if '<playlistretries>' in data or '<playlisttimeout>' in data:
@@ -16282,8 +16361,8 @@ class Playlist(object):
 		playlistTimeout = '<playlisttimeout>7200</playlisttimeout>'
 
 		if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-		data = Regex.remove(data = data, expression = '(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
-		data = Regex.remove(data = data, expression = '(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+		data = Regex.remove(data = data, expression = r'(\n?\s*<playlistretries>.*?<\/playlistretries>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+		data = Regex.remove(data = data, expression = r'(\n?\s*<playlisttimeout>.*?<\/playlisttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 		data = data.replace('</advancedsettings>', '\n\t%s%s\n\t%s%s\n</advancedsettings>' % (playlistRetries, comment, playlistTimeout, comment))
 		if File.writeNow(System.AdvancedSettings, data):
 			data = File.readNow(System.AdvancedSettings)
@@ -17050,7 +17129,7 @@ class Changelog(object):
 
 		data = File.readNow(File.joinPath(System.path(), 'changelog.txt'))
 		if data:
-			releases = Regex.extract(data = data, expression = '\[B\](\d+\.\d+\.\d+).*?\((.*?)\)\s*\[\/B]\s*(.*?)\s*\n{2,}', all = True, group = None, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
+			releases = Regex.extract(data = data, expression = r'\[B\](\d+\.\d+\.\d+).*?\((.*?)\)\s*\[\/B]\s*(.*?)\s*\n{2,}', all = True, group = None, flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
 			if releases:
 				for release in releases:
 					if not version or System.versionNumber(version = release[0]) > version:
@@ -17262,10 +17341,10 @@ class Buffer(object):
 		flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines
 		if File.exists(System.AdvancedSettings):
 			data = File.readNow(System.AdvancedSettings)
-			extract = Regex.extract(data = data, expression = '(<cache>.*?<\/cache>)', flags = flags)
+			extract = Regex.extract(data = data, expression = r'(<cache>.*?<\/cache>)', flags = flags)
 			if extract:
 				cache = extract
-				extract = Regex.extract(data = cache, expression = '<memorysize>(.*?)<\/memorysize>', flags = flags)
+				extract = Regex.extract(data = cache, expression = r'<memorysize>(.*?)<\/memorysize>', flags = flags)
 				if extract:
 					try:
 						currentBuffer = int(extract)
@@ -17281,7 +17360,7 @@ class Buffer(object):
 			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
-				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
+				data = Regex.remove(data = data, expression = r'(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
 				if File.writeNow(System.AdvancedSettings, data):
 					data = File.readNow(System.AdvancedSettings)
 					if '<cache>' in data and '<memorysize>' in data:
@@ -17330,7 +17409,7 @@ class Buffer(object):
 			elif choice == Dialog.ChoiceNo:
 				cache = '\n\t<cache>\n\t\t<buffermode>1</buffermode>%s\n\t\t<memorysize>%d</memorysize>%s\n\t\t<readfactor>%d</readfactor>%s\n\t</cache>\n' % (comment, newBuffer, comment, factor, comment)
 				if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-				data = Regex.remove(data = data, expression = '(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
+				data = Regex.remove(data = data, expression = r'(\n?\s*<cache>.*?<\/cache>)', flags = flags, all = True)
 				data = data.replace('</advancedsettings>', cache + '</advancedsettings>')
 				if File.writeNow(System.AdvancedSettings, data):
 					if ('<memorysize>%d</memorysize>' % newBuffer) in File.readNow(System.AdvancedSettings):
@@ -17359,9 +17438,9 @@ class Buffer(object):
 		if File.exists(System.AdvancedSettings):
 			flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines
 			data = File.readNow(System.AdvancedSettings)
-			extract = Regex.extract(data = data, expression = '(<cache>.*?<\/cache>)', flags = flags)
+			extract = Regex.extract(data = data, expression = r'(<cache>.*?<\/cache>)', flags = flags)
 			if extract:
-				extract = Regex.extract(data = extract, expression = '<memorysize>(.*?)<\/memorysize>', flags = flags)
+				extract = Regex.extract(data = extract, expression = r'<memorysize>(.*?)<\/memorysize>', flags = flags)
 				if extract:
 					try: result = int(extract)
 					except: Logger.error()
@@ -17390,10 +17469,10 @@ class Timeout(object):
 		flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines
 		if File.exists(System.AdvancedSettings):
 			data = File.readNow(System.AdvancedSettings)
-			extract = Regex.extract(data = data, expression = '(<network>.*?<\/network>)', flags = flags)
+			extract = Regex.extract(data = data, expression = r'(<network>.*?<\/network>)', flags = flags)
 			if extract:
 				network = extract
-				extract = Regex.extract(data = network, expression = '<curlclienttimeout>(.*?)<\/curlclienttimeout>', flags = flags)
+				extract = Regex.extract(data = network, expression = r'<curlclienttimeout>(.*?)<\/curlclienttimeout>', flags = flags)
 				if extract:
 					try:
 						current = int(extract)
@@ -17408,7 +17487,7 @@ class Timeout(object):
 			if choice == Dialog.ChoiceCanceled or choice == Dialog.ChoiceYes:
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceCustom:
-				data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+				data = Regex.remove(data = data, expression = r'(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 				if File.writeNow(System.AdvancedSettings, data):
 					data = File.readNow(System.AdvancedSettings)
 					if '<network>' in data and '<curlclienttimeout>' in data:
@@ -17426,7 +17505,7 @@ class Timeout(object):
 				return self._settingsResult(result = False, settings = settings)
 			elif choice == Dialog.ChoiceNo:
 				if not new:
-					data = Regex.remove(data = data, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+					data = Regex.remove(data = data, expression = r'(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					if File.writeNow(System.AdvancedSettings, data):
 						data = File.readNow(System.AdvancedSettings)
 						if '<network>' in data and '<curlclienttimeout>' in data:
@@ -17437,13 +17516,13 @@ class Timeout(object):
 							return self._settingsResult(result = True, settings = settings)
 
 				if network:
-					network = Regex.remove(data = network, expression = '(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
+					network = Regex.remove(data = network, expression = r'(\n?\s*<curlclienttimeout>.*?<\/curlclienttimeout>(?:\s*<!--.*?-->)?)', flags = flags, all = True)
 					network = network.replace('</network>', '\t<curlclienttimeout>%d</curlclienttimeout>%s\n\t</network>' % (new, comment))
 				else:
 					network = '<network>\n\t\t<curlclienttimeout>%d</curlclienttimeout>%s\n\t</network>\n' % (new, comment)
 
 				if not data or not '</advancedsettings>' in data: data = '<advancedsettings></advancedsettings>'
-				data = Regex.remove(data = data, expression = '(\n?\s*<network>.*?<\/network>)', flags = flags, all = True)
+				data = Regex.remove(data = data, expression = r'(\n?\s*<network>.*?<\/network>)', flags = flags, all = True)
 				data = data.replace('</advancedsettings>', '\n\t' + network + '\n</advancedsettings>')
 				if File.writeNow(System.AdvancedSettings, data):
 					if ('<curlclienttimeout>%d</curlclienttimeout>' % new) in File.readNow(System.AdvancedSettings):
@@ -17472,9 +17551,9 @@ class Timeout(object):
 		if File.exists(System.AdvancedSettings):
 			flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines
 			data = File.readNow(System.AdvancedSettings)
-			extract = Regex.extract(data = data, expression = '(<network>.*?<\/network>)', flags = flags)
+			extract = Regex.extract(data = data, expression = r'(<network>.*?<\/network>)', flags = flags)
 			if extract:
-				extract = Regex.extract(data = extract, expression = '<curlclienttimeout>(.*?)<\/curlclienttimeout>', flags = flags)
+				extract = Regex.extract(data = extract, expression = r'<curlclienttimeout>(.*?)<\/curlclienttimeout>', flags = flags)
 				if extract:
 					try: result = int(extract)
 					except: Logger.error()

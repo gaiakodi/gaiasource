@@ -45,9 +45,9 @@ class Provider(ProviderHtml):
 	_AttributeItem			= 'grey_bar3'
 	_AttributePages			= 'pagination_box'
 
-	_ExpressionLink			= '(\/torrent\/.*)'
-	_ExpressionNext			= '(>|&gt;){2,}'
-	_ExpressionDetails		= '(grey_bara?1)'
+	_ExpressionLink			= r'(\/torrent\/.*)'
+	_ExpressionNext			= r'(>|&gt;){2,}'
+	_ExpressionDetails		= r'(grey_bara?1)'
 
 	##############################################################################
 	# INITIALIZE

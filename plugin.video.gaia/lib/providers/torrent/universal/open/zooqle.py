@@ -51,16 +51,16 @@ class Provider(ProviderHtml):
 	_AttributeCell		= 'cell'
 	_AttributeDetails	= 'table-torrents'
 
-	_ExpressionSeeds	= 'seed.*?([\d,]+)'
-	_ExpressionLeeches	= 'leech.*?([\d,]+)'
-	_ExpressionStandard	= '(std)'
-	_ExpressionAudio	= '(audio)'
-	_ExpressionLanguage	= '(language)'
-	_ExpressionNext		= '(next)'
-	_ExpressionMute		= '(mute)'
-	_ExpressionExclude	= '(med|low)'
-	_ExpressionChannels	= '(?:(?:audio.?)(?:format|channels?))'
-	_ExpressionLanguages= '(?:(?:detected.?)languages?)'
+	_ExpressionSeeds	= r'seed.*?([\d,]+)'
+	_ExpressionLeeches	= r'leech.*?([\d,]+)'
+	_ExpressionStandard	= r'(std)'
+	_ExpressionAudio	= r'(audio)'
+	_ExpressionLanguage	= r'(language)'
+	_ExpressionNext		= r'(next)'
+	_ExpressionMute		= r'(mute)'
+	_ExpressionExclude	= r'(med|low)'
+	_ExpressionChannels	= r'(?:(?:audio.?)(?:format|channels?))'
+	_ExpressionLanguages= r'(?:(?:detected.?)languages?)'
 
 	##############################################################################
 	# INITIALIZE

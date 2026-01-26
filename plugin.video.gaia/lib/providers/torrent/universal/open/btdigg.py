@@ -38,9 +38,9 @@ class Provider(ProviderHtml):
 	_AttributeSize			= 'torrent_size'
 	_AttributeTime			= 'torrent_age'
 
-	_ExpressionTime			= 'found\s*(.*)'
-	_ExpressionDownloads	= 'downloaded\s*(\d+)\s*time'
-	_ExpressionNext			= '(>|&gt;){1,}'
+	_ExpressionTime			= r'found\s*(.*)'
+	_ExpressionDownloads	= r'downloaded\s*(\d+)\s*time'
+	_ExpressionNext			= r'(>|&gt;){1,}'
 
 	##############################################################################
 	# INITIALIZE

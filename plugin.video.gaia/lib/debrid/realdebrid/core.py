@@ -607,9 +607,9 @@ class Core(base.Core):
 		if cached: return cache.Cache.instance().cacheShort(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts, action = Core.ActionDomains)
 		else: return cache.Cache.instance().cacheClear(self._retrieve, method = Core.MethodGet, category = Core.CategoryHosts, action = Core.ActionDomains)
 
-	def servicesList(self, onlyEnabled = False, domains = True):
+	def servicesList(self, cached = True, onlyEnabled = False, domains = True):
 		if Core.ServicesList is None:
-			services = self.services(onlyEnabled = onlyEnabled)
+			services = self.services(cached = cached, onlyEnabled = onlyEnabled)
 			special = [service['id'] for service in services if not service['hoster']]
 			result = [service['id'] for service in services if service['hoster']]
 			if domains:

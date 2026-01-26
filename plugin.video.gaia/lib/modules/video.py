@@ -304,7 +304,7 @@ class Video(object):
 
 			# Remove "... Collection" keyword for sets, otherwise too few results are found.
 			if Media.isSet(self.mMedia):
-				expression = '(\scollection)(?:$|[\"\'])'
+				expression = r'(\scollection)(?:$|[\"\'])'
 				title = Regex.remove(data = title, expression = expression, group = 1, cache = True)
 				query = [Regex.remove(data = i, expression = expression, group = 1, cache = True) for i in query]
 
@@ -344,7 +344,7 @@ class Video(object):
 								items[j]['snippet'].update(i['snippet'])
 							except: pass
 
-							duration = re.search('^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$', items[j]['contentDetails']['duration'])
+							duration = re.search(r'^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$', items[j]['contentDetails']['duration'])
 							try: duration = (int(duration.group(1) if duration.group(1) else 0) * 3600) + (int(duration.group(2) if duration.group(2) else 0) * 60) + (int(duration.group(3) if duration.group(3) else 0))
 							except: duration = 0
 							items[j]['contentDetails']['duration'] = duration
@@ -381,7 +381,7 @@ class Video(object):
 					else:
 						exclude[i] = exclude[i].lower()
 
-			title = re.split('[-!$%^&*()_+|~=`{}\[\]:";\'<>?,.\/\s]', title.lower())
+			title = re.split(r'[-!$%^&*()_+|~=`{}\[\]:";\'<>?,.\/\s]', title.lower())
 			title = [i for i in title if i]
 			countTitle = len(title)
 
@@ -391,7 +391,7 @@ class Video(object):
 				name = items[i]['snippet']['title']
 				try: items[i]['snippet']['title'] = name = Converter.unicode(Parser(name).contents[0]) # Unescape HTML entities.
 				except: pass
-				split = [j for j in re.split('[-!$%^&*()_+|~=`{}\[\]:";\'<>?,.\/\s]', name.lower()) if j]
+				split = [j for j in re.split(r'[-!$%^&*()_+|~=`{}\[\]:";\'<>?,.\/\s]', name.lower()) if j]
 				split = [i for i in split if i]
 				joined = ' '.join(split)
 
@@ -402,7 +402,7 @@ class Video(object):
 						if not Tools.isArray(j): j = [j]
 						for k in j:
 							if '+' in k:
-								sub = re.split('[+]', k)
+								sub = re.split(r'[+]', k)
 								try: first = split.index(sub[0])
 								except: first = -1
 								try: second = split.index(sub[1])
@@ -424,7 +424,7 @@ class Video(object):
 						if not Tools.isArray(j): j = [j]
 						for k in j:
 							if '+' in k:
-								sub = re.split('[+]', k)
+								sub = re.split(r'[+]', k)
 								try: first = split.index(sub[0])
 								except: first = -1
 								try: second = split.index(sub[1])
@@ -445,7 +445,7 @@ class Video(object):
 				# Move videos with a different season number to the end of the list from _sort().
 				hasSeason = None
 				if serie:
-					seasonExtract = Regex.extract(data = name, expression = '(?:season[\s\-\_\+]*|s|part)([0]*\d+)')
+					seasonExtract = Regex.extract(data = name, expression = r'(?:season[\s\-\_\+]*|s|part)([0]*\d+)')
 					if seasonExtract:
 						seasonExtract = int(seasonExtract)
 						seasonSearch = 1 if season is None else season
@@ -663,7 +663,7 @@ class Video(object):
 
 			# There are different kind of YouTube URLs with a different way of adding the ID.
 			# https://stackoverflow.com/questions/60120026/how-do-i-parse-youtube-urls-to-get-the-video-id-from-a-url-using-dart
-			id = Regex.extract(data = link, expression = '.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/)|(?:(?:watch)?\/?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*')
+			id = Regex.extract(data = link, expression = r'.*(?:(?:youtu\.be\/|v\/|vi\/|u\/\w\/|embed\/)|(?:(?:watch)?\/?v(?:i)?=|\&v(?:i)?=))([^#\&\?]*).*')
 			if not id:
 				id = link.split('?v=')[-1].split('/')[-1].split('?')[0].split('&')[0]
 				if not id and not Networker.linkIs(link): id = link
@@ -674,7 +674,7 @@ class Video(object):
 			# Some errors are not in the HTML, but are rendered through JS.
 			# "playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm your age","errorScreen":{"playerErrorMessageRenderer":{"subreason":{"runs":[{"text":"This video may be inappropriate for some users."}]},"reason":{"runs":[{"text":"Sign in to confirm your age"}]},
 			# Update: This could also be done through the old API like the YouTube addon (video_info.py) does it: https://youtubei.googleapis.com/youtubei/v1/player
-			if re.search('playerErrorMessageRenderer"\s*:\s*\{', result): return None
+			if re.search(r'playerErrorMessageRenderer"\s*:\s*\{', result): return None
 
 			parser = Parser(result, parser = Parser.ParserHtml5)
 
@@ -684,7 +684,7 @@ class Video(object):
 			message = parser.findAll('div', {'id': 'unavailable-submessage'})
 			if message:
 				message = ''.join([i.text for i in message])
-				if re.search('[a-zA-Z]', message): return None
+				if re.search(r'[a-zA-Z]', message): return None
 
 			play = 'plugin://plugin.video.youtube/play/?video_id=%s' % id
 			return {'link' : link, 'play' : play}

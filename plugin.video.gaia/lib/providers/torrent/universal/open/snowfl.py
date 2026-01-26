@@ -44,7 +44,7 @@ class Provider(ProviderJson):
 	_AttributeTrusted		= 'trusted'
 	_AttributeNsfw			= 'nsfw'
 
-	_ExpressionType			= '(?:^|\s|\-|:|>|\/)\s*(video|movie|tv|show|episode|hd|4k|3d|hdr|x264|x265|other|foreign)'
+	_ExpressionType			= r'(?:^|\s|\-|:|>|\/)\s*(video|movie|tv|show|episode|hd|4k|3d|hdr|x264|x265|other|foreign)'
 
 	##############################################################################
 	# INITIALIZE
@@ -77,7 +77,7 @@ class Provider(ProviderJson):
 
 											},
 											ProviderJson.ProcessExtract : {
-												ProviderJson.RequestData : 'var\s*[a-z0-9]+\s*=\s*"((?!abcde)[a-z0-9]{30,})"', # The size of the string does not always have the same length (eg sometimes 35, other times 34).
+												ProviderJson.RequestData : r'var\s*[a-z0-9]+\s*=\s*"((?!abcde)[a-z0-9]{30,})"', # The size of the string does not always have the same length (eg sometimes 35, other times 34).
 											},
 										},
 

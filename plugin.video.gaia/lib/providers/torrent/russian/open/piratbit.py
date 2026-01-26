@@ -51,8 +51,8 @@ class Provider(ProviderHtml):
 	_AttributeMain			= 'topocs_maine'
 	_AttributeDetails		= 'table-condensed'
 
-	_ExpressionFailure		= u'tor_info.*?(noopener)'
-	_ExpressionVerified		= u'(проверено)'
+	_ExpressionFailure		= r'tor_info.*?(noopener)'
+	_ExpressionVerified		= r'(проверено)'
 
 	##############################################################################
 	# INITIALIZE

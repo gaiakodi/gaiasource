@@ -238,7 +238,7 @@ class ConverterData(ConverterBase):
 	# Extracts number from string.
 	@classmethod
 	def _extractNumber(self, string):
-		number = re.search('\d+\.*\d*', str(string))
+		number = re.search(r'\d+\.*\d*', str(string))
 		if not number is None: number = float(number.group(0))
 		return number
 
@@ -246,7 +246,7 @@ class ConverterData(ConverterBase):
 	# labels: main or other
 	@classmethod
 	def _extractString(self, string, units, labels):
-		regex = '\d+\.*\d*[\s,_]*'
+		regex = r'\d+\.*\d*[\s,_]*'
 		unit = ConverterData.Unknown
 		value = ConverterData.Failure
 		stop = False
@@ -918,7 +918,7 @@ class ConverterTime(ConverterBase):
 
 			# Replace language specific month names.
 			language = None
-			if re.search(u'[\u0400-\u04FF]', value): language = ConverterTime.Languages['ru'] # Cyrillic alphabet
+			if re.search(r'[\u0400-\u04FF]', value): language = ConverterTime.Languages['ru'] # Cyrillic alphabet
 			if language:
 				before = value
 				for other, english in language.items():
@@ -937,7 +937,7 @@ class ConverterTime(ConverterBase):
 			if offsetHas:
 				offsetTemp = self.offset(value)
 				if offsetTemp: offset = offsetTemp
-				valueOffsetless = re.sub('[\+\-]\d{4,6}', '', value).strip()
+				valueOffsetless = re.sub(r'[\+\-]\d{4,6}', '', value).strip()
 
 			for form in format:
 				val = value
@@ -951,7 +951,7 @@ class ConverterTime(ConverterBase):
 				# http://www.4webhelp.net/us/timestamp.php
 				if '%z' in form and valueOffsetless:
 					val = valueOffsetless
-					form = re.sub('%z', '', form).strip()
+					form = re.sub(r'%z', '', form).strip()
 
 				# https://forum.kodi.tv/showthread.php?tid=112916
 				# NB: First use time.strptime and only try datetime.datetime.strptime afterwards.
@@ -1032,7 +1032,7 @@ class ConverterTime(ConverterBase):
 				else: return None
 
 		result = 0
-		match = re.search('([\+\-](?:\d{4}|\d{6})(?:\.\d{1,6})?)', offset)
+		match = re.search(r'([\+\-](?:\d{4}|\d{6})(?:\.\d{1,6})?)', offset)
 		if match:
 			match = match.group(1)
 
@@ -1043,19 +1043,19 @@ class ConverterTime(ConverterBase):
 				inverse = False
 				match = match.replace('+', '')
 
-			hours = re.search('^(\d{2}).*', match)
+			hours = re.search(r'^(\d{2}).*', match)
 			if hours: hours = int(hours.group(1))
 			else: hours = 0
 
-			minutes = re.search('^\d{2}(\d{2}).*', match)
+			minutes = re.search(r'^\d{2}(\d{2}).*', match)
 			if minutes: minutes = int(minutes.group(1))
 			else: minutes = 0
 
-			seconds = re.search('^\d{4}(\d{2}).*', match)
+			seconds = re.search(r'^\d{4}(\d{2}).*', match)
 			if seconds: seconds = int(seconds.group(1))
 			else: seconds = 0
 
-			fraction = re.search('^\d{4,6}(\.\d{1,6})', match)
+			fraction = re.search(r'^\d{4,6}(\.\d{1,6})', match)
 			if fraction: seconds += float(fraction.group(1))
 
 			result = (hours * 3600) + (minutes * 60) + seconds
@@ -1108,7 +1108,7 @@ class ConverterTime(ConverterBase):
 
 			if format == ConverterTime.FormatDateTimeJsonShort:
 				result = date.strftime(ConverterTime.FormatDateTimeJson)
-				result = re.sub('(\d{3})(\d{3})(Z)', r'\1\3', result)
+				result = re.sub(r'(\d{3})(\d{3})(Z)', r'\1\3', result)
 				return result
 			else:
 				return date.strftime(format)

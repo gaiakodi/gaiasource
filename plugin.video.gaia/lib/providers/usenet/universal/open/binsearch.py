@@ -59,9 +59,9 @@ class Provider(ProviderUsenetHtml):
 	_AttributePages			= 'navigation'
 	_AttributeDisabled		= 'disabled'
 
-	_ExpressionNext			= '(>|&gt;)'
-	_ExpressionSize			= 'size\s*:\s*(.+?)(?:$|,)'
-	_ExpressionParts		= 'parts\s*available:\s*(\d+)\s*\/\s*(\d+)'
+	_ExpressionNext			= r'(>|&gt;)'
+	_ExpressionSize			= r'size\s*:\s*(.+?)(?:$|,)'
+	_ExpressionParts		= r'parts\s*available:\s*(\d+)\s*\/\s*(\d+)'
 
 	##############################################################################
 	# INITIALIZE

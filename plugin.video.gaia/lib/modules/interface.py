@@ -35,7 +35,7 @@ class Translation(object):
 		if tools.Tools.isInteger(id):
 			# Needs ID when called from RunScript(vpn.py)
 			if system: result = xbmc.getLocalizedString(id)
-			else: result = xbmcaddon.Addon(tools.System.GaiaAddon).getLocalizedString(id)
+			else: result = tools.System.addon().getLocalizedString(id)
 		else:
 			if tools.Tools.isString(id): result = id
 			else: result = str(id)
@@ -547,37 +547,37 @@ class Font(object):
 
 				if path:
 					data = tools.File.readNow(path)
-					fonts = tools.Regex.extract(data = data, expression = '<font>(.*?)<\/font>', group = None, all = True, flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagAllLines)
+					fonts = tools.Regex.extract(data = data, expression = r'<font>(.*?)<\/font>', group = None, all = True, flags = tools.Regex.FlagCaseInsensitive | tools.Regex.FlagAllLines)
 					for font in fonts:
-						name = tools.Regex.extract(data = font, expression = '<name>(.*?)<\/name>')
-						file = tools.Regex.extract(data = font, expression = '<filename>(.*?)<\/filename>')
+						name = tools.Regex.extract(data = font, expression = r'<name>(.*?)<\/name>')
+						file = tools.Regex.extract(data = font, expression = r'<filename>(.*?)<\/filename>')
 
-						size = tools.Regex.extract(data = font, expression = '<size>(.*?)<\/size>')
+						size = tools.Regex.extract(data = font, expression = r'<size>(.*?)<\/size>')
 						if size: size = int(size)
 
 						if size: dimension = int(size / adjust)
 						else: dimension = size
 
-						aspect = tools.Regex.extract(data = font, expression = '<aspect>(.*?)<\/aspect>')
+						aspect = tools.Regex.extract(data = font, expression = r'<aspect>(.*?)<\/aspect>')
 						if aspect: aspect = float(aspect)
 
-						spacing = tools.Regex.extract(data = font, expression = '<linespacing>(.*?)<\/linespacing>')
+						spacing = tools.Regex.extract(data = font, expression = r'<linespacing>(.*?)<\/linespacing>')
 						if spacing: spacing = float(spacing)
 
-						style = tools.Regex.extract(data = font, expression = '<style>(.*?)<\/style>')
+						style = tools.Regex.extract(data = font, expression = r'<style>(.*?)<\/style>')
 						if not style: style = ''
 						if name: style += ' ' + name
 						if file: style += ' ' + file
 
-						bold = tools.Regex.match(data = style, expression = 'bold')
-						black = tools.Regex.match(data = style, expression = 'black')
-						italic = tools.Regex.match(data = style, expression = 'italic')
-						light = tools.Regex.match(data = style, expression = 'light')
-						mono = tools.Regex.match(data = style, expression = 'mono')
-						upper = tools.Regex.match(data = style, expression = 'upper')
-						lower = tools.Regex.match(data = style, expression = 'lower')
-						capital = tools.Regex.match(data = style, expression = 'capitalize')
-						symbol = tools.Regex.match(data = style, expression = 'symbol')
+						bold = tools.Regex.match(data = style, expression = r'bold')
+						black = tools.Regex.match(data = style, expression = r'black')
+						italic = tools.Regex.match(data = style, expression = r'italic')
+						light = tools.Regex.match(data = style, expression = r'light')
+						mono = tools.Regex.match(data = style, expression = r'mono')
+						upper = tools.Regex.match(data = style, expression = r'upper')
+						lower = tools.Regex.match(data = style, expression = r'lower')
+						capital = tools.Regex.match(data = style, expression = r'capitalize')
+						symbol = tools.Regex.match(data = style, expression = r'symbol')
 
 						Font.FontData.append({
 							'name' : name,
@@ -1548,13 +1548,13 @@ class Format(object):
 
 	@classmethod
 	def colorExtract(self, color):
-		result = tools.Regex.extract(data = color, expression = '\\[.*?\\]([0-9A-F]{8}|[0-9A-F]{6})\\[.*?\\]')
-		if not result: result = tools.Regex.extract(data = color, expression = '([0-9A-F]{8}|[0-9A-F]{6})')
+		result = tools.Regex.extract(data = color, expression = r'\[.*?\]([0-9A-F]{8}|[0-9A-F]{6})\[.*?\]')
+		if not result: result = tools.Regex.extract(data = color, expression = r'([0-9A-F]{8}|[0-9A-F]{6})')
 		return result
 
 	@classmethod
 	def colorIsHex(self, color):
-		return tools.Regex.match(data = color, expression = '^([0-9A-F]{1,8})$')
+		return tools.Regex.match(data = color, expression = r'^([0-9A-F]{1,8})$')
 
 	@classmethod
 	def colorToRgb(self, hex, alpha = False):
@@ -1978,7 +1978,7 @@ class Format(object):
 	def fontSplit(self, label, interval = None, type = None):
 		if not interval: interval = Format.FontSplitInterval
 		if not type: type = Format.FontNewline
-		return re.sub('(.{' + str(interval) + '})', '\\1' + type, label, 0, re.DOTALL)
+		return re.sub(r'(.{' + str(interval) + '})', r'\1' + type, label, 0, re.DOTALL)
 
 	# Synonyms
 
@@ -2020,8 +2020,8 @@ class Format(object):
 
 	@classmethod
 	def clean(self, label):
-		label = tools.Regex.remove(data = label, expression = '(\[.*?\])', all = True)
-		label = tools.Regex.remove(data = label, expression = '(\[\/.*?\])', all = True)
+		label = tools.Regex.remove(data = label, expression = r'(\[.*?\])', all = True)
+		label = tools.Regex.remove(data = label, expression = r'(\[\/.*?\])', all = True)
 		return label
 
 
@@ -4122,10 +4122,15 @@ class Player(xbmc.Player):
 			'id' : data['index'],
 			'name' : data['name'],
 			'language' : language,
-			'default' : data['isdefault'],
+
+			'codec' : data['codec'],
 			'channels' : data['channels'],
 			'bitrate' : data['bitrate'],
-			'codec' : data['codec'],
+			'samplerate' : data['samplerate'],
+
+			'default' : data['isdefault'],
+			'original' : data['isoriginal'],
+			'impaired' : data['isimpaired'],
 		}
 
 	def audioStream(self, retrieve = RetrieveAll, process = False, unknown = None):
@@ -4971,10 +4976,12 @@ class Context(object):
 		return self._commandPlugin(action = 'streamsVideo', parameters = {'video' : video or self.mVideo, 'selection' : Video.ModeAutomatic, 'media' : self.mMedia, 'imdb' : self.mImdb, 'tmdb' : self.mTmdb, 'tvdb' : self.mTvdb, 'trakt' : self.mTrakt, 'season' : self.mSeason, 'title' : self.mTitle, 'year' : self.mYear})
 
 	def commandBrowse(self, season = False):
-		# Important for "parameters=False" to avoid pulling int he parameters of the current menu.
+		# Important for "parameters=False" to avoid pulling in the parameters of the current menu.
 		# Eg: If executed from a progress submenu, do not add the eg episode number from the submenu.
 		from lib.meta.menu import MetaMenu
-		return self._commandMenu(parameters = MetaMenu.instance().commandCreateMenu(media = tools.Media.Episode if season else tools.Media.Season, imdb = self.mImdb, tmdb = self.mTmdb, tvdb = self.mTvdb, trakt = self.mTrakt, season = self.mSeason if season else None, parameters = False))
+		if tools.Media.isMovie(self.mMedia): parameters = MetaMenu.instance().commandCreateMenu(media = tools.Media.Set, tmdb = self.mSet.get('tmdb'), trakt = self.mSet.get('trakt'), parameters = False)
+		else: parameters = MetaMenu.instance().commandCreateMenu(media = tools.Media.Episode if season else tools.Media.Season, imdb = self.mImdb, tmdb = self.mTmdb, tvdb = self.mTvdb, trakt = self.mTrakt, season = self.mSeason if season else None, parameters = False)
+		return self._commandMenu(parameters = parameters)
 
 	def commandDownloadCloud(self):
 		return self._commandPlugin(action = 'downloadCloud', parameters = {'source' : self.mSource})
@@ -5258,11 +5265,11 @@ class Context(object):
 				self.addLink()
 			elif not self.mMedia == tools.Media.Person:
 				self.addVideos()
+				self.addScrape()
+				self.addActivity()
+				self.addLink()
 				self.addBrowse()
 				self.addBinge()
-				self.addScrape()
-				self.addLink()
-				self.addActivity()
 				self.addLibrary()
 				self.addPlaylist()
 			self.addShortcut()
@@ -5453,6 +5460,10 @@ class Context(object):
 					{'label' : 36397, 'command' : 'commandBrowse', 'parameters' : False},
 					{'label' : 36398, 'command' : 'commandBrowse', 'parameters' : True},
 				])
+		elif tools.Media.isMovie(self.mMedia) and self.mSet:
+			self.add(label = 32071, icon = Font.IconBrowse, items = [
+				{'label' : 35884, 'command' : 'commandBrowse'},
+			])
 
 	def addDownloads(self):
 		self.add(label = 32009, icon = Font.IconDownload, items = [

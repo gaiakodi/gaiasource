@@ -28,7 +28,7 @@ class Provider(ProviderTele):
 						ProviderTele.Version2 : ['https://cpasbien.sh'],
 					}
 
-	_ExpressionHash	= 'window\.location\.href.*?[\'"\/]([a-f0-9]{40})[\'"]'
+	_ExpressionHash	= r'window\.location\.href.*?[\'"\/]([a-f0-9]{40})[\'"]'
 
 	##############################################################################
 	# INITIALIZE

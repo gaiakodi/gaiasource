@@ -47,11 +47,11 @@ class Provider(ProviderHtml):
 	_AttributeContent		= 'content'
 	_AttributePages			= 'pag'
 
-	_ExpressionHash			= 'infohash.*?' + ProviderHtml.ExpressionSha + '(?:$|\s|<)'
-	_ExpressionGood			= 'good'
-	_ExpressionBad			= 'bad'
-	_ExpressionVerified		= 'verified'
-	_ExpressionNext			= 'next'
+	_ExpressionHash			= r'infohash.*?' + ProviderHtml.ExpressionSha + r'(?:$|\s|<)'
+	_ExpressionGood			= r'good'
+	_ExpressionBad			= r'bad'
+	_ExpressionVerified		= r'verified'
+	_ExpressionNext			= r'next'
 
 	##############################################################################
 	# INITIALIZE

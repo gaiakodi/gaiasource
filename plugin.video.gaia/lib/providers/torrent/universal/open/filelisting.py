@@ -37,9 +37,9 @@ class Provider(ProviderHtml):
 	_AttributeButton		= 'btn'
 	_AttributeDisabled		= 'disabled'
 
-	_ExpressionLink			= '-%s\.html' % ProviderHtml.ExpressionSha
-	_ExpressionSeeds		= '(\d+)\s*\/\s*\d+'
-	_ExpressionLeeches		= '\d+\s*\/\s*(\d+)'
+	_ExpressionLink			= r'-%s\.html' % ProviderHtml.ExpressionSha
+	_ExpressionSeeds		= r'(\d+)\s*\/\s*\d+'
+	_ExpressionLeeches		= r'\d+\s*\/\s*(\d+)'
 
 	##############################################################################
 	# INITIALIZE

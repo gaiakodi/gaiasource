@@ -1090,7 +1090,7 @@ class Trakt(Account):
 		fileOriginal = None
 		if File.exists(path):
 			fileOriginal = file = File.readNow(path)
-			file = Regex.replace(data = file, expression = 'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all.*?\)[\'"]\)', replacement = 'pass', all = True)
+			file = Regex.replace(data = file, expression = r'xbmc\.executebuiltin\([\'"]Dialog\.Close\(all.*?\)[\'"]\)', replacement = 'pass', all = True)
 			File.writeNow(path, file)
 		Time.sleep(0.1)
 
@@ -1176,7 +1176,7 @@ class Imdb(Account):
 		if networker.responseErrorCloudflare():
 			return Account.VerifyCloudflare
 		elif networker.responseSuccess() and result:
-			username = Regex.extract(data = result, expression = '<title>(.*?)\'?s?\s*profile.*?<\/title>')
+			username = Regex.extract(data = result, expression = r'<title>(.*?)\'?s?\s*profile.*?<\/title>')
 			if username:
 				data[Account.AttributeUsername] = username
 				return data

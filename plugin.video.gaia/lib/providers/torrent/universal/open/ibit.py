@@ -47,10 +47,10 @@ class Provider(ProviderHtml):
 	_AttributeInfo			= 'more-info'
 	_AttributeLanguage		= 'inLanguage'
 
-	_ExpressionVotes		= '(\d+)\s*votes?'
-	_ExpressionDisabled		= '(disabled)'
-	_ExpressionCategory		= '(applicationSubCategory)' # Use an expression, since the attribute can contain multiple values.
-	_ExpressionUploader		= '(author)' # Use an expression, since the attribute can contain multiple values.
+	_ExpressionVotes		= r'(\d+)\s*votes?'
+	_ExpressionDisabled		= r'(disabled)'
+	_ExpressionCategory		= r'(applicationSubCategory)' # Use an expression, since the attribute can contain multiple values.
+	_ExpressionUploader		= r'(author)' # Use an expression, since the attribute can contain multiple values.
 
 	##############################################################################
 	# INITIALIZE
@@ -124,14 +124,14 @@ class Provider(ProviderHtml):
 	def processLink(self, value, item, details = None, entry = None):
 		if details:
 			if value:
-				magnet = Regex.extract(data = value, expression = '[\'\"]%s[\'\"]' % ProviderHtml.ExpressionMagnet)
+				magnet = Regex.extract(data = value, expression = r'[\'\"]%s[\'\"]' % ProviderHtml.ExpressionMagnet)
 				if magnet:
 					# Unescape hex-escaped characters (eg: "\\x26").
 					magnet = Converter.unicodeHex(magnet)
 
 					# The hash is split with "X-X".
 					# Eg: magnet:?xt=urn:btih:AD5FE1537AX-X4BEBF91B2EX-X4C25A29F56X-XDCCD25A819
-					hash = Regex.extract(data = magnet, expression = 'urn:bt[im]h:(.*?)(?:$|&)')
+					hash = Regex.extract(data = magnet, expression = r'urn:bt[im]h:(.*?)(?:$|&)')
 					if hash:
 						hashCleaned = hash.replace('X-X', '')
 						if hashCleaned:

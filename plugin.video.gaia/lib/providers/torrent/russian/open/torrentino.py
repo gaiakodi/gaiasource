@@ -62,7 +62,7 @@ class Provider(ProviderHtml):
 	_AttributeSeeds			= 'torrent-seeds'
 	_AttributeLeeches		= 'torrent-peers'
 
-	_Expression3d			= '(?:^|[\s,])(3d|bd3d|side\s*by\s*side|over\s*under)(?:$|[\s,])'
+	_Expression3d			= r'(?:^|[\s,])(3d|bd3d|side\s*by\s*side|over\s*under)(?:$|[\s,])'
 
 	##############################################################################
 	# INITIALIZE

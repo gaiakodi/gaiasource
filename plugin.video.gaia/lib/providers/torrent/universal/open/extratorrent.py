@@ -108,17 +108,17 @@ class Provider(ProviderJson, ProviderHtml):
 	_AttributePage			= 'pager_link'
 	_AttributeDisabled		= 'pager_no_link'
 
-	_ExpressionVideo		= '(video|anime)'
-	_ExpressionMovie		= '(movie)'
-	_ExpressionShow			= '(tv)'
-	_ExpressionExclude		= '(book|tutorial|adult|porn|software|picture|music|game)'
+	_ExpressionVideo		= r'(video|anime)'
+	_ExpressionMovie		= r'(movie)'
+	_ExpressionShow			= r'(tv)'
+	_ExpressionExclude		= r'(book|tutorial|adult|porn|software|picture|music|game)'
 
-	_ExpressionNext1		= '(next)'
-	_ExpressionNext2		= '(>|&gt;)'
-	_ExpressionToday		= '(today\-*(?:\d{4})?)'
-	_ExpressionYesterday	= '(y[\-\s]*day\-*(?:\d{4})?)'
-	_ExpressionHash			= '\/([a-z0-9]{32,})(?:[\/\?\&]|$)'
-	_ExpressionVideo		= '(video)'
+	_ExpressionNext1		= r'(next)'
+	_ExpressionNext2		= r'(>|&gt;)'
+	_ExpressionToday		= r'(today\-*(?:\d{4})?)'
+	_ExpressionYesterday	= r'(y[\-\s]*day\-*(?:\d{4})?)'
+	_ExpressionHash			= r'\/([a-z0-9]{32,})(?:[\/\?\&]|$)'
+	_ExpressionVideo		= r'(video)'
 
 	##############################################################################
 	# INITIALIZE
@@ -165,7 +165,7 @@ class Provider(ProviderJson, ProviderHtml):
 												},
 												ProviderHtml.ProcessExtract : {
 													ProviderHtml.RequestHeaders : {
-														ProviderHtml.RequestHeaderLocation : 'https?://(w+\d*)\..*',
+														ProviderHtml.RequestHeaderLocation : r'https?://(w+\d*)\..*',
 													},
 												},
 											},
@@ -334,7 +334,7 @@ class Provider(ProviderJson, ProviderHtml):
 			# Even this does not work:
 			#	extractParser = ProviderHtml.ParserHtml5
 			# Use regex to extract and then parse.
-			data = Regex.extract(data = str(data), expression = '(<table\s*class="tl".*?<\/table>)', flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
+			data = Regex.extract(data = str(data), expression = r'(<table\s*class="tl".*?<\/table>)', flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
 			if data: data = self.parseHtml(data = data)
 		return data
 
@@ -406,12 +406,12 @@ class Provider(ProviderJson, ProviderHtml):
 			if value:
 				# Remove prefix.
 				#	Original Name: Luca 2021 2160p UHD BluRay x265-B0MBARDiERS
-				value = Regex.remove(data = value, expression = '(^\s*original\s*name\s*:*\s*)', all = True)
+				value = Regex.remove(data = value, expression = r'(^\s*original\s*name\s*:*\s*)', all = True)
 
 				# Remove suffix.
 				#	Original Name: 【更多高清电影访问 】夏日友晴天[简繁字幕] Luca 2021 1080p BluRay x264 [email protected] COM 9.94GB (description)
 				#	Luca 2021 Hybrid 1080p BluRay REMUX AVC Atmos-EPSiLON [1o80p ReMuX] (description)
-				value = Regex.remove(data = value, expression = '(\s*[\(\{\[](?:email\s*protect(?:ed)|description)[\)\}\]].*$)', all = True)
+				value = Regex.remove(data = value, expression = r'(\s*[\(\{\[](?:email\s*protect(?:ed)|description)[\)\}\]].*$)', all = True)
 		return value
 
 	def processSourceTime(self, value, item, details = None, entry = None):

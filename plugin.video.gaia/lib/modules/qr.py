@@ -376,7 +376,7 @@ class Qr(object):
 			if Networker.linkIs(data, magnet = True):
 				while len(data) > Qr.LimitScanner:
 					try:
-						index = Regex.index(data = data, expression = '.*(&.*?=)', group = 1)
+						index = Regex.index(data = data, expression = r'.*(&.*?=)', group = 1)
 						data = data[:index]
 					except: break
 		return data
@@ -452,6 +452,8 @@ class Qr(object):
 				draw.line([(width + 1.5 * size, radius - 1), (width + 1.5 * size, height - radius + 2 * size)], color, size)
 				draw.line([(radius - 1, height + 1.5 * size), (width - radius + 2 * size, height + 1.5 * size)], color, size)
 
-			image = image.resize((resolution, resolution), Image.ANTIALIAS) # Smooth.
+			try: antialias = Image.ANTIALIAS # Python 3.11 + PIL 9.0 and prior.
+			except: antialias = Image.LANCZOS # Python 3.12 + PIL 10.0 and prior.
+			image = image.resize((resolution, resolution), antialias) # Smooth.
 		except: Logger.error()
 		return image

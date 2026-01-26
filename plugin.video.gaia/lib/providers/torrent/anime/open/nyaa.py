@@ -51,7 +51,7 @@ class Provider(ProviderHtml):
 	_AttributeSuccess		= 'success'
 	_AttributeDanger		= 'danger'
 
-	_ExpressionEnglish		= '(?<!non.)english' # Exclude "Non-English"
+	_ExpressionEnglish		= r'(?<!non.)english' # Exclude "Non-English"
 
 	##############################################################################
 	# INITIALIZE

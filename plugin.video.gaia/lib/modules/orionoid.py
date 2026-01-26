@@ -70,7 +70,7 @@ try:
 		SettingsAddonFilters = Orion.SettingsFilters
 
 		IgnoreDomains = ['furk', 'easynews']
-		IgnoreHeaders = ['phpsessid', 'session.*', 'auth(?:orization|enticat(?:e|ion))?', 'x?.?(?:rapid)?.?api.?(?:key)?', 'token', 'key', 'user(?:name)?$', 'pass(?:word)?'] # Header or cookie keys.
+		IgnoreHeaders = [r'phpsessid', r'session.*', r'auth(?:orization|enticat(?:e|ion))?', r'x?.?(?:rapid)?.?api.?(?:key)?', r'token', r'key', r'user(?:name)?$', r'pass(?:word)?'] # Header or cookie keys.
 
 		PropertyAuthentication = 'GaiaOrionAuthentication'
 
@@ -131,11 +131,11 @@ try:
 				directory = System.path(id = Orionoid.Id)
 				path = File.joinPath(directory, 'addon.xml')
 				data = File.readNow(path)
-				data = Regex.replace(data = data, expression = 'id="' + Orionoid.Id + '"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '\sname="Orion"', replacement = ' name="Orion Dummy"', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = '<extension\s*point="xbmc\.service".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = r'id="' + Orionoid.Id + r'"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = r'\sname="Orion"', replacement = ' name="Orion Dummy"', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
+				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.service".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
 				File.writeNow(path, data)
 				directories, files = File.listDirectory(directory, absolute = True)
 				for i in directories: File.deleteDirectory(i)

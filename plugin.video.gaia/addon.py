@@ -959,7 +959,7 @@ elif action.startswith('external'):
 	if action == 'externalImport':
 		from lib.modules.external import Loader
 		module = parameters.get('module')
-		Loader.instance(module = module).moduleLoad()
+		Loader.instance(module = module).moduleLoad(initialize = True)
 
 ####################################################
 # COMPRESSION
@@ -2838,7 +2838,7 @@ elif action.startswith('developer'):
 
 		# TESTER
 
-		Tester.test()
+		#Tester.test()
 
 		# STREAM
 

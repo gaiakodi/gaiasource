@@ -1,0 +1,4 @@
+The exact Python version for these is not known. It just says Python 3.~ on:
+	https://pkgs.org/download/python3-psutil
+But on PyPi v7.0.0 was compiled with max Python 3.7.
+Place them under 3_12, since there do not seem to be any wheels for this version.

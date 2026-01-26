@@ -258,7 +258,7 @@ class Cache(Database):
 		return Hash.sha1(data)
 
 	def _idInitialize(self):
-		if Cache.Id is None: Cache.Id = {'kodi' : System.versionKodi(full = True), 'addon' : System.version(), 'expression1' : re.compile('.+\smethod\s|.+function\s|\sat\s.+|\sof\s.+'), 'expression2' : re.compile('>')}
+		if Cache.Id is None: Cache.Id = {'kodi' : System.versionKodi(full = True), 'addon' : System.version(), 'expression1' : re.compile(r'.+\smethod\s|.+function\s|\sat\s.+|\sof\s.+'), 'expression2' : re.compile(r'>')}
 		return Cache.Id
 
 	def _idRepresentation(self, function, kwargs):

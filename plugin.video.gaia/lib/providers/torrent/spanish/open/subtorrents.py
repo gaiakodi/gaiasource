@@ -34,17 +34,17 @@ class Provider(ProviderHtml):
 	_AttributeDetails			= 'fichdatos'
 	_AttributePages				= 'pagination'
 
-	_ExpressionSize				= u'tamaño.*?>(.*?)(?:<\/li>)'
-	_ExpressionTime				= u'fecha(?:\s*de\s*estreno)?.*?>(.*?)(?:<\/li>)'
-	_ExpressionVideoQuality		= u'calidad.*?>(.*?)(?:<\/li>)'
-	_ExpressionVideo3d			= u'3d.*?>(.*?)(?:<\/li>)'
-	_ExpressionAudioCodec		= u'audio.*?>(.*?)\s*(?:<\/li>)'
-	_ExpressionAudioLanguage	= u'>[\s,]*(idioma.*?)\s*<.*?(?:>[\s,]*(idioma.*?)\s*<)*'
-	_ExpressionSubtitleType		= u'>([^<]*subtitulos.*?)\s*<'
-	_ExpressionSubtitleLanguage	= u'subtitulos.*title\s*=\s*[\'"](?!trailer)(.*?)[\'"]'
-	_ExpressionSubtitle			= u'(subtitulos)'
-	_ExpressionLanguage			= u'(idioma\s*)'
-	_ExpressionNext				= u'(»|&raquo;)'
+	_ExpressionSize				= r'tamaño.*?>(.*?)(?:<\/li>)'
+	_ExpressionTime				= r'fecha(?:\s*de\s*estreno)?.*?>(.*?)(?:<\/li>)'
+	_ExpressionVideoQuality		= r'calidad.*?>(.*?)(?:<\/li>)'
+	_ExpressionVideo3d			= r'3d.*?>(.*?)(?:<\/li>)'
+	_ExpressionAudioCodec		= r'audio.*?>(.*?)\s*(?:<\/li>)'
+	_ExpressionAudioLanguage	= r'>[\s,]*(idioma.*?)\s*<.*?(?:>[\s,]*(idioma.*?)\s*<)*'
+	_ExpressionSubtitleType		= r'>([^<]*subtitulos.*?)\s*<'
+	_ExpressionSubtitleLanguage	= r'subtitulos.*title\s*=\s*[\'"](?!trailer)(.*?)[\'"]'
+	_ExpressionSubtitle			= r'(subtitulos)'
+	_ExpressionLanguage			= r'(idioma\s*)'
+	_ExpressionNext				= r'(»|&raquo;)'
 
 	##############################################################################
 	# INITIALIZE

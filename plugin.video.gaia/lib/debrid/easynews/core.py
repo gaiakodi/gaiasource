@@ -203,18 +203,17 @@ class Core(base.Core):
 		version = 2.0
 		try:
 			# Either has changed, or some accounts do not have this anymore.
-			'''if cached: html = cache.Cache.instance().cacheRefreshLong(self._request, Core.LinkMembers)
-			else: html = cache.Cache.instance().cacheClear(self._request, Core.LinkMembers)
-
-			version = tools.Regex.extract(data = html, expression = 'x-easynews-version.*?content\s*=\s*[\'"](.*?)[\'"]')
-			if version: version = float(version)
-			else: version = 2.0'''
+			#if cached: html = cache.Cache.instance().cacheRefreshLong(self._request, Core.LinkMembers)
+			#else: html = cache.Cache.instance().cacheClear(self._request, Core.LinkMembers)
+			#version = tools.Regex.extract(data = html, expression = r'x-easynews-version.*?content\s*=\s*[\'"](.*?)[\'"]')
+			#if version: version = float(version)
+			#else: version = 2.0
 
 			if cached: html = cache.Cache.instance().cacheMedium(self._request, link = Core.LinkPreferences)
 			else: html = cache.Cache.instance().cacheClear(self._request, link = Core.LinkPreferences)
 
-			version = tools.Regex.extract(data = html, expression = '<select.*?name="members2".*?>(.*?)<\/select>')
-			version = tools.Regex.extract(data = version, expression = '<option.*?selected="selected".*?>(.*?)<\/option>')
+			version = tools.Regex.extract(data = html, expression = r'<select.*?name="members2".*?>(.*?)<\/select>')
+			version = tools.Regex.extract(data = version, expression = r'<option.*?selected="selected".*?>(.*?)<\/option>')
 			version = version.lower()
 
 			if '2.0' in version: version = 2.0
@@ -348,11 +347,11 @@ class Core(base.Core):
 							try:
 								usageLoyalty = columns[2].getText()
 
-								usageLoyaltyTime = tools.Regex.extract(data = usageLoyalty, expression = '(\d{4}-\d{1,2}-\d{1,2})')
+								usageLoyaltyTime = tools.Regex.extract(data = usageLoyalty, expression = r'(\d{4}-\d{1,2}-\d{1,2})')
 								usageLoyaltyTimestamp = convert.ConverterTime(usageLoyaltyTime, format = convert.ConverterTime.FormatDate).timestamp()
 								usageLoyaltyTime = datetime.datetime.fromtimestamp(usageLoyaltyTimestamp)
 
-								usageLoyaltyPoints = float(tools.Regex.extract(data = usageLoyalty, expression = '(\d+\.\d+)'))
+								usageLoyaltyPoints = float(tools.Regex.extract(data = usageLoyalty, expression = r'(\d+\.\d+)'))
 								usageLoyaltyDate = usageLoyaltyTime.strftime('%Y-%m-%d')
 							except: pass
 							break
@@ -436,7 +435,7 @@ class Core(base.Core):
 		return account
 
 	def _accountSize(self, data):
-		value = tools.Regex.extract(data = data, expression = '\((.*?)\)')
+		value = tools.Regex.extract(data = data, expression = r'\((.*?)\)')
 		if value: data = value
 		value = int(convert.ConverterSize.toBytes(data.replace(',', '').strip()))
 		if value < 0: return None

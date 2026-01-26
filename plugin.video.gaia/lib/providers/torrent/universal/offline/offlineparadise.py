@@ -44,7 +44,7 @@ class Provider(ProviderOffline):
 			dumpLinkWeb			= 'https://torrent-paradise.ml',
 			dumpLinkSource		= 'https://github.com/urbanguacamole/torrent-paradise',
 			dumpLinkOrignal		= 'https://cloudflare-ipfs.com/ipfs/QmcsjpRsLkSojdJ19PpTYoevP8ZdeCqmtEvjqa2R28rxWs', # https://ipfs.io/ipfs/QmcsjpRsLkSojdJ19PpTYoevP8ZdeCqmtEvjqa2R28rxWs
-			dumpProcessFilter	= '.*?,(.*)(?:,\d+){4}',
+			dumpProcessFilter	= r'.*?,(.*)(?:,\d+){4}',
 		)
 
 	##############################################################################

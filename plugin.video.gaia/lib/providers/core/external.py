@@ -121,15 +121,15 @@ class ProviderExternal(ProviderBase):
 
 		# Always include sub-dependecies before dependecies.
 		data = File.readNow(File.translate(File.joinPath(path, 'addon.xml')))
-		dependencies = Regex.extract(data = data, expression = '<import.*?addon\s*=\s*"(.*?)"', group = None, all = True)
+		dependencies = Regex.extract(data = data, expression = r'<import.*?addon\s*=\s*"(.*?)"', group = None, all = True)
 		if dependencies:
 			for dependency in dependencies:
 				if not dependency.startswith('xbmc.'):
 					self.instancesInclude(id = dependency)
 
 		# Some modules, like kodi-six, use a different directory name than "lib".
-		library = Regex.extract(data = data, expression = '<extension.*?library\s*=\s*"(.*?)".*?point\s*=\s*"xbmc.python.module".*?>')
-		if not library: library = Regex.extract(data = data, expression = '<extension.*?point\s*=\s*"xbmc.python.module".*?library\s*=\s*"(.*?)".*?>')
+		library = Regex.extract(data = data, expression = r'<extension.*?library\s*=\s*"(.*?)".*?point\s*=\s*"xbmc.python.module".*?>')
+		if not library: library = Regex.extract(data = data, expression = r'<extension.*?point\s*=\s*"xbmc.python.module".*?library\s*=\s*"(.*?)".*?>')
 		if not library: library = 'lib'
 		library = File.translate(File.joinPath(path, library))
 		if File.existsDirectory(library):
@@ -192,10 +192,10 @@ class ProviderExternal(ProviderBase):
 
 				# TheCrew -> client.py: has base64 encoded code that also contain imports.
 				if not 'cfscrape' in file and 'eval(' in data:
-					replacement = ')'
+					replacement = r')'
 					for replace in replacementsMain:
-						replacement += '.replace(b\'%s\', b\'%s\')' % (replace[0], replace[1])
-					data = Regex.replace(data = data, expression = 'b64decode\(eval\(.*?\)(\))', replacement = replacement, group = 1, all = True, flags = flags)
+						replacement += r'.replace(b\'%s\', b\'%s\')' % (replace[0], replace[1])
+					data = Regex.replace(data = data, expression = r'b64decode\(eval\(.*?\)(\))', replacement = replacement, group = 1, all = True, flags = flags)
 
 				# There is a sporadic error when importing modules if multiple external addons are used.
 				# These are random (about 50% of the time) and depend on the order in which external providers are executed.
@@ -218,7 +218,7 @@ class ProviderExternal(ProviderBase):
 				# For many files/functions this is not a problem, since they are the same across addons.
 				# However, in some cases if the file/functions are different, it can throw exceptions.
 				# The problem is mitigated by replacing all import statements with addon-specific aliases (eg: from fenomscrapers.modules import source_utils as fenomscrapers_source_utils).
-				modules = Regex.extract(data = data, expression = 'from\s+%s.*?\s+import\s+(.*?)\n' % self.IdLibrary, group = None, all = True, flags = flags)
+				modules = Regex.extract(data = data, expression = r'from\s+%s.*?\s+import\s+(.*?)\n' % self.IdLibrary, group = None, all = True, flags = flags)
 				if modules:
 					modules = [module.split(',') for module in modules]
 					modules = Tools.listFlatten(modules)
@@ -226,39 +226,57 @@ class ProviderExternal(ProviderBase):
 					modules = Tools.listUnique(modules)
 					for module in modules:
 						if ' as ' in module:
-							module = Regex.extract(data = module, expression = 'as\s+(.*)', group = 1)
+							module = Regex.extract(data = module, expression = r'as\s+(.*)', group = 1)
 							alias = '%s_%s' % (self.IdLibrary, module)
-							data = Regex.replace(data = data, expression = 'from\s+%s.*?\s+import\s+.*?\s+as\s+(%s)' % (self.IdLibrary, module), replacement = alias, group = 1, all = True, flags = Regex.FlagNone)
+							data = Regex.replace(data = data, expression = r'from\s+%s.*?\s+import\s+.*?\s+as\s+(%s)' % (self.IdLibrary, module), replacement = alias, group = 1, all = True, flags = Regex.FlagNone)
 						else:
 							alias = '%s_%s' % (self.IdLibrary, module)
-							data = Regex.replace(data = data, expression = 'from\s+%s.*?\s+import.*?[\s,]+(?<!%s_)(%s)' % (self.IdLibrary, self.IdLibrary, module), replacement = '%s as %s' % (module, alias), group = 1, all = True, flags = Regex.FlagNone)
+							data = Regex.replace(data = data, expression = r'from\s+%s.*?\s+import.*?[\s,]+(?<!%s_)(%s)' % (self.IdLibrary, self.IdLibrary, module), replacement = '%s as %s' % (module, alias), group = 1, all = True, flags = Regex.FlagNone)
 
-						if module.isupper(): data = Regex.replace(data = data, expression = '(%s)' % module, replacement = alias, group = 1, all = True, flags = Regex.FlagNone) # Assume a variable is imported (eg: control.py -> UNDESIRABLES).
-						else: data = Regex.replace(data = data, expression = '(%s)[\.\(\[]' % module, replacement = alias, group = 1, all = True, flags = Regex.FlagNone)
+						if module.isupper(): data = Regex.replace(data = data, expression = r'(%s)' % module, replacement = alias, group = 1, all = True, flags = Regex.FlagNone) # Assume a variable is imported (eg: control.py -> UNDESIRABLES).
+						else: data = Regex.replace(data = data, expression = r'(%s)[\.\(\[]' % module, replacement = alias, group = 1, all = True, flags = Regex.FlagNone)
 
 				# Calls to the parent's addon settings or info.
 				# These calls fail if the parent addon is not installed or disabled.
 				# Eg: OathScrapers -> cache.py -> data_path = oathscrapers_control.transPath(oathscrapers_control.addon('plugin.video.theoath').getAddonInfo('profile'))
 				if '.addon(' in data:
-					calls = Regex.extract(data = data, expression = '=\s*(.*?\.addon\(.*?\)\..*?\(.*?\)+)', all = True, group = None)
+					calls = Regex.extract(data = data, expression = r'=\s*(.*?\.addon\(.*?\)\..*?\(.*?\)+)', all = True, group = None)
 					if calls:
 						for call in calls:
-							call2 = Regex.extract(data = call, expression = '([^\(]*?\.addon\(.*?\))')
+							call2 = Regex.extract(data = call, expression = r'([^\(]*?\.addon\(.*?\))')
 							if call2:
 								call2 = call2.replace('"', '\\"')
 								variable = Hash.random()
 								data = data.replace(call, '%s if exec("try:\\n GAIA_%s = %s\\nexcept: GAIA_%s = None", globals(), locals()) or locals()["GAIA_%s"] else None' % (call, variable, call2, variable, variable))
 
+				# Update (2026-01):
+				# Since Python 3.12, Syntax Warnings are thrown if there is an unknown escape sequence in a regex string, eg: "\s\d".
+				# Change it to a raw string r'...' to get rid of these warnings.
+				# Eg: r = [(i[0], i[1], re.findall('(.*?)\s+-\s+Season\s+(\d)', i[1])) for i in r]
+				# Eg: tag = re.match('<([^\s/>]+)', match)
+				# Eg: for match in re.finditer('''\s+(?P<key>[^=]+)=\s*(?:(?P<delim>["'])(?P<value1>.*?)(?P=delim)|(?P<value2>[^"'][^>\s]*))''', element):\
+				# Eg: pattern = '(<%s(?:\s[^>]*>|/?>))' % name
+				# Eg: pattern = '''(<{tag}[^>]*\s{key}=(?P<delim>['"])(.*?)(?P=delim)[^>]*>)'''.format(tag=name, key=key)
+				if 're.' in data:
+					data = Regex.replace(data = data, expression = r'(re\.[a-z]+\(|[a-z0-9-_\.][\'\"]?\s*[\:\=]\s*)([\'\"]+)', replacement = r'\1r\2', group = None, all = True)
+				# And other escape sequences:
+				# Eg: title = title.translate(None, ':*?"\'\.<>|&!,')
+                # Eg: 'url': url.replace('\/', '/'),
+				# Eg: '[\]^_`abcdefghijklmnopqrstuvwxyz{|}~')
+				# Eg: url = url.replace('"', '').replace(',', '').replace('\/', '/')
+				if r'\/' in data or r'\.' in data or r'\]' in data or r'\)' in data or r'\}' in data:
+					data = Regex.replace(data = data, expression = r'(.*)(?<=\s|\()([\'\"]+)(.*?\\[\/\.\]\)\}])', replacement = r'\1r\2\3', group = None, all = True)
+
 				# Make sure the addon does not filter out unsupported links. Let Gaia do that.
 				if file.endswith('source_utils.py'):
 					# Make sure the last return statement in the try-except part is still left as is.
-					data = Regex.replace(data = data, expression = 'def\s*is_host_valid.*?(?:except.*?)(return\s*False).*(?:$|def\s)', replacement = 'pass;return False', group = 1, all = True, flags = flags)
+					data = Regex.replace(data = data, expression = r'def\s*is_host_valid.*?(?:except.*?)(return\s*False).*(?:$|def\s)', replacement = 'pass;return False', group = 1, all = True, flags = flags)
 
 					# Replace remaining ones.
-					data = Regex.replace(data = data, expression = 'def\s*is_host_valid.*?(?<!pass[;#])(return\s*False).*(?:$|def\s)', replacement = 'pass#', group = 1, all = True, flags = flags)
+					data = Regex.replace(data = data, expression = r'def\s*is_host_valid.*?(?<!pass[;#])(return\s*False).*(?:$|def\s)', replacement = 'pass#', group = 1, all = True, flags = flags)
 
 					# Replace the one that checks if the host is valid.
-					data = Regex.replace(data = data, expression = 'def\s*is_host_valid.*?(return\s*any\(hosts\)).*(?:$|def\s)', replacement = 'return True', group = 1, all = True, flags = flags)
+					data = Regex.replace(data = data, expression = r'def\s*is_host_valid.*?(return\s*any\(hosts\)).*(?:$|def\s)', replacement = 'return True', group = 1, all = True, flags = flags)
 
 				# TheCrew - Ororo
 				# \'Authorization\': \'Basic %s\' % base64.b64encode(\'%s:%s\' % (self.user, self.password).encode(\'utf-8\')),\n', "AttributeError: 'tuple' object has no attribute 'encode'\n"]
@@ -393,7 +411,7 @@ class ProviderExternal(ProviderBase):
 			if scraper:
 				import inspect
 				code = inspect.getsource(scraper.__class__)
-				if Regex.match(data = code, expression = '(magnet:|[\'"](?:torrent|magnet)[\'"])'): return True
+				if Regex.match(data = code, expression = r'(magnet:|[\'"](?:torrent|magnet)[\'"])'): return True
 		except: self.logError()
 		return False
 
@@ -419,15 +437,15 @@ class ProviderExternal(ProviderBase):
 			# Check if it has a custom resolve() function.
 			if path:
 				data = File.readNow(path)
-				resolver = Regex.match(data = data, expression = 'def\s+resolve\(')
-				if resolver and Regex.match(data = data, expression = 'def\s+resolve\(.*?\n\s*return\s(?:u(?:rl)?|link|None|True|False)'): resolver = False
+				resolver = Regex.match(data = data, expression = r'def\s+resolve\(')
+				if resolver and Regex.match(data = data, expression = r'def\s+resolve\(.*?\n\s*return\s(?:u(?:rl)?|link|None|True|False)'): resolver = False
 				provider.resolverSet(resolver)
 
 			# Extract the languages.
 			language = []
 			try: language = scraper.language
 			except:
-				try: language = Regex.extract(data = directory, expression = '^(\w{2})(?:_.*$|$)')
+				try: language = Regex.extract(data = directory, expression = r'^(\w{2})(?:_.*$|$)')
 				except: pass
 			if not language: language = []
 			if not Tools.isArray(language): language = [language]
@@ -549,10 +567,10 @@ class ProviderExternal(ProviderBase):
 							source = Converter.unicode(item['source']).lower().replace(' ', '')
 							if 'torrent' in source: continue
 							if Networker.linkIsIp(source): source = 'Anonymous'
-							elif Regex.match(data = source, expression = '(google.*?(vid|link))'): source = 'GoogleVideo'
-							elif Regex.match(data = source, expression = '(google.*?(cloud|user|content))'): source = 'GoogleCloud'
-							elif Regex.match(data = source, expression = '(google.*?doc)'): source = 'GoogleDocs'
-							elif Regex.match(data = source, expression = '(google.*?drive)'): source = 'GoogleDrive'
+							elif Regex.match(data = source, expression = r'(google.*?(vid|link))'): source = 'GoogleVideo'
+							elif Regex.match(data = source, expression = r'(google.*?(cloud|user|content))'): source = 'GoogleCloud'
+							elif Regex.match(data = source, expression = r'(google.*?doc)'): source = 'GoogleDocs'
+							elif Regex.match(data = source, expression = r'(google.*?drive)'): source = 'GoogleDrive'
 							elif '.' in source: source = Networker.linkDomain(link = source, subdomain = False, topdomain = True, ip = True)
 
 							try: videoQuality = item['quality']
@@ -674,7 +692,7 @@ class ProviderExternalUnstructured(ProviderExternal):
 								try:
 									url = instance.movie(idImdb, titleMain, titleLocal, titleAliases, str(year))
 								except Exception as error:
-									if Regex.match(data = str(error).lower(), expression = 'takes.*\s5\s.*argument'):
+									if Regex.match(data = str(error).lower(), expression = r'takes.*\s5\s.*argument'):
 										url = instance.movie(idImdb, titleMain, titleAliases, str(year))
 								self.statisticsUpdateSearch(request = True)
 					else: # New FenomScrapers pass the dictionary directly to sources().

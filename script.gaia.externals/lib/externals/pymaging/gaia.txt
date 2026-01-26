@@ -15,4 +15,26 @@ find ./ -type f -exec sed -i -e 's/from pymaging/from externals.pymaging/g' {} \
 Add the "pymaging-png" module as a sub-directory "png".
 Delete "tests" and "testdata" directories.
 
+Update (2026-01): pkg_resources is deprecated in Python 3.12.
+Change formats.py from:
+
+            import pkg_resources
+            for entry_point in pkg_resources.iter_entry_points('pymaging.formats'):
+                format = entry_point.load()
+                self.register(format)
+		
+to (make sure the indentation is correct - spaces):
+
+            # GAIACODE
+            try:
+                from importlib.metadata import entry_points
+                for entry_point in entry_points(group='pymaging.formats'):
+                    format = entry_point.load()
+                    self.register(format)
+            except:
+                import pkg_resources
+                for entry_point in pkg_resources.iter_entry_points('pymaging.formats'):
+                    format = entry_point.load()
+                    self.register(format)
+
 #########################################################################################################################

@@ -124,6 +124,7 @@ class Importer(object):
 			if Tools.isString(module): module = self.module(module = module)
 			name = module.__name__
 			if name.startswith('externals.'): name = name.split('.')[1]
+			pkg = True
 
 			if not result:
 				try:
@@ -141,10 +142,18 @@ class Importer(object):
 				try:
 					from importlib.metadata import version
 					result = version(name)
-				except: pass
+				except Exception as e:
+					# pkg_resources is deprecated since Python 3.12, logging this:
+					#	UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81. from pkg_resources import get_distribution
+					# If importlib.metadata.version throws a PackageNotFoundError exception, we know the module works, there is just no version info available in the module.
+					# Eg: uJson has no version info, since it only has the compiled library, but no version info in any of the Python file.
+					# In such a case, do not try pkg_resources as well, since it will also not work just only show the warning.
+					try:
+						if type(e).__name__ == 'PackageNotFoundError': pkg = False
+					except: pass
 
 			# Python < 3.8
-			if not result:
+			if not result and pkg:
 				try:
 					from pkg_resources import get_distribution
 					result = get_distribution(name).version
@@ -163,8 +172,9 @@ class Importer(object):
 							value = Regex.extract(data = data, expression = b'(.{0,20}__version__.{0,20})', flags = Regex.FlagCaseInsensitive | Regex.FlagAllLines)
 							if value:
 								value = str(value)
-								value = Regex.remove(data = value, expression = '\\\\x[0-9a-f]{2}', all = True)
-								value = Regex.extract(data = value, expression = '(\d+\.\d+\.\d+)')
+								value = Regex.remove(data = value, expression = r'\\\\x[0-9a-f]{2}', all = True)
+								value = Regex.remove(data = value, expression = r'\\x[0-9a-f]{2}', all = True)
+								value = Regex.extract(data = value, expression = r'(\d+\.\d+\.\d+)')
 								if value: result = value
 				except: pass
 
@@ -214,7 +224,7 @@ class Importer(object):
 				except: pass
 				try: details.append(platform['architecture']['type'].replace('arm', 'ARM'))
 				except: pass
-				try: details.append('Python ' + Regex.extract(data = platform['python']['version'], expression = '(\d+\.\d+)'))
+				try: details.append('Python ' + Regex.extract(data = platform['python']['version'], expression = r'(\d+\.\d+)'))
 				except: pass
 
 			version = Importer.moduleVersion(moduleLibrary)
@@ -560,6 +570,7 @@ class Loader(object):
 	Labels			= {
 		'win64'		: ['Windows', '64bit', 'x86'],
 		'win32'		: ['Windows', '32bit', 'x86'],
+		'winarm'	: ['Windows', '64bit', 'ARM'],
 
 		'mac64'		: ['Mac', '64bit', 'x86'],
 		'mac32'		: ['Mac', '32bit', 'x86'],
@@ -706,7 +717,7 @@ class Loader(object):
 					libraries = self.moduleLibraries(path = pathTo)
 					for library in libraries:
 						libraryFrom = File.joinPath(pathTo, library)
-						libraryTo = File.joinPath(pathTo, Regex.replace(data = library, expression = '\.(?:cpython|cp)\-?(\d+[a-z]?)\-', replacement = replacement, group = 1))
+						libraryTo = File.joinPath(pathTo, Regex.replace(data = library, expression = r'\.(?:cpython|cp)\-?(\d+[a-z]?)\-', replacement = replacement, group = 1))
 						File.move(pathFrom = libraryFrom, pathTo = libraryTo, replace = False)
 
 				if File.existsDirectory(pathTo) and self.moduleLibraries(path = pathTo):
@@ -770,12 +781,12 @@ class Loader(object):
 		for file in files:
 			try:
 				data = File.readNow(file)
-				if data and Regex.match(data = data, expression = 'sys\.modules\[[\'"]externals.'):
-					parts = Regex.extract(data = file, expression = 'lib\%s(externals\%s.*)\%s' % (separator, separator, separator))
+				if data and Regex.match(data = data, expression = r'sys\.modules\[[\'"]externals.'):
+					parts = Regex.extract(data = file, expression = r'lib\%s(externals\%s.*)\%s' % (separator, separator, separator))
 					parts = parts.split(separator)
 					parts = '.'.join(parts)
 					if parts:
-						data = Regex.replace(data = data, expression = 'sys\.modules\[(.*?)]', replacement = '\'%s\'' % parts, group = 1)
+						data = Regex.replace(data = data, expression = r'sys\.modules\[(.*?)]', replacement = '\'%s\'' % parts, group = 1)
 						File.writeNow(file, data)
 			except:
 				from lib.modules.tools import Logger
@@ -787,11 +798,11 @@ class Loader(object):
 		from lib.modules.tools import System
 		System.executePlugin(action = 'externalImport', parameters = {'module' : self.moduleId()}, wait = wait)
 
-	def moduleLoad(self):
+	def moduleLoad(self, initialize = False):
 		try:
 			# Do not use tools.Settings, since the class itself uses JSON.
-			import xbmcaddon
-			if xbmcaddon.Addon().getSettingBool('general.performance.library'):
+			from lib.modules.tools import System
+			if System.addon().getSettingBool('general.performance.library'):
 				id = self.moduleId()
 				load = False
 				try:
