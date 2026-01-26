@@ -21,7 +21,6 @@
 # NB: Careful when importing this file, since it can take a long time (100ms).
 # Only import on-demand and not at the top of a file. Otherwise menus are slow, when the nested imports import this file without it actually being used during execution.
 
-import re
 from lib.modules.tools import Tools
 from lib.modules.external import Importer
 
@@ -62,7 +61,18 @@ class Parser(BeautifulSoup):
 			System.exit()
 
 		if convert: data = self.convert(data = data, full = False)
-		BeautifulSoup.__init__(self, data, parser, parse_only = only)
+
+		try:
+			BeautifulSoup.__init__(self, data, parser, parse_only = only)
+		except Exception as error:
+			# If html5lib is not available in the Python environment.
+			# html5lib is now also available from script.gaia.externals, but leave here as las resort.
+			if type(error).__name__ == 'FeatureNotFound':
+				from lib.modules.tools import Logger
+				Logger.error('The BeautifulSoup parser is not available: %s.' % parser)
+				if not parser == Parser.ParserHtml:
+					parser = Parser.ParserHtml
+					BeautifulSoup.__init__(self, data, parser, parse_only = only)
 
 	# Do not name this funnction "decode", since BeautifulSoup has its own function with that name.
 	@classmethod

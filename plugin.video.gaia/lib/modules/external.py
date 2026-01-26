@@ -394,6 +394,14 @@ class Importer(object):
 		return self.module(module = 'externals.beautifulsoup.element', submodule = 'NavigableString', error = error)
 
 	###################################################################
+	# HTML5LIB
+	###################################################################
+
+	@classmethod
+	def moduleHtml5lib(self, error = True):
+		return self.module(module = 'html5lib', backupModule = 'externals.html5lib', error = error)
+
+	###################################################################
 	# JAVASCRIPT
 	###################################################################
 

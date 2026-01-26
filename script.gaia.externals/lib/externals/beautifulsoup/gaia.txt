@@ -1,7 +1,7 @@
 #########################################################################################################################
 
 Download:			https://pypi.org/project/beautifulsoup4/#files
-Current Version:		4.12.3 (2024-11-29)
+Current Version:		4.14.3 (2026-01-26)
 Used By:			Gaia
 
 #########################################################################################################################
@@ -13,6 +13,8 @@ find ./ -type f -exec sed -i -e 's/from html5lib/from externals.html5lib/g' {} \
 
 find ./ -type f -exec sed -i -e 's/import soupsieve/from externals import soupsieve/g' {} \;
 find ./ -type f -exec sed -i -e 's/from soupsieve/from externals.soupsieve/g' {} \;
+
+find ./ -type f -exec sed -i -e 's/from typing_extensions/from externals.typingextensions/g' {} \;
 
 find ./ -type f -exec sed -i -e 's/from . import _lxml/pass #from . import _lxml/g' {} \;
 find ./ -type f -exec sed -i -e 's/register_treebuilders_from(_lxml)/#register_treebuilders_from(_lxml)/g' {} \;

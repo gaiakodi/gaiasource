@@ -127,19 +127,19 @@ try:
 
 		@classmethod
 		def uninstall(self, setting = False):
-			'''if Dialog.option(title = 35400, message = 35633):
-				directory = System.path(id = Orionoid.Id)
-				path = File.joinPath(directory, 'addon.xml')
-				data = File.readNow(path)
-				data = Regex.replace(data = data, expression = r'id="' + Orionoid.Id + r'"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = r'\sname="Orion"', replacement = ' name="Orion Dummy"', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
-				data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.service".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
-				File.writeNow(path, data)
-				directories, files = File.listDirectory(directory, absolute = True)
-				for i in directories: File.deleteDirectory(i)
-				Dialog.notification(title = 35400, message = 35635, icon = Dialog.IconSuccess)'''
+			#if Dialog.option(title = 35400, message = 35633):
+			#	directory = System.path(id = Orionoid.Id)
+			#	path = File.joinPath(directory, 'addon.xml')
+			#	data = File.readNow(path)
+			#	data = Regex.replace(data = data, expression = r'id="' + Orionoid.Id + r'"\s*version="(.*?)"', replacement = 'id="' + Orionoid.Id + '" version="9.9.9"', all = True, flags = Regex.FlagAllLines)
+			#	data = Regex.replace(data = data, expression = r'\sname="Orion"', replacement = ' name="Orion Dummy"', all = True, flags = Regex.FlagAllLines)
+			#	data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.pluginsource".*?<\/extension>', replacement = '', all = True, flags = Regex.FlagAllLines)
+			#	data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.python\.module".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
+			#	data = Regex.replace(data = data, expression = r'<extension\s*point="xbmc\.service".*?\/>', replacement = '', all = True, flags = Regex.FlagAllLines)
+			#	File.writeNow(path, data)
+			#	directories, files = File.listDirectory(directory, absolute = True)
+			#	for i in directories: File.deleteDirectory(i)
+			#	Dialog.notification(title = 35400, message = 35635, icon = Dialog.IconSuccess)
 
 			if Dialog.option(title = 35400, message = 36240): self.addonDisable(refresh = True)
 			if settings: self.settingsAddon()
@@ -498,6 +498,7 @@ try:
 								Stream.AudioTypeDubbedLine : Orion.AudioDubbed,
 								Stream.AudioTypeDubbedMic : Orion.AudioDubbed,
 								Stream.AudioTypeDubbedFan : Orion.AudioDubbed,
+								Stream.AudioTypeDubbedAi : Orion.AudioDubbed,
 							},
 						},
 						'system' : {
@@ -605,6 +606,8 @@ try:
 							'gaia' : {
 								Stream.SubtitleTypeSoft : Orion.SubtitleSoft,
 								Stream.SubtitleTypeHard : Orion.SubtitleHard,
+								Stream.SubtitleTypeFan : Orion.SubtitleSoft,
+								Stream.SubtitleTypeAi : Orion.SubtitleSoft,
 							},
 						},
 					},

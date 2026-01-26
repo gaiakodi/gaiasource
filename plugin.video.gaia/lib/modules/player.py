@@ -81,6 +81,10 @@
 #	3. [CURRENT SOLUTION BEING TESTED] Wait in streamSelect() for the audio stream to get selected before continuing with the rest of the initialization code.
 #		If the audio stream is changed, wait for onAVChange() to fire, before continuing with the other initialization code (eg: playback resume).
 #		playbackInitialize() was also changed to adjust when progressInitialize() is started.
+#
+# Update (2026-01-26):
+#	After the changes above, the failed playback resume still happens occasionally.
+#	Updated Player.resume() to now start a thread that will check if the playback was actually resumed, and if not, will attempt a second resume.
 
 import xbmc
 import xbmcvfs
@@ -309,7 +313,9 @@ class Player(xbmc.Player):
 			self.sizeProgress = 0
 			self.dialog = None
 			self.voted = False
+
 			self.resumeTime = resume
+			self.resumeThread = None
 			self.resumedTime = None
 
 			self.interacted = False
@@ -1977,6 +1983,25 @@ class Player(xbmc.Player):
 	def resume(self, seconds, offset = False):
 		self.resumedTime = max(0, seconds - (Player.ResumeTime if offset else 0))
 		self.seekTime(self.resumedTime)
+
+		#gaiaremove
+		# Occasionally if playback is resumed, Kodi starts playing the video from the start.
+		# Not sure why this happens. It is very sporadic.
+		# Maybe the playback is resumed, but then when the audio/subtitle stream are changed, Kodi resets something internally, causing the resume point to be lost.
+		# Start a thread that checks a few seconds later if the playback was resumed, and if not, attempt another resume.
+		try:
+			if not self.resumeThread or not self.resumeThread.alive():
+				self.resumeThread = Pool.thread(target = self._resume, start = True)
+		except: tools.Logger.error()
+
+	def _resume(self):
+		try:
+			tools.Time.sleep(0.1)
+			threshold = 10
+			if self.resumedTime > threshold:
+				tools.Time.sleep(2)
+				if not (self.getTime() > threshold): self.seekTime(self.resumedTime)
+		except: tools.Logger.error()
 
 	def playbackInitialize(self):
 		if not self.playbackInitialized:

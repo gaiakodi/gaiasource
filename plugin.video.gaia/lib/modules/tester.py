@@ -31092,9 +31092,6 @@ class Tester(object):
 		#self.metadataSeason()
 		#self.metadataEpisode()
 
-		self.streamLanguage()
-
-
 		# Always reset the metadata detail after testing.
 		self._metadataDetail(extended = True)
 
@@ -48703,6 +48700,21 @@ class Tester(object):
 			{'result' : Stream.ReleaseFormatNone,			'data' : 'Uncut Gems (2019) [720p] [BluRay] [YTS] [YIFY]', 				'exclude' : ['Uncut Gems']},
 			{'result' : Stream.ReleaseFormatNone,			'data' : 'Daniel Isn\'t Real (2019) [WEBRip] [720p] [YTS] [YIFY]', 		'exclude' : ['Daniel Isn\'t Real']},
 			{'result' : Stream.ReleaseFormatNone,			'data' : 'Artificial Intelligence: AI (2001) 720p BrRip x264 - YIFY', 	'exclude' : ['A.I. Artificial Intelligence (2001)']},
+
+			# Aujdio or subtitle AI.
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [ENG-Dubbing PL-Lektor PL AI] [Alusia]'},
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Lektor-PL-AI] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Lektor AI] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [AI Lektor] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [LektorAI] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [AIDubbed] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [DubbedAI] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Dubbed AI] [Alusia]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : '[POLSKIE-TORRENTY.EU] Ice.Road.Vengeance.2025.PLSUB.Ai.1080p.WEB-DL.H264.DDP5.1-S56'},
+			{'result' : Stream.ReleaseFormatNone,			'data' : '[POLSKIE-TORRENTY.EU] Ice.Road.Vengeance.2025.Ai.PLSUB.1080p.WEB-DL.H264.DDP5.1-S56'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Lodowy szlak 2 / Ice Road: Vengeance (2025) [1080p] [WEB-DL] [H264] [DDP5.1-S56] [Napisy PL AI]'},
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Lodowy szlak 2 / Ice Road: Vengeance (2025) [1080p] [WEB-DL] [H264] [DDP5.1-S56] [AI Napisy PL]'}, # Fake
+			{'result' : Stream.ReleaseFormatNone,			'data' : 'Lodowy szlak 2 / Ice Road: Vengeance (2025) [1080p] [WEB-DL] [H264] [DDP5.1-S56] [Napisy AI PL]'}, # Fake
 		)
 
 		timer = tools.Time(start = True)
@@ -51957,6 +51969,15 @@ class Tester(object):
 			{'result' : Stream.AudioTypeDubbedFan,	'data' : 'Flavors of Youth (2018) NF WEB-DL 720p [Hindi Fan Dubbed] x264 - KatmovieHD'},
 			{'result' : Stream.AudioTypeDubbedFan,	'data' : 'Death Note Hindi Episode (1-7) 720p Dual Audio [Hindi - English] Fan Dubbed x264 [MW]'},
 			{'result' : Stream.AudioTypeDubbedFan,	'data' : 'AVATAR (2009) [RUS ENG SUB] QHD 4K Blue Ray Любительский одноголосый/многоголосый'},
+
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [ENG-Dubbing PL-Lektor PL AI] [Alusia]'},
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Lektor-PL-AI] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Lektor AI] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [AI Lektor] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [LektorAI] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [AIDubbed] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [DubbedAI] [Alusia]'}, # Fake
+			{'result' : Stream.AudioTypeDubbedAi,		'data' : 'Jedna bitwa po drugiej - One Battle After Another 2025 [10Bit DV-HDR] [2160p.WEB-DL.H265.EAC3.5.1-AS76-FT] [Dubbed AI] [Alusia]'}, # Fake
 
 			{'result' : Stream.AudioTypeLine,		'data' : 'John Wick Chapter 2 2017 HDRip XVid Line-NoGrp'},
 			{'result' : Stream.AudioTypeLine,		'data' : 'Bad Boys For Life (2020) V2 720p HDTS Line Multi Audio'},

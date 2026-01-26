@@ -2481,12 +2481,14 @@ class Stream(Serializer):
 	AudioTypeDubbedLine	= 'dubbedline'	# Just like AudioTypeLine, but the recorded audio has a different language to the original video.
 	AudioTypeDubbedMic	= 'dubbedmic'	# Just like AudioTypeMic, but the recorded audio has a different language to the original video.
 	AudioTypeDubbedFan	= 'dubbedfan'	# Fan-made, probably low-quality, dubbed-over audio.
+	AudioTypeDubbedAi	= 'dubbedai'	# dubbed-over audio created by automated AI.
 	AudioTypeDefault	= AudioTypeOriginal
 	AudioTypeDubbeds	= {
 		AudioTypeDubbed : True,
 		AudioTypeDubbedLine : True,
 		AudioTypeDubbedMic : True,
 		AudioTypeDubbedFan : True,
+		AudioTypeDubbedAi : True,
 	}
 	AudioTypeRecordings	= {
 		AudioTypeLine : True,
@@ -2548,12 +2550,14 @@ class Stream(Serializer):
 			'line'			: r'line',
 			'mic'			: r'(?:mic(?:rophone)?|cam{separator}*(?:aud(?:io)?|sound))',
 			'fan'			: r'fan{separator}*(?:made|created)?',
+			'ai'			: r'(?:ai|artificial{separator}*intelligence)',
 
 			'french'		: r'(?:vfstfr?|vff?|true{separator}*french|pfd|vf?q|vfb|vfi)',
 			'polish'		: r'(?:lektor(?:{separator}*pl)?|lek{separator}*pl)',
 		},
 
 		'expression' : (
+			(AudioTypeDubbedAi,		r'({ai}{symbol}*{dubbed}|{dubbed}{symbol}*{ai})'),
 			(AudioTypeDubbedFan,	r'({dubbedfan}|{fan}{symbol}*{dubbed}|{dubbed}{symbol}*{fan})'),
 			(AudioTypeDubbedLine,	r'({dubbedline}|{line}{symbol}*{dubbed}|{dubbed}{symbol}*{line}|{codec}{separator}*{dubbedline})'),
 			(AudioTypeDubbedMic,	r'({dubbedmic}|{mic}{symbol}*{dubbed}|{dubbed}{symbol}*{mic}|{codec}{separator}*{dubbedmic})'),
@@ -2582,6 +2586,7 @@ class Stream(Serializer):
 		AudioTypeDubbedLine	: { LabelShort : 'DLN',	LabelMedium : 'Line-Dubbed',	LabelLong : 'Dubbed Line Recorded Audio' },
 		AudioTypeDubbedMic	: { LabelShort : 'DMC',	LabelMedium : 'Mic-Dubbed',		LabelLong : 'Dubbed Microphone Recorded Audio' },
 		AudioTypeDubbedFan	: { LabelShort : 'DFN',	LabelMedium : 'Fan-Dubbed',		LabelLong : 'Dubbed Fan-Made Audio' },
+		AudioTypeDubbedAi	: { LabelShort : 'DAI',	LabelMedium : 'AI-Dubbed',		LabelLong : 'Dubbed AI-Made Audio' },
 	}
 
 	OrderAudioType = {
@@ -2592,6 +2597,7 @@ class Stream(Serializer):
 		AudioTypeDubbedLine	: { OrderInterface : 5,	OrderSorting : 5 },
 		AudioTypeDubbedMic	: { OrderInterface : 6,	OrderSorting : 6 },
 		AudioTypeDubbedFan	: { OrderInterface : 7,	OrderSorting : 7 },
+		AudioTypeDubbedAi	: { OrderInterface : 8,	OrderSorting : 8 },
 	}
 
 	##############################################################################
@@ -3455,6 +3461,7 @@ class Stream(Serializer):
 			'single'	: r'[a-z]{{1,3}}',
 			'forced'	: r'forced?',
 			'multi'		: ExpressionSubtitleMulti,
+			'ai'		: r'(?:ai|artificial{separator}*intelligence)',
 
 			# Use specific language codes.
 			# Otherwise the word "Richard" will be detected as hardcoded subs.
@@ -3464,7 +3471,7 @@ class Stream(Serializer):
 
 		'expression' : (
 			(SubtitleTypeHard,	r'{language}((?:hc|hard{coded}|burned{separator}in|ingeb(?:akken|rande?)|fixa){subtitle}?|{subtitle}{separator}*{forced}|{forced}{separator}*{subtitle})'),
-			(SubtitleTypeAi,	r'(ai{separator}*{language}{separator}*{subtitle}|{language}{separator}*{subtitle}{separator}*{language}{separator}*ai)'),
+			(SubtitleTypeAi,	r'({ai}{separator}*{language}{separator}*{subtitle}|{language}{separator}*{subtitle}{separator}*{language}{separator}*{ai})'),
 			(SubtitleTypeSoft,	r'((?:soft{coded}|optional|itegra(?:ted?|dos)|nordic|extern(?:al|e))(?<!fan)(?<!fan{separator}){subtitle}?|(?:{multi}|{single})?{separator}*(?<!fan)(?<!fan{separator}){subtitle})'),
 			(SubtitleTypeFan,	r'(fan{separator}*{subtitle})'),
 
@@ -4753,7 +4760,7 @@ class Stream(Serializer):
 		ReleaseFormatRaw			: { LabelShort : 'RAW',		LabelMedium : 'RAW',			LabelLong : 'Raw Unedited Release' },
 		ReleaseFormatReal			: { LabelShort : 'REA',		LabelMedium : 'REAL',			LabelLong : 'Real Release' },
 		ReleaseFormatMatte			: { LabelShort : 'MAT',		LabelMedium : 'MATTE',			LabelLong : 'Open Matte Release' },
-		ReleaseFormatAi				: { LabelShort : 'AI',		LabelMedium : 'AI',				LabelLong : 'Artificial Intelligence Release' },
+		ReleaseFormatAi				: { LabelShort : 'AI',		LabelMedium : 'AI',				LabelLong : 'AI Processed Release' },
 		ReleaseFormatInterlace		: { LabelShort : 'INL',		LabelMedium : 'INTERLANCED',	LabelLong : 'Interlaced Release' },
 		ReleaseFormatUpscale		: { LabelShort : 'UPS',		LabelMedium : 'UPSCALED',		LabelLong : 'Upscaled Quality Release' },
 		ReleaseFormatDownscale		: { LabelShort : 'DWS',		LabelMedium : 'DOWNSCALED',		LabelLong : 'Downscaled Quality Release' },
@@ -28579,7 +28586,25 @@ class Stream(Serializer):
 			if encode: exclude = self.cleanEncode(exclude)
 			exclude = self._releaseFormatExclude(exclude)
 		expression = self._expressionFormatExpression(id = 'releaseFormatExtract', type = Stream.ExpressionSequential, expression = Stream.ExpressionReleaseFormat, exhaustive = True)
-		return self._expressionMatchType(id = 'releaseFormatExtract', data = data, expression = expression, exclude = exclude)
+
+		result = self._expressionMatchType(id = 'releaseFormatExtract', data = data, expression = expression, exclude = exclude)
+
+		# Audio or subtitle AI.
+		if result == Stream.ReleaseFormatAi:
+			ai = False
+			subtitle = self.subtitleTypeExtract(data = data, exclude = exclude, encode = False, clean = False)
+			if subtitle == Stream.SubtitleTypeAi: ai = True
+			else:
+				audio = self.audioTypeExtract(data = data, exclude = exclude, encode = False, clean = False)
+				if audio == Stream.AudioTypeDubbedAi: ai = True
+			if ai:
+				if exclude is None: exclude = []
+				else: exclude = tools.Tools.copy(exclude)
+				exclude.append('ai')
+				exclude.append('artificial intelligence')
+				return self._expressionMatchType(id = 'releaseFormatExtract', data = data, expression = expression, exclude = exclude)
+
+		return result
 
 	'''
 		FUNCTION:
